@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { createInvoice, updateInvoice, getInvoice } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
-import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry } from '@/shared/api/types'
+import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult } from '@/shared/api/types'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react'
@@ -116,11 +116,11 @@ export default function InvoiceForm() {
     }
     setLoadingSemaforo(true)
     client
-      .get<{ success: true; data: SemaforoEntry[] }>(ENDPOINTS.cobros.semaforo, {
+      .get<{ success: true; data: SemaforoResult }>(ENDPOINTS.cobros.semaforo, {
         params: { customer: selectedCustomer.id },
       })
       .then((res) => {
-        const entry = res.data.data.find((s) => s.customer === selectedCustomer.id) ?? null
+        const entry = res.data.data.clientes.find((s) => s.customer === selectedCustomer.id) ?? null
         setSemaforo(entry)
       })
       .catch(() => setSemaforo(null))
@@ -332,10 +332,10 @@ export default function InvoiceForm() {
                     {loadingSemaforo ? (
                       <div className="skeleton-box" style={{ width: 120, height: 20 }} />
                     ) : semaforo ? (
-                      <div className={`semaforo ${semaforoStatusClass[semaforo.status] ?? ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                      <div className={`semaforo ${semaforoStatusClass[semaforo.semaforo] ?? ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
                         <span className="semaforo-dot" />
-                        {semaforoLabel[semaforo.status] ?? semaforo.status}
-                        {` — ${semaforo.usagePct.toFixed(0)}% del límite`}
+                        {semaforoLabel[semaforo.semaforo] ?? semaforo.semaforo}
+                        {` — ${(semaforo.pctUsado ?? 0).toFixed(0)}% del límite`}
                       </div>
                     ) : null}
                   </div>
@@ -385,9 +385,9 @@ export default function InvoiceForm() {
               </div>
             </div>
 
-            {semaforo?.status === 'rojo' && (
+            {semaforo?.semaforo === 'rojo' && (
               <div className="inline-alert inline-alert-warn" style={{ marginTop: 12 }}>
-                El cliente ha excedido su límite de crédito ({semaforo.usagePct.toFixed(1)}% utilizado).
+                El cliente ha excedido su límite de crédito ${(semaforo.pctUsado ?? 0).toFixed(1)}% utilizado).
                 Considera revisar el saldo pendiente antes de emitir esta factura.
               </div>
             )}

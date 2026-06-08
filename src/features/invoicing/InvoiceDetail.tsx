@@ -291,7 +291,7 @@ export default function InvoiceDetail() {
               <span>Total</span>
               <span>{formatDOP(invoice.grandTotal)}</span>
             </div>
-            {invoice.status === 'Submitted' && (
+            {invoice.status === 'submitted' && (
               <div className="items-total-line" style={{ color: outstandingColor, fontWeight: 600 }}>
                 <span>Pendiente</span>
                 <span>{formatDOP(invoice.outstandingAmount)}</span>

@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query'
 import { getInventoryHistory, listWarehouses } from '@/shared/api/inventory'
 import { formatDate, formatNumber } from '@/lib/formatters'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 30
 
