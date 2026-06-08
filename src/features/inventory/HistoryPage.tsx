@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getInventoryHistory, listWarehouses } from '@/shared/api/inventory'
 import { formatDate, formatNumber } from '@/lib/formatters'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 30
 
@@ -145,12 +146,13 @@ export default function HistoryPage() {
                           textAlign: 'right',
                           fontFamily: 'monospace',
                           fontWeight: 600,
-                          color: entry.actualQty >= 0 ? 'var(--color-success)' : 'var(--color-error)',
-                        }}>
-                          {entry.actualQty >= 0 ? '+' : ''}{formatNumber(entry.actualQty)}
+                          color: entry.movementQty >= 0 ? 'oklch(62.7% 0.194 149.214)' : 'oklch(51.4% 0.222 16.935)',
+                        }}
+                        >
+                          {formatNumber(entry.movementQty)}
                         </td>
                         <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>
-                          {formatNumber(entry.qtyAfterTransaction)}
+                          {formatNumber(entry.stockAfter)}
                         </td>
                         <td className="td-muted">{entry.voucherType}</td>
                         <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{entry.voucherNo}</td>

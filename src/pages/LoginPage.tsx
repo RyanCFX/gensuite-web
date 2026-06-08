@@ -5,7 +5,8 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AuthLayout } from '@/shared/layout/AuthLayout'
 import LogoMark from '@/components/LogoMark'
-import { login, isApiError } from '@/shared/api/auth'
+import { isApiError } from '@/shared/api/auth'
+import { useAuthStore } from '@/stores/auth.store'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -38,6 +39,7 @@ export default function LoginPage() {
 
   const [serverError, setServerError] = useState<string | null>(null)
   const [isRateLimited, setIsRateLimited] = useState(false)
+  const authLogin = useAuthStore((s) => s.login)
 
   const {
     register,
@@ -52,11 +54,7 @@ export default function LoginPage() {
     setServerError(null)
 
     try {
-      await login({
-        email: values.email,
-        password: values.password,
-        tenant: values.tenant,
-      })
+      await authLogin(values.email, values.password, values.tenant)
       navigate(next, { replace: true })
     } catch (error) {
       if (isApiError(error)) {

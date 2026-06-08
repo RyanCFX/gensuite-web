@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { ChevronDown } from 'lucide-react'
+import { useFloatingDropdown, FloatingPortal } from '@/lib/useFloatingPortal'
 
 interface SelectProps {
   value?: string
@@ -11,51 +12,43 @@ interface SelectProps {
 }
 
 function Select({ value, onValueChange, placeholder, children, disabled, className = '' }: SelectProps) {
-  const [open, setOpen] = React.useState(false)
-  const ref = React.useRef<HTMLDivElement>(null)
-
-  React.useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    if (open) document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
+  const triggerRef = React.useRef<HTMLButtonElement>(null)
+  const { open, style, toggle, close, portalRef } = useFloatingDropdown(triggerRef)
 
   type ItemEl = React.ReactElement<{ value: string; children: React.ReactNode }>
   const allChildren = React.Children.toArray(children) as ItemEl[]
   const selectedLabel = allChildren.find((child) => child.props?.value === value)?.props?.children ?? placeholder ?? 'Seleccionar...'
 
   return (
-    <div ref={ref} style={{ position: 'relative' }} className={className}>
+    <div style={{ position: 'relative' }} className={className}>
       <button
+        ref={triggerRef}
         type="button"
         className="select-trigger"
         disabled={disabled}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
+        aria-haspopup="listbox"
+        aria-expanded={open}
       >
         <span style={{ color: value ? undefined : 'var(--text-tertiary, hsl(var(--muted-foreground)))' }}>
           {selectedLabel}
         </span>
         <ChevronDown size={14} style={{ flexShrink: 0, opacity: 0.6 }} />
       </button>
-      {open && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, zIndex: 500 }}>
-          <div className="select-content">
-            {React.Children.map(children, (child: any) =>
-              React.cloneElement(child, {
-                onClick: () => {
-                  onValueChange?.(child.props.value)
-                  setOpen(false)
-                },
-                'data-selected': child.props.value === value ? '' : undefined,
-              }),
-            )}
-          </div>
+
+      <FloatingPortal open={open} style={style} portalRef={portalRef}>
+        <div className="select-content">
+          {React.Children.map(children, (child: any) =>
+            React.cloneElement(child, {
+              onClick: () => {
+                onValueChange?.(child.props.value)
+                close()
+              },
+              'data-selected': child.props.value === value ? '' : undefined,
+            }),
+          )}
         </div>
-      )}
+      </FloatingPortal>
     </div>
   )
 }

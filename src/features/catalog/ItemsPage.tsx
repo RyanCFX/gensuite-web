@@ -66,12 +66,12 @@ export default function ItemsPage() {
 
   const { data: categoriesData } = useQuery({
     queryKey: ['categories', {}],
-    queryFn: () => listCategories({ limit: 200 }),
+    queryFn: () => listCategories(),
   })
 
   const { data: brandsData } = useQuery({
     queryKey: ['brands', {}],
-    queryFn: () => listBrands({ limit: 200 }),
+    queryFn: () => listBrands(),
   })
 
   const toggleMutation = useMutation({

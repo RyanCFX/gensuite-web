@@ -55,7 +55,13 @@ function ServiceUnavailable({ message }: { message?: string }) {
 
 // ─── Generic table renderer ───────────────────────────────────────────────────
 
-function ReportTable({ data }: { data: Record<string, unknown>[] }) {
+function ReportTable({
+  data,
+  columns,
+}: {
+  data: Record<string, unknown>[]
+  columns?: ColumnDef[]
+}) {
   if (!data || data.length === 0) {
     return (
       <div className="empty-state">
@@ -66,31 +72,34 @@ function ReportTable({ data }: { data: Record<string, unknown>[] }) {
     )
   }
 
-  const cols = Object.keys(data[0])
+  // Usa los fieldnames de `columns` si vienen del backend; si no, infiere de la primera fila
+  const colDefs: ColumnDef[] = columns && columns.length > 0
+    ? columns
+    : Object.keys(data[0]).map((k) => ({ fieldname: k, label: k.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim() }))
 
   return (
     <div className="table-scroll">
       <table className="data-table">
         <thead>
           <tr>
-            {cols.map((c) => (
-              <th key={c}>{c.replace(/([A-Z])/g, ' $1').trim()}</th>
+            {colDefs.map((c) => (
+              <th key={c.fieldname}>{c.label}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {data.map((row, i) => (
             <tr key={i}>
-              {cols.map((c) => {
-                const val = row[c]
-                const isAmount = c.toLowerCase().includes('monto') || c.toLowerCase().includes('total')
+              {colDefs.map((c) => {
+                const val = row[c.fieldname]
+                const isAmount = c.fieldname.toLowerCase().includes('monto') || c.fieldname.toLowerCase().includes('total')
                 const isDate = typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val)
                 const str = typeof val === 'number' && isAmount
                   ? formatDOP(val)
                   : isDate
                     ? formatDate(val as string)
                     : String(val ?? '—')
-                return <td key={c}>{str}</td>
+                return <td key={c.fieldname}>{str}</td>
               })}
             </tr>
           ))}
@@ -121,11 +130,26 @@ function ErrorBanner({ err }: { err: unknown }) {
   )
 }
 
-function extractRows(data: unknown): Record<string, unknown>[] {
-  if (!data) return []
-  const d = data as { data?: unknown }
-  const inner = d.data ?? data
-  return Array.isArray(inner) ? (inner as Record<string, unknown>[]) : []
+type ColumnDef = { fieldname: string; label: string }
+
+function extractRows(data: unknown): { rows: Record<string, unknown>[]; columns?: ColumnDef[] } {
+  if (!data) return { rows: [] }
+
+  // Case: { success, data: { rows, columns, totalRows } }  ← formato DGII 606/607/608
+  const envelope = data as { data?: unknown }
+  const inner = envelope.data ?? data
+
+  if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+    const shaped = inner as { rows?: unknown; columns?: ColumnDef[] }
+    if (Array.isArray(shaped.rows)) {
+      return { rows: shaped.rows as Record<string, unknown>[], columns: shaped.columns }
+    }
+  }
+
+  // Case: data is a direct array
+  if (Array.isArray(inner)) return { rows: inner as Record<string, unknown>[] }
+
+  return { rows: [] }
 }
 
 // ─── Report components ────────────────────────────────────────────────────────
@@ -171,10 +195,16 @@ function DgiiReport({ tipo }: { tipo: '606' | '607' | '608' }) {
       <div className="card">
         {isLoading && <LoadingRows />}
         {error && <ErrorBanner err={error} />}
-        {!isLoading && !error && <ReportTable data={extractRows(data)} />}
+        {!isLoading && !error && <AutoTable data={data} />}
       </div>
     </div>
   )
+}
+
+/** Wrapper que desenvuelve cualquier formato de respuesta y renderiza la tabla */
+function AutoTable({ data }: { data: unknown }) {
+  const { rows, columns } = extractRows(data)
+  return <ReportTable data={rows} columns={columns} />
 }
 
 function FinancialReport({ tipo }: { tipo: 'balance' | 'pl' }) {
@@ -214,7 +244,7 @@ function FinancialReport({ tipo }: { tipo: 'balance' | 'pl' }) {
                 <AlertCircle size={14} aria-hidden="true" /> {note}
               </div>
             )}
-            <ReportTable data={extractRows(data)} />
+            <AutoTable data={data} />
           </>
         )}
       </div>
@@ -249,7 +279,7 @@ function VentasReport() {
       <div className="card">
         {isLoading && <LoadingRows />}
         {error && <ErrorBanner err={error} />}
-        {!isLoading && !error && <ReportTable data={extractRows(data)} />}
+        {!isLoading && !error && <AutoTable data={data} />}
       </div>
     </div>
   )
@@ -285,7 +315,7 @@ function InventarioReport({ tipo }: { tipo: 'stock' | 'movimientos' }) {
           </div>
         )}
         {error && <ErrorBanner err={error} />}
-        {!isLoading && !error && !isGenerating && <ReportTable data={extractRows(data)} />}
+        {!isLoading && !error && !isGenerating && <AutoTable data={data} />}
       </div>
     </div>
   )
@@ -302,7 +332,7 @@ function CxcAgingReport() {
     <div className="card">
       {isLoading && <LoadingRows />}
       {error && <ErrorBanner err={error} />}
-      {!isLoading && !error && <ReportTable data={extractRows(data)} />}
+      {!isLoading && !error && <AutoTable data={data} />}
     </div>
   )
 }
@@ -327,7 +357,7 @@ function CajaCuadreReport() {
       <div className="card">
         {isLoading && <LoadingRows />}
         {error && <ErrorBanner err={error} />}
-        {!isLoading && !error && <ReportTable data={extractRows(data)} />}
+        {!isLoading && !error && <AutoTable data={data} />}
       </div>
     </div>
   )

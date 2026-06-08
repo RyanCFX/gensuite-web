@@ -36,7 +36,7 @@ export default function BrandsPage() {
 
   const { data: categoriesData } = useQuery({
     queryKey: ['categories', { tree: false }],
-    queryFn: () => listCategories({ limit: 200 }),
+    queryFn: () => listCategories(),
   })
 
   const {

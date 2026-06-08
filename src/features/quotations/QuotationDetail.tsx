@@ -126,7 +126,7 @@ export default function QuotationDetail() {
       </div>
 
       <div className="doc-actions-bar">
-        {quotation.status === 'Draft' && (
+        {quotation.status === 'draft' && (
           <>
             <button
               className="btn btn-primary btn-size-sm"
@@ -144,7 +144,7 @@ export default function QuotationDetail() {
             </button>
           </>
         )}
-        {quotation.status === 'Submitted' && (
+        {quotation.status === 'submitted' && (
           <button
             className="btn btn-secondary btn-size-sm"
             onClick={() => setConvertDialogOpen(true)}
