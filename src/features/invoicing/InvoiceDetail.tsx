@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getInvoice, submitInvoice, cancelInvoice, amendInvoice, getInvoicePdfUrl } from '@/shared/api/invoices'
+import { getInvoice, submitInvoice, cancelInvoice, amendInvoice, downloadInvoicePdf } from '@/shared/api/invoices'
 import { ArrowLeft, Send, XCircle, FileEdit, Download, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatDOP } from '@/lib/formatters'
@@ -66,11 +66,10 @@ export default function InvoiceDetail() {
 
   const isActionsLoading = submitMutation.isPending || cancelMutation.isPending || amendMutation.isPending
 
-  function handleDownloadPdf() {
-    if (!id) return
-    const url = getInvoicePdfUrl(id)
-    window.open(url, '_blank')
-  }
+  const downloadMutation = useMutation({
+    mutationFn: () => downloadInvoicePdf(id!, `factura-${id}.pdf`),
+    onError: () => toast.error('No se pudo descargar el PDF'),
+  })
 
   if (isLoading) {
     return (
@@ -151,8 +150,14 @@ export default function InvoiceDetail() {
         )}
         {invoice.status === 'submitted' && (
           <>
-            <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadPdf}>
-              <Download size={14} /> Descargar PDF
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => downloadMutation.mutate()}
+              disabled={downloadMutation.isPending}
+            >
+              {downloadMutation.isPending
+                ? <><span className="spinner" /> Descargando…</>
+                : <><Download size={14} /> Descargar PDF</>}
             </button>
             <button className="btn btn-danger btn-size-sm" onClick={() => cancelMutation.mutate()} disabled={isActionsLoading}>
               <XCircle size={14} /> Cancelar

@@ -1,16 +1,25 @@
-import { client, unwrapRaw } from './client'
+import { client } from './client'
 
-export interface SalesChartPoint {
-  date: string
-  amount: number
+export type DashboardPeriod = 'today' | '7d' | 'month' | 'year'
+
+// ─── Shape returned by GET /dashboard/summary ─────────────────────────────────
+
+export interface DashboardKpis {
+  totalVentas: number
+  numFacturas: number
+  totalCompras: number
+  numCompras: number
+  totalGastos: number
+  totalCobrado: number
+  totalPendiente: number
+  utilidad: number
+  currency: string
 }
 
-export interface DashboardSummary {
-  totalVentas: number
-  totalCompras: number
-  totalCobrado: number
-  saldoPendiente: number
-  salesChartData: SalesChartPoint[]
+export interface DashboardChart {
+  labels: string[]
+  sales: number[]
+  credits: number[]
 }
 
 export interface TopProduct {
@@ -23,49 +32,34 @@ export interface TopProduct {
 export interface TopCustomer {
   customer: string
   customerName: string
-  invoiceCount: number
   total: number
+  count: number
 }
 
 export interface RecentActivityItem {
   type: string
+  id: string
   description: string
   amount: number
-  date: string
+  timestamp: string
 }
 
-export type DashboardPeriod = 'today' | '7d' | 'month' | 'year'
+export interface DashboardData {
+  period: string
+  periodLabel: string
+  dateRange: { from: string; to: string }
+  kpis: DashboardKpis
+  chart: DashboardChart
+  topProducts: TopProduct[]
+  topCustomers: TopCustomer[]
+  recentActivity: RecentActivityItem[]
+}
 
-export async function getDashboardSummary(period: DashboardPeriod): Promise<DashboardSummary> {
-  const res = await client.get<{ data: DashboardSummary }>('/dashboard/summary', {
+// ─── Single fetch — all data in one call ──────────────────────────────────────
+
+export async function getDashboardData(period: DashboardPeriod): Promise<DashboardData> {
+  const res = await client.get<{ success: true; data: DashboardData }>('/dashboard/summary', {
     params: { period },
   })
-  return unwrapRaw(res).data
-}
-
-export async function getTopProducts(
-  period: DashboardPeriod,
-  limit = 5,
-): Promise<TopProduct[]> {
-  const res = await client.get<{ data: TopProduct[] }>('/dashboard/top-products', {
-    params: { period, limit },
-  })
-  return unwrapRaw(res).data
-}
-
-export async function getTopCustomers(
-  period: DashboardPeriod,
-  limit = 5,
-): Promise<TopCustomer[]> {
-  const res = await client.get<{ data: TopCustomer[] }>('/dashboard/top-customers', {
-    params: { period, limit },
-  })
-  return unwrapRaw(res).data
-}
-
-export async function getRecentActivity(limit = 10): Promise<RecentActivityItem[]> {
-  const res = await client.get<{ data: RecentActivityItem[] }>('/dashboard/recent-activity', {
-    params: { limit },
-  })
-  return unwrapRaw(res).data
+  return res.data.data
 }

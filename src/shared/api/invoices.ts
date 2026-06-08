@@ -52,6 +52,14 @@ export async function amendInvoice(id: string) {
   return unwrap(res)
 }
 
-export function getInvoicePdfUrl(id: string): string {
-  return `${client.defaults.baseURL}${ENDPOINTS.invoices.pdf(id)}`
+export async function downloadInvoicePdf(id: string, filename?: string): Promise<void> {
+  const res = await client.get<Blob>(ENDPOINTS.invoices.pdf(id), {
+    responseType: 'blob',
+  })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename ?? `factura-${id}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
 }
