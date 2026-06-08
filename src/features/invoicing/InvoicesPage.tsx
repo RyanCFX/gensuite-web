@@ -1,0 +1,206 @@
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import { listInvoices } from '@/shared/api/invoices'
+import type { ListInvoicesParams } from '@/shared/api/invoices'
+import { Plus, Eye, Search } from 'lucide-react'
+import { formatDate, formatDOP } from '@/lib/formatters'
+import { NCF_TYPES } from '@/lib/constants'
+
+type StatusFilter = 'draft' | 'submitted' | 'cancelled' | 'all'
+type PaymentFilter = 'paid' | 'unpaid' | 'overdue' | 'partial' | 'all'
+
+const STATUS_BADGE: Record<string, string> = {
+  Draft: 'badge-draft',
+  Submitted: 'badge-submitted',
+  Cancelled: 'badge-cancelled',
+}
+const STATUS_LABEL: Record<string, string> = {
+  Draft: 'Borrador',
+  Submitted: 'Sometido',
+  Cancelled: 'Cancelado',
+}
+
+export default function InvoicesPage() {
+  const navigate = useNavigate()
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState<StatusFilter>('all')
+  const [paymentStatus, setPaymentStatus] = useState<PaymentFilter>('all')
+  const [ncfType, setNcfType] = useState('')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+
+  const params: ListInvoicesParams = {
+    search: search || undefined,
+    status: status === 'all' ? undefined : status,
+    paymentStatus: paymentStatus === 'all' ? undefined : paymentStatus,
+    ncfType: ncfType || undefined,
+    fromDate: fromDate || undefined,
+    toDate: toDate || undefined,
+    limit: 50,
+  }
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['invoices', params],
+    queryFn: () => listInvoices(params),
+  })
+
+  const invoices = data?.items ?? []
+
+  function paymentBadge(inv: { outstandingAmount: number; grandTotal: number; status: string }) {
+    if (inv.status !== 'Submitted') return null
+    if (inv.outstandingAmount === 0) return <span className="badge badge-success">Pagado</span>
+    if (inv.outstandingAmount < inv.grandTotal && inv.outstandingAmount > 0)
+      return <span className="badge badge-info">Parcial</span>
+    return <span className="badge badge-warning">Pendiente</span>
+  }
+
+  return (
+    <div className="page-container">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Facturas</h1>
+          <p className="page-sub">Gestiona tus facturas de venta y comprobantes fiscales</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => navigate('/facturacion/facturas/nueva')}>
+          <Plus size={16} />
+          Nueva Factura
+        </button>
+      </div>
+
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <div className="search-input-wrap">
+            <Search size={15} className="search-input-icon" />
+            <input
+              className="search-input"
+              placeholder="Buscar por cliente..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <select className="filter-select" value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}>
+            <option value="all">Todos</option>
+            <option value="draft">Borrador</option>
+            <option value="submitted">Sometido</option>
+            <option value="cancelled">Cancelado</option>
+          </select>
+          <select className="filter-select" value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value as PaymentFilter)}>
+            <option value="all">Todo estado pago</option>
+            <option value="paid">Pagado</option>
+            <option value="unpaid">Pendiente</option>
+            <option value="overdue">Vencido</option>
+            <option value="partial">Parcial</option>
+          </select>
+          <select className="filter-select" value={ncfType} onChange={(e) => setNcfType(e.target.value)}>
+            <option value="">Todos los tipos NCF</option>
+            {NCF_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+          <input
+            type="date"
+            className="ff-input ff-input-sm"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            style={{ width: 144 }}
+          />
+          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+          <input
+            type="date"
+            className="ff-input ff-input-sm"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            style={{ width: 144 }}
+          />
+        </div>
+      </div>
+
+      <div className="table-scroll">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Cliente</th>
+              <th>Fecha</th>
+              <th>Vence</th>
+              <th>NCF</th>
+              <th style={{ textAlign: 'right' }}>Total</th>
+              <th style={{ textAlign: 'right' }}>Pendiente</th>
+              <th>Estado pago</th>
+              <th>Estado</th>
+              <th style={{ textAlign: 'right', width: 64 }}>Ver</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i}>
+                  {Array.from({ length: 10 }).map((__, j) => (
+                    <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
+                  ))}
+                </tr>
+              ))
+            ) : invoices.length === 0 ? (
+              <tr>
+                <td colSpan={10}>
+                  <div className="empty-state">
+                    <div className="empty-title">Sin facturas</div>
+                    <p className="empty-sub">Crea tu primera factura para comenzar.</p>
+                    <button className="btn btn-primary btn-size-sm" onClick={() => navigate('/facturacion/facturas/nueva')}>
+                      <Plus size={14} /> Nueva Factura
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              invoices.map((inv) => (
+                <tr
+                  key={inv.id}
+                  className="table-row-clickable"
+                  onClick={() => navigate(`/facturacion/facturas/${inv.id}`)}
+                >
+                  <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{inv.id}</td>
+                  <td style={{ fontWeight: 500 }}>{inv.customerName}</td>
+                  <td>{formatDate(inv.postingDate)}</td>
+                  <td>{formatDate(inv.dueDate)}</td>
+                  <td>
+                    {inv.ncf
+                      ? <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{inv.ncf}</span>
+                      : inv.ncfType
+                        ? <span className="badge badge-neutral" style={{ fontSize: 11 }}>{inv.ncfType}</span>
+                        : <span className="td-dim">—</span>}
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(inv.grandTotal)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatDOP(inv.outstandingAmount)}</td>
+                  <td>{paymentBadge(inv)}</td>
+                  <td>
+                    <span className={`badge ${STATUS_BADGE[inv.status] ?? 'badge-neutral'}`}>
+                      {STATUS_LABEL[inv.status] ?? inv.status}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button
+                      className="btn btn-ghost btn-size-icon-sm"
+                      onClick={(e) => { e.stopPropagation(); navigate(`/facturacion/facturas/${inv.id}`) }}
+                    >
+                      <Eye size={15} />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {data?.meta && (
+        <div className="pagination">
+          <span className="pagination-info">
+            Mostrando {invoices.length} de {data.meta.total} facturas
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}

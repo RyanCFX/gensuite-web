@@ -1,0 +1,783 @@
+// ─── Universal API Response Shapes ───────────────────────────────────────────
+
+export interface ApiError {
+  code: string
+  message: string
+  statusCode: number
+}
+
+export interface ApiResponse<T> {
+  success: true
+  data: T
+}
+
+export interface PaginatedResponse<T> {
+  success: true
+  data: T[]
+  meta: PaginationMeta
+}
+
+export interface PaginationMeta {
+  total: number
+  limit: number
+  offset: number
+  hasMore: boolean
+}
+
+export interface ApiErrorResponse {
+  success: false
+  error: ApiError
+}
+
+// ─── Generic Pagination Params ────────────────────────────────────────────────
+
+export interface PaginationParams {
+  limit?: number
+  offset?: number
+  search?: string
+  orderBy?: string
+}
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+export interface LoginRequest {
+  email: string
+  password: string
+  tenant?: string
+}
+
+export interface AuthTenant {
+  slug: string
+  siteUrl: string
+  id: string
+}
+
+export interface AuthUser {
+  email: string
+  full_name: string
+  roles: string[]
+}
+
+export interface LoginResponse {
+  access_token: string
+  token_type: string
+  expires_in: number
+  tenant: AuthTenant
+  user: AuthUser
+}
+
+export interface JwtPayload {
+  sub: string
+  tenant: string
+  ak: string
+  ask: string
+  iat: number
+  exp: number
+}
+
+// ─── Customer ─────────────────────────────────────────────────────────────────
+// API schema: CreateCustomerDto does NOT have tipoIdentificacion.
+// Identification type is inferred from rnc/cedula presence.
+
+export interface Customer {
+  id: string
+  customerName: string
+  customerType: 'Company' | 'Individual'
+  rnc?: string
+  cedula?: string
+  email?: string
+  phone?: string
+  address?: string
+  isCompany: boolean
+  hasCredit: boolean
+  isGovernment: boolean
+  creditLimit: number
+  creditDays: number
+  emailInvoice?: string
+  birthday?: string
+  photo?: string
+  disabled: boolean
+  createdAt: string
+  modifiedAt: string
+}
+
+export interface CreateCustomerDto {
+  customerName: string
+  customerType: 'Company' | 'Individual'
+  // NOTE: tipoIdentificacion does NOT exist in BFF — removed.
+  rnc?: string
+  cedula?: string
+  email?: string
+  phone?: string
+  address?: string
+  isCompany?: boolean
+  hasCredit?: boolean
+  isGovernment?: boolean
+  creditLimit?: number
+  creditDays?: number
+  emailInvoice?: string
+  birthday?: string
+  photo?: string
+}
+
+export type UpdateCustomerDto = Partial<Omit<CreateCustomerDto, 'customerType'>> & {
+  customerType?: 'Company' | 'Individual'
+}
+
+// ─── Supplier ─────────────────────────────────────────────────────────────────
+// tipoIdentificacion IS required for suppliers.
+
+export interface Supplier {
+  id: string
+  supplierName: string
+  supplierType: 'Company' | 'Individual'
+  tipoIdentificacion?: 'RNC' | 'Cedula' | 'Pasaporte' | 'NIT'
+  rnc?: string
+  cedula?: string
+  esProveedorExterior: boolean
+  paisOrigen?: string
+  banco?: string
+  tipoCuenta?: string         // 'Corriente' | 'Ahorro'
+  numeroCuenta?: string
+  abaSwift?: string
+  tipoProveedor606?: string
+  diasCredito: number
+  supplierGroup?: string
+  paymentTerms?: string
+  emailId?: string
+  emailPagos?: string
+  mobileNo?: string
+  address?: string
+  disabled: boolean
+  balance: number
+  createdAt: string
+  modifiedAt: string
+}
+
+export interface CreateProveedorDto {
+  supplierName: string
+  supplierType: 'Company' | 'Individual'
+  tipoIdentificacion: 'RNC' | 'Cedula' | 'Pasaporte' | 'NIT'   // required for suppliers
+  rnc?: string
+  cedula?: string
+  esProveedorExterior?: boolean
+  paisOrigen?: string
+  banco?: string
+  tipoCuenta?: 'Corriente' | 'Ahorro'
+  numeroCuenta?: string
+  abaSwift?: string
+  tipoProveedor606?: string
+  diasCredito?: number
+  supplierGroup?: string
+  paymentTerms?: string
+  emailId?: string
+  emailPagos?: string
+  mobileNo?: string
+  address?: string
+}
+
+export type UpdateProveedorDto = Partial<CreateProveedorDto>
+
+// ─── Invoice ──────────────────────────────────────────────────────────────────
+
+export interface InvoiceItem {
+  itemCode: string
+  description: string
+  qty: number
+  rate: number
+  amount: number
+  uom: string
+}
+
+export interface Invoice {
+  id: string
+  status: 'Draft' | 'Submitted' | 'Cancelled'
+  customer: string
+  customerName: string
+  postingDate: string
+  dueDate: string
+  ncf?: string
+  ncfType?: string
+  subtotal: number
+  taxAmount: number
+  grandTotal: number
+  outstandingAmount: number
+  items: InvoiceItem[]
+  notes?: string
+  amendedFrom?: string
+  createdAt: string
+  modifiedAt: string
+}
+
+export interface CreateInvoiceDto {
+  customer: string
+  postingDate: string
+  dueDate?: string
+  ncfType: 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
+  items: {
+    itemCode: string
+    description: string
+    qty: number
+    rate: number
+    uom?: string
+  }[]
+  notes?: string
+}
+
+// ─── Quotation ────────────────────────────────────────────────────────────────
+
+export interface QuotationItem {
+  itemCode: string
+  description: string
+  qty: number
+  rate: number
+  amount: number
+  uom: string
+}
+
+export interface Quotation {
+  id: string
+  customer: string
+  customerName: string
+  date: string
+  validTill: string
+  status: 'Draft' | 'Submitted' | 'Ordered' | 'Lost' | 'Cancelled'
+  items: QuotationItem[]
+  notes?: string
+}
+
+export interface CreateQuotationDto {
+  customer: string
+  date: string               // required per API
+  validTill?: string
+  items: {
+    itemCode: string
+    description: string
+    qty: number
+    rate: number
+    uom?: string
+  }[]
+  notes?: string
+}
+
+export type UpdateQuotationDto = Partial<CreateQuotationDto>
+
+// ─── Credit / Debit Notes ─────────────────────────────────────────────────────
+// CreateCreditNoteDto: originalInvoice (not invoiceId), postingDate required.
+// CreateDebitNoteDto: uses customer (not invoiceId).
+
+export interface CreditNote {
+  id: string
+  status: 'Draft' | 'Submitted' | 'Cancelled'
+  originalInvoice: string
+  reason?: string
+  grandTotal: number
+  ncf?: string
+  postingDate: string
+  createdAt: string
+}
+
+export interface CreateCreditNoteDto {
+  originalInvoice: string    // field name corrected from invoiceId
+  postingDate: string        // required
+  items: {
+    itemCode: string
+    qty: number
+    rate: number
+    uom?: string
+  }[]
+  reason?: string
+}
+
+export interface DebitNote {
+  id: string
+  status: 'Draft' | 'Submitted' | 'Cancelled'
+  customer: string
+  grandTotal: number
+  ncf?: string
+  postingDate: string
+  createdAt: string
+}
+
+export interface CreateDebitNoteDto {
+  customer: string           // debit notes use customer, not invoiceId
+  postingDate: string        // required
+  items: {
+    itemCode: string
+    qty: number
+    rate: number
+    uom?: string
+  }[]
+  notes?: string
+}
+
+// ─── Item / Catalog ───────────────────────────────────────────────────────────
+
+export interface Item {
+  id: string
+  itemName: string
+  category: string
+  categoryName?: string
+  brand?: string
+  brandName?: string
+  type: 'product' | 'service'
+  standardRate: number
+  valuationRate?: number
+  currentStock?: number
+  description?: string
+  image?: string
+  disabled: boolean
+}
+
+export interface CreateItemDto {
+  itemCode?: string           // optional, BFF can auto-generate
+  itemName: string
+  category: string
+  brand?: string
+  type: 'product' | 'service'
+  standardRate: number
+  valuationRate?: number
+  description?: string
+  image?: string
+  defaultWarehouse?: string   // correct field name (not "warehouse")
+}
+
+export type UpdateItemDto = Partial<CreateItemDto>
+
+export interface Category {
+  id: string
+  name: string
+  parentCategory: string | null
+  isGroup: boolean
+  image?: string
+  children?: Category[]
+}
+
+export interface CreateCategoryDto {
+  name: string
+  parentCategory?: string
+  isGroup?: boolean
+  image?: string
+}
+
+export type UpdateCategoryDto = Partial<CreateCategoryDto>
+
+export interface Brand {
+  id: string
+  name: string
+  description?: string
+  categoryId?: string
+  categoryName?: string
+  image?: string
+}
+
+export interface CreateBrandDto {
+  name: string
+  description?: string
+  categoryId?: string
+  image?: string
+}
+
+export type UpdateBrandDto = Partial<CreateBrandDto>
+
+// ─── Inventory ────────────────────────────────────────────────────────────────
+
+export interface InventoryItem {
+  itemCode: string
+  itemName: string
+  warehouse: string
+  actualQty: number
+  reservedQty: number
+  pendingQty: number
+  valuationRate: number
+  valuationAmount: number
+  sellingRate: number
+  sellingAmount: number
+  potentialProfit: number
+  stockStatus: 'in_stock' | 'low_stock' | 'out_of_stock'
+}
+
+export interface InventorySummary {
+  totalInvestment: number
+  totalValue: number
+  potentialProfit: number
+}
+
+// API returns: { id, name, parent } — NOT warehouseName/isGroup/disabled
+export interface Warehouse {
+  id: string
+  name: string
+  parent?: string
+}
+
+export interface InventoryHistory {
+  itemCode: string
+  itemName: string
+  warehouse: string
+  voucherType: string
+  voucherNo: string
+  actualQty: number
+  qtyAfterTransaction: number
+  valuationRate: number
+  postingDate: string
+}
+
+// ─── Physical Count ───────────────────────────────────────────────────────────
+// API: CreateCountDto requires postingDate (root), items have {itemCode, warehouse, qty}
+// The "countedQty" concept is just "qty" in the BFF.
+
+export interface InventoryCount {
+  id: string
+  status: 'Draft' | 'Submitted'
+  postingDate: string
+  remarks?: string
+  items: {
+    itemCode: string
+    warehouse: string
+    qty: number              // this is the counted qty
+    valuationRate?: number
+  }[]
+  createdAt: string
+  modifiedAt: string
+}
+
+export interface InventoryCountTemplate {
+  itemCode: string
+  itemName: string
+  warehouse: string
+  currentQty: number         // current system stock
+}
+
+export interface CreateCountDto {
+  postingDate: string        // required
+  remarks?: string
+  items: {
+    itemCode: string
+    warehouse: string
+    qty: number              // counted qty (was countedQty — renamed to match API)
+    valuationRate?: number
+  }[]
+}
+
+// ─── Compra (Purchase Invoice — update_stock=1) ───────────────────────────────
+// CompraItemDto has NO description field.
+
+export interface CompraTax {
+  chargeType: string
+  accountHead: string
+  rate: number
+  description?: string
+}
+
+export interface CompraItem {
+  itemCode: string
+  qty: number
+  rate: number
+  amount: number
+  warehouse?: string
+  uom?: string
+  // NOTE: no "description" in CompraItemDto per BFF schema
+}
+
+export interface Compra {
+  id: string
+  supplier: string
+  supplierName: string
+  postingDate: string
+  dueDate: string
+  status: 'Draft' | 'Submitted' | 'Cancelled'
+  currency: string
+  items: CompraItem[]
+  taxes?: CompraTax[]
+  grandTotal: number
+  ncfProveedor?: string
+  tipoBienes606?: string
+  formaPago606?: string
+  retencionItbis?: number
+  retencionIsr?: number
+  tipoPago?: 'Contado' | 'Crédito'
+  amendedFrom?: string
+}
+
+export interface CreateCompraDto {
+  supplier: string
+  postingDate: string
+  dueDate?: string
+  currency?: string
+  conversionRate?: number
+  items: {
+    itemCode: string
+    qty: number
+    rate: number
+    warehouse?: string
+    uom?: string
+    // NO description
+  }[]
+  taxes?: {
+    chargeType: string
+    accountHead: string
+    rate: number
+    description?: string
+  }[]
+  ncfProveedor?: string
+  tipoBienes606?: string
+  formaPago606?: string
+  retencionItbis?: number
+  retencionIsr?: number
+  tipoPago?: 'Contado' | 'Crédito'
+}
+
+export type UpdateCompraDto = Partial<CreateCompraDto>
+
+// ─── Gasto (Purchase Invoice — update_stock=0) ────────────────────────────────
+// GastoItemDto: itemCode, qty, rate, uom?, description? (description is allowed)
+
+export interface GastoItem {
+  itemCode: string
+  qty: number
+  rate: number
+  amount: number
+  uom?: string
+  description?: string
+}
+
+export interface Gasto {
+  id: string
+  supplier: string
+  supplierName: string
+  postingDate: string
+  dueDate: string
+  status: 'Draft' | 'Submitted' | 'Cancelled'
+  currency: string
+  items: GastoItem[]
+  grandTotal: number
+  ncfProveedor?: string
+  tipoComprobante?: 'B01' | 'B13' | 'B14' | 'B15' | 'B16' | 'B17' | 'E31'
+  tipoBienes606?: string
+  formaPago606?: string
+  retencionItbis?: number
+  retencionIsr?: number
+  categoriaGasto?: 'Operativo' | 'Administrativo' | 'Ventas' | 'Financiero'
+  esDeducible?: boolean
+  amendedFrom?: string
+}
+
+export interface CreateGastoDto {
+  supplier: string
+  postingDate: string
+  dueDate?: string
+  currency?: string
+  conversionRate?: number
+  items: {
+    itemCode: string
+    qty: number
+    rate: number
+    uom?: string
+    description?: string     // allowed in GastoItemDto
+  }[]
+  ncfProveedor?: string
+  tipoComprobante?: 'B01' | 'B13' | 'B14' | 'B15' | 'B16' | 'B17' | 'E31'
+  tipoBienes606?: string
+  formaPago606?: string
+  retencionItbis?: number
+  retencionIsr?: number
+  categoriaGasto?: 'Operativo' | 'Administrativo' | 'Ventas' | 'Financiero'
+  esDeducible?: boolean
+}
+
+export type UpdateGastoDto = Partial<CreateGastoDto>
+
+// ─── Usuario ──────────────────────────────────────────────────────────────────
+
+export interface Usuario {
+  email: string
+  firstName: string
+  lastName?: string
+  fullName: string
+  enabled: boolean
+  roles: string[]
+  language?: string
+  timeZone?: string
+  mobileNo?: string
+  lastActive?: string
+}
+
+export interface CreateUsuarioDto {
+  email: string
+  firstName: string
+  lastName?: string
+  mobileNo?: string
+  roles: string[]
+  language?: string
+  timeZone?: string
+  sendWelcomeEmail?: boolean
+}
+
+export interface UpdateUsuarioDto {
+  firstName?: string
+  lastName?: string
+  mobileNo?: string
+  roles?: string[]
+}
+
+export interface Role {
+  name: string
+}
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+
+export interface Empresa {
+  companyName: string
+  rnc?: string
+  regimenFiscal?: 'Ordinario' | 'Simplificado' | 'RST'
+  actividadEconomica?: string
+  representanteLegal?: string
+  cedulaRepresentante?: string
+  logoUrl?: string
+  telefono?: string
+  email?: string
+  website?: string
+  direccion?: string
+  defaultCurrency?: string
+  country?: string
+}
+
+export interface UpdateEmpresaDto {
+  rnc?: string
+  regimenFiscal?: 'Ordinario' | 'Simplificado' | 'RST'
+  actividadEconomica?: string
+  representanteLegal?: string
+  cedulaRepresentante?: string
+  logoUrl?: string
+  telefono?: string
+  email?: string
+  website?: string
+  direccion?: string
+}
+
+export interface CobrosConfig {
+  limiteCreditoAmarilloPct: number
+  limiteCreditoRojoPct: number
+  diasAlertaVencimiento: number
+  rangoAging1Dias: number
+  rangoAging2Dias: number
+  rangoAging3Dias: number
+  rangoAging4Label: string
+  enviarRecordatorioAutomatico: boolean
+}
+
+export interface MetodoPago {
+  name: string
+  type: 'Cash' | 'Bank' | 'General'
+  codigo606?: string
+  disabled: boolean
+}
+
+export interface ListaPrecio {
+  name: string
+  priceListName: string
+  currency: string
+  buying: boolean
+  selling: boolean
+  enabled: boolean
+}
+
+export interface UOM {
+  name: string
+  uomName: string
+  mustBeWholeNumber: boolean
+}
+
+export interface Grupo {
+  name: string
+  parentGroup?: string
+}
+
+export interface NcfSerie {
+  ncfType: string
+  prefix: string
+  currentNumber: number
+  validFrom: string
+  validTo: string
+}
+
+// ─── Cobros ───────────────────────────────────────────────────────────────────
+
+export interface AgingEntry {
+  customer: string
+  customerName: string
+  totalOutstanding: number
+  current: number
+  range1: number
+  range2: number
+  range3: number
+  range4: number
+}
+
+export interface SemaforoEntry {
+  customer: string
+  customerName: string
+  creditLimit: number
+  totalOutstanding: number
+  usagePct: number
+  status: 'verde' | 'amarillo' | 'rojo'
+}
+
+export interface PaymentEntry {
+  id: string
+  customer: string
+  customerName: string
+  date: string
+  amount: number
+  reference?: string
+}
+
+// CreateCobroDto — matches BFF's CreateCobroDto exactly
+export interface CreateCobroDto {
+  customer: string
+  postingDate: string
+  paidAmount: number
+  paidTo: string             // account/cashier name
+  modeOfPayment: string
+  referenceNo?: string
+  referenceDate?: string
+  remarks?: string
+  referencias?: {
+    invoiceId: string
+    allocatedAmount: number
+  }[]
+}
+
+// Alias for backward compat in existing pages
+export type RegisterPagoDto = CreateCobroDto
+
+// ─── Reportes ─────────────────────────────────────────────────────────────────
+
+export interface Reporte606Entry {
+  rncProveedor: string
+  proveedor: string
+  ncf: string
+  ncfType: string
+  fecha: string
+  montoFacturado: number
+  itbisFacturado: number
+}
+
+export interface Reporte607Entry {
+  rncProveedor: string
+  proveedor: string
+  ncf: string
+  tipoRenta: string
+  montoRetenido: number
+  fecha: string
+}
+
+export interface Reporte608Entry {
+  rncCliente: string
+  cliente: string
+  ncf: string
+  ncfType: string
+  fecha: string
+  montoFacturado: number
+  itbisFacturado: number
+}

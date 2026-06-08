@@ -1,0 +1,1462 @@
+{
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/cleanup-deprecated.mjs": {
+    "mtime": 1780854592.6643791,
+    "ast_hash": "fddcc885ed5305df37d966ba654e0eae",
+    "semantic_hash": "fddcc885ed5305df37d966ba654e0eae"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/command-metadata.json": {
+    "mtime": 1780854592.664111,
+    "ast_hash": "883d1962f87b23b4a0f6229e1aadd484",
+    "semantic_hash": "883d1962f87b23b4a0f6229e1aadd484"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/context-signals.mjs": {
+    "mtime": 1780854592.6638055,
+    "ast_hash": "962c9d4a7608582b1839223eccde1889",
+    "semantic_hash": "962c9d4a7608582b1839223eccde1889"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/context.mjs": {
+    "mtime": 1780854592.665118,
+    "ast_hash": "5db7930910705545dc776e946c320be9",
+    "semantic_hash": "5db7930910705545dc776e946c320be9"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/critique-storage.mjs": {
+    "mtime": 1780854592.665285,
+    "ast_hash": "2609dfc633db44ef5990ec2376069ce5",
+    "semantic_hash": "2609dfc633db44ef5990ec2376069ce5"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/design-parser.mjs": {
+    "mtime": 1780854592.6647232,
+    "ast_hash": "77bbd8593cdea6e08a0b3e7870e93fc8",
+    "semantic_hash": "77bbd8593cdea6e08a0b3e7870e93fc8"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detect-csp.mjs": {
+    "mtime": 1780854592.665104,
+    "ast_hash": "02c5a9a8ad69f87d23af72bf580fd3f4",
+    "semantic_hash": "02c5a9a8ad69f87d23af72bf580fd3f4"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detect.mjs": {
+    "mtime": 1780854592.664877,
+    "ast_hash": "11dbeb9341477d06d1a24c3ad1f37ac9",
+    "semantic_hash": "11dbeb9341477d06d1a24c3ad1f37ac9"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/browser/injected/index.mjs": {
+    "mtime": 1780854592.671434,
+    "ast_hash": "9b3db8af5aadf21ecf3395b74b02200a",
+    "semantic_hash": "9b3db8af5aadf21ecf3395b74b02200a"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/cli/main.mjs": {
+    "mtime": 1780854592.670061,
+    "ast_hash": "5208183c07f839d8ff178d4614b0a5e8",
+    "semantic_hash": "5208183c07f839d8ff178d4614b0a5e8"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/detect-antipatterns-browser.js": {
+    "mtime": 1780854592.6693268,
+    "ast_hash": "bfa43a8ce0ff23b90cf5d649ffc6d33b",
+    "semantic_hash": "bfa43a8ce0ff23b90cf5d649ffc6d33b"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/detect-antipatterns.mjs": {
+    "mtime": 1780854592.6693795,
+    "ast_hash": "1ee45163c27e086f43af1a3bb6b76504",
+    "semantic_hash": "1ee45163c27e086f43af1a3bb6b76504"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/engines/browser/detect-url.mjs": {
+    "mtime": 1780854592.6710854,
+    "ast_hash": "f9a37e92021f13b178b860eb52a33f98",
+    "semantic_hash": "f9a37e92021f13b178b860eb52a33f98"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/engines/regex/detect-text.mjs": {
+    "mtime": 1780854592.6712642,
+    "ast_hash": "f99d96047b51dbe3dd24ca272d009a09",
+    "semantic_hash": "f99d96047b51dbe3dd24ca272d009a09"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/engines/static-html/css-cascade.mjs": {
+    "mtime": 1780854592.6707666,
+    "ast_hash": "248b84788b792dc75c8a18058a9a6a46",
+    "semantic_hash": "248b84788b792dc75c8a18058a9a6a46"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/engines/static-html/detect-html.mjs": {
+    "mtime": 1780854592.670927,
+    "ast_hash": "48549abcbb3e1fee4f93f07661d77ac0",
+    "semantic_hash": "48549abcbb3e1fee4f93f07661d77ac0"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/engines/visual/screenshot-contrast.mjs": {
+    "mtime": 1780854592.6712658,
+    "ast_hash": "6312c6dbc048c4445f50e69f167a297d",
+    "semantic_hash": "6312c6dbc048c4445f50e69f167a297d"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/findings.mjs": {
+    "mtime": 1780854592.6691892,
+    "ast_hash": "f7f3de6f00121150c4762809df00df9f",
+    "semantic_hash": "f7f3de6f00121150c4762809df00df9f"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/node/file-system.mjs": {
+    "mtime": 1780854592.6696253,
+    "ast_hash": "310714c7a308e35e386034999479ff84",
+    "semantic_hash": "310714c7a308e35e386034999479ff84"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/profile/profiler.mjs": {
+    "mtime": 1780854592.6699648,
+    "ast_hash": "88c5d2027852842be578edf349a0f9c8",
+    "semantic_hash": "88c5d2027852842be578edf349a0f9c8"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/registry/antipatterns.mjs": {
+    "mtime": 1780854592.6702595,
+    "ast_hash": "30ed4f1a91098bf96a2dd2e0582a8162",
+    "semantic_hash": "30ed4f1a91098bf96a2dd2e0582a8162"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/rules/checks.mjs": {
+    "mtime": 1780854592.6699617,
+    "ast_hash": "6fce30f2d923b97a37bb54272773c600",
+    "semantic_hash": "6fce30f2d923b97a37bb54272773c600"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/shared/color.mjs": {
+    "mtime": 1780854592.670571,
+    "ast_hash": "2363d500ccf490f9ff285119b613276d",
+    "semantic_hash": "2363d500ccf490f9ff285119b613276d"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/shared/constants.mjs": {
+    "mtime": 1780854592.670455,
+    "ast_hash": "5700477c8a86d876b90de9d6eb63f191",
+    "semantic_hash": "5700477c8a86d876b90de9d6eb63f191"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/detector/shared/page.mjs": {
+    "mtime": 1780854592.6702688,
+    "ast_hash": "ab3a243b690b4f70c4ef639cdf970d82",
+    "semantic_hash": "ab3a243b690b4f70c4ef639cdf970d82"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/impeccable-paths.mjs": {
+    "mtime": 1780854592.6651227,
+    "ast_hash": "2dd4310d900b4e7678f8b3620e634687",
+    "semantic_hash": "2dd4310d900b4e7678f8b3620e634687"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/is-generated.mjs": {
+    "mtime": 1780854592.6657293,
+    "ast_hash": "edd718b1a4737edbf9631ff7f6f512ef",
+    "semantic_hash": "edd718b1a4737edbf9631ff7f6f512ef"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-accept.mjs": {
+    "mtime": 1780854592.6654847,
+    "ast_hash": "c17aa7eb3d9aa7d7903e1dbd8cb49f68",
+    "semantic_hash": "c17aa7eb3d9aa7d7903e1dbd8cb49f68"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-browser-session.js": {
+    "mtime": 1780854592.6654377,
+    "ast_hash": "5dec3dae6158050d69762fb79facaf48",
+    "semantic_hash": "5dec3dae6158050d69762fb79facaf48"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-browser.js": {
+    "mtime": 1780854592.6660826,
+    "ast_hash": "0425706002b1f064292b5607f29dea7e",
+    "semantic_hash": "0425706002b1f064292b5607f29dea7e"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-commit-manual-edits.mjs": {
+    "mtime": 1780854592.6662471,
+    "ast_hash": "fc32b152d40668abfedeb77c6deb2515",
+    "semantic_hash": "fc32b152d40668abfedeb77c6deb2515"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-complete.mjs": {
+    "mtime": 1780854592.665827,
+    "ast_hash": "ac0ba59701ad5fa70d0dea5b05dc1ac7",
+    "semantic_hash": "ac0ba59701ad5fa70d0dea5b05dc1ac7"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-completion.mjs": {
+    "mtime": 1780854592.6656644,
+    "ast_hash": "77185bc6cced6322e6892af8e05839f0",
+    "semantic_hash": "77185bc6cced6322e6892af8e05839f0"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-copy-edit-agent.mjs": {
+    "mtime": 1780854592.6656096,
+    "ast_hash": "1c4926b56d5442775dab0138bf71a790",
+    "semantic_hash": "1c4926b56d5442775dab0138bf71a790"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-discard-manual-edits.mjs": {
+    "mtime": 1780854592.6663623,
+    "ast_hash": "0efb77b3a97cf2140bff04db767c2b2e",
+    "semantic_hash": "0efb77b3a97cf2140bff04db767c2b2e"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-event-validation.mjs": {
+    "mtime": 1780854592.666088,
+    "ast_hash": "d793088931b8bfc0f908e4366875284d",
+    "semantic_hash": "d793088931b8bfc0f908e4366875284d"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-inject.mjs": {
+    "mtime": 1780854592.6663346,
+    "ast_hash": "3e835768ddaa32b5f64ea7cf0eb56551",
+    "semantic_hash": "3e835768ddaa32b5f64ea7cf0eb56551"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-insert-ui.mjs": {
+    "mtime": 1780854592.6666646,
+    "ast_hash": "b6c5c82e14218c0c1b1e66f0851bff3f",
+    "semantic_hash": "b6c5c82e14218c0c1b1e66f0851bff3f"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-insert.mjs": {
+    "mtime": 1780854592.6660836,
+    "ast_hash": "606ec6eae7e2fd645a069457979bee2a",
+    "semantic_hash": "606ec6eae7e2fd645a069457979bee2a"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-manual-edit-evidence.mjs": {
+    "mtime": 1780854592.6667821,
+    "ast_hash": "0a5b4c8cadb7f1d9d86a9d481d4a8223",
+    "semantic_hash": "0a5b4c8cadb7f1d9d86a9d481d4a8223"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-manual-edits-buffer.mjs": {
+    "mtime": 1780854592.6666615,
+    "ast_hash": "97db5c92eed8b17e5431a1b0ccd87f01",
+    "semantic_hash": "97db5c92eed8b17e5431a1b0ccd87f01"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-poll.mjs": {
+    "mtime": 1780854592.6672409,
+    "ast_hash": "38ecad4a14df6651ccc8e4c7a9d61de1",
+    "semantic_hash": "38ecad4a14df6651ccc8e4c7a9d61de1"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-resume.mjs": {
+    "mtime": 1780854592.667718,
+    "ast_hash": "42d7b6774ee440e057bfc6e0b93a3d7e",
+    "semantic_hash": "42d7b6774ee440e057bfc6e0b93a3d7e"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-server.mjs": {
+    "mtime": 1780854592.6669598,
+    "ast_hash": "ee0b522e87f762f54b70db86b00c0afc",
+    "semantic_hash": "ee0b522e87f762f54b70db86b00c0afc"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-session-store.mjs": {
+    "mtime": 1780854592.667087,
+    "ast_hash": "18373d8bcbbbdc462efc0281f5cbd548",
+    "semantic_hash": "18373d8bcbbbdc462efc0281f5cbd548"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-status.mjs": {
+    "mtime": 1780854592.6670663,
+    "ast_hash": "ef654aa3bfb5c204fd0b9ae8613179d3",
+    "semantic_hash": "ef654aa3bfb5c204fd0b9ae8613179d3"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-svelte-component.mjs": {
+    "mtime": 1780854592.6673453,
+    "ast_hash": "b23495379a1527dbb9c7c3171041819e",
+    "semantic_hash": "b23495379a1527dbb9c7c3171041819e"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-sveltekit-adapter.mjs": {
+    "mtime": 1780854592.6681561,
+    "ast_hash": "66e07d2c07827af6099ce81a442bd66e",
+    "semantic_hash": "66e07d2c07827af6099ce81a442bd66e"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-ui-core.mjs": {
+    "mtime": 1780854592.6686692,
+    "ast_hash": "b3d7c78852285bb1b6a26aef4872482d",
+    "semantic_hash": "b3d7c78852285bb1b6a26aef4872482d"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-vocabulary.mjs": {
+    "mtime": 1780854592.6677022,
+    "ast_hash": "b01045bb30462ef9c792098c768ba160",
+    "semantic_hash": "b01045bb30462ef9c792098c768ba160"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live-wrap.mjs": {
+    "mtime": 1780854592.6681085,
+    "ast_hash": "623ab8ca3a284bb9e573ec6d01b74641",
+    "semantic_hash": "623ab8ca3a284bb9e573ec6d01b74641"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/live.mjs": {
+    "mtime": 1780854592.6674566,
+    "ast_hash": "292ae3ec6df11d04939ed36755ce8350",
+    "semantic_hash": "292ae3ec6df11d04939ed36755ce8350"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/modern-screenshot.umd.js": {
+    "mtime": 1780854592.668387,
+    "ast_hash": "4fe5f9e490ab4f107afc707d7eafc819",
+    "semantic_hash": "4fe5f9e490ab4f107afc707d7eafc819"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/palette.mjs": {
+    "mtime": 1780854592.6685054,
+    "ast_hash": "adbc82e1e9021b4948901b21563277a2",
+    "semantic_hash": "adbc82e1e9021b4948901b21563277a2"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/scripts/pin.mjs": {
+    "mtime": 1780854592.6691632,
+    "ast_hash": "867ca7fdded9987e84a128a3b4fb6bab",
+    "semantic_hash": "867ca7fdded9987e84a128a3b4fb6bab"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/metadata.json": {
+    "mtime": 1780857021.7193546,
+    "ast_hash": "5cd9ae4fc688353236c3b92e8f06dfcc",
+    "semantic_hash": "5cd9ae4fc688353236c3b92e8f06dfcc"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.claude/settings.local.json": {
+    "mtime": 1780900103.9818895,
+    "ast_hash": "a36f4efb8bb91239c41e9b6f000e2ffc",
+    "semantic_hash": "a36f4efb8bb91239c41e9b6f000e2ffc"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/components.json": {
+    "mtime": 1780862229.7907724,
+    "ast_hash": "38097b37753e0335b04096c7968d6d6b",
+    "semantic_hash": "38097b37753e0335b04096c7968d6d6b"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/eslint.config.js": {
+    "mtime": 1780855386.416246,
+    "ast_hash": "0355276bc79439afe3c53e3a2470ca1e",
+    "semantic_hash": "0355276bc79439afe3c53e3a2470ca1e"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/package.json": {
+    "mtime": 1780862248.0789454,
+    "ast_hash": "d661a40ca505e7a7551b452e79fd1ed8",
+    "semantic_hash": "d661a40ca505e7a7551b452e79fd1ed8"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/skills-lock.json": {
+    "mtime": 1780857021.7284033,
+    "ast_hash": "21b13c5a5f01e0ecd8e5fc80612ec454",
+    "semantic_hash": "21b13c5a5f01e0ecd8e5fc80612ec454"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/App.tsx": {
+    "mtime": 1780881611.5656745,
+    "ast_hash": "09cc309946e1040761065326b5884746",
+    "semantic_hash": "09cc309946e1040761065326b5884746"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/LogoMark.tsx": {
+    "mtime": 1780870521.929149,
+    "ast_hash": "6c78de31fa8d3c617a6b8ea9e588c10c",
+    "semantic_hash": "6c78de31fa8d3c617a6b8ea9e588c10c"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ProtectedRoute.tsx": {
+    "mtime": 1780870521.9310586,
+    "ast_hash": "59e59200f2fbb29ff15cfc18cafba31c",
+    "semantic_hash": "59e59200f2fbb29ff15cfc18cafba31c"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/layout/AppLayout.tsx": {
+    "mtime": 1780876303.6824775,
+    "ast_hash": "1a17a4d0e309f36f5af39a148efb9307",
+    "semantic_hash": "1a17a4d0e309f36f5af39a148efb9307"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/shared/DocumentActions.tsx": {
+    "mtime": 1780876342.0792391,
+    "ast_hash": "3e48ab42366d32cef8d1a3fb29574cd2",
+    "semantic_hash": "3e48ab42366d32cef8d1a3fb29574cd2"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/shared/PageHeader.tsx": {
+    "mtime": 1780876318.6087687,
+    "ast_hash": "417d7664e0d0361376e2d00fdc57a973",
+    "semantic_hash": "417d7664e0d0361376e2d00fdc57a973"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/shared/SemaforoIndicator.tsx": {
+    "mtime": 1780876349.437834,
+    "ast_hash": "5fa4139a189635aee01280897bff22d1",
+    "semantic_hash": "5fa4139a189635aee01280897bff22d1"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/shared/StatusBadge.tsx": {
+    "mtime": 1780876323.9355974,
+    "ast_hash": "cd684ed9c40ba620df527de7815eaf36",
+    "semantic_hash": "cd684ed9c40ba620df527de7815eaf36"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/alert-dialog.tsx": {
+    "mtime": 1780870522.0454915,
+    "ast_hash": "9106ed59426372d198490e5f16a78897",
+    "semantic_hash": "9106ed59426372d198490e5f16a78897"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/badge.tsx": {
+    "mtime": 1780870522.068158,
+    "ast_hash": "440e069099c24e7282c761c06b20380d",
+    "semantic_hash": "440e069099c24e7282c761c06b20380d"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/button.tsx": {
+    "mtime": 1780870522.0753758,
+    "ast_hash": "7f0c8c99f29ef759ff64a7cc0f05daa2",
+    "semantic_hash": "7f0c8c99f29ef759ff64a7cc0f05daa2"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/card.tsx": {
+    "mtime": 1780870522.0502925,
+    "ast_hash": "6c21b161521e61a9d311ff7dd00b257c",
+    "semantic_hash": "6c21b161521e61a9d311ff7dd00b257c"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/checkbox.tsx": {
+    "mtime": 1780870522.0770793,
+    "ast_hash": "538cb8d9e2c3e085df1e5eaf1f3d5624",
+    "semantic_hash": "538cb8d9e2c3e085df1e5eaf1f3d5624"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/command.tsx": {
+    "mtime": 1780870803.6086447,
+    "ast_hash": "21ab6ee3c9551cf55c50681c586e80b8",
+    "semantic_hash": "21ab6ee3c9551cf55c50681c586e80b8"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/dialog.tsx": {
+    "mtime": 1780870902.1522636,
+    "ast_hash": "62c0c9e063443957105f28f33815968c",
+    "semantic_hash": "62c0c9e063443957105f28f33815968c"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/dropdown-menu.tsx": {
+    "mtime": 1780870522.080099,
+    "ast_hash": "4edffc65b653a5eeeca49889357f1a94",
+    "semantic_hash": "4edffc65b653a5eeeca49889357f1a94"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/form.tsx": {
+    "mtime": 1780870522.098607,
+    "ast_hash": "09ca07a7a4fbaf37c166c3aca7f6a797",
+    "semantic_hash": "09ca07a7a4fbaf37c166c3aca7f6a797"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/input.tsx": {
+    "mtime": 1780870522.0881221,
+    "ast_hash": "6c80a451a35e37e047ff3c7f1a43a5b3",
+    "semantic_hash": "6c80a451a35e37e047ff3c7f1a43a5b3"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/label.tsx": {
+    "mtime": 1780870522.059046,
+    "ast_hash": "3a27d8e70197b61b386f26883624be63",
+    "semantic_hash": "3a27d8e70197b61b386f26883624be63"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/popover.tsx": {
+    "mtime": 1780870522.0521836,
+    "ast_hash": "d6c53df09da0457c072213d1b8a944c2",
+    "semantic_hash": "d6c53df09da0457c072213d1b8a944c2"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/scroll-area.tsx": {
+    "mtime": 1780870522.057028,
+    "ast_hash": "c516d94b15778053419f43fb16be59ab",
+    "semantic_hash": "c516d94b15778053419f43fb16be59ab"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/select.tsx": {
+    "mtime": 1780870571.5793662,
+    "ast_hash": "ab901856f68136fc225f3e46ec677035",
+    "semantic_hash": "ab901856f68136fc225f3e46ec677035"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/separator.tsx": {
+    "mtime": 1780870522.0734634,
+    "ast_hash": "3d0f210fa60f3cea7b5bcee85950ce3a",
+    "semantic_hash": "3d0f210fa60f3cea7b5bcee85950ce3a"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/sheet.tsx": {
+    "mtime": 1780870522.053614,
+    "ast_hash": "1c148eb9b71cda5c2e740d44bc10368e",
+    "semantic_hash": "1c148eb9b71cda5c2e740d44bc10368e"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/skeleton.tsx": {
+    "mtime": 1780870522.0936954,
+    "ast_hash": "9b06a3dcd0c7a1aa753601ef69529b61",
+    "semantic_hash": "9b06a3dcd0c7a1aa753601ef69529b61"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/sonner.tsx": {
+    "mtime": 1780870522.0613062,
+    "ast_hash": "bf63056ab36f6a5bec85afbf4e6cd0e0",
+    "semantic_hash": "bf63056ab36f6a5bec85afbf4e6cd0e0"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/table.tsx": {
+    "mtime": 1780870522.0703602,
+    "ast_hash": "a83c61d84e340dd209f60f25c7e6d74b",
+    "semantic_hash": "a83c61d84e340dd209f60f25c7e6d74b"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/components/ui/tabs.tsx": {
+    "mtime": 1780870522.0483975,
+    "ast_hash": "050a66d4f7eead84eaac33de713bb65b",
+    "semantic_hash": "050a66d4f7eead84eaac33de713bb65b"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/catalog/BrandsPage.tsx": {
+    "mtime": 1780875531.3710172,
+    "ast_hash": "0ccc9812b3ed921d341ec1b5ddc33142",
+    "semantic_hash": "0ccc9812b3ed921d341ec1b5ddc33142"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/catalog/CategoriesPage.tsx": {
+    "mtime": 1780875500.618187,
+    "ast_hash": "7d52ea26df383d5c48f5b6a267a08cfa",
+    "semantic_hash": "7d52ea26df383d5c48f5b6a267a08cfa"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/catalog/ItemDetail.tsx": {
+    "mtime": 1780875593.211478,
+    "ast_hash": "14f17361993927127cd726983fe5d6a8",
+    "semantic_hash": "14f17361993927127cd726983fe5d6a8"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/catalog/ItemForm.tsx": {
+    "mtime": 1780895067.6811357,
+    "ast_hash": "af2eb06cc22e86a590173254dc25e8dd",
+    "semantic_hash": "af2eb06cc22e86a590173254dc25e8dd"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/catalog/ItemsPage.tsx": {
+    "mtime": 1780875569.1008441,
+    "ast_hash": "173e83f649f946337ac033d09a2de62a",
+    "semantic_hash": "173e83f649f946337ac033d09a2de62a"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/cobros/AgingPage.tsx": {
+    "mtime": 1780874970.912869,
+    "ast_hash": "f4d4819a5f2c42995dc4821b1d8c5de3",
+    "semantic_hash": "f4d4819a5f2c42995dc4821b1d8c5de3"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/cobros/PagoPage.tsx": {
+    "mtime": 1780895668.3306046,
+    "ast_hash": "412c95ca2c5883267b00135efb6dbc7c",
+    "semantic_hash": "412c95ca2c5883267b00135efb6dbc7c"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/cobros/SemaforoPage.tsx": {
+    "mtime": 1780874991.752536,
+    "ast_hash": "a2245d8eb264fbfa3fb94faeeb2cdf30",
+    "semantic_hash": "a2245d8eb264fbfa3fb94faeeb2cdf30"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/compras/CompraDetail.tsx": {
+    "mtime": 1780878833.432418,
+    "ast_hash": "0011de29091b19ecbba0c2160f667507",
+    "semantic_hash": "0011de29091b19ecbba0c2160f667507"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/compras/CompraForm.tsx": {
+    "mtime": 1780895503.9837253,
+    "ast_hash": "c7f1efc6e918e63ab6f2300d6b3499b7",
+    "semantic_hash": "c7f1efc6e918e63ab6f2300d6b3499b7"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/compras/ComprasPage.tsx": {
+    "mtime": 1780876585.9378521,
+    "ast_hash": "82717a55c19291a2465128822cbb7d6d",
+    "semantic_hash": "82717a55c19291a2465128822cbb7d6d"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/config/ConfigPage.tsx": {
+    "mtime": 1780876564.5040731,
+    "ast_hash": "9927c3e1de10c8270d07e9e4005fa9db",
+    "semantic_hash": "9927c3e1de10c8270d07e9e4005fa9db"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/config/EmpresaConfig.tsx": {
+    "mtime": 1780875096.6136281,
+    "ast_hash": "2889c0adbafda3db013f9db841033250",
+    "semantic_hash": "2889c0adbafda3db013f9db841033250"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/customers/CustomerDetail.tsx": {
+    "mtime": 1780879016.7333102,
+    "ast_hash": "0ebbc00135f50dec8036f067be25b584",
+    "semantic_hash": "0ebbc00135f50dec8036f067be25b584"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/customers/CustomerForm.tsx": {
+    "mtime": 1780878618.5879424,
+    "ast_hash": "e278acaa2f0719b0be3dccc74bc77ac4",
+    "semantic_hash": "e278acaa2f0719b0be3dccc74bc77ac4"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/customers/CustomersPage.tsx": {
+    "mtime": 1780893913.7715995,
+    "ast_hash": "21848f941424728ad21992612c5dd79d",
+    "semantic_hash": "21848f941424728ad21992612c5dd79d"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/dashboard/DashboardPage.tsx": {
+    "mtime": 1780875353.189163,
+    "ast_hash": "f6b92b700524362c156505c3a5959231",
+    "semantic_hash": "f6b92b700524362c156505c3a5959231"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/gastos/GastoDetail.tsx": {
+    "mtime": 1780874796.8025384,
+    "ast_hash": "558d1144f1bc7d0f01ad4391d3315c21",
+    "semantic_hash": "558d1144f1bc7d0f01ad4391d3315c21"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/gastos/GastoForm.tsx": {
+    "mtime": 1780895538.5170777,
+    "ast_hash": "300193f9c50c1f91ee2e8a8433ff4b1e",
+    "semantic_hash": "300193f9c50c1f91ee2e8a8433ff4b1e"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/gastos/GastosPage.tsx": {
+    "mtime": 1780874710.3245578,
+    "ast_hash": "c3f64f47153f9155f5ba3a8cbfcfbac1",
+    "semantic_hash": "c3f64f47153f9155f5ba3a8cbfcfbac1"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/inventory/CountsPage.tsx": {
+    "mtime": 1780894866.2998533,
+    "ast_hash": "817a6fb1ddf572ac3407ffd0abf06df8",
+    "semantic_hash": "817a6fb1ddf572ac3407ffd0abf06df8"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/inventory/HistoryPage.tsx": {
+    "mtime": 1780894866.302651,
+    "ast_hash": "9312c891e1aea25fc2855e5b3e2ad308",
+    "semantic_hash": "9312c891e1aea25fc2855e5b3e2ad308"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/inventory/StockPage.tsx": {
+    "mtime": 1780895146.3606186,
+    "ast_hash": "1b427320f977ac9da5580e1eeb4abea7",
+    "semantic_hash": "1b427320f977ac9da5580e1eeb4abea7"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/invoicing/CreditNotesPage.tsx": {
+    "mtime": 1780895773.0397124,
+    "ast_hash": "ef59f9a0ea434b165eb382c2ade3034d",
+    "semantic_hash": "ef59f9a0ea434b165eb382c2ade3034d"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/invoicing/DebitNotesPage.tsx": {
+    "mtime": 1780895777.0904024,
+    "ast_hash": "24a62caf652a5101887dbc0e99a7a207",
+    "semantic_hash": "24a62caf652a5101887dbc0e99a7a207"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/invoicing/InvoiceDetail.tsx": {
+    "mtime": 1780875824.4281855,
+    "ast_hash": "c7b3b38767aaefbbf6983fa1da2e167f",
+    "semantic_hash": "c7b3b38767aaefbbf6983fa1da2e167f"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/invoicing/InvoiceForm.tsx": {
+    "mtime": 1780895767.247254,
+    "ast_hash": "375ae33a4d17bd4fb55519334110b396",
+    "semantic_hash": "375ae33a4d17bd4fb55519334110b396"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/invoicing/InvoicesPage.tsx": {
+    "mtime": 1780875728.0396519,
+    "ast_hash": "dd36cacbbd9c42b48f33326025fac421",
+    "semantic_hash": "dd36cacbbd9c42b48f33326025fac421"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/quotations/QuotationDetail.tsx": {
+    "mtime": 1780875695.9058297,
+    "ast_hash": "b4e70dc3270694e1fb8f75ac23f867a7",
+    "semantic_hash": "b4e70dc3270694e1fb8f75ac23f867a7"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/quotations/QuotationForm.tsx": {
+    "mtime": 1780895577.0962589,
+    "ast_hash": "e87398565e2d20c69a230559204ce749",
+    "semantic_hash": "e87398565e2d20c69a230559204ce749"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/quotations/QuotationsPage.tsx": {
+    "mtime": 1780875616.3286002,
+    "ast_hash": "50815c6c4350eebd97d3f9db03baa132",
+    "semantic_hash": "50815c6c4350eebd97d3f9db03baa132"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/reportes/ReportesPage.tsx": {
+    "mtime": 1780877893.7376246,
+    "ast_hash": "2a9f474e0f2dc41d54fcc9012b41476c",
+    "semantic_hash": "2a9f474e0f2dc41d54fcc9012b41476c"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/suppliers/SupplierDetail.tsx": {
+    "mtime": 1780874915.488388,
+    "ast_hash": "6d6f5a6be9bfa23e51cbc42b1b258046",
+    "semantic_hash": "6d6f5a6be9bfa23e51cbc42b1b258046"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/suppliers/SupplierForm.tsx": {
+    "mtime": 1780874879.1991045,
+    "ast_hash": "a282a9646c5e40788baf02083b812207",
+    "semantic_hash": "a282a9646c5e40788baf02083b812207"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/suppliers/SuppliersPage.tsx": {
+    "mtime": 1780874829.645863,
+    "ast_hash": "e9d7739732e506e794680cb07bf4067f",
+    "semantic_hash": "e9d7739732e506e794680cb07bf4067f"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/features/usuarios/UsuariosPage.tsx": {
+    "mtime": 1780894357.531944,
+    "ast_hash": "a3a2afd0645355b95824915351156368",
+    "semantic_hash": "a3a2afd0645355b95824915351156368"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/lib/constants.ts": {
+    "mtime": 1780862038.895062,
+    "ast_hash": "bd680e6106b691df87d2de2a432fdf31",
+    "semantic_hash": "bd680e6106b691df87d2de2a432fdf31"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/lib/formatters.ts": {
+    "mtime": 1780862044.612174,
+    "ast_hash": "70bc1274440106e391ae3fe8fdf1127d",
+    "semantic_hash": "70bc1274440106e391ae3fe8fdf1127d"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/lib/useDebounce.ts": {
+    "mtime": 1780862455.5388134,
+    "ast_hash": "90772698f52efbe00fc79beafa8324bb",
+    "semantic_hash": "90772698f52efbe00fc79beafa8324bb"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/lib/utils.ts": {
+    "mtime": 1780862133.2914996,
+    "ast_hash": "9a4cc6f9f3155ffdc1fa7c2c097f6429",
+    "semantic_hash": "9a4cc6f9f3155ffdc1fa7c2c097f6429"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/lib/validators/dgii.ts": {
+    "mtime": 1780862013.759054,
+    "ast_hash": "20a9c9b34c66c4c86a72dd0e6b3aeb24",
+    "semantic_hash": "20a9c9b34c66c4c86a72dd0e6b3aeb24"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/main.tsx": {
+    "mtime": 1780862259.6644402,
+    "ast_hash": "d1a6728fedcd66f6961e31fe519df483",
+    "semantic_hash": "d1a6728fedcd66f6961e31fe519df483"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/pages/LoginPage.tsx": {
+    "mtime": 1780870382.0198126,
+    "ast_hash": "023cdaf585a94cbddc7396825e27cbb5",
+    "semantic_hash": "023cdaf585a94cbddc7396825e27cbb5"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/auth.ts": {
+    "mtime": 1780858830.414388,
+    "ast_hash": "d7c11f2b6146213002f2c6e2f5b73550",
+    "semantic_hash": "d7c11f2b6146213002f2c6e2f5b73550"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/catalog.ts": {
+    "mtime": 1780858670.6153164,
+    "ast_hash": "6979373a55b3a1c7765061c9a4c36d83",
+    "semantic_hash": "6979373a55b3a1c7765061c9a4c36d83"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/client.ts": {
+    "mtime": 1780858819.342719,
+    "ast_hash": "c02444fdc9d3e02e08819894ad89b1c6",
+    "semantic_hash": "c02444fdc9d3e02e08819894ad89b1c6"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/cobros.ts": {
+    "mtime": 1780877765.2171266,
+    "ast_hash": "bd383c2687900625590d4e9cc70ace79",
+    "semantic_hash": "bd383c2687900625590d4e9cc70ace79"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/compras-gastos.ts": {
+    "mtime": 1780858679.178456,
+    "ast_hash": "f699b6f325b37177e4b0df541e0df889",
+    "semantic_hash": "f699b6f325b37177e4b0df541e0df889"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/config.ts": {
+    "mtime": 1780858688.9643905,
+    "ast_hash": "ed56f3444dcfde8dbf29fb1fc3a9ba42",
+    "semantic_hash": "ed56f3444dcfde8dbf29fb1fc3a9ba42"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/counts.ts": {
+    "mtime": 1780878823.1822968,
+    "ast_hash": "e9f7d62e35bdacc6a05af3e697304a96",
+    "semantic_hash": "e9f7d62e35bdacc6a05af3e697304a96"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/customers.ts": {
+    "mtime": 1780858655.4399698,
+    "ast_hash": "987e866c7223714b872e347860669bdf",
+    "semantic_hash": "987e866c7223714b872e347860669bdf"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/dashboard.ts": {
+    "mtime": 1780862385.337045,
+    "ast_hash": "38fc5fe31caaffac5e8a393b3ca04957",
+    "semantic_hash": "38fc5fe31caaffac5e8a393b3ca04957"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/endpoints.ts": {
+    "mtime": 1780877737.208675,
+    "ast_hash": "5922650d832a18df94338678f616c246",
+    "semantic_hash": "5922650d832a18df94338678f616c246"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/index.ts": {
+    "mtime": 1780858651.1694036,
+    "ast_hash": "8baaab547203eb1eb103c9c8772b5402",
+    "semantic_hash": "8baaab547203eb1eb103c9c8772b5402"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/inventory.ts": {
+    "mtime": 1780894848.8614068,
+    "ast_hash": "afb4340eed521217e34a63d937235d28",
+    "semantic_hash": "afb4340eed521217e34a63d937235d28"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/invoices.ts": {
+    "mtime": 1780858659.97144,
+    "ast_hash": "c36c2204b2b1362d6fbadbc4e39d61a3",
+    "semantic_hash": "c36c2204b2b1362d6fbadbc4e39d61a3"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/notes.ts": {
+    "mtime": 1780858698.1488605,
+    "ast_hash": "e896bd1f9e4c82c005a8efd7929a7e32",
+    "semantic_hash": "e896bd1f9e4c82c005a8efd7929a7e32"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/quotations.ts": {
+    "mtime": 1780858662.9040031,
+    "ast_hash": "9946b0a9dcb0a3beacf4f7a8f456d688",
+    "semantic_hash": "9946b0a9dcb0a3beacf4f7a8f456d688"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/reportes.ts": {
+    "mtime": 1780877749.0969808,
+    "ast_hash": "f2dd98664440f5d9ed18b6c023f8123d",
+    "semantic_hash": "f2dd98664440f5d9ed18b6c023f8123d"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/storage.ts": {
+    "mtime": 1780858827.1771278,
+    "ast_hash": "c955fd29abcbbcc3e13822b78e253da2",
+    "semantic_hash": "c955fd29abcbbcc3e13822b78e253da2"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/suppliers.ts": {
+    "mtime": 1780858665.5382016,
+    "ast_hash": "396d2f9c8fdd774d2492604c9fd13a52",
+    "semantic_hash": "396d2f9c8fdd774d2492604c9fd13a52"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/types.ts": {
+    "mtime": 1780894801.6850662,
+    "ast_hash": "cf033bf32f9df2e3ec68e6514722f71a",
+    "semantic_hash": "cf033bf32f9df2e3ec68e6514722f71a"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/api/usuarios.ts": {
+    "mtime": 1780894549.6860862,
+    "ast_hash": "cc71f976f1dc0757293a8eb81c8942fd",
+    "semantic_hash": "cc71f976f1dc0757293a8eb81c8942fd"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/layout/AuthLayout.tsx": {
+    "mtime": 1780866614.7270985,
+    "ast_hash": "8b3104ac00e6ee9cad209cc64716c2a8",
+    "semantic_hash": "8b3104ac00e6ee9cad209cc64716c2a8"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/ui/Badge.tsx": {
+    "mtime": 1780876182.2233415,
+    "ast_hash": "c554e67d87c3070b00ce74376c8470aa",
+    "semantic_hash": "c554e67d87c3070b00ce74376c8470aa"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/ui/Button.tsx": {
+    "mtime": 1780876175.4744089,
+    "ast_hash": "1a4357a25272984d2dcbb45f0c369213",
+    "semantic_hash": "1a4357a25272984d2dcbb45f0c369213"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/ui/EmptyState.tsx": {
+    "mtime": 1780876245.6673584,
+    "ast_hash": "8a826279037c000c971809b2c08d7f67",
+    "semantic_hash": "8a826279037c000c971809b2c08d7f67"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/ui/Input.tsx": {
+    "mtime": 1780876203.2947989,
+    "ast_hash": "f1fb857dc0dc9ac5e6134e7858dafaae",
+    "semantic_hash": "f1fb857dc0dc9ac5e6134e7858dafaae"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/ui/Modal.tsx": {
+    "mtime": 1780876234.9504898,
+    "ast_hash": "c39bce8f9f4c6b419aa4f5f3877e8f52",
+    "semantic_hash": "c39bce8f9f4c6b419aa4f5f3877e8f52"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/ui/SearchSelect.tsx": {
+    "mtime": 1780895422.0604455,
+    "ast_hash": "05134b3fed77fb4bfcc15f35d4792e1f",
+    "semantic_hash": "05134b3fed77fb4bfcc15f35d4792e1f"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/ui/Skeleton.tsx": {
+    "mtime": 1780876241.4336605,
+    "ast_hash": "7df19fd3e1d11a58c26a7135addcff4a",
+    "semantic_hash": "7df19fd3e1d11a58c26a7135addcff4a"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/shared/ui/Table.tsx": {
+    "mtime": 1780876220.1558862,
+    "ast_hash": "e9ede54f8a572bb483fa49fadf2bd37d",
+    "semantic_hash": "e9ede54f8a572bb483fa49fadf2bd37d"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/stores/auth.store.ts": {
+    "mtime": 1780870377.7516263,
+    "ast_hash": "0acf2fe05ec65d26f25bf1b1bfb08f4c",
+    "semantic_hash": "0acf2fe05ec65d26f25bf1b1bfb08f4c"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/tsconfig.app.json": {
+    "mtime": 1780856177.0029569,
+    "ast_hash": "c6b159a8ccc30e1849f96f488181630d",
+    "semantic_hash": "c6b159a8ccc30e1849f96f488181630d"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/tsconfig.json": {
+    "mtime": 1780855386.4158742,
+    "ast_hash": "a3d39fa780ebff65444de257f291ce6c",
+    "semantic_hash": "a3d39fa780ebff65444de257f291ce6c"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/tsconfig.node.json": {
+    "mtime": 1780855386.4124405,
+    "ast_hash": "70bdd0a673bcfc0e828080b306e7c680",
+    "semantic_hash": "70bdd0a673bcfc0e828080b306e7c680"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/vite.config.ts": {
+    "mtime": 1780874164.2923138,
+    "ast_hash": "4931a6d972d66f012e39ecdcb58ab8d8",
+    "semantic_hash": "4931a6d972d66f012e39ecdcb58ab8d8"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/emil-design-eng/SKILL.md": {
+    "mtime": 1780854637.3166747,
+    "ast_hash": "fd025de68df6836a0c52564d7ac85e72",
+    "semantic_hash": "fd025de68df6836a0c52564d7ac85e72"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/frontend-design/LICENSE.txt": {
+    "mtime": 1780854519.1201851,
+    "ast_hash": "2ee41112a44fe7014dce33e26468ba93",
+    "semantic_hash": "2ee41112a44fe7014dce33e26468ba93"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/frontend-design/SKILL.md": {
+    "mtime": 1780854519.121245,
+    "ast_hash": "06a0520e81f698334258c73ff0de533b",
+    "semantic_hash": "06a0520e81f698334258c73ff0de533b"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/SKILL.md": {
+    "mtime": 1780854592.656486,
+    "ast_hash": "7ad37fd42eaac6beaa55c858ccdbfa5d",
+    "semantic_hash": "7ad37fd42eaac6beaa55c858ccdbfa5d"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/agents/openai.yaml": {
+    "mtime": 1780854592.6593947,
+    "ast_hash": "f6a36117ebc5ff8f67efb518ad1fe775",
+    "semantic_hash": "f6a36117ebc5ff8f67efb518ad1fe775"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/adapt.md": {
+    "mtime": 1780854592.659199,
+    "ast_hash": "d349a7700926a5d51c1f7de8d66965ef",
+    "semantic_hash": "d349a7700926a5d51c1f7de8d66965ef"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/animate.md": {
+    "mtime": 1780854592.660324,
+    "ast_hash": "a81ce3c8c233b189a76b7b7e734308bc",
+    "semantic_hash": "a81ce3c8c233b189a76b7b7e734308bc"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/audit.md": {
+    "mtime": 1780854592.6600876,
+    "ast_hash": "6fcb6455f2051f6e40c61d3553295c62",
+    "semantic_hash": "6fcb6455f2051f6e40c61d3553295c62"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/bolder.md": {
+    "mtime": 1780854592.6603346,
+    "ast_hash": "68705d6f0c6a82691163fa9870c626d0",
+    "semantic_hash": "68705d6f0c6a82691163fa9870c626d0"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/brand.md": {
+    "mtime": 1780854592.6596186,
+    "ast_hash": "5e8f9b86533d7b855aa1b93bc0b9a311",
+    "semantic_hash": "5e8f9b86533d7b855aa1b93bc0b9a311"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/clarify.md": {
+    "mtime": 1780854592.6598604,
+    "ast_hash": "25946f47983871d36205f2e50b6a4519",
+    "semantic_hash": "25946f47983871d36205f2e50b6a4519"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/codex.md": {
+    "mtime": 1780854592.6608572,
+    "ast_hash": "4cf0b41300869b9b5e80bad1804ccdf3",
+    "semantic_hash": "4cf0b41300869b9b5e80bad1804ccdf3"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/colorize.md": {
+    "mtime": 1780854592.6608734,
+    "ast_hash": "bcaa5f7d07ee6a0548f6b1bc74e33e96",
+    "semantic_hash": "bcaa5f7d07ee6a0548f6b1bc74e33e96"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/craft.md": {
+    "mtime": 1780854592.6607063,
+    "ast_hash": "d49d10ec508c66cb95795231822c3dfb",
+    "semantic_hash": "d49d10ec508c66cb95795231822c3dfb"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/critique.md": {
+    "mtime": 1780854592.6612992,
+    "ast_hash": "8383aae6307ceac0912014c42f6e1af3",
+    "semantic_hash": "8383aae6307ceac0912014c42f6e1af3"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/delight.md": {
+    "mtime": 1780854592.6615114,
+    "ast_hash": "7b79555d08e21cd6acb5300eea797309",
+    "semantic_hash": "7b79555d08e21cd6acb5300eea797309"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/distill.md": {
+    "mtime": 1780854592.6635723,
+    "ast_hash": "03f5a189dfee0d929eed41e2428a3d16",
+    "semantic_hash": "03f5a189dfee0d929eed41e2428a3d16"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/document.md": {
+    "mtime": 1780854592.6610913,
+    "ast_hash": "2e86f98f3899715b74d45271f1f58c4f",
+    "semantic_hash": "2e86f98f3899715b74d45271f1f58c4f"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/extract.md": {
+    "mtime": 1780854592.6611557,
+    "ast_hash": "6f3be96d7d72a8f99d3d7a8219710cc7",
+    "semantic_hash": "6f3be96d7d72a8f99d3d7a8219710cc7"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/harden.md": {
+    "mtime": 1780854592.6613169,
+    "ast_hash": "d547667e282ba223077e496ef9df4c18",
+    "semantic_hash": "d547667e282ba223077e496ef9df4c18"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/init.md": {
+    "mtime": 1780854592.6617749,
+    "ast_hash": "90d6c90d0293a523b40a03ad803375a3",
+    "semantic_hash": "90d6c90d0293a523b40a03ad803375a3"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/interaction-design.md": {
+    "mtime": 1780854592.662817,
+    "ast_hash": "1dd83bb8a96d7e250914064aa7389f8b",
+    "semantic_hash": "1dd83bb8a96d7e250914064aa7389f8b"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/layout.md": {
+    "mtime": 1780854592.6621423,
+    "ast_hash": "d0e7cb7de94bac343cbe982cd81b12d2",
+    "semantic_hash": "d0e7cb7de94bac343cbe982cd81b12d2"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/live.md": {
+    "mtime": 1780854592.663148,
+    "ast_hash": "b8b4be7b587a6e076057f4335fa12357",
+    "semantic_hash": "b8b4be7b587a6e076057f4335fa12357"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/onboard.md": {
+    "mtime": 1780854592.6621265,
+    "ast_hash": "e1439e7cb4d19ea29a8990f008aa60f2",
+    "semantic_hash": "e1439e7cb4d19ea29a8990f008aa60f2"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/optimize.md": {
+    "mtime": 1780854592.6632826,
+    "ast_hash": "7355a3b5927b2b9b507def36f4b89b53",
+    "semantic_hash": "7355a3b5927b2b9b507def36f4b89b53"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/overdrive.md": {
+    "mtime": 1780854592.6635687,
+    "ast_hash": "ff1a1fe7400aa845f65fca05ffc028d5",
+    "semantic_hash": "ff1a1fe7400aa845f65fca05ffc028d5"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/polish.md": {
+    "mtime": 1780854592.6628432,
+    "ast_hash": "b70a3e30a38f00e6730ef1da472a0e84",
+    "semantic_hash": "b70a3e30a38f00e6730ef1da472a0e84"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/product.md": {
+    "mtime": 1780854592.6630936,
+    "ast_hash": "6408a63ddbfe7003c732650381506860",
+    "semantic_hash": "6408a63ddbfe7003c732650381506860"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/quieter.md": {
+    "mtime": 1780854592.663924,
+    "ast_hash": "2eda6743707424e946e4e88874500986",
+    "semantic_hash": "2eda6743707424e946e4e88874500986"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/shape.md": {
+    "mtime": 1780854592.6641548,
+    "ast_hash": "8cbc6f4bc6e66d60e009f8fb687f7c82",
+    "semantic_hash": "8cbc6f4bc6e66d60e009f8fb687f7c82"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/impeccable/reference/typeset.md": {
+    "mtime": 1780854592.6645799,
+    "ast_hash": "aa7076c91c2d1095ac405a80f30cc470",
+    "semantic_hash": "aa7076c91c2d1095ac405a80f30cc470"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/AGENTS.md": {
+    "mtime": 1780857021.7181141,
+    "ast_hash": "fc8f9b0218d2173112a8418bf9d8abe7",
+    "semantic_hash": "fc8f9b0218d2173112a8418bf9d8abe7"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/README.md": {
+    "mtime": 1780857021.7199426,
+    "ast_hash": "abb5236c535db0bf7ce6f38c8998bc47",
+    "semantic_hash": "abb5236c535db0bf7ce6f38c8998bc47"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/SKILL.md": {
+    "mtime": 1780857100.121178,
+    "ast_hash": "063d068057686a65e94708aea2c7996a",
+    "semantic_hash": "063d068057686a65e94708aea2c7996a"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/_sections.md": {
+    "mtime": 1780857111.9354506,
+    "ast_hash": "b8c110b45145ded6919562772afe067c",
+    "semantic_hash": "b8c110b45145ded6919562772afe067c"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/_template.md": {
+    "mtime": 1780857111.9357724,
+    "ast_hash": "a0d76a2f87f3f80e9a8f3a2a1054aaaf",
+    "semantic_hash": "a0d76a2f87f3f80e9a8f3a2a1054aaaf"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/advanced-effect-event-deps.md": {
+    "mtime": 1780857111.9359503,
+    "ast_hash": "3a0e314bb9576bab61f68d5de5afaf3e",
+    "semantic_hash": "3a0e314bb9576bab61f68d5de5afaf3e"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/advanced-event-handler-refs.md": {
+    "mtime": 1780857111.9361174,
+    "ast_hash": "f2a0d125f3773bfda91e187fa5bed48a",
+    "semantic_hash": "f2a0d125f3773bfda91e187fa5bed48a"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/advanced-init-once.md": {
+    "mtime": 1780857111.9362679,
+    "ast_hash": "0100519098b834e69a3515657a39bdc9",
+    "semantic_hash": "0100519098b834e69a3515657a39bdc9"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/advanced-use-latest.md": {
+    "mtime": 1780857111.9364388,
+    "ast_hash": "60309961293388c9b9e9fd4e0db344e3",
+    "semantic_hash": "60309961293388c9b9e9fd4e0db344e3"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/async-api-routes.md": {
+    "mtime": 1780857111.9365969,
+    "ast_hash": "344fa543b37e303660404e1ef3a4638b",
+    "semantic_hash": "344fa543b37e303660404e1ef3a4638b"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/async-cheap-condition-before-await.md": {
+    "mtime": 1780857111.9367516,
+    "ast_hash": "96352f626f328e15a6213d485e29e36f",
+    "semantic_hash": "96352f626f328e15a6213d485e29e36f"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/async-defer-await.md": {
+    "mtime": 1780857111.9369109,
+    "ast_hash": "235a6b5760c2e4843d778167e462cb0e",
+    "semantic_hash": "235a6b5760c2e4843d778167e462cb0e"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/async-dependencies.md": {
+    "mtime": 1780857111.9370773,
+    "ast_hash": "9c5622d97b20b9e0cb79455b4322061a",
+    "semantic_hash": "9c5622d97b20b9e0cb79455b4322061a"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/async-parallel.md": {
+    "mtime": 1780857111.93725,
+    "ast_hash": "a0e06a8e9985cdff4ece0312d8ee35db",
+    "semantic_hash": "a0e06a8e9985cdff4ece0312d8ee35db"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/async-suspense-boundaries.md": {
+    "mtime": 1780857111.9374144,
+    "ast_hash": "dbb2fc80721ca1ce32426f43219d314f",
+    "semantic_hash": "dbb2fc80721ca1ce32426f43219d314f"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/bundle-analyzable-paths.md": {
+    "mtime": 1780857111.9375677,
+    "ast_hash": "8cfe6e284cafd2be33f09c6a1abc78fd",
+    "semantic_hash": "8cfe6e284cafd2be33f09c6a1abc78fd"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/bundle-barrel-imports.md": {
+    "mtime": 1780857111.9377167,
+    "ast_hash": "fcba301df7f11c6847dca5962ac78828",
+    "semantic_hash": "fcba301df7f11c6847dca5962ac78828"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/bundle-conditional.md": {
+    "mtime": 1780857111.937871,
+    "ast_hash": "585be2b6fc418c766e5b91cc2141d334",
+    "semantic_hash": "585be2b6fc418c766e5b91cc2141d334"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/bundle-defer-third-party.md": {
+    "mtime": 1780857111.9380233,
+    "ast_hash": "6d4d1d4fac411f724071428dd0bc93ba",
+    "semantic_hash": "6d4d1d4fac411f724071428dd0bc93ba"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/bundle-dynamic-imports.md": {
+    "mtime": 1780857111.9381948,
+    "ast_hash": "72d89583306887810f67e9f7860f06af",
+    "semantic_hash": "72d89583306887810f67e9f7860f06af"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/bundle-preload.md": {
+    "mtime": 1780857111.9383616,
+    "ast_hash": "924ec7e7502ca042070326d38e88f8cd",
+    "semantic_hash": "924ec7e7502ca042070326d38e88f8cd"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/client-event-listeners.md": {
+    "mtime": 1780857111.9385223,
+    "ast_hash": "71062add972f9735348b7ae77e778eb8",
+    "semantic_hash": "71062add972f9735348b7ae77e778eb8"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/client-localstorage-schema.md": {
+    "mtime": 1780857111.9386873,
+    "ast_hash": "982a459b07cbec2f8386e526b924c339",
+    "semantic_hash": "982a459b07cbec2f8386e526b924c339"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/client-passive-event-listeners.md": {
+    "mtime": 1780857111.938835,
+    "ast_hash": "3853533fd5f49fa2fc98296f9c34d84f",
+    "semantic_hash": "3853533fd5f49fa2fc98296f9c34d84f"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/client-swr-dedup.md": {
+    "mtime": 1780857111.938999,
+    "ast_hash": "e565fcba7836d339ca4707aad6fdaa4a",
+    "semantic_hash": "e565fcba7836d339ca4707aad6fdaa4a"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/js-batch-dom-css.md": {
+    "mtime": 1780857111.939151,
+    "ast_hash": "869dbc06a931ccfb899b739316c348af",
+    "semantic_hash": "869dbc06a931ccfb899b739316c348af"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/js-cache-function-results.md": {
+    "mtime": 1780857111.9393375,
+    "ast_hash": "5d641ce87ef753d59e3205244e2851a1",
+    "semantic_hash": "5d641ce87ef753d59e3205244e2851a1"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/js-cache-property-access.md": {
+    "mtime": 1780857111.939508,
+    "ast_hash": "5b4ae3cd853b92222a8fd8c8d8202426",
+    "semantic_hash": "5b4ae3cd853b92222a8fd8c8d8202426"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/js-cache-storage.md": {
+    "mtime": 1780857111.9396558,
+    "ast_hash": "828f260566ff92df56089321fa41c116",
+    "semantic_hash": "828f260566ff92df56089321fa41c116"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/js-combine-iterations.md": {
+    "mtime": 1780857111.9400642,
+    "ast_hash": "4f241532133637fee75304d40f016713",
+    "semantic_hash": "4f241532133637fee75304d40f016713"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/js-early-exit.md": {
+    "mtime": 1780857111.9402268,
+    "ast_hash": "d300cb3e57255029e446bdfa49dc4074",
+    "semantic_hash": "d300cb3e57255029e446bdfa49dc4074"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/js-flatmap-filter.md": {
+    "mtime": 1780857111.940375,
+    "ast_hash": "161d9d8b444e5ec9cb58bffb0e1b76cd",
+    "semantic_hash": "161d9d8b444e5ec9cb58bffb0e1b76cd"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/js-hoist-regexp.md": {
+    "mtime": 1780857111.9405453,
+    "ast_hash": "ced4609a5916db47bbaccfcc3f2dcdbb",
+    "semantic_hash": "ced4609a5916db47bbaccfcc3f2dcdbb"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/js-index-maps.md": {
+    "mtime": 1780857111.9407082,
+    "ast_hash": "db5bcfde02e1ce9f41d6ed1f5aafc8c5",
+    "semantic_hash": "db5bcfde02e1ce9f41d6ed1f5aafc8c5"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/js-length-check-first.md": {
+    "mtime": 1780857111.940859,
+    "ast_hash": "2ba208759dd91578f1085c28e6a92ce9",
+    "semantic_hash": "2ba208759dd91578f1085c28e6a92ce9"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/js-min-max-loop.md": {
+    "mtime": 1780857111.941008,
+    "ast_hash": "82f654d27529dd80be7ae33d45dcdf8c",
+    "semantic_hash": "82f654d27529dd80be7ae33d45dcdf8c"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/js-request-idle-callback.md": {
+    "mtime": 1780857111.9411585,
+    "ast_hash": "91d7e7fca676efb7cecb4ccff1eaec01",
+    "semantic_hash": "91d7e7fca676efb7cecb4ccff1eaec01"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/js-set-map-lookups.md": {
+    "mtime": 1780857111.9413111,
+    "ast_hash": "59a278e21ecd322bff566ba4ad7f5a30",
+    "semantic_hash": "59a278e21ecd322bff566ba4ad7f5a30"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/js-tosorted-immutable.md": {
+    "mtime": 1780857111.9414647,
+    "ast_hash": "fd0804905877b6b7b1858e5df1b5f3c4",
+    "semantic_hash": "fd0804905877b6b7b1858e5df1b5f3c4"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rendering-activity.md": {
+    "mtime": 1780857111.9416351,
+    "ast_hash": "b66bde1377564aa196ba15fc94215cd3",
+    "semantic_hash": "b66bde1377564aa196ba15fc94215cd3"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rendering-animate-svg-wrapper.md": {
+    "mtime": 1780857111.9417818,
+    "ast_hash": "7301cbe48bf0e1c44934847861384d03",
+    "semantic_hash": "7301cbe48bf0e1c44934847861384d03"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rendering-conditional-render.md": {
+    "mtime": 1780857111.941932,
+    "ast_hash": "7aa6112d7544d55147e183b84add9c31",
+    "semantic_hash": "7aa6112d7544d55147e183b84add9c31"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rendering-content-visibility.md": {
+    "mtime": 1780857111.9423177,
+    "ast_hash": "a4ec0125d3a9d79ac2ab5f7a7b5b4d7d",
+    "semantic_hash": "a4ec0125d3a9d79ac2ab5f7a7b5b4d7d"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rendering-hoist-jsx.md": {
+    "mtime": 1780857111.9424658,
+    "ast_hash": "00519c11155c5c2a6f493d7980211a71",
+    "semantic_hash": "00519c11155c5c2a6f493d7980211a71"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rendering-hydration-no-flicker.md": {
+    "mtime": 1780857111.9426255,
+    "ast_hash": "a33ebc96d26525f94c460342d913e47a",
+    "semantic_hash": "a33ebc96d26525f94c460342d913e47a"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rendering-hydration-suppress-warning.md": {
+    "mtime": 1780857111.9427872,
+    "ast_hash": "23bc895f5697c19a59712bf19474ec12",
+    "semantic_hash": "23bc895f5697c19a59712bf19474ec12"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rendering-resource-hints.md": {
+    "mtime": 1780857111.9429333,
+    "ast_hash": "a612b2d1d86d1b8205b92ff7dfd81eb8",
+    "semantic_hash": "a612b2d1d86d1b8205b92ff7dfd81eb8"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rendering-script-defer-async.md": {
+    "mtime": 1780857111.9430811,
+    "ast_hash": "d62596aed565dd3ad7bddd38bc8f7798",
+    "semantic_hash": "d62596aed565dd3ad7bddd38bc8f7798"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rendering-svg-precision.md": {
+    "mtime": 1780857111.9432297,
+    "ast_hash": "1b880754ee449c52ccc725481f8b2e90",
+    "semantic_hash": "1b880754ee449c52ccc725481f8b2e90"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rendering-usetransition-loading.md": {
+    "mtime": 1780857111.9433768,
+    "ast_hash": "3cea04ec76a76183cebc6571ac6365a2",
+    "semantic_hash": "3cea04ec76a76183cebc6571ac6365a2"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rerender-defer-reads.md": {
+    "mtime": 1780857111.9435275,
+    "ast_hash": "2b754062eb7b203632859f6515ed3561",
+    "semantic_hash": "2b754062eb7b203632859f6515ed3561"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rerender-dependencies.md": {
+    "mtime": 1780857111.9436934,
+    "ast_hash": "ad0e42cd0616237f62f8a5abbc2138bc",
+    "semantic_hash": "ad0e42cd0616237f62f8a5abbc2138bc"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rerender-derived-state-no-effect.md": {
+    "mtime": 1780857111.943845,
+    "ast_hash": "c83ba3c8ea58015fd30072790a4959c4",
+    "semantic_hash": "c83ba3c8ea58015fd30072790a4959c4"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rerender-derived-state.md": {
+    "mtime": 1780857111.9439905,
+    "ast_hash": "fadd31941e355786cb0cc7bba3c672fd",
+    "semantic_hash": "fadd31941e355786cb0cc7bba3c672fd"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rerender-functional-setstate.md": {
+    "mtime": 1780857111.9443548,
+    "ast_hash": "188c0b949d23c11885914c573f4a770a",
+    "semantic_hash": "188c0b949d23c11885914c573f4a770a"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rerender-lazy-state-init.md": {
+    "mtime": 1780857111.9445043,
+    "ast_hash": "6f9fc3d826cea2ca484912256149b077",
+    "semantic_hash": "6f9fc3d826cea2ca484912256149b077"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rerender-memo-with-default-value.md": {
+    "mtime": 1780857111.9446495,
+    "ast_hash": "9bfa45660e0a4d4f180e1d12d9ed44ea",
+    "semantic_hash": "9bfa45660e0a4d4f180e1d12d9ed44ea"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rerender-memo.md": {
+    "mtime": 1780857111.9447975,
+    "ast_hash": "f0decabf1e4cf032c36f0977c81167b7",
+    "semantic_hash": "f0decabf1e4cf032c36f0977c81167b7"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rerender-move-effect-to-event.md": {
+    "mtime": 1780857111.9449415,
+    "ast_hash": "599463fe624afd8822ba2bfa7c0138d5",
+    "semantic_hash": "599463fe624afd8822ba2bfa7c0138d5"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rerender-no-inline-components.md": {
+    "mtime": 1780857111.9450986,
+    "ast_hash": "713855e0060cfe2ce549d08ea77e1af6",
+    "semantic_hash": "713855e0060cfe2ce549d08ea77e1af6"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rerender-simple-expression-in-memo.md": {
+    "mtime": 1780857111.9452567,
+    "ast_hash": "42c37552160cff86a0fcbd93a27aa74e",
+    "semantic_hash": "42c37552160cff86a0fcbd93a27aa74e"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rerender-split-combined-hooks.md": {
+    "mtime": 1780857111.945403,
+    "ast_hash": "b7485878ff82ce8468078a31fc1b7f19",
+    "semantic_hash": "b7485878ff82ce8468078a31fc1b7f19"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rerender-transitions.md": {
+    "mtime": 1780857111.9455547,
+    "ast_hash": "3f275bbfb966fcb39c554ad959fdf016",
+    "semantic_hash": "3f275bbfb966fcb39c554ad959fdf016"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rerender-use-deferred-value.md": {
+    "mtime": 1780857111.9457052,
+    "ast_hash": "913dc783397142c25ec997b5dc11245b",
+    "semantic_hash": "913dc783397142c25ec997b5dc11245b"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/rerender-use-ref-transient-values.md": {
+    "mtime": 1780857111.9458547,
+    "ast_hash": "24d2e82617e2da4207afaf049e1314f3",
+    "semantic_hash": "24d2e82617e2da4207afaf049e1314f3"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/server-after-nonblocking.md": {
+    "mtime": 1780857111.946016,
+    "ast_hash": "c88a79384f87826bf1b20aa3637093a5",
+    "semantic_hash": "c88a79384f87826bf1b20aa3637093a5"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/server-auth-actions.md": {
+    "mtime": 1780857111.9461653,
+    "ast_hash": "d8691820d666e5dd9094ccc6996398e3",
+    "semantic_hash": "d8691820d666e5dd9094ccc6996398e3"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/server-cache-lru.md": {
+    "mtime": 1780857111.9463146,
+    "ast_hash": "723195ea460bfbc4d43b4eb0c47b246b",
+    "semantic_hash": "723195ea460bfbc4d43b4eb0c47b246b"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/server-cache-react.md": {
+    "mtime": 1780857111.9464645,
+    "ast_hash": "bc168ee66c4378854c7aa23cb9ca1369",
+    "semantic_hash": "bc168ee66c4378854c7aa23cb9ca1369"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/server-dedup-props.md": {
+    "mtime": 1780857111.94662,
+    "ast_hash": "86bf6f2d562ca98bca778a5b9d2f0251",
+    "semantic_hash": "86bf6f2d562ca98bca778a5b9d2f0251"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/server-hoist-static-io.md": {
+    "mtime": 1780857111.9467802,
+    "ast_hash": "05789c4ba35f68cc0ed6deba3078f7ab",
+    "semantic_hash": "05789c4ba35f68cc0ed6deba3078f7ab"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/server-no-shared-module-state.md": {
+    "mtime": 1780857111.946947,
+    "ast_hash": "7733faf82c146008e8f1c65660bac4bb",
+    "semantic_hash": "7733faf82c146008e8f1c65660bac4bb"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/server-parallel-fetching.md": {
+    "mtime": 1780857111.9470992,
+    "ast_hash": "1a36cf0b49a1a498fc1150afbf7a42c2",
+    "semantic_hash": "1a36cf0b49a1a498fc1150afbf7a42c2"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/server-parallel-nested-fetching.md": {
+    "mtime": 1780857111.9472425,
+    "ast_hash": "eaa7835a15d41842406acc34002f0d6c",
+    "semantic_hash": "eaa7835a15d41842406acc34002f0d6c"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vercel-react-best-practices/rules/server-serialization.md": {
+    "mtime": 1780857111.9473937,
+    "ast_hash": "e6d34426614852685f43609dd9e3b250",
+    "semantic_hash": "e6d34426614852685f43609dd9e3b250"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vite/GENERATION.md": {
+    "mtime": 1780854519.1308863,
+    "ast_hash": "0710ba4e920eac0b736aa01caa043d2e",
+    "semantic_hash": "0710ba4e920eac0b736aa01caa043d2e"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vite/SKILL.md": {
+    "mtime": 1780854519.1315749,
+    "ast_hash": "f95c98eea5671d3335df1c43e55b0694",
+    "semantic_hash": "f95c98eea5671d3335df1c43e55b0694"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vite/references/build-and-ssr.md": {
+    "mtime": 1780854519.1326127,
+    "ast_hash": "3591994102965408ff22039e96dbd2fd",
+    "semantic_hash": "3591994102965408ff22039e96dbd2fd"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vite/references/core-config.md": {
+    "mtime": 1780854519.1328743,
+    "ast_hash": "1b003bb6fcab7c97f9f28c44c80bfe87",
+    "semantic_hash": "1b003bb6fcab7c97f9f28c44c80bfe87"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vite/references/core-features.md": {
+    "mtime": 1780854519.1333067,
+    "ast_hash": "fb994d6242d2276ea707a63516462244",
+    "semantic_hash": "fb994d6242d2276ea707a63516462244"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vite/references/core-plugin-api.md": {
+    "mtime": 1780854519.1335635,
+    "ast_hash": "e156a1f2df25b836ee552f7404be72fc",
+    "semantic_hash": "e156a1f2df25b836ee552f7404be72fc"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vite/references/environment-api.md": {
+    "mtime": 1780854519.1339617,
+    "ast_hash": "e9e3aa8e1da4b8eff430048fc7dba211",
+    "semantic_hash": "e9e3aa8e1da4b8eff430048fc7dba211"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vite/references/rolldown-migration.md": {
+    "mtime": 1780854519.134496,
+    "ast_hash": "72ac2ba21662e706f29d3e3b58e72951",
+    "semantic_hash": "72ac2ba21662e706f29d3e3b58e72951"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/README.md": {
+    "mtime": 1780855386.413545,
+    "ast_hash": "f6e3faf55d738cf2affe1b44195f27cf",
+    "semantic_hash": "f6e3faf55d738cf2affe1b44195f27cf"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/docs/frontend/CONTEXT.md": {
+    "mtime": 1780858491.0598452,
+    "ast_hash": "592842aa666fbad793f64935ca7e6118",
+    "semantic_hash": "592842aa666fbad793f64935ca7e6118"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/docs/frontend/README.md": {
+    "mtime": 1780861501.1620772,
+    "ast_hash": "9ddd136b3ced97b1347883a20cd55930",
+    "semantic_hash": "9ddd136b3ced97b1347883a20cd55930"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/docs/frontend/TAREAS.md": {
+    "mtime": 1780861496.732739,
+    "ast_hash": "55b680cf83a7c05e5023e86a05e102ce",
+    "semantic_hash": "55b680cf83a7c05e5023e86a05e102ce"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/docs/frontend/docs/api-client.md": {
+    "mtime": 1780861517.8141673,
+    "ast_hash": "7060e2edeb296857f6233533976359da",
+    "semantic_hash": "7060e2edeb296857f6233533976359da"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/docs/frontend/docs/document-lifecycle.md": {
+    "mtime": 1780861512.294021,
+    "ast_hash": "9a7a2353e009b58ff9ec43605284662e",
+    "semantic_hash": "9a7a2353e009b58ff9ec43605284662e"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/docs/frontend/docs/validators-dgii.md": {
+    "mtime": 1780861506.882163,
+    "ast_hash": "4802d7954670a4d41a5451c3f6524c76",
+    "semantic_hash": "4802d7954670a4d41a5451c3f6524c76"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/index.html": {
+    "mtime": 1780855677.423513,
+    "ast_hash": "a6179446d8e394354f1299c933fbfee8",
+    "semantic_hash": "a6179446d8e394354f1299c933fbfee8"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/public/favicon.svg": {
+    "mtime": 1780855386.4147966,
+    "ast_hash": "7e840862161341271697daa99a40d76b",
+    "semantic_hash": "7e840862161341271697daa99a40d76b"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/public/icons.svg": {
+    "mtime": 1780855386.4141972,
+    "ast_hash": "3b4fcfcf393eca4d264dca4a4663bc37",
+    "semantic_hash": "3b4fcfcf393eca4d264dca4a4663bc37"
+  },
+  "/Users/ryancastrofelix/Documents/projects/gensuite_web/src/assets/login_background.jpg": {
+    "mtime": 1780855496.5844066,
+    "ast_hash": "909e1ab0b93766ec5affab719d7ab9bd",
+    "semantic_hash": "909e1ab0b93766ec5affab719d7ab9bd"
+  }
+}

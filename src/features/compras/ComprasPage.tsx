@@ -1,0 +1,187 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { listCompras } from '@/shared/api/compras-gastos'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { StatusBadge } from '@/components/shared/StatusBadge'
+import { formatDate, formatDOP } from '@/lib/formatters'
+import { Plus, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+
+const PAGE_SIZE = 20
+
+export default function ComprasPage() {
+  const navigate = useNavigate()
+  const [supplier, setSupplier] = useState('')
+  const [status, setStatus] = useState<string>('all')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [page, setPage] = useState(1)
+
+  const offset = (page - 1) * PAGE_SIZE
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['compras', { supplier, status, fromDate, toDate, offset }],
+    queryFn: () =>
+      listCompras({
+        supplier: supplier || undefined,
+        status: status !== 'all' ? status : undefined,
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
+        limit: PAGE_SIZE,
+        offset,
+      }),
+  })
+
+  const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
+
+  return (
+    <div>
+      <PageHeader
+        title="Compras"
+        description="Registro de compras con actualización de inventario"
+        action={
+          <button className="btn btn-primary" onClick={() => navigate('/compras/nueva')}>
+            <Plus size={16} />
+            Nueva Compra
+          </button>
+        }
+      />
+
+      <div className="page-container">
+        <div className="filter-bar">
+          <div className="filter-bar-left">
+            <div className="search-input-wrap">
+              <Search size={14} className="search-input-icon" />
+              <input
+                className="search-input"
+                placeholder="Buscar proveedor…"
+                value={supplier}
+                onChange={(e) => { setSupplier(e.target.value); setPage(1) }}
+              />
+            </div>
+            <select
+              className="filter-select"
+              value={status}
+              onChange={(e) => { setStatus(e.target.value); setPage(1) }}
+            >
+              <option value="all">Todos</option>
+              <option value="Draft">Borrador</option>
+              <option value="Submitted">Sometido</option>
+              <option value="Cancelled">Anulado</option>
+            </select>
+            <input
+              type="date"
+              className="filter-select"
+              value={fromDate}
+              onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
+            />
+            <input
+              type="date"
+              className="filter-select"
+              value={toDate}
+              onChange={(e) => { setToDate(e.target.value); setPage(1) }}
+            />
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Proveedor</th>
+                  <th>Fecha</th>
+                  <th>NCF Proveedor</th>
+                  <th style={{ textAlign: 'right' }}>Total</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading
+                  ? Array.from({ length: 8 }).map((_, i) => (
+                      <tr key={i}>
+                        {Array.from({ length: 7 }).map((__, j) => (
+                          <td key={j}><span className="skeleton-box" style={{ height: 16, width: '100%', display: 'block' }} /></td>
+                        ))}
+                      </tr>
+                    ))
+                  : isError
+                    ? (
+                        <tr>
+                          <td colSpan={7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
+                            Error al cargar las compras
+                          </td>
+                        </tr>
+                      )
+                    : data?.items.length === 0
+                      ? (
+                          <tr>
+                            <td colSpan={7}>
+                              <div className="empty-state">
+                                <div className="empty-icon">
+                                  <Plus size={20} />
+                                </div>
+                                <p className="empty-title">Sin compras</p>
+                                <p className="empty-sub">No hay compras registradas.</p>
+                                <button className="btn btn-primary btn-size-sm" onClick={() => navigate('/compras/nueva')}>
+                                  <Plus size={14} />Nueva Compra
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      : data?.items.map((c) => (
+                          <tr key={c.id} className="table-row-clickable" onClick={() => navigate(`/compras/${c.id}`)}>
+                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{c.id}</td>
+                            <td style={{ fontWeight: 500 }}>{c.supplierName}</td>
+                            <td>{formatDate(c.postingDate)}</td>
+                            <td className="td-muted" style={{ fontFamily: 'var(--font-mono)' }}>{c.ncfProveedor ?? '—'}</td>
+                            <td style={{ textAlign: 'right' }}>{formatDOP(c.grandTotal)}</td>
+                            <td><StatusBadge status={c.status} /></td>
+                            <td>
+                              <button
+                                className="btn btn-ghost btn-size-xs"
+                                onClick={(e) => { e.stopPropagation(); navigate(`/compras/${c.id}`) }}
+                              >
+                                Ver
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+              </tbody>
+            </table>
+          </div>
+
+          {data && data.meta.total > PAGE_SIZE && (
+            <div className="pagination">
+              <span className="pagination-info">
+                Mostrando {offset + 1}–{Math.min(offset + PAGE_SIZE, data.meta.total)} de {data.meta.total}
+              </span>
+              <div className="pagination-controls">
+                <button
+                  className="btn btn-ghost btn-size-icon-sm"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '0 8px' }}>
+                  {page} / {totalPages}
+                </span>
+                <button
+                  className="btn btn-ghost btn-size-icon-sm"
+                  disabled={!data.meta.hasMore}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
