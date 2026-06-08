@@ -1173,6 +1173,60 @@ button {
 
 .filter-select:focus { border-color: var(--border-focus); outline: none; }
 
+/* ─── CUSTOM SELECT (Select component) ─── */
+.select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  background: var(--surface-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 150ms;
+}
+.select-trigger:hover { border-color: var(--border-strong); }
+.select-trigger:focus { border-color: var(--border-focus); }
+.select-trigger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Rendered via FloatingPortal — needs its own visual styling */
+.select-content {
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow-y: auto;
+  padding: 4px;
+  animation: slide-up 120ms var(--ease-spring);
+}
+
+/* Reset de botón + estilos del ítem — funciona en light y dark */
+.select-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: background 100ms;
+}
+.select-item:hover { background: var(--surface-hover); color: var(--text-primary); }
+.select-item[data-selected] { background: var(--surface-selected); font-weight: 500; color: var(--text-primary); }
+
 /* ─── PAGINATION ─── */
 .pagination {
   display: flex;
@@ -1424,9 +1478,16 @@ button {
   color: var(--text-primary);
   outline: none;
   transition: border-color 150ms;
+  /* Reset cuando se usa en <button> */
+  cursor: pointer;
+  text-align: left;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .items-input:focus { border-color: var(--border-focus); background: var(--surface-page); box-shadow: 0 0 0 2px rgba(255, 69, 56, 0.1); }
+.items-input-error { border-color: var(--error-text) !important; background: rgba(196, 30, 19, 0.04) !important; }
+.items-input-error:focus { border-color: var(--error-text); box-shadow: 0 0 0 2px rgba(196, 30, 19, 0.12); }
 
 .items-total-row {
   display: flex;
@@ -1855,11 +1916,10 @@ button {
 }
 
 .search-select-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 200;
+  /* position & top/left/width are set by the FloatingPortal (position:fixed via JS).
+     Keep static here so the portal wrapper's fixed style takes full control. */
+  position: static;
+  z-index: 9999;
   background: var(--surface-overlay);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);

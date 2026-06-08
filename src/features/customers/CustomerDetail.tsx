@@ -3,22 +3,19 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getCustomer, deleteCustomer } from '@/shared/api/customers'
-import { getSemaforo } from '@/shared/api/cobros'
+import { getSemaforoByCustomer } from '@/shared/api/cobros'
 import { client } from '@/shared/api/client'
-import type { Invoice, SemaforoEntry } from '@/shared/api/types'
+import type { Invoice } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Pencil, Ban, Building2, User, ArrowLeft } from 'lucide-react'
 
 function SemaforoIndicator({ customerId }: { customerId: string }) {
-  const { data } = useQuery({
-    queryKey: ['semaforo'],
-    queryFn: getSemaforo,
+  const { data: entry } = useQuery({
+    queryKey: ['semaforo', customerId],
+    queryFn: () => getSemaforoByCustomer(customerId),
     retry: false,
   })
 
-  if (!data) return null
-
-  const entry: SemaforoEntry | undefined = data.find((s) => s.customer === customerId)
   if (!entry) return null
 
   const statusClass: Record<string, string> = {
@@ -35,11 +32,11 @@ function SemaforoIndicator({ customerId }: { customerId: string }) {
   return (
     <div className="card" style={{ marginBottom: 16 }}>
       <div className="card-body">
-        <div className={`semaforo ${statusClass[entry.status] ?? ''}`} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className={`semaforo ${statusClass[entry.semaforo] ?? ''}`} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span className="semaforo-dot" />
-          <span style={{ fontWeight: 500 }}>{labelMap[entry.status] ?? entry.status}</span>
+          <span style={{ fontWeight: 500 }}>{labelMap[entry.semaforo] ?? entry.semaforo}</span>
           <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
-            ({entry.usagePct.toFixed(1)}% utilizado — {formatDOP(entry.totalOutstanding)} de {formatDOP(entry.creditLimit)})
+            ({(entry.pctUsado ?? 0).toFixed(1)}% utilizado — {formatDOP(entry.balance)} de {formatDOP(entry.creditLimit)})
           </span>
         </div>
       </div>

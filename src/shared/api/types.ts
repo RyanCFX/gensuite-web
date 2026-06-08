@@ -191,7 +191,8 @@ export interface InvoiceItem {
 
 export interface Invoice {
   id: string
-  status: 'Draft' | 'Submitted' | 'Cancelled'
+  status: 'draft' | 'submitted' | 'cancelled'
+  paymentStatus?: 'unpaid' | 'partly_paid' | 'paid' | null
   customer: string
   customerName: string
   postingDate: string
@@ -224,6 +225,21 @@ export interface CreateInvoiceDto {
   notes?: string
 }
 
+export interface UpdateInvoiceDto {
+  customer?: string
+  postingDate?: string
+  dueDate?: string
+  ncfType?: 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
+  items?: {
+    itemCode: string
+    description: string
+    qty: number
+    rate: number
+    uom?: string
+  }[]
+  notes?: string
+}
+
 // ─── Quotation ────────────────────────────────────────────────────────────────
 
 export interface QuotationItem {
@@ -241,7 +257,7 @@ export interface Quotation {
   customerName: string
   date: string
   validTill: string
-  status: 'Draft' | 'Submitted' | 'Ordered' | 'Lost' | 'Cancelled'
+  status: 'draft' | 'submitted' | 'ordered' | 'lost' | 'cancelled'
   items: QuotationItem[]
   notes?: string
 }
@@ -313,6 +329,11 @@ export interface CreateDebitNoteDto {
 
 // ─── Item / Catalog ───────────────────────────────────────────────────────────
 
+export interface ItemUomConversion {
+  uom: string
+  conversionFactor: number
+}
+
 export interface Item {
   id: string
   itemName: string
@@ -327,6 +348,9 @@ export interface Item {
   description?: string
   image?: string
   disabled: boolean
+  stockUom?: string
+  salesUom?: string
+  uoms?: ItemUomConversion[]
 }
 
 export interface CreateItemDto {
@@ -339,7 +363,10 @@ export interface CreateItemDto {
   valuationRate?: number
   description?: string
   image?: string
-  defaultWarehouse?: string   // correct field name (not "warehouse")
+  defaultWarehouse?: string
+  stockUom?: string
+  salesUom?: string
+  uoms?: ItemUomConversion[]
 }
 
 export type UpdateItemDto = Partial<CreateItemDto>
@@ -385,22 +412,29 @@ export type UpdateBrandDto = Partial<CreateBrandDto>
 export interface InventoryItem {
   itemCode: string
   itemName: string
+  category?: string
+  brand?: string
   warehouse: string
   actualQty: number
-  reservedQty: number
-  pendingQty: number
-  valuationRate: number
-  valuationAmount: number
-  sellingRate: number
-  sellingAmount: number
+  valuationRate: number    // costo unitario
+  standardRate: number     // precio de venta unitario
+  investmentValue: number  // qty × costo
+  saleValue: number        // qty × precio venta
   potentialProfit: number
-  stockStatus: 'in_stock' | 'low_stock' | 'out_of_stock'
 }
 
 export interface InventorySummary {
   totalInvestment: number
-  totalValue: number
-  potentialProfit: number
+  totalSaleValue: number
+  totalPotentialProfit: number
+  totalItems: number
+  totalUnits: number
+}
+
+export interface InventoryListResult {
+  items: InventoryItem[]
+  summary: InventorySummary
+  meta: PaginationMeta
 }
 
 // API returns: { id, name, parent } — NOT warehouseName/isGroup/disabled
@@ -416,8 +450,8 @@ export interface InventoryHistory {
   warehouse: string
   voucherType: string
   voucherNo: string
-  actualQty: number
-  qtyAfterTransaction: number
+  movementQty: number
+  stockAfter: number
   valuationRate: number
   postingDate: string
 }
@@ -485,7 +519,7 @@ export interface Compra {
   supplierName: string
   postingDate: string
   dueDate: string
-  status: 'Draft' | 'Submitted' | 'Cancelled'
+  status: 'draft' | 'submitted' | 'cancelled'
   currency: string
   items: CompraItem[]
   taxes?: CompraTax[]
@@ -684,7 +718,6 @@ export interface ListaPrecio {
 
 export interface UOM {
   name: string
-  uomName: string
   mustBeWholeNumber: boolean
 }
 
@@ -718,18 +751,43 @@ export interface SemaforoEntry {
   customer: string
   customerName: string
   creditLimit: number
-  totalOutstanding: number
-  usagePct: number
-  status: 'verde' | 'amarillo' | 'rojo'
+  balance: number
+  pctUsado?: number
+  semaforo: 'verde' | 'amarillo' | 'rojo'
+}
+
+export interface SemaforoResumen {
+  total: number
+  verde: number
+  amarillo: number
+  rojo: number
+}
+
+export interface SemaforoResult {
+  resumen: SemaforoResumen
+  clientes: SemaforoEntry[]
+}
+
+export interface PaymentEntryReferencia {
+  invoiceId: string
+  invoiceName?: string
+  allocatedAmount: number
 }
 
 export interface PaymentEntry {
   id: string
+  status: 'draft' | 'submitted' | 'cancelled'
   customer: string
   customerName: string
-  date: string
-  amount: number
-  reference?: string
+  postingDate: string
+  paidAmount: number
+  modeOfPayment: string
+  referenceNo?: string
+  referenceDate?: string
+  remarks?: string
+  referencias?: PaymentEntryReferencia[]
+  createdAt: string
+  modifiedAt?: string
 }
 
 // CreateCobroDto — matches BFF's CreateCobroDto exactly
@@ -737,7 +795,6 @@ export interface CreateCobroDto {
   customer: string
   postingDate: string
   paidAmount: number
-  paidTo: string             // account/cashier name
   modeOfPayment: string
   referenceNo?: string
   referenceDate?: string

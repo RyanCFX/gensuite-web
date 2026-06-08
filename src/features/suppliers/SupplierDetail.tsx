@@ -104,12 +104,10 @@ export default function SupplierDetail() {
   }
 
   return (
-    <div>
-      <div className="page-container" style={{ paddingBottom: 0 }}>
-        <button className="page-back-link" onClick={() => navigate('/proveedores')}>
-          ← Proveedores
-        </button>
-      </div>
+    <div className="page-container">
+      <button className="page-back-link" onClick={() => navigate('/proveedores')}>
+        ← Proveedores
+      </button>
 
       <PageHeader
         title={

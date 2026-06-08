@@ -61,7 +61,7 @@ export default function SuppliersPage() {
   }
 
   return (
-    <div>
+    <div className="page-container">
       <PageHeader
         title="Proveedores"
         description={data ? `${data.meta.total} proveedores en total` : ''}
@@ -73,7 +73,7 @@ export default function SuppliersPage() {
         }
       />
 
-      <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div className="filter-bar">
           <div className="filter-bar-left">
             <div className="search-input-wrap">

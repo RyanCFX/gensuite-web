@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getInvoice, submitInvoice, cancelInvoice, amendInvoice, getInvoicePdfUrl } from '@/shared/api/invoices'
-import { ArrowLeft, Send, XCircle, FileEdit, Download } from 'lucide-react'
+import { ArrowLeft, Send, XCircle, FileEdit, Download, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { NCF_TYPES } from '@/lib/constants'
@@ -96,14 +96,24 @@ export default function InvoiceDetail() {
   }
 
   const ncfLabel = NCF_TYPES.find((t) => t.value === invoice.ncfType)?.label
-  const isPaid = invoice.outstandingAmount === 0 && invoice.status === 'Submitted'
-  const isPartial = invoice.outstandingAmount > 0 && invoice.outstandingAmount < invoice.grandTotal
+  const ps = invoice.paymentStatus
 
-  const outstandingColor = isPaid
+  const outstandingColor = ps === 'paid'
     ? 'var(--color-success)'
-    : isPartial
+    : ps === 'partly_paid'
     ? 'var(--color-brand)'
     : 'var(--color-error)'
+
+  const PAYMENT_BADGE: Record<string, string> = {
+    unpaid: 'badge-warning',
+    partly_paid: 'badge-info',
+    paid: 'badge-success',
+  }
+  const PAYMENT_LABEL: Record<string, string> = {
+    unpaid: 'Pendiente',
+    partly_paid: 'Parcial',
+    paid: 'Pagado',
+  }
 
   return (
     <div className="page-container">
@@ -125,12 +135,21 @@ export default function InvoiceDetail() {
       </div>
 
       <div className="doc-actions-bar">
-        {invoice.status === 'Draft' && (
-          <button className="btn btn-primary btn-size-sm" onClick={() => submitMutation.mutate()} disabled={isActionsLoading}>
-            <Send size={14} /> Someter
-          </button>
+        {invoice.status === 'draft' && (
+          <>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => navigate(`/facturacion/facturas/${id}/editar`)}
+              disabled={isActionsLoading}
+            >
+              <Pencil size={14} /> Editar
+            </button>
+            <button className="btn btn-primary btn-size-sm" onClick={() => submitMutation.mutate()} disabled={isActionsLoading}>
+              <Send size={14} /> Someter
+            </button>
+          </>
         )}
-        {invoice.status === 'Submitted' && (
+        {invoice.status === 'submitted' && (
           <>
             <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadPdf}>
               <Download size={14} /> Descargar PDF
@@ -140,7 +159,7 @@ export default function InvoiceDetail() {
             </button>
           </>
         )}
-        {invoice.status === 'Cancelled' && (
+        {invoice.status === 'cancelled' && (
           <button className="btn btn-secondary btn-size-sm" onClick={() => amendMutation.mutate()} disabled={isActionsLoading}>
             <FileEdit size={14} /> Enmendar
           </button>
@@ -190,7 +209,7 @@ export default function InvoiceDetail() {
             )}
           </div>
 
-          {invoice.status === 'Submitted' && (
+          {invoice.status === 'submitted' && (
             <div style={{ paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: 24 }}>
               <div className="detail-field">
                 <span className="detail-label">Subtotal</span>
@@ -208,16 +227,16 @@ export default function InvoiceDetail() {
                 <span className="detail-label">Pendiente</span>
                 <span className="detail-value" style={{ fontWeight: 700, color: outstandingColor }}>{formatDOP(invoice.outstandingAmount)}</span>
               </div>
-              <div className="detail-field">
-                <span className="detail-label">Estado pago</span>
-                <span className="detail-value">
-                  {isPaid
-                    ? <span className="badge badge-success">Pagado</span>
-                    : isPartial
-                    ? <span className="badge badge-info">Parcial</span>
-                    : <span className="badge badge-warning">Pendiente</span>}
-                </span>
-              </div>
+              {ps && (
+                <div className="detail-field">
+                  <span className="detail-label">Estado de Pago</span>
+                  <span className="detail-value">
+                    <span className={`badge ${PAYMENT_BADGE[ps] ?? 'badge-neutral'}`}>
+                      {PAYMENT_LABEL[ps] ?? ps}
+                    </span>
+                  </span>
+                </div>
+              )}
             </div>
           )}
 

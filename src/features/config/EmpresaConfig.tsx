@@ -53,7 +53,7 @@ export default function EmpresaConfig() {
   }
 
   return (
-    <div>
+    <div className="page-container">
       <PageHeader
         title="Configuración de Empresa"
         description="Datos fiscales y de contacto de la empresa"
@@ -65,8 +65,8 @@ export default function EmpresaConfig() {
         }
       />
 
-      <form onSubmit={handleSubmit}>
-        <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 720 }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 720 }}>
+        <div>
           {/* Datos Fiscales */}
           <div className="card">
             <div className="card-header">

@@ -3,6 +3,7 @@ import { ENDPOINTS } from './endpoints'
 import type {
   Invoice,
   CreateInvoiceDto,
+  UpdateInvoiceDto,
   PaginatedResponse,
   PaginationParams,
 } from './types'
@@ -12,7 +13,7 @@ export interface ListInvoicesParams extends PaginationParams {
   status?: 'draft' | 'submitted' | 'cancelled' | 'all'
   fromDate?: string
   toDate?: string
-  paymentStatus?: 'paid' | 'unpaid' | 'overdue' | 'partial'
+  paymentStatus?: 'paid' | 'unpaid' | 'partly_paid' | 'overdue'
   ncfType?: string
 }
 
@@ -28,6 +29,11 @@ export async function getInvoice(id: string) {
 
 export async function createInvoice(data: CreateInvoiceDto) {
   const res = await client.post<{ success: true; data: Invoice }>(ENDPOINTS.invoices.list, data)
+  return unwrap(res)
+}
+
+export async function updateInvoice(id: string, data: UpdateInvoiceDto) {
+  const res = await client.put<{ success: true; data: Invoice }>(ENDPOINTS.invoices.byId(id), data)
   return unwrap(res)
 }
 

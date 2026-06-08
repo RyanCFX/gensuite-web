@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react'
 import { ChevronDown, X } from 'lucide-react'
 import { useDebounce } from '@/lib/useDebounce'
+import { FloatingPortal, useFloatingDropdown } from '@/lib/useFloatingPortal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,31 +50,23 @@ export function SearchSelect({
   id,
 }: SearchSelectProps) {
   const [inputValue, setInputValue] = useState('')
-  const [open, setOpen] = useState(false)
   const [focusedIdx, setFocusedIdx] = useState(-1)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
+  // Portal-based floating dropdown — bypasses overflow:hidden on parent containers
+  const { open, style, openDropdown, close, portalRef } = useFloatingDropdown(
+    containerRef as React.RefObject<HTMLElement>,
+    () => { if (value) setInputValue('') },
+  )
+
   // Debounce the search query
   const debouncedQuery = useDebounce(inputValue, debounceMs)
   useEffect(() => {
     if (open) onSearch(debouncedQuery)
   }, [debouncedQuery, open, onSearch])
-
-  // Close on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-        // If user clicked away without selecting, restore the selected label
-        if (value) setInputValue('')
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [value])
 
   // Reset focused index when options change
   useEffect(() => { setFocusedIdx(-1) }, [options])
@@ -94,7 +87,7 @@ export function SearchSelect({
         : ''
 
   const handleFocus = () => {
-    setOpen(true)
+    openDropdown()
     onSearch('')
     // Select all text so user can immediately type a new search
     inputRef.current?.select()
@@ -102,28 +95,28 @@ export function SearchSelect({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value)
-    setOpen(true)
+    if (!open) openDropdown()
   }
 
   const handleSelect = useCallback((opt: SearchSelectOption) => {
     onChange(opt.value, opt)
     setInputValue('')
-    setOpen(false)
+    close()
     setFocusedIdx(-1)
-  }, [onChange])
+  }, [onChange, close])
 
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation()
     onChange('', null)
     setInputValue('')
-    setOpen(false)
+    close()
     inputRef.current?.focus()
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (!open) {
       if (e.key === 'Enter' || e.key === 'ArrowDown') {
-        setOpen(true)
+        openDropdown()
         onSearch('')
       }
       return
@@ -147,11 +140,11 @@ export function SearchSelect({
         }
         break
       case 'Escape':
-        setOpen(false)
+        close()
         if (value) setInputValue('')
         break
       case 'Tab':
-        setOpen(false)
+        close()
         break
     }
   }
@@ -208,8 +201,9 @@ export function SearchSelect({
         )}
       </div>
 
-      {open && (
-        <div className="search-select-dropdown" role="listbox" ref={listRef}>
+      <FloatingPortal open={open} style={style} portalRef={portalRef}>
+        <div className="search-select-dropdown" role="listbox" ref={listRef}
+          style={{ position: 'static', maxHeight: 220 }}>
           {loading ? (
             <div className="search-select-loading">
               <span className="spinner spinner-brand spinner-sm" aria-hidden="true" />
@@ -247,7 +241,7 @@ export function SearchSelect({
             </div>
           )}
         </div>
-      )}
+      </FloatingPortal>
     </div>
   )
 }

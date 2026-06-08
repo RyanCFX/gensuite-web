@@ -340,7 +340,7 @@ function UomSection() {
             ? <span className="skeleton-box" style={{ height: 80, display: 'block' }} />
             : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {data?.map((u) => <span key={u.name} className="badge badge-default">{u.uomName}</span>)}
+                  {data?.map((u) => <span key={u.name} className="badge badge-default">{u.name}</span>)}
                 </div>
               )}
         </div>
@@ -547,9 +547,9 @@ export default function ConfigPage() {
   }
 
   return (
-    <div>
+    <div className="page-container">
       <PageHeader title={title} />
-      <div className="page-container" style={{ maxWidth: 760 }}>
+      <div style={{ maxWidth: 760 }}>
         {sectionMap[seccion] ?? (
           <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: '48px 0' }}>
             Sección no encontrada.

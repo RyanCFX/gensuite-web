@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
-import { createInvoice } from '@/shared/api/invoices'
+import { useNavigate, useParams } from 'react-router-dom'
+import { createInvoice, updateInvoice, getInvoice } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
-import type { CreateInvoiceDto, Customer, SemaforoEntry } from '@/shared/api/types'
+import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry } from '@/shared/api/types'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react'
@@ -13,11 +13,15 @@ import { format, addDays } from 'date-fns'
 import { NCF_TYPES } from '@/lib/constants'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { ItemSelect } from '@/shared/ui/ItemSelect'
+import { UomSelect } from '@/shared/ui/UomSelect'
+import type { Item } from '@/shared/api/types'
 
 type NcfType = 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
 
 interface LineItem {
   itemCode: string
+  itemLabel?: string
   description: string
   qty: number
   rate: number
@@ -42,6 +46,10 @@ function calcAmount(qty: number, rate: number) {
 export default function InvoiceForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  // When `:id` is present in the URL we're in edit mode
+  const { id } = useParams<{ id?: string }>()
+  const isEdit = Boolean(id)
+
   const [customerId, setCustomerId] = useState('')
   const [customerQuery, setCustomerQuery] = useState('')
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
@@ -52,7 +60,37 @@ export default function InvoiceForm() {
   const [notes, setNotes] = useState('')
   const [semaforo, setSemaforo] = useState<SemaforoEntry | null>(null)
   const [loadingSemaforo, setLoadingSemaforo] = useState(false)
+  const [initialized, setInitialized] = useState(false)
 
+  // ── Load existing invoice when editing ────────────────────────────────────
+  const { data: existingInvoice, isLoading: loadingInvoice } = useQuery({
+    queryKey: ['invoice', id],
+    queryFn: () => getInvoice(id!),
+    enabled: isEdit,
+  })
+
+  // Pre-populate form once the existing invoice loads
+  useEffect(() => {
+    if (!existingInvoice || initialized) return
+    setCustomerId(existingInvoice.customer)
+    setPostingDate(existingInvoice.postingDate)
+    setDueDate(existingInvoice.dueDate ?? defaultDueDate())
+    setNcfType((existingInvoice.ncfType as NcfType) ?? 'B02')
+    setNotes(existingInvoice.notes ?? '')
+    setItems(
+      existingInvoice.items.map((i) => ({
+        itemCode: i.itemCode,
+        description: i.description,
+        qty: i.qty,
+        rate: i.rate,
+        amount: i.amount,
+        uom: i.uom,
+      })),
+    )
+    setInitialized(true)
+  }, [existingInvoice, initialized])
+
+  // ── Customer search ───────────────────────────────────────────────────────
   const { data: customersData, isLoading: loadingCustomers } = useQuery({
     queryKey: ['customerSearch', customerQuery],
     queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
@@ -65,6 +103,12 @@ export default function InvoiceForm() {
     sublabel: c.rnc ?? c.cedula,
   }))
 
+  // In edit mode, the selected customer name comes from the invoice until the user picks a new one
+  const selectedLabel = isEdit && !customerQuery && existingInvoice && customerId === existingInvoice.customer
+    ? existingInvoice.customerName
+    : undefined
+
+  // ── Semaforo ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!selectedCustomer) {
       setSemaforo(null)
@@ -83,6 +127,7 @@ export default function InvoiceForm() {
       .finally(() => setLoadingSemaforo(false))
   }, [selectedCustomer])
 
+  // ── Auto-select NCF type based on customer (only for new customers) ───────
   useEffect(() => {
     if (!selectedCustomer) return
     if (selectedCustomer.isGovernment) {
@@ -94,6 +139,7 @@ export default function InvoiceForm() {
     }
   }, [selectedCustomer])
 
+  // ── Mutations ─────────────────────────────────────────────────────────────
   const createMutation = useMutation({
     mutationFn: (dto: CreateInvoiceDto) => createInvoice(dto),
     onSuccess: (invoice) => {
@@ -106,6 +152,22 @@ export default function InvoiceForm() {
     },
   })
 
+  const updateMutation = useMutation({
+    mutationFn: (dto: UpdateInvoiceDto) => updateInvoice(id!, dto),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      toast.success('Factura actualizada')
+      navigate(`/facturacion/facturas/${id}`)
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? 'Error al actualizar la factura')
+    },
+  })
+
+  const isSaving = createMutation.isPending || updateMutation.isPending
+
+  // ── Line item helpers ─────────────────────────────────────────────────────
   function updateItem(index: number, patch: Partial<LineItem>) {
     setItems((prev) =>
       prev.map((item, i) => {
@@ -115,8 +177,29 @@ export default function InvoiceForm() {
           updated.amount = calcAmount(updated.qty, updated.rate)
         }
         return updated
-      })
+      }),
     )
+  }
+
+  function selectCatalogItem(index: number, catalogItem: Item) {
+    setItems((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row
+        const rate = catalogItem.standardRate ?? 0
+        return {
+          ...row,
+          itemCode: catalogItem.id,
+          itemLabel: catalogItem.itemName,
+          description: catalogItem.description ?? catalogItem.itemName,
+          rate,
+          amount: calcAmount(row.qty, rate),
+        }
+      }),
+    )
+  }
+
+  function clearCatalogItem(index: number) {
+    updateItem(index, { itemCode: '', itemLabel: undefined, description: '', rate: 0, amount: 0 })
   }
 
   function addRow() {
@@ -131,6 +214,7 @@ export default function InvoiceForm() {
   const itbis = Math.round(subtotal * ITBIS_RATE * 100) / 100
   const total = subtotal + itbis
 
+  // ── Submit ────────────────────────────────────────────────────────────────
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
@@ -147,22 +231,33 @@ export default function InvoiceForm() {
       return
     }
 
-    const dto: CreateInvoiceDto = {
-      customer: customerId,
-      postingDate,
-      dueDate,
-      ncfType,
-      items: items.map((i) => ({
-        itemCode: i.itemCode,
-        description: i.description,
-        qty: i.qty,
-        rate: i.rate,
-        uom: i.uom,
-      })),
-      notes: notes || undefined,
-    }
+    const itemsDto = items.map((i) => ({
+      itemCode: i.itemCode,
+      description: i.description,
+      qty: i.qty,
+      rate: i.rate,
+      uom: i.uom,
+    }))
 
-    createMutation.mutate(dto)
+    if (isEdit) {
+      updateMutation.mutate({
+        customer: customerId,
+        postingDate,
+        dueDate,
+        ncfType,
+        items: itemsDto,
+        notes: notes || undefined,
+      })
+    } else {
+      createMutation.mutate({
+        customer: customerId,
+        postingDate,
+        dueDate,
+        ncfType,
+        items: itemsDto,
+        notes: notes || undefined,
+      })
+    }
   }
 
   const semaforoStatusClass: Record<string, string> = {
@@ -176,14 +271,30 @@ export default function InvoiceForm() {
     rojo: 'Límite excedido',
   }
 
+  // ── Loading skeleton while fetching existing invoice ─────────────────────
+  if (isEdit && loadingInvoice) {
+    return (
+      <div className="page-container">
+        <div className="skeleton-box" style={{ width: 220, height: 24, marginBottom: 8 }} />
+        <div className="skeleton-box" style={{ width: '100%', height: 180, borderRadius: 'var(--radius-lg)', marginBottom: 16 }} />
+        <div className="skeleton-box" style={{ width: '100%', height: 280, borderRadius: 'var(--radius-lg)' }} />
+      </div>
+    )
+  }
+
   return (
     <div className="page-container">
       <div className="page-header">
         <div>
-          <a className="page-back-link" onClick={() => navigate('/facturacion/facturas')}>
-            <ArrowLeft size={14} /> Facturas
+          <a className="page-back-link" onClick={() => navigate(isEdit ? `/facturacion/facturas/${id}` : '/facturacion/facturas')}>
+            <ArrowLeft size={14} /> {isEdit ? `Factura ${id}` : 'Facturas'}
           </a>
-          <h1 className="page-title">Nueva Factura</h1>
+          <h1 className="page-title">{isEdit ? 'Editar Factura' : 'Nueva Factura'}</h1>
+          {isEdit && (
+            <p className="page-sub" style={{ color: 'var(--color-warning)' }}>
+              Solo facturas en borrador pueden ser editadas
+            </p>
+          )}
         </div>
       </div>
 
@@ -199,13 +310,14 @@ export default function InvoiceForm() {
                 <SearchSelect
                   id="customer"
                   value={customerId}
-                  onChange={(id, _opt) => {
-                    setCustomerId(id)
-                    if (!id) {
+                  selectedLabel={selectedLabel}
+                  onChange={(val, _opt) => {
+                    setCustomerId(val)
+                    if (!val) {
                       setSelectedCustomer(null)
                       setSemaforo(null)
                     } else {
-                      const match = customersData?.items.find((c) => c.id === id) ?? null
+                      const match = customersData?.items.find((c) => c.id === val) ?? null
                       setSelectedCustomer(match)
                     }
                   }}
@@ -290,7 +402,7 @@ export default function InvoiceForm() {
             <table className="items-table">
               <thead>
                 <tr>
-                  <th>Código</th>
+                  <th style={{ minWidth: 200 }}>Artículo</th>
                   <th>Descripción</th>
                   <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
@@ -309,8 +421,13 @@ export default function InvoiceForm() {
                 ) : (
                   items.map((item, index) => (
                     <tr key={index}>
-                      <td>
-                        <input className="items-input" value={item.itemCode} onChange={(e) => updateItem(index, { itemCode: e.target.value })} placeholder="ITEM-001" />
+                      <td style={{ minWidth: 200 }}>
+                        <ItemSelect
+                          value={item.itemCode}
+                          selectedLabel={item.itemLabel}
+                          onSelect={(catalogItem) => selectCatalogItem(index, catalogItem)}
+                          onClear={() => clearCatalogItem(index)}
+                        />
                       </td>
                       <td>
                         <input className="items-input" value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="Descripción" />
@@ -323,7 +440,7 @@ export default function InvoiceForm() {
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
                       <td>
-                        <input className="items-input" value={item.uom} onChange={(e) => updateItem(index, { uom: e.target.value })} placeholder="Unidad" />
+                        <UomSelect value={item.uom} onChange={(v) => updateItem(index, { uom: v })} itemCode={item.itemCode || undefined} />
                       </td>
                       <td>
                         <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeRow(index)}>
@@ -373,14 +490,18 @@ export default function InvoiceForm() {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-          <button type="button" className="btn btn-ghost" onClick={() => navigate('/facturacion/facturas')}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => navigate(isEdit ? `/facturacion/facturas/${id}` : '/facturacion/facturas')}
+          >
             Cancelar
           </button>
-          <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
-            {createMutation.isPending
+          <button type="submit" className="btn btn-primary" disabled={isSaving}>
+            {isSaving
               ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
               : <Save size={15} />}
-            Guardar Borrador
+            {isEdit ? 'Guardar Cambios' : 'Guardar Borrador'}
           </button>
         </div>
       </form>

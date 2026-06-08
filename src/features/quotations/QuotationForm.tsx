@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+
 import { useNavigate } from 'react-router-dom'
 import { createQuotation, updateQuotation } from '@/shared/api/quotations'
 import { listCustomers } from '@/shared/api/customers'
 import type { CreateQuotationDto } from '@/shared/api/types'
+import type { Item } from '@/shared/api/types'
+import { ItemSelect } from '@/shared/ui/ItemSelect'
+import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDOP } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -11,8 +15,11 @@ import { format, addDays } from 'date-fns'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface LineItem {
   itemCode: string
+  itemLabel?: string      // nombre del artículo — para mostrar en el SearchSelect
   description: string
   qty: number
   rate: number
@@ -23,6 +30,8 @@ interface LineItem {
 interface QuotationFormProps {
   editId?: string
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function todayIso() {
   return format(new Date(), 'yyyy-MM-dd')
@@ -38,6 +47,8 @@ function calcAmount(qty: number, rate: number) {
   return Math.round(qty * rate * 100) / 100
 }
 
+// ─── Form ─────────────────────────────────────────────────────────────────────
+
 export default function QuotationForm({ editId }: QuotationFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -48,6 +59,9 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
   const [validTill, setValidTill] = useState(defaultValidTill())
   const [items, setItems] = useState<LineItem[]>([])
   const [notes, setNotes] = useState('')
+  const [submitted, setSubmitted] = useState(false)
+
+  // ── Customer search ──────────────────────────────────────────────────────
 
   const { data: customersData, isLoading: loadingCustomers } = useQuery({
     queryKey: ['customerSearch', customerQuery],
@@ -60,6 +74,8 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
     label: c.customerName,
     sublabel: c.rnc ?? c.cedula,
   }))
+
+  // ── Mutations ────────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
     mutationFn: (dto: CreateQuotationDto) => createQuotation(dto),
@@ -88,6 +104,8 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
+  // ── Line item helpers ────────────────────────────────────────────────────
+
   function updateItem(index: number, patch: Partial<LineItem>) {
     setItems((prev) =>
       prev.map((item, i) => {
@@ -97,8 +115,29 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
           updated.amount = calcAmount(updated.qty, updated.rate)
         }
         return updated
-      })
+      }),
     )
+  }
+
+  function selectCatalogItem(index: number, catalogItem: Item) {
+    setItems((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row
+        const rate = catalogItem.standardRate ?? 0
+        return {
+          ...row,
+          itemCode: catalogItem.id,
+          itemLabel: catalogItem.itemName,
+          description: catalogItem.description ?? catalogItem.itemName,
+          rate,
+          amount: calcAmount(row.qty, rate),
+        }
+      }),
+    )
+  }
+
+  function clearCatalogItem(index: number) {
+    updateItem(index, { itemCode: '', itemLabel: undefined, description: '', rate: 0, amount: 0 })
   }
 
   function addRow() {
@@ -113,8 +152,11 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
   const itbis = Math.round(subtotal * ITBIS_RATE * 100) / 100
   const total = subtotal + itbis
 
+  // ── Submit ────────────────────────────────────────────────────────────────
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setSubmitted(true)
 
     if (!customerId) {
       toast.error('Selecciona un cliente')
@@ -123,6 +165,23 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
     if (items.length === 0) {
       toast.error('Agrega al menos un artículo')
       return
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      const row = items[i]
+      const num = i + 1
+      if (!row.qty || row.qty <= 0) {
+        toast.error(`Artículo #${num}: la cantidad es requerida`)
+        return
+      }
+      if (!row.rate || row.rate <= 0) {
+        toast.error(`Artículo #${num}: el precio unitario es requerido`)
+        return
+      }
+      if (!row.uom) {
+        toast.error(`Artículo #${num}: la unidad (UDM) es requerida`)
+        return
+      }
     }
 
     const dto: CreateQuotationDto = {
@@ -146,6 +205,8 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -158,6 +219,7 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {/* ── Información General ─────────────────────────────────────────── */}
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">Información General</h2>
@@ -204,6 +266,7 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
           </div>
         </div>
 
+        {/* ── Artículos ───────────────────────────────────────────────────── */}
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">Artículos</h2>
@@ -212,12 +275,12 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
             <table className="items-table">
               <thead>
                 <tr>
-                  <th>Código</th>
+                  <th style={{ minWidth: 200 }}>Artículo</th>
                   <th>Descripción</th>
                   <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
-                  <th style={{ width: 56 }}>UDM</th>
+                  <th style={{ width: 72 }}>UDM</th>
                   <th style={{ width: 40 }} />
                 </tr>
               </thead>
@@ -231,25 +294,29 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
                 ) : (
                   items.map((item, index) => (
                     <tr key={index}>
-                      <td>
-                        <input
-                          className="items-input"
+                      {/* Artículo — SearchSelect por catálogo */}
+                      <td style={{ minWidth: 200 }}>
+                        <ItemSelect
                           value={item.itemCode}
-                          onChange={(e) => updateItem(index, { itemCode: e.target.value })}
-                          placeholder="ITEM-001"
+                          selectedLabel={item.itemLabel}
+                          onSelect={(catalogItem) => selectCatalogItem(index, catalogItem)}
+                          onClear={() => clearCatalogItem(index)}
                         />
                       </td>
+
+                      {/* Descripción — editable, pre-llenada al seleccionar ítem */}
                       <td>
                         <input
                           className="items-input"
                           value={item.description}
                           onChange={(e) => updateItem(index, { description: e.target.value })}
-                          placeholder="Descripción"
+                          placeholder="Descripción del servicio o artículo"
                         />
                       </td>
+
                       <td>
                         <input
-                          className="items-input"
+                          className={`items-input${submitted && (!item.qty || item.qty <= 0) ? ' items-input-error' : ''}`}
                           type="number"
                           min="0"
                           step="1"
@@ -258,9 +325,11 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
                           style={{ textAlign: 'right' }}
                         />
                       </td>
+
+                      {/* Precio — editable, pre-llenado con standardRate del catálogo */}
                       <td>
                         <input
-                          className="items-input"
+                          className={`items-input${submitted && (!item.rate || item.rate <= 0) ? ' items-input-error' : ''}`}
                           type="number"
                           min="0"
                           step="0.01"
@@ -269,15 +338,18 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
                           style={{ textAlign: 'right' }}
                         />
                       </td>
+
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
+
                       <td>
-                        <input
-                          className="items-input"
+                        <UomSelect
                           value={item.uom}
-                          onChange={(e) => updateItem(index, { uom: e.target.value })}
-                          placeholder="Unidad"
+                          onChange={(v) => updateItem(index, { uom: v })}
+                          itemCode={item.itemCode || undefined}
+                          error={submitted && !item.uom}
                         />
                       </td>
+
                       <td>
                         <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeRow(index)}>
                           <Trash2 size={13} />
@@ -312,6 +384,7 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
           </div>
         </div>
 
+        {/* ── Notas ───────────────────────────────────────────────────────── */}
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">Notas</h2>

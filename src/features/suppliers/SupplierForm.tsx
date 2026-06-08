@@ -186,17 +186,15 @@ export default function SupplierForm() {
   }
 
   return (
-    <div>
-      <div className="page-container" style={{ paddingBottom: 0 }}>
-        <button className="page-back-link" onClick={() => navigate(-1)}>
-          ← Proveedores
-        </button>
-      </div>
+    <div className="page-container">
+      <button className="page-back-link" onClick={() => navigate(-1)}>
+        ← Proveedores
+      </button>
 
       <PageHeader title={isEdit ? 'Editar Proveedor' : 'Nuevo Proveedor'} />
 
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 720 }}>
+      <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 720 }}>
+        <div>
           {/* General info */}
           <div className="card">
             <div className="card-header">

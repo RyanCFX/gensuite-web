@@ -38,6 +38,8 @@ const SupplierForm    = lazy(() => import('@/features/suppliers/SupplierForm'))
 const AgingPage       = lazy(() => import('@/features/cobros/AgingPage'))
 const SemaforoPage    = lazy(() => import('@/features/cobros/SemaforoPage'))
 const PagoPage        = lazy(() => import('@/features/cobros/PagoPage'))
+const CobrosPage      = lazy(() => import('@/features/cobros/CobrosPage'))
+const CobroDetail     = lazy(() => import('@/features/cobros/CobroDetail'))
 const UsuariosPage    = lazy(() => import('@/features/usuarios/UsuariosPage'))
 const ReportesPage    = lazy(() => import('@/features/reportes/ReportesPage'))
 const EmpresaConfig   = lazy(() => import('@/features/config/EmpresaConfig'))
@@ -90,6 +92,7 @@ export default function App() {
             {/* Facturación */}
             <Route path="/facturacion/facturas" element={<Suspense fallback={<PageLoader />}><InvoicesPage /></Suspense>} />
             <Route path="/facturacion/facturas/nueva" element={<Suspense fallback={<PageLoader />}><InvoiceForm /></Suspense>} />
+            <Route path="/facturacion/facturas/:id/editar" element={<Suspense fallback={<PageLoader />}><InvoiceForm /></Suspense>} />
             <Route path="/facturacion/facturas/:id" element={<Suspense fallback={<PageLoader />}><InvoiceDetail /></Suspense>} />
             <Route path="/facturacion/notas-credito" element={<Suspense fallback={<PageLoader />}><CreditNotesPage /></Suspense>} />
             <Route path="/facturacion/notas-debito" element={<Suspense fallback={<PageLoader />}><DebitNotesPage /></Suspense>} />
@@ -116,9 +119,11 @@ export default function App() {
             <Route path="/proveedores/:id/editar" element={<Suspense fallback={<PageLoader />}><SupplierForm /></Suspense>} />
 
             {/* Cobros */}
+            <Route path="/cobros" element={<Suspense fallback={<PageLoader />}><CobrosPage /></Suspense>} />
+            <Route path="/cobros/pago" element={<Suspense fallback={<PageLoader />}><PagoPage /></Suspense>} />
             <Route path="/cobros/aging" element={<Suspense fallback={<PageLoader />}><AgingPage /></Suspense>} />
             <Route path="/cobros/semaforo" element={<Suspense fallback={<PageLoader />}><SemaforoPage /></Suspense>} />
-            <Route path="/cobros/pago" element={<Suspense fallback={<PageLoader />}><PagoPage /></Suspense>} />
+            <Route path="/cobros/:id" element={<Suspense fallback={<PageLoader />}><CobroDetail /></Suspense>} />
 
             {/* Usuarios */}
             <Route path="/usuarios" element={<Suspense fallback={<PageLoader />}><UsuariosPage /></Suspense>} />

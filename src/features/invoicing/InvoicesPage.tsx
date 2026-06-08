@@ -8,17 +8,28 @@ import { formatDate, formatDOP } from '@/lib/formatters'
 import { NCF_TYPES } from '@/lib/constants'
 
 type StatusFilter = 'draft' | 'submitted' | 'cancelled' | 'all'
-type PaymentFilter = 'paid' | 'unpaid' | 'overdue' | 'partial' | 'all'
+type PaymentFilter = 'paid' | 'unpaid' | 'partly_paid' | 'overdue' | 'all'
 
 const STATUS_BADGE: Record<string, string> = {
-  Draft: 'badge-draft',
-  Submitted: 'badge-submitted',
-  Cancelled: 'badge-cancelled',
+  draft: 'badge-draft',
+  submitted: 'badge-submitted',
+  cancelled: 'badge-cancelled',
 }
 const STATUS_LABEL: Record<string, string> = {
-  Draft: 'Borrador',
-  Submitted: 'Sometido',
-  Cancelled: 'Cancelado',
+  draft: 'Borrador',
+  submitted: 'Sometido',
+  cancelled: 'Cancelado',
+}
+
+const PAYMENT_BADGE: Record<string, string> = {
+  unpaid: 'badge-warning',
+  partly_paid: 'badge-info',
+  paid: 'badge-success',
+}
+const PAYMENT_LABEL: Record<string, string> = {
+  unpaid: 'Pendiente',
+  partly_paid: 'Parcial',
+  paid: 'Pagado',
 }
 
 export default function InvoicesPage() {
@@ -47,12 +58,13 @@ export default function InvoicesPage() {
 
   const invoices = data?.items ?? []
 
-  function paymentBadge(inv: { outstandingAmount: number; grandTotal: number; status: string }) {
-    if (inv.status !== 'Submitted') return null
-    if (inv.outstandingAmount === 0) return <span className="badge badge-success">Pagado</span>
-    if (inv.outstandingAmount < inv.grandTotal && inv.outstandingAmount > 0)
-      return <span className="badge badge-info">Parcial</span>
-    return <span className="badge badge-warning">Pendiente</span>
+  function paymentBadge(inv: { status: string; paymentStatus?: string | null }) {
+    if (!inv.paymentStatus) return null
+    return (
+      <span className={`badge ${PAYMENT_BADGE[inv.paymentStatus] ?? 'badge-neutral'}`}>
+        {PAYMENT_LABEL[inv.paymentStatus] ?? inv.paymentStatus}
+      </span>
+    )
   }
 
   return (
@@ -87,10 +99,10 @@ export default function InvoicesPage() {
           </select>
           <select className="filter-select" value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value as PaymentFilter)}>
             <option value="all">Todo estado pago</option>
-            <option value="paid">Pagado</option>
             <option value="unpaid">Pendiente</option>
+            <option value="partly_paid">Parcial</option>
+            <option value="paid">Pagado</option>
             <option value="overdue">Vencido</option>
-            <option value="partial">Parcial</option>
           </select>
           <select className="filter-select" value={ncfType} onChange={(e) => setNcfType(e.target.value)}>
             <option value="">Todos los tipos NCF</option>

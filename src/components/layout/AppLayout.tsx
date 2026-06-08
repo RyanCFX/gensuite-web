@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Package, FileText, Receipt, Warehouse,
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
   ChevronRight, LogOut, Menu, Building2, UserCog, Sun, Moon,
-  Shield, X,
+  Shield, X, List,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth.store'
 import { Toaster } from 'sonner'
@@ -82,9 +82,10 @@ const NAV_FINANZAS: NavEntry[] = [
     icon: <Wallet size={16} aria-hidden="true" />,
     prefix: '/cobros',
     children: [
-      { label: 'Aging',           icon: <BarChart3 size={14} />, path: '/cobros/aging'   },
+      { label: 'Cobros',          icon: <List size={14} />,      path: '/cobros'          },
+      { label: 'Registrar Cobro', icon: <Wallet size={14} />,    path: '/cobros/pago'     },
+      { label: 'Aging',           icon: <BarChart3 size={14} />, path: '/cobros/aging'    },
       { label: 'Semáforo',        icon: <Shield size={14} />,    path: '/cobros/semaforo' },
-      { label: 'Registrar Cobro', icon: <Wallet size={14} />,    path: '/cobros/pago'    },
     ],
   },
   { label: 'Usuarios', icon: <UserCog size={16} aria-hidden="true" />, path: '/usuarios' },

@@ -10,9 +10,12 @@ import { TIPO_BIENES_606, FORMA_PAGO_606, NCF_TYPES_COMPRA, CATEGORIA_GASTO } fr
 import { Plus, Trash2, Info, AlertCircle } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { ItemSelect } from '@/shared/ui/ItemSelect'
+import type { Item } from '@/shared/api/types'
 
 interface ItemRow {
   itemCode: string
+  itemLabel?: string
   description: string
   qty: number
   rate: number
@@ -76,6 +79,25 @@ export default function GastoForm() {
     setItems((prev) => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row))
   }, [])
 
+  const selectCatalogItem = useCallback((idx: number, catalogItem: Item) => {
+    setItems((prev) => prev.map((row, i) => {
+      if (i !== idx) return row
+      return {
+        ...row,
+        itemCode: catalogItem.id,
+        itemLabel: catalogItem.itemName,
+        description: catalogItem.description ?? catalogItem.itemName,
+        rate: catalogItem.standardRate ?? 0,
+      }
+    }))
+  }, [])
+
+  const clearCatalogItem = useCallback((idx: number) => {
+    setItems((prev) => prev.map((row, i) =>
+      i === idx ? { ...row, itemCode: '', itemLabel: undefined, description: '', rate: 0 } : row,
+    ))
+  }, [])
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!supplierId) { toast.error('Selecciona un proveedor'); return }
@@ -104,15 +126,15 @@ export default function GastoForm() {
   }
 
   return (
-    <div>
+    <div className="page-container">
       <button className="page-back-link" onClick={() => navigate(-1)}>
         ← Volver
       </button>
 
       <PageHeader title="Nuevo Gasto" description="Registra un gasto sin movimiento de inventario" />
 
-      <form onSubmit={handleSubmit}>
-        <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div>
           {/* Header */}
           <div className="card">
             <div className="card-header">
@@ -158,7 +180,7 @@ export default function GastoForm() {
                 <table className="items-table">
                   <thead>
                     <tr>
-                      <th style={{ width: '12%' }}>Código</th>
+                      <th style={{ minWidth: 180 }}>Artículo / Concepto</th>
                       <th>Descripción</th>
                       <th style={{ width: '10%', textAlign: 'right' }}>Qty</th>
                       <th style={{ width: '12%', textAlign: 'right' }}>Precio</th>
@@ -168,8 +190,14 @@ export default function GastoForm() {
                   <tbody>
                     {items.map((item, idx) => (
                       <tr key={idx}>
-                        <td>
-                          <input className="items-input" placeholder="Código" value={item.itemCode} onChange={(e) => updateItem(idx, 'itemCode', e.target.value)} />
+                        <td style={{ minWidth: 180 }}>
+                          <ItemSelect
+                            value={item.itemCode}
+                            selectedLabel={item.itemLabel}
+                            onSelect={(catalogItem) => selectCatalogItem(idx, catalogItem)}
+                            onClear={() => clearCatalogItem(idx)}
+                            placeholder="Buscar concepto…"
+                          />
                         </td>
                         <td>
                           <input className="items-input" placeholder="Descripción" value={item.description} onChange={(e) => updateItem(idx, 'description', e.target.value)} />

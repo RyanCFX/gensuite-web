@@ -2,6 +2,7 @@ import { client, unwrap, unwrapPaginated } from './client'
 import { ENDPOINTS } from './endpoints'
 import type {
   InventoryItem,
+  InventoryListResult,
   InventorySummary,
   InventoryHistory,
   Warehouse,
@@ -24,9 +25,17 @@ export interface HistoryFilterParams extends PaginationParams {
   toDate?: string
 }
 
-export async function listInventory(params?: InventoryFilterParams) {
-  const res = await client.get<PaginatedResponse<InventoryItem>>(ENDPOINTS.inventory.list, { params })
-  return unwrapPaginated(res)
+export async function listInventory(params?: InventoryFilterParams): Promise<InventoryListResult> {
+  // Response shape: { success, data: { items: T[], summary: {} }, meta: {} }
+  const res = await client.get<{ success: true; data: { items: InventoryItem[]; summary: InventorySummary }; meta: { total: number; limit: number; offset: number; hasMore: boolean } }>(
+    ENDPOINTS.inventory.list,
+    { params },
+  )
+  return {
+    items: res.data.data.items ?? [],
+    summary: res.data.data.summary,
+    meta: res.data.meta,
+  }
 }
 
 export async function getInventorySummary() {

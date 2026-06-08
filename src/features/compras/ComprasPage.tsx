@@ -35,7 +35,7 @@ export default function ComprasPage() {
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
 
   return (
-    <div>
+    <div className="page-container">
       <PageHeader
         title="Compras"
         description="Registro de compras con actualización de inventario"
@@ -47,7 +47,7 @@ export default function ComprasPage() {
         }
       />
 
-      <div className="page-container">
+      <div>
         <div className="filter-bar">
           <div className="filter-bar-left">
             <div className="search-input-wrap">

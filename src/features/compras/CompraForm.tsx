@@ -11,9 +11,13 @@ import { TIPO_BIENES_606, FORMA_PAGO_606 } from '@/lib/constants'
 import { Plus, Trash2, Info } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { ItemSelect } from '@/shared/ui/ItemSelect'
+import { UomSelect } from '@/shared/ui/UomSelect'
+import type { Item } from '@/shared/api/types'
 
 interface ItemRow {
   itemCode: string
+  itemLabel?: string
   description: string
   qty: number
   rate: number
@@ -114,6 +118,26 @@ export default function CompraForm() {
     setItems((prev) => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row))
   }, [])
 
+  const selectCatalogItem = useCallback((idx: number, catalogItem: Item) => {
+    setItems((prev) => prev.map((row, i) => {
+      if (i !== idx) return row
+      return {
+        ...row,
+        itemCode: catalogItem.id,
+        itemLabel: catalogItem.itemName,
+        description: catalogItem.description ?? catalogItem.itemName,
+        // Para compras usamos valuationRate (costo) si existe, si no standardRate
+        rate: catalogItem.valuationRate ?? catalogItem.standardRate ?? 0,
+      }
+    }))
+  }, [])
+
+  const clearCatalogItem = useCallback((idx: number) => {
+    setItems((prev) => prev.map((row, i) =>
+      i === idx ? { ...row, itemCode: '', itemLabel: undefined, description: '', rate: 0 } : row,
+    ))
+  }, [])
+
   if (isEdit && loadingEdit) {
     return (
       <div className="page-container">
@@ -124,7 +148,7 @@ export default function CompraForm() {
   }
 
   return (
-    <div>
+    <div className="page-container">
       <button className="page-back-link" onClick={() => navigate(-1)}>
         ← Volver
       </button>
@@ -134,8 +158,8 @@ export default function CompraForm() {
         description="Registra una compra de inventario"
       />
 
-      <form onSubmit={handleSubmit}>
-        <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div>
           {/* Header fields */}
           <div className="card">
             <div className="card-header">
@@ -199,7 +223,7 @@ export default function CompraForm() {
                 <table className="items-table">
                   <thead>
                     <tr>
-                      <th style={{ width: '12%' }}>Código</th>
+                      <th style={{ minWidth: 180 }}>Artículo</th>
                       <th>Descripción</th>
                       <th style={{ width: '8%', textAlign: 'right' }}>Qty</th>
                       <th style={{ width: '12%', textAlign: 'right' }}>Precio</th>
@@ -211,12 +235,12 @@ export default function CompraForm() {
                   <tbody>
                     {items.map((item, idx) => (
                       <tr key={idx}>
-                        <td>
-                          <input
-                            className="items-input"
-                            placeholder="Código"
+                        <td style={{ minWidth: 180 }}>
+                          <ItemSelect
                             value={item.itemCode}
-                            onChange={(e) => updateItem(idx, 'itemCode', e.target.value)}
+                            selectedLabel={item.itemLabel}
+                            onSelect={(catalogItem) => selectCatalogItem(idx, catalogItem)}
+                            onClear={() => clearCatalogItem(idx)}
                           />
                         </td>
                         <td>
@@ -262,12 +286,7 @@ export default function CompraForm() {
                           </select>
                         </td>
                         <td>
-                          <input
-                            className="items-input"
-                            placeholder="Nos"
-                            value={item.uom}
-                            onChange={(e) => updateItem(idx, 'uom', e.target.value)}
-                          />
+                          <UomSelect value={item.uom} onChange={(v) => updateItem(idx, 'uom', v)} itemCode={item.itemCode || undefined} />
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <button

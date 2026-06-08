@@ -53,7 +53,7 @@ export default function GastosPage() {
   const resumenTyped = resumen as GastoResumen | undefined
 
   return (
-    <div>
+    <div className="page-container">
       <PageHeader
         title="Gastos"
         description="Registro de gastos sin movimiento de inventario"
@@ -65,7 +65,7 @@ export default function GastosPage() {
         }
       />
 
-      <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* Resumen del mes */}
         <div className="stats-row" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
           <div className="stat-card">

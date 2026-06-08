@@ -83,12 +83,10 @@ export default function GastoDetail() {
   }
 
   return (
-    <div>
-      <div className="page-container" style={{ paddingBottom: 0 }}>
-        <button className="page-back-link" onClick={() => navigate(-1)}>
-          ← Gastos
-        </button>
-      </div>
+    <div className="page-container">
+      <button className="page-back-link" onClick={() => navigate(-1)}>
+        ← Gastos
+      </button>
 
       <PageHeader
         title={`Gasto ${gasto.id}`}

@@ -90,7 +90,7 @@ export default function UsuariosPage() {
   }
 
   return (
-    <div>
+    <div className="page-container">
       <PageHeader
         title="Usuarios"
         description="Gestiona los usuarios del sistema"
@@ -102,7 +102,7 @@ export default function UsuariosPage() {
         }
       />
 
-      <div className="page-container">
+      <div>
         <div className="card">
           <div className="table-scroll">
             <table className="data-table">

@@ -18,13 +18,13 @@ export default function AgingPage() {
   }
 
   return (
-    <div>
+    <div className="page-container">
       <PageHeader
         title="Aging de Cuentas por Cobrar"
         description="Análisis de saldos vencidos por cliente"
       />
 
-      <div className="page-container">
+      <div>
         <div className="card">
           <div className="table-scroll">
             <table className="data-table">
@@ -69,7 +69,7 @@ export default function AgingPage() {
                         )
                       : data.map((entry) => (
                           <tr key={entry.customer}>
-                            <td style={{ fontWeight: 500 }}>{entry.customerName}</td>
+                            <td style={{ fontWeight: 500 }}>{entry.customer}</td>
                             <td style={{ textAlign: 'right' }}>{formatDOP(entry.current)}</td>
                             <td style={{ textAlign: 'right', ...agingStyle(entry.range1) }}>{formatDOP(entry.range1)}</td>
                             <td style={{ textAlign: 'right', ...agingStyle(entry.range2) }}>{formatDOP(entry.range2)}</td>

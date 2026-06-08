@@ -10,13 +10,13 @@ export default function SemaforoPage() {
   })
 
   return (
-    <div>
+    <div className="page-container">
       <PageHeader
         title="Semáforo de Crédito"
         description="Estado de crédito por cliente"
       />
 
-      <div className="page-container">
+      <div>
         {isLoading && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             {Array.from({ length: 6 }).map((_, i) => (
@@ -38,35 +38,35 @@ export default function SemaforoPage() {
           </div>
         )}
 
-        {!isLoading && !isError && (!data || data.length === 0) && (
+        {!isLoading && !isError && (!data || data.clientes.length === 0) && (
           <div className="empty-state">
             <p className="empty-title">Sin datos</p>
             <p className="empty-sub">No hay clientes con crédito activo.</p>
           </div>
         )}
 
-        {data && data.length > 0 && (
+        {data && data.clientes.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-            {data.map((entry) => {
-              const semaforoClass = entry.status === 'verde'
+            {data.clientes.map((entry) => {
+              const semaforoClass = entry.semaforo === 'verde'
                 ? 'semaforo-verde'
-                : entry.status === 'amarillo'
+                : entry.semaforo === 'amarillo'
                   ? 'semaforo-amarillo'
                   : 'semaforo-rojo'
-              const semaforoLabel = entry.status === 'verde' ? 'Normal' : entry.status === 'amarillo' ? 'Alerta' : 'Crítico'
-              const barColor = entry.status === 'verde'
+              const semaforoLabel = entry.semaforo === 'verde' ? 'Normal' : entry.semaforo === 'amarillo' ? 'Alerta' : 'Crítico'
+              const barColor = entry.semaforo === 'verde'
                 ? 'var(--success-text)'
-                : entry.status === 'amarillo'
+                : entry.semaforo === 'amarillo'
                   ? 'var(--warning-text)'
                   : 'var(--error-text)'
 
-              const borderColor = entry.status === 'verde'
+              const borderColor = entry.semaforo === 'verde'
                 ? 'var(--success-text)'
-                : entry.status === 'amarillo'
+                : entry.semaforo === 'amarillo'
                   ? 'var(--warning-text)'
                   : 'var(--error-text)'
 
-              const pct = Math.min(entry.usagePct, 100)
+              const pct = Math.min(entry.pctUsado ?? 0, 100)
 
               return (
                 <div
@@ -97,7 +97,7 @@ export default function SemaforoPage() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <div>
                         <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Balance actual</p>
-                        <p style={{ fontSize: 13, fontWeight: 600 }}>{formatDOP(entry.totalOutstanding)}</p>
+                        <p style={{ fontSize: 13, fontWeight: 600 }}>{formatDOP(entry.balance)}</p>
                       </div>
                       <div>
                         <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Límite de crédito</p>

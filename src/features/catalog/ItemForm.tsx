@@ -1,13 +1,19 @@
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { useForm, useFieldArray } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { createItem, listCategories, listBrands } from '@/shared/api/catalog'
 import { listWarehouses } from '@/shared/api/inventory'
+import { listUOMs } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+
+const uomConversionSchema = z.object({
+  uom: z.string().min(1, 'Requerido'),
+  conversionFactor: z.number().min(0.0001, 'Debe ser mayor a 0'),
+})
 
 const schema = z.object({
   itemName: z.string().min(1, 'El nombre es requerido'),
@@ -19,6 +25,9 @@ const schema = z.object({
   description: z.string().optional(),
   itemCode: z.string().min(1, 'El código es requerido'),
   defaultWarehouse: z.string().optional(),
+  stockUom: z.string().optional(),
+  salesUom: z.string().optional(),
+  uoms: z.array(uomConversionSchema).optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -42,6 +51,12 @@ export default function ItemForm() {
     queryFn: () => listWarehouses(),
   })
 
+  const { data: uomsData } = useQuery({
+    queryKey: ['uoms'],
+    queryFn: listUOMs,
+    staleTime: 5 * 60_000,
+  })
+
   const createMutation = useMutation({
     mutationFn: (data: FormValues) => createItem(data),
     onSuccess: () => {
@@ -58,6 +73,7 @@ export default function ItemForm() {
     register,
     handleSubmit,
     watch,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -71,27 +87,39 @@ export default function ItemForm() {
       description: '',
       itemCode: '',
       defaultWarehouse: '',
+      stockUom: '',
+      salesUom: '',
+      uoms: [],
     },
+  })
+
+  const { fields: uomFields, append: appendUom, remove: removeUom } = useFieldArray({
+    control,
+    name: 'uoms',
   })
 
   const selectedType = watch('type')
 
   const onSubmit = (data: FormValues) => {
-    const payload: FormValues = {
+    createMutation.mutate({
       ...data,
       brand: data.brand || undefined,
-      itemCode: data.itemCode,
       description: data.description || undefined,
       defaultWarehouse: data.defaultWarehouse || undefined,
       valuationRate: data.valuationRate || undefined,
-    }
-    createMutation.mutate(payload)
+      stockUom: data.stockUom || undefined,
+      salesUom: data.salesUom || undefined,
+      uoms: data.uoms?.length ? data.uoms : undefined,
+    })
   }
 
-  // unwrapPaginated returns { items, meta } — use .items, not .data
   const categories = categoriesData?.items ?? []
   const brands = brandsData?.items ?? []
   const warehouses = warehousesData ?? []
+  const uoms = uomsData ?? []
+
+  console.log(uoms);
+  
 
   return (
     <div className="page-container">
@@ -105,151 +133,220 @@ export default function ItemForm() {
         overline="Catálogo"
       />
 
-      <div className="card" style={{ maxWidth: 640 }}>
-        <form onSubmit={handleSubmit(onSubmit)}>
+      <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 680 }}>
+
+        {/* ── Información básica ───────────────────────────────────────── */}
+        <div className="card">
+          <div className="card-header"><h2 className="card-title">Información General</h2></div>
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Tipo */}
-            <div className="ff-wrap">
-              <label className="ff-label" htmlFor="type">
-                Tipo <span className="ff-required">*</span>
-              </label>
-              <select id="type" className="ff-select" {...register('type')}>
-                <option value="product">Producto</option>
-                <option value="service">Servicio</option>
-              </select>
+
+            <div className="form-row">
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="type">Tipo <span className="ff-required">*</span></label>
+                <select id="type" className="ff-select" {...register('type')}>
+                  <option value="product">Producto</option>
+                  <option value="service">Servicio</option>
+                </select>
+              </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="itemCode">Código <span className="ff-required">*</span></label>
+                <input
+                  id="itemCode"
+                  className={`ff-input${errors.itemCode ? ' ff-input-error' : ''}`}
+                  placeholder="Ej: PROD-001"
+                  {...register('itemCode')}
+                />
+                {errors.itemCode && <span className="ff-error">{errors.itemCode.message}</span>}
+              </div>
             </div>
 
-            {/* Código */}
             <div className="ff-wrap">
-              <label className="ff-label" htmlFor="itemCode">
-                Código <span className="ff-required">*</span>
-              </label>
-              <input
-                id="itemCode"
-                className={`ff-input${errors.itemCode ? ' ff-input-error' : ''}`}
-                placeholder="Ej: PROD-001"
-                {...register('itemCode')}
-              />
-              {errors.itemCode && <span className="ff-error">{errors.itemCode.message}</span>}
-            </div>
-
-            {/* Nombre */}
-            <div className="ff-wrap">
-              <label className="ff-label" htmlFor="itemName">
-                Nombre <span className="ff-required">*</span>
-              </label>
+              <label className="ff-label" htmlFor="itemName">Nombre <span className="ff-required">*</span></label>
               <input
                 id="itemName"
-                className="ff-input"
+                className={`ff-input${errors.itemName ? ' ff-input-error' : ''}`}
                 placeholder="Nombre del artículo"
                 {...register('itemName')}
               />
               {errors.itemName && <span className="ff-error">{errors.itemName.message}</span>}
             </div>
 
-            {/* Descripción */}
             <div className="ff-wrap">
               <label className="ff-label" htmlFor="description">Descripción</label>
-              <textarea
-                id="description"
-                className="ff-textarea"
-                rows={3}
-                placeholder="Descripción opcional"
-                {...register('description')}
-              />
+              <textarea id="description" className="ff-textarea" rows={3} placeholder="Descripción opcional" {...register('description')} />
             </div>
 
-            {/* Categoría */}
-            <div className="ff-wrap">
-              <label className="ff-label" htmlFor="category">
-                Categoría <span className="ff-required">*</span>
-              </label>
-              <select id="category" className="ff-select" {...register('category')}>
-                <option value="">Seleccionar categoría</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </select>
-              {errors.category && <span className="ff-error">{errors.category.message}</span>}
-            </div>
+            <div className="form-row">
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="category">Categoría <span className="ff-required">*</span></label>
+                <select id="category" className={`ff-select${errors.category ? ' ff-input-error' : ''}`} {...register('category')}>
+                  <option value="">Seleccionar categoría</option>
+                  {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                </select>
+                {errors.category && <span className="ff-error">{errors.category.message}</span>}
+              </div>
 
-            {/* Marca */}
-            <div className="ff-wrap">
-              <label className="ff-label" htmlFor="brand">Marca</label>
-              <select id="brand" className="ff-select" {...register('brand')}>
-                <option value="">Sin marca</option>
-                {brands.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="brand">Marca</label>
+                <select id="brand" className="ff-select" {...register('brand')}>
+                  <option value="">Sin marca</option>
+                  {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
             </div>
+          </div>
+        </div>
 
-            {/* Precio de Venta */}
-            <div className="ff-wrap">
-              <label className="ff-label" htmlFor="standardRate">
-                Precio de Venta <span className="ff-required">*</span>
-              </label>
-              <input
-                id="standardRate"
-                type="number"
-                step="0.01"
-                min="0"
-                className="ff-input"
-                placeholder="0.00"
-                {...register('standardRate', { valueAsNumber: true })}
-              />
-              {errors.standardRate && <span className="ff-error">{errors.standardRate.message}</span>}
-            </div>
+        {/* ── Precios ──────────────────────────────────────────────────── */}
+        <div className="card">
+          <div className="card-header"><h2 className="card-title">Precios</h2></div>
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="form-row">
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="standardRate">Precio de Venta <span className="ff-required">*</span></label>
+                <input
+                  id="standardRate"
+                  type="number" step="0.01" min="0"
+                  className={`ff-input${errors.standardRate ? ' ff-input-error' : ''}`}
+                  placeholder="0.00"
+                  {...register('standardRate', { valueAsNumber: true })}
+                />
+                {errors.standardRate && <span className="ff-error">{errors.standardRate.message}</span>}
+              </div>
 
-            {selectedType === 'product' && (
-              <>
-                {/* Costo de Valoración */}
+              {selectedType === 'product' && (
                 <div className="ff-wrap">
                   <label className="ff-label" htmlFor="valuationRate">Costo de Valoración</label>
                   <input
                     id="valuationRate"
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="number" step="0.01" min="0"
                     className="ff-input"
                     placeholder="0.00"
                     {...register('valuationRate', { valueAsNumber: true })}
                   />
-                  {errors.valuationRate && <span className="ff-error">{errors.valuationRate.message}</span>}
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
 
-                {/* Almacén por defecto */}
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="defaultWarehouse">Almacén por defecto</label>
-                  <select id="defaultWarehouse" className="ff-select" {...register('defaultWarehouse')}>
-                    <option value="">Sin asignar</option>
-                    {warehouses.map((w) => (
-                      <option key={w.id} value={w.id}>{w.name}</option>
-                    ))}
-                  </select>
+        {/* ── Unidades de Medida ───────────────────────────────────────── */}
+        <div className="card">
+          <div className="card-header"><h2 className="card-title">Unidades de Medida</h2></div>
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            <div className="form-row">
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="stockUom">UDM de Stock</label>
+                <select id="stockUom" className="ff-select" {...register('stockUom')}>
+                  <option value="">Seleccionar</option>
+                  {uoms.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
+                </select>
+                <p className="ff-hint">Unidad base en la que se registra el inventario</p>
+              </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="salesUom">UDM de Venta</label>
+                
+                <select id="salesUom" className="ff-select" {...register('salesUom')}>
+                  <option value="">Igual a UDM de Stock</option>
+                  {uoms.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
+                </select>
+                <p className="ff-hint">Unidad en la que se vende al cliente</p>
+              </div>
+            </div>
+
+            {/* Conversiones adicionales */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span className="ff-label" style={{ margin: 0 }}>Conversiones adicionales</span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-size-sm"
+                  onClick={() => appendUom({ uom: '', conversionFactor: 1 })}
+                >
+                  <Plus size={13} /> Agregar
+                </button>
+              </div>
+
+              {uomFields.length === 0 ? (
+                <p className="ff-hint">Sin conversiones. Agrega una si usas múltiples unidades (ej: Caja = 12 Nos).</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {uomFields.map((field, idx) => (
+                    <div key={field.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                      <div className="ff-wrap" style={{ flex: 1 }}>
+                        {idx === 0 && <label className="ff-label">Unidad</label>}
+                        <select
+                          className={`ff-select${errors.uoms?.[idx]?.uom ? ' ff-input-error' : ''}`}
+                          {...register(`uoms.${idx}.uom`)}
+                        >
+                          <option value="">Seleccionar</option>
+                          {uoms.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
+                        </select>
+                        {errors.uoms?.[idx]?.uom && <span className="ff-error">{errors.uoms[idx]?.uom?.message}</span>}
+                      </div>
+
+                      <div className="ff-wrap" style={{ width: 140 }}>
+                        {idx === 0 && <label className="ff-label">Factor de conversión</label>}
+                        <input
+                          type="number"
+                          step="0.0001"
+                          min="0.0001"
+                          className={`ff-input${errors.uoms?.[idx]?.conversionFactor ? ' ff-input-error' : ''}`}
+                          placeholder="Ej: 12"
+                          {...register(`uoms.${idx}.conversionFactor`, { valueAsNumber: true })}
+                        />
+                        {errors.uoms?.[idx]?.conversionFactor && (
+                          <span className="ff-error">{errors.uoms[idx]?.conversionFactor?.message}</span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-size-icon-sm"
+                        style={{ marginTop: idx === 0 ? 22 : 0 }}
+                        onClick={() => removeUom(idx)}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                  <p className="ff-hint">
+                    Ejemplo: UDM Stock = <strong>Nos</strong>, conversión <strong>Box → 12</strong> significa que 1 Box = 12 Nos.
+                  </p>
                 </div>
-              </>
-            )}
+              )}
+            </div>
           </div>
+        </div>
 
-          <div className="card-footer" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => navigate('/catalogo/articulos')}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={isSubmitting || createMutation.isPending}
-            >
-              {createMutation.isPending ? 'Guardando…' : 'Crear Artículo'}
-            </button>
+        {/* ── Inventario (solo productos) ──────────────────────────────── */}
+        {selectedType === 'product' && (
+          <div className="card">
+            <div className="card-header"><h2 className="card-title">Inventario</h2></div>
+            <div className="card-body">
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="defaultWarehouse">Almacén por defecto</label>
+                <select id="defaultWarehouse" className="ff-select" {...register('defaultWarehouse')}>
+                  <option value="">Sin asignar</option>
+                  {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+            </div>
           </div>
-        </form>
-      </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate('/catalogo/articulos')}>
+            Cancelar
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={isSubmitting || createMutation.isPending}>
+            {createMutation.isPending ? 'Guardando…' : 'Crear Artículo'}
+          </button>
+        </div>
+      </form>
     </div>
   )
 }

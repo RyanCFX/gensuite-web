@@ -98,19 +98,17 @@ export default function CompraDetail() {
   }
 
   return (
-    <div>
-      <div className="page-container" style={{ paddingBottom: 0 }}>
-        <button className="page-back-link" onClick={() => navigate(-1)}>
-          ← Compras
-        </button>
-      </div>
+    <div className="page-container">
+      <button className="page-back-link" onClick={() => navigate(-1)}>
+        ← Compras
+      </button>
 
       <PageHeader
         title={`Compra ${compra.id}`}
         description={compra.supplierName}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {compra.status === 'Draft' && (
+            {compra.status === 'draft' && (
               <>
                 <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmAction('submit')}>
                   <Send size={14} />Someter
@@ -120,7 +118,7 @@ export default function CompraDetail() {
                 </button>
               </>
             )}
-            {compra.status === 'Submitted' && (
+            {compra.status === 'submitted' && (
               <>
                 <button className="btn btn-secondary btn-size-sm" onClick={() => setConfirmAction('amend')}>
                   <RotateCcw size={14} />Enmendar
