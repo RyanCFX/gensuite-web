@@ -51,6 +51,7 @@ const CuentaForm      = lazy(() => import('@/features/cuentas/CuentaForm'))
 const JournalPage     = lazy(() => import('@/features/journal/JournalPage'))
 const JournalForm     = lazy(() => import('@/features/journal/JournalForm'))
 const JournalDetail   = lazy(() => import('@/features/journal/JournalDetail'))
+const CierrePeriodoPage = lazy(() => import('@/features/contabilidad/CierrePeriodoPage'))
 
 function PageLoader() {
   return (
@@ -126,7 +127,7 @@ export default function App() {
             <Route path="/proveedores/:id/editar" element={<Suspense fallback={<PageLoader />}><SupplierForm /></Suspense>} />
 
             {/* Cobros */}
-            <Route path="/cobros" element={<Suspense fallback={<PageLoader />}><CobrosPage /></Suspense>} />
+            <Route path="/cobros/lista" element={<Suspense fallback={<PageLoader />}><CobrosPage /></Suspense>} />
             <Route path="/cobros/pago" element={<Suspense fallback={<PageLoader />}><PagoPage /></Suspense>} />
             <Route path="/cobros/aging" element={<Suspense fallback={<PageLoader />}><AgingPage /></Suspense>} />
             <Route path="/cobros/semaforo" element={<Suspense fallback={<PageLoader />}><SemaforoPage /></Suspense>} />
@@ -149,6 +150,9 @@ export default function App() {
             <Route path="/asientos" element={<Suspense fallback={<PageLoader />}><JournalPage /></Suspense>} />
             <Route path="/asientos/nuevo" element={<Suspense fallback={<PageLoader />}><JournalForm /></Suspense>} />
             <Route path="/asientos/:id" element={<Suspense fallback={<PageLoader />}><JournalDetail /></Suspense>} />
+
+            {/* Contabilidad — Cierre de Período */}
+            <Route path="/contabilidad/cierre-periodo" element={<Suspense fallback={<PageLoader />}><CierrePeriodoPage /></Suspense>} />
 
             {/* Configuración */}
             <Route path="/config/empresa" element={<Suspense fallback={<PageLoader />}><EmpresaConfig /></Suspense>} />

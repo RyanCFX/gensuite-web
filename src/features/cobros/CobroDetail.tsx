@@ -70,7 +70,7 @@ export default function CobroDetail() {
   if (isError || !cobro) {
     return (
       <div className="page-container">
-        <a className="page-back-link" onClick={() => navigate('/cobros')}>
+        <a className="page-back-link" onClick={() => navigate('/cobros/lista')}>
           <ArrowLeft size={14} /> Cobros
         </a>
         <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-tertiary)' }}>
@@ -88,7 +88,7 @@ export default function CobroDetail() {
     <div className="page-container">
 
       {/* Back */}
-      <a className="page-back-link" onClick={() => navigate('/cobros')}>
+      <a className="page-back-link" onClick={() => navigate('/cobros/lista')}>
         <ArrowLeft size={14} /> Cobros
       </a>
 

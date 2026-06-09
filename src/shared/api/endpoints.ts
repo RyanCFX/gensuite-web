@@ -119,8 +119,20 @@ export const ENDPOINTS = {
     impuestosCompras: '/config/impuestos-compras',
     impuestosComprasById: (id: string) => `/config/impuestos-compras/${encodeURIComponent(id)}`,
   },
+  ejercicioFiscal: {
+    list: '/config/ejercicio-fiscal',
+    vigente: '/config/ejercicio-fiscal/vigente',
+    byId: (id: string) => `/config/ejercicio-fiscal/${encodeURIComponent(id)}`,
+    close: (id: string) => `/config/ejercicio-fiscal/${encodeURIComponent(id)}/close`,
+    reopen: (id: string) => `/config/ejercicio-fiscal/${encodeURIComponent(id)}/reopen`,
+  },
+  cierrePeriodo: {
+    list: '/contabilidad/cierre-periodo',
+    byId: (id: string) => `/contabilidad/cierre-periodo/${encodeURIComponent(id)}`,
+    submit: (id: string) => `/contabilidad/cierre-periodo/${encodeURIComponent(id)}/submit`,
+  },
   cobros: {
-    list: '/cobros',
+    list: '/cobros/lista',
     pendientes: '/cobros/pendientes',
     aging: '/cobros/aging',
     semaforo: '/cobros/semaforo',

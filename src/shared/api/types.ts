@@ -992,3 +992,46 @@ export interface CreateJournalEntryDto {
   remarks?: string
   voucherType?: string
 }
+
+// ─── Ejercicio Fiscal ──────────────────────────────────────────────────────────
+
+export interface EjercicioFiscal {
+  id: string
+  year: string
+  yearStartDate: string
+  yearEndDate: string
+  isClosed: boolean
+  disabled: boolean
+}
+
+export interface CreateEjercicioFiscalDto {
+  year: string
+  yearStartDate: string
+  yearEndDate: string
+}
+
+// ─── Cierre de Período ─────────────────────────────────────────────────────────
+
+export interface CierrePeriodo {
+  id: string
+  transactionDate: string
+  postingDate: string
+  periodEndDate: string
+  closingFiscalYear: string
+  costCenter: string
+  closingAccountHead: string
+  remarks?: string
+  status: 'draft' | 'submitted'
+  warning?: string
+  createdAt: string
+  modifiedAt: string
+}
+
+export interface CreateCierrePeriodoDto {
+  periodEndDate: string
+  closingFiscalYear: string
+  costCenter: string
+  closingAccountHead: string
+  postingDate: string
+  remarks?: string
+}

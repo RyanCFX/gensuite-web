@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Package, FileText, Receipt, Warehouse,
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
   ChevronRight, LogOut, Menu, Building2, UserCog, Sun, Moon,
-  Shield, X, BookOpen, ClipboardList, Percent,
+  Shield, X, BookOpen, ClipboardList, Percent, Calendar, Lock,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth.store'
 import { Toaster } from 'sonner'
@@ -82,7 +82,7 @@ const NAV_FINANZAS: NavEntry[] = [
     icon: <Wallet size={16} aria-hidden="true" />,
     prefix: '/cobros',
     children: [
-      { label: 'Cobros',          icon: <ClipboardList size={14} />, path: '/cobros'          },
+      { label: 'Cobros',          icon: <ClipboardList size={14} />, path: '/cobros/lista'          },
       { label: 'Registrar Cobro', icon: <Wallet size={14} />,    path: '/cobros/pago'     },
       { label: 'Aging',           icon: <BarChart3 size={14} />, path: '/cobros/aging'    },
       { label: 'Semáforo',        icon: <Shield size={14} />,    path: '/cobros/semaforo' },
@@ -108,7 +108,7 @@ const NAV_REPORTES: NavEntry = {
 const NAV_CONFIG: NavEntry = {
   label: 'Configuración',
   icon: <Settings size={16} aria-hidden="true" />,
-  prefix: '/config|/cuentas|/asientos',
+  prefix: '/config|/cuentas|/asientos|/contabilidad',
   children: [
     { label: 'Empresa',            icon: <Building2 size={14} />,    path: '/config/empresa'      },
     { label: 'Cobranza',           icon: <Wallet size={14} />,       path: '/config/cobros'       },
@@ -119,8 +119,10 @@ const NAV_CONFIG: NavEntry = {
     { label: 'Secuencias NCF',     icon: <Shield size={14} />,       path: '/config/ncf'          },
     { label: 'Impuestos Ventas',   icon: <Percent size={14} />,      path: '/config/impuestos-ventas'  },
     { label: 'Impuestos Compras',  icon: <Percent size={14} />,      path: '/config/impuestos-compras' },
+    { label: 'Ejercicio Fiscal',   icon: <Calendar size={14} />,     path: '/config/ejercicio-fiscal'  },
     { label: 'Cuentas Contables',  icon: <BookOpen size={14} />,     path: '/cuentas'             },
     { label: 'Asientos Contables', icon: <ClipboardList size={14} />, path: '/asientos'           },
+    { label: 'Cierre de Período',  icon: <Lock size={14} />,         path: '/contabilidad/cierre-periodo' },
     { label: 'Mi Perfil',          icon: <UserCog size={14} />,      path: '/config/perfil'       },
   ],
 }

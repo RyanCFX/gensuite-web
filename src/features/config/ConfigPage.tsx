@@ -19,6 +19,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { formatDate } from '@/lib/formatters'
 import { Plus, Trash2, Save, FileWarning, X, Pencil } from 'lucide-react'
+import EjercicioFiscalSection from './EjercicioFiscalSection'
 
 function is503(error: unknown): boolean {
   if (axios.isAxiosError(error) && error.response?.status === 503) return true
@@ -959,6 +960,7 @@ const SECTION_TITLES: Record<string, string> = {
   ncf: 'Secuencias NCF',
   'impuestos-ventas': 'Impuestos — Ventas',
   'impuestos-compras': 'Impuestos — Compras',
+  'ejercicio-fiscal': 'Ejercicio Fiscal',
   perfil: 'Mi Perfil',
 }
 
@@ -975,6 +977,7 @@ export default function ConfigPage() {
     ncf: <NcfSection />,
     'impuestos-ventas': <TaxTemplatesSection kind="ventas" />,
     'impuestos-compras': <TaxTemplatesSection kind="compras" />,
+    'ejercicio-fiscal': <EjercicioFiscalSection />,
     perfil: <PerfilSection />,
   }
 
