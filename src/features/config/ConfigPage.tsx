@@ -11,8 +11,10 @@ import {
   listListasPrecio,
   getNcfSeries,
   getPerfil, updatePerfil,
+  listImpuestosVentas, createImpuestoVentas, updateImpuestoVentas, deleteImpuestoVentas,
+  listImpuestosCompras, createImpuestoCompras, updateImpuestoCompras, deleteImpuestoCompras,
 } from '@/shared/api/config'
-import type { CobrosConfig, MetodoPago } from '@/shared/api/types'
+import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, CreateTaxTemplateDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { formatDate } from '@/lib/formatters'
@@ -630,6 +632,323 @@ function PerfilSection() {
   )
 }
 
+// ---- Tax Templates Section (shared for ventas/compras) ----
+const CHARGE_TYPE_OPTIONS: TaxChargeType[] = [
+  'On Net Total',
+  'Actual',
+  'On Previous Row Amount',
+  'On Previous Row Total',
+  'On Item Quantity',
+]
+
+function emptyTaxLine(): TaxTemplateLine {
+  return { chargeType: 'On Net Total', accountHead: '', rate: 18, description: '' }
+}
+
+interface TaxTemplatesSectionProps {
+  kind: 'ventas' | 'compras'
+}
+
+function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
+  const queryClient = useQueryClient()
+  const queryKey = kind === 'ventas' ? 'impuestos-ventas' : 'impuestos-compras'
+  const listFn = kind === 'ventas' ? listImpuestosVentas : listImpuestosCompras
+  const createFn = kind === 'ventas' ? createImpuestoVentas : createImpuestoCompras
+  const updateFn = kind === 'ventas' ? updateImpuestoVentas : updateImpuestoCompras
+  const deleteFn = kind === 'ventas' ? deleteImpuestoVentas : deleteImpuestoCompras
+
+  const { data, isLoading } = useQuery({ queryKey: [queryKey], queryFn: listFn })
+
+  // ── Form state ────────────────────────────────────────────────────────────
+  const [showForm, setShowForm] = useState(false)
+  const [editTarget, setEditTarget] = useState<TaxTemplate | null>(null)
+  const [toDelete, setToDelete] = useState<TaxTemplate | null>(null)
+
+  const [formTitle, setFormTitle] = useState('')
+  const [formDefault, setFormDefault] = useState(false)
+  const [formTaxes, setFormTaxes] = useState<TaxTemplateLine[]>([emptyTaxLine()])
+
+  function openCreate() {
+    setEditTarget(null)
+    setFormTitle('')
+    setFormDefault(false)
+    setFormTaxes([emptyTaxLine()])
+    setShowForm(true)
+  }
+
+  function openEdit(t: TaxTemplate) {
+    setEditTarget(t)
+    setFormTitle(t.title)
+    setFormDefault(t.isDefault)
+    setFormTaxes(t.taxes.length > 0 ? t.taxes.map((l) => ({ ...l })) : [emptyTaxLine()])
+    setShowForm(true)
+  }
+
+  function closeForm() {
+    setShowForm(false)
+    setEditTarget(null)
+  }
+
+  function updateTaxLine(idx: number, patch: Partial<TaxTemplateLine>) {
+    setFormTaxes((prev) => prev.map((l, i) => i === idx ? { ...l, ...patch } : l))
+  }
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const dto: CreateTaxTemplateDto = {
+        title: formTitle,
+        isDefault: formDefault,
+        taxes: formTaxes,
+      }
+      return editTarget ? updateFn(editTarget.id, dto) : createFn(dto)
+    },
+    onSuccess: () => {
+      toast.success(editTarget ? 'Template actualizado' : 'Template creado')
+      queryClient.invalidateQueries({ queryKey: [queryKey] })
+      closeForm()
+    },
+    onError: () => toast.error('Error al guardar el template'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteFn(id),
+    onSuccess: () => {
+      toast.success('Template eliminado')
+      queryClient.invalidateQueries({ queryKey: [queryKey] })
+      setToDelete(null)
+    },
+    onError: () => toast.error('Error al eliminar el template'),
+  })
+
+  const label = kind === 'ventas' ? 'Ventas' : 'Compras'
+
+  return (
+    <>
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Templates de Impuesto — {label}</span>
+          <button className="btn btn-primary btn-size-sm" onClick={openCreate}>
+            <Plus size={14} /> Nuevo
+          </button>
+        </div>
+        <div>
+          {isLoading
+            ? <span className="skeleton-box" style={{ height: 128, display: 'block', margin: 16 }} />
+            : !data || data.length === 0
+              ? (
+                  <div className="card-body">
+                    <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                      No hay templates configurados. Crea uno con el botón <strong>Nuevo</strong>.
+                    </p>
+                  </div>
+                )
+              : (
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Título</th>
+                        <th>Líneas</th>
+                        <th>Por defecto</th>
+                        <th style={{ width: 80 }} />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.map((t) => (
+                        <tr key={t.id}>
+                          <td style={{ fontWeight: 500 }}>{t.title}</td>
+                          <td className="td-muted">
+                            {t.taxes.map((l, i) => (
+                              <span key={i} style={{ display: 'block', fontSize: 12 }}>
+                                {l.description || l.chargeType} — {l.rate}%
+                              </span>
+                            ))}
+                          </td>
+                          <td>
+                            {t.isDefault
+                              ? <span className="badge badge-success">Sí</span>
+                              : <span className="badge badge-neutral">No</span>}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button className="btn btn-ghost btn-size-icon-sm" onClick={() => openEdit(t)}>
+                                <Pencil size={13} />
+                              </button>
+                              <button
+                                className="btn btn-ghost btn-size-icon-sm"
+                                style={{ color: 'var(--icon-muted)' }}
+                                onClick={() => setToDelete(t)}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+        </div>
+      </div>
+
+      {/* Create / Edit modal */}
+      {showForm && (
+        <div className="modal-overlay" onClick={closeForm}>
+          <div className="modal-box" style={{ maxWidth: 680 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title">{editTarget ? 'Editar Template' : 'Nuevo Template'} — {label}</h2>
+              <button className="modal-close" onClick={closeForm}><X size={16} /></button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div className="ff-wrap" style={{ flex: 1 }}>
+                  <label className="ff-label ff-required">Título</label>
+                  <input
+                    className="ff-input"
+                    value={formTitle}
+                    onChange={(e) => setFormTitle(e.target.value)}
+                    placeholder="ITBIS 18%"
+                  />
+                </div>
+                <div className="ff-wrap" style={{ alignSelf: 'center', paddingTop: 20 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={formDefault}
+                      onChange={(e) => setFormDefault(e.target.checked)}
+                      style={{ width: 16, height: 16 }}
+                    />
+                    Template por defecto
+                  </label>
+                </div>
+              </div>
+
+              {/* Tax lines table */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <label className="ff-label" style={{ marginBottom: 0 }}>Líneas de impuesto</label>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-size-sm"
+                    onClick={() => setFormTaxes((prev) => [...prev, emptyTaxLine()])}
+                  >
+                    <Plus size={14} /> Agregar línea
+                  </button>
+                </div>
+                <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: 'var(--surface-sunken)' }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Tipo de cargo</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Cuenta GL</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11, width: 80 }}>Tasa %</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Descripción</th>
+                        <th style={{ width: 36 }} />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {formTaxes.map((line, idx) => (
+                        <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}>
+                          <td style={{ padding: '6px 8px' }}>
+                            <select
+                              className="ff-select"
+                              style={{ fontSize: 12, padding: '4px 8px' }}
+                              value={line.chargeType}
+                              onChange={(e) => updateTaxLine(idx, { chargeType: e.target.value as TaxChargeType })}
+                            >
+                              {CHARGE_TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                          </td>
+                          <td style={{ padding: '6px 8px' }}>
+                            <input
+                              className="ff-input"
+                              style={{ fontSize: 12, padding: '4px 8px' }}
+                              placeholder="ITBIS por Pagar - ACC"
+                              value={line.accountHead}
+                              onChange={(e) => updateTaxLine(idx, { accountHead: e.target.value })}
+                            />
+                          </td>
+                          <td style={{ padding: '6px 8px' }}>
+                            <input
+                              className="ff-input"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              style={{ fontSize: 12, padding: '4px 8px', textAlign: 'right' }}
+                              value={line.rate}
+                              onChange={(e) => updateTaxLine(idx, { rate: parseFloat(e.target.value) || 0 })}
+                            />
+                          </td>
+                          <td style={{ padding: '6px 8px' }}>
+                            <input
+                              className="ff-input"
+                              style={{ fontSize: 12, padding: '4px 8px' }}
+                              placeholder="Opcional"
+                              value={line.description ?? ''}
+                              onChange={(e) => updateTaxLine(idx, { description: e.target.value })}
+                            />
+                          </td>
+                          <td style={{ padding: '4px 6px', textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-size-icon-sm"
+                              style={{ color: 'var(--icon-muted)' }}
+                              onClick={() => setFormTaxes((prev) => prev.filter((_, i) => i !== idx))}
+                              disabled={formTaxes.length === 1}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={closeForm}>Cancelar</button>
+              <button
+                className="btn btn-primary"
+                onClick={() => saveMutation.mutate()}
+                disabled={!formTitle || formTaxes.some((l) => !l.accountHead) || saveMutation.isPending}
+              >
+                {saveMutation.isPending ? 'Guardando…' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm */}
+      {toDelete && (
+        <div className="modal-overlay" onClick={() => setToDelete(null)}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title">¿Eliminar template?</h2>
+              <button className="modal-close" onClick={() => setToDelete(null)}><X size={16} /></button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                Se eliminará <strong>{toDelete.title}</strong>. Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={() => setToDelete(null)}>Cancelar</button>
+              <button
+                className="btn btn-danger"
+                onClick={() => deleteMutation.mutate(toDelete.id)}
+                disabled={deleteMutation.isPending}
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ---- Main ConfigPage ----
 const SECTION_TITLES: Record<string, string> = {
   cobros: 'Configuración de Cobranza',
@@ -638,6 +957,8 @@ const SECTION_TITLES: Record<string, string> = {
   uom: 'Unidades de Medida',
   'listas-precio': 'Listas de Precio',
   ncf: 'Secuencias NCF',
+  'impuestos-ventas': 'Impuestos — Ventas',
+  'impuestos-compras': 'Impuestos — Compras',
   perfil: 'Mi Perfil',
 }
 
@@ -652,6 +973,8 @@ export default function ConfigPage() {
     uom: <UomSection />,
     'listas-precio': <ListasPrecioSection />,
     ncf: <NcfSection />,
+    'impuestos-ventas': <TaxTemplatesSection kind="ventas" />,
+    'impuestos-compras': <TaxTemplatesSection kind="compras" />,
     perfil: <PerfilSection />,
   }
 

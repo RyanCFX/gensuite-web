@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { createInvoice, updateInvoice, getInvoice } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
+import { listImpuestosVentas } from '@/shared/api/config'
 import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult } from '@/shared/api/types'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP } from '@/lib/formatters'
@@ -37,6 +38,7 @@ function defaultDueDate() {
   return format(addDays(new Date(), 30), 'yyyy-MM-dd')
 }
 
+// fallback rate used only when no template is selected
 const ITBIS_RATE = 0.18
 
 function calcAmount(qty: number, rate: number) {
@@ -61,6 +63,7 @@ export default function InvoiceForm() {
   const [semaforo, setSemaforo] = useState<SemaforoEntry | null>(null)
   const [loadingSemaforo, setLoadingSemaforo] = useState(false)
   const [initialized, setInitialized] = useState(false)
+  const [taxesAndCharges, setTaxesAndCharges] = useState<string>('')
 
   // ── Load existing invoice when editing ────────────────────────────────────
   const { data: existingInvoice, isLoading: loadingInvoice } = useQuery({
@@ -102,6 +105,21 @@ export default function InvoiceForm() {
     label: c.customerName,
     sublabel: c.rnc ?? c.cedula,
   }))
+
+  // ── Tax templates ─────────────────────────────────────────────────────────
+  const { data: taxTemplates } = useQuery({
+    queryKey: ['impuestos-ventas'],
+    queryFn: listImpuestosVentas,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Auto-select default template on first load
+  useEffect(() => {
+    if (taxTemplates && !taxesAndCharges) {
+      const def = taxTemplates.find((t) => t.isDefault)
+      if (def) setTaxesAndCharges(def.id)
+    }
+  }, [taxTemplates])
 
   // In edit mode, the selected customer name comes from the invoice until the user picks a new one
   const selectedLabel = isEdit && !customerQuery && existingInvoice && customerId === existingInvoice.customer
@@ -211,8 +229,18 @@ export default function InvoiceForm() {
   }
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0)
-  const itbis = Math.round(subtotal * ITBIS_RATE * 100) / 100
+  const selectedTemplate = taxTemplates?.find((t) => t.id === taxesAndCharges) ?? null
+  const taxRate = selectedTemplate
+    ? selectedTemplate.taxes
+        .filter((l) => l.chargeType === 'On Net Total')
+        .reduce((s, l) => s + l.rate, 0) / 100
+    : ITBIS_RATE
+  const itbis = Math.round(subtotal * taxRate * 100) / 100
   const total = subtotal + itbis
+  const taxLabel = selectedTemplate
+    ? selectedTemplate.taxes[0]?.description || selectedTemplate.title
+    : 'ITBIS (18%)'
+  const taxPct = Math.round(taxRate * 100)
 
   // ── Submit ────────────────────────────────────────────────────────────────
   function handleSubmit(e: React.FormEvent) {
@@ -245,6 +273,7 @@ export default function InvoiceForm() {
         postingDate,
         dueDate,
         ncfType,
+        taxesAndCharges: taxesAndCharges || undefined,
         items: itemsDto,
         notes: notes || undefined,
       })
@@ -254,6 +283,7 @@ export default function InvoiceForm() {
         postingDate,
         dueDate,
         ncfType,
+        taxesAndCharges: taxesAndCharges || undefined,
         items: itemsDto,
         notes: notes || undefined,
       })
@@ -458,14 +488,36 @@ export default function InvoiceForm() {
               </button>
             </div>
             <div className="items-total-row">
+              {/* Tax template selector */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Template de impuesto</span>
+                <select
+                  className="ff-select"
+                  style={{ fontSize: 12, padding: '3px 8px', flex: 1 }}
+                  value={taxesAndCharges}
+                  onChange={(e) => setTaxesAndCharges(e.target.value)}
+                >
+                  <option value="">— Sin impuesto —</option>
+                  {taxTemplates?.map((t) => (
+                    <option key={t.id} value={t.id}>{t.title}</option>
+                  ))}
+                </select>
+                {taxTemplates?.length === 0 && (
+                  <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                    No hay templates. <a href="/config/impuestos-ventas" style={{ color: 'var(--color-brand)' }}>Configurar</a>
+                  </span>
+                )}
+              </div>
               <div className="items-total-line">
                 <span>Subtotal</span>
                 <span>{formatDOP(subtotal)}</span>
               </div>
-              <div className="items-total-line">
-                <span>ITBIS (18%)</span>
-                <span>{formatDOP(itbis)}</span>
-              </div>
+              {taxesAndCharges && (
+                <div className="items-total-line">
+                  <span>{taxLabel} ({taxPct}%)</span>
+                  <span>{formatDOP(itbis)}</span>
+                </div>
+              )}
               <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
                 <span>Total</span>
                 <span>{formatDOP(total)}</span>

@@ -244,9 +244,9 @@ export default function CobroDetail() {
       {/* ── Confirm Submit modal ────────────────────────────────────────── */}
       {confirmSubmit && (
         <div className="modal-overlay" onClick={() => setConfirmSubmit(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <span className="modal-title">Someter Cobro</span>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title">Someter Cobro</h2>
             </div>
             <div className="modal-body">
               <p style={{ margin: 0 }}>
@@ -257,8 +257,8 @@ export default function CobroDetail() {
                 Esta acción aplicará el pago a las facturas vinculadas y no podrá revertirse.
               </p>
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setConfirmSubmit(false)}>
+            <div className="modal-foot">
+              <button className="btn btn-ghost" onClick={() => setConfirmSubmit(false)}>
                 Cancelar
               </button>
               <button
@@ -267,7 +267,7 @@ export default function CobroDetail() {
                 disabled={submitMutation.isPending}
               >
                 {submitMutation.isPending
-                  ? <><span className="spinner spinner-white spinner-sm" /> Sometiendo…</>
+                  ? <><span className="spinner" /> Sometiendo…</>
                   : <><Send size={14} /> Confirmar</>}
               </button>
             </div>

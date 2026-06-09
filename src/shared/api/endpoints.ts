@@ -114,6 +114,10 @@ export const ENDPOINTS = {
     ncfEnable: (id: number) => `/config/ncf/${id}/enable`,
     perfil: '/config/perfil',
     cuentasEmpresa: '/config/cuentas-empresa',
+    impuestosVentas: '/config/impuestos-ventas',
+    impuestosVentasById: (id: string) => `/config/impuestos-ventas/${encodeURIComponent(id)}`,
+    impuestosCompras: '/config/impuestos-compras',
+    impuestosComprasById: (id: string) => `/config/impuestos-compras/${encodeURIComponent(id)}`,
   },
   cobros: {
     list: '/cobros',

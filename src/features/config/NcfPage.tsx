@@ -104,13 +104,13 @@ function StatusBadgePill({ serie }: { serie: NcfSerie }) {
   if (status === 'disabled') {
     return (
       <span className="badge badge-error">
-        🔴 Deshabilitada
+        Deshabilitada
       </span>
     )
   }
   return (
     <span className="badge badge-success">
-      🟢 Activa
+      Activa
     </span>
   )
 }
@@ -663,7 +663,7 @@ export default function NcfPage() {
   )
 
   return (
-    <div>
+    <div className='page-container'>
       <PageHeader
         overline="Configuración"
         title="Secuencias NCF"

@@ -13,6 +13,8 @@ import type {
   NcfActionResult,
   CuentasEmpresa,
   UpdateCuentasEmpresaDto,
+  TaxTemplate,
+  CreateTaxTemplateDto,
 } from './types'
 
 export async function getEmpresa() {
@@ -162,4 +164,46 @@ export async function getCuentasEmpresa() {
 export async function updateCuentasEmpresa(data: UpdateCuentasEmpresaDto) {
   const res = await client.put<{ success: true; data: CuentasEmpresa }>(ENDPOINTS.config.cuentasEmpresa, data)
   return unwrap(res)
+}
+
+// ─── Tax Templates — Ventas ───────────────────────────────────────────────────
+
+export async function listImpuestosVentas(): Promise<TaxTemplate[]> {
+  const res = await client.get<{ success: true; data: TaxTemplate[] }>(ENDPOINTS.config.impuestosVentas)
+  return unwrap(res)
+}
+
+export async function createImpuestoVentas(data: CreateTaxTemplateDto): Promise<TaxTemplate> {
+  const res = await client.post<{ success: true; data: TaxTemplate }>(ENDPOINTS.config.impuestosVentas, data)
+  return unwrap(res)
+}
+
+export async function updateImpuestoVentas(id: string, data: Partial<CreateTaxTemplateDto>): Promise<TaxTemplate> {
+  const res = await client.put<{ success: true; data: TaxTemplate }>(ENDPOINTS.config.impuestosVentasById(id), data)
+  return unwrap(res)
+}
+
+export async function deleteImpuestoVentas(id: string): Promise<void> {
+  await client.delete(ENDPOINTS.config.impuestosVentasById(id))
+}
+
+// ─── Tax Templates — Compras ──────────────────────────────────────────────────
+
+export async function listImpuestosCompras(): Promise<TaxTemplate[]> {
+  const res = await client.get<{ success: true; data: TaxTemplate[] }>(ENDPOINTS.config.impuestosCompras)
+  return unwrap(res)
+}
+
+export async function createImpuestoCompras(data: CreateTaxTemplateDto): Promise<TaxTemplate> {
+  const res = await client.post<{ success: true; data: TaxTemplate }>(ENDPOINTS.config.impuestosCompras, data)
+  return unwrap(res)
+}
+
+export async function updateImpuestoCompras(id: string, data: Partial<CreateTaxTemplateDto>): Promise<TaxTemplate> {
+  const res = await client.put<{ success: true; data: TaxTemplate }>(ENDPOINTS.config.impuestosComprasById(id), data)
+  return unwrap(res)
+}
+
+export async function deleteImpuestoCompras(id: string): Promise<void> {
+  await client.delete(ENDPOINTS.config.impuestosComprasById(id))
 }

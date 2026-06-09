@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Package, FileText, Receipt, Warehouse,
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
   ChevronRight, LogOut, Menu, Building2, UserCog, Sun, Moon,
-  Shield, X, BookOpen, ClipboardList,
+  Shield, X, BookOpen, ClipboardList, Percent,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth.store'
 import { Toaster } from 'sonner'
@@ -117,6 +117,8 @@ const NAV_CONFIG: NavEntry = {
     { label: 'Unidades de Medida', icon: <Settings size={14} />,     path: '/config/uom'          },
     { label: 'Listas de Precio',   icon: <FileText size={14} />,     path: '/config/listas-precio'},
     { label: 'Secuencias NCF',     icon: <Shield size={14} />,       path: '/config/ncf'          },
+    { label: 'Impuestos Ventas',   icon: <Percent size={14} />,      path: '/config/impuestos-ventas'  },
+    { label: 'Impuestos Compras',  icon: <Percent size={14} />,      path: '/config/impuestos-compras' },
     { label: 'Cuentas Contables',  icon: <BookOpen size={14} />,     path: '/cuentas'             },
     { label: 'Asientos Contables', icon: <ClipboardList size={14} />, path: '/asientos'           },
     { label: 'Mi Perfil',          icon: <UserCog size={14} />,      path: '/config/perfil'       },

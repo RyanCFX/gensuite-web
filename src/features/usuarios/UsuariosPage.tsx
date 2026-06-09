@@ -152,11 +152,11 @@ export default function UsuariosPage() {
                           <tr key={u.email}>
                             <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{u.email}</td>
                             <td style={{ fontWeight: 500 }}>{u.fullName}</td>
-                            <td>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                            <td style={{ maxWidth: 260 }}>
+                              <div style={{ display: 'grid', gridTemplateRows: 'repeat(2, auto)', gridAutoFlow: 'column', gridAutoColumns: 'max-content', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
                                 {u.roles.length > 0
                                   ? u.roles.map((r) => (
-                                      <span key={r} className="badge badge-default">{r}</span>
+                                      <span key={r} className="badge badge-default" style={{ whiteSpace: 'nowrap' }}>{r}</span>
                                     ))
                                   : <span className="td-muted">Sin roles</span>}
                               </div>

@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { createCompra, updateCompra, getCompra } from '@/shared/api/compras-gastos'
 import { listSuppliers } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
+import { listImpuestosCompras } from '@/shared/api/config'
 import type { CreateCompraDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { TIPO_BIENES_606, FORMA_PAGO_606 } from '@/lib/constants'
@@ -49,6 +50,7 @@ export default function CompraForm() {
   const [tipoPago, setTipoPago] = useState<'Contado' | 'Crédito'>('Contado')
   const [retencionItbis, setRetencionItbis] = useState<number>(0)
   const [retencionIsr, setRetencionIsr] = useState<number>(0)
+  const [taxesAndCharges, setTaxesAndCharges] = useState<string>('')
 
   const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
     queryKey: ['supplierSearch', supplierQuery],
@@ -66,6 +68,19 @@ export default function CompraForm() {
     queryKey: ['warehouses'],
     queryFn: listWarehouses,
   })
+
+  const { data: taxTemplates } = useQuery({
+    queryKey: ['impuestos-compras'],
+    queryFn: listImpuestosCompras,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  useEffect(() => {
+    if (taxTemplates && !taxesAndCharges) {
+      const def = taxTemplates.find((t) => t.isDefault)
+      if (def) setTaxesAndCharges(def.id)
+    }
+  }, [taxTemplates])
 
   const { isLoading: loadingEdit } = useQuery({
     queryKey: ['compra', id],
@@ -87,7 +102,19 @@ export default function CompraForm() {
   })
 
   const ncfValid = !ncfProveedor || NCF_REGEX.test(ncfProveedor)
-  const grandTotal = items.reduce((sum, i) => sum + i.qty * i.rate, 0)
+  const subtotal = items.reduce((sum, i) => sum + i.qty * i.rate, 0)
+  const selectedTemplate = taxTemplates?.find((t) => t.id === taxesAndCharges) ?? null
+  const taxRate = selectedTemplate
+    ? selectedTemplate.taxes
+        .filter((l) => l.chargeType === 'On Net Total')
+        .reduce((s, l) => s + l.rate, 0) / 100
+    : 0
+  const taxAmount = Math.round(subtotal * taxRate * 100) / 100
+  const grandTotal = subtotal + taxAmount
+  const taxLabel = selectedTemplate
+    ? selectedTemplate.taxes[0]?.description || selectedTemplate.title
+    : ''
+  const taxPct = Math.round(taxRate * 100)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -98,6 +125,7 @@ export default function CompraForm() {
       supplier: supplierId,
       postingDate,
       dueDate: dueDate || undefined,
+      taxesAndCharges: taxesAndCharges || undefined,
       items: items.map((i) => ({
         itemCode: i.itemCode,
         description: i.description,
@@ -304,7 +332,32 @@ export default function CompraForm() {
                   </tbody>
                 </table>
                 <div className="items-total-row">
+                  {/* Tax template selector */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Template de impuesto</span>
+                    <select
+                      className="ff-select"
+                      style={{ fontSize: 12, padding: '3px 8px', flex: 1 }}
+                      value={taxesAndCharges}
+                      onChange={(e) => setTaxesAndCharges(e.target.value)}
+                    >
+                      <option value="">— Sin impuesto —</option>
+                      {taxTemplates?.map((t) => (
+                        <option key={t.id} value={t.id}>{t.title}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="items-total-line">
+                    <span>Subtotal</span>
+                    <span>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(subtotal)}</span>
+                  </div>
+                  {taxesAndCharges && taxAmount > 0 && (
+                    <div className="items-total-line">
+                      <span>{taxLabel} ({taxPct}%)</span>
+                      <span>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(taxAmount)}</span>
+                    </div>
+                  )}
+                  <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
                     <span>Total</span>
                     <strong>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(grandTotal)}</strong>
                   </div>

@@ -25,11 +25,13 @@ const PAYMENT_BADGE: Record<string, string> = {
   unpaid: 'badge-warning',
   partly_paid: 'badge-info',
   paid: 'badge-success',
+  overdue: 'badge-error',
 }
 const PAYMENT_LABEL: Record<string, string> = {
   unpaid: 'Pendiente',
-  partly_paid: 'Parcial',
+  partly_paid: 'Pago parcial',
   paid: 'Pagado',
+  overdue: 'Vencido',
 }
 
 export default function InvoicesPage() {
@@ -58,11 +60,21 @@ export default function InvoicesPage() {
 
   const invoices = data?.items ?? []
 
-  function paymentBadge(inv: { status: string; paymentStatus?: string | null }) {
-    if (!inv.paymentStatus) return null
+  function statusBadge(inv: { status: string; paymentStatus?: string | null }) {
+    // Submitted → show paymentStatus (or neutral "Sometido" if null)
+    if (inv.status === 'submitted') {
+      if (inv.paymentStatus) {
+        return (
+          <span className={`badge ${PAYMENT_BADGE[inv.paymentStatus] ?? 'badge-neutral'}`}>
+            {PAYMENT_LABEL[inv.paymentStatus] ?? inv.paymentStatus}
+          </span>
+        )
+      }
+      return <span className="badge badge-submitted">Sometido</span>
+    }
     return (
-      <span className={`badge ${PAYMENT_BADGE[inv.paymentStatus] ?? 'badge-neutral'}`}>
-        {PAYMENT_LABEL[inv.paymentStatus] ?? inv.paymentStatus}
+      <span className={`badge ${STATUS_BADGE[inv.status] ?? 'badge-neutral'}`}>
+        {STATUS_LABEL[inv.status] ?? inv.status}
       </span>
     )
   }
@@ -139,7 +151,6 @@ export default function InvoicesPage() {
               <th>NCF</th>
               <th style={{ textAlign: 'right' }}>Total</th>
               <th style={{ textAlign: 'right' }}>Pendiente</th>
-              <th>Estado pago</th>
               <th>Estado</th>
               <th style={{ textAlign: 'right', width: 64 }}>Ver</th>
             </tr>
@@ -148,14 +159,14 @@ export default function InvoicesPage() {
             {isLoading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 10 }).map((__, j) => (
+                  {Array.from({ length: 9 }).map((__, j) => (
                     <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                   ))}
                 </tr>
               ))
             ) : invoices.length === 0 ? (
               <tr>
-                <td colSpan={10}>
+                <td colSpan={9}>
                   <div className="empty-state">
                     <div className="empty-title">Sin facturas</div>
                     <p className="empty-sub">Crea tu primera factura para comenzar.</p>
@@ -185,12 +196,7 @@ export default function InvoicesPage() {
                   </td>
                   <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(inv.grandTotal)}</td>
                   <td style={{ textAlign: 'right' }}>{formatDOP(inv.outstandingAmount)}</td>
-                  <td>{paymentBadge(inv)}</td>
-                  <td>
-                    <span className={`badge ${STATUS_BADGE[inv.status] ?? 'badge-neutral'}`}>
-                      {STATUS_LABEL[inv.status] ?? inv.status}
-                    </span>
-                  </td>
+                  <td>{statusBadge(inv)}</td>
                   <td style={{ textAlign: 'right' }}>
                     <button
                       className="btn btn-ghost btn-size-icon-sm"

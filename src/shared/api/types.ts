@@ -215,6 +215,7 @@ export interface CreateInvoiceDto {
   postingDate: string
   dueDate?: string
   ncfType: 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
+  taxesAndCharges?: string
   items: {
     itemCode: string
     description: string
@@ -556,6 +557,7 @@ export interface CreateCompraDto {
     uom?: string
     // NO description
   }[]
+  taxesAndCharges?: string
   taxes?: {
     chargeType: string
     accountHead: string
@@ -618,6 +620,7 @@ export interface CreateGastoDto {
     uom?: string
     description?: string     // allowed in GastoItemDto
   }[]
+  taxesAndCharges?: string
   ncfProveedor?: string
   tipoComprobante?: 'B01' | 'B13' | 'B14' | 'B15' | 'B16' | 'B17' | 'E31'
   tipoBienes606?: string
@@ -665,6 +668,35 @@ export interface UpdateUsuarioDto {
 
 export interface Role {
   name: string
+}
+
+// ─── Tax Templates ────────────────────────────────────────────────────────────
+
+export type TaxChargeType =
+  | 'On Net Total'
+  | 'Actual'
+  | 'On Previous Row Amount'
+  | 'On Previous Row Total'
+  | 'On Item Quantity'
+
+export interface TaxTemplateLine {
+  chargeType: TaxChargeType
+  accountHead: string
+  rate: number
+  description?: string
+}
+
+export interface TaxTemplate {
+  id: string
+  title: string
+  isDefault: boolean
+  taxes: TaxTemplateLine[]
+}
+
+export interface CreateTaxTemplateDto {
+  title: string
+  isDefault?: boolean
+  taxes: TaxTemplateLine[]
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────

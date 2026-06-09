@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { createGasto } from '@/shared/api/compras-gastos'
 import { listSuppliers } from '@/shared/api/suppliers'
+import { listImpuestosCompras } from '@/shared/api/config'
 import type { CreateGastoDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { TIPO_BIENES_606, FORMA_PAGO_606, NCF_TYPES_COMPRA, CATEGORIA_GASTO } from '@/lib/constants'
@@ -47,6 +48,7 @@ export default function GastoForm() {
   const [esDeducible, setEsDeducible] = useState(true)
   const [retencionItbis, setRetencionItbis] = useState(0)
   const [retencionIsr, setRetencionIsr] = useState(0)
+  const [taxesAndCharges, setTaxesAndCharges] = useState<string>('')
 
   const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
     queryKey: ['supplierSearch', supplierQuery],
@@ -60,6 +62,19 @@ export default function GastoForm() {
     sublabel: s.rnc ?? s.cedula,
   }))
 
+  const { data: taxTemplates } = useQuery({
+    queryKey: ['impuestos-compras'],
+    queryFn: listImpuestosCompras,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  useEffect(() => {
+    if (taxTemplates && !taxesAndCharges) {
+      const def = taxTemplates.find((t) => t.isDefault)
+      if (def) setTaxesAndCharges(def.id)
+    }
+  }, [taxTemplates])
+
   const saveMutation = useMutation({
     mutationFn: (dto: CreateGastoDto) => createGasto(dto),
     onSuccess: (data) => {
@@ -70,7 +85,15 @@ export default function GastoForm() {
     onError: () => toast.error('Error al guardar el gasto'),
   })
 
-  const grandTotal = items.reduce((sum, i) => sum + i.qty * i.rate, 0)
+  const subtotal = items.reduce((sum, i) => sum + i.qty * i.rate, 0)
+  const selectedTemplate = taxTemplates?.find((t) => t.id === taxesAndCharges) ?? null
+  const taxRate = selectedTemplate
+    ? selectedTemplate.taxes.filter((l) => l.chargeType === 'On Net Total').reduce((s, l) => s + l.rate, 0) / 100
+    : 0
+  const taxAmount = Math.round(subtotal * taxRate * 100) / 100
+  const grandTotal = subtotal + taxAmount
+  const taxLabel = selectedTemplate ? (selectedTemplate.taxes[0]?.description || selectedTemplate.title) : ''
+  const taxPct = Math.round(taxRate * 100)
   const ncfValid = !ncfProveedor || NCF_REGEX.test(ncfProveedor)
   const isB17 = tipoComprobante === 'B17'
   const b17Error = isB17 && grandTotal > B17_MAX
@@ -108,6 +131,7 @@ export default function GastoForm() {
       supplier: supplierId,
       postingDate,
       dueDate: dueDate || undefined,
+      taxesAndCharges: taxesAndCharges || undefined,
       items: items.map((i) => ({
         itemCode: i.itemCode,
         description: i.description,
@@ -228,7 +252,31 @@ export default function GastoForm() {
                 )}
 
                 <div className="items-total-row">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Template de impuesto</span>
+                    <select
+                      className="ff-select"
+                      style={{ fontSize: 12, padding: '3px 8px', flex: 1 }}
+                      value={taxesAndCharges}
+                      onChange={(e) => setTaxesAndCharges(e.target.value)}
+                    >
+                      <option value="">— Sin impuesto —</option>
+                      {taxTemplates?.map((t) => (
+                        <option key={t.id} value={t.id}>{t.title}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="items-total-line">
+                    <span>Subtotal</span>
+                    <span>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(subtotal)}</span>
+                  </div>
+                  {taxesAndCharges && taxAmount > 0 && (
+                    <div className="items-total-line">
+                      <span>{taxLabel} ({taxPct}%)</span>
+                      <span>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(taxAmount)}</span>
+                    </div>
+                  )}
+                  <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
                     <span>Total</span>
                     <strong>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(grandTotal)}</strong>
                   </div>
