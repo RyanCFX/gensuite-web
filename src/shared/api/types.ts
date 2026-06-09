@@ -231,6 +231,7 @@ export interface UpdateInvoiceDto {
   postingDate?: string
   dueDate?: string
   ncfType?: 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
+  taxesAndCharges?: string
   items?: {
     itemCode: string
     description: string
