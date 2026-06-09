@@ -43,6 +43,7 @@ const CobroDetail     = lazy(() => import('@/features/cobros/CobroDetail'))
 const UsuariosPage    = lazy(() => import('@/features/usuarios/UsuariosPage'))
 const ReportesPage    = lazy(() => import('@/features/reportes/ReportesPage'))
 const EmpresaConfig   = lazy(() => import('@/features/config/EmpresaConfig'))
+const NcfPage         = lazy(() => import('@/features/config/NcfPage'))
 const ConfigPage      = lazy(() => import('@/features/config/ConfigPage'))
 const CuentasPage     = lazy(() => import('@/features/cuentas/CuentasPage'))
 const CuentaDetail    = lazy(() => import('@/features/cuentas/CuentaDetail'))
@@ -151,6 +152,8 @@ export default function App() {
 
             {/* Configuración */}
             <Route path="/config/empresa" element={<Suspense fallback={<PageLoader />}><EmpresaConfig /></Suspense>} />
+            {/* /config/ncf must be before /config/:seccion to avoid being caught as seccion='ncf' */}
+            <Route path="/config/ncf" element={<Suspense fallback={<PageLoader />}><NcfPage /></Suspense>} />
             <Route path="/config/:seccion" element={<Suspense fallback={<PageLoader />}><ConfigPage /></Suspense>} />
             <Route path="/config" element={<Navigate to="/config/empresa" replace />} />
 

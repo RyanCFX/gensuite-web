@@ -735,12 +735,46 @@ export interface Grupo {
   parentGroup?: string
 }
 
+// NcfSerie — matches actual BFF response exactly.
+// id is an integer (ERPNext autoincrement), NOT a UUID.
+// nextNcf = -1 is a special signal meaning "exhausted" — never display -1 to users.
 export interface NcfSerie {
+  id: number
+  ncfType: 'B01' | 'B02' | 'B14' | 'B15'
+  start: number
+  end: number
+  nextNcf: number        // -1 means exhausted
+  expirationDate: string
+  disabled: boolean
+  remaining: number
+  // Detail-only fields (GET /config/ncf/:id)
+  exhausted?: boolean
+  used?: number
+  usedPct?: number
+}
+
+export interface CreateNcfSerieDto {
+  ncfType: 'B01' | 'B02' | 'B14' | 'B15'
+  start: number
+  end: number
+  nextNcf: number        // should equal start on creation
+  expirationDate: string // must be a future date
+}
+
+export interface UpdateNcfSerieDto {
+  ncfType?: 'B01' | 'B02' | 'B14' | 'B15'  // only if used === 0
+  end?: number           // can only extend (increase), never reduce
+  expirationDate?: string
+  // start is also updatable if used === 0, but omit from PUT for simplicity
+}
+
+// Response shape from disable/enable actions
+export interface NcfActionResult {
+  message: string
   ncfType: string
-  prefix: string
-  currentNumber: number
-  validFrom: string
-  validTo: string
+  remaining?: number
+  nextNcf?: number
+  warnings: string[]
 }
 
 // ─── Cobros ───────────────────────────────────────────────────────────────────

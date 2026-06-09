@@ -8,6 +8,9 @@ import type {
   UOM,
   Grupo,
   NcfSerie,
+  CreateNcfSerieDto,
+  UpdateNcfSerieDto,
+  NcfActionResult,
   CuentasEmpresa,
   UpdateCuentasEmpresaDto,
 } from './types'
@@ -110,6 +113,34 @@ export async function createGrupoProveedor(data: Grupo) {
 
 export async function getNcfSeries() {
   const res = await client.get<{ success: true; data: NcfSerie[] }>(ENDPOINTS.config.ncf)
+  return unwrap(res)
+}
+
+export async function getNcfSerie(id: number) {
+  const res = await client.get<{ success: true; data: NcfSerie }>(ENDPOINTS.config.ncfById(id))
+  return unwrap(res)
+}
+
+export async function createNcfSerie(data: CreateNcfSerieDto) {
+  const res = await client.post<{ success: true; data: { id: number } }>(ENDPOINTS.config.ncf, data)
+  return unwrap(res)
+}
+
+export async function updateNcfSerie(id: number, data: UpdateNcfSerieDto) {
+  const res = await client.put<{ success: true; data: NcfSerie & { warnings?: string[] } }>(
+    ENDPOINTS.config.ncfById(id),
+    data,
+  )
+  return unwrap(res)
+}
+
+export async function disableNcfSerie(id: number) {
+  const res = await client.post<{ success: true; data: NcfActionResult }>(ENDPOINTS.config.ncfDisable(id))
+  return unwrap(res)
+}
+
+export async function enableNcfSerie(id: number) {
+  const res = await client.post<{ success: true; data: NcfActionResult }>(ENDPOINTS.config.ncfEnable(id))
   return unwrap(res)
 }
 

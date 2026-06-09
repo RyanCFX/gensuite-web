@@ -567,10 +567,10 @@ function NcfSection() {
               : data.map((s) => (
                   <tr key={s.ncfType}>
                     <td style={{ fontFamily: 'var(--font-mono)' }}>{s.ncfType}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)' }}>{s.prefix}</td>
-                    <td style={{ textAlign: 'right' }}>{s.currentNumber}</td>
-                    <td>{formatDate(s.validFrom)}</td>
-                    <td>{formatDate(s.validTo)}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>{String(s.id)}</td>
+                    <td style={{ textAlign: 'right' }}>{s.nextNcf === -1 ? "Agotada" : s.nextNcf}</td>
+                    <td>{formatDate(String(s.start))}</td>
+                    <td>{formatDate(s.expirationDate)}</td>
                   </tr>
                 ))}
           </tbody>
