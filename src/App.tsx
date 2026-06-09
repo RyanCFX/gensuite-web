@@ -44,6 +44,12 @@ const UsuariosPage    = lazy(() => import('@/features/usuarios/UsuariosPage'))
 const ReportesPage    = lazy(() => import('@/features/reportes/ReportesPage'))
 const EmpresaConfig   = lazy(() => import('@/features/config/EmpresaConfig'))
 const ConfigPage      = lazy(() => import('@/features/config/ConfigPage'))
+const CuentasPage     = lazy(() => import('@/features/cuentas/CuentasPage'))
+const CuentaDetail    = lazy(() => import('@/features/cuentas/CuentaDetail'))
+const CuentaForm      = lazy(() => import('@/features/cuentas/CuentaForm'))
+const JournalPage     = lazy(() => import('@/features/journal/JournalPage'))
+const JournalForm     = lazy(() => import('@/features/journal/JournalForm'))
+const JournalDetail   = lazy(() => import('@/features/journal/JournalDetail'))
 
 function PageLoader() {
   return (
@@ -131,6 +137,17 @@ export default function App() {
             {/* Reportes */}
             <Route path="/reportes/:tipo" element={<Suspense fallback={<PageLoader />}><ReportesPage /></Suspense>} />
             <Route path="/reportes" element={<Navigate to="/reportes/606" replace />} />
+
+            {/* Contabilidad — Plan de Cuentas */}
+            <Route path="/cuentas" element={<Suspense fallback={<PageLoader />}><CuentasPage /></Suspense>} />
+            <Route path="/cuentas/nueva" element={<Suspense fallback={<PageLoader />}><CuentaForm /></Suspense>} />
+            <Route path="/cuentas/:id/editar" element={<Suspense fallback={<PageLoader />}><CuentaForm /></Suspense>} />
+            <Route path="/cuentas/:id" element={<Suspense fallback={<PageLoader />}><CuentaDetail /></Suspense>} />
+
+            {/* Contabilidad — Asientos */}
+            <Route path="/asientos" element={<Suspense fallback={<PageLoader />}><JournalPage /></Suspense>} />
+            <Route path="/asientos/nuevo" element={<Suspense fallback={<PageLoader />}><JournalForm /></Suspense>} />
+            <Route path="/asientos/:id" element={<Suspense fallback={<PageLoader />}><JournalDetail /></Suspense>} />
 
             {/* Configuración */}
             <Route path="/config/empresa" element={<Suspense fallback={<PageLoader />}><EmpresaConfig /></Suspense>} />

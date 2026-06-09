@@ -88,6 +88,17 @@ export const ENDPOINTS = {
   roles: {
     list: '/roles',
   },
+  cuentas: {
+    list: '/cuentas',
+    tree: '/cuentas/tree',
+    byId: (id: string) => `/cuentas/${encodeURIComponent(id)}`,
+  },
+  journalEntry: {
+    list: '/journal-entry',
+    byId: (id: string) => `/journal-entry/${encodeURIComponent(id)}`,
+    submit: (id: string) => `/journal-entry/${encodeURIComponent(id)}/submit`,
+    cancel: (id: string) => `/journal-entry/${encodeURIComponent(id)}/cancel`,
+  },
   config: {
     empresa: '/config/empresa',
     cobros: '/config/cobros',
@@ -99,6 +110,7 @@ export const ENDPOINTS = {
     gruposProveedores: '/config/grupos-proveedores',
     ncf: '/config/ncf',
     perfil: '/config/perfil',
+    cuentasEmpresa: '/config/cuentas-empresa',
   },
   cobros: {
     list: '/cobros',

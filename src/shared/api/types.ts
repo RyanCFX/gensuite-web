@@ -377,6 +377,8 @@ export interface Category {
   parentCategory: string | null
   isGroup: boolean
   image?: string
+  incomeAccount?: string
+  expenseAccount?: string
   children?: Category[]
 }
 
@@ -387,7 +389,14 @@ export interface CreateCategoryDto {
   image?: string
 }
 
-export type UpdateCategoryDto = Partial<CreateCategoryDto>
+export interface UpdateCategoryDto {
+  name?: string
+  parentCategory?: string
+  isGroup?: boolean
+  image?: string
+  incomeAccount?: string
+  expenseAccount?: string
+}
 
 export interface Brand {
   id: string
@@ -837,4 +846,83 @@ export interface Reporte608Entry {
   fecha: string
   montoFacturado: number
   itbisFacturado: number
+}
+
+// ─── Cuenta (Chart of Accounts) ────────────────────────────────────────────
+
+export interface Cuenta {
+  id: string                    // full ERPNext name e.g. "Ventas - JB"
+  accountName: string
+  accountNumber?: string
+  accountType?: string
+  rootType: 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense'
+  parentAccount?: string
+  isGroup: boolean
+  disabled: boolean
+  currency: string
+  debit: number
+  credit: number
+  balance: number
+  children?: Cuenta[]           // only in tree response
+}
+
+export interface CreateCuentaDto {
+  accountName: string           // required
+  parentAccount: string         // required
+  accountType?: string
+  accountNumber?: string
+  currency?: string             // default 'DOP'
+  isGroup?: boolean
+}
+
+export interface UpdateCuentaDto {
+  accountName?: string
+  accountNumber?: string
+  disabled?: boolean
+  // Only editable when no GL movements:
+  accountType?: string
+  parentAccount?: string
+  currency?: string
+}
+
+// ─── Cuentas de la Empresa ──────────────────────────────────────────────────
+
+export interface CuentasEmpresa {
+  defaultReceivableAccount?: string
+  defaultPayableAccount?: string
+  defaultIncomeAccount?: string
+  defaultExpenseAccount?: string
+  defaultBankAccount?: string
+  writeOffAccount?: string
+  roundOffAccount?: string
+}
+
+export type UpdateCuentasEmpresaDto = CuentasEmpresa
+
+// ─── Journal Entry ──────────────────────────────────────────────────────────
+
+export interface JournalEntryLine {
+  account: string
+  debit: number
+  credit: number
+  description?: string
+}
+
+export interface JournalEntry {
+  id: string
+  postingDate: string
+  voucherType?: string
+  remarks?: string
+  status: 'Draft' | 'Submitted' | 'Cancelled'
+  totalDebit: number
+  totalCredit: number
+  entries?: JournalEntryLine[]  // only in detail
+  createdAt: string
+}
+
+export interface CreateJournalEntryDto {
+  postingDate: string           // required
+  entries: JournalEntryLine[]  // required - must balance (sum debit = sum credit)
+  remarks?: string
+  voucherType?: string
 }

@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm, useFieldArray } from 'react-hook-form'
+import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -8,6 +9,7 @@ import { createItem, listCategories, listBrands } from '@/shared/api/catalog'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listUOMs } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { AccountSelect } from '@/components/shared/AccountSelect'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 
 const uomConversionSchema = z.object({
@@ -28,6 +30,8 @@ const schema = z.object({
   stockUom: z.string().optional(),
   salesUom: z.string().optional(),
   uoms: z.array(uomConversionSchema).optional(),
+  incomeAccount: z.string().optional(),
+  expenseAccount: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -35,6 +39,7 @@ type FormValues = z.infer<typeof schema>
 export default function ItemForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [showAccounting, setShowAccounting] = useState(false)
 
   const { data: categoriesData } = useQuery({
     queryKey: ['categories', {}],
@@ -90,6 +95,8 @@ export default function ItemForm() {
       stockUom: '',
       salesUom: '',
       uoms: [],
+      incomeAccount: '',
+      expenseAccount: '',
     },
   })
 
@@ -110,6 +117,8 @@ export default function ItemForm() {
       stockUom: data.stockUom || undefined,
       salesUom: data.salesUom || undefined,
       uoms: data.uoms?.length ? data.uoms : undefined,
+      incomeAccount: data.incomeAccount || undefined,
+      expenseAccount: data.expenseAccount || undefined,
     })
   }
 
@@ -117,9 +126,6 @@ export default function ItemForm() {
   const brands = brandsData?.items ?? []
   const warehouses = warehousesData ?? []
   const uoms = uomsData ?? []
-
-  console.log(uoms);
-  
 
   return (
     <div className="page-container">
@@ -333,6 +339,61 @@ export default function ItemForm() {
                   <option value="">Sin asignar</option>
                   {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Contabilidad (opcional) ──────────────────────────────────── */}
+        <button
+          type="button"
+          onClick={() => setShowAccounting((s) => !s)}
+          className="btn btn-ghost btn-size-sm"
+          style={{ alignSelf: 'flex-start' }}
+        >
+          {showAccounting ? '▾' : '▸'} Contabilidad (opcional)
+        </button>
+
+        {showAccounting && (
+          <div className="card">
+            <div className="card-header"><h2 className="card-title">Cuentas Contables</h2></div>
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="inline-alert inline-alert-info" style={{ fontSize: 12 }}>
+                Si no se especifica, se usará la cuenta de la categoría o la de la empresa por defecto.
+              </div>
+              <div className="form-row">
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="incomeAccount">Cuenta de Ingresos</label>
+                  <Controller
+                    control={control}
+                    name="incomeAccount"
+                    render={({ field }) => (
+                      <AccountSelect
+                        id="incomeAccount"
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        rootType="Income"
+                        ledgerOnly={true}
+                      />
+                    )}
+                  />
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="expenseAccount">Cuenta de Gastos (COGS)</label>
+                  <Controller
+                    control={control}
+                    name="expenseAccount"
+                    render={({ field }) => (
+                      <AccountSelect
+                        id="expenseAccount"
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        rootType="Expense"
+                        ledgerOnly={true}
+                      />
+                    )}
+                  />
+                </div>
               </div>
             </div>
           </div>

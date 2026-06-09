@@ -8,6 +8,8 @@ import type {
   UOM,
   Grupo,
   NcfSerie,
+  CuentasEmpresa,
+  UpdateCuentasEmpresaDto,
 } from './types'
 
 export async function getEmpresa() {
@@ -118,5 +120,15 @@ export async function getPerfil() {
 
 export async function updatePerfil(data: Record<string, unknown>) {
   const res = await client.put<{ success: true; data: unknown }>(ENDPOINTS.config.perfil, data)
+  return unwrap(res)
+}
+
+export async function getCuentasEmpresa() {
+  const res = await client.get<{ success: true; data: CuentasEmpresa }>(ENDPOINTS.config.cuentasEmpresa)
+  return unwrap(res)
+}
+
+export async function updateCuentasEmpresa(data: UpdateCuentasEmpresaDto) {
+  const res = await client.put<{ success: true; data: CuentasEmpresa }>(ENDPOINTS.config.cuentasEmpresa, data)
   return unwrap(res)
 }

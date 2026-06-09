@@ -5,8 +5,8 @@ import { toast } from 'sonner'
 import axios from 'axios'
 import {
   getCobrosConfig, updateCobrosConfig,
-  listAlmacenes, createAlmacen, deleteAlmacen,
-  listMetodosPago, createMetodoPago,
+  listAlmacenes, createAlmacen, deleteAlmacen, updateAlmacen,
+  listMetodosPago, createMetodoPago, updateMetodoPago,
   listUOMs, createUOM,
   listListasPrecio,
   getNcfSeries,
@@ -14,8 +14,9 @@ import {
 } from '@/shared/api/config'
 import type { CobrosConfig, MetodoPago } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { AccountSelect } from '@/components/shared/AccountSelect'
 import { formatDate } from '@/lib/formatters'
-import { Plus, Trash2, Save, FileWarning, X } from 'lucide-react'
+import { Plus, Trash2, Save, FileWarning, X, Pencil } from 'lucide-react'
 
 function is503(error: unknown): boolean {
   if (axios.isAxiosError(error) && error.response?.status === 503) return true
@@ -112,6 +113,8 @@ function AlmacenesSection() {
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
   const [toDelete, setToDelete] = useState<string | null>(null)
+  const [editTarget, setEditTarget] = useState<{ name: string; warehouseName: string } | null>(null)
+  const [editWarehouseAccount, setEditWarehouseAccount] = useState('')
 
   const { data, isLoading } = useQuery({ queryKey: ['almacenes'], queryFn: listAlmacenes })
 
@@ -121,11 +124,24 @@ function AlmacenesSection() {
     onError: () => toast.error('Error al crear el almacén'),
   })
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data: d }: { id: string; data: Partial<{ warehouseName: string; account: string }> }) =>
+      updateAlmacen(id, d),
+    onSuccess: () => { toast.success('Almacén actualizado'); queryClient.invalidateQueries({ queryKey: ['almacenes'] }); setEditTarget(null) },
+    onError: () => toast.error('Error al actualizar el almacén'),
+  })
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteAlmacen(id),
     onSuccess: () => { toast.success('Almacén eliminado'); queryClient.invalidateQueries({ queryKey: ['almacenes'] }); setToDelete(null) },
     onError: () => toast.error('Error al eliminar el almacén'),
   })
+
+  function openEdit(a: { name: string; warehouseName: string }) {
+    setEditTarget(a)
+    setEditWarehouseAccount('')
+    setToDelete(null)
+  }
 
   return (
     <>
@@ -145,7 +161,7 @@ function AlmacenesSection() {
                     <tr>
                       <th>Nombre</th>
                       <th>Estado</th>
-                      <th style={{ width: 48 }} />
+                      <th style={{ width: 80 }} />
                     </tr>
                   </thead>
                   <tbody>
@@ -158,13 +174,21 @@ function AlmacenesSection() {
                             : <span className="badge badge-success">Activo</span>}
                         </td>
                         <td>
-                          <button
-                            className="btn btn-ghost btn-size-icon-sm"
-                            style={{ color: 'var(--icon-muted)' }}
-                            onClick={() => setToDelete(a.name)}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button
+                              className="btn btn-ghost btn-size-icon-sm"
+                              onClick={() => openEdit(a)}
+                            >
+                              <Pencil size={13} />
+                            </button>
+                            <button
+                              className="btn btn-ghost btn-size-icon-sm"
+                              style={{ color: 'var(--icon-muted)' }}
+                              onClick={() => setToDelete(a.name)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -191,6 +215,38 @@ function AlmacenesSection() {
               <button className="btn btn-secondary" onClick={() => setShowNew(false)}>Cancelar</button>
               <button className="btn btn-primary" onClick={() => createMutation.mutate()} disabled={!newName || createMutation.isPending}>
                 {createMutation.isPending ? 'Creando…' : 'Crear'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editTarget && (
+        <div className="modal-overlay" onClick={() => setEditTarget(null)}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title">Editar Almacén</h2>
+              <button className="modal-close" onClick={() => setEditTarget(null)}><X size={16} /></button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="ff-wrap">
+                <label className="ff-label">Cuenta de Inventario</label>
+                <AccountSelect
+                  value={editWarehouseAccount}
+                  onChange={setEditWarehouseAccount}
+                  placeholder="Buscar cuenta de inventario…"
+                  rootType="Asset"
+                />
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={() => setEditTarget(null)}>Cancelar</button>
+              <button
+                className="btn btn-primary"
+                onClick={() => updateMutation.mutate({ id: editTarget.name, data: { account: editWarehouseAccount || undefined } })}
+                disabled={updateMutation.isPending}
+              >
+                {updateMutation.isPending ? 'Guardando…' : 'Guardar'}
               </button>
             </div>
           </div>
@@ -230,6 +286,8 @@ function MetodosPagoSection() {
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
   const [newType, setNewType] = useState<MetodoPago['type']>('Cash')
+  const [editTarget, setEditTarget] = useState<MetodoPago | null>(null)
+  const [editAccount, setEditAccount] = useState('')
 
   const { data, isLoading } = useQuery({ queryKey: ['metodos-pago'], queryFn: listMetodosPago })
 
@@ -238,6 +296,19 @@ function MetodosPagoSection() {
     onSuccess: () => { toast.success('Método de pago creado'); queryClient.invalidateQueries({ queryKey: ['metodos-pago'] }); setShowNew(false); setNewName('') },
     onError: () => toast.error('Error al crear el método'),
   })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data: d }: { id: string; data: Partial<MetodoPago & { account?: string }> }) =>
+      updateMetodoPago(id, d),
+    onSuccess: () => { toast.success('Método de pago actualizado'); queryClient.invalidateQueries({ queryKey: ['metodos-pago'] }); setEditTarget(null) },
+    onError: () => toast.error('Error al actualizar el método'),
+  })
+
+  function openEdit(m: MetodoPago) {
+    setEditTarget(m)
+    setEditAccount('')
+    setShowNew(false)
+  }
 
   return (
     <>
@@ -258,6 +329,7 @@ function MetodosPagoSection() {
                       <th>Nombre</th>
                       <th>Tipo</th>
                       <th>Estado</th>
+                      <th style={{ width: 48 }} />
                     </tr>
                   </thead>
                   <tbody>
@@ -269,6 +341,11 @@ function MetodosPagoSection() {
                           {m.disabled
                             ? <span className="badge badge-error">Inactivo</span>
                             : <span className="badge badge-success">Activo</span>}
+                        </td>
+                        <td>
+                          <button className="btn btn-ghost btn-size-icon-sm" onClick={() => openEdit(m)}>
+                            <Pencil size={13} />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -303,6 +380,38 @@ function MetodosPagoSection() {
               <button className="btn btn-secondary" onClick={() => setShowNew(false)}>Cancelar</button>
               <button className="btn btn-primary" onClick={() => createMutation.mutate()} disabled={!newName || createMutation.isPending}>
                 {createMutation.isPending ? 'Creando…' : 'Crear'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editTarget && (
+        <div className="modal-overlay" onClick={() => setEditTarget(null)}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title">Editar Método de Pago</h2>
+              <button className="modal-close" onClick={() => setEditTarget(null)}><X size={16} /></button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="ff-wrap">
+                <label className="ff-label">Cuenta Bancaria / Caja</label>
+                <AccountSelect
+                  value={editAccount}
+                  onChange={setEditAccount}
+                  placeholder="Buscar cuenta bancaria o caja…"
+                />
+                <p className="ff-hint">Ej: "Efectivo RD" → "Cash - JB"</p>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={() => setEditTarget(null)}>Cancelar</button>
+              <button
+                className="btn btn-primary"
+                onClick={() => updateMutation.mutate({ id: editTarget.name, data: { account: editAccount || undefined } })}
+                disabled={updateMutation.isPending}
+              >
+                {updateMutation.isPending ? 'Guardando…' : 'Guardar'}
               </button>
             </div>
           </div>

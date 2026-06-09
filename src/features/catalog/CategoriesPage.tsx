@@ -5,7 +5,8 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { listCategories, createCategory, updateCategory, deleteCategory } from '@/shared/api/catalog'
-import type { Category } from '@/shared/api/types'
+import type { Category, UpdateCategoryDto } from '@/shared/api/types'
+import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Folder, FolderOpen } from 'lucide-react'
 
 const categorySchema = z.object({
@@ -99,6 +100,8 @@ export default function CategoriesPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Category | null>(null)
   const [toDelete, setToDelete] = useState<Category | null>(null)
+  const [editIncomeAccount, setEditIncomeAccount] = useState('')
+  const [editExpenseAccount, setEditExpenseAccount] = useState('')
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['categories', { tree: true }],
@@ -126,7 +129,7 @@ export default function CategoriesPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data: d }: { id: string; data: Partial<CategoryFormValues> }) =>
+    mutationFn: ({ id, data: d }: { id: string; data: UpdateCategoryDto }) =>
       updateCategory(id, d),
     onSuccess: () => {
       toast.success('Categoría actualizada')
@@ -159,6 +162,8 @@ export default function CategoriesPage() {
       parentCategory: cat.parentCategory ?? '',
       isGroup: cat.isGroup,
     })
+    setEditIncomeAccount(cat.incomeAccount ?? '')
+    setEditExpenseAccount(cat.expenseAccount ?? '')
     setDialogOpen(true)
   }
 
@@ -169,15 +174,20 @@ export default function CategoriesPage() {
   }
 
   function onSubmit(values: CategoryFormValues) {
-    const payload = {
+    const basePayload = {
       name: values.name,
       parentCategory: values.parentCategory || undefined,
       isGroup: values.isGroup,
     }
     if (editTarget) {
-      updateMutation.mutate({ id: editTarget.id, data: payload })
+      const editPayload = {
+        ...basePayload,
+        incomeAccount: editIncomeAccount || undefined,
+        expenseAccount: editExpenseAccount || undefined,
+      }
+      updateMutation.mutate({ id: editTarget.id, data: editPayload })
     } else {
-      createMutation.mutate(payload)
+      createMutation.mutate(basePayload)
     }
   }
 
@@ -256,6 +266,32 @@ export default function CategoriesPage() {
                   <input type="checkbox" className="ff-check" id="isGroup" {...register('isGroup')} />
                   <span style={{ fontSize: 13 }}>Es un grupo (puede contener subcategorías)</span>
                 </label>
+
+                {editTarget && (
+                  <div style={{ borderTop: '1px solid var(--border-default)', marginTop: 16, paddingTop: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', marginBottom: 12 }}>
+                      Cuentas Contables (opcional)
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div className="ff-wrap">
+                        <label className="ff-label">Cuenta de Ingresos</label>
+                        <AccountSelect
+                          value={editIncomeAccount}
+                          onChange={setEditIncomeAccount}
+                          rootType="Income"
+                        />
+                      </div>
+                      <div className="ff-wrap">
+                        <label className="ff-label">Cuenta de Gastos (COGS)</label>
+                        <AccountSelect
+                          value={editExpenseAccount}
+                          onChange={setEditExpenseAccount}
+                          rootType="Expense"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="modal-foot">
                 <button type="button" className="btn btn-ghost" onClick={closeDialog}>Cancelar</button>

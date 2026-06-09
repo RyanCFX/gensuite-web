@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Package, FileText, Receipt, Warehouse,
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
   ChevronRight, LogOut, Menu, Building2, UserCog, Sun, Moon,
-  Shield, X, List,
+  Shield, X, BookOpen, ClipboardList,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth.store'
 import { Toaster } from 'sonner'
@@ -82,7 +82,7 @@ const NAV_FINANZAS: NavEntry[] = [
     icon: <Wallet size={16} aria-hidden="true" />,
     prefix: '/cobros',
     children: [
-      { label: 'Cobros',          icon: <List size={14} />,      path: '/cobros'          },
+      { label: 'Cobros',          icon: <ClipboardList size={14} />, path: '/cobros'          },
       { label: 'Registrar Cobro', icon: <Wallet size={14} />,    path: '/cobros/pago'     },
       { label: 'Aging',           icon: <BarChart3 size={14} />, path: '/cobros/aging'    },
       { label: 'Semáforo',        icon: <Shield size={14} />,    path: '/cobros/semaforo' },
@@ -108,16 +108,18 @@ const NAV_REPORTES: NavEntry = {
 const NAV_CONFIG: NavEntry = {
   label: 'Configuración',
   icon: <Settings size={16} aria-hidden="true" />,
-  prefix: '/config',
+  prefix: '/config|/cuentas|/asientos',
   children: [
-    { label: 'Empresa',          icon: <Building2 size={14} />, path: '/config/empresa'      },
-    { label: 'Cobranza',         icon: <Wallet size={14} />,    path: '/config/cobros'       },
-    { label: 'Almacenes',        icon: <Warehouse size={14} />, path: '/config/almacenes'    },
-    { label: 'Métodos de Pago',  icon: <CreditCard size={14} />, path: '/config/metodos-pago' },
-    { label: 'Unidades de Medida', icon: <Settings size={14} />, path: '/config/uom'         },
-    { label: 'Listas de Precio', icon: <FileText size={14} />, path: '/config/listas-precio' },
-    { label: 'Secuencias NCF',   icon: <Shield size={14} />,    path: '/config/ncf'          },
-    { label: 'Mi Perfil',        icon: <UserCog size={14} />,   path: '/config/perfil'       },
+    { label: 'Empresa',            icon: <Building2 size={14} />,    path: '/config/empresa'      },
+    { label: 'Cobranza',           icon: <Wallet size={14} />,       path: '/config/cobros'       },
+    { label: 'Almacenes',          icon: <Warehouse size={14} />,    path: '/config/almacenes'    },
+    { label: 'Métodos de Pago',    icon: <CreditCard size={14} />,   path: '/config/metodos-pago' },
+    { label: 'Unidades de Medida', icon: <Settings size={14} />,     path: '/config/uom'          },
+    { label: 'Listas de Precio',   icon: <FileText size={14} />,     path: '/config/listas-precio'},
+    { label: 'Secuencias NCF',     icon: <Shield size={14} />,       path: '/config/ncf'          },
+    { label: 'Cuentas Contables',  icon: <BookOpen size={14} />,     path: '/cuentas'             },
+    { label: 'Asientos Contables', icon: <ClipboardList size={14} />, path: '/asientos'           },
+    { label: 'Mi Perfil',          icon: <UserCog size={14} />,      path: '/config/perfil'       },
   ],
 }
 
@@ -141,7 +143,8 @@ function NavItemBtn({ item, onNav, collapsed }: { item: NavItem; onNav: (p: stri
 
 function NavGroupBtn({ group, onNav, collapsed }: { group: NavGroup; onNav: (p: string) => void; collapsed: boolean }) {
   const { pathname } = useLocation()
-  const groupActive = pathname.startsWith(group.prefix)
+  // prefix supports pipe-separated alternatives: '/config|/cuentas|/asientos'
+  const groupActive = group.prefix.split('|').some((p) => pathname.startsWith(p))
   const [open, setOpen] = useState(groupActive)
 
   return (
