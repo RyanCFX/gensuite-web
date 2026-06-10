@@ -1,0 +1,247 @@
+/* ─── DASHBOARD — Modern CSS enhancements ─── */
+
+/* ── Animatable custom properties ── */
+@property --stat-glow {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --activity-progress {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+/* ──────────────────────────────────────────────────
+   KPI STAT CARDS — staggered entrance + hover glow
+   ────────────────────────────────────────────────── */
+
+/* 5-column layout for the dashboard */
+.dashboard-kpis.stats-row {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.dashboard-kpis .stat-card {
+  animation: stat-in 420ms var(--ease-spring) both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+  transition:
+    border-color 180ms var(--ease-in-out),
+    box-shadow 250ms var(--ease-in-out),
+    --stat-glow 300ms var(--ease-out);
+}
+
+@starting-style {
+  .dashboard-kpis .stat-card {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+}
+
+@keyframes stat-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Hover: brand glow ring */
+.dashboard-kpis .stat-card:hover {
+  --stat-glow: 1;
+  border-color: color-mix(in oklch, var(--brand-primary) 35%, var(--border-default));
+  box-shadow:
+    var(--shadow-md),
+    0 0 0 3px color-mix(in oklch, var(--brand-primary) calc(var(--stat-glow) * 12%), transparent);
+}
+
+/* Icon badge: brand-tinted surface */
+.dashboard-kpis .stat-card .stat-icon-badge {
+  background: color-mix(in oklch, var(--brand-primary) 10%, var(--surface-sunken));
+  color: var(--brand-primary);
+}
+
+/* Stat value: optical leading trim */
+.stat-value {
+  text-wrap: balance;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ──────────────────────────────────────────────────
+   CHART CARD — scroll-driven fade-in
+   ────────────────────────────────────────────────── */
+
+.dashboard-chart {
+  animation: section-in 500ms var(--ease-out) both;
+  animation-timeline: view();
+  animation-range: entry 0% cover 25%;
+}
+
+@supports not (animation-timeline: view()) {
+  .dashboard-chart {
+    animation: section-in 500ms 200ms var(--ease-out) both;
+  }
+}
+
+@keyframes section-in {
+  from {
+    opacity: 0;
+    translate: 0 20px;
+  }
+  to {
+    opacity: 1;
+    translate: none;
+  }
+}
+
+/* ──────────────────────────────────────────────────
+   TOP TABLES — staggered row entrance
+   ────────────────────────────────────────────────── */
+
+.dashboard-tables {
+  animation: section-in 500ms var(--ease-out) both;
+  animation-timeline: view();
+  animation-range: entry 0% cover 30%;
+}
+
+@supports not (animation-timeline: view()) {
+  .dashboard-tables {
+    animation: section-in 500ms 300ms var(--ease-out) both;
+  }
+}
+
+.dashboard-tables tbody tr {
+  animation: row-in 300ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@starting-style {
+  .dashboard-tables tbody tr {
+    opacity: 0;
+    translate: -6px 0;
+  }
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    translate: -6px 0;
+  }
+  to {
+    opacity: 1;
+    translate: none;
+  }
+}
+
+/* ──────────────────────────────────────────────────
+   ACTIVITY FEED — staggered slide-in + accent dot
+   ────────────────────────────────────────────────── */
+
+.dashboard-activity {
+  animation: section-in 500ms var(--ease-out) both;
+  animation-timeline: view();
+  animation-range: entry 0% cover 35%;
+}
+
+@supports not (animation-timeline: view()) {
+  .dashboard-activity {
+    animation: section-in 500ms 400ms var(--ease-out) both;
+  }
+}
+
+.activity-item {
+  animation: activity-in 350ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 50ms);
+  transition: background-color 150ms var(--ease-out);
+}
+
+@starting-style {
+  .activity-item {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+@keyframes activity-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+  to {
+    opacity: 1;
+    translate: none;
+  }
+}
+
+.activity-item:hover {
+  background: var(--surface-hover);
+}
+
+/* Dot indicator replacing the left border accent */
+.activity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+  background: var(--accent-color, var(--border-strong));
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent-color, var(--border-strong)) 20%, transparent);
+}
+
+/* ──────────────────────────────────────────────────
+   PERIOD TABS — active indicator slide
+   ────────────────────────────────────────────────── */
+
+.tabs-bar .tab-btn {
+  position: relative;
+}
+
+.tabs-bar .tab-btn::after {
+  content: '';
+  position: absolute;
+  inset-block-end: -1px;
+  inset-inline: 0;
+  height: 2px;
+  background: var(--brand-primary);
+  border-radius: var(--radius-full);
+  scale: 0 1;
+  transition: scale 200ms var(--ease-spring);
+}
+
+.tabs-bar .tab-btn[data-active]::after {
+  scale: 1 1;
+}
+
+/* ──────────────────────────────────────────────────
+   RESPONSIVE — collapse to 2 cols on narrow screens
+   ────────────────────────────────────────────────── */
+
+@media (width <= 1200px) {
+  .dashboard-kpis.stats-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (width <= 768px) {
+  .dashboard-kpis.stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dashboard-tables {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Respect user motion preferences ── */
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-kpis .stat-card,
+  .dashboard-chart,
+  .dashboard-tables,
+  .dashboard-tables tbody tr,
+  .dashboard-activity,
+  .activity-item {
+    animation: none;
+  }
+}

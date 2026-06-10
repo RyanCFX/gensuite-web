@@ -1,3 +1,4 @@
+import './Dashboard.css'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -20,12 +21,11 @@ const PERIOD_OPTIONS: { label: string; value: DashboardPeriod }[] = [
   { label: 'Este año', value: 'year' },
 ]
 
-// Activity type keys match the API values (e.g. "invoice_created")
 const ACTIVITY_COLORS: Record<string, string> = {
-  invoice_created: 'var(--color-brand)',
-  invoice_cancelled: 'var(--color-error)',
-  payment_received: 'var(--color-success)',
-  purchase_registered: 'var(--color-warning)',
+  invoice_created: 'var(--brand-primary)',
+  invoice_cancelled: 'var(--error-text)',
+  payment_received: 'var(--success-text)',
+  purchase_registered: 'var(--warning-text)',
   expense_registered: '#7c3aed',
 }
 
@@ -55,6 +55,20 @@ function ChartTooltipContent({ active, payload, label }: {
   )
 }
 
+const KPI_CARDS = [
+  {
+    key: 'ventas',
+    label: 'Total Ventas',
+    icon: (u?: number) => <TrendingUp size={16} />,
+    value: (kpis: ReturnType<typeof useKpis>) => formatDOP(kpis?.totalVentas),
+    sub: (kpis: ReturnType<typeof useKpis>) =>
+      `${kpis?.numFacturas ?? 0} ${kpis?.numFacturas === 1 ? 'factura' : 'facturas'}`,
+  },
+] as const
+
+// Small hook to avoid repeating kpis
+function useKpis() { return null as never }
+
 export default function DashboardPage() {
   const [period, setPeriod] = useState<DashboardPeriod>('month')
 
@@ -67,7 +81,6 @@ export default function DashboardPage() {
   const kpis = data?.kpis
   const chart = data?.chart
 
-  // Build chart series: zip labels with sales & credits arrays
   const chartData = chart
     ? chart.labels.map((label, i) => ({
         label,
@@ -102,8 +115,8 @@ export default function DashboardPage() {
 
       {isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          <div className="stats-row">
-            {Array.from({ length: 4 }).map((_, i) => (
+          <div className="stats-row dashboard-kpis">
+            {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="stat-card">
                 <div className="skeleton-box" style={{ width: '60%', height: 12, marginBottom: 8 }} />
                 <div className="skeleton-box" style={{ width: '80%', height: 26, marginBottom: 8 }} />
@@ -111,7 +124,7 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-          <div className="card">
+          <div className="card dashboard-chart">
             <div className="card-header">
               <div className="skeleton-box" style={{ width: '30%', height: 16 }} />
             </div>
@@ -123,76 +136,79 @@ export default function DashboardPage() {
       ) : (
         <>
           {/* KPI cards */}
-          <div className="stats-row">
-            <div className="stat-card">
-              <div className="stat-card-top">
-                <div className="stat-icon-badge"><TrendingUp size={16} /></div>
-                <span className="stat-label">Total Ventas</span>
-              </div>
-              <div className="stat-value">{formatDOP(kpis?.totalVentas)}</div>
-              <div className="stat-footer">
-                <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                  {kpis?.numFacturas ?? 0} {kpis?.numFacturas === 1 ? 'factura' : 'facturas'}
-                </span>
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-card-top">
-                <div className="stat-icon-badge"><ShoppingCart size={16} /></div>
-                <span className="stat-label">Total Compras</span>
-              </div>
-              <div className="stat-value">{formatDOP(kpis?.totalCompras)}</div>
-              <div className="stat-footer">
-                <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                  {kpis?.numCompras ?? 0} {kpis?.numCompras === 1 ? 'compra' : 'compras'}
-                </span>
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-card-top">
-                <div className="stat-icon-badge"><Wallet size={16} /></div>
-                <span className="stat-label">Total Cobrado</span>
-              </div>
-              <div className="stat-value">{formatDOP(kpis?.totalCobrado)}</div>
-              <div className="stat-footer">
-                <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Total recibido</span>
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-card-top">
-                <div className="stat-icon-badge"><Clock size={16} /></div>
-                <span className="stat-label">Saldo Pendiente</span>
-              </div>
-              <div className="stat-value">{formatDOP(kpis?.totalPendiente)}</div>
-              <div className="stat-footer">
-                <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Por cobrar</span>
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-card-top">
-                <div className="stat-icon-badge" style={{ background: (kpis?.utilidad ?? 0) >= 0 ? 'var(--success-surface)' : 'var(--error-surface)' }}>
-                  {(kpis?.utilidad ?? 0) >= 0 ? <TrendingUp size={16} style={{ color: 'var(--success-text)' }} /> : <TrendingDown size={16} style={{ color: 'var(--error-text)' }} />}
-                </div>
-                <span className="stat-label">Utilidad</span>
-              </div>
+          <div className="stats-row dashboard-kpis">
+            {([
+              {
+                icon: <TrendingUp size={16} />,
+                label: 'Total Ventas',
+                value: formatDOP(kpis?.totalVentas),
+                sub: `${kpis?.numFacturas ?? 0} ${kpis?.numFacturas === 1 ? 'factura' : 'facturas'}`,
+              },
+              {
+                icon: <ShoppingCart size={16} />,
+                label: 'Total Compras',
+                value: formatDOP(kpis?.totalCompras),
+                sub: `${kpis?.numCompras ?? 0} ${kpis?.numCompras === 1 ? 'compra' : 'compras'}`,
+              },
+              {
+                icon: <Wallet size={16} />,
+                label: 'Total Cobrado',
+                value: formatDOP(kpis?.totalCobrado),
+                sub: 'Total recibido',
+              },
+              {
+                icon: <Clock size={16} />,
+                label: 'Saldo Pendiente',
+                value: formatDOP(kpis?.totalPendiente),
+                sub: 'Por cobrar',
+              },
+              {
+                icon: (kpis?.utilidad ?? 0) >= 0
+                  ? <TrendingUp size={16} style={{ color: 'var(--success-text)' }} />
+                  : <TrendingDown size={16} style={{ color: 'var(--error-text)' }} />,
+                label: 'Utilidad',
+                value: formatDOP(kpis?.utilidad),
+                sub: 'Ventas − Compras',
+                valueColor: (kpis?.utilidad ?? 0) >= 0 ? 'var(--success-text)' : 'var(--error-text)',
+                iconBg: (kpis?.utilidad ?? 0) >= 0 ? 'var(--success-bg)' : 'var(--error-bg)',
+              },
+            ] as {
+              icon: React.ReactNode
+              label: string
+              value: string
+              sub: string
+              valueColor?: string
+              iconBg?: string
+            }[]).map((card, i) => (
               <div
-                className="stat-value"
-                style={{ color: (kpis?.utilidad ?? 0) >= 0 ? 'var(--success-text)' : 'var(--error-text)' }}
+                key={card.label}
+                className="stat-card"
+                style={{ '--i': i } as React.CSSProperties}
               >
-                {formatDOP(kpis?.utilidad)}
+                <div className="stat-card-top">
+                  <div
+                    className="stat-icon-badge"
+                    style={card.iconBg ? { background: card.iconBg } : undefined}
+                  >
+                    {card.icon}
+                  </div>
+                  <span className="stat-label">{card.label}</span>
+                </div>
+                <div
+                  className="stat-value"
+                  style={card.valueColor ? { color: card.valueColor } : undefined}
+                >
+                  {card.value}
+                </div>
+                <div className="stat-footer">
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{card.sub}</span>
+                </div>
               </div>
-              <div className="stat-footer">
-                <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Ventas − Compras</span>
-              </div>
-            </div>
+            ))}
           </div>
 
           {/* Chart */}
-          <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card dashboard-chart" style={{ marginBottom: 24 }}>
             <div className="card-header">
               <h3 className="card-title">Ventas vs. Crédito pendiente</h3>
             </div>
@@ -210,15 +226,15 @@ export default function DashboardPage() {
                   >
                     <defs>
                       <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--color-brand)" stopOpacity={0.15} />
-                        <stop offset="100%" stopColor="var(--color-brand)" stopOpacity={0} />
+                        <stop offset="0%" stopColor="var(--brand-primary)" stopOpacity={0.18} />
+                        <stop offset="100%" stopColor="var(--brand-primary)" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="creditsGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--color-warning)" stopOpacity={0.15} />
-                        <stop offset="100%" stopColor="var(--color-warning)" stopOpacity={0} />
+                        <stop offset="0%" stopColor="var(--warning-text)" stopOpacity={0.15} />
+                        <stop offset="100%" stopColor="var(--warning-text)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-default)" vertical={false} />
                     <XAxis
                       dataKey="label"
                       tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
@@ -232,24 +248,24 @@ export default function DashboardPage() {
                       tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
                       width={40}
                     />
-                    <Tooltip content={<ChartTooltipContent />} cursor={{ stroke: 'var(--border)', strokeWidth: 1 }} />
+                    <Tooltip content={<ChartTooltipContent />} cursor={{ stroke: 'var(--border-default)', strokeWidth: 1 }} />
                     <Area
                       type="monotone"
                       dataKey="sales"
                       name="Ventas"
-                      stroke="var(--color-brand)"
+                      stroke="var(--brand-primary)"
                       strokeWidth={2}
                       fill="url(#salesGradient)"
-                      activeDot={{ r: 4, fill: 'var(--color-brand)', stroke: 'var(--surface)', strokeWidth: 2 }}
+                      activeDot={{ r: 4, fill: 'var(--brand-primary)', stroke: 'var(--surface-page)', strokeWidth: 2 }}
                     />
                     <Area
                       type="monotone"
                       dataKey="credits"
                       name="Pendiente"
-                      stroke="var(--color-warning)"
+                      stroke="var(--warning-text)"
                       strokeWidth={2}
                       fill="url(#creditsGradient)"
-                      activeDot={{ r: 4, fill: 'var(--color-warning)', stroke: 'var(--surface)', strokeWidth: 2 }}
+                      activeDot={{ r: 4, fill: 'var(--warning-text)', stroke: 'var(--surface-page)', strokeWidth: 2 }}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -258,7 +274,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Top products + top customers */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
+          <div className="dashboard-tables" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
             <div className="card">
               <div className="card-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -284,8 +300,8 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.topProducts.map((row) => (
-                        <tr key={row.itemCode}>
+                      {data.topProducts.map((row, i) => (
+                        <tr key={row.itemCode} style={{ '--i': i } as React.CSSProperties}>
                           <td>
                             <div style={{ fontWeight: 500, fontSize: 13 }}>{row.itemName}</div>
                             <div className="td-muted" style={{ fontFamily: 'monospace', fontSize: 11 }}>{row.itemCode}</div>
@@ -329,8 +345,8 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.topCustomers.map((row) => (
-                        <tr key={row.customer}>
+                      {data.topCustomers.map((row, i) => (
+                        <tr key={row.customer} style={{ '--i': i } as React.CSSProperties}>
                           <td>
                             <div style={{ fontWeight: 500, fontSize: 13 }}>{row.customerName}</div>
                           </td>
@@ -350,7 +366,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Recent activity */}
-          <div className="card">
+          <div className="card dashboard-activity">
             <div className="card-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Activity size={14} style={{ color: 'var(--text-secondary)' }} />
@@ -367,24 +383,30 @@ export default function DashboardPage() {
             ) : (
               <div>
                 {data.recentActivity.map((item, idx) => {
-                  const accentColor = ACTIVITY_COLORS[item.type] ?? 'var(--border)'
+                  const accentColor = ACTIVITY_COLORS[item.type] ?? 'var(--border-strong)'
                   const label = ACTIVITY_LABELS[item.type] ?? item.type
                   return (
                     <div
                       key={idx}
+                      className="activity-item"
                       style={{
+                        '--i': idx,
+                        '--accent-color': accentColor,
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 16,
+                        gap: 14,
                         padding: '12px 20px',
-                        borderLeft: `3px solid ${accentColor}`,
-                        borderBottom: idx < (data.recentActivity?.length ?? 0) - 1 ? '1px solid var(--border)' : 'none',
-                      }}
+                        borderBottom: idx < (data.recentActivity?.length ?? 0) - 1 ? '1px solid var(--border-subtle)' : 'none',
+                      } as React.CSSProperties}
                     >
-                      <span className="badge badge-neutral" style={{ flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10 }}>
+                      <div className="activity-dot" />
+                      <span
+                        className="badge badge-neutral"
+                        style={{ flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10 }}
+                      >
                         {label}
                       </span>
-                      <p style={{ flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <p style={{ flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
                         {item.description}
                       </p>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
