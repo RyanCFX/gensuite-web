@@ -2198,3 +2198,235 @@ button {
   font-size: 11px;
   color: var(--text-tertiary);
 }
+
+/* ─────────────────────────────────────────────────────────
+   ENTRANCE ANIMATIONS — design-system wide
+   Uses @starting-style so they fire once on DOM insertion.
+   prefers-reduced-motion respected at the bottom.
+   ───────────────────────────────────────────────────────── */
+
+@property --_glow {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* Keyframes */
+@keyframes _fade-down {
+  from { opacity: 0; translate: 0 -10px; }
+  to   { opacity: 1; translate: none; }
+}
+
+@keyframes _fade-up {
+  from { opacity: 0; translate: 0 8px; }
+  to   { opacity: 1; translate: none; }
+}
+
+@keyframes _fade-left {
+  from { opacity: 0; translate: -8px 0; }
+  to   { opacity: 1; translate: none; }
+}
+
+@keyframes _row-in {
+  from { opacity: 0; translate: 0 5px; }
+  to   { opacity: 1; translate: none; }
+}
+
+@keyframes _badge-pop {
+  from { opacity: 0; scale: 0.72; }
+  to   { opacity: 1; scale: 1; }
+}
+
+@keyframes _menu-in {
+  from { opacity: 0; scale: 0.92; translate: 0 -4px; }
+  to   { opacity: 1; scale: 1; translate: none; }
+}
+
+@keyframes _modal-in {
+  from { opacity: 0; scale: 0.94; translate: 0 14px; }
+  to   { opacity: 1; scale: 1; translate: none; }
+}
+
+@keyframes _overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes _btn-in {
+  from { opacity: 0; scale: 0.88; }
+  to   { opacity: 1; scale: 1; }
+}
+
+/* Page header — slides down */
+.page-header {
+  animation: _fade-down 360ms var(--ease-out) both;
+}
+@starting-style {
+  .page-header { opacity: 0; translate: 0 -10px; }
+}
+
+/* Filter bar — fades up after header */
+.filter-bar {
+  animation: _fade-up 320ms 70ms var(--ease-out) both;
+}
+@starting-style {
+  .filter-bar { opacity: 0; translate: 0 8px; }
+}
+
+/* Card — fades up */
+.card {
+  animation: _fade-up 360ms 100ms var(--ease-out) both;
+}
+@starting-style {
+  .card { opacity: 0; translate: 0 8px; }
+}
+
+/* Table wrapper */
+.table-scroll {
+  animation: _fade-up 360ms 110ms var(--ease-out) both;
+}
+@starting-style {
+  .table-scroll { opacity: 0; translate: 0 8px; }
+}
+
+/* Table rows — stagger via :nth-child, no JS needed */
+tbody tr {
+  animation: _row-in 300ms var(--ease-out) both;
+}
+tbody tr:nth-child(1)    { animation-delay:   0ms }
+tbody tr:nth-child(2)    { animation-delay:  28ms }
+tbody tr:nth-child(3)    { animation-delay:  52ms }
+tbody tr:nth-child(4)    { animation-delay:  74ms }
+tbody tr:nth-child(5)    { animation-delay:  92ms }
+tbody tr:nth-child(6)    { animation-delay: 108ms }
+tbody tr:nth-child(7)    { animation-delay: 122ms }
+tbody tr:nth-child(8)    { animation-delay: 134ms }
+tbody tr:nth-child(9)    { animation-delay: 144ms }
+tbody tr:nth-child(10)   { animation-delay: 153ms }
+tbody tr:nth-child(n+11) { animation-delay: 160ms }
+
+@starting-style {
+  tbody tr { opacity: 0; translate: 0 5px; }
+}
+
+/* Badges inside table rows inherit row delay */
+tbody .badge {
+  animation: _badge-pop 260ms var(--ease-spring) both;
+  animation-delay: inherit;
+  display: inline-flex;
+}
+@starting-style {
+  tbody .badge { opacity: 0; scale: 0.72; }
+}
+
+/* Actions dropdown */
+.actions-menu {
+  animation: _menu-in 170ms var(--ease-spring) both;
+  transform-origin: top right;
+}
+@starting-style {
+  .actions-menu { opacity: 0; scale: 0.92; translate: 0 -4px; }
+}
+
+/* Modal overlay */
+.modal-overlay {
+  animation: _overlay-in 180ms var(--ease-out) both;
+}
+@starting-style {
+  .modal-overlay { opacity: 0; }
+}
+
+/* Modal box */
+.modal-box {
+  animation: _modal-in 270ms var(--ease-spring) both;
+}
+@starting-style {
+  .modal-box { opacity: 0; scale: 0.94; translate: 0 14px; }
+}
+
+/* Pagination */
+.pagination {
+  animation: _fade-up 280ms 150ms var(--ease-out) both;
+}
+@starting-style {
+  .pagination { opacity: 0; translate: 0 8px; }
+}
+
+/* Back link — slides in from left */
+.page-back-link {
+  animation: _fade-left 300ms var(--ease-out) both;
+}
+@starting-style {
+  .page-back-link { opacity: 0; translate: -8px 0; }
+}
+
+/* Stat cards — stagger via --i (set inline from JS) */
+.stat-card {
+  animation: _fade-up 380ms var(--ease-spring) both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+  transition:
+    border-color 180ms var(--ease-in-out),
+    box-shadow 250ms var(--ease-in-out),
+    --_glow 300ms var(--ease-out);
+}
+@starting-style {
+  .stat-card { opacity: 0; translate: 0 10px; }
+}
+
+.stat-card:hover {
+  --_glow: 1;
+  border-color: color-mix(in oklch, var(--brand-primary) 30%, var(--border-default));
+  box-shadow:
+    var(--shadow-md),
+    0 0 0 3px color-mix(in oklch, var(--brand-primary) calc(var(--_glow) * 10%), transparent);
+}
+
+/* Detail fields — stagger via :nth-child */
+.detail-field {
+  animation: _fade-up 300ms var(--ease-out) both;
+}
+.detail-field:nth-child(1)   { animation-delay: 120ms }
+.detail-field:nth-child(2)   { animation-delay: 145ms }
+.detail-field:nth-child(3)   { animation-delay: 168ms }
+.detail-field:nth-child(4)   { animation-delay: 188ms }
+.detail-field:nth-child(5)   { animation-delay: 206ms }
+.detail-field:nth-child(n+6) { animation-delay: 222ms }
+
+@starting-style {
+  .detail-field { opacity: 0; translate: 0 6px; }
+}
+
+/* Tab button active underline slide */
+.tabs-bar .tab-btn { position: relative; }
+.tabs-bar .tab-btn::after {
+  content: '';
+  position: absolute;
+  inset-block-end: -1px;
+  inset-inline: 0;
+  height: 2px;
+  background: var(--brand-primary);
+  border-radius: var(--radius-full);
+  scale: 0 1;
+  transition: scale 200ms var(--ease-spring);
+}
+.tabs-bar .tab-btn[data-active]::after { scale: 1 1; }
+
+/* Respect user motion preferences — disable all entrance animations */
+@media (prefers-reduced-motion: reduce) {
+  .page-header,
+  .filter-bar,
+  .card,
+  .table-scroll,
+  tbody tr,
+  tbody .badge,
+  .actions-menu,
+  .modal-overlay,
+  .modal-box,
+  .pagination,
+  .page-back-link,
+  .stat-card,
+  .detail-field {
+    animation: none;
+    transition: none;
+  }
+}
