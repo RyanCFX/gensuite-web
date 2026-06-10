@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "css-animations": {
+      "source": "heygen-com/hyperframes",
+      "sourceType": "github",
+      "skillPath": "skills/css-animations/SKILL.md",
+      "computedHash": "df468749b06a8ec7369cfea69bf71bf65e46cfc376e837e439e26f4230852c6b"
+    },
     "emil-design-eng": {
       "source": "emilkowalski/skill",
       "sourceType": "github",
@@ -18,6 +24,12 @@
       "sourceType": "github",
       "skillPath": ".agents/skills/impeccable/SKILL.md",
       "computedHash": "9fc469b8e0ee85a7ba2070050997f8e7ebb4ad1d79be3b21770a33392c1e9b93"
+    },
+    "modern-css": {
+      "source": "paulirish/dotfiles",
+      "sourceType": "github",
+      "skillPath": "agents/skills/modern-css/SKILL.md",
+      "computedHash": "04b1fd69e3c088949827e7c2af748402b2b7f798fc8742e9a7315ed506b161cc"
     },
     "vercel-react-best-practices": {
       "source": "vercel-labs/agent-skills",

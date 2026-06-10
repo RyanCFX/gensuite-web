@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Package, FileText, Receipt, Warehouse,
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
   ChevronRight, LogOut, Menu, Building2, UserCog, Sun, Moon,
-  Shield, X, BookOpen, ClipboardList, Percent, Calendar, Lock,
+  Shield, X, BookOpen, ClipboardList, Percent, Calendar, Lock, BookText,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth.store'
 import { CommandPalette } from './CommandPalette'
@@ -124,6 +124,7 @@ const NAV_CONFIG: NavEntry = {
     { label: 'Cuentas Contables',  icon: <BookOpen size={14} />,     path: '/cuentas'             },
     { label: 'Asientos Contables', icon: <ClipboardList size={14} />, path: '/asientos'           },
     { label: 'Libro Diario',        icon: <BookOpen size={14} />,     path: '/contabilidad/libro-diario'   },
+    { label: 'Libro Mayor',         icon: <BookText size={14} />,     path: '/contabilidad/libro-mayor'    },
     { label: 'Cierre de Período',  icon: <Lock size={14} />,         path: '/contabilidad/cierre-periodo' },
     { label: 'Mi Perfil',          icon: <UserCog size={14} />,      path: '/config/perfil'       },
   ],

@@ -154,6 +154,7 @@ export const ENDPOINTS = {
     cxcAging: '/reportes/cxc/aging',
     cajaCuadre: '/reportes/caja/cuadre',
     libroDiario: '/reportes/libro-diario',
+    libroMayor: '/reportes/libro-mayor',
   },
   cuentasMovimientos: {
     byId: (id: string) => `/cuentas/${encodeURIComponent(id)}/movimientos`,
