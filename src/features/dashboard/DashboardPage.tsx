@@ -55,20 +55,6 @@ function ChartTooltipContent({ active, payload, label }: {
   )
 }
 
-const KPI_CARDS = [
-  {
-    key: 'ventas',
-    label: 'Total Ventas',
-    icon: (u?: number) => <TrendingUp size={16} />,
-    value: (kpis: ReturnType<typeof useKpis>) => formatDOP(kpis?.totalVentas),
-    sub: (kpis: ReturnType<typeof useKpis>) =>
-      `${kpis?.numFacturas ?? 0} ${kpis?.numFacturas === 1 ? 'factura' : 'facturas'}`,
-  },
-] as const
-
-// Small hook to avoid repeating kpis
-function useKpis() { return null as never }
-
 export default function DashboardPage() {
   const [period, setPeriod] = useState<DashboardPeriod>('month')
 
