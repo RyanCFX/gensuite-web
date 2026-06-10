@@ -52,6 +52,7 @@ const JournalPage     = lazy(() => import('@/features/journal/JournalPage'))
 const JournalForm     = lazy(() => import('@/features/journal/JournalForm'))
 const JournalDetail   = lazy(() => import('@/features/journal/JournalDetail'))
 const CierrePeriodoPage = lazy(() => import('@/features/contabilidad/CierrePeriodoPage'))
+const LibroDiarioPage   = lazy(() => import('@/features/contabilidad/LibroDiarioPage'))
 
 function PageLoader() {
   return (
@@ -153,6 +154,9 @@ export default function App() {
 
             {/* Contabilidad — Cierre de Período */}
             <Route path="/contabilidad/cierre-periodo" element={<Suspense fallback={<PageLoader />}><CierrePeriodoPage /></Suspense>} />
+
+            {/* Contabilidad — Libro Diario */}
+            <Route path="/contabilidad/libro-diario" element={<Suspense fallback={<PageLoader />}><LibroDiarioPage /></Suspense>} />
 
             {/* Configuración */}
             <Route path="/config/empresa" element={<Suspense fallback={<PageLoader />}><EmpresaConfig /></Suspense>} />

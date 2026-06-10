@@ -5,7 +5,8 @@ import { listCuentas, getCuentasTree } from '@/shared/api/cuentas'
 import type { Cuenta } from '@/shared/api/types'
 import type { ListCuentasParams } from '@/shared/api/cuentas'
 import { useDebounce } from '@/lib/useDebounce'
-import { Plus, Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightSmall, Folder, FileText } from 'lucide-react'
+import { Plus, Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightSmall, Folder, FileText, BarChart2 } from 'lucide-react'
+import { CuentaMovimientosModal } from '@/features/contabilidad/CuentaMovimientosModal'
 
 const PAGE_SIZE = 25
 
@@ -41,7 +42,7 @@ function rootTypeLabel(rootType: string): string {
 
 // ─── Tree node ────────────────────────────────────────────────────────────────
 
-function TreeNode({ cuenta, depth, onNavigate }: { cuenta: Cuenta; depth: number; onNavigate: (id: string) => void }) {
+function TreeNode({ cuenta, depth, onNavigate, onMovimientos }: { cuenta: Cuenta; depth: number; onNavigate: (id: string) => void; onMovimientos: (name: string) => void }) {
   const [expanded, setExpanded] = useState(depth < 2)
   const hasChildren = Boolean(cuenta.children && cuenta.children.length > 0)
 
@@ -121,10 +122,20 @@ function TreeNode({ cuenta, depth, onNavigate }: { cuenta: Cuenta; depth: number
         {cuenta.disabled && (
           <span className="badge badge-error" style={{ fontSize: 11 }}>Deshabilitada</span>
         )}
+        {!hasChildren && (
+          <button
+            className="btn btn-ghost btn-size-sm"
+            title="Ver movimientos"
+            onClick={(e) => { e.stopPropagation(); onMovimientos(cuenta.id) }}
+            style={{ padding: '0 4px' }}
+          >
+            <BarChart2 size={13} />
+          </button>
+        )}
       </div>
 
       {hasChildren && expanded && cuenta.children?.map((child) => (
-        <TreeNode key={child.id} cuenta={child} depth={depth + 1} onNavigate={onNavigate} />
+        <TreeNode key={child.id} cuenta={child} depth={depth + 1} onNavigate={onNavigate} onMovimientos={onMovimientos} />
       ))}
     </div>
   )
@@ -135,6 +146,7 @@ function TreeNode({ cuenta, depth, onNavigate }: { cuenta: Cuenta; depth: number
 export default function CuentasPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<'lista' | 'arbol'>('lista')
+  const [movimientosAccount, setMovimientosAccount] = useState<string | null>(null)
 
   // Lista tab state
   const [search, setSearch] = useState('')
@@ -258,6 +270,7 @@ export default function CuentasPage() {
                   <th>Raíz</th>
                   <th>Moneda</th>
                   <th>Estado</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -272,7 +285,7 @@ export default function CuentasPage() {
                   : isError
                     ? (
                         <tr>
-                          <td colSpan={6} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
+                          <td colSpan={7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
                             Error al cargar las cuentas
                           </td>
                         </tr>
@@ -280,7 +293,7 @@ export default function CuentasPage() {
                     : data?.items.length === 0
                       ? (
                           <tr>
-                            <td colSpan={6}>
+                            <td colSpan={7}>
                               <div className="empty-state">
                                 <div className="empty-icon"><FileText size={28} /></div>
                                 <p className="empty-title">No se encontraron cuentas</p>
@@ -313,6 +326,17 @@ export default function CuentasPage() {
                               {cuenta.disabled
                                 ? <span className="badge badge-error">Deshabilitada</span>
                                 : <span className="badge badge-submitted">Activa</span>}
+                            </td>
+                            <td onClick={(e) => e.stopPropagation()}>
+                              {!cuenta.isGroup && (
+                                <button
+                                  className="btn btn-ghost btn-size-sm"
+                                  title="Ver movimientos"
+                                  onClick={() => setMovimientosAccount(cuenta.id)}
+                                >
+                                  <BarChart2 size={13} />
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -347,6 +371,10 @@ export default function CuentasPage() {
         </>
       )}
 
+      {movimientosAccount && (
+        <CuentaMovimientosModal accountId={movimientosAccount} onClose={() => setMovimientosAccount(null)} />
+      )}
+
       {/* ── Árbol Tab ── */}
       {activeTab === 'arbol' && (
         <div className="card">
@@ -379,6 +407,7 @@ export default function CuentasPage() {
                         cuenta={root}
                         depth={0}
                         onNavigate={(id) => navigate(`/cuentas/${encodeURIComponent(id)}`)}
+                        onMovimientos={(name) => setMovimientosAccount(name)}
                       />
                     ))}
           </div>

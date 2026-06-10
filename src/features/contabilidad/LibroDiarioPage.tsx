@@ -1,0 +1,253 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { Search, BookOpen } from 'lucide-react'
+import { getLibroDiario, type LibroDiarioParams } from '@/shared/api/libroDiario'
+import { formatDate, formatDOP } from '@/lib/formatters'
+import { AccountSelect } from '@/components/shared/AccountSelect'
+
+function firstOfMonth(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+}
+
+function today(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const VOUCHER_TYPES = [
+  'Sales Invoice',
+  'Purchase Invoice',
+  'Payment Entry',
+  'Journal Entry',
+  'Delivery Note',
+  'Purchase Receipt',
+  'Stock Entry',
+]
+
+function voucherLink(voucherType: string, voucherNo: string): string | null {
+  switch (voucherType) {
+    case 'Sales Invoice':    return `/facturacion/facturas/${voucherNo}`
+    case 'Purchase Invoice': return `/compras/${voucherNo}`
+    case 'Payment Entry':    return `/cobros/${voucherNo}`
+    case 'Journal Entry':    return `/asientos/${voucherNo}`
+    default:                 return null
+  }
+}
+
+export default function LibroDiarioPage() {
+  const navigate = useNavigate()
+
+  const [fromDate, setFromDate] = useState(firstOfMonth())
+  const [toDate, setToDate] = useState(today())
+  const [account, setAccount] = useState('')
+  const [voucherType, setVoucherType] = useState('')
+  const [voucherNo, setVoucherNo] = useState('')
+  const [groupBy, setGroupBy] = useState('Group by Voucher (Consolidated)')
+
+  const [queryParams, setQueryParams] = useState<LibroDiarioParams | null>(null)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['libro-diario', queryParams],
+    queryFn: () => getLibroDiario(queryParams ?? {}),
+    enabled: queryParams !== null,
+  })
+
+  const handleSearch = () => {
+    setQueryParams({
+      fromDate,
+      toDate,
+      account: account || undefined,
+      voucherType: voucherType || undefined,
+      voucherNo: voucherNo || undefined,
+      groupBy: groupBy || undefined,
+    })
+  }
+
+  const rows = data?.rows ?? []
+  const totalDebit = data?.totalDebit ?? 0
+  const totalCredit = data?.totalCredit ?? 0
+
+  return (
+    <div className="page-container">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Libro Diario</h1>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-body">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
+            <div className="ff-wrap">
+              <label className="ff-label">Desde</label>
+              <input
+                type="date"
+                className="ff-input"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+              />
+            </div>
+            <div className="ff-wrap">
+              <label className="ff-label">Hasta</label>
+              <input
+                type="date"
+                className="ff-input"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+              />
+            </div>
+            <div className="ff-wrap" style={{ minWidth: 240 }}>
+              <label className="ff-label">Cuenta contable</label>
+              <AccountSelect
+                value={account}
+                onChange={setAccount}
+                placeholder="Buscar cuenta…"
+                ledgerOnly={false}
+              />
+            </div>
+            <div className="ff-wrap">
+              <label className="ff-label">Tipo de voucher</label>
+              <select
+                className="ff-select"
+                value={voucherType}
+                onChange={(e) => setVoucherType(e.target.value)}
+              >
+                <option value="">Todos</option>
+                {VOUCHER_TYPES.map((vt) => (
+                  <option key={vt} value={vt}>{vt}</option>
+                ))}
+              </select>
+            </div>
+            <div className="ff-wrap">
+              <label className="ff-label">No. Voucher</label>
+              <input
+                className="ff-input"
+                placeholder="Número de voucher…"
+                value={voucherNo}
+                onChange={(e) => setVoucherNo(e.target.value)}
+              />
+            </div>
+            <div className="ff-wrap" style={{ minWidth: 240 }}>
+              <label className="ff-label">Agrupar por</label>
+              <select
+                className="ff-select"
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value)}
+              >
+                <option value="Group by Voucher (Consolidated)">Group by Voucher (Consolidated)</option>
+                <option value="Group by Account">Group by Account</option>
+                <option value="">Sin agrupar</option>
+              </select>
+            </div>
+            <button className="btn btn-primary" onClick={handleSearch}>
+              <Search size={14} />
+              Buscar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="card">
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Cuenta</th>
+                <th>Tipo</th>
+                <th>Voucher</th>
+                <th style={{ textAlign: 'right' }}>Débito</th>
+                <th style={{ textAlign: 'right' }}>Crédito</th>
+                <th style={{ textAlign: 'right' }}>Saldo</th>
+                <th>Parte</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading
+                ? Array.from({ length: 8 }).map((_, i) => (
+                    <tr key={i}>
+                      {Array.from({ length: 8 }).map((__, j) => (
+                        <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
+                      ))}
+                    </tr>
+                  ))
+                : queryParams === null
+                  ? (
+                      <tr>
+                        <td colSpan={8}>
+                          <div className="empty-state">
+                            <div className="empty-icon"><BookOpen size={28} /></div>
+                            <p className="empty-title">Selecciona un rango de fechas</p>
+                            <p className="empty-sub">Define los filtros y presiona Buscar para ver el libro diario</p>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  : rows.length === 0
+                    ? (
+                        <tr>
+                          <td colSpan={8}>
+                            <div className="empty-state">
+                              <div className="empty-icon"><BookOpen size={28} /></div>
+                              <p className="empty-title">Sin movimientos</p>
+                              <p className="empty-sub">No se encontraron registros para el período seleccionado</p>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    : rows.map((row, i) => {
+                        const link = voucherLink(row.voucherType, row.voucherNo)
+                        return (
+                          <tr key={i}>
+                            <td className="td-muted">{formatDate(row.postingDate)}</td>
+                            <td style={{ fontSize: 12 }}>{row.account}</td>
+                            <td className="td-muted" style={{ fontSize: 12 }}>{row.voucherType}</td>
+                            <td>
+                              {link
+                                ? (
+                                    <button
+                                      className="btn btn-ghost btn-size-sm"
+                                      style={{ padding: '0 4px', fontSize: 12 }}
+                                      onClick={() => navigate(link)}
+                                    >
+                                      {row.voucherNo}
+                                    </button>
+                                  )
+                                : <span style={{ fontSize: 12 }}>{row.voucherNo}</span>}
+                            </td>
+                            <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
+                              {row.debit ? formatDOP(row.debit) : '—'}
+                            </td>
+                            <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
+                              {row.credit ? formatDOP(row.credit) : '—'}
+                            </td>
+                            <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
+                              {formatDOP(row.balance)}
+                            </td>
+                            <td className="td-muted" style={{ fontSize: 12 }}>
+                              {row.party ?? '—'}
+                            </td>
+                          </tr>
+                        )
+                      })}
+            </tbody>
+            {rows.length > 0 && (
+              <tfoot>
+                <tr style={{ fontWeight: 600, borderTop: '2px solid var(--border-default)' }}>
+                  <td colSpan={4} style={{ fontSize: 13 }}>Totales</td>
+                  <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 13 }}>{formatDOP(totalDebit)}</td>
+                  <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 13 }}>{formatDOP(totalCredit)}</td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}

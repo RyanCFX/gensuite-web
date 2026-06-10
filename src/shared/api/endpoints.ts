@@ -153,5 +153,9 @@ export const ENDPOINTS = {
     inventarioMovimientos: '/reportes/inventario/movimientos',
     cxcAging: '/reportes/cxc/aging',
     cajaCuadre: '/reportes/caja/cuadre',
+    libroDiario: '/reportes/libro-diario',
+  },
+  cuentasMovimientos: {
+    byId: (id: string) => `/cuentas/${encodeURIComponent(id)}/movimientos`,
   },
 } as const
