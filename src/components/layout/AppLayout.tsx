@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Package, FileText, Receipt, Warehouse,
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
   ChevronRight, LogOut, Menu, Building2, UserCog, Sun, Moon,
-  Shield, X, BookOpen, ClipboardList, Percent, Calendar, Lock, BarChart2,
+  Shield, X, BookOpen, ClipboardList, Percent, Calendar, Lock,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth.store'
 import { CommandPalette } from './CommandPalette'
