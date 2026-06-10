@@ -555,6 +555,11 @@ button {
 .app-shell.collapsed .sb-section { padding: 8px 0; }
 .app-shell.collapsed .sb-footer { padding: 8px 0; }
 
+/* Floating group panel — overrides collapsed sidebar styles */
+.app-shell.collapsed .nav-float-panel .nav-label { display: block; }
+.app-shell.collapsed .nav-float-panel .nav-item { justify-content: flex-start; padding: 0 8px; width: 100%; margin: 0; }
+.app-shell.collapsed .nav-float-panel .nav-group-chevron { display: none; }
+
 /* ─── MAIN CONTENT ─── */
 .main {
   grid-area: main;

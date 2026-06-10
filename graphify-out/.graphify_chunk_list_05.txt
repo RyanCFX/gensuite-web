@@ -1,0 +1,16 @@
+/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vite/references/core-config.md
+/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vite/references/core-features.md
+/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vite/references/core-plugin-api.md
+/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vite/references/environment-api.md
+/Users/ryancastrofelix/Documents/projects/gensuite_web/.agents/skills/vite/references/rolldown-migration.md
+/Users/ryancastrofelix/Documents/projects/gensuite_web/README.md
+/Users/ryancastrofelix/Documents/projects/gensuite_web/docs/frontend/CONTEXT.md
+/Users/ryancastrofelix/Documents/projects/gensuite_web/docs/frontend/README.md
+/Users/ryancastrofelix/Documents/projects/gensuite_web/docs/frontend/TAREAS.md
+/Users/ryancastrofelix/Documents/projects/gensuite_web/docs/frontend/docs/api-client.md
+/Users/ryancastrofelix/Documents/projects/gensuite_web/docs/frontend/docs/document-lifecycle.md
+/Users/ryancastrofelix/Documents/projects/gensuite_web/docs/frontend/docs/validators-dgii.md
+/Users/ryancastrofelix/Documents/projects/gensuite_web/index.html
+/Users/ryancastrofelix/Documents/projects/gensuite_web/public/favicon.svg
+/Users/ryancastrofelix/Documents/projects/gensuite_web/public/icons.svg
+/Users/ryancastrofelix/Documents/projects/gensuite_web/src/assets/login_background.jpg

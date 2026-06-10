@@ -62,6 +62,7 @@ function ReportTable({
   data: Record<string, unknown>[]
   columns?: ColumnDef[]
 }) {
+  
   if (!data || data.length === 0) {
     return (
       <div className="empty-state">
@@ -337,6 +338,17 @@ function CxcAgingReport() {
   )
 }
 
+type CajaCuadreData = {
+  date: string
+  cashier: string
+  totalCobrado: number
+  totalFacturado: number
+  numCobros: number
+  numFacturas: number
+  porMetodoDePago: { metodo: string; total: number }[]
+  diferencia: number
+}
+
 function CajaCuadreReport() {
   const [date, setDate] = useState(today())
   const { data, isLoading, error } = useQuery({
@@ -345,8 +357,11 @@ function CajaCuadreReport() {
     retry: false,
   })
 
+  const cuadre = (data as { data?: CajaCuadreData } | undefined)?.data
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Filtro */}
       <div className="filter-bar">
         <div className="filter-bar-left">
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
@@ -354,11 +369,72 @@ function CajaCuadreReport() {
           </label>
         </div>
       </div>
-      <div className="card">
-        {isLoading && <LoadingRows />}
-        {error && <ErrorBanner err={error} />}
-        {!isLoading && !error && <AutoTable data={data} />}
-      </div>
+
+      {isLoading && <div className="card"><LoadingRows /></div>}
+      {error && <ErrorBanner err={error} />}
+
+      {!isLoading && !error && cuadre && (
+        <>
+          {/* Tarjetas resumen */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+            {[
+              { label: 'Total Cobrado',    value: formatDOP(cuadre.totalCobrado),   sub: `${cuadre.numCobros} cobro${cuadre.numCobros !== 1 ? 's' : ''}` },
+              { label: 'Total Facturado',  value: formatDOP(cuadre.totalFacturado), sub: `${cuadre.numFacturas} factura${cuadre.numFacturas !== 1 ? 's' : ''}` },
+              { label: 'Diferencia',       value: formatDOP(cuadre.diferencia),     sub: cuadre.diferencia > 0 ? 'Pendiente por cobrar' : 'Cuadrado', danger: cuadre.diferencia > 0 },
+              { label: 'Cajero',           value: cuadre.cashier,                  sub: formatDate(cuadre.date) },
+            ].map((card) => (
+              <div key={card.label} className="card" style={{ padding: '14px 16px' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{card.label}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: card.danger ? 'var(--color-danger, #e53e3e)' : 'var(--text-primary)', wordBreak: 'break-all' }}>{card.value}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{card.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desglose por método de pago */}
+          <div className="card">
+            <div style={{ padding: '14px 16px 10px', fontWeight: 600, fontSize: 13, borderBottom: '1px solid var(--border-default)' }}>
+              Desglose por método de pago
+            </div>
+            {cuadre.porMetodoDePago.length === 0
+              ? (
+                <div className="empty-state">
+                  <span className="empty-icon"><FileText size={20} /></span>
+                  <p className="empty-title">Sin movimientos</p>
+                  <p className="empty-sub">No hubo cobros registrados en esta fecha.</p>
+                </div>
+              )
+              : (
+                <div className="table-scroll">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Método de pago</th>
+                        <th style={{ textAlign: 'right' }}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cuadre.porMetodoDePago.map((row) => (
+                        <tr key={row.metodo}>
+                          <td>{row.metodo}</td>
+                          <td style={{ textAlign: 'right' }}>{formatDOP(row.total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+          </div>
+        </>
+      )}
+
+      {!isLoading && !error && !cuadre && (
+        <div className="empty-state">
+          <span className="empty-icon"><FileText size={20} /></span>
+          <p className="empty-title">Sin datos</p>
+          <p className="empty-sub">No hay información de caja para la fecha seleccionada.</p>
+        </div>
+      )}
     </div>
   )
 }
@@ -414,18 +490,18 @@ export default function ReportesPage() {
         overflowY: 'auto',
       }}>
         {groups.map((group) => (
-          <div key={group} style={{ marginBottom: 4 }}>
-            <div className="sb-label" style={{ padding: '6px 12px 2px' }}>{group}</div>
+          <div key={group} style={{ marginBottom: 4, padding:'0px 10px' }}>
+            <div style={{ padding: '6px 12px 2px' }}>{group}</div>
             {REPORT_NAV.filter((n) => n.group === group).map((n) => (
               <button
                 key={n.key}
                 className={`nav-item${active === n.key ? ' active' : ''}`}
-                style={{ height: 30, padding: '0 12px', fontSize: 12 }}
+                style={{ height: 30, padding: '0 12px', fontSize: 12, width:'100%', justifyContent:'flex-start' }}
                 onClick={() => navigate(`/reportes/${n.key}`)}
                 aria-current={active === n.key ? 'page' : undefined}
               >
                 <BarChart3 size={13} aria-hidden="true" />
-                <span className="nav-label">{n.label}</span>
+                <span>{n.label}</span>
               </button>
             ))}
           </div>

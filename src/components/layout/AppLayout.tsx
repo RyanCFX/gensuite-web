@@ -146,25 +146,43 @@ function NavItemBtn({ item, onNav, collapsed }: { item: NavItem; onNav: (p: stri
   )
 }
 
-function NavGroupBtn({ group, onNav, collapsed }: { group: NavGroup; onNav: (p: string) => void; collapsed: boolean }) {
+function NavGroupBtn({
+  group, onNav, collapsed, onOpen, floatWhenCollapsed,
+}: {
+  group: NavGroup
+  onNav: (p: string) => void
+  collapsed: boolean
+  onOpen?: () => void
+  floatWhenCollapsed?: boolean
+}) {
   const { pathname } = useLocation()
-  // prefix supports pipe-separated alternatives: '/config|/cuentas|/asientos'
   const groupActive = group.prefix.split('|').some((p) => pathname.startsWith(p))
   const [open, setOpen] = useState(groupActive)
 
+  const handleClick = () => {
+    const next = !open
+    setOpen(next)
+    if (next && onOpen) onOpen()
+  }
+
+  const showInline = open && !collapsed
+  const showFloat = open && collapsed && floatWhenCollapsed
+
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
       <button
         className={`nav-item${groupActive ? ' active' : ''}`}
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        onClick={handleClick}
         title={collapsed ? group.label : undefined}
       >
         {group.icon}
         <span className="nav-label">{group.label}</span>
         <ChevronRight size={12} aria-hidden="true" className={`nav-group-chevron${open ? ' open' : ''}`} />
       </button>
-      {open && !collapsed && (
+
+      {/* Inline children (sidebar expanded) */}
+      {showInline && (
         <div className="nav-children" role="group" aria-label={group.label}>
           {group.children.map((child) => {
             const active = pathname === child.path || pathname.startsWith(child.path + '/')
@@ -182,12 +200,67 @@ function NavGroupBtn({ group, onNav, collapsed }: { group: NavGroup; onNav: (p: 
           })}
         </div>
       )}
+
+      {/* Floating children (sidebar collapsed) */}
+      {showFloat && (
+        <div
+          className="nav-float-panel"
+          role="group"
+          aria-label={group.label}
+          style={{
+            position: 'absolute',
+            left: 'calc(100% + 8px)',
+            top: 0,
+            background: 'var(--surface-overlay, var(--surface-app))',
+            border: '1px solid var(--border-default)',
+            borderRadius: 8,
+            padding: '6px 4px',
+            minWidth: 180,
+            zIndex: 400,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+          }}
+        >
+          <div style={{ padding: '4px 10px 6px', fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            {group.label}
+          </div>
+          {group.children.map((child) => {
+            const active = pathname === child.path || pathname.startsWith(child.path + '/')
+            return (
+              <button
+                key={child.path}
+                className={`nav-item nav-child${active ? ' active' : ''}`}
+                aria-current={active ? 'page' : undefined}
+                onClick={() => onNav(child.path)}
+                style={{ width: '100%' }}
+              >
+                {child.icon}
+                <span className="nav-label">{child.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
 
-function renderEntry(entry: NavEntry, onNav: (p: string) => void, collapsed: boolean) {
-  if (isGroup(entry)) return <NavGroupBtn key={entry.prefix} group={entry} onNav={onNav} collapsed={collapsed} />
+function renderEntry(
+  entry: NavEntry,
+  onNav: (p: string) => void,
+  collapsed: boolean,
+  opts?: { onOpen?: () => void; floatWhenCollapsed?: boolean },
+) {
+  if (isGroup(entry))
+    return (
+      <NavGroupBtn
+        key={entry.prefix}
+        group={entry}
+        onNav={onNav}
+        collapsed={collapsed}
+        onOpen={opts?.onOpen}
+        floatWhenCollapsed={opts?.floatWhenCollapsed}
+      />
+    )
   return <NavItemBtn key={entry.path} item={entry} onNav={onNav} collapsed={collapsed} />
 }
 
@@ -207,6 +280,14 @@ export default function AppLayout() {
 
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Auto-collapse sidebar when on any reportes page
+  useEffect(() => {
+    if (location.pathname.startsWith('/reportes')) {
+      setCollapsed(true)
+    }
+  }, [location.pathname])
 
   const displayName = user?.full_name ?? user?.email ?? 'Usuario'
   const initials = displayName.slice(0, 2).toUpperCase()
@@ -276,7 +357,7 @@ export default function AppLayout() {
 
       {/* Footer */}
       <div className="sb-footer">
-        {renderEntry(NAV_REPORTES, handleNav, collapsed)}
+        {renderEntry(NAV_REPORTES, handleNav, collapsed, { floatWhenCollapsed: true })}
         {renderEntry(NAV_CONFIG, handleNav, collapsed)}
       </div>
     </>
