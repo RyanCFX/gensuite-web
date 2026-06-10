@@ -7,6 +7,7 @@ import {
   Shield, X, BookOpen, ClipboardList, Percent, Calendar, Lock,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth.store'
+import { CommandPalette } from './CommandPalette'
 import { Toaster } from 'sonner'
 
 // ─── Nav definitions ─────────────────────────────────────────────────────────
@@ -195,6 +196,7 @@ function renderEntry(entry: NavEntry, onNav: (p: string) => void, collapsed: boo
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [cmdOpen, setCmdOpen] = useState(false)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('gensuite-theme')
     if (saved === 'dark' || saved === 'light') return saved
@@ -222,6 +224,18 @@ export default function AppLayout() {
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Global keyboard shortcut: ⌘K / Ctrl+K → open command palette
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setCmdOpen((o) => !o)
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
   }, [])
 
   const handleLogout = () => {
@@ -297,6 +311,26 @@ export default function AppLayout() {
           </div>
 
           <span className="divider-v" aria-hidden="true" />
+
+          {/* Search trigger */}
+          <div className="search-wrap" style={{ flex: 1, maxWidth: 280 }}>
+            <span className="search-icon" aria-hidden="true">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+              </svg>
+            </span>
+            <input
+              placeholder="Buscar…"
+              aria-label="Abrir búsqueda global"
+              readOnly
+              onClick={() => setCmdOpen(true)}
+              style={{ cursor: 'pointer' }}
+            />
+            <div className="search-shortcut" aria-hidden="true">
+              <kbd className="kbd">⌘</kbd>
+              <kbd className="kbd">K</kbd>
+            </div>
+          </div>
 
           {/* Right actions */}
           <div className="topbar-right">
@@ -390,6 +424,7 @@ export default function AppLayout() {
         <div style={{ flex: 1, overflowY: 'auto' }}>{sidebarContent}</div>
       </nav>
 
+      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
       <Toaster richColors position="top-right" />
     </>
   )
