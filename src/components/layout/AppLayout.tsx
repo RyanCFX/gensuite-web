@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Package, FileText, Receipt, Warehouse,
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
   ChevronRight, LogOut, Menu, Building2, UserCog, Sun, Moon,
-  Shield, X, BookOpen, ClipboardList, Percent, Calendar, Lock, BookText,
+  Shield, X, BookOpen, ClipboardList, Percent, Calendar, Lock, BookText, Tag,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth.store'
 import { CommandPalette } from './CommandPalette'
@@ -44,6 +44,7 @@ const NAV_CATALOG: NavEntry = {
     { label: 'Categorías', icon: <Package size={14} />, path: '/catalogo/categorias' },
     { label: 'Marcas',     icon: <Shield size={14} />,  path: '/catalogo/marcas'     },
     { label: 'Artículos',  icon: <Package size={14} />, path: '/catalogo/articulos'  },
+    { label: 'Atributos',  icon: <Tag size={14} />,     path: '/catalogo/atributos'  },
   ],
 }
 
