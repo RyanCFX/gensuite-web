@@ -32,12 +32,19 @@ function StockBadge({ item }: { item: Item }) {
   )
 }
 
+function ItemTypeBadge({ item }: { item: Item }) {
+  if (item.hasVariants) return <span className="badge badge-info">Template</span>
+  if (item.variantOf) return <span className="badge badge-neutral">Variante</span>
+  return <span className="badge badge-draft">Artículo</span>
+}
+
 export default function ItemsPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   const [search, setSearch] = useState('')
-  const [typeFilter, setTypeFilter] = useState<'all' | 'product' | 'service'>('all')
+  const [kindFilter, setKindFilter] = useState<'all' | 'product' | 'service'>('all')
+  const [templateFilter, setTemplateFilter] = useState<'all' | 'template' | 'standalone'>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('')
   const [brandFilter, setBrandFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'disabled'>('active')
@@ -50,15 +57,16 @@ export default function ItemsPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: [
       'items',
-      { search: debouncedSearch, typeFilter, categoryFilter, brandFilter, statusFilter, offset },
+      { search: debouncedSearch, kindFilter, templateFilter, categoryFilter, brandFilter, statusFilter, offset },
     ],
     queryFn: () =>
       listItems({
         search: debouncedSearch || undefined,
-        type: typeFilter === 'all' ? undefined : typeFilter,
+        type: kindFilter === 'all' ? undefined : kindFilter,
         category: categoryFilter || undefined,
         brand: brandFilter || undefined,
         disabled: statusFilter === 'all' ? undefined : statusFilter === 'disabled' ? 'true' : 'false',
+        isTemplate: templateFilter === 'template' ? true : undefined,
         limit: PAGE_SIZE,
         offset,
       }),
@@ -118,8 +126,8 @@ export default function ItemsPage() {
           </div>
           <select
             className="filter-select"
-            value={typeFilter}
-            onChange={(e) => { setTypeFilter(e.target.value as 'all' | 'product' | 'service'); setPage(1) }}
+            value={kindFilter}
+            onChange={(e) => { setKindFilter(e.target.value as 'all' | 'product' | 'service'); setPage(1) }}
           >
             <option value="all">Todos los tipos</option>
             <option value="product">Producto</option>
@@ -155,6 +163,22 @@ export default function ItemsPage() {
             <option value="disabled">Inactivos</option>
           </select>
         </div>
+        {/* Template / standalone toggle */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {[
+            { value: 'all', label: 'Todos' },
+            { value: 'template', label: 'Solo Templates' },
+            { value: 'standalone', label: 'Solo Artículos' },
+          ].map((opt) => (
+            <button
+              key={opt.value}
+              className={`btn btn-size-xs ${templateFilter === opt.value ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => { setTemplateFilter(opt.value as typeof templateFilter); setPage(1) }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="table-scroll">
@@ -164,6 +188,7 @@ export default function ItemsPage() {
               <th>Código</th>
               <th>Nombre</th>
               <th>Tipo</th>
+              <th>Rol</th>
               <th>Categoría</th>
               <th>Marca</th>
               <th style={{ textAlign: 'right' }}>Precio</th>
@@ -176,7 +201,7 @@ export default function ItemsPage() {
             {isLoading
               ? Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 9 }).map((__, j) => (
+                    {Array.from({ length: 10 }).map((__, j) => (
                       <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                     ))}
                   </tr>
@@ -184,7 +209,7 @@ export default function ItemsPage() {
               : isError
                 ? (
                     <tr>
-                      <td colSpan={9} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
+                      <td colSpan={10} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
                         Error al cargar los artículos
                       </td>
                     </tr>
@@ -192,7 +217,7 @@ export default function ItemsPage() {
                 : data?.items.length === 0
                   ? (
                       <tr>
-                        <td colSpan={9} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-secondary)' }}>
+                        <td colSpan={10} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-secondary)' }}>
                           No se encontraron artículos
                         </td>
                       </tr>
@@ -210,9 +235,14 @@ export default function ItemsPage() {
                             {item.type === 'product' ? 'Producto' : 'Servicio'}
                           </span>
                         </td>
+                        <td><ItemTypeBadge item={item} /></td>
                         <td className="td-muted">{item.categoryName ?? '—'}</td>
                         <td className="td-muted">{item.brandName ?? '—'}</td>
-                        <td style={{ textAlign: 'right' }}>{formatDOP(item.standardRate)}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          {item.hasVariants
+                            ? <span className="td-muted">—</span>
+                            : formatDOP(item.standardRate)}
+                        </td>
                         <td><StockBadge item={item} /></td>
                         <td>
                           {item.disabled
@@ -236,6 +266,15 @@ export default function ItemsPage() {
                                   <Eye size={14} />
                                   Ver detalle
                                 </button>
+                                {item.hasVariants && (
+                                  <button
+                                    className="actions-item"
+                                    onClick={() => { setOpenMenuId(null); navigate(`/catalogo/articulos/${item.id}#variants`) }}
+                                  >
+                                    <Eye size={14} />
+                                    Ver variantes
+                                  </button>
+                                )}
                                 <button
                                   className="actions-item"
                                   disabled={toggleMutation.isPending}

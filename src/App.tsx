@@ -13,6 +13,7 @@ const CustomerForm    = lazy(() => import('@/features/customers/CustomerForm'))
 const CategoriesPage  = lazy(() => import('@/features/catalog/CategoriesPage'))
 const BrandsPage      = lazy(() => import('@/features/catalog/BrandsPage'))
 const ItemsPage       = lazy(() => import('@/features/catalog/ItemsPage'))
+const AttributesPage  = lazy(() => import('@/features/catalog/AttributesPage'))
 const ItemDetail      = lazy(() => import('@/features/catalog/ItemDetail'))
 const ItemForm         = lazy(() => import('@/features/catalog/ItemForm'))
 const QuotationsPage  = lazy(() => import('@/features/quotations/QuotationsPage'))
@@ -93,6 +94,7 @@ export default function App() {
             <Route path="/catalogo/articulos" element={<Suspense fallback={<PageLoader />}><ItemsPage /></Suspense>} />
             <Route path="/catalogo/articulos/nuevo" element={<Suspense fallback={<PageLoader />}><ItemForm /></Suspense>} />
             <Route path="/catalogo/articulos/:id" element={<Suspense fallback={<PageLoader />}><ItemDetail /></Suspense>} />
+            <Route path="/catalogo/atributos" element={<Suspense fallback={<PageLoader />}><AttributesPage /></Suspense>} />
 
             {/* Cotizaciones */}
             <Route path="/cotizaciones" element={<Suspense fallback={<PageLoader />}><QuotationsPage /></Suspense>} />

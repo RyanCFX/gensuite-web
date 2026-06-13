@@ -10,6 +10,7 @@ import { listWarehouses } from '@/shared/api/inventory'
 import { listUOMs } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { AttributeSelect } from '@/components/shared/AttributeSelect'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 
 const uomConversionSchema = z.object({
@@ -40,6 +41,9 @@ export default function ItemForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [showAccounting, setShowAccounting] = useState(false)
+  const [showVariants, setShowVariants] = useState(false)
+  const [hasVariants, setHasVariants] = useState(false)
+  const [selectedAttributes, setSelectedAttributes] = useState<string[]>([])
 
   const { data: categoriesData } = useQuery({
     queryKey: ['categories', {}],
@@ -63,7 +67,7 @@ export default function ItemForm() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: FormValues) => createItem(data),
+    mutationFn: (data: Parameters<typeof createItem>[0]) => createItem(data),
     onSuccess: () => {
       toast.success('Artículo creado correctamente')
       queryClient.invalidateQueries({ queryKey: ['items'] })
@@ -119,6 +123,11 @@ export default function ItemForm() {
       uoms: data.uoms?.length ? data.uoms : undefined,
       incomeAccount: data.incomeAccount || undefined,
       expenseAccount: data.expenseAccount || undefined,
+      hasVariants: hasVariants || undefined,
+      attributes:
+        hasVariants && selectedAttributes.length > 0
+          ? selectedAttributes.map((attr) => ({ attribute: attr }))
+          : undefined,
     })
   }
 
@@ -395,6 +404,52 @@ export default function ItemForm() {
                   />
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Variantes (opcional) ──────────────────────────────────────── */}
+        <button
+          type="button"
+          onClick={() => setShowVariants((s) => !s)}
+          className="btn btn-ghost btn-size-sm"
+          style={{ alignSelf: 'flex-start' }}
+        >
+          {showVariants ? '▾' : '▸'} Variantes (opcional)
+        </button>
+
+        {showVariants && (
+          <div className="card">
+            <div className="card-header"><h2 className="card-title">Variantes</h2></div>
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <label className="ff-check-wrap">
+                <input
+                  type="checkbox"
+                  className="ff-check"
+                  checked={hasVariants}
+                  onChange={(e) => setHasVariants(e.target.checked)}
+                />
+                <span style={{ fontSize: 13 }}>Este artículo tiene variantes</span>
+              </label>
+
+              {hasVariants && (
+                <>
+                  <div className="inline-alert inline-alert-info" style={{ fontSize: 12 }}>
+                    Al guardar, las variantes se generarán en la pantalla de detalle del artículo.
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">Atributos de variantes</label>
+                    <AttributeSelect
+                      selected={selectedAttributes}
+                      onChange={setSelectedAttributes}
+                    />
+                    <p className="ff-hint">Ej: Color, Talla. Selecciona todos los atributos que diferencian las variantes.</p>
+                  </div>
+                  <p className="ff-hint" style={{ fontSize: 11 }}>
+                    El precio de venta se configura en cada variante individual.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         )}

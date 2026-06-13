@@ -1,9 +1,343 @@
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { getItem, toggleItem } from '@/shared/api/catalog'
+import { getItem, toggleItem, listItemVariants, generateVariants, createVariant, getAttribute } from '@/shared/api/catalog'
 import { formatDOP } from '@/lib/formatters'
-import { ToggleLeft, ToggleRight, Package, ArrowLeft } from 'lucide-react'
+import { ToggleLeft, ToggleRight, Package, ArrowLeft, X } from 'lucide-react'
+import type { Item, GenerateVariantsResult, ItemAttribute } from '@/shared/api/types'
+
+// ─── Generate Confirm Modal ───────────────────────────────────────────────────
+
+function GenerateConfirmModal({
+  item,
+  onConfirm,
+  onClose,
+}: {
+  item: Item
+  onConfirm: () => void
+  onClose: () => void
+}) {
+  const attributeIds = (item.attributes ?? []).map((a) => a.attribute)
+
+  // Load each attribute to count values
+  const attributeQueries = attributeIds.map((attrId) =>
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useQuery({
+      queryKey: ['attribute', attrId],
+      queryFn: () => getAttribute(attrId),
+      staleTime: 5 * 60_000,
+    })
+  )
+
+  const allLoaded = attributeQueries.every((q) => q.data)
+  const totalCombinations = allLoaded
+    ? attributeQueries.reduce((acc, q) => {
+        const attr = q.data as ItemAttribute
+        if (attr.numeric && attr.fromRange != null && attr.toRange != null && attr.increment) {
+          const count = Math.floor((attr.toRange - attr.fromRange) / attr.increment) + 1
+          return acc * count
+        }
+        return acc * (attr.values?.length ?? 1)
+      }, 1)
+    : null
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2 className="modal-title">Generar variantes</h2>
+          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="modal-body">
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
+            {totalCombinations != null
+              ? `Se crearán hasta ${totalCombinations} variante(s) automáticamente. Las combinaciones que ya existan serán saltadas.`
+              : 'Se generarán todas las combinaciones de atributos para este template.'}
+          </p>
+          {item.attributes && item.attributes.length === 0 && (
+            <div className="inline-alert inline-alert-warn" style={{ marginTop: 12 }}>
+              Este template no tiene atributos definidos. Edita el artículo para agregar atributos.
+            </div>
+          )}
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" onClick={onConfirm}>Generar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Create Variant Modal ─────────────────────────────────────────────────────
+
+function CreateVariantModal({
+  item,
+  itemId,
+  onClose,
+  onSuccess,
+}: {
+  item: Item
+  itemId: string
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const attributeIds = (item.attributes ?? []).map((a) => a.attribute)
+
+  const attributeQueries = attributeIds.map((attrId) =>
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useQuery({
+      queryKey: ['attribute', attrId],
+      queryFn: () => getAttribute(attrId),
+      staleTime: 5 * 60_000,
+    })
+  )
+
+  const [standardRate, setStandardRate] = useState(0)
+  const [attrValues, setAttrValues] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      const attributes = attributeIds.map((attrId) => ({
+        attribute: attrId,
+        attributeValue: attrValues[attrId] ?? '',
+      }))
+      await createVariant(itemId, { standardRate, attributes })
+      toast.success('Variante creada correctamente')
+      onSuccess()
+    } catch (err: unknown) {
+      const e = err as { message?: string }
+      toast.error(e?.message ?? 'Error al crear la variante')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2 className="modal-title">Agregar variante</h2>
+          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {attributeIds.map((attrId, i) => {
+              const attrData = attributeQueries[i]?.data
+              return (
+                <div key={attrId} className="ff-wrap">
+                  <label className="ff-label">
+                    {attrData?.name ?? attrId} <span className="ff-required">*</span>
+                  </label>
+                  {attrData?.numeric ? (
+                    <input
+                      type="number"
+                      className="ff-input"
+                      value={attrValues[attrId] ?? ''}
+                      onChange={(e) => setAttrValues((v) => ({ ...v, [attrId]: e.target.value }))}
+                      required
+                    />
+                  ) : (
+                    <select
+                      className="ff-select"
+                      value={attrValues[attrId] ?? ''}
+                      onChange={(e) => setAttrValues((v) => ({ ...v, [attrId]: e.target.value }))}
+                      required
+                    >
+                      <option value="">Seleccionar…</option>
+                      {(attrData?.values ?? []).map((val) => (
+                        <option key={val.value} value={val.value}>{val.value}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )
+            })}
+            <div className="ff-wrap">
+              <label className="ff-label">Precio de Venta <span className="ff-required">*</span></label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="ff-input"
+                value={standardRate}
+                onChange={(e) => setStandardRate(Number(e.target.value))}
+                required
+              />
+            </div>
+          </div>
+          <div className="modal-foot">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? 'Guardando…' : 'Crear variante'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── Variants Panel ───────────────────────────────────────────────────────────
+
+function VariantsPanel({ itemId, item }: { itemId: string; item: Item }) {
+  const qc = useQueryClient()
+  const navigate = useNavigate()
+
+  const [showCreateVariant, setShowCreateVariant] = useState(false)
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false)
+  const [generateResult, setGenerateResult] = useState<GenerateVariantsResult | null>(null)
+  const [generating, setGenerating] = useState(false)
+
+  const { data: variants, isLoading } = useQuery({
+    queryKey: ['item-variants', itemId],
+    queryFn: () => listItemVariants(itemId),
+    enabled: Boolean(itemId),
+  })
+
+  async function handleGenerate() {
+    setGenerating(true)
+    setShowGenerateConfirm(false)
+    try {
+      const result = await generateVariants(itemId)
+      setGenerateResult(result)
+      qc.invalidateQueries({ queryKey: ['item-variants', itemId] })
+    } catch (err: unknown) {
+      const e = err as { message?: string }
+      toast.error(e?.message ?? 'Error al generar variantes')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const attrCols = item.attributes ?? []
+
+  return (
+    <div className="card" id="variants">
+      <div className="card-header">
+        <div>
+          <span className="card-title">Variantes</span>
+          {variants && (
+            <span className="card-meta" style={{ marginLeft: 8 }}>{variants.length} variante(s)</span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="btn btn-ghost btn-size-sm"
+            onClick={() => setShowCreateVariant(true)}
+          >
+            + Agregar variante
+          </button>
+          <button
+            className="btn btn-primary btn-size-sm"
+            onClick={() => setShowGenerateConfirm(true)}
+            disabled={generating}
+          >
+            {generating ? '…' : '⚡ Generar todas'}
+          </button>
+        </div>
+      </div>
+
+      {generateResult && (
+        <div className="card-body" style={{ paddingBottom: 0 }}>
+          {generateResult.created === 0 && generateResult.skipped > 0 ? (
+            <div className="inline-alert inline-alert-info">
+              Todas las variantes ya existen ({generateResult.skipped} saltadas)
+            </div>
+          ) : (
+            <div className="inline-alert inline-alert-success">
+              ✓ {generateResult.created} variantes creadas
+              {generateResult.skipped > 0 && `, ${generateResult.skipped} ya existían`}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="table-scroll">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Nombre</th>
+              {attrCols.map((a) => <th key={a.attribute}>{a.attribute}</th>)}
+              <th style={{ textAlign: 'right' }}>Precio</th>
+              <th style={{ textAlign: 'right' }}>Stock</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading
+              ? Array.from({ length: 3 }).map((_, i) => (
+                  <tr key={i}>
+                    {Array.from({ length: 4 + attrCols.length }).map((__, j) => (
+                      <td key={j}>
+                        <span className="skeleton-box" style={{ height: 13, width: '80%', display: 'block' }} />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              : (variants ?? []).length === 0
+                ? (
+                    <tr>
+                      <td colSpan={4 + attrCols.length}>
+                        <div className="empty-state">
+                          <p className="empty-title">Sin variantes</p>
+                          <p className="empty-sub">Genera todas las variantes automáticamente o añade una manual.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                : (variants ?? []).map((v) => (
+                    <tr
+                      key={v.id}
+                      className="table-row-clickable"
+                      onClick={() => navigate(`/catalogo/articulos/${v.id}`)}
+                    >
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{v.id}</td>
+                      <td style={{ fontWeight: 500 }}>{v.itemName}</td>
+                      {attrCols.map((a) => {
+                        const av = (v.attributes ?? []).find((va) => va.attribute === a.attribute)
+                        return <td key={a.attribute}>{av?.attributeValue ?? '—'}</td>
+                      })}
+                      <td style={{ textAlign: 'right' }}>
+                        {v.standardRate > 0
+                          ? formatDOP(v.standardRate)
+                          : <span className="td-muted">RD$0</span>}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>{v.currentStock ?? 0}</td>
+                    </tr>
+                  ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showGenerateConfirm && (
+        <GenerateConfirmModal
+          item={item}
+          onConfirm={handleGenerate}
+          onClose={() => setShowGenerateConfirm(false)}
+        />
+      )}
+
+      {showCreateVariant && (
+        <CreateVariantModal
+          item={item}
+          itemId={itemId}
+          onClose={() => setShowCreateVariant(false)}
+          onSuccess={() => {
+            setShowCreateVariant(false)
+            qc.invalidateQueries({ queryKey: ['item-variants', itemId] })
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ItemDetail() {
   const { id } = useParams<{ id: string }>()
@@ -80,6 +414,8 @@ export default function ItemDetail() {
               ? <span className="badge badge-neutral">Inactivo</span>
               : <span className="badge badge-success">Activo</span>}
             <span className="badge badge-neutral">{item.type === 'product' ? 'Producto' : 'Servicio'}</span>
+            {item.hasVariants && <span className="badge badge-info">Template</span>}
+            {item.variantOf && <span className="badge badge-neutral">Variante</span>}
           </h1>
           <p className="page-sub" style={{ fontFamily: 'monospace' }}>{item.id}</p>
         </div>
@@ -94,7 +430,20 @@ export default function ItemDetail() {
         </button>
       </div>
 
-      {item.type === 'product' && (
+      {/* Variant-of banner */}
+      {item.variantOf && (
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
+          Variante de:{' '}
+          <a
+            style={{ fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+            onClick={() => navigate(`/catalogo/articulos/${item.variantOf}`)}
+          >
+            {item.variantOf}
+          </a>
+        </div>
+      )}
+
+      {item.type === 'product' && !item.hasVariants && (
         <div className="stats-row" style={{ marginBottom: 16 }}>
           <div className="stat-card">
             <div className="stat-card-top">
@@ -126,7 +475,7 @@ export default function ItemDetail() {
         </div>
       )}
 
-      {item.type === 'service' && (
+      {item.type === 'service' && !item.hasVariants && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header">
             <h2 className="card-title">Precio</h2>
@@ -168,8 +517,42 @@ export default function ItemDetail() {
               <span className="detail-value">{item.description ?? '—'}</span>
             </div>
           </div>
+
+          {/* Template attributes list */}
+          {item.hasVariants && (item.attributes ?? []).length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <span className="ff-label" style={{ display: 'block', marginBottom: 6 }}>Atributos de variantes</span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {(item.attributes ?? []).map((a) => (
+                  <span key={a.attribute} className="badge badge-info">{a.attribute}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Variant attribute values */}
+          {item.variantOf && (item.attributes ?? []).length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <span className="ff-label" style={{ display: 'block', marginBottom: 6 }}>Atributos</span>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {(item.attributes ?? []).map((a) => (
+                  <span key={a.attribute} style={{ fontSize: 13 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{a.attribute}:</span>{' '}
+                    <strong>{a.attributeValue ?? '—'}</strong>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Variants panel — only for templates */}
+      {item.hasVariants && (
+        <div style={{ marginTop: 20 }}>
+          <VariantsPanel itemId={id!} item={item} />
+        </div>
+      )}
     </div>
   )
 }

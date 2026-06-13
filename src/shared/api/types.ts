@@ -353,6 +353,9 @@ export interface Item {
   stockUom?: string
   salesUom?: string
   uoms?: ItemUomConversion[]
+  hasVariants?: boolean
+  variantOf?: string
+  attributes?: TemplateAttribute[]
 }
 
 export interface CreateItemDto {
@@ -369,6 +372,10 @@ export interface CreateItemDto {
   stockUom?: string
   salesUom?: string
   uoms?: ItemUomConversion[]
+  hasVariants?: boolean
+  attributes?: { attribute: string }[]  // for templates: just attribute names
+  incomeAccount?: string
+  expenseAccount?: string
 }
 
 export type UpdateItemDto = Partial<CreateItemDto>
@@ -1035,4 +1042,53 @@ export interface CreateCierrePeriodoDto {
   closingAccountHead: string
   postingDate: string
   remarks?: string
+}
+
+// ─── Item Attributes (Variants) ───────────────────────────────────────────────
+
+export interface AttributeValue {
+  value: string    // "Red", "Blue", "Small", "Large"
+  abbr: string     // "RED", "BLU", "S", "L" — used in variant code generation
+}
+
+export interface ItemAttribute {
+  id: string
+  name: string
+  numeric: boolean
+  // Only in detail response:
+  fromRange?: number
+  toRange?: number
+  increment?: number
+  values?: AttributeValue[]
+}
+
+export interface CreateAttributeDto {
+  name: string
+  numeric?: boolean
+  // For discrete values:
+  values?: AttributeValue[]
+  // For numeric range:
+  fromRange?: number
+  toRange?: number
+  increment?: number
+}
+
+export interface UpdateAttributeDto {
+  name?: string
+  values?: AttributeValue[]
+}
+
+// Template attribute reference (in item.attributes[])
+export interface TemplateAttribute {
+  attribute: string          // attribute id/name, e.g. "Colour"
+  attributeValue?: string    // only on variants: "Red", "Blue"
+}
+
+// Generate variants result
+export interface GenerateVariantsResult {
+  templateId: string
+  totalCombinations: number
+  created: number
+  skipped: number
+  variants: Item[]
 }
