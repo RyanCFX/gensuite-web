@@ -49,38 +49,19 @@
   }
 }
 
-/* Per-card accent colors via top bar */
-.dashboard-kpis .stat-card:nth-child(1) { --stat-accent: var(--brand-primary); }
-.dashboard-kpis .stat-card:nth-child(2) { --stat-accent: var(--brand-secondary); }
-.dashboard-kpis .stat-card:nth-child(3) { --stat-accent: var(--success-text); }
-.dashboard-kpis .stat-card:nth-child(4) { --stat-accent: var(--warning-text); }
-
-/* Icon badge: tinted per accent */
-.dashboard-kpis .stat-card:nth-child(1) .stat-icon-badge {
-  background: color-mix(in oklch, var(--brand-primary) 12%, var(--surface-sunken));
-  color: var(--brand-primary);
-}
-.dashboard-kpis .stat-card:nth-child(2) .stat-icon-badge {
-  background: color-mix(in oklch, var(--brand-secondary) 12%, var(--surface-sunken));
-  color: var(--brand-secondary);
-}
-.dashboard-kpis .stat-card:nth-child(3) .stat-icon-badge {
-  background: var(--success-bg);
-  color: var(--success-text);
-}
-.dashboard-kpis .stat-card:nth-child(4) .stat-icon-badge {
-  background: var(--warning-bg);
-  color: var(--warning-text);
-}
-
-/* Hover: colored glow matching the card's accent */
+/* Hover: brand glow ring */
 .dashboard-kpis .stat-card:hover {
   --stat-glow: 1;
-  border-color: color-mix(in oklch, var(--stat-accent, var(--brand-primary)) 30%, var(--border-default));
+  border-color: color-mix(in oklch, var(--brand-primary) 35%, var(--border-default));
   box-shadow:
-    var(--shadow-lg),
-    0 0 0 3px color-mix(in oklch, var(--stat-accent, var(--brand-primary)) 10%, transparent);
-  transform: translateY(-2px);
+    var(--shadow-md),
+    0 0 0 3px color-mix(in oklch, var(--brand-primary) calc(var(--stat-glow) * 12%), transparent);
+}
+
+/* Icon badge: brand-tinted surface */
+.dashboard-kpis .stat-card .stat-icon-badge {
+  background: color-mix(in oklch, var(--brand-primary) 10%, var(--surface-sunken));
+  color: var(--brand-primary);
 }
 
 /* Stat value: optical leading trim */

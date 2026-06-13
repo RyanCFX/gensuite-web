@@ -399,6 +399,7 @@ export default function AttributesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<ItemAttribute | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [loadingEdit, setLoadingEdit] = useState<string | null>(null) // id being fetched
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['attributes'],
@@ -419,10 +420,20 @@ export default function AttributesPage() {
     setModalOpen(true)
   }
 
-  function openEdit(attr: ItemAttribute) {
-    setEditTarget(attr)
-    setModalOpen(true)
-    setDetailId(null)
+  // Always fetch the full attribute (with values) before opening the edit modal.
+  // The list endpoint returns { id, name, numeric } without values[].
+  async function openEdit(attr: ItemAttribute) {
+    setLoadingEdit(attr.id)
+    try {
+      const full = await getAttribute(attr.id)
+      setEditTarget(full)
+      setModalOpen(true)
+      setDetailId(null)
+    } catch {
+      toast.error('Error al cargar el atributo')
+    } finally {
+      setLoadingEdit(null)
+    }
   }
 
   function closeModal() {
@@ -518,8 +529,11 @@ export default function AttributesPage() {
                             className="btn btn-ghost btn-size-xs"
                             title="Editar"
                             onClick={() => openEdit(attr)}
+                            disabled={loadingEdit === attr.id}
                           >
-                            <Pencil size={13} />
+                            {loadingEdit === attr.id
+                              ? <span className="spinner spinner-brand spinner-sm" aria-label="Cargando…" />
+                              : <Pencil size={13} />}
                           </button>
                         </div>
                       </td>
