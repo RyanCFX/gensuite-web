@@ -22,12 +22,14 @@ interface ItemRow {
   description: string
   qty: number
   rate: number
+  /** Precio base al stockUom — se usa para recalcular al cambiar UOM */
+  baseRate: number
   warehouse: string
   uom: string
 }
 
 function emptyItem(): ItemRow {
-  return { itemCode: '', description: '', qty: 1, rate: 0, warehouse: '', uom: 'Nos' }
+  return { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, warehouse: '', uom: 'Nos' }
 }
 
 const NCF_REGEX = /^[BE]\d{10}$/
@@ -149,13 +151,16 @@ export default function CompraForm() {
   const selectCatalogItem = useCallback((idx: number, catalogItem: Item) => {
     setItems((prev) => prev.map((row, i) => {
       if (i !== idx) return row
+      // Para compras usamos valuationRate (costo) si existe, si no standardRate
+      const baseRate = catalogItem.valuationRate ?? catalogItem.standardRate ?? 0
       return {
         ...row,
         itemCode: catalogItem.id,
         itemLabel: catalogItem.itemName,
         description: catalogItem.description ?? catalogItem.itemName,
-        // Para compras usamos valuationRate (costo) si existe, si no standardRate
-        rate: catalogItem.valuationRate ?? catalogItem.standardRate ?? 0,
+        rate: baseRate,
+        baseRate,
+        uom: catalogItem.purchaseUom ?? catalogItem.stockUom ?? row.uom,
       }
     }))
   }, [])
@@ -314,7 +319,16 @@ export default function CompraForm() {
                           </select>
                         </td>
                         <td>
-                          <UomSelect value={item.uom} onChange={(v) => updateItem(idx, 'uom', v)} itemCode={item.itemCode || undefined} />
+                          <UomSelect
+                            value={item.uom}
+                            onChange={(v, factor) => {
+                              const newRate = Math.round(item.baseRate * factor * 10000) / 10000
+                              setItems(prev => prev.map((row, i) =>
+                                i === idx ? { ...row, uom: v, rate: newRate } : row,
+                              ))
+                            }}
+                            itemCode={item.itemCode || undefined}
+                          />
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <button

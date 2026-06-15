@@ -5,7 +5,8 @@ import { createInvoice, updateInvoice, getInvoice } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
 import { listImpuestosVentas } from '@/shared/api/config'
-import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult } from '@/shared/api/types'
+import { getItemStock } from '@/shared/api/catalog'
+import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, ItemStock } from '@/shared/api/types'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react'
@@ -27,7 +28,14 @@ interface LineItem {
   qty: number
   rate: number
   amount: number
+  /** Precio base al stockUom — se usa para recalcular al cambiar UOM */
+  baseRate: number
   uom: string
+  warehouse: string
+  /** Snapshot del stock por almacén al momento de seleccionar el artículo */
+  stock?: ItemStock
+  /** Factor de conversión activo (UOM seleccionada / stockUom) */
+  conversionFactor: number
 }
 
 function todayIso() {
@@ -43,6 +51,29 @@ const ITBIS_RATE = 0.18
 
 function calcAmount(qty: number, rate: number) {
   return Math.round(qty * rate * 100) / 100
+}
+
+// ─── WarehouseSelect — SearchSelect con filtrado local ────────────────────────
+interface WarehouseSelectProps {
+  value: string
+  options: SearchSelectOption[]
+  onChange: (value: string) => void
+}
+function WarehouseSelect({ value, options, onChange }: WarehouseSelectProps) {
+  const [query, setQuery] = useState('')
+  const filtered = options.filter(o =>
+    !query || o.label.toLowerCase().includes(query.toLowerCase()),
+  )
+  return (
+    <SearchSelect
+      value={value}
+      options={filtered}
+      onSearch={setQuery}
+      onChange={(val) => onChange(val)}
+      placeholder="Buscar almacén…"
+      className="items-input"
+    />
+  )
 }
 
 export default function InvoiceForm() {
@@ -86,8 +117,11 @@ export default function InvoiceForm() {
         description: i.description,
         qty: i.qty,
         rate: i.rate,
+        baseRate: i.rate,
         amount: i.amount,
         uom: i.uom,
+        warehouse: i.warehouse ?? '',
+        conversionFactor: 1,
       })),
     )
     setInitialized(true)
@@ -199,18 +233,31 @@ export default function InvoiceForm() {
     )
   }
 
-  function selectCatalogItem(index: number, catalogItem: Item) {
+  async function selectCatalogItem(index: number, catalogItem: Item) {
+    // Fetch stock in parallel with state update
+    let stock: ItemStock | undefined
+    try {
+      stock = await getItemStock(catalogItem.id)
+    } catch {
+      stock = undefined
+    }
+
     setItems((prev) =>
       prev.map((row, i) => {
         if (i !== index) return row
-        const rate = catalogItem.standardRate ?? 0
+        const baseRate = catalogItem.standardRate ?? 0
         return {
           ...row,
           itemCode: catalogItem.id,
           itemLabel: catalogItem.itemName,
           description: catalogItem.description ?? catalogItem.itemName,
-          rate,
-          amount: calcAmount(row.qty, rate),
+          rate: baseRate,
+          baseRate,
+          amount: calcAmount(row.qty, baseRate),
+          uom: catalogItem.salesUom ?? catalogItem.stockUom ?? row.uom,
+          warehouse: '',
+          stock,
+          conversionFactor: 1,
         }
       }),
     )
@@ -221,7 +268,7 @@ export default function InvoiceForm() {
   }
 
   function addRow() {
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, uom: 'Unidad' }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, uom: 'Unidad', warehouse: '', conversionFactor: 1 }])
   }
 
   function removeRow(index: number) {
@@ -259,12 +306,34 @@ export default function InvoiceForm() {
       return
     }
 
+    // Validar almacén seleccionado y stock disponible
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (!item.itemCode) continue
+      if (!item.warehouse) {
+        toast.error(`Línea ${i + 1}: selecciona un almacén`)
+        return
+      }
+      if (item.stock) {
+        const whEntry = item.stock.warehouses.find(w => w.warehouse === item.warehouse)
+        const availableQty = whEntry?.qty ?? 0
+        // La cantidad ingresada está en la UOM seleccionada; convertir a stockUom para comparar
+        const qtyInStockUom = item.qty * item.conversionFactor
+        if (qtyInStockUom > availableQty) {
+          const disponible = (availableQty / item.conversionFactor).toFixed(4).replace(/\.?0+$/, '')
+          toast.error(`Línea ${i + 1} (${item.itemLabel ?? item.itemCode}): stock insuficiente en "${item.warehouse}". Disponible: ${disponible} ${item.uom}`)
+          return
+        }
+      }
+    }
+
     const itemsDto = items.map((i) => ({
       itemCode: i.itemCode,
       description: i.description,
       qty: i.qty,
       rate: i.rate,
       uom: i.uom,
+      warehouse: i.warehouse || undefined,
     }))
 
     if (isEdit) {
@@ -434,6 +503,7 @@ export default function InvoiceForm() {
                 <tr>
                   <th style={{ minWidth: 200 }}>Artículo</th>
                   <th>Descripción</th>
+                  <th style={{ width: 160 }}>Almacén</th>
                   <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
@@ -463,6 +533,33 @@ export default function InvoiceForm() {
                         <input className="items-input" value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="Descripción" />
                       </td>
                       <td>
+                        {(() => {
+                          const whOptions: SearchSelectOption[] = item.stock
+                            ? item.stock.warehouses.map((w) => {
+                                const avail = (w.qty / item.conversionFactor).toFixed(2).replace(/\.?0+$/, '')
+                                return { value: w.warehouse, label: w.warehouse, sublabel: `${avail} ${item.uom} disp.` }
+                              })
+                            : []
+                          const whEntry = item.stock?.warehouses.find(w => w.warehouse === item.warehouse)
+                          const available = whEntry ? whEntry.qty / item.conversionFactor : null
+                          const overStock = available !== null && item.qty > available
+                          return (
+                            <div>
+                              <WarehouseSelect
+                                value={item.warehouse}
+                                options={whOptions}
+                                onChange={(val) => updateItem(index, { warehouse: val })}
+                              />
+                              {overStock && (
+                                <span style={{ fontSize: 11, color: 'var(--color-danger)', display: 'block', marginTop: 2 }}>
+                                  Disp: {available!.toFixed(2).replace(/\.?0+$/, '')} {item.uom}
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })()}
+                      </td>
+                      <td>
                         <input className="items-input" type="number" min="0" step="1" value={item.qty} onChange={(e) => updateItem(index, { qty: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right' }} />
                       </td>
                       <td>
@@ -470,7 +567,14 @@ export default function InvoiceForm() {
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
                       <td>
-                        <UomSelect value={item.uom} onChange={(v) => updateItem(index, { uom: v })} itemCode={item.itemCode || undefined} />
+                        <UomSelect
+                          value={item.uom}
+                          onChange={(v, factor) => {
+                            const newRate = Math.round(item.baseRate * factor * 10000) / 10000
+                            updateItem(index, { uom: v, rate: newRate, conversionFactor: factor })
+                          }}
+                          itemCode={item.itemCode || undefined}
+                        />
                       </td>
                       <td>
                         <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeRow(index)}>

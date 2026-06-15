@@ -13,6 +13,7 @@ import type {
   CreateAttributeDto,
   UpdateAttributeDto,
   GenerateVariantsResult,
+  ItemStock,
 } from './types'
 
 // ---- Items ----
@@ -49,6 +50,11 @@ export async function updateItem(id: string, data: Partial<CreateItemDto>) {
 
 export async function deleteItem(id: string) {
   await client.delete(ENDPOINTS.catalog.items.byId(id))
+}
+
+export async function getItemStock(id: string) {
+  const res = await client.get<{ success: true; data: ItemStock }>(ENDPOINTS.catalog.items.stock(id))
+  return unwrap(res)
 }
 
 export async function toggleItem(id: string) {

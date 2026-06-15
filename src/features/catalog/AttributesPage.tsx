@@ -254,7 +254,7 @@ function AttributeModal({
           <button className="modal-close" onClick={onClose} aria-label="Cerrar" />
         </div>
 
-        <div className="modal-body">
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Name */}
           <div className="ff-wrap">
             <label className="ff-label">Nombre *</label>
@@ -271,12 +271,14 @@ function AttributeModal({
           {/* Numeric toggle — only on create */}
           {!isEdit && (
             <div className="ff-check-wrap">
-              <label className="ff-check">
-                <input
-                  type="checkbox"
-                  checked={form.numeric}
-                  onChange={(e) => setField('numeric', e.target.checked)}
-                />
+              <input
+                id="attr-numeric"
+                type="checkbox"
+                className="ff-check"
+                checked={form.numeric}
+                onChange={(e) => setField('numeric', e.target.checked)}
+              />
+              <label htmlFor="attr-numeric" className="ff-label" style={{ margin: 0, cursor: 'pointer' }}>
                 Valores numéricos (rango)
               </label>
             </div>

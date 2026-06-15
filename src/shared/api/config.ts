@@ -6,6 +6,8 @@ import type {
   MetodoPago,
   ListaPrecio,
   UOM,
+  UOMDetail,
+  CreateUOMDto,
   Grupo,
   NcfSerie,
   CreateNcfSerieDto,
@@ -53,7 +55,7 @@ export async function updateMetodoPago(id: string, data: Partial<MetodoPago>) {
 }
 
 export async function listAlmacenes() {
-  const res = await client.get<{ success: true; data: { name: string; warehouseName: string; disabled: boolean }[] }>(
+  const res = await client.get<{ success: true; data: { name: string; disabled: boolean }[] }>(
     ENDPOINTS.config.almacenes,
   )
   return unwrap(res)
@@ -78,8 +80,13 @@ export async function listUOMs() {
   return unwrap(res)
 }
 
-export async function createUOM(data: Omit<UOM, 'name'> & { uomName: string }) {
+export async function createUOM(data: CreateUOMDto) {
   const res = await client.post<{ success: true; data: UOM }>(ENDPOINTS.config.uom, data)
+  return unwrap(res)
+}
+
+export async function getUOM(id: string) {
+  const res = await client.get<{ success: true; data: UOMDetail }>(ENDPOINTS.config.uomById(id))
   return unwrap(res)
 }
 
@@ -88,7 +95,7 @@ export async function listListasPrecio() {
   return unwrap(res)
 }
 
-export async function createListaPrecio(data: Pick<ListaPrecio, 'priceListName' | 'currency' | 'buying' | 'selling'>) {
+export async function createListaPrecio(data: Pick<ListaPrecio, 'name' | 'currency' | 'buying' | 'selling'>) {
   const res = await client.post<{ success: true; data: ListaPrecio }>(ENDPOINTS.config.listasPrecio, data)
   return unwrap(res)
 }

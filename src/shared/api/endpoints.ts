@@ -42,6 +42,7 @@ export const ENDPOINTS = {
     items: {
       list: '/catalog/items',
       byId: (id: string) => `/catalog/items/${id}`,
+      stock: (id: string) => `/catalog/items/${id}/stock`,
       toggle: (id: string) => `/catalog/items/${id}/toggle`,
     },
   },
@@ -105,6 +106,7 @@ export const ENDPOINTS = {
     metodosPago: '/config/metodos-pago',
     almacenes: '/config/almacenes',
     uom: '/config/uom',
+    uomById: (id: string) => `/config/uom/${encodeURIComponent(id)}`,
     listasPrecio: '/config/listas-precio',
     gruposClientes: '/config/grupos-clientes',
     gruposProveedores: '/config/grupos-proveedores',

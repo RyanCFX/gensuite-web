@@ -351,6 +351,7 @@ export interface Item {
   image?: string
   disabled: boolean
   stockUom?: string
+  purchaseUom?: string
   salesUom?: string
   uoms?: ItemUomConversion[]
   hasVariants?: boolean
@@ -370,6 +371,7 @@ export interface CreateItemDto {
   image?: string
   defaultWarehouse?: string
   stockUom?: string
+  purchaseUom?: string
   salesUom?: string
   uoms?: ItemUomConversion[]
   hasVariants?: boolean
@@ -426,6 +428,19 @@ export interface CreateBrandDto {
 export type UpdateBrandDto = Partial<CreateBrandDto>
 
 // ─── Inventory ────────────────────────────────────────────────────────────────
+
+export interface ItemStockWarehouse {
+  warehouse: string
+  qty: number
+  valuationRate: number
+  stockValue: number
+}
+
+export interface ItemStock {
+  itemCode: string
+  totalQty: number
+  warehouses: ItemStockWarehouse[]
+}
 
 export interface InventoryItem {
   itemCode: string
@@ -758,7 +773,6 @@ export interface MetodoPago {
 
 export interface ListaPrecio {
   name: string
-  priceListName: string
   currency: string
   buying: boolean
   selling: boolean
@@ -768,6 +782,21 @@ export interface ListaPrecio {
 export interface UOM {
   name: string
   mustBeWholeNumber: boolean
+}
+
+export interface UomConversionEntry {
+  id?: string
+  toUom: string
+  factor: number
+}
+
+export interface UOMDetail extends UOM {
+  conversions: UomConversionEntry[]
+}
+
+export interface CreateUOMDto {
+  name: string
+  conversions?: { toUom: string; factor: number }[]
 }
 
 export interface Grupo {

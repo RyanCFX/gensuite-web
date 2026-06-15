@@ -6,9 +6,12 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { getSupplier, createSupplier, updateSupplier } from '@/shared/api/suppliers'
+import { listGruposProveedores } from '@/shared/api/config'
 import { validateRNC, validateCedula, formatRNC, formatCedula } from '@/lib/validators/dgii'
 import { TIPO_IDENTIFICACION } from '@/lib/constants'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { CheckCircle2, XCircle } from 'lucide-react'
 
 const schema = z
@@ -57,6 +60,18 @@ export default function SupplierForm() {
     queryFn: () => getSupplier(id!),
     enabled: isEdit,
   })
+
+  const { data: gruposData, isLoading: gruposLoading } = useQuery({
+    queryKey: ['grupos-proveedores'],
+    queryFn: listGruposProveedores,
+    staleTime: 60_000,
+  })
+
+  const grupoOptions: SearchSelectOption[] = (gruposData ?? []).map((g) => ({
+    value: g.name,
+    label: g.name,
+    sublabel: g.parentGroup ? `Sub de: ${g.parentGroup}` : undefined,
+  }))
 
   const {
     register,
@@ -310,6 +325,27 @@ export default function SupplierForm() {
                   <div className="ff-wrap">
                     <label className="ff-label">Días de Crédito</label>
                     <input className="ff-input" type="number" min={0} {...register('diasCredito', { valueAsNumber: true })} />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="ff-wrap">
+                    <label className="ff-label">Grupo de Proveedor</label>
+                    <Controller
+                      name="supplierGroup"
+                      control={control}
+                      render={({ field }) => (
+                        <SearchSelect
+                          value={field.value ?? ''}
+                          onChange={(id) => field.onChange(id || undefined)}
+                          options={grupoOptions}
+                          onSearch={() => {}}
+                          loading={gruposLoading}
+                          placeholder="Buscar grupo…"
+                        />
+                      )}
+                    />
+                    <p className="ff-hint">Categoría organizativa del proveedor</p>
                   </div>
                 </div>
               </div>

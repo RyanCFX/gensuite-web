@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { listCategories, createCategory, updateCategory, deleteCategory } from '@/shared/api/catalog'
 import type { Category, UpdateCategoryDto } from '@/shared/api/types'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Folder, FolderOpen } from 'lucide-react'
 
 const categorySchema = z.object({
@@ -102,16 +104,26 @@ export default function CategoriesPage() {
   const [toDelete, setToDelete] = useState<Category | null>(null)
   const [editIncomeAccount, setEditIncomeAccount] = useState('')
   const [editExpenseAccount, setEditExpenseAccount] = useState('')
+  const [parentCatQuery, setParentCatQuery] = useState('')
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['categories', { tree: true }],
     queryFn: () => listCategories({ tree: true }),
   })
 
+  // For the parent category SearchSelect — flat list (no tree), filtered by search
+  const { data: parentCatData, isLoading: parentCatLoading } = useQuery({
+    queryKey: ['categories-flat', parentCatQuery],
+    queryFn: () => listCategories({ search: parentCatQuery || undefined, limit: 30 }),
+    staleTime: 30_000,
+    enabled: dialogOpen,
+  })
+
   const {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
@@ -253,13 +265,31 @@ export default function CategoriesPage() {
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="parentCategory">Categoría Padre (ID)</label>
-                  <input
-                    id="parentCategory"
-                    className="ff-input"
-                    placeholder="Dejar vacío si es raíz"
-                    {...register('parentCategory')}
+                  <label className="ff-label" htmlFor="parentCategory">Categoría Padre</label>
+                  <Controller
+                    name="parentCategory"
+                    control={control}
+                    render={({ field }) => {
+                      const parentOptions: SearchSelectOption[] = (parentCatData?.items ?? [])
+                        .filter((c) => c.id !== editTarget?.id)
+                        .map((c) => ({
+                          value: c.id,
+                          label: c.name,
+                          sublabel: c.parentCategory ? `Sub de: ${c.parentCategory}` : 'Raíz',
+                        }))
+                      return (
+                        <SearchSelect
+                          value={field.value ?? ''}
+                          onChange={(id) => field.onChange(id || '')}
+                          options={parentOptions}
+                          onSearch={setParentCatQuery}
+                          loading={parentCatLoading}
+                          placeholder="Buscar categoría padre… (vacío = raíz)"
+                        />
+                      )
+                    }}
                   />
+                  <p className="ff-hint">Deja vacío para crear en la raíz</p>
                 </div>
 
                 <label className="ff-check-wrap">

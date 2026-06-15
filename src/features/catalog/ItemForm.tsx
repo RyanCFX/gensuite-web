@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { createItem, listCategories, listBrands } from '@/shared/api/catalog'
 import { listWarehouses } from '@/shared/api/inventory'
-import { listUOMs } from '@/shared/api/config'
+import { listUOMs, getUOM } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { AttributeSelect } from '@/components/shared/AttributeSelect'
@@ -29,6 +29,7 @@ const schema = z.object({
   itemCode: z.string().min(1, 'El código es requerido'),
   defaultWarehouse: z.string().optional(),
   stockUom: z.string().optional(),
+  purchaseUom: z.string().optional(),
   salesUom: z.string().optional(),
   uoms: z.array(uomConversionSchema).optional(),
   incomeAccount: z.string().optional(),
@@ -97,6 +98,7 @@ export default function ItemForm() {
       itemCode: '',
       defaultWarehouse: '',
       stockUom: '',
+      purchaseUom: '',
       salesUom: '',
       uoms: [],
       incomeAccount: '',
@@ -110,6 +112,22 @@ export default function ItemForm() {
   })
 
   const selectedType = watch('type')
+  const watchedPurchaseUom = watch('purchaseUom')
+  const watchedSalesUom = watch('salesUom')
+
+  const { data: purchaseUomDetail } = useQuery({
+    queryKey: ['uom', watchedPurchaseUom],
+    queryFn: () => getUOM(watchedPurchaseUom!),
+    enabled: !!watchedPurchaseUom,
+    staleTime: 5 * 60_000,
+  })
+
+  const { data: salesUomDetail } = useQuery({
+    queryKey: ['uom', watchedSalesUom],
+    queryFn: () => getUOM(watchedSalesUom!),
+    enabled: !!watchedSalesUom,
+    staleTime: 5 * 60_000,
+  })
 
   const onSubmit = (data: FormValues) => {
     createMutation.mutate({
@@ -119,6 +137,7 @@ export default function ItemForm() {
       defaultWarehouse: data.defaultWarehouse || undefined,
       valuationRate: data.valuationRate || undefined,
       stockUom: data.stockUom || undefined,
+      purchaseUom: data.purchaseUom || undefined,
       salesUom: data.salesUom || undefined,
       uoms: data.uoms?.length ? data.uoms : undefined,
       incomeAccount: data.incomeAccount || undefined,
@@ -262,13 +281,29 @@ export default function ItemForm() {
               </div>
 
               <div className="ff-wrap">
+                <label className="ff-label" htmlFor="purchaseUom">UDM de Compra</label>
+                <select id="purchaseUom" className="ff-select" {...register('purchaseUom')}>
+                  <option value="">Igual a UDM de Stock</option>
+                  {uoms.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
+                </select>
+                {watchedPurchaseUom && purchaseUomDetail && (
+                  purchaseUomDetail.conversions.length > 0
+                    ? <p className="ff-hint">Factor de conversión global: {purchaseUomDetail.conversions.map(c => `1 ${watchedPurchaseUom} = ${c.factor} ${c.toUom}`).join(', ')} (del plan de UOM)</p>
+                    : null
+                )}
+              </div>
+
+              <div className="ff-wrap">
                 <label className="ff-label" htmlFor="salesUom">UDM de Venta</label>
-                
                 <select id="salesUom" className="ff-select" {...register('salesUom')}>
                   <option value="">Igual a UDM de Stock</option>
                   {uoms.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
                 </select>
-                <p className="ff-hint">Unidad en la que se vende al cliente</p>
+                {watchedSalesUom && salesUomDetail && (
+                  salesUomDetail.conversions.length > 0
+                    ? <p className="ff-hint">Factor de conversión global: {salesUomDetail.conversions.map(c => `1 ${watchedSalesUom} = ${c.factor} ${c.toUom}`).join(', ')} (del plan de UOM)</p>
+                    : null
+                )}
               </div>
             </div>
 

@@ -20,7 +20,9 @@ import { useFloatingDropdown, FloatingPortal } from '@/lib/useFloatingPortal'
 
 interface UomSelectProps {
   value: string
-  onChange: (value: string) => void
+  /** conversionFactor = cuántas unidades de stockUom equivale 1 de la UOM seleccionada.
+   *  Es 1 cuando se selecciona stockUom o una UOM sin conversión configurada. */
+  onChange: (value: string, conversionFactor: number) => void
   /** Cuando se provee, muestra primero las UOMs del artículo */
   itemCode?: string
   className?: string
@@ -42,7 +44,7 @@ function SimpleUomSelect({ value, onChange, className = 'ff-select', disabled, e
       <input
         className={className.replace('ff-select', 'ff-input')}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value, 1)}
         placeholder="Unidad"
         disabled={disabled}
       />
@@ -53,7 +55,7 @@ function SimpleUomSelect({ value, onChange, className = 'ff-select', disabled, e
     <select
       className={`${className}${error ? ' ff-input-error' : ''}`}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => onChange(e.target.value, 1)}
       disabled={disabled}
     >
       <option value="">—</option>
@@ -104,7 +106,17 @@ function ItemUomSelect({ value, onChange, itemCode, className = 'items-input', d
   )
 
   function select(v: string) {
-    onChange(v)
+    // Calcular factor de conversión: 1 si es stockUom o sin conversión
+    let factor = 1
+    if (itemData) {
+      if (v === itemData.stockUom) {
+        factor = 1
+      } else {
+        const entry = itemData.uoms?.find((u) => u.uom === v)
+        factor = entry?.conversionFactor ?? 1
+      }
+    }
+    onChange(v, factor)
     close()
     setShowAll(false)
   }

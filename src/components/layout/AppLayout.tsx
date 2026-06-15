@@ -78,19 +78,19 @@ const NAV_OPS: NavEntry[] = [
   { label: 'Proveedores',icon: <Truck size={16} aria-hidden="true" />,        path: '/proveedores' },
 ]
 
-const NAV_FINANZAS: NavEntry[] = [
-  {
-    label: 'Cuentas por Cobrar',
-    icon: <Wallet size={16} aria-hidden="true" />,
-    prefix: '/cobros',
-    children: [
-      { label: 'Cobros',          icon: <ClipboardList size={14} />, path: '/cobros/lista'          },
-      { label: 'Registrar Cobro', icon: <Wallet size={14} />,    path: '/cobros/pago'     },
-      { label: 'Aging',           icon: <BarChart3 size={14} />, path: '/cobros/aging'    },
-      { label: 'Semáforo',        icon: <Shield size={14} />,    path: '/cobros/semaforo' },
-    ],
-  },
-  { label: 'Usuarios', icon: <UserCog size={16} aria-hidden="true" />, path: '/usuarios' },
+const NAV_FINANZAS: NavItem[] = [
+  { label: 'Cobros',          icon: <ClipboardList size={16} aria-hidden="true" />, path: '/cobros/lista'    },
+  { label: 'Registrar Cobro', icon: <Wallet size={16} aria-hidden="true" />,        path: '/cobros/pago'     },
+  { label: 'Aging CxC',      icon: <BarChart3 size={16} aria-hidden="true" />,      path: '/cobros/aging'    },
+  { label: 'Semáforo',        icon: <Shield size={16} aria-hidden="true" />,        path: '/cobros/semaforo' },
+]
+
+const NAV_CONTABILIDAD: NavItem[] = [
+  { label: 'Plan de Cuentas',   icon: <BookOpen size={16} aria-hidden="true" />,      path: '/cuentas'                     },
+  { label: 'Asientos',          icon: <ClipboardList size={16} aria-hidden="true" />, path: '/asientos'                    },
+  { label: 'Libro Diario',      icon: <BookOpen size={16} aria-hidden="true" />,      path: '/contabilidad/libro-diario'   },
+  { label: 'Libro Mayor',       icon: <BookText size={16} aria-hidden="true" />,      path: '/contabilidad/libro-mayor'    },
+  { label: 'Cierre de Período', icon: <Lock size={16} aria-hidden="true" />,          path: '/contabilidad/cierre-periodo' },
 ]
 
 const NAV_REPORTES: NavEntry = {
@@ -110,24 +110,20 @@ const NAV_REPORTES: NavEntry = {
 const NAV_CONFIG: NavEntry = {
   label: 'Configuración',
   icon: <Settings size={16} aria-hidden="true" />,
-  prefix: '/config|/cuentas|/asientos|/contabilidad',
+  prefix: '/config',
   children: [
-    { label: 'Empresa',            icon: <Building2 size={14} />,    path: '/config/empresa'      },
-    { label: 'Cobranza',           icon: <Wallet size={14} />,       path: '/config/cobros'       },
-    { label: 'Almacenes',          icon: <Warehouse size={14} />,    path: '/config/almacenes'    },
-    { label: 'Métodos de Pago',    icon: <CreditCard size={14} />,   path: '/config/metodos-pago' },
-    { label: 'Unidades de Medida', icon: <Settings size={14} />,     path: '/config/uom'          },
-    { label: 'Listas de Precio',   icon: <FileText size={14} />,     path: '/config/listas-precio'},
-    { label: 'Secuencias NCF',     icon: <Shield size={14} />,       path: '/config/ncf'          },
-    { label: 'Impuestos Ventas',   icon: <Percent size={14} />,      path: '/config/impuestos-ventas'  },
-    { label: 'Impuestos Compras',  icon: <Percent size={14} />,      path: '/config/impuestos-compras' },
-    { label: 'Ejercicio Fiscal',   icon: <Calendar size={14} />,     path: '/config/ejercicio-fiscal'  },
-    { label: 'Cuentas Contables',  icon: <BookOpen size={14} />,     path: '/cuentas'             },
-    { label: 'Asientos Contables', icon: <ClipboardList size={14} />, path: '/asientos'           },
-    { label: 'Libro Diario',        icon: <BookOpen size={14} />,     path: '/contabilidad/libro-diario'   },
-    { label: 'Libro Mayor',         icon: <BookText size={14} />,     path: '/contabilidad/libro-mayor'    },
-    { label: 'Cierre de Período',  icon: <Lock size={14} />,         path: '/contabilidad/cierre-periodo' },
-    { label: 'Mi Perfil',          icon: <UserCog size={14} />,      path: '/config/perfil'       },
+    { label: 'Empresa',            icon: <Building2 size={14} />,   path: '/config/empresa'           },
+    { label: 'Cobranza',           icon: <Wallet size={14} />,      path: '/config/cobros'            },
+    { label: 'Almacenes',          icon: <Warehouse size={14} />,   path: '/config/almacenes'         },
+    { label: 'Métodos de Pago',    icon: <CreditCard size={14} />,  path: '/config/metodos-pago'      },
+    { label: 'Unidades de Medida', icon: <Settings size={14} />,    path: '/config/uom'               },
+    { label: 'Listas de Precio',   icon: <FileText size={14} />,    path: '/config/listas-precio'     },
+    { label: 'Secuencias NCF',     icon: <Shield size={14} />,      path: '/config/ncf'               },
+    { label: 'Impuestos Ventas',   icon: <Percent size={14} />,     path: '/config/impuestos-ventas'  },
+    { label: 'Impuestos Compras',  icon: <Percent size={14} />,     path: '/config/impuestos-compras' },
+    { label: 'Ejercicio Fiscal',   icon: <Calendar size={14} />,    path: '/config/ejercicio-fiscal'  },
+    { label: 'Usuarios',           icon: <UserCog size={14} />,     path: '/usuarios'                 },
+    { label: 'Mi Perfil',          icon: <UserCog size={14} />,     path: '/config/perfil'            },
   ],
 }
 
@@ -355,7 +351,17 @@ export default function AppLayout() {
       {/* Finanzas */}
       <div className="sb-section">
         {!collapsed && <div className="sb-label">Finanzas</div>}
-        {NAV_FINANZAS.map((entry) => renderEntry(entry, handleNav, collapsed))}
+        {NAV_FINANZAS.map((item) => (
+          <NavItemBtn key={item.path} item={item} onNav={handleNav} collapsed={collapsed} />
+        ))}
+      </div>
+
+      {/* Contabilidad */}
+      <div className="sb-section">
+        {!collapsed && <div className="sb-label">Contabilidad</div>}
+        {NAV_CONTABILIDAD.map((item) => (
+          <NavItemBtn key={item.path} item={item} onNav={handleNav} collapsed={collapsed} />
+        ))}
       </div>
 
       {/* Footer */}

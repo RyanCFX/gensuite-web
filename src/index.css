@@ -520,15 +520,15 @@ button {
   position: absolute;
   /* vertical bar is at left:19px on .nav-children (padding-left:12px),
      so from .nav-child's own left edge: 19 - 12 = 7px */
-  left: 7px;
-  top: 30%;
+  left: 6.5px;
+  top: 40%;
   transform: translateY(-50%);
   /* connect from the vertical bar (7px) to just before the icon (26px) */
-  width: 13px;
-  height: 13px;
+  width: 10px;
+  height: 10px;
   /* background: var(--border-strong); */
-  border-bottom: 1px solid var(--border-strong);
-  border-left: 1px solid var(--border-strong);
+  border-bottom: 1.8px solid var(--border-strong);
+  border-left: 1.8px solid var(--border-strong);
   border-radius: 0 0 0 7px;
   /* border-color: var(--border-strong); */
   pointer-events: none;

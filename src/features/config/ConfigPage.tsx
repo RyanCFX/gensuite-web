@@ -7,7 +7,7 @@ import {
   getCobrosConfig, updateCobrosConfig,
   listAlmacenes, createAlmacen, deleteAlmacen, updateAlmacen,
   listMetodosPago, createMetodoPago, updateMetodoPago,
-  listUOMs, createUOM,
+  listUOMs, createUOM, getUOM,
   listListasPrecio,
   getNcfSeries,
   getPerfil, updatePerfil,
@@ -16,9 +16,10 @@ import {
 } from '@/shared/api/config'
 import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, CreateTaxTemplateDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { formatDate } from '@/lib/formatters'
-import { Plus, Trash2, Save, FileWarning, X, Pencil } from 'lucide-react'
+import { Plus, Trash2, Save, FileWarning, X, Pencil, ChevronLeft, ChevronRight } from 'lucide-react'
 import EjercicioFiscalSection from './EjercicioFiscalSection'
 
 function is503(error: unknown): boolean {
@@ -116,7 +117,7 @@ function AlmacenesSection() {
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
   const [toDelete, setToDelete] = useState<string | null>(null)
-  const [editTarget, setEditTarget] = useState<{ name: string; warehouseName: string } | null>(null)
+  const [editTarget, setEditTarget] = useState<{ name: string; } | null>(null)
   const [editWarehouseAccount, setEditWarehouseAccount] = useState('')
 
   const { data, isLoading } = useQuery({ queryKey: ['almacenes'], queryFn: listAlmacenes })
@@ -140,7 +141,7 @@ function AlmacenesSection() {
     onError: () => toast.error('Error al eliminar el almacén'),
   })
 
-  function openEdit(a: { name: string; warehouseName: string }) {
+  function openEdit(a: { name: string; }) {
     setEditTarget(a)
     setEditWarehouseAccount('')
     setToDelete(null)
@@ -170,7 +171,7 @@ function AlmacenesSection() {
                   <tbody>
                     {data?.map((a) => (
                       <tr key={a.name}>
-                        <td style={{ fontWeight: 500 }}>{a.warehouseName}</td>
+                        <td style={{ fontWeight: 500 }}>{a.name}</td>
                         <td>
                           {a.disabled
                             ? <span className="badge badge-error">Inactivo</span>
@@ -425,57 +426,313 @@ function MetodosPagoSection() {
 }
 
 // ---- UOM Section ----
+const UOM_PAGE_SIZE = 10
+
+interface UomConversionRow {
+  toUom: string
+  factor: string // string para el input, se convierte a number al enviar
+  searchQuery: string // para filtrar el SearchSelect de cada fila
+}
+
 function UomSection() {
   const queryClient = useQueryClient()
-  const [showNew, setShowNew] = useState(false)
-  const [newUom, setNewUom] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
+  const [newUomName, setNewUomName] = useState('')
+  const [conversions, setConversions] = useState<UomConversionRow[]>([])
+  const [convErrors, setConvErrors] = useState<Record<number, string>>({})
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
 
   const { data, isLoading } = useQuery({ queryKey: ['uom'], queryFn: listUOMs })
+  const uoms = data ?? []
+
+  // Filtrado + paginación client-side
+  const sortedUoms = [...uoms]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .filter(u => !search || u.name.toLowerCase().includes(search.toLowerCase()))
+  const totalPages = Math.max(1, Math.ceil(sortedUoms.length / UOM_PAGE_SIZE))
+  const offset = (page - 1) * UOM_PAGE_SIZE
+  const pageUoms = sortedUoms.slice(offset, offset + UOM_PAGE_SIZE)
+
+  const { data: detailData, isLoading: isDetailLoading } = useQuery({
+    queryKey: ['uom', detailId],
+    queryFn: () => getUOM(detailId!),
+    enabled: !!detailId,
+  })
 
   const createMutation = useMutation({
-    mutationFn: () => createUOM({ uomName: newUom, mustBeWholeNumber: false }),
-    onSuccess: () => { toast.success('Unidad creada'); queryClient.invalidateQueries({ queryKey: ['uom'] }); setShowNew(false); setNewUom('') },
+    mutationFn: () => createUOM({
+      name: newUomName,
+      conversions: conversions.length
+        ? conversions.map(c => ({ toUom: c.toUom, factor: Number(c.factor) }))
+        : undefined,
+    }),
+    onSuccess: () => {
+      toast.success('Unidad creada')
+      queryClient.invalidateQueries({ queryKey: ['uom'] })
+      setShowCreate(false)
+      setNewUomName('')
+      setConversions([])
+      setConvErrors({})
+    },
     onError: () => toast.error('Error al crear la unidad'),
   })
+
+  function addConversionRow() {
+    setConversions(prev => [...prev, { toUom: '', factor: '', searchQuery: '' }])
+  }
+
+  function removeConversionRow(idx: number) {
+    setConversions(prev => prev.filter((_, i) => i !== idx))
+    setConvErrors(prev => {
+      const next = { ...prev }
+      delete next[idx]
+      return next
+    })
+  }
+
+  function updateConversionRow(idx: number, field: keyof UomConversionRow, value: string) {
+    setConversions(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r))
+    setConvErrors(prev => { const next = { ...prev }; delete next[idx]; return next })
+  }
+
+  function validateAndSave() {
+    const errors: Record<number, string> = {}
+    const seenUoms = new Set<string>()
+    conversions.forEach((row, idx) => {
+      if (!row.toUom && !row.factor) return // vacía, se ignora (si el user la dejó vacía)
+      if (!row.toUom) { errors[idx] = 'Selecciona la UOM destino'; return }
+      if (!row.factor || Number(row.factor) <= 0) { errors[idx] = 'El factor debe ser mayor a 0'; return }
+      if (seenUoms.has(row.toUom)) { errors[idx] = 'UOM duplicada en la tabla'; return }
+      seenUoms.add(row.toUom)
+    })
+    if (Object.keys(errors).length) { setConvErrors(errors); return }
+    // filtrar filas completamente vacías
+    setConversions(prev => prev.filter(r => r.toUom || r.factor))
+    createMutation.mutate()
+  }
+
+  // UOMs disponibles para seleccionar como destino (excluye la UOM que se está creando)
+  const availableUoms = uoms.filter(u => u.name !== newUomName)
 
   return (
     <>
       <div className="card">
         <div className="card-header">
           <span className="card-title">Unidades de Medida</span>
-          <button className="btn btn-primary btn-size-sm" onClick={() => setShowNew(true)}>
-            <Plus size={14} />Nueva
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              className="ff-input"
+              style={{ width: 200 }}
+              placeholder="Buscar…"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            />
+            <button className="btn btn-primary btn-size-sm" onClick={() => { setNewUomName(''); setConversions([]); setConvErrors({}); setShowCreate(true) }}>
+              <Plus size={14} />Nueva
+            </button>
+          </div>
         </div>
-        <div className="card-body">
+        <div>
           {isLoading
-            ? <span className="skeleton-box" style={{ height: 80, display: 'block' }} />
+            ? <span className="skeleton-box" style={{ height: 128, display: 'block', margin: 16 }} />
             : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {data?.map((u) => <span key={u.name} className="badge badge-default">{u.name}</span>)}
-                </div>
+                <>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Nombre</th>
+                        <th style={{ width: 100 }} />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pageUoms.length === 0
+                        ? (
+                            <tr>
+                              <td colSpan={2} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '24px 0' }}>
+                                Sin resultados para "{search}"
+                              </td>
+                            </tr>
+                          )
+                        : pageUoms.map(u => (
+                            <tr key={u.name}>
+                              <td style={{ fontWeight: 500 }}>{u.name}</td>
+                              <td>
+                                <button className="btn btn-ghost btn-size-sm" onClick={() => setDetailId(u.name)}>
+                                  Ver detalle
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                      }
+                    </tbody>
+                  </table>
+                  {sortedUoms.length > UOM_PAGE_SIZE && (
+                    <div className="pagination">
+                      <span className="pagination-info">
+                        Mostrando {offset + 1}–{Math.min(offset + UOM_PAGE_SIZE, sortedUoms.length)} de {sortedUoms.length}
+                      </span>
+                      <div className="pagination-controls">
+                        <button
+                          className="btn btn-ghost btn-size-icon-sm"
+                          disabled={page === 1}
+                          onClick={() => setPage(p => p - 1)}
+                        >
+                          <ChevronLeft size={14} />
+                        </button>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '0 8px' }}>
+                          {page} / {totalPages}
+                        </span>
+                        <button
+                          className="btn btn-ghost btn-size-icon-sm"
+                          disabled={page === totalPages}
+                          onClick={() => setPage(p => p + 1)}
+                        >
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
         </div>
       </div>
 
-      {showNew && (
-        <div className="modal-overlay" onClick={() => setShowNew(false)}>
-          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+      {/* Create modal */}
+      {showCreate && (
+        <div className="modal-overlay" onClick={() => setShowCreate(false)}>
+          <div className="modal-box" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">Nueva Unidad de Medida</h2>
-              <button className="modal-close" onClick={() => setShowNew(false)}><X size={16} /></button>
+              <button className="modal-close" onClick={() => setShowCreate(false)}><X size={16} /></button>
             </div>
-            <div className="modal-body">
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="ff-wrap">
-                <label className="ff-label">Nombre</label>
-                <input className="ff-input" value={newUom} onChange={(e) => setNewUom(e.target.value)} placeholder="Caja, Litro, Kg…" />
+                <label className="ff-label">Nombre <span className="ff-required">*</span></label>
+                <input
+                  className="ff-input"
+                  value={newUomName}
+                  onChange={(e) => setNewUomName(e.target.value)}
+                  placeholder="Caja, Litro, Kg…"
+                  autoFocus
+                />
+              </div>
+
+              {/* Conversions table */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span className="ff-label" style={{ margin: 0 }}>Factores de conversión <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>(opcional)</span></span>
+                  <button type="button" className="btn btn-ghost btn-size-sm" onClick={addConversionRow}>
+                    <Plus size={13} />Agregar conversión
+                  </button>
+                </div>
+                {conversions.length > 0 && (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-default)' }}>
+                        <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                          1 {newUomName || '[esta UOM]'} =
+                        </th>
+                        <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)', fontWeight: 500 }}>Otra UOM</th>
+                        <th style={{ width: 36 }} />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {conversions.map((row, idx) => {
+                        const filteredOptions = availableUoms
+                          .filter(u => !row.searchQuery || u.name.toLowerCase().includes(row.searchQuery.toLowerCase()))
+                          .map(u => ({ value: u.name, label: u.name }))
+                        return (
+                          <tr key={idx}>
+                            <td style={{ padding: '4px 8px 4px 0' }}>
+                              <input
+                                className={`ff-input${convErrors[idx] ? ' ff-input-error' : ''}`}
+                                type="number"
+                                min="0.0001"
+                                step="0.0001"
+                                value={row.factor}
+                                onChange={(e) => updateConversionRow(idx, 'factor', e.target.value)}
+                                placeholder="Ej: 12"
+                                style={{ width: '100%' }}
+                              />
+                            </td>
+                            <td style={{ padding: '4px 8px' }}>
+                              <SearchSelect
+                                value={row.toUom}
+                                options={filteredOptions}
+                                onSearch={(q) => setConversions(prev => prev.map((r, i) => i === idx ? { ...r, searchQuery: q } : r))}
+                                onChange={(val) => updateConversionRow(idx, 'toUom', val)}
+                                placeholder="Buscar UOM…"
+                                error={!!convErrors[idx]}
+                              />
+                              {convErrors[idx] && <p className="ff-error" style={{ marginTop: 2 }}>{convErrors[idx]}</p>}
+                            </td>
+                            <td style={{ padding: '4px 0 4px 4px', verticalAlign: 'top' }}>
+                              <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeConversionRow(idx)}>
+                                <Trash2 size={13} />
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                )}
+                {conversions.length === 0 && (
+                  <p className="ff-hint">Sin conversiones. Útil si esta UOM equivale a múltiples otras (ej: 1 Caja = 12 Nos).</p>
+                )}
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setShowNew(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={() => createMutation.mutate()} disabled={!newUom || createMutation.isPending}>
+              <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>Cancelar</button>
+              <button
+                className="btn btn-primary"
+                onClick={validateAndSave}
+                disabled={!newUomName || createMutation.isPending}
+              >
                 {createMutation.isPending ? 'Creando…' : 'Crear'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detail modal */}
+      {detailId && (
+        <div className="modal-overlay" onClick={() => setDetailId(null)}>
+          <div className="modal-box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title">{detailId}</h2>
+              <button className="modal-close" onClick={() => setDetailId(null)}><X size={16} /></button>
+            </div>
+            <div className="modal-body">
+              {isDetailLoading
+                ? <span className="skeleton-box" style={{ height: 80, display: 'block' }} />
+                : detailData?.conversions.length
+                  ? (
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>1 {detailId} equivale a</th>
+                            <th>UOM destino</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detailData.conversions.map((c, i) => (
+                            <tr key={i}>
+                              <td>{c.factor}</td>
+                              <td>{c.toUom}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )
+                  : <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Esta UOM no tiene conversiones configuradas.</p>
+              }
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={() => setDetailId(null)}>Cerrar</button>
             </div>
           </div>
         </div>
@@ -510,7 +767,7 @@ function ListasPrecioSection() {
                 <tbody>
                   {data?.map((l) => (
                     <tr key={l.name}>
-                      <td style={{ fontWeight: 500 }}>{l.priceListName}</td>
+                      <td style={{ fontWeight: 500 }}>{l.name}</td>
                       <td>{l.currency}</td>
                       <td>{l.buying ? 'Sí' : '—'}</td>
                       <td>{l.selling ? 'Sí' : '—'}</td>
@@ -859,13 +1116,12 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
                               {CHARGE_TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                             </select>
                           </td>
-                          <td style={{ padding: '6px 8px' }}>
-                            <input
-                              className="ff-input"
-                              style={{ fontSize: 12, padding: '4px 8px' }}
-                              placeholder="ITBIS por Pagar - ACC"
+                          <td style={{ padding: '6px 8px', minWidth: 220 }}>
+                            <AccountSelect
                               value={line.accountHead}
-                              onChange={(e) => updateTaxLine(idx, { accountHead: e.target.value })}
+                              onChange={(id) => updateTaxLine(idx, { accountHead: id })}
+                              placeholder="Buscar cuenta GL…"
+                              ledgerOnly
                             />
                           </td>
                           <td style={{ padding: '6px 8px' }}>
