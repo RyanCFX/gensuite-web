@@ -8,6 +8,7 @@ import type {
   UOM,
   UOMDetail,
   CreateUOMDto,
+  UpdateUOMDto,
   Grupo,
   NcfSerie,
   CreateNcfSerieDto,
@@ -87,6 +88,11 @@ export async function createUOM(data: CreateUOMDto) {
 
 export async function getUOM(id: string) {
   const res = await client.get<{ success: true; data: UOMDetail }>(ENDPOINTS.config.uomById(id))
+  return unwrap(res)
+}
+
+export async function updateUOM(id: string, data: UpdateUOMDto) {
+  const res = await client.put<{ success: true; data: { id: string } }>(ENDPOINTS.config.uomById(id), data)
   return unwrap(res)
 }
 

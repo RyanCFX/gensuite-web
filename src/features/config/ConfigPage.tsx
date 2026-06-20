@@ -7,7 +7,7 @@ import {
   getCobrosConfig, updateCobrosConfig,
   listAlmacenes, createAlmacen, deleteAlmacen, updateAlmacen,
   listMetodosPago, createMetodoPago, updateMetodoPago,
-  listUOMs, createUOM, getUOM,
+  listUOMs, createUOM, getUOM, updateUOM,
   listListasPrecio,
   getNcfSeries,
   getPerfil, updatePerfil,
@@ -441,6 +441,10 @@ function UomSection() {
   const [conversions, setConversions] = useState<UomConversionRow[]>([])
   const [convErrors, setConvErrors] = useState<Record<number, string>>({})
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editConversions, setEditConversions] = useState<UomConversionRow[]>([])
+  const [editConvErrors, setEditConvErrors] = useState<Record<number, string>>({})
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
 
@@ -478,6 +482,51 @@ function UomSection() {
     },
     onError: () => toast.error('Error al crear la unidad'),
   })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, dto }: { id: string; dto: Parameters<typeof updateUOM>[1] }) =>
+      updateUOM(id, dto),
+    onSuccess: () => {
+      toast.success('Unidad actualizada')
+      queryClient.invalidateQueries({ queryKey: ['uom'] })
+      setEditing(false)
+      setDetailId(null)
+    },
+    onError: () => toast.error('Error al actualizar la unidad'),
+  })
+
+  function openEdit() {
+    if (!detailData) return
+    setEditName(detailId ?? '')
+    setEditConversions(
+      detailData.conversions.map(c => ({ toUom: c.toUom, factor: String(c.factor), searchQuery: '' }))
+    )
+    setEditConvErrors({})
+    setEditing(true)
+  }
+
+  function handleUpdate() {
+    if (!detailId) return
+    const errors: Record<number, string> = {}
+    const seenUoms = new Set<string>()
+    editConversions.forEach((row, idx) => {
+      if (!row.toUom && !row.factor) return
+      if (!row.toUom) { errors[idx] = 'Selecciona la UOM destino'; return }
+      if (!row.factor || Number(row.factor) <= 0) { errors[idx] = 'El factor debe ser mayor a 0'; return }
+      if (seenUoms.has(row.toUom)) { errors[idx] = 'UOM duplicada'; return }
+      seenUoms.add(row.toUom)
+    })
+    if (Object.keys(errors).length) { setEditConvErrors(errors); return }
+
+    const dto: Parameters<typeof updateUOM>[1] = {}
+    if (editName && editName !== detailId) dto.name = editName
+    const validConversions = editConversions.filter(r => r.toUom && r.factor)
+    if (validConversions.length) {
+      dto.conversions = validConversions.map(r => ({ toUom: r.toUom, factor: Number(r.factor) }))
+    }
+    if (Object.keys(dto).length === 0) { setEditing(false); return }
+    updateMutation.mutate({ id: detailId, dto })
+  }
 
   function addConversionRow() {
     setConversions(prev => [...prev, { toUom: '', factor: '', searchQuery: '' }])
@@ -698,42 +747,148 @@ function UomSection() {
         </div>
       )}
 
-      {/* Detail modal */}
+      {/* Detail / Edit modal */}
       {detailId && (
-        <div className="modal-overlay" onClick={() => setDetailId(null)}>
+        <div className="modal-overlay" onClick={() => { setDetailId(null); setEditing(false) }}>
           <div className="modal-box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
-              <h2 className="modal-title">{detailId}</h2>
-              <button className="modal-close" onClick={() => setDetailId(null)}><X size={16} /></button>
+              <h2 className="modal-title">{editing ? 'Editar UOM' : detailId}</h2>
+              <button className="modal-close" onClick={() => { setDetailId(null); setEditing(false) }}><X size={16} /></button>
             </div>
-            <div className="modal-body">
-              {isDetailLoading
-                ? <span className="skeleton-box" style={{ height: 80, display: 'block' }} />
-                : detailData?.conversions.length
-                  ? (
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>1 {detailId} equivale a</th>
-                            <th>UOM destino</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {detailData.conversions.map((c, i) => (
-                            <tr key={i}>
-                              <td>{c.factor}</td>
-                              <td>{c.toUom}</td>
+
+            {editing ? (
+              <>
+                <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="ff-wrap">
+                    <label className="ff-label">Nombre</label>
+                    <input className="ff-input" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                  </div>
+
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span className="ff-label" style={{ margin: 0 }}>
+                        Factores de conversión
+                        <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}> (opcional)</span>
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-size-sm"
+                        onClick={() => setEditConversions(prev => [...prev, { toUom: '', factor: '', searchQuery: '' }])}
+                      >
+                        <Plus size={13} />Agregar
+                      </button>
+                    </div>
+
+                    {editConversions.length > 0 ? (
+                      <>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid var(--border-default)' }}>
+                              <th style={{ textAlign: 'left', padding: '4px 8px 4px 0', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                                1 {editName || detailId} =
+                              </th>
+                              <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)', fontWeight: 500 }}>Otra UOM</th>
+                              <th style={{ width: 36 }} />
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )
-                  : <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Esta UOM no tiene conversiones configuradas.</p>
-              }
-            </div>
-            <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setDetailId(null)}>Cerrar</button>
-            </div>
+                          </thead>
+                          <tbody>
+                            {editConversions.map((row, idx) => {
+                              const opts = uoms
+                                .filter(u => u.name !== detailId && (!row.searchQuery || u.name.toLowerCase().includes(row.searchQuery.toLowerCase())))
+                                .map(u => ({ value: u.name, label: u.name }))
+                              return (
+                                <tr key={idx}>
+                                  <td style={{ padding: '4px 8px 4px 0' }}>
+                                    <input
+                                      className={`ff-input${editConvErrors[idx] ? ' ff-input-error' : ''}`}
+                                      type="number"
+                                      min="0.0001"
+                                      step="0.0001"
+                                      value={row.factor}
+                                      onChange={(e) => setEditConversions(prev => prev.map((r, i) => i === idx ? { ...r, factor: e.target.value } : r))}
+                                      placeholder="Ej: 24"
+                                      style={{ width: '100%' }}
+                                    />
+                                  </td>
+                                  <td style={{ padding: '4px 8px' }}>
+                                    <SearchSelect
+                                      value={row.toUom}
+                                      options={opts}
+                                      onSearch={(q) => setEditConversions(prev => prev.map((r, i) => i === idx ? { ...r, searchQuery: q } : r))}
+                                      onChange={(val) => {
+                                        setEditConversions(prev => prev.map((r, i) => i === idx ? { ...r, toUom: val } : r))
+                                        setEditConvErrors(prev => { const n = { ...prev }; delete n[idx]; return n })
+                                      }}
+                                      placeholder="Buscar UOM…"
+                                      error={!!editConvErrors[idx]}
+                                    />
+                                    {editConvErrors[idx] && <p className="ff-error" style={{ marginTop: 2 }}>{editConvErrors[idx]}</p>}
+                                  </td>
+                                  <td style={{ padding: '4px 0 4px 4px', verticalAlign: 'top' }}>
+                                    <button
+                                      type="button"
+                                      className="btn btn-ghost btn-size-icon-sm"
+                                      onClick={() => setEditConversions(prev => prev.filter((_, i) => i !== idx))}
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                        <p className="ff-hint" style={{ marginTop: 6, color: 'var(--color-warning, #b45309)' }}>
+                          Los factores enviados se crearán o actualizarán. Los de otras UOM destino no se eliminan.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="ff-hint">Sin conversiones. Los factores existentes no se modificarán.</p>
+                    )}
+                  </div>
+                </div>
+                <div className="modal-foot">
+                  <button className="btn btn-secondary" onClick={() => setEditing(false)}>Cancelar</button>
+                  <button className="btn btn-primary" onClick={handleUpdate} disabled={updateMutation.isPending}>
+                    {updateMutation.isPending ? 'Guardando…' : 'Guardar'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="modal-body">
+                  {isDetailLoading
+                    ? <span className="skeleton-box" style={{ height: 80, display: 'block' }} />
+                    : detailData?.conversions.length
+                      ? (
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th>1 {detailId} equivale a</th>
+                                <th>UOM destino</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {detailData.conversions.map((c, i) => (
+                                <tr key={i}>
+                                  <td>{c.factor}</td>
+                                  <td>{c.toUom}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )
+                      : <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Esta UOM no tiene conversiones configuradas.</p>
+                  }
+                </div>
+                <div className="modal-foot">
+                  <button className="btn btn-secondary" onClick={() => setDetailId(null)}>Cerrar</button>
+                  <button className="btn btn-primary" onClick={openEdit} disabled={isDetailLoading}>
+                    <Pencil size={13} /> Editar
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -961,7 +1116,7 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
       return editTarget ? updateFn(editTarget.id, dto) : createFn(dto)
     },
     onSuccess: () => {
-      toast.success(editTarget ? 'Template actualizado' : 'Template creado')
+      toast.success(editTarget ? 'Plantilla actualizada' : 'Plantilla creada')
       queryClient.invalidateQueries({ queryKey: [queryKey] })
       closeForm()
     },
@@ -971,7 +1126,7 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteFn(id),
     onSuccess: () => {
-      toast.success('Template eliminado')
+      toast.success('Plantilla eliminada')
       queryClient.invalidateQueries({ queryKey: [queryKey] })
       setToDelete(null)
     },
@@ -984,7 +1139,7 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
     <>
       <div className="card">
         <div className="card-header">
-          <span className="card-title">Templates de Impuesto — {label}</span>
+          <span className="card-title">Plantillas de Impuesto — {label}</span>
           <button className="btn btn-primary btn-size-sm" onClick={openCreate}>
             <Plus size={14} /> Nuevo
           </button>
@@ -1053,7 +1208,7 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
         <div className="modal-overlay" onClick={closeForm}>
           <div className="modal-box" style={{ maxWidth: 680 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
-              <h2 className="modal-title">{editTarget ? 'Editar Template' : 'Nuevo Template'} — {label}</h2>
+              <h2 className="modal-title">{editTarget ? 'Editar Plantilla' : 'Nueva Plantilla'} — {label}</h2>
               <button className="modal-close" onClick={closeForm}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1075,7 +1230,7 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
                       onChange={(e) => setFormDefault(e.target.checked)}
                       style={{ width: 16, height: 16 }}
                     />
-                    Template por defecto
+                    Plantilla por defecto
                   </label>
                 </div>
               </div>

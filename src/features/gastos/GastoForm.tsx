@@ -253,7 +253,7 @@ export default function GastoForm() {
 
                 <div className="items-total-row">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                    <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Template de impuesto</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Plantilla de impuesto</span>
                     <select
                       className="ff-select"
                       style={{ fontSize: 12, padding: '3px 8px', flex: 1 }}

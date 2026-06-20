@@ -799,6 +799,11 @@ export interface CreateUOMDto {
   conversions?: { toUom: string; factor: number }[]
 }
 
+export interface UpdateUOMDto {
+  name?: string
+  conversions?: { toUom: string; factor: number }[]
+}
+
 export interface Grupo {
   name: string
   parentGroup?: string

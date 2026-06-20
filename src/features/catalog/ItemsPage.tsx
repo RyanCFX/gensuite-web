@@ -66,7 +66,7 @@ export default function ItemsPage() {
         category: categoryFilter || undefined,
         brand: brandFilter || undefined,
         disabled: statusFilter === 'all' ? undefined : statusFilter === 'disabled' ? 'true' : 'false',
-        isTemplate: templateFilter === 'template' ? true : undefined,
+        isTemplate: templateFilter === 'template' ? true : templateFilter === 'standalone' ? false : undefined,
         limit: PAGE_SIZE,
         offset,
       }),
@@ -167,7 +167,7 @@ export default function ItemsPage() {
         <div style={{ display: 'flex', gap: 4 }}>
           {[
             { value: 'all', label: 'Todos' },
-            { value: 'template', label: 'Solo Templates' },
+            { value: 'template', label: 'Solo Plantillas' },
             { value: 'standalone', label: 'Solo Artículos' },
           ].map((opt) => (
             <button
