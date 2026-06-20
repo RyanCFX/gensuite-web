@@ -187,6 +187,7 @@ export interface InvoiceItem {
   rate: number
   amount: number
   uom: string
+  warehouse?: string
 }
 
 export interface Invoice {

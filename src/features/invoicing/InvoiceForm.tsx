@@ -120,7 +120,7 @@ export default function InvoiceForm() {
         baseRate: i.rate,
         amount: i.amount,
         uom: i.uom,
-        warehouse: i.warehouse ?? '',
+        warehouse: i?.warehouse ?? '',
         conversionFactor: 1,
       })),
     )
