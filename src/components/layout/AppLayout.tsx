@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, useOutlet } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Package, FileText, Receipt, Warehouse,
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import { CommandPalette } from './CommandPalette'
 import { Toaster } from 'sonner'
 import { TabsProvider, useTabs } from '@/contexts/TabsContext'
+import { KeepAlive, useKeepAliveRef } from 'keepalive-for-react'
 
 // ─── Nav definitions ─────────────────────────────────────────────────────────
 
@@ -269,7 +270,7 @@ function renderEntry(
 
 // ─── TabBar ──────────────────────────────────────────────────────────────────
 
-function TabBar() {
+function TabBar({ keepAliveRef }: { keepAliveRef: ReturnType<typeof useKeepAliveRef> }) {
   const { tabs, activeId, closeTab } = useTabs()
   const navigate = useNavigate()
 
@@ -351,6 +352,7 @@ function TabBar() {
                   if (!window.confirm(`"${tab.title}" tiene cambios sin guardar. ¿Cerrar de todas formas?`)) return
                 }
                 closeTab(tab.id)
+                keepAliveRef.current?.destroy(tab.path)
               }}
               aria-label={`Cerrar ${tab.title}`}
             >
@@ -376,10 +378,12 @@ function AppLayoutInner() {
   })
   const [userOpen, setUserOpen] = useState(false)
   const userRef = useRef<HTMLDivElement>(null)
-
+  const keepAliveRef = useKeepAliveRef()
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
   const location = useLocation()
+  const outlet = useOutlet()
+  const activeTabPath = location.pathname + (location.search || '')
 
   // Auto-collapse sidebar when on any reportes page
   useEffect(() => {
@@ -583,9 +587,15 @@ function AppLayoutInner() {
 
         {/* ── Main ── */}
         <main className="main" style={{ display: 'flex', flexDirection: 'column' }}>
-          <TabBar />
+          <TabBar keepAliveRef={keepAliveRef} />
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            <Outlet />
+            <KeepAlive
+              activeCacheKey={activeTabPath}
+              max={15}
+              cacheNodeRef={keepAliveRef}
+            >
+              {outlet}
+            </KeepAlive>
           </div>
         </main>
       </div>
