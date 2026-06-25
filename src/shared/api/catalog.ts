@@ -26,6 +26,7 @@ export interface ListItemsParams extends PaginationParams {
   isTemplate?: boolean
   includeVariants?: boolean
   variantOf?: string
+  barcode?: string
 }
 
 export async function listItems(params?: ListItemsParams) {

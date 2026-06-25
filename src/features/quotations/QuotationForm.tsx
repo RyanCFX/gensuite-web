@@ -9,21 +9,28 @@ import type { Item } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDOP } from '@/lib/formatters'
-import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Loader2, ShieldAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { PinModal } from '@/components/shared/PinModal'
+import { VariantsModal } from '@/components/shared/VariantsModal'
+import type { VariantSelection } from '@/components/shared/VariantsModal'
+import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
+import { listItems } from '@/shared/api/catalog'
+import { client } from '@/shared/api/client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface LineItem {
   itemCode: string
-  itemLabel?: string      // nombre del artículo — para mostrar en el SearchSelect
+  itemLabel?: string
   description: string
   qty: number
   rate: number
   amount: number
+  discountPct: number
   uom: string
 }
 
@@ -43,8 +50,10 @@ function defaultValidTill() {
 
 const ITBIS_RATE = 0.18
 
-function calcAmount(qty: number, rate: number) {
-  return Math.round(qty * rate * 100) / 100
+function calcAmount(qty: number, rate: number, discountPct: number = 0) {
+  const base = qty * rate
+  const discount = base * (discountPct / 100)
+  return Math.round((base - discount) * 100) / 100
 }
 
 // ─── Form ─────────────────────────────────────────────────────────────────────
@@ -60,6 +69,19 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
   const [items, setItems] = useState<LineItem[]>([])
   const [notes, setNotes] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [pinModalOpen, setPinModalOpen] = useState(false)
+  const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
+
+  // ── Barcode scanner ───────────────────────────────────────────────────────
+  useBarcodeScanner({
+    onBarcode: async (code) => {
+      const res = await listItems({ barcode: code, limit: 1 })
+      const item = res.items?.[0]
+      if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
+      addRow()
+      setTimeout(() => selectCatalogItem(items.length, item), 0)
+    },
+  })
 
   // ── Customer search ──────────────────────────────────────────────────────
 
@@ -85,7 +107,7 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
       navigate(`/cotizaciones/${quotation.id}`)
     },
     onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al crear la cotización')
+      handleError(err)
     },
   })
 
@@ -98,11 +120,39 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
       navigate(`/cotizaciones/${quotation.id}`)
     },
     onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al actualizar la cotización')
+      handleError(err)
     },
   })
 
   const isPending = createMutation.isPending || updateMutation.isPending
+
+  function submitDto() {
+    const dto: CreateQuotationDto = {
+      customer: customerId,
+      date,
+      validTill,
+      items: items.map((i) => ({
+        itemCode: i.itemCode,
+        description: i.description,
+        qty: i.qty,
+        rate: i.rate,
+        discountPct: i.discountPct || undefined,
+        uom: i.uom,
+      })),
+      notes: notes || undefined,
+    }
+    if (editId) updateMutation.mutate(dto)
+    else createMutation.mutate(dto)
+  }
+
+  function handleError(err: { message?: string }) {
+    const msg = err?.message ?? ''
+    if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) {
+      setPinModalOpen(true)
+      return
+    }
+    toast.error(msg || 'Error al guardar la cotización')
+  }
 
   // ── Line item helpers ────────────────────────────────────────────────────
 
@@ -111,12 +161,29 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
       prev.map((item, i) => {
         if (i !== index) return item
         const updated = { ...item, ...patch }
-        if ('qty' in patch || 'rate' in patch) {
-          updated.amount = calcAmount(updated.qty, updated.rate)
+        if ('qty' in patch || 'rate' in patch || 'discountPct' in patch) {
+          updated.amount = calcAmount(updated.qty, updated.rate, updated.discountPct)
         }
         return updated
       }),
     )
+  }
+
+  function onVariantConfirm(selections: VariantSelection[]) {
+    setItems((prev) => [
+      ...prev,
+      ...selections.map((s) => ({
+        itemCode: s.item.id,
+        itemLabel: s.item.itemName,
+        description: s.item.description ?? s.item.itemName,
+        qty: s.qty,
+        rate: s.item.standardRate ?? 0,
+        amount: calcAmount(s.qty, s.item.standardRate ?? 0, 0),
+        discountPct: 0,
+        uom: s.item.salesUom ?? s.item.stockUom ?? 'Unidad',
+      })),
+    ])
+    setVariantTemplate(null)
   }
 
   function selectCatalogItem(index: number, catalogItem: Item) {
@@ -130,18 +197,18 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
           itemLabel: catalogItem.itemName,
           description: catalogItem.description ?? catalogItem.itemName,
           rate,
-          amount: calcAmount(row.qty, rate),
+          amount: calcAmount(row.qty, rate, row.discountPct),
         }
       }),
     )
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, description: '', rate: 0, amount: 0 })
+    updateItem(index, { itemCode: '', itemLabel: undefined, description: '', rate: 0, amount: 0, discountPct: 0 })
   }
 
   function addRow() {
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, uom: 'Unidad' }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, uom: 'Unidad' }])
   }
 
   function removeRow(index: number) {
@@ -149,6 +216,8 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
   }
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0)
+  const grossTotal = items.reduce((s, i) => s + i.qty * i.rate, 0)
+  const totalDiscount = grossTotal - subtotal
   const itbis = Math.round(subtotal * ITBIS_RATE * 100) / 100
   const total = subtotal + itbis
 
@@ -184,25 +253,7 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
       }
     }
 
-    const dto: CreateQuotationDto = {
-      customer: customerId,
-      date,
-      validTill,
-      items: items.map((i) => ({
-        itemCode: i.itemCode,
-        description: i.description,
-        qty: i.qty,
-        rate: i.rate,
-        uom: i.uom,
-      })),
-      notes: notes || undefined,
-    }
-
-    if (editId) {
-      updateMutation.mutate(dto)
-    } else {
-      createMutation.mutate(dto)
-    }
+    submitDto()
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -279,6 +330,7 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
                   <th>Descripción</th>
                   <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
+                  <th style={{ textAlign: 'right', width: 80 }}>Dto. %</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 72 }}>UDM</th>
                   <th style={{ width: 40 }} />
@@ -301,6 +353,7 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
                           selectedLabel={item.itemLabel}
                           onSelect={(catalogItem) => selectCatalogItem(index, catalogItem)}
                           onClear={() => clearCatalogItem(index)}
+                          onVariantSelect={(t) => setVariantTemplate(t)}
                         />
                       </td>
 
@@ -339,6 +392,20 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
                         />
                       </td>
 
+                      {/* Descuento */}
+                      <td>
+                        <input
+                          className="items-input"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={item.discountPct}
+                          onChange={(e) => updateItem(index, { discountPct: parseFloat(e.target.value) || 0 })}
+                          style={{ textAlign: 'right', width: 64 }}
+                        />
+                      </td>
+
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
 
                       <td>
@@ -368,14 +435,24 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
             </div>
 
             <div className="items-total-row">
-              <div className="items-total-line">
-                <span>Subtotal</span>
-                <span>{formatDOP(subtotal)}</span>
+            <div className="items-total-line">
+                <span>Subtotal bruto</span>
+                <span>{formatDOP(grossTotal)}</span>
               </div>
-              <div className="items-total-line">
-                <span>ITBIS (18%)</span>
-                <span>{formatDOP(itbis)}</span>
-              </div>
+              {totalDiscount > 0 && (
+                <div className="items-total-line" style={{ color: 'var(--text-danger)' }}>
+                  <span>Descuento total</span>
+                  <span>-{formatDOP(totalDiscount)}</span>
+                </div>
+              )}
+            <div className="items-total-line">
+              <span>Subtotal neto</span>
+              <span>{formatDOP(subtotal)}</span>
+            </div>
+            <div className="items-total-line">
+              <span>ITBIS (18%)</span>
+              <span>{formatDOP(itbis)}</span>
+            </div>
               <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
                 <span>Total</span>
                 <span>{formatDOP(total)}</span>
@@ -412,6 +489,22 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
           </button>
         </div>
       </form>
+
+      <PinModal
+        open={pinModalOpen}
+        onClose={() => setPinModalOpen(false)}
+        onAuthorized={(userId) => { client.defaults.headers.common['X-Admin-Pin'] = userId; setPinModalOpen(false); submitDto() }}
+        title="Autorización requerida"
+        description="El descuento supera tu límite. Ingresa el PIN de un administrador."
+      />
+
+      {variantTemplate && (
+        <VariantsModal
+          templateItem={variantTemplate}
+          onConfirm={onVariantConfirm}
+          onClose={() => setVariantTemplate(null)}
+        />
+      )}
     </div>
   )
 }

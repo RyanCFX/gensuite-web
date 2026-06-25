@@ -55,6 +55,10 @@ const JournalDetail   = lazy(() => import('@/features/journal/JournalDetail'))
 const CierrePeriodoPage = lazy(() => import('@/features/contabilidad/CierrePeriodoPage'))
 const LibroDiarioPage   = lazy(() => import('@/features/contabilidad/LibroDiarioPage'))
 const LibroMayorPage    = lazy(() => import('@/features/contabilidad/LibroMayorPage'))
+const BundlesPage       = lazy(() => import('@/features/bundles/BundlesPage'))
+const PedidosPage       = lazy(() => import('@/features/pedidos/PedidosPage'))
+const PedidoDetail      = lazy(() => import('@/features/pedidos/PedidoDetail'))
+const PedidoForm        = lazy(() => import('@/features/pedidos/PedidoForm'))
 
 function PageLoader() {
   return (
@@ -95,11 +99,18 @@ export default function App() {
             <Route path="/catalogo/articulos/nuevo" element={<Suspense fallback={<PageLoader />}><ItemForm /></Suspense>} />
             <Route path="/catalogo/articulos/:id" element={<Suspense fallback={<PageLoader />}><ItemDetail /></Suspense>} />
             <Route path="/catalogo/atributos" element={<Suspense fallback={<PageLoader />}><AttributesPage /></Suspense>} />
+            <Route path="/catalogo/combos" element={<Suspense fallback={<PageLoader />}><BundlesPage /></Suspense>} />
 
             {/* Cotizaciones */}
             <Route path="/cotizaciones" element={<Suspense fallback={<PageLoader />}><QuotationsPage /></Suspense>} />
             <Route path="/cotizaciones/nueva" element={<Suspense fallback={<PageLoader />}><QuotationForm /></Suspense>} />
             <Route path="/cotizaciones/:id" element={<Suspense fallback={<PageLoader />}><QuotationDetail /></Suspense>} />
+
+            {/* Pedidos de Venta */}
+            <Route path="/pedidos" element={<Suspense fallback={<PageLoader />}><PedidosPage /></Suspense>} />
+            <Route path="/pedidos/nuevo" element={<Suspense fallback={<PageLoader />}><PedidoForm /></Suspense>} />
+            <Route path="/pedidos/:id" element={<Suspense fallback={<PageLoader />}><PedidoDetail /></Suspense>} />
+            <Route path="/pedidos/:id/editar" element={<Suspense fallback={<PageLoader />}><PedidoForm /></Suspense>} />
 
             {/* Facturación */}
             <Route path="/facturacion/facturas" element={<Suspense fallback={<PageLoader />}><InvoicesPage /></Suspense>} />

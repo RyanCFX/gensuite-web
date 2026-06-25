@@ -13,8 +13,10 @@ import {
   getPerfil, updatePerfil,
   listImpuestosVentas, createImpuestoVentas, updateImpuestoVentas, deleteImpuestoVentas,
   listImpuestosCompras, createImpuestoCompras, updateImpuestoCompras, deleteImpuestoCompras,
+  listGruposClientes, createGrupoCliente, updateGrupoCliente, deleteGrupoCliente,
+  listGruposProveedores, createGrupoProveedor,
 } from '@/shared/api/config'
-import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, CreateTaxTemplateDto } from '@/shared/api/types'
+import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, CreateTaxTemplateDto, Grupo, GrupoCliente } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
@@ -1361,6 +1363,163 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
   )
 }
 
+// ---- Grupos de Clientes ----
+const PRICE_TIER_OPTIONS = [
+  { value: '', label: 'Sin nivel' },
+  { value: 'A', label: 'A — Minorista' },
+  { value: 'B', label: 'B — Medio mayoreo' },
+  { value: 'C', label: 'C — Mayorista' },
+]
+
+function GruposClientesSection() {
+  const { data: grupos, isLoading, refetch } = useQuery({ queryKey: ['grupos-clientes'], queryFn: listGruposClientes })
+  const [toDelete, setToDelete] = useState<Grupo | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [editTarget, setEditTarget] = useState<Grupo | null>(null)
+  const [formName, setFormName] = useState('')
+  const [formPriceTier, setFormPriceTier] = useState<string>('')
+
+  const createMutation = useMutation({
+    mutationFn: () => createGrupoCliente({ name: formName }),
+    onSuccess: () => { closeForm(); refetch() },
+  })
+  const updateMutation = useMutation({
+    mutationFn: () => updateGrupoCliente(editTarget!.id!, { name: formName, priceTier: formPriceTier as 'A' | 'B' | 'C' | undefined }),
+    onSuccess: () => { closeForm(); refetch() },
+  })
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteGrupoCliente(toDelete!.id!),
+    onSuccess: () => { setToDelete(null); refetch() },
+  })
+
+  function openCreate() {
+    setEditTarget(null)
+    setFormName('')
+    setFormPriceTier('')
+    setShowForm(true)
+  }
+  function openEdit(g: Grupo) {
+    setEditTarget(g)
+    setFormName(g.name)
+    setFormPriceTier('')
+    setShowForm(true)
+  }
+  function closeForm() {
+    setShowForm(false)
+    setEditTarget(null)
+  }
+
+  return (
+    <>
+      <div className="config-section">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h2 className="config-section-title">Grupos de Clientes</h2>
+          <button className="btn btn-primary btn-size-sm" onClick={openCreate}>
+            <Plus size={14} /> Nuevo
+          </button>
+        </div>
+        {isLoading ? (
+          <p style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>Cargando…</p>
+        ) : !grupos?.length ? (
+          <p style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>No hay grupos de clientes.</p>
+        ) : (
+          <table className="table-config">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Nivel de precio</th>
+                <th style={{ width: 80 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {grupos.map((g) => (
+                <tr key={g.id}>
+                  <td>{g.name}</td>
+                  <td>
+                    <span className="badge" style={{ background: g.priceTier ? 'var(--accent-bg)' : 'var(--surface-sunken)', color: g.priceTier ? 'var(--accent)' : 'var(--text-tertiary)' }}>
+                      {g.priceTier ? `Nivel ${g.priceTier}` : 'Sin nivel'}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button className="btn btn-ghost btn-size-icon-sm" onClick={() => openEdit(g)}>
+                        <Pencil size={13} />
+                      </button>
+                      <button className="btn btn-ghost btn-size-icon-sm" style={{ color: 'var(--icon-muted)' }} onClick={() => setToDelete(g)}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Create / Edit modal */}
+      {showForm && (
+        <div className="modal-overlay" onClick={closeForm}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title">{editTarget ? 'Editar Grupo' : 'Nuevo Grupo'}</h2>
+              <button className="modal-close" onClick={closeForm}><X size={16} /></button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="ff-wrap">
+                <label className="ff-label ff-required">Nombre</label>
+                <input className="ff-input" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="Ej: Mayoristas" />
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Nivel de precio por defecto</label>
+                <select className="ff-select" value={formPriceTier} onChange={(e) => setFormPriceTier(e.target.value)}>
+                  {PRICE_TIER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>
+                  Los clientes de este grupo usarán este nivel de precio al crear cotizaciones/facturas.
+                </p>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={closeForm}>Cancelar</button>
+              <button
+                className="btn btn-primary"
+                onClick={() => (editTarget ? updateMutation.mutate() : createMutation.mutate())}
+                disabled={!formName || (editTarget ? updateMutation.isPending : createMutation.isPending)}
+              >
+                {(editTarget ? updateMutation.isPending : createMutation.isPending) ? 'Guardando…' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm */}
+      {toDelete && (
+        <div className="modal-overlay" onClick={() => setToDelete(null)}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title">¿Eliminar grupo?</h2>
+              <button className="modal-close" onClick={() => setToDelete(null)}><X size={16} /></button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                Se eliminará <strong>{toDelete.name}</strong>. Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={() => setToDelete(null)}>Cancelar</button>
+              <button className="btn btn-danger" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ---- Main ConfigPage ----
 const SECTION_TITLES: Record<string, string> = {
   cobros: 'Configuración de Cobranza',
@@ -1373,6 +1532,7 @@ const SECTION_TITLES: Record<string, string> = {
   'impuestos-compras': 'Impuestos — Compras',
   'ejercicio-fiscal': 'Ejercicio Fiscal',
   perfil: 'Mi Perfil',
+  'grupos-clientes': 'Grupos de Clientes',
 }
 
 export default function ConfigPage() {
@@ -1390,6 +1550,7 @@ export default function ConfigPage() {
     'impuestos-compras': <TaxTemplatesSection kind="compras" />,
     'ejercicio-fiscal': <EjercicioFiscalSection />,
     perfil: <PerfilSection />,
+    'grupos-clientes': <GruposClientesSection />,
   }
 
   return (

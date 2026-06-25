@@ -111,8 +111,27 @@ export async function listGruposClientes() {
   return unwrap(res)
 }
 
+export async function getGrupoCliente(id: string) {
+  const res = await client.get<{ success: true; data: Grupo }>(`${ENDPOINTS.config.gruposClientes}/${id}`)
+  return unwrap(res)
+}
+
 export async function createGrupoCliente(data: Grupo) {
   const res = await client.post<{ success: true; data: Grupo }>(ENDPOINTS.config.gruposClientes, data)
+  return unwrap(res)
+}
+
+export async function updateGrupoCliente(id: string, data: Partial<Grupo & { priceTier?: 'A' | 'B' | 'C' }>) {
+  const res = await client.put<{ success: true; data: Grupo }>(`${ENDPOINTS.config.gruposClientes}/${id}`, data)
+  return unwrap(res)
+}
+
+export async function deleteGrupoCliente(id: string) {
+  await client.delete(`${ENDPOINTS.config.gruposClientes}/${id}`)
+}
+
+export async function listItemTaxTemplates() {
+  const res = await client.get<{ success: true; data: { id: string; title: string }[] }>(ENDPOINTS.config.itemTaxTemplates)
   return unwrap(res)
 }
 

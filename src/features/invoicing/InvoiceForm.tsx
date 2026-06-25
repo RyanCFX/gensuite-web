@@ -5,8 +5,8 @@ import { createInvoice, updateInvoice, getInvoice } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
 import { listImpuestosVentas } from '@/shared/api/config'
-import { getItemStock } from '@/shared/api/catalog'
-import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, ItemStock } from '@/shared/api/types'
+import { getItemStock, listItems } from '@/shared/api/catalog'
+import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, ItemStock, Item } from '@/shared/api/types'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react'
@@ -17,7 +17,10 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
-import type { Item } from '@/shared/api/types'
+import { PinModal } from '@/components/shared/PinModal'
+import { VariantsModal } from '@/components/shared/VariantsModal'
+import type { VariantSelection } from '@/components/shared/VariantsModal'
+import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 
 type NcfType = 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
 
@@ -28,6 +31,7 @@ interface LineItem {
   qty: number
   rate: number
   amount: number
+  discountPct: number
   /** Precio base al stockUom — se usa para recalcular al cambiar UOM */
   baseRate: number
   uom: string
@@ -49,8 +53,10 @@ function defaultDueDate() {
 // fallback rate used only when no template is selected
 const ITBIS_RATE = 0.18
 
-function calcAmount(qty: number, rate: number) {
-  return Math.round(qty * rate * 100) / 100
+function calcAmount(qty: number, rate: number, discountPct: number = 0) {
+  const base = qty * rate
+  const discount = base * (discountPct / 100)
+  return Math.round((base - discount) * 100) / 100
 }
 
 // ─── WarehouseSelect — SearchSelect con filtrado local ────────────────────────
@@ -95,6 +101,19 @@ export default function InvoiceForm() {
   const [loadingSemaforo, setLoadingSemaforo] = useState(false)
   const [initialized, setInitialized] = useState(false)
   const [taxesAndCharges, setTaxesAndCharges] = useState<string>('')
+  const [pinModalOpen, setPinModalOpen] = useState(false)
+  const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
+
+  // ── Barcode scanner ───────────────────────────────────────────────────────
+  useBarcodeScanner({
+    onBarcode: async (code) => {
+      const res = await listItems({ barcode: code, limit: 1 })
+      const item = res.items?.[0]
+      if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
+      addRow()
+      setTimeout(() => selectCatalogItem(items.length, item), 0)
+    },
+  })
 
   // ── Load existing invoice when editing ────────────────────────────────────
   const { data: existingInvoice, isLoading: loadingInvoice } = useQuery({
@@ -119,6 +138,7 @@ export default function InvoiceForm() {
         rate: i.rate,
         baseRate: i.rate,
         amount: i.amount,
+        discountPct: (i as any).discountPct ?? 0,
         uom: i.uom,
         warehouse: i?.warehouse ?? '',
         conversionFactor: 1,
@@ -200,7 +220,9 @@ export default function InvoiceForm() {
       navigate(`/facturacion/facturas/${invoice.id}`)
     },
     onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al crear la factura')
+      const msg = err?.message ?? ''
+      if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) { setPinModalOpen(true); return }
+      toast.error(msg || 'Error al crear la factura')
     },
   })
 
@@ -213,7 +235,9 @@ export default function InvoiceForm() {
       navigate(`/facturacion/facturas/${id}`)
     },
     onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al actualizar la factura')
+      const msg = err?.message ?? ''
+      if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) { setPinModalOpen(true); return }
+      toast.error(msg || 'Error al actualizar la factura')
     },
   })
 
@@ -225,8 +249,8 @@ export default function InvoiceForm() {
       prev.map((item, i) => {
         if (i !== index) return item
         const updated = { ...item, ...patch }
-        if ('qty' in patch || 'rate' in patch) {
-          updated.amount = calcAmount(updated.qty, updated.rate)
+        if ('qty' in patch || 'rate' in patch || 'discountPct' in patch) {
+          updated.amount = calcAmount(updated.qty, updated.rate, updated.discountPct)
         }
         return updated
       }),
@@ -253,7 +277,7 @@ export default function InvoiceForm() {
           description: catalogItem.description ?? catalogItem.itemName,
           rate: baseRate,
           baseRate,
-          amount: calcAmount(row.qty, baseRate),
+          amount: calcAmount(row.qty, baseRate, row.discountPct),
           uom: catalogItem.salesUom ?? catalogItem.stockUom ?? row.uom,
           warehouse: '',
           stock,
@@ -264,11 +288,31 @@ export default function InvoiceForm() {
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, description: '', rate: 0, amount: 0 })
+    updateItem(index, { itemCode: '', itemLabel: undefined, description: '', rate: 0, amount: 0, discountPct: 0 })
+  }
+
+  function onVariantConfirm(selections: VariantSelection[]) {
+    setItems((prev) => [
+      ...prev,
+      ...selections.map((s) => ({
+        itemCode: s.item.id,
+        itemLabel: s.item.itemName,
+        description: s.item.description ?? s.item.itemName,
+        qty: s.qty,
+        rate: s.item.standardRate ?? 0,
+        baseRate: s.item.standardRate ?? 0,
+        amount: calcAmount(s.qty, s.item.standardRate ?? 0, 0),
+        discountPct: 0,
+        uom: s.item.salesUom ?? s.item.stockUom ?? 'Unidad',
+        warehouse: '',
+        conversionFactor: 1,
+      })),
+    ])
+    setVariantTemplate(null)
   }
 
   function addRow() {
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, uom: 'Unidad', warehouse: '', conversionFactor: 1 }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, discountPct: 0, uom: 'Unidad', warehouse: '', conversionFactor: 1 }])
   }
 
   function removeRow(index: number) {
@@ -276,6 +320,8 @@ export default function InvoiceForm() {
   }
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0)
+  const grossTotal = items.reduce((s, i) => s + i.qty * i.rate, 0)
+  const totalDiscount = grossTotal - subtotal
   const selectedTemplate = taxTemplates?.find((t) => t.id === taxesAndCharges) ?? null
   const taxRate = selectedTemplate
     ? selectedTemplate.taxes
@@ -332,6 +378,7 @@ export default function InvoiceForm() {
       description: i.description,
       qty: i.qty,
       rate: i.rate,
+      discountPct: i.discountPct || undefined,
       uom: i.uom,
       warehouse: i.warehouse || undefined,
     }))
@@ -506,6 +553,7 @@ export default function InvoiceForm() {
                   <th style={{ width: 160 }}>Almacén</th>
                   <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
+                  <th style={{ textAlign: 'right', width: 72 }}>Dto. %</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 56 }}>UDM</th>
                   <th style={{ width: 40 }} />
@@ -527,6 +575,7 @@ export default function InvoiceForm() {
                           selectedLabel={item.itemLabel}
                           onSelect={(catalogItem) => selectCatalogItem(index, catalogItem)}
                           onClear={() => clearCatalogItem(index)}
+                          onVariantSelect={(t) => setVariantTemplate(t)}
                         />
                       </td>
                       <td>
@@ -564,6 +613,9 @@ export default function InvoiceForm() {
                       </td>
                       <td>
                         <input className="items-input" type="number" min="0" step="0.01" value={item.rate} onChange={(e) => updateItem(index, { rate: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right' }} />
+                      </td>
+                      <td>
+                        <input className="items-input" type="number" min="0" max="100" step="0.1" value={item.discountPct} onChange={(e) => updateItem(index, { discountPct: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right', width: 56 }} />
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
                       <td>
@@ -613,7 +665,17 @@ export default function InvoiceForm() {
                 )}
               </div>
               <div className="items-total-line">
-                <span>Subtotal</span>
+                <span>Subtotal bruto</span>
+                <span>{formatDOP(grossTotal)}</span>
+              </div>
+              {totalDiscount > 0 && (
+                <div className="items-total-line" style={{ color: 'var(--text-danger)' }}>
+                  <span>Descuento total</span>
+                  <span>-{formatDOP(totalDiscount)}</span>
+                </div>
+              )}
+              <div className="items-total-line">
+                <span>Subtotal neto</span>
                 <span>{formatDOP(subtotal)}</span>
               </div>
               {taxesAndCharges && (
@@ -661,6 +723,31 @@ export default function InvoiceForm() {
           </button>
         </div>
       </form>
+
+      <PinModal
+        open={pinModalOpen}
+        onClose={() => setPinModalOpen(false)}
+        onAuthorized={(userId) => {
+          client.defaults.headers.common['X-Admin-Pin'] = userId
+          setPinModalOpen(false)
+          const itemsDto = items.map((i) => ({
+            itemCode: i.itemCode, description: i.description, qty: i.qty, rate: i.rate,
+            discountPct: i.discountPct || undefined, uom: i.uom, warehouse: i.warehouse || undefined,
+          }))
+          if (isEdit) updateMutation.mutate({ customer: customerId, postingDate, dueDate, ncfType, taxesAndCharges: taxesAndCharges || undefined, items: itemsDto, notes: notes || undefined })
+          else createMutation.mutate({ customer: customerId, postingDate, dueDate, ncfType, items: itemsDto, notes: notes || undefined })
+        }}
+        title="Autorización requerida"
+        description="El descuento supera tu límite. Ingresa el PIN de un administrador."
+      />
+
+      {variantTemplate && (
+        <VariantsModal
+          templateItem={variantTemplate}
+          onConfirm={onVariantConfirm}
+          onClose={() => setVariantTemplate(null)}
+        />
+      )}
     </div>
   )
 }

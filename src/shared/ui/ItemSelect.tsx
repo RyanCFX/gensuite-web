@@ -17,17 +17,13 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 export interface ItemSelectProps {
-  /** Código del artículo actualmente seleccionado */
   value: string
-  /** Nombre del artículo para mostrar cuando el campo está cerrado */
   selectedLabel?: string
-  /** Se llama con el artículo completo cuando el usuario hace una selección */
   onSelect: (item: Item) => void
-  /** Se llama cuando el usuario limpia la selección */
   onClear: () => void
-  /** Placeholder del input */
   placeholder?: string
   disabled?: boolean
+  onVariantSelect?: (template: Item) => void
 }
 
 export function ItemSelect({
@@ -37,6 +33,7 @@ export function ItemSelect({
   onClear,
   placeholder = 'Buscar artículo…',
   disabled,
+  onVariantSelect,
 }: ItemSelectProps) {
   const [query, setQuery] = useState('')
 
@@ -61,7 +58,9 @@ export function ItemSelect({
       onChange={(val) => {
         if (!val) { onClear(); return }
         const found = data?.items.find((i) => i.id === val)
-        if (found) onSelect(found)
+        if (!found) return
+        if (found.hasVariants && onVariantSelect) { onVariantSelect(found); return }
+        onSelect(found)
       }}
       options={options}
       onSearch={setQuery}

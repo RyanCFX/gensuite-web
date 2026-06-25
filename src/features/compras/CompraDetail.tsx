@@ -30,7 +30,16 @@ export default function CompraDetail() {
 
   const submitMutation = useMutation({
     mutationFn: () => submitCompra(id!),
-    onSuccess: () => { toast.success('Compra sometida'); queryClient.invalidateQueries({ queryKey: ['compra', id] }); queryClient.invalidateQueries({ queryKey: ['compras'] }); setConfirmAction(null) },
+    onSuccess: (result) => {
+      toast.success('Compra sometida')
+      queryClient.invalidateQueries({ queryKey: ['compra', id] })
+      queryClient.invalidateQueries({ queryKey: ['compras'] })
+      setConfirmAction(null)
+      const updatedPrices = (result as any)?.updatedPrices
+      if (updatedPrices && updatedPrices > 0) {
+        toast.info(`Se actualizaron los precios de ${updatedPrices} artículo(s) (modo sobre costo)`)
+      }
+    },
     onError: () => toast.error('Error al someter la compra'),
   })
 

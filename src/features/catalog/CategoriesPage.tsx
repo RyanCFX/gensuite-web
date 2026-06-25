@@ -5,16 +5,18 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { listCategories, createCategory, updateCategory, deleteCategory } from '@/shared/api/catalog'
+import { getEmpresa } from '@/shared/api/config'
 import type { Category, UpdateCategoryDto } from '@/shared/api/types'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
-import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Folder, FolderOpen } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Folder, FolderOpen, Tag } from 'lucide-react'
 
 const categorySchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   parentCategory: z.string().optional(),
   isGroup: z.boolean(),
+  itemCodePrefix: z.string().max(5).optional(),
 })
 
 type CategoryFormValues = z.infer<typeof categorySchema>
@@ -65,6 +67,9 @@ function CategoryRow({ category, depth, onEdit, onDelete }: CategoryRowProps) {
           {category.isGroup && (
             <span className="badge badge-neutral" style={{ fontSize: 11 }}>Grupo</span>
           )}
+          {isPrefixAuto && category.itemCodePrefix && (
+            <span className="badge badge-brand" style={{ fontSize: 11 }}>Prefijo: {category.itemCodePrefix}</span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
           <button className="btn btn-ghost btn-size-icon-sm" type="button" onClick={() => onEdit(category)}>
@@ -106,6 +111,13 @@ export default function CategoriesPage() {
   const [editExpenseAccount, setEditExpenseAccount] = useState('')
   const [parentCatQuery, setParentCatQuery] = useState('')
 
+  const { data: empresa } = useQuery({
+    queryKey: ['empresa'],
+    queryFn: getEmpresa,
+    staleTime: 5 * 60_000,
+  })
+  const isPrefixAuto = empresa?.itemCodeMode === 'prefix_auto'
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ['categories', { tree: true }],
     queryFn: () => listCategories({ tree: true }),
@@ -127,7 +139,7 @@ export default function CategoriesPage() {
     formState: { errors, isSubmitting },
   } = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
-    defaultValues: { name: '', parentCategory: '', isGroup: false },
+    defaultValues: { name: '', parentCategory: '', isGroup: false, itemCodePrefix: '' },
   })
 
   const createMutation = useMutation({
@@ -163,7 +175,7 @@ export default function CategoriesPage() {
 
   function openCreate() {
     setEditTarget(null)
-    reset({ name: '', parentCategory: '', isGroup: false })
+    reset({ name: '', parentCategory: '', isGroup: false, itemCodePrefix: '' })
     setDialogOpen(true)
   }
 
@@ -173,6 +185,7 @@ export default function CategoriesPage() {
       name: cat.name,
       parentCategory: cat.parentCategory ?? '',
       isGroup: cat.isGroup,
+      itemCodePrefix: (cat as any).itemCodePrefix ?? '',
     })
     setEditIncomeAccount(cat.incomeAccount ?? '')
     setEditExpenseAccount(cat.expenseAccount ?? '')
@@ -186,10 +199,13 @@ export default function CategoriesPage() {
   }
 
   function onSubmit(values: CategoryFormValues) {
-    const basePayload = {
+    const basePayload: Record<string, unknown> = {
       name: values.name,
       parentCategory: values.parentCategory || undefined,
       isGroup: values.isGroup,
+    }
+    if (isPrefixAuto && values.itemCodePrefix) {
+      basePayload.itemCodePrefix = values.itemCodePrefix
     }
     if (editTarget) {
       const editPayload = {
@@ -197,9 +213,9 @@ export default function CategoriesPage() {
         incomeAccount: editIncomeAccount || undefined,
         expenseAccount: editExpenseAccount || undefined,
       }
-      updateMutation.mutate({ id: editTarget.id, data: editPayload })
+      updateMutation.mutate({ id: editTarget.id, data: editPayload as UpdateCategoryDto })
     } else {
-      createMutation.mutate(basePayload)
+      createMutation.mutate(basePayload as any)
     }
   }
 
@@ -296,6 +312,14 @@ export default function CategoriesPage() {
                   <input type="checkbox" className="ff-check" id="isGroup" {...register('isGroup')} />
                   <span style={{ fontSize: 13 }}>Es un grupo (puede contener subcategorías)</span>
                 </label>
+
+                {isPrefixAuto && (
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="itemCodePrefix">Prefijo de código</label>
+                    <input id="itemCodePrefix" className="ff-input" maxLength={5} placeholder="Ej: VEN" {...register('itemCodePrefix')} />
+                    <p className="ff-hint">Máx 5 caracteres. Se usará como prefijo en códigos de artículo (ej: VEN-0001)</p>
+                  </div>
+                )}
 
                 {editTarget && (
                   <div style={{ borderTop: '1px solid var(--border-default)', marginTop: 16, paddingTop: 16 }}>

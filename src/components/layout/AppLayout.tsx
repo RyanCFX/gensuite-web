@@ -9,6 +9,7 @@ import {
 import { useAuthStore } from '@/stores/auth.store'
 import { CommandPalette } from './CommandPalette'
 import { Toaster } from 'sonner'
+import { TabsProvider, useTabs } from '@/contexts/TabsContext'
 
 // ─── Nav definitions ─────────────────────────────────────────────────────────
 
@@ -37,19 +38,20 @@ const NAV_MAIN: NavItem[] = [
 ]
 
 const NAV_CATALOG: NavEntry = {
-  label: 'Catálogo',
+  label: 'Tablas',
   icon: <Package size={16} aria-hidden="true" />,
   prefix: '/catalogo',
   children: [
     { label: 'Categorías', icon: <Package size={14} />, path: '/catalogo/categorias' },
     { label: 'Marcas',     icon: <Shield size={14} />,  path: '/catalogo/marcas'     },
-    { label: 'Artículos',  icon: <Package size={14} />, path: '/catalogo/articulos'  },
+    { label: 'Combos',     icon: <Package size={14} />, path: '/catalogo/combos'     },
     { label: 'Atributos',  icon: <Tag size={14} />,     path: '/catalogo/atributos'  },
   ],
 }
 
 const NAV_VENTAS: NavEntry[] = [
   { label: 'Cotizaciones', icon: <FileText size={16} aria-hidden="true" />, path: '/cotizaciones' },
+  { label: 'Pedidos',      icon: <ClipboardList size={16} aria-hidden="true" />, path: '/pedidos' },
   {
     label: 'Facturación',
     icon: <Receipt size={16} aria-hidden="true" />,
@@ -66,11 +68,12 @@ const NAV_OPS: NavEntry[] = [
   {
     label: 'Inventario',
     icon: <Warehouse size={16} aria-hidden="true" />,
-    prefix: '/inventario',
+    prefix: '/inventario|/catalogo/articulos',
     children: [
-      { label: 'Stock Actual', icon: <Warehouse size={14} />, path: '/inventario/stock'    },
-      { label: 'Historial',    icon: <BarChart3 size={14} />, path: '/inventario/historial' },
-      { label: 'Conteos',      icon: <FileText size={14} />,  path: '/inventario/conteos'  },
+      { label: 'Artículos',   icon: <Package size={14} />,  path: '/catalogo/articulos' },
+      { label: 'Stock Actual',icon: <Warehouse size={14} />, path: '/inventario/stock'    },
+      { label: 'Historial',   icon: <BarChart3 size={14} />, path: '/inventario/historial' },
+      { label: 'Conteos',     icon: <FileText size={14} />,  path: '/inventario/conteos'  },
     ],
   },
   { label: 'Compras',    icon: <ShoppingCart size={16} aria-hidden="true" />, path: '/compras'    },
@@ -122,6 +125,7 @@ const NAV_CONFIG: NavEntry = {
     { label: 'Impuestos Ventas',   icon: <Percent size={14} />,     path: '/config/impuestos-ventas'  },
     { label: 'Impuestos Compras',  icon: <Percent size={14} />,     path: '/config/impuestos-compras' },
     { label: 'Ejercicio Fiscal',   icon: <Calendar size={14} />,    path: '/config/ejercicio-fiscal'  },
+    { label: 'Grupos de Clientes', icon: <Users size={14} />,       path: '/config/grupos-clientes'   },
     { label: 'Usuarios',           icon: <UserCog size={14} />,     path: '/usuarios'                 },
     { label: 'Mi Perfil',          icon: <UserCog size={14} />,     path: '/config/perfil'            },
   ],
@@ -263,9 +267,105 @@ function renderEntry(
   return <NavItemBtn key={entry.path} item={entry} onNav={onNav} collapsed={collapsed} />
 }
 
-// ─── AppLayout ────────────────────────────────────────────────────────────────
+// ─── TabBar ──────────────────────────────────────────────────────────────────
 
-export default function AppLayout() {
+function TabBar() {
+  const { tabs, activeId, closeTab } = useTabs()
+  const navigate = useNavigate()
+
+  if (tabs.length === 0) return null
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'stretch',
+        overflowX: 'auto',
+        overflowY: 'hidden',
+        borderBottom: '1px solid var(--border-default)',
+        background: 'var(--surface-app)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
+        scrollbarWidth: 'none',
+        flexShrink: 0,
+      }}
+    >
+      {tabs.map((tab) => {
+        const isActive = tab.id === activeId
+        return (
+          <div
+            key={tab.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '0 10px 0 14px',
+              height: 36,
+              minWidth: 80,
+              maxWidth: 200,
+              flexShrink: 0,
+              cursor: 'pointer',
+              borderRight: '1px solid var(--border-default)',
+              background: isActive ? 'var(--surface-raised, var(--bg-surface))' : 'transparent',
+              borderBottom: isActive ? '2px solid var(--color-primary, #4f46e5)' : '2px solid transparent',
+              transition: 'background 0.12s',
+              userSelect: 'none',
+            }}
+            onClick={() => navigate(tab.path)}
+            title={tab.title}
+          >
+            {tab.isDirty && (
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-primary, #4f46e5)', flexShrink: 0 }} />
+            )}
+            <span style={{
+              flex: 1,
+              fontSize: 12,
+              fontWeight: isActive ? 500 : 400,
+              color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {tab.title}
+            </span>
+            <button
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 16,
+                height: 16,
+                borderRadius: 4,
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                color: 'var(--text-tertiary)',
+                padding: 0,
+                flexShrink: 0,
+                opacity: 0.7,
+              }}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (tab.isDirty) {
+                  if (!window.confirm(`"${tab.title}" tiene cambios sin guardar. ¿Cerrar de todas formas?`)) return
+                }
+                closeTab(tab.id)
+              }}
+              aria-label={`Cerrar ${tab.title}`}
+            >
+              <X size={11} />
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── AppLayout inner (uses TabsContext) ───────────────────────────────────────
+
+function AppLayoutInner() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
@@ -482,8 +582,11 @@ export default function AppLayout() {
         </nav>
 
         {/* ── Main ── */}
-        <main className="main">
-          <Outlet />
+        <main className="main" style={{ display: 'flex', flexDirection: 'column' }}>
+          <TabBar />
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <Outlet />
+          </div>
         </main>
       </div>
 
@@ -517,5 +620,13 @@ export default function AppLayout() {
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
       <Toaster richColors position="top-right" />
     </>
+  )
+}
+
+export default function AppLayout() {
+  return (
+    <TabsProvider>
+      <AppLayoutInner />
+    </TabsProvider>
   )
 }

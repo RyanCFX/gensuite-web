@@ -1,6 +1,7 @@
 export const ENDPOINTS = {
   auth: {
     login: '/auth/login',
+    verifyAdminPin: '/auth/verify-admin-pin',
   },
   customers: {
     list: '/customers',
@@ -19,6 +20,7 @@ export const ENDPOINTS = {
     byId: (id: string) => `/quotations/${id}`,
     submit: (id: string) => `/quotations/${id}/submit`,
     convert: (id: string) => `/quotations/${id}/convert`,
+    amend: (id: string) => `/quotations/${id}/amend`,
   },
   creditNotes: {
     list: '/credit-notes',
@@ -44,6 +46,12 @@ export const ENDPOINTS = {
       byId: (id: string) => `/catalog/items/${id}`,
       stock: (id: string) => `/catalog/items/${id}/stock`,
       toggle: (id: string) => `/catalog/items/${id}/toggle`,
+      variants: (id: string) => `/catalog/items/${id}/variants`,
+      generateVariants: (id: string) => `/catalog/items/${id}/variants/generate`,
+    },
+    bundles: {
+      list: '/catalog/bundles',
+      byId: (id: string) => `/catalog/bundles/${id}`,
     },
   },
   suppliers: {
@@ -57,6 +65,8 @@ export const ENDPOINTS = {
     warehouses: '/inventory/warehouses',
     history: '/inventory/history',
     historyByItem: (itemCode: string) => `/inventory/history/${itemCode}`,
+    lotes: '/inventory/lotes',
+    seriales: '/inventory/seriales',
     counts: {
       list: '/inventory/counts',
       template: '/inventory/counts/template',
@@ -71,6 +81,13 @@ export const ENDPOINTS = {
     cancel: (id: string) => `/compras/${id}/cancel`,
     amend: (id: string) => `/compras/${id}/amend`,
     return: (id: string) => `/compras/${id}/return`,
+  },
+  pedidos: {
+    list: '/pedidos',
+    byId: (id: string) => `/pedidos/${id}`,
+    submit: (id: string) => `/pedidos/${id}/submit`,
+    cancel: (id: string) => `/pedidos/${id}/cancel`,
+    amend: (id: string) => `/pedidos/${id}/amend`,
   },
   gastos: {
     list: '/gastos',
@@ -120,6 +137,8 @@ export const ENDPOINTS = {
     impuestosVentasById: (id: string) => `/config/impuestos-ventas/${encodeURIComponent(id)}`,
     impuestosCompras: '/config/impuestos-compras',
     impuestosComprasById: (id: string) => `/config/impuestos-compras/${encodeURIComponent(id)}`,
+    itemTaxTemplates: '/config/item-tax-templates',
+    gruposClientesById: (id: string) => `/config/grupos-clientes/${encodeURIComponent(id)}`,
   },
   ejercicioFiscal: {
     list: '/config/ejercicio-fiscal',

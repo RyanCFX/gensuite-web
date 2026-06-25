@@ -15,6 +15,10 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import type { Item } from '@/shared/api/types'
+import { VariantsModal } from '@/components/shared/VariantsModal'
+import type { VariantSelection } from '@/components/shared/VariantsModal'
+import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
+import { listItems } from '@/shared/api/catalog'
 
 interface ItemRow {
   itemCode: string
@@ -33,6 +37,25 @@ function emptyItem(): ItemRow {
 }
 
 const NCF_REGEX = /^[BE]\d{10}$/
+
+function onVariantConfirm(
+  selections: VariantSelection[],
+  setItems: React.Dispatch<React.SetStateAction<ItemRow[]>>,
+) {
+  setItems((prev) => [
+    ...prev,
+    ...selections.map((s) => ({
+      itemCode: s.item.id,
+      itemLabel: s.item.itemName,
+      description: s.item.description ?? s.item.itemName,
+      qty: s.qty,
+      rate: s.item.valuationRate ?? s.item.standardRate ?? 0,
+      baseRate: s.item.valuationRate ?? s.item.standardRate ?? 0,
+      warehouse: '',
+      uom: s.item.purchaseUom ?? s.item.stockUom ?? 'Nos',
+    })),
+  ])
+}
 
 export default function CompraForm() {
   const navigate = useNavigate()
@@ -53,6 +76,18 @@ export default function CompraForm() {
   const [retencionItbis, setRetencionItbis] = useState<number>(0)
   const [retencionIsr, setRetencionIsr] = useState<number>(0)
   const [taxesAndCharges, setTaxesAndCharges] = useState<string>('')
+  const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
+
+  // ── Barcode scanner ───────────────────────────────────────────────────────
+  useBarcodeScanner({
+    onBarcode: async (code) => {
+      const res = await listItems({ barcode: code, limit: 1 })
+      const item = res.items?.[0]
+      if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
+      setItems((prev) => [...prev, emptyItem()])
+      setTimeout(() => selectCatalogItem(items.length, item), 0)
+    },
+  })
 
   const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
     queryKey: ['supplierSearch', supplierQuery],
@@ -97,6 +132,10 @@ export default function CompraForm() {
       isEdit ? updateCompra(id!, dto) : createCompra(dto),
     onSuccess: (data) => {
       toast.success(isEdit ? 'Compra actualizada' : 'Compra creada')
+      const updatedPrices = (data as any)?.updatedPrices
+      if (updatedPrices && updatedPrices > 0) {
+        toast.info(`Se actualizaron los precios de ${updatedPrices} artículo(s) (modo sobre costo)`)
+      }
       queryClient.invalidateQueries({ queryKey: ['compras'] })
       navigate(`/compras/${data.id}`)
     },
@@ -274,6 +313,7 @@ export default function CompraForm() {
                             selectedLabel={item.itemLabel}
                             onSelect={(catalogItem) => selectCatalogItem(idx, catalogItem)}
                             onClear={() => clearCatalogItem(idx)}
+                            onVariantSelect={(t) => setVariantTemplate(t)}
                           />
                         </td>
                         <td>
@@ -474,6 +514,17 @@ export default function CompraForm() {
           </div>
         </div>
       </form>
+
+      {variantTemplate && (
+        <VariantsModal
+          templateItem={variantTemplate}
+          onConfirm={(selections) => {
+            onVariantConfirm(selections, setItems)
+            setVariantTemplate(null)
+          }}
+          onClose={() => setVariantTemplate(null)}
+        />
+      )}
     </div>
   )
 }

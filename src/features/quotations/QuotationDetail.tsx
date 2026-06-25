@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getQuotation, submitQuotation, deleteQuotation, convertQuotationToInvoice } from '@/shared/api/quotations'
-import type { Quotation } from '@/shared/api/types'
-import { ArrowLeft, FileText, Loader2, Send, Trash2 } from 'lucide-react'
+import { getQuotation, submitQuotation, deleteQuotation, convertQuotationToInvoice, amendQuotation } from '@/shared/api/quotations'
+import type { Quotation, AmendmentEntry } from '@/shared/api/types'
+import { ArrowLeft, FileText, Loader2, Send, Trash2, ClipboardList, GitBranch, History } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { NCF_TYPES } from '@/lib/constants'
@@ -79,7 +79,21 @@ export default function QuotationDetail() {
     },
   })
 
-  const isActionsLoading = submitMutation.isPending || deleteMutation.isPending || convertMutation.isPending
+  const amendMutation = useMutation({
+    mutationFn: () => amendQuotation(id!),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['quotations'] })
+      toast.success('Enmienda creada')
+      navigate(`/cotizaciones/${result.newId}`)
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? 'Error al crear enmienda')
+    },
+  })
+
+  const isActionsLoading = submitMutation.isPending || deleteMutation.isPending || convertMutation.isPending || amendMutation.isPending
+
+  const versionNumber = quotation?.history ? quotation.history.length + 1 : 1
 
   if (isLoading) {
     return (
@@ -105,6 +119,8 @@ export default function QuotationDetail() {
   }
 
   const subtotal = quotation.items.reduce((s, i) => s + i.amount, 0)
+  const grossTotal = quotation.items.reduce((s, i) => s + i.qty * i.rate, 0)
+  const totalDiscount = grossTotal - subtotal
   const itbis = Math.round(subtotal * 0.18 * 100) / 100
   const total = subtotal + itbis
 
@@ -120,6 +136,9 @@ export default function QuotationDetail() {
             <span className={`badge ${STATUS_BADGE[quotation.status] ?? 'badge-neutral'}`}>
               {STATUS_LABEL[quotation.status] ?? quotation.status}
             </span>
+            {quotation.amendedFrom && (
+              <span className="badge badge-info">Versión {versionNumber}</span>
+            )}
           </h1>
           <p className="page-sub">Cliente: {quotation.customerName}</p>
         </div>
@@ -145,13 +164,17 @@ export default function QuotationDetail() {
           </>
         )}
         {quotation.status === 'submitted' && (
-          <button
-            className="btn btn-secondary btn-size-sm"
-            onClick={() => setConvertDialogOpen(true)}
-            disabled={isActionsLoading}
-          >
-            <FileText size={14} /> Convertir a Factura
-          </button>
+          <>
+            <button className="btn btn-secondary btn-size-sm" onClick={() => setConvertDialogOpen(true)} disabled={isActionsLoading}>
+              <FileText size={14} /> Convertir a Factura
+            </button>
+            <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/pedidos/nuevo?quotation=${id}`)} disabled={isActionsLoading}>
+              <ClipboardList size={14} /> Crear Pedido
+            </button>
+            <button className="btn btn-ghost btn-size-sm" onClick={() => amendMutation.mutate()} disabled={isActionsLoading}>
+              <GitBranch size={14} /> Enmendar
+            </button>
+          </>
         )}
       </div>
 
@@ -203,6 +226,7 @@ export default function QuotationDetail() {
                 <th>Descripción</th>
                 <th style={{ textAlign: 'right' }}>Cant.</th>
                 <th style={{ textAlign: 'right' }}>Precio Unit.</th>
+                <th style={{ textAlign: 'right', width: 72 }}>Dto. %</th>
                 <th style={{ textAlign: 'right' }}>Importe</th>
                 <th>UDM</th>
               </tr>
@@ -213,7 +237,15 @@ export default function QuotationDetail() {
                   <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.itemCode || '—'}</td>
                   <td>{item.description || '—'}</td>
                   <td style={{ textAlign: 'right' }}>{item.qty}</td>
-                  <td style={{ textAlign: 'right' }}>{formatDOP(item.rate)}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    {item.discountPct && item.discountPct > 0 ? (
+                      <>
+                        <span style={{ textDecoration: 'line-through', color: 'var(--text-tertiary)', marginRight: 4 }}>{formatDOP(item.rate)}</span>
+                        {formatDOP(item.discountedRate ?? item.rate)}
+                      </>
+                    ) : formatDOP(item.rate)}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>{item.discountPct ? `${item.discountPct}%` : '—'}</td>
                   <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
                   <td>{item.uom || '—'}</td>
                 </tr>
@@ -222,7 +254,17 @@ export default function QuotationDetail() {
           </table>
           <div className="items-total-row">
             <div className="items-total-line">
-              <span>Subtotal</span>
+              <span>Subtotal bruto</span>
+              <span>{formatDOP(grossTotal)}</span>
+            </div>
+            {totalDiscount > 0 && (
+              <div className="items-total-line" style={{ color: 'var(--text-danger)' }}>
+                <span>Descuento total</span>
+                <span>-{formatDOP(totalDiscount)}</span>
+              </div>
+            )}
+            <div className="items-total-line">
+              <span>Subtotal neto</span>
               <span>{formatDOP(subtotal)}</span>
             </div>
             <div className="items-total-line">
@@ -236,6 +278,49 @@ export default function QuotationDetail() {
           </div>
         </div>
       </div>
+
+      {/* Historial de versiones */}
+      {quotation.history && quotation.history.length > 0 && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card-header">
+            <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <History size={15} /> Historial de versiones
+            </h2>
+          </div>
+          <div className="card-body">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {[...quotation.history]
+                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                .map((entry, idx) => (
+                  <div
+                    key={entry.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '12px 0', borderBottom: idx < quotation.history!.length - 1 ? '1px solid var(--border)' : 'none',
+                    }}
+                  >
+                    <div style={{
+                      width: 8, height: 8, borderRadius: '50%',
+                      background: entry.status === 'Cancelled' ? 'var(--color-danger)' : 'var(--color-success)',
+                      flexShrink: 0,
+                    }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 500, fontSize: 13 }}>
+                        Versión {idx + 1} — {entry.id}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+                        {entry.status === 'Cancelled' ? 'Cancelada' : entry.status} · {formatDate(entry.date)} · {formatDOP(entry.total)}
+                      </div>
+                    </div>
+                    <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/cotizaciones/${entry.id}`)}>
+                      Ver
+                    </button>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {convertDialogOpen && (
         <div className="modal-overlay" onClick={() => setConvertDialogOpen(false)}>

@@ -51,3 +51,8 @@ export async function convertQuotationToInvoice(id: string, ncfType?: string) {
   )
   return unwrap(res)
 }
+
+export async function amendQuotation(id: string) {
+  const res = await client.post<{ success: true; data: { newId: string; amendedFrom: string } }>(ENDPOINTS.quotations.amend(id))
+  return unwrap(res)
+}

@@ -5,6 +5,8 @@ import type {
   InventoryListResult,
   InventorySummary,
   InventoryHistory,
+  InventoryLote,
+  InventorySerial,
   Warehouse,
   PaginatedResponse,
   PaginationParams,
@@ -55,5 +57,19 @@ export async function getInventoryHistory(params?: HistoryFilterParams) {
 
 export async function getItemHistory(itemCode: string, params?: HistoryFilterParams) {
   const res = await client.get<PaginatedResponse<InventoryHistory>>(ENDPOINTS.inventory.historyByItem(itemCode), { params })
+  return unwrapPaginated(res)
+}
+
+// ─── Lotes (Batches) ────────────────────────────────────────────────────────
+
+export async function listLotes(params?: PaginationParams & { itemCode?: string }) {
+  const res = await client.get<PaginatedResponse<InventoryLote>>(ENDPOINTS.inventory.lotes, { params })
+  return unwrapPaginated(res)
+}
+
+// ─── Seriales ───────────────────────────────────────────────────────────────
+
+export async function listSeriales(params?: PaginationParams & { itemCode?: string; status?: string }) {
+  const res = await client.get<PaginatedResponse<InventorySerial>>(ENDPOINTS.inventory.seriales, { params })
   return unwrapPaginated(res)
 }

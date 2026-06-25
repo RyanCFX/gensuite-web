@@ -185,6 +185,8 @@ export interface InvoiceItem {
   description: string
   qty: number
   rate: number
+  discountPct?: number
+  discountedRate?: number
   amount: number
   uom: string
   warehouse?: string
@@ -223,6 +225,7 @@ export interface CreateInvoiceDto {
     qty: number
     rate: number
     uom?: string
+    discountPct?: number
   }[]
   notes?: string
 }
@@ -239,6 +242,7 @@ export interface UpdateInvoiceDto {
     qty: number
     rate: number
     uom?: string
+    discountPct?: number
   }[]
   notes?: string
 }
@@ -250,6 +254,8 @@ export interface QuotationItem {
   description: string
   qty: number
   rate: number
+  discountPct?: number
+  discountedRate?: number
   amount: number
   uom: string
 }
@@ -263,6 +269,8 @@ export interface Quotation {
   status: 'draft' | 'submitted' | 'ordered' | 'lost' | 'cancelled'
   items: QuotationItem[]
   notes?: string
+  amendedFrom?: string
+  history?: AmendmentEntry[]
 }
 
 export interface CreateQuotationDto {
@@ -275,6 +283,7 @@ export interface CreateQuotationDto {
     qty: number
     rate: number
     uom?: string
+    discountPct?: number
   }[]
   notes?: string
 }
@@ -337,6 +346,48 @@ export interface ItemUomConversion {
   conversionFactor: number
 }
 
+// Barcode entry
+export interface ItemBarcode {
+  barcode: string
+  barcodeType: string
+}
+
+// Bundle / Combo
+export interface BundleComponent {
+  itemCode: string
+  itemName?: string
+  qty: number
+  stockQty?: number
+}
+
+export interface Bundle {
+  id: string
+  itemName: string
+  components: BundleComponent[]
+  priceA?: number
+  priceB?: number
+  priceC?: number
+  disabled: boolean
+}
+
+export interface CreateBundleDto {
+  itemCode?: string
+  itemName: string
+  components: { itemCode: string; qty: number }[]
+  priceA?: number
+  priceB?: number
+  priceC?: number
+}
+
+export type UpdateBundleDto = Partial<CreateBundleDto>
+
+// Item Prices
+export interface ItemPrices {
+  A?: number
+  B?: number
+  C?: number
+}
+
 export interface Item {
   id: string
   itemName: string
@@ -346,9 +397,15 @@ export interface Item {
   brandName?: string
   type: 'product' | 'service'
   standardRate: number
+  prices?: ItemPrices
   valuationRate?: number
   currentStock?: number
   description?: string
+  shortName?: string
+  notes?: string
+  hasWarranty?: boolean
+  warrantyPeriod?: number
+  barcodes?: ItemBarcode[]
   image?: string
   disabled: boolean
   stockUom?: string
@@ -358,6 +415,14 @@ export interface Item {
   hasVariants?: boolean
   variantOf?: string
   attributes?: TemplateAttribute[]
+  priceMode?: 'manual' | 'cost_plus'
+  marginA?: number
+  marginB?: number
+  marginC?: number
+  allowsDiscount?: boolean
+  minDiscountPct?: number
+  trackingType?: 'none' | 'batch' | 'serial'
+  taxTemplate?: string
 }
 
 export interface CreateItemDto {
@@ -366,9 +431,18 @@ export interface CreateItemDto {
   category: string
   brand?: string
   type: 'product' | 'service'
-  standardRate: number
+  standardRate?: number       // deprecated — use prices
+  prices?: ItemPrices
+  priceA?: number
+  priceB?: number
+  priceC?: number
   valuationRate?: number
-  description?: string
+  description?: string        // now means internal description (#6)
+  shortName?: string
+  notes?: string
+  hasWarranty?: boolean
+  warrantyPeriod?: number
+  barcodes?: ItemBarcode[]
   image?: string
   defaultWarehouse?: string
   stockUom?: string
@@ -377,11 +451,124 @@ export interface CreateItemDto {
   uoms?: ItemUomConversion[]
   hasVariants?: boolean
   attributes?: { attribute: string }[]  // for templates: just attribute names
-  incomeAccount?: string
-  expenseAccount?: string
+  priceMode?: 'manual' | 'cost_plus'
+  marginA?: number
+  marginB?: number
+  marginC?: number
+  allowsDiscount?: boolean
+  minDiscountPct?: number
+  trackingType?: 'none' | 'batch' | 'serial'
+  taxTemplate?: string
 }
 
 export type UpdateItemDto = Partial<CreateItemDto>
+
+// Brand with price tier on customer groups
+export interface GrupoCliente extends Grupo {
+  priceTier?: 'A' | 'B' | 'C'
+}
+
+// Amendment history for quotations / pedidos
+export interface AmendmentEntry {
+  id: string
+  date: string
+  status: string
+  total: number
+}
+
+// Pedido de Venta (Sales Order)
+export interface PedidoItem {
+  itemCode: string
+  description: string
+  qty: number
+  rate: number
+  amount: number
+  uom?: string
+  discountPct?: number
+}
+
+export interface Pedido {
+  id: string
+  customer: string
+  customerName: string
+  transactionDate: string
+  deliveryDate?: string
+  status: 'draft' | 'submitted' | 'cancelled'
+  items: PedidoItem[]
+  notes?: string
+  amendedFrom?: string
+  history?: AmendmentEntry[]
+  quotation?: string
+  facturaId?: string
+  createdAt: string
+  modifiedAt: string
+}
+
+export interface CreatePedidoDto {
+  customer: string
+  transactionDate?: string
+  deliveryDate?: string
+  items: {
+    itemCode: string
+    qty: number
+    rate: number
+    discountPct?: number
+  }[]
+  quotation?: string
+}
+
+export type UpdatePedidoDto = Partial<CreatePedidoDto>
+
+// Batch / Serial inventory tracking
+export interface InventoryLote {
+  id: string
+  item: string
+  itemName: string
+  expiryDate?: string
+  qty: number
+  disabled: boolean
+}
+
+export interface InventorySerial {
+  id: string
+  itemCode: string
+  itemName: string
+  status: string
+  purchaseDate?: string
+  deliveryDate?: string
+}
+
+// Document line items with discount
+export interface DocumentItemWithDiscount {
+  itemCode: string
+  description: string
+  qty: number
+  rate: number
+  discountPct?: number
+  discountedRate?: number
+  amount: number
+  uom?: string
+  warehouse?: string
+}
+
+// Verify PIN response
+export interface VerifyPinResponse {
+  valid: boolean
+  userId: string
+  canOverridePrice: boolean
+}
+
+// Item Tax Templates (for #13)
+export interface ItemTaxTemplate {
+  id: string
+  title: string
+}
+
+// Customer with price tier (#14)
+export interface CustomerWithPriceTier {
+  customerGroup?: string
+  priceTier?: 'A' | 'B' | 'C'
+}
 
 export interface Category {
   id: string
@@ -391,6 +578,7 @@ export interface Category {
   image?: string
   incomeAccount?: string
   expenseAccount?: string
+  itemCodePrefix?: string
   children?: Category[]
 }
 
@@ -408,6 +596,7 @@ export interface UpdateCategoryDto {
   image?: string
   incomeAccount?: string
   expenseAccount?: string
+  itemCodePrefix?: string
 }
 
 export interface Brand {
@@ -681,6 +870,7 @@ export interface CreateUsuarioDto {
   language?: string
   timeZone?: string
   sendWelcomeEmail?: boolean
+  warehouses?: string[]
 }
 
 export interface UpdateUsuarioDto {
@@ -688,6 +878,7 @@ export interface UpdateUsuarioDto {
   lastName?: string
   mobileNo?: string
   roles?: string[]
+  warehouses?: string[]
 }
 
 export interface Role {
@@ -739,6 +930,9 @@ export interface Empresa {
   direccion?: string
   defaultCurrency?: string
   country?: string
+  itemCodeMode?: 'manual' | 'auto' | 'prefix_auto'
+  defaultWarehouse?: string
+  defaultPriceTipo?: 'A' | 'B' | 'C'
 }
 
 export interface UpdateEmpresaDto {
@@ -752,6 +946,9 @@ export interface UpdateEmpresaDto {
   email?: string
   website?: string
   direccion?: string
+  itemCodeMode?: 'manual' | 'auto' | 'prefix_auto'
+  defaultWarehouse?: string
+  defaultPriceTipo?: 'A' | 'B' | 'C'
 }
 
 export interface CobrosConfig {

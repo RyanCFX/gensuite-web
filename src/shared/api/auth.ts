@@ -1,5 +1,5 @@
 import { client, unwrap } from './client'
-import type { LoginRequest, LoginResponse } from './types'
+import type { LoginRequest, LoginResponse, VerifyPinResponse } from './types'
 import { saveSession } from './storage'
 import type { ApiError } from './types'
 
@@ -20,6 +20,11 @@ export async function login(data: LoginRequest): Promise<AuthResult> {
     user: payload.user,
     tenant: payload.tenant,
   }
+}
+
+export async function verifyAdminPin(pin: string) {
+  const res = await client.post<{ success: true; data: VerifyPinResponse }>('/auth/verify-admin-pin', { pin })
+  return unwrap(res)
 }
 
 export function isApiError(error: unknown): error is ApiError {

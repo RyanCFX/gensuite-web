@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { getEmpresa, updateEmpresa, getCuentasEmpresa, updateCuentasEmpresa } from '@/shared/api/config'
-import type { Empresa, CuentasEmpresa } from '@/shared/api/types'
+import { getEmpresa, updateEmpresa, getCuentasEmpresa, updateCuentasEmpresa, listAlmacenes } from '@/shared/api/config'
+import type { Empresa, CuentasEmpresa, Warehouse } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { REGIMENES_FISCALES } from '@/lib/constants'
@@ -33,14 +33,27 @@ export default function EmpresaConfig() {
     onError: () => toast.error('Error al guardar los datos'),
   })
 
+  const [itemCodeWarning, setItemCodeWarning] = useState(false)
+
   function set<K extends keyof Empresa>(key: K, value: Empresa[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }))
+    setForm((prev) => {
+      if (key === 'itemCodeMode' && (value === 'auto' || value === 'prefix_auto') && prev.itemCodeMode === 'manual') {
+        setItemCodeWarning(true)
+      }
+      return { ...prev, [key]: value }
+    })
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     saveMutation.mutate(form)
   }
+
+  // ── Warehouses lookup ──────────────────────────────────────────────────────
+  const { data: warehouses } = useQuery({
+    queryKey: ['almacenes'],
+    queryFn: listAlmacenes,
+  })
 
   // ── Cuentas por Defecto tab state ──────────────────────────────────────────
   const { data: cuentasData, isLoading: cuentasLoading } = useQuery({
@@ -211,6 +224,64 @@ export default function EmpresaConfig() {
                         placeholder="000-0000000-0"
                       />
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Predeterminados */}
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title">Valores Predeterminados</span>
+              </div>
+              <div className="card-body">
+                <div className="form-row">
+                  <div className="ff-wrap">
+                    <label className="ff-label">Modo de código de artículo</label>
+                    <select
+                      className="ff-select"
+                      value={form.itemCodeMode ?? 'manual'}
+                      onChange={(e) => set('itemCodeMode', e.target.value as 'manual' | 'auto' | 'prefix_auto')}
+                    >
+                      <option value="manual">Manual</option>
+                      <option value="auto">Automático</option>
+                      <option value="prefix_auto">Por prefijo de categoría</option>
+                    </select>
+                    <p className="ff-hint">Define cómo se asigna el código a nuevos artículos</p>
+                    {itemCodeWarning && (
+                      <div className="inline-alert inline-alert-warn" style={{ marginTop: 8 }}>
+                        ⚠️ Este cambio es irreversible. Los artículos existentes mantendrán su código actual, pero los nuevos se generarán automáticamente.
+                        <button type="button" className="btn btn-ghost btn-size-xs" style={{ marginLeft: 8 }} onClick={() => setItemCodeWarning(false)}>Entendido</button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">Almacén por defecto</label>
+                    <select
+                      className="ff-select"
+                      value={form.defaultWarehouse ?? ''}
+                      onChange={(e) => set('defaultWarehouse', e.target.value || undefined)}
+                    >
+                      <option value="">Sin predeterminado</option>
+                      {(warehouses ?? []).map((w: Warehouse) => (
+                        <option key={w.id} value={w.name}>{w.name}</option>
+                      ))}
+                    </select>
+                    <p className="ff-hint">Se usará al crear documentos si el usuario no tiene almacén asignado</p>
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">Nivel de precio por defecto</label>
+                    <select
+                      className="ff-select"
+                      value={form.defaultPriceTipo ?? ''}
+                      onChange={(e) => set('defaultPriceTipo', e.target.value as 'A' | 'B' | 'C' | undefined || undefined)}
+                    >
+                      <option value="">Sin predeterminado</option>
+                      <option value="A">A — Minorista</option>
+                      <option value="B">B — Medio mayoreo</option>
+                      <option value="C">C — Mayorista</option>
+                    </select>
+                    <p className="ff-hint">Nivel de precio sugerido para nuevos documentos</p>
                   </div>
                 </div>
               </div>

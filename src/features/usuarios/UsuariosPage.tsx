@@ -4,7 +4,8 @@ import { toast } from 'sonner'
 import {
   listUsuarios, createUsuario, enableUsuario, deleteUsuario, resetPasswordUsuario, listRoles,
 } from '@/shared/api/usuarios'
-import type { Usuario, CreateUsuarioDto } from '@/shared/api/types'
+import { listAlmacenes } from '@/shared/api/config'
+import type { Usuario, CreateUsuarioDto, Warehouse } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { formatDate } from '@/lib/formatters'
 import { Plus, MoreHorizontal, Ban, KeyRound, UserCheck, X } from 'lucide-react'
@@ -22,6 +23,7 @@ export default function UsuariosPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
+  const [selectedWarehouses, setSelectedWarehouses] = useState<string[]>([])
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['usuarios'],
@@ -31,6 +33,11 @@ export default function UsuariosPage() {
   const { data: roles } = useQuery({
     queryKey: ['roles'],
     queryFn: listRoles,
+  })
+
+  const { data: warehouses } = useQuery({
+    queryKey: ['almacenes'],
+    queryFn: listAlmacenes,
   })
 
   const createMutation = useMutation({
@@ -74,6 +81,7 @@ export default function UsuariosPage() {
     setFirstName('')
     setLastName('')
     setSelectedRoles([])
+    setSelectedWarehouses([])
     setShowForm(false)
   }
 
@@ -86,7 +94,7 @@ export default function UsuariosPage() {
   function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!email || !firstName) { toast.error('Email y nombre son requeridos'); return }
-    createMutation.mutate({ email, firstName, lastName: lastName || undefined, roles: selectedRoles })
+    createMutation.mutate({ email, firstName, lastName: lastName || undefined, roles: selectedRoles, warehouses: selectedWarehouses.length > 0 ? selectedWarehouses : undefined })
   }
 
   return (
@@ -272,6 +280,45 @@ export default function UsuariosPage() {
                       </label>
                     ))}
                   </div>
+                </div>
+
+                <div className="ff-wrap">
+                  <label className="ff-label">Almacenes asignados</label>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 8,
+                    maxHeight: 160,
+                    overflowY: 'auto',
+                    border: '1px solid var(--border-default)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: 12,
+                  }}>
+                    {(warehouses ?? []).length === 0 ? (
+                      <p style={{ fontSize: 13, color: 'var(--text-tertiary)', gridColumn: '1 / -1' }}>
+                        No hay almacenes configurados.
+                      </p>
+                    ) : (
+                      (warehouses ?? []).map((w: Warehouse) => (
+                        <label key={w.id} className="ff-check-wrap">
+                          <input
+                            type="checkbox"
+                            className="ff-check"
+                            checked={selectedWarehouses.includes(w.name)}
+                            onChange={() =>
+                              setSelectedWarehouses((prev) =>
+                                prev.includes(w.name)
+                                  ? prev.filter((x) => x !== w.name)
+                                  : [...prev, w.name],
+                              )
+                            }
+                          />
+                          <span style={{ fontSize: 13 }}>{w.name}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  <p className="ff-hint">El usuario solo podrá facturar desde estos almacenes.</p>
                 </div>
               </div>
               <div className="modal-foot">

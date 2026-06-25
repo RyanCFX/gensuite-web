@@ -266,6 +266,7 @@ export default function InvoiceDetail() {
                 <th>Descripción</th>
                 <th style={{ textAlign: 'right' }}>Cant.</th>
                 <th style={{ textAlign: 'right' }}>Precio Unit.</th>
+                <th style={{ textAlign: 'right', width: 72 }}>Dto. %</th>
                 <th style={{ textAlign: 'right' }}>Importe</th>
                 <th>UDM</th>
               </tr>
@@ -276,7 +277,15 @@ export default function InvoiceDetail() {
                   <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.itemCode || '—'}</td>
                   <td>{item.description || '—'}</td>
                   <td style={{ textAlign: 'right' }}>{item.qty}</td>
-                  <td style={{ textAlign: 'right' }}>{formatDOP(item.rate)}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    {item.discountPct && item.discountPct > 0 ? (
+                      <>
+                        <span style={{ textDecoration: 'line-through', color: 'var(--text-tertiary)', marginRight: 4 }}>{formatDOP(item.rate)}</span>
+                        {formatDOP(item.discountedRate ?? item.rate)}
+                      </>
+                    ) : formatDOP(item.rate)}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>{item.discountPct ? `${item.discountPct}%` : '—'}</td>
                   <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
                   <td>{item.uom || '—'}</td>
                 </tr>
@@ -284,10 +293,17 @@ export default function InvoiceDetail() {
             </tbody>
           </table>
           <div className="items-total-row">
-            <div className="items-total-line">
-              <span>Subtotal</span>
-              <span>{formatDOP(invoice.subtotal)}</span>
-            </div>
+            {(() => {
+              const gross = invoice.items.reduce((s, i) => s + i.qty * i.rate, 0)
+              const discount = gross - invoice.subtotal
+              return (
+                <>
+                  <div className="items-total-line"><span>Subtotal bruto</span><span>{formatDOP(gross)}</span></div>
+                  {discount > 0 && <div className="items-total-line" style={{ color: 'var(--text-danger)' }}><span>Descuento total</span><span>-{formatDOP(discount)}</span></div>}
+                  <div className="items-total-line"><span>Subtotal neto</span><span>{formatDOP(invoice.subtotal)}</span></div>
+                </>
+              )
+            })()}
             <div className="items-total-line">
               <span>ITBIS (18%)</span>
               <span>{formatDOP(invoice.taxAmount)}</span>
