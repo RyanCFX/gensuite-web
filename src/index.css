@@ -597,6 +597,39 @@ button {
   padding: 24px 32px;
 }
 
+/* ─── Table wrapper ─── */
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table-config {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-config th {
+  text-align: left;
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  border-bottom: 1px solid hsl(var(--border));
+  white-space: nowrap;
+}
+
+.table-config td {
+  padding: 12px 16px;
+  border-bottom: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+  vertical-align: middle;
+}
+
+.table-config tbody tr:last-child td {
+  border-bottom: none;
+}
+
 /* ─── PAGE HEADER ─── */
 .page-header {
   display: flex;
@@ -692,6 +725,7 @@ button {
 .btn-size-lg { height: 44px; padding: 0 20px; font-size: 14px; }
 .btn-size-icon { height: 36px; width: 36px; padding: 0; }
 .btn-size-icon-sm { height: 30px; width: 30px; padding: 0; }
+.btn-size-icon-xs { height: 22px; width: 22px; padding: 0; font-size: 11px; line-height: 1; }
 
 /* ─── STAT CARDS (Dashboard) ─── */
 .stats-row {
@@ -777,7 +811,6 @@ button {
   background: var(--surface-page);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
-  overflow: hidden;
   transition:
     border-color 150ms var(--ease-in-out),
     background-color var(--duration-normal) var(--ease-in-out);
@@ -811,6 +844,7 @@ button {
   padding: 10px 18px;
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-sunken);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
 .card-action {
@@ -926,7 +960,7 @@ button {
 .badge-out-stock { background: var(--error-bg); color: var(--error-text); border-color: var(--error-border); }
 
 /* ─── ACTIONS DROPDOWN ─── */
-.actions-cell { position: relative; }
+.actions-cell { width: 48px; }
 
 .actions-trigger {
   width: 28px;
@@ -1491,6 +1525,8 @@ button {
 }
 
 .items-table tbody tr:last-child td { border-bottom: none; }
+
+.items-table .tracking-row td { height: auto; padding: 4px 8px 8px; border-bottom: 1px solid var(--border-subtle); background: var(--surface-sunken); }
 
 .items-input {
   width: 100%;

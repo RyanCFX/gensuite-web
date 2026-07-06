@@ -5,10 +5,10 @@
  *
  * Sin itemCode → select nativo con todas las UOMs de /config/uom.
  *
- * Con itemCode → dropdown con portal que muestra:
- *   1. UOMs configuradas en el artículo (stockUom, salesUom, conversiones)
- *      obtenidas de GET /catalog/items/:id
- *   2. Botón "Más opciones" que expande todas las de /config/uom
+ * Con itemCode → muestra las UOMs del artículo (stockUom + uoms[])
+ *   obtenidas de GET /catalog/items/:id.
+ *   Si solo hay 1 UOM, se muestra como texto no editable.
+ *   Si hay más de 1, dropdown con portal + "Más opciones".
  */
 
 import { useRef, useState, useMemo } from 'react'
@@ -89,12 +89,11 @@ function ItemUomSelect({ value, onChange, itemCode, className = 'items-input', d
     staleTime: 5 * 60_000,
   })
 
-  // Combina stockUom + salesUom + uoms del artículo en un Set sin duplicados
+  // Combina stockUom + uoms del artículo en un Set sin duplicados
   const itemUoms = useMemo(() => {
     if (!itemData) return []
     const set = new Set<string>()
     if (itemData.stockUom) set.add(itemData.stockUom)
-    if (itemData.salesUom) set.add(itemData.salesUom)
     itemData.uoms?.forEach((u) => set.add(u.uom))
     return [...set].filter(Boolean)
   }, [itemData])
@@ -119,6 +118,10 @@ function ItemUomSelect({ value, onChange, itemCode, className = 'items-input', d
     onChange(v, factor)
     close()
     setShowAll(false)
+  }
+
+  if (itemUoms.length === 1 && itemData) {
+    return <span className={className} style={{ color: 'var(--text-primary)', lineHeight: '32px' }}>{itemUoms[0]}</span>
   }
 
   return (

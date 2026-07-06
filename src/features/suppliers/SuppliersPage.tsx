@@ -7,7 +7,10 @@ import type { Supplier } from '@/shared/api/types'
 import { formatDOP } from '@/lib/formatters'
 import { useDebounce } from '@/lib/useDebounce'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { Plus, ChevronLeft, ChevronRight, Search, Pencil, Ban, MoreHorizontal } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Search, Pencil, Ban } from 'lucide-react'
+import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
+import { useSortState } from '@/shared/hooks/useSortState'
+import { SortableTh } from '@/shared/ui/SortableTh'
 
 const PAGE_SIZE = 20
 
@@ -19,19 +22,20 @@ export default function SuppliersPage() {
   const [showExterior, setShowExterior] = useState(false)
   const [page, setPage] = useState(1)
   const [toDisable, setToDisable] = useState<Supplier | null>(null)
-  const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const { orderBy, sort } = useSortState()
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['suppliers', { search: debouncedSearch, showExterior, offset }],
+    queryKey: ['suppliers', { search: debouncedSearch, showExterior, offset, orderBy }],
     queryFn: () =>
       listSuppliers({
         search: debouncedSearch || undefined,
         esProveedorExterior: showExterior ? true : undefined,
         limit: PAGE_SIZE,
         offset,
+        orderBy: orderBy || undefined,
       }),
   })
 
@@ -102,7 +106,7 @@ export default function SuppliersPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Nombre</th>
+                  <SortableTh label="Nombre" sortKey="supplierName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
                   <th>RNC / Cédula</th>
                   <th>Tipo</th>
                   <th>Exterior</th>
@@ -161,34 +165,17 @@ export default function SuppliersPage() {
                                 ? <span style={{ fontWeight: 500, color: 'var(--error-text)' }}>{formatDOP(supplier.balance)}</span>
                                 : <span className="td-muted">{formatDOP(0)}</span>}
                             </td>
-                            <td
-                              style={{ position: 'relative' }}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <button
-                                className="actions-trigger"
-                                onClick={() => setOpenMenu(openMenu === supplier.id ? null : supplier.id)}
-                              >
-                                <MoreHorizontal size={15} />
-                              </button>
-                              {openMenu === supplier.id && (
-                                <div className="actions-menu" onMouseLeave={() => setOpenMenu(null)}>
-                                  <button
-                                    className="actions-item"
-                                    onClick={() => { navigate(`/proveedores/${supplier.id}/editar`); setOpenMenu(null) }}
-                                  >
-                                    <Pencil size={14} />Editar
-                                  </button>
-                                  {!supplier.disabled && (
-                                    <button
-                                      className="actions-item actions-item-danger"
-                                      onClick={() => { setToDisable(supplier); setOpenMenu(null) }}
-                                    >
-                                      <Ban size={14} />Desactivar
-                                    </button>
-                                  )}
-                                </div>
-                              )}
+                            <td onClick={(e) => e.stopPropagation()} className="actions-cell">
+                              <ActionsMenu>
+                                <ActionsMenuItem onClick={() => navigate(`/proveedores/${supplier.id}/editar`)}>
+                                  <Pencil size={14} /> Editar
+                                </ActionsMenuItem>
+                                {!supplier.disabled && (
+                                  <ActionsMenuItem danger onClick={() => setToDisable(supplier)}>
+                                    <Ban size={14} /> Desactivar
+                                  </ActionsMenuItem>
+                                )}
+                              </ActionsMenu>
                             </td>
                           </tr>
                         ))}

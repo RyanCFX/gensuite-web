@@ -3,10 +3,18 @@ import { ENDPOINTS } from './endpoints'
 import type {
   CreateCreditNoteDto,
   CreateDebitNoteDto,
+  PaginationParams,
 } from './types'
 
-export async function listCreditNotes() {
-  const res = await client.get(ENDPOINTS.creditNotes.list)
+export interface ListNotesParams extends PaginationParams {
+  search?: string
+  status?: string
+  fromDate?: string
+  toDate?: string
+}
+
+export async function listCreditNotes(params?: ListNotesParams) {
+  const res = await client.get(ENDPOINTS.creditNotes.list, { params })
   return unwrap(res)
 }
 
@@ -25,8 +33,8 @@ export async function submitCreditNote(id: string) {
   return unwrap(res)
 }
 
-export async function listDebitNotes() {
-  const res = await client.get(ENDPOINTS.debitNotes.list)
+export async function listDebitNotes(params?: ListNotesParams) {
+  const res = await client.get(ENDPOINTS.debitNotes.list, { params })
   return unwrap(res)
 }
 

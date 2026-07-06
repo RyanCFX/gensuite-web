@@ -28,8 +28,8 @@ const ALL_ITEMS: SearchItem[] = [
   // ── Catálogo ───────────────────────────────────────────────────────────────
   { id: 'categorias',   label: 'Categorías',           group: 'Catálogo',     path: '/catalogo/categorias',            icon: <Package size={15} />, keywords: 'catalog categories grupos' },
   { id: 'marcas',       label: 'Marcas',               group: 'Catálogo',     path: '/catalogo/marcas',                icon: <Package size={15} />, keywords: 'brands marca' },
-  { id: 'articulos',    label: 'Artículos',            group: 'Catálogo',     path: '/catalogo/articulos',             icon: <Package size={15} />, keywords: 'items productos servicios catalog' },
-  { id: 'articulo-nuevo', label: 'Nuevo Artículo',     group: 'Catálogo',     path: '/catalogo/articulos',             icon: <Package size={15} />, keywords: 'crear item producto servicio' },
+  { id: 'articulos',    label: 'Artículos',            group: 'Catálogo',     path: '/inventario/articulos',             icon: <Package size={15} />, keywords: 'items productos servicios catalog' },
+  { id: 'articulo-nuevo', label: 'Nuevo Artículo',     group: 'Catálogo',     path: '/inventario/articulos',             icon: <Package size={15} />, keywords: 'crear item producto servicio' },
 
   // ── Ventas ─────────────────────────────────────────────────────────────────
   { id: 'cotizaciones', label: 'Cotizaciones',         group: 'Ventas',       path: '/cotizaciones',                   icon: <FileText size={15} />, keywords: 'quotations cotizar presupuesto' },

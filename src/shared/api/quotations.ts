@@ -3,6 +3,7 @@ import { ENDPOINTS } from './endpoints'
 import type {
   Quotation,
   CreateQuotationDto,
+  DraftVersion,
   PaginatedResponse,
   PaginationParams,
 } from './types'
@@ -52,7 +53,29 @@ export async function convertQuotationToInvoice(id: string, ncfType?: string) {
   return unwrap(res)
 }
 
+export async function getQuotationVersion(id: string, sequence: number) {
+  const res = await client.get<{ success: true; data: DraftVersion }>(ENDPOINTS.quotations.version(id, sequence))
+  return unwrap(res)
+}
+
 export async function amendQuotation(id: string) {
   const res = await client.post<{ success: true; data: { newId: string; amendedFrom: string } }>(ENDPOINTS.quotations.amend(id))
   return unwrap(res)
+}
+
+export async function cancelQuotation(id: string) {
+  const res = await client.post<{ success: true; data: Quotation }>(ENDPOINTS.quotations.cancel(id))
+  return unwrap(res)
+}
+
+export async function downloadQuotationPdf(id: string, filename?: string): Promise<void> {
+  const res = await client.get<Blob>(ENDPOINTS.quotations.pdf(id), {
+    responseType: 'blob',
+  })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename ?? `cotizacion-${id}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
 }

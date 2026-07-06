@@ -3,8 +3,10 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { listQuotations } from '@/shared/api/quotations'
 import type { ListQuotationsParams } from '@/shared/api/quotations'
-import { Plus, Eye, Search } from 'lucide-react'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { Plus, Eye, Search, GitBranch } from 'lucide-react'
+import { formatDate, formatDOP, displayId } from '@/lib/formatters'
+import { useSortState } from '@/shared/hooks/useSortState'
+import { SortableTh } from '@/shared/ui/SortableTh'
 
 type StatusFilter = 'draft' | 'submitted' | 'ordered' | 'lost' | 'cancelled' | 'all'
 
@@ -29,12 +31,14 @@ export default function QuotationsPage() {
   const [status, setStatus] = useState<StatusFilter>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const { orderBy, sort } = useSortState()
 
   const params: ListQuotationsParams = {
     search: search || undefined,
     status: status === 'all' ? undefined : status,
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
+    orderBy: orderBy || undefined,
     limit: 50,
   }
 
@@ -103,12 +107,12 @@ export default function QuotationsPage() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>#</th>
-              <th>Cliente</th>
-              <th>Fecha</th>
+              <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} />
+              <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} />
+              <SortableTh label="Fecha" sortKey="date" orderBy={orderBy} onSort={sort} />
               <th>Válida hasta</th>
               <th style={{ textAlign: 'right' }}>Total</th>
-              <th>Estado</th>
+              <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
               <th style={{ textAlign: 'right', width: 64 }}>Ver</th>
             </tr>
           </thead>
@@ -142,7 +146,10 @@ export default function QuotationsPage() {
                     className="table-row-clickable"
                     onClick={() => navigate(`/cotizaciones/${q.id}`)}
                   >
-                    <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{q.id}</td>
+                    <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                      {q.amendedFrom && <GitBranch size={11} style={{ marginRight: 4, color: 'var(--text-tertiary)', verticalAlign: 'middle' }} />}
+                      {displayId(q.id, q.sequence)}
+                    </td>
                     <td style={{ fontWeight: 500 }}>{q.customerName}</td>
                     <td>{formatDate(q.date)}</td>
                     <td>{formatDate(q.validTill)}</td>

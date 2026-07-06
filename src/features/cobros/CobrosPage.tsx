@@ -5,6 +5,8 @@ import { listCobros } from '@/shared/api/cobros'
 import type { ListCobrosParams } from '@/shared/api/cobros'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, Search } from 'lucide-react'
+import { useSortState } from '@/shared/hooks/useSortState'
+import { SortableTh } from '@/shared/ui/SortableTh'
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
@@ -30,12 +32,14 @@ export default function CobrosPage() {
   const [status, setStatus] = useState<StatusFilter>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const { orderBy, sort } = useSortState()
 
   const params: ListCobrosParams = {
     customer: search || undefined,
     status: status === 'all' ? undefined : status,
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
+    orderBy: orderBy || undefined,
     limit: 50,
   }
 
@@ -108,12 +112,12 @@ export default function CobrosPage() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Cliente</th>
-                <th>Fecha</th>
+                <SortableTh label="ID" sortKey="id" orderBy={orderBy} onSort={sort} />
+                <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} />
+                <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} />
                 <th>Método de Pago</th>
-                <th style={{ textAlign: 'right' }}>Monto</th>
-                <th>Estado</th>
+                <SortableTh label="Monto" sortKey="paidAmount" orderBy={orderBy} onSort={sort} align="right" />
+                <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
               </tr>
             </thead>
             <tbody>

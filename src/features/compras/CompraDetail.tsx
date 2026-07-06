@@ -3,15 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
-  getCompra, submitCompra, cancelCompra, amendCompra, returnCompra,
+  getCompra, submitCompra, cancelCompra, amendCompra, returnCompra, deleteCompra,
 } from '@/shared/api/compras-gastos'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { TIPO_BIENES_606, FORMA_PAGO_606 } from '@/lib/constants'
-import { Send, X, RotateCcw, Undo2, Info } from 'lucide-react'
+import { Send, X, RotateCcw, Undo2, Info, FileText, Trash2 } from 'lucide-react'
 
-type ConfirmAction = 'submit' | 'cancel' | 'amend' | null
+type ConfirmAction = 'submit' | 'cancel' | 'amend' | 'delete' | null
 
 export default function CompraDetail() {
   const { id } = useParams<{ id: string }>()
@@ -55,6 +55,19 @@ export default function CompraDetail() {
     onError: () => toast.error('Error al enmendar la compra'),
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteCompra(id!),
+    onSuccess: () => {
+      toast.success('Compra eliminada')
+      queryClient.invalidateQueries({ queryKey: ['compras'] })
+      setConfirmAction(null)
+      navigate('/compras')
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? 'Error al eliminar la compra')
+    },
+  })
+
   const returnMutation = useMutation({
     mutationFn: () => {
       const items = Object.entries(returnQtys)
@@ -70,9 +83,10 @@ export default function CompraDetail() {
     if (confirmAction === 'submit') submitMutation.mutate()
     else if (confirmAction === 'cancel') cancelMutation.mutate()
     else if (confirmAction === 'amend') amendMutation.mutate()
+    else if (confirmAction === 'delete') deleteMutation.mutate()
   }
 
-  const isPending = submitMutation.isPending || cancelMutation.isPending || amendMutation.isPending
+  const isPending = submitMutation.isPending || cancelMutation.isPending || amendMutation.isPending || deleteMutation.isPending
 
   function getTipoBienesLabel(value?: string) {
     return TIPO_BIENES_606.find((t) => t.value === value)?.label ?? value ?? '—'
@@ -104,6 +118,7 @@ export default function CompraDetail() {
     submit: { title: '¿Someter compra?', description: 'Esta acción actualizará el inventario y la compra no podrá editarse.', actionLabel: 'Someter' },
     cancel: { title: '¿Anular compra?', description: 'La compra será anulada y se revertirá el movimiento de inventario.', actionLabel: 'Anular' },
     amend: { title: '¿Enmendar compra?', description: 'Se creará una nueva compra basada en esta. La versión actual será cancelada.', actionLabel: 'Enmendar' },
+    delete: { title: '¿Eliminar compra?', description: 'Esta acción eliminará permanentemente la compra. No se puede deshacer.', actionLabel: 'Eliminar' },
   }
 
   return (
@@ -119,16 +134,22 @@ export default function CompraDetail() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {compra.status === 'draft' && (
               <>
+                <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/compras/${id}/editar`)}>
+                  <FileText size={14} />Editar
+                </button>
                 <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmAction('submit')}>
                   <Send size={14} />Someter
                 </button>
-                <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmAction('cancel')}>
-                  <X size={14} />Anular
+                <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmAction('delete')}>
+                  <Trash2 size={14} />Eliminar
                 </button>
               </>
             )}
             {compra.status === 'submitted' && (
               <>
+                <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmAction('cancel')}>
+                  <X size={14} />Anular
+                </button>
                 <button className="btn btn-secondary btn-size-sm" onClick={() => setConfirmAction('amend')}>
                   <RotateCcw size={14} />Enmendar
                 </button>
@@ -232,10 +253,6 @@ export default function CompraDetail() {
             <div className="detail-field">
               <span className="detail-label">Tipo de Pago</span>
               <span className="detail-value">{compra.tipoPago ?? '—'}</span>
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">Retención ITBIS</span>
-              <span className="detail-value">{formatDOP(compra.retencionItbis)}</span>
             </div>
             <div className="detail-field">
               <span className="detail-label">Retención ISR</span>

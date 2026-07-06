@@ -27,6 +27,7 @@ export interface ListItemsParams extends PaginationParams {
   includeVariants?: boolean
   variantOf?: string
   barcode?: string
+  validateStock?: boolean
 }
 
 export async function listItems(params?: ListItemsParams) {
@@ -37,6 +38,11 @@ export async function listItems(params?: ListItemsParams) {
 export async function getItem(id: string) {
   const res = await client.get<{ success: true; data: Item }>(ENDPOINTS.catalog.items.byId(id))
   return unwrap(res)
+}
+
+export async function getDefaultPriceTier() {
+  const res = await listItems({ limit: 1 })
+  return res.meta.defaultPriceTier
 }
 
 export async function createItem(data: CreateItemDto) {

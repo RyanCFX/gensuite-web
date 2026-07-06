@@ -14,6 +14,8 @@ interface TabsContextValue {
   closeTab: (id: string) => void
   setTabDirty: (pathname: string, dirty: boolean) => void
   updateTabTitle: (pathname: string, title: string) => void
+  multiTab: boolean
+  toggleMultiTab: () => void
 }
 
 const TabsContext = createContext<TabsContextValue | null>(null)
@@ -117,6 +119,12 @@ function TabsProviderInner({ children }: { children: React.ReactNode }) {
     const saved = loadTabs()
     return saved.find((t) => t.path.split('?')[0] === location.pathname)?.id ?? null
   })
+  const [multiTab, setMultiTab] = useState(() => localStorage.getItem('gensuite-multitab') !== 'false')
+  const toggleMultiTab = () => {
+    const next = !multiTab
+    localStorage.setItem('gensuite-multitab', String(next))
+    setMultiTab(next)
+  }
 
   const setTabs = (updater: (prev: Tab[]) => Tab[]) => {
     setTabsRaw((prev) => {
@@ -128,13 +136,13 @@ function TabsProviderInner({ children }: { children: React.ReactNode }) {
 
   // Sync tabs when location changes (handles all navigation sources)
   useEffect(() => {
+    if (!multiTab) return
     const pathname = location.pathname
     const fullPath = pathname + (location.search || '')
 
     setTabs((prev) => {
       const existing = prev.find((t) => t.path.split('?')[0] === pathname)
       if (existing) {
-        // Update stored path in case query changed, then activate
         const next = prev.map((t) => t.id === existing.id ? { ...t, path: fullPath } : t)
         setActiveId(existing.id)
         return next
@@ -144,7 +152,7 @@ function TabsProviderInner({ children }: { children: React.ReactNode }) {
       return [...prev, newTab]
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, location.search])
+  }, [location.pathname, location.search, multiTab])
 
   const closeTab = (id: string) => {
     setTabs((prev) => {
@@ -176,7 +184,7 @@ function TabsProviderInner({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <TabsContext.Provider value={{ tabs, activeId, closeTab, setTabDirty, updateTabTitle }}>
+    <TabsContext.Provider value={{ tabs, activeId, closeTab, setTabDirty, updateTabTitle, multiTab, toggleMultiTab }}>
       {children}
     </TabsContext.Provider>
   )

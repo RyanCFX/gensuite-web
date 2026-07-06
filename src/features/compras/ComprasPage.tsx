@@ -6,6 +6,8 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { useSortState } from '@/shared/hooks/useSortState'
+import { SortableTh } from '@/shared/ui/SortableTh'
 
 const PAGE_SIZE = 20
 
@@ -16,17 +18,19 @@ export default function ComprasPage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
+  const { orderBy, sort } = useSortState()
 
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['compras', { supplier, status, fromDate, toDate, offset }],
+    queryKey: ['compras', { supplier, status, fromDate, toDate, offset, orderBy }],
     queryFn: () =>
       listCompras({
         supplier: supplier || undefined,
         status: status !== 'all' ? status : undefined,
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
+        orderBy: orderBy || undefined,
         limit: PAGE_SIZE,
         offset,
       }),
@@ -89,12 +93,12 @@ export default function ComprasPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Proveedor</th>
-                  <th>Fecha</th>
+                  <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
+                  <SortableTh label="Proveedor" sortKey="supplierName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
+                  <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
                   <th>NCF Proveedor</th>
-                  <th style={{ textAlign: 'right' }}>Total</th>
-                  <th>Estado</th>
+                  <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} align="right" />
+                  <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
                   <th>Acciones</th>
                 </tr>
               </thead>

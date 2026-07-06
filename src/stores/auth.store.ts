@@ -3,6 +3,14 @@ import { getToken, getTenant, getUser, clearSession } from '@/shared/api/storage
 import { login as apiLogin } from '@/shared/api/auth'
 import type { AuthUser, AuthTenant } from '@/shared/api/types'
 
+function decodeJwt(token: string): Record<string, unknown> {
+  try {
+    return JSON.parse(atob(token.split('.')[1]))
+  } catch {
+    return {}
+  }
+}
+
 interface AuthState {
   token: string | null
   user: AuthUser | null
@@ -24,7 +32,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     const user = getUser()
     const tenant = getTenant()
     if (token && user) {
-      set({ token, user, tenant, isAuthenticated: true })
+      const jwtPayload = decodeJwt(token)
+      const hydratedUser: AuthUser = {
+        ...user,
+        defaultWarehouse: user.defaultWarehouse ?? (jwtPayload.defaultWarehouse as string) ?? undefined,
+        warehouses: user.warehouses ?? (jwtPayload.warehouses as string[]) ?? undefined,
+      }
+      set({ token, user: hydratedUser, tenant, isAuthenticated: true })
     }
   },
 

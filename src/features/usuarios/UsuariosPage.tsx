@@ -1,33 +1,45 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
-  listUsuarios, createUsuario, enableUsuario, deleteUsuario, resetPasswordUsuario, listRoles,
+  listUsuarios, createUsuario, updateUsuario, enableUsuario, deleteUsuario, resetPasswordUsuario, listRoles,
 } from '@/shared/api/usuarios'
 import { listAlmacenes } from '@/shared/api/config'
-import type { Usuario, CreateUsuarioDto, Warehouse } from '@/shared/api/types'
+import type { Usuario, CreateUsuarioDto, UpdateUsuarioDto, Warehouse } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { formatDate } from '@/lib/formatters'
-import { Plus, MoreHorizontal, Ban, KeyRound, UserCheck, X } from 'lucide-react'
+import { Plus, Ban, KeyRound, UserCheck, Pencil, X } from 'lucide-react'
+import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
+import { useSortState } from '@/shared/hooks/useSortState'
+import { SortableTh } from '@/shared/ui/SortableTh'
+import { useAuthStore } from '@/stores/auth.store'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 type ConfirmType = { type: 'disable'; user: Usuario } | { type: 'enable'; user: Usuario } | null
 
 export default function UsuariosPage() {
   const queryClient = useQueryClient()
+  const authUser = useAuthStore((s) => s.user)
+  const logout = useAuthStore((s) => s.logout)
 
   const [showForm, setShowForm] = useState(false)
+  const [editingUser, setEditingUser] = useState<Usuario | null>(null)
   const [confirm, setConfirm] = useState<ConfirmType>(null)
-  const [openMenu, setOpenMenu] = useState<string | null>(null)
 
   const [email, setEmail] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
+  const [maxDiscountPct, setMaxDiscountPct] = useState(0)
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [selectedWarehouses, setSelectedWarehouses] = useState<string[]>([])
+  const [defaultWarehouse, setDefaultWarehouse] = useState('')
+  const [whSearch, setWhSearch] = useState('')
+  const { orderBy, sort } = useSortState()
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['usuarios'],
-    queryFn: () => listUsuarios({ limit: 100 }),
+    queryKey: ['usuarios', { orderBy }],
+    queryFn: () => listUsuarios({ limit: 100, orderBy: orderBy || undefined }),
   })
 
   const { data: roles } = useQuery({
@@ -48,6 +60,16 @@ export default function UsuariosPage() {
       resetForm()
     },
     onError: () => toast.error('Error al crear el usuario'),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ email, data }: { email: string; data: Partial<UpdateUsuarioDto> }) => updateUsuario(email, data),
+    onSuccess: () => {
+      toast.success('Usuario actualizado')
+      queryClient.invalidateQueries({ queryKey: ['usuarios'] })
+      resetForm()
+    },
+    onError: () => toast.error('Error al actualizar el usuario'),
   })
 
   const disableMutation = useMutation({
@@ -76,12 +98,42 @@ export default function UsuariosPage() {
     onError: () => toast.error('Error al enviar el email'),
   })
 
+  const allWarehouses = (warehouses ?? []) as Warehouse[]
+  const availableWarehouses = editingUser?.warehouses?.length
+    ? allWarehouses.filter((w) => editingUser.warehouses?.includes(w.name))
+    : allWarehouses
+
+  const warehouseOptions: SearchSelectOption[] = useMemo(
+    () => availableWarehouses.map((w) => ({ value: w.name, label: w.name })),
+    [availableWarehouses],
+  )
+
+  const filteredWarehouseOptions = useMemo(() => {
+    const q = whSearch.toLowerCase()
+    return warehouseOptions.filter((o) => !q || o.label.toLowerCase().includes(q))
+  }, [warehouseOptions, whSearch])
+
+  function openEdit(user: Usuario) {
+    setEditingUser(user)
+    setEmail(user.email)
+    setFirstName(user.firstName)
+    setLastName(user.lastName ?? '')
+    setMaxDiscountPct(user.maxDiscountPct ?? 0)
+    setSelectedRoles(user.roles)
+    setSelectedWarehouses(user.warehouses ?? [])
+    setDefaultWarehouse(user.defaultWarehouse ?? '')
+    setShowForm(true)
+  }
+
   function resetForm() {
     setEmail('')
     setFirstName('')
     setLastName('')
+    setMaxDiscountPct(0)
     setSelectedRoles([])
     setSelectedWarehouses([])
+    setDefaultWarehouse('')
+    setEditingUser(null)
     setShowForm(false)
   }
 
@@ -91,10 +143,26 @@ export default function UsuariosPage() {
     )
   }
 
-  function handleCreate(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!email || !firstName) { toast.error('Email y nombre son requeridos'); return }
-    createMutation.mutate({ email, firstName, lastName: lastName || undefined, roles: selectedRoles, warehouses: selectedWarehouses.length > 0 ? selectedWarehouses : undefined })
+    const maxDisc = maxDiscountPct > 0 ? maxDiscountPct : 0
+    const payload: Partial<UpdateUsuarioDto> = {
+      firstName,
+      lastName: lastName || undefined,
+      maxDiscountPct: maxDisc,
+      roles: selectedRoles,
+      warehouses: selectedWarehouses.length > 0 ? selectedWarehouses : undefined,
+      defaultWarehouse: defaultWarehouse || undefined,
+    }
+    if (editingUser) {
+      updateMutation.mutate({ email, data: payload })
+      if (email === authUser?.email && defaultWarehouse !== authUser.defaultWarehouse) {
+        toast.success('Almacén por defecto actualizado. Cierra sesión y vuelve a entrar para que los cambios tomen efecto.')
+      }
+    } else {
+      createMutation.mutate({ email, firstName, lastName: lastName || undefined, maxDiscountPct: maxDisc, roles: selectedRoles, warehouses: selectedWarehouses.length > 0 ? selectedWarehouses : undefined })
+    }
   }
 
   return (
@@ -116,8 +184,8 @@ export default function UsuariosPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Email</th>
-                  <th>Nombre</th>
+                  <SortableTh label="Email" sortKey="email" orderBy={orderBy} onSort={sort} />
+                  <SortableTh label="Nombre" sortKey="fullName" orderBy={orderBy} onSort={sort} />
                   <th>Roles</th>
                   <th>Último acceso</th>
                   <th>Estado</th>
@@ -175,43 +243,26 @@ export default function UsuariosPage() {
                                 ? <span className="badge badge-success">Activo</span>
                                 : <span className="badge badge-error">Inactivo</span>}
                             </td>
-                            <td
-                              style={{ position: 'relative' }}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <button
-                                className="actions-trigger"
-                                onClick={() => setOpenMenu(openMenu === u.email ? null : u.email)}
-                              >
-                                <MoreHorizontal size={15} />
-                              </button>
-                              {openMenu === u.email && (
-                                <div className="actions-menu" onMouseLeave={() => setOpenMenu(null)}>
-                                  {u.enabled
-                                    ? (
-                                        <button
-                                          className="actions-item actions-item-danger"
-                                          onClick={() => { setConfirm({ type: 'disable', user: u }); setOpenMenu(null) }}
-                                        >
-                                          <Ban size={14} />Desactivar
-                                        </button>
-                                      )
-                                    : (
-                                        <button
-                                          className="actions-item"
-                                          onClick={() => { setConfirm({ type: 'enable', user: u }); setOpenMenu(null) }}
-                                        >
-                                          <UserCheck size={14} />Reactivar
-                                        </button>
-                                      )}
-                                  <button
-                                    className="actions-item"
-                                    onClick={() => { resetPasswordMutation.mutate(u.email); setOpenMenu(null) }}
-                                  >
-                                    <KeyRound size={14} />Restablecer contraseña
-                                  </button>
-                                </div>
-                              )}
+                            <td onClick={(e) => e.stopPropagation()} className="actions-cell">
+                              <ActionsMenu>
+                                <ActionsMenuItem onClick={() => openEdit(u)}>
+                                  <Pencil size={14} /> Editar
+                                </ActionsMenuItem>
+                                {u.enabled
+                                  ? (
+                                      <ActionsMenuItem danger onClick={() => setConfirm({ type: 'disable', user: u })}>
+                                        <Ban size={14} /> Desactivar
+                                      </ActionsMenuItem>
+                                    )
+                                  : (
+                                      <ActionsMenuItem onClick={() => setConfirm({ type: 'enable', user: u })}>
+                                        <UserCheck size={14} /> Reactivar
+                                      </ActionsMenuItem>
+                                    )}
+                                <ActionsMenuItem onClick={() => resetPasswordMutation.mutate(u.email)}>
+                                  <KeyRound size={14} /> Restablecer contraseña
+                                </ActionsMenuItem>
+                              </ActionsMenu>
                             </td>
                           </tr>
                         ))}
@@ -221,19 +272,19 @@ export default function UsuariosPage() {
         </div>
       </div>
 
-      {/* Create User Modal */}
+      {/* User Form Modal */}
       {showForm && (
         <div className="modal-overlay" onClick={resetForm}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <div>
-                <h2 className="modal-title">Nuevo Usuario</h2>
-                <p className="modal-sub">Crea un nuevo usuario con acceso al sistema.</p>
+                <h2 className="modal-title">{editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}</h2>
+                <p className="modal-sub">{editingUser ? 'Actualiza los datos del usuario.' : 'Crea un nuevo usuario con acceso al sistema.'}</p>
               </div>
               <button className="modal-close" onClick={resetForm}><X size={16} /></button>
             </div>
-            <form onSubmit={handleCreate}>
-              <div className="modal-body">
+              <form onSubmit={handleSubmit}>
+              <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
                 <div className="ff-wrap">
                   <label className="ff-label">Email <span className="ff-required">*</span></label>
                   <input
@@ -242,6 +293,7 @@ export default function UsuariosPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    disabled={!!editingUser}
                     placeholder="usuario@empresa.com"
                   />
                 </div>
@@ -254,6 +306,21 @@ export default function UsuariosPage() {
                     <label className="ff-label">Apellido</label>
                     <input className="ff-input" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Pérez" />
                   </div>
+                </div>
+
+                {/* Descuento máximo */}
+                <div className="ff-wrap">
+                  <label className="ff-label">Descuento máximo (%)</label>
+                  <input
+                    type="number"
+                    className="ff-input"
+                    min={0}
+                    max={100}
+                    value={maxDiscountPct}
+                    onChange={(e) => setMaxDiscountPct(parseInt(e.target.value) || 0)}
+                    style={{ maxWidth: 140 }}
+                  />
+                  <p className="ff-hint">{maxDiscountPct === 0 ? 'Sin restricción' : `El usuario no podrá aplicar descuentos mayores a ${maxDiscountPct}%`}</p>
                 </div>
 
                 <div className="ff-wrap">
@@ -320,11 +387,30 @@ export default function UsuariosPage() {
                   </div>
                   <p className="ff-hint">El usuario solo podrá facturar desde estos almacenes.</p>
                 </div>
+
+                {editingUser && (
+                  <div className="ff-wrap">
+                    <label className="ff-label">Almacén por defecto</label>
+                    <SearchSelect
+                      value={defaultWarehouse}
+                      onChange={(val) => setDefaultWarehouse(val)}
+                      options={filteredWarehouseOptions}
+                      onSearch={setWhSearch}
+                      selectedLabel={defaultWarehouse || ''}
+                      placeholder="Sin almacén por defecto"
+                    />
+                    <p className="ff-hint">
+                      {selectedWarehouses.length > 0
+                        ? 'Solo se muestran los almacenes asignados al usuario.'
+                        : 'Se muestran todos los almacenes disponibles.'}
+                    </p>
+                  </div>
+                )}
               </div>
               <div className="modal-foot">
                 <button type="button" className="btn btn-secondary" onClick={resetForm}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? 'Creando…' : 'Crear Usuario'}
+                <button type="submit" className="btn btn-primary" disabled={createMutation.isPending || updateMutation.isPending}>
+                  {(createMutation.isPending || updateMutation.isPending) ? 'Guardando…' : (editingUser ? 'Guardar Cambios' : 'Crear Usuario')}
                 </button>
               </div>
             </form>

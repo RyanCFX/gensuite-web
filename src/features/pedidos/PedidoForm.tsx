@@ -4,7 +4,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { createPedido, updatePedido, getPedido } from '@/shared/api/pedidos'
 import { listCustomers } from '@/shared/api/customers'
 import { getQuotation } from '@/shared/api/quotations'
-import type { Item } from '@/shared/api/types'
+import type { Item, ItemPrices, CreatePedidoDto } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDOP } from '@/lib/formatters'
@@ -13,10 +13,14 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
+import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
-import { listItems } from '@/shared/api/catalog'
+import { listItems, getDefaultPriceTier } from '@/shared/api/catalog'
+import { client } from '@/shared/api/client'
+import { getUsuario } from '@/shared/api/usuarios'
+import { getUser } from '@/shared/api/storage'
 
 interface LineItem {
   itemCode: string
@@ -27,14 +31,24 @@ interface LineItem {
   amount: number
   discountPct: number
   uom: string
+  maxDiscountPct?: number
+  _prices?: ItemPrices
 }
 
 function todayIso() { return format(new Date(), 'yyyy-MM-dd') }
 function defaultDelivery() { return format(addDays(new Date(), 7), 'yyyy-MM-dd') }
-const ITBIS_RATE = 0.18
 function calcAmount(qty: number, rate: number, discountPct: number = 0) {
   const base = qty * rate; const discount = base * (discountPct / 100)
   return Math.round((base - discount) * 100) / 100
+}
+
+function maxDiscFromPrices(rate: number, prices: ItemPrices | undefined): number {
+  if (!prices || rate <= 0) return 100
+  const vals = Object.values(prices).filter((v): v is number => v != null)
+  if (vals.length === 0) return 100
+  const minPrice = Math.min(...vals)
+  if (minPrice <= 0) return 100
+  return Math.max(0, (1 - minPrice / rate) * 100)
 }
 
 export default function PedidoForm() {
@@ -46,6 +60,8 @@ export default function PedidoForm() {
   const isEdit = !!id
 
   const [customerId, setCustomerId] = useState('')
+  const [customerName, setCustomerName] = useState('')
+  const [customerPriceTier, setCustomerPriceTier] = useState<keyof ItemPrices | undefined>(undefined)
   const [customerQuery, setCustomerQuery] = useState('')
   const [transactionDate, setTransactionDate] = useState(todayIso())
   const [deliveryDate, setDeliveryDate] = useState(defaultDelivery())
@@ -54,11 +70,13 @@ export default function PedidoForm() {
   const [submitted, setSubmitted] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [pinModalOpen, setPinModalOpen] = useState(false)
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
     onBarcode: async (code) => {
-      const res = await listItems({ barcode: code, limit: 1 })
+      const res = await listItems({ barcode: code, limit: 1, validateStock: true })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
       addRow()
@@ -114,28 +132,41 @@ export default function PedidoForm() {
     queryKey: ['customerSearch', customerQuery],
     queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
   })
+  const { data: defaultPriceTier = 'B' } = useQuery({
+    queryKey: ['defaultPriceTier'],
+    queryFn: getDefaultPriceTier,
+    staleTime: 5 * 60_000,
+  })
+
+  const currentUserEmail = getUser()?.email
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser', currentUserEmail],
+    queryFn: () => getUsuario(currentUserEmail!),
+    enabled: !!currentUserEmail,
+    staleTime: 5 * 60_000,
+  })
+
   const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({ value: c.id, label: c.customerName, sublabel: c.rnc ?? c.cedula }))
 
+  function handleError(err: unknown) {
+    const msg = (err as any)?.message ?? ''
+    setSubmitError(msg)
+    if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) {
+      setPinModalOpen(true)
+      return
+    }
+    toast.error(msg || 'Error al guardar el pedido')
+  }
+
   const createMutation = useMutation({
-    mutationFn: () => createPedido({
-      customer: customerId,
-      transactionDate,
-      deliveryDate: deliveryDate || undefined,
-      items: items.map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate, discountPct: i.discountPct || undefined })),
-      quotation: quotationId || undefined,
-    }),
-    onSuccess: (p) => { queryClient.invalidateQueries({ queryKey: ['pedidos'] }); toast.success('Pedido creado'); navigate(`/pedidos/${p.id}`) },
-    onError: () => toast.error('Error al crear el pedido'),
+    mutationFn: (dto: CreatePedidoDto) => createPedido(dto),
+    onSuccess: (p) => { setSubmitError(null); queryClient.invalidateQueries({ queryKey: ['pedidos'] }); toast.success('Pedido creado'); navigate(`/pedidos/${p.id}`) },
+    onError: (err) => handleError(err),
   })
   const updateMutation = useMutation({
-    mutationFn: () => updatePedido(id!, {
-      customer: customerId,
-      transactionDate,
-      deliveryDate: deliveryDate || undefined,
-      items: items.map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate, discountPct: i.discountPct || undefined })),
-    }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['pedidos'] }); queryClient.invalidateQueries({ queryKey: ['pedido', id] }); toast.success('Pedido actualizado'); navigate(`/pedidos/${id}`) },
-    onError: () => toast.error('Error al actualizar el pedido'),
+    mutationFn: (dto: Partial<CreatePedidoDto>) => updatePedido(id!, dto),
+    onSuccess: (result) => { setSubmitError(null); queryClient.invalidateQueries({ queryKey: ['pedidos'] }); queryClient.invalidateQueries({ queryKey: ['pedido', id] }); toast.success('Pedido actualizado'); const newId = (result as any).id; navigate(newId && newId !== id ? `/pedidos/${newId}` : `/pedidos/${id}`) },
+    onError: (err) => handleError(err),
   })
   const isPending = createMutation.isPending || updateMutation.isPending
 
@@ -148,28 +179,57 @@ export default function PedidoForm() {
     }))
   }
   function selectCatalogItem(index: number, catalogItem: Item) {
+    const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
     setItems((prev) => prev.map((row, i) => {
       if (i !== index) return row
-      const rate = catalogItem.standardRate ?? 0
-      return { ...row, itemCode: catalogItem.id, itemLabel: catalogItem.itemName, description: catalogItem.description ?? catalogItem.itemName, rate, amount: calcAmount(row.qty, rate, row.discountPct) }
+      const rate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
+      return {
+        ...row,
+        itemCode: catalogItem.id,
+        itemLabel: catalogItem.itemName,
+        description: catalogItem.internalDescription ?? catalogItem.itemName,
+        rate,
+        amount: calcAmount(row.qty, rate, row.discountPct),
+        uom: catalogItem.stockUom ?? row.uom,
+        maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
+        _prices: catalogItem.prices,
+      }
     }))
   }
   function onVariantConfirm(selections: VariantSelection[]) {
+    const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
     setItems((prev) => [
       ...prev,
-      ...selections.map((s) => ({
-        itemCode: s.item.id,
-        itemLabel: s.item.itemName,
-        description: s.item.description ?? s.item.itemName,
-        qty: s.qty,
-        rate: s.item.standardRate ?? 0,
-        amount: calcAmount(s.qty, s.item.standardRate ?? 0, 0),
-        discountPct: 0,
-        uom: s.item.salesUom ?? s.item.stockUom ?? 'Unidad',
-      })),
+      ...selections.map((s) => {
+        const rate = s.item.prices?.[tier] ?? s.item.standardRate ?? 0
+        return {
+          itemCode: s.item.id,
+          itemLabel: s.item.itemName,
+          description: s.item.internalDescription ?? s.item.itemName,
+          qty: s.qty,
+          rate,
+          amount: calcAmount(s.qty, rate, 0),
+          discountPct: 0,
+          uom: s.item.stockUom ?? 'Unidad',
+          maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
+          _prices: s.item.prices,
+        }
+      }),
     ])
     setVariantTemplate(null)
   }
+
+  // ── Reprice on customer change ───────────────────────────────────────────
+  useEffect(() => {
+    const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
+    setItems((prev) =>
+      prev.map((row) => {
+        if (!row._prices) return row
+        const rate = row._prices[tier] ?? row.rate
+        return { ...row, rate, amount: calcAmount(row.qty, rate, row.discountPct) }
+      }),
+    )
+  }, [customerPriceTier, defaultPriceTier])
 
   function addRow() { setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, uom: 'Unidad' }]) }
   function removeRow(index: number) { setItems((prev) => prev.filter((_, i) => i !== index)) }
@@ -177,21 +237,45 @@ export default function PedidoForm() {
   const subtotal = items.reduce((s, i) => s + i.amount, 0)
   const grossTotal = items.reduce((s, i) => s + i.qty * i.rate, 0)
   const totalDiscount = grossTotal - subtotal
-  const itbis = Math.round(subtotal * ITBIS_RATE * 100) / 100
-  const total = subtotal + itbis
+  const total = subtotal
+
+  function submitDto() {
+    const itemsDto = items.map((i) => ({
+      itemCode: i.itemCode,
+      qty: i.qty,
+      rate: i.rate,
+      discountPct: i.discountPct || undefined,
+    }))
+    if (isEdit) updateMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, items: itemsDto, quotation: quotationId || undefined })
+    else createMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, items: itemsDto, quotation: quotationId || undefined })
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitted(true)
-    if (!customerId) { toast.error('Selecciona un cliente'); return }
-    if (items.length === 0) { toast.error('Agrega al menos un artículo'); return }
-    for (let i = 0; i < items.length; i++) {
-      const row = items[i]; const num = i + 1
-      if (!row.qty || row.qty <= 0) { toast.error(`Artículo #${num}: la cantidad es requerida`); return }
-      if (!row.rate || row.rate <= 0) { toast.error(`Artículo #${num}: el precio unitario es requerido`); return }
+    setSubmitError(null)
+
+    try {
+      if (!customerId) { toast.error('Selecciona un cliente'); return }
+      if (items.length === 0) { toast.error('Agrega al menos un artículo'); return }
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]; const num = i + 1
+        if (!item.qty || item.qty <= 0) { toast.error(`Artículo #${num}: la cantidad es requerida`); return }
+        if (!item.rate || item.rate <= 0) { toast.error(`Artículo #${num}: el precio unitario es requerido`); return }
+        const itemMax = item.maxDiscountPct && item.maxDiscountPct > 0 ? item.maxDiscountPct : 100
+        const userMax = currentUser?.maxDiscountPct && currentUser.maxDiscountPct > 0 ? currentUser.maxDiscountPct : 100
+        const priceLimit = maxDiscFromPrices(item.rate, item._prices)
+        const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
+        if (item.discountPct > effectiveLimit) {
+          toast.error(`Línea ${num}: el descuento supera el límite de ${effectiveLimit}%`)
+          return
+        }
+      }
+      submitDto()
+    } catch (err) {
+      setSubmitError(String(err))
+      toast.error('Error inesperado al enviar el formulario')
     }
-    if (isEdit) updateMutation.mutate()
-    else createMutation.mutate()
   }
 
   return (
@@ -203,17 +287,38 @@ export default function PedidoForm() {
         </div>
       </div>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {submitError && (
+          <div className="alert alert-danger" style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 14px', borderRadius: 6, background: 'var(--bg-danger)', border: '1px solid var(--border-danger)', color: 'var(--text-danger)' }}>
+            <span style={{ flex: 1, fontSize: 13, lineHeight: 1.4 }}>{submitError}</span>
+            <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => setSubmitError(null)} style={{ flexShrink: 0 }}>✕</button>
+          </div>
+        )}
         <div className="card">
           <div className="card-header"><h2 className="card-title">Información General</h2></div>
           <div className="card-body">
             <div className="form-row form-row-3">
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Cliente</label>
-                <SearchSelect value={customerId} onChange={(id) => setCustomerId(id)} options={customerOptions} onSearch={setCustomerQuery} loading={false} placeholder="Buscar cliente…" error={submitted && !customerId} />
+                <SearchSelect
+                  value={customerId}
+                  onChange={(id, opt) => {
+                    const cid = id === '' ? '' : (opt?.value ?? id)
+                    setCustomerId(cid)
+                    setCustomerName(opt?.label ?? '')
+                    const c = cid && customersData?.items?.find((c) => c.id === cid)
+                    setCustomerPriceTier(c?.priceTier)
+                  }}
+                  options={customerOptions}
+                  selectedLabel={customerName}
+                  onSearch={setCustomerQuery}
+                  loading={false}
+                  placeholder="Buscar cliente…"
+                  error={submitted && !customerId}
+                />
               </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Fecha</label>
-                <input type="date" className="ff-input" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} required />
+                <input type="date" className="ff-input" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
               </div>
               <div className="ff-wrap">
                 <label className="ff-label">Entrega estimada</label>
@@ -245,14 +350,50 @@ export default function PedidoForm() {
                 ) : (
                   items.map((item, index) => (
                     <tr key={index}>
-                      <td><ItemSelect value={item.itemCode} selectedLabel={item.itemLabel} onSelect={(ci) => selectCatalogItem(index, ci)} onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, description: '', rate: 0, amount: 0, discountPct: 0 })} onVariantSelect={(t) => setVariantTemplate(t)} /></td>
-                      <td><input className="items-input" value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="Descripción" /></td>
-                      <td><input className={`items-input${submitted && (!item.qty || item.qty <= 0) ? ' items-input-error' : ''}`} type="number" min="0" step="1" value={item.qty} onChange={(e) => updateItem(index, { qty: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right' }} /></td>
-                      <td><input className={`items-input${submitted && (!item.rate || item.rate <= 0) ? ' items-input-error' : ''}`} type="number" min="0" step="0.01" value={item.rate} onChange={(e) => updateItem(index, { rate: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right' }} /></td>
-                      <td><input className="items-input" type="number" min="0" max="100" step="0.1" value={item.discountPct} onChange={(e) => updateItem(index, { discountPct: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right', width: 56 }} /></td>
+                      <td>
+                        <ItemSelect value={item.itemCode} selectedLabel={item.itemLabel} onSelect={(ci) => selectCatalogItem(index, ci)} onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, description: '', rate: 0, amount: 0, discountPct: 0 })} onVariantSelect={(t) => setVariantTemplate(t)} validateStock />
+                      </td>
+                      <td>
+                        <input className="items-input" value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="Descripción" />
+                      </td>
+                      <td>
+                        <input className={`items-input${submitted && (!item.qty || item.qty <= 0) ? ' items-input-error' : ''}`} type="number" min="0" step="1" value={item.qty} onChange={(e) => updateItem(index, { qty: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right' }} />
+                      </td>
+                      <td>
+                        <input className={`items-input${submitted && (!item.rate || item.rate <= 0) ? ' items-input-error' : ''}`} type="number" min="0" step="0.01" value={item.rate} disabled style={{ textAlign: 'right' }} />
+                      </td>
+                      <td>
+                        {(() => {
+                          const itemMax = item.maxDiscountPct && item.maxDiscountPct > 0 ? item.maxDiscountPct : 100
+                          const userMax = currentUser?.maxDiscountPct && currentUser.maxDiscountPct > 0 ? currentUser.maxDiscountPct : 100
+                          const priceLimit = maxDiscFromPrices(item.rate, item._prices)
+                          const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
+                          return (
+                            <>
+                              <input className={`items-input${item.discountPct > effectiveLimit ? ' items-input-error' : ''}`} type="number" min="0" max="100" step="0.1" value={item.discountPct} onChange={(e) => updateItem(index, { discountPct: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right', width: 56 }} />
+                              {effectiveLimit < 100 && (
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                  máx {effectiveLimit.toFixed(2)}%
+                                </span>
+                              )}
+                              {item.discountPct > effectiveLimit && (
+                                <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                  Supera el límite de {effectiveLimit.toFixed(2)}%
+                                </span>
+                              )}
+                            </>
+                          )
+                        })()}
+                      </td>
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
-                      <td><UomSelect value={item.uom} onChange={(v) => updateItem(index, { uom: v })} itemCode={item.itemCode || undefined} /></td>
-                      <td><button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeRow(index)}><Trash2 size={13} /></button></td>
+                      <td>
+                        <UomSelect value={item.uom} onChange={(v) => updateItem(index, { uom: v })} itemCode={item.itemCode || undefined} />
+                      </td>
+                      <td>
+                        <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeRow(index)}>
+                          <Trash2 size={13} />
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -265,7 +406,6 @@ export default function PedidoForm() {
               <div className="items-total-line"><span>Subtotal bruto</span><span>{formatDOP(grossTotal)}</span></div>
               {totalDiscount > 0 && <div className="items-total-line" style={{ color: 'var(--text-danger)' }}><span>Descuento total</span><span>-{formatDOP(totalDiscount)}</span></div>}
               <div className="items-total-line"><span>Subtotal neto</span><span>{formatDOP(subtotal)}</span></div>
-              <div className="items-total-line"><span>ITBIS (18%)</span><span>{formatDOP(itbis)}</span></div>
               <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}><span>Total</span><span>{formatDOP(total)}</span></div>
             </div>
           </div>
@@ -294,6 +434,18 @@ export default function PedidoForm() {
           onClose={() => setVariantTemplate(null)}
         />
       )}
+
+      <PinModal
+        open={pinModalOpen}
+        onClose={() => setPinModalOpen(false)}
+        onAuthorized={(userId) => {
+          client.defaults.headers.common['X-Admin-Pin'] = userId
+          setPinModalOpen(false)
+          submitDto()
+        }}
+        title="Autorización requerida"
+        description="El descuento supera tu límite. Ingresa el PIN de un administrador."
+      />
     </div>
   )
 }

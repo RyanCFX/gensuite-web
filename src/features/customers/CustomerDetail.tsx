@@ -208,6 +208,20 @@ export default function CustomerDetail() {
               <span className="detail-value">{customer.emailInvoice ?? '—'}</span>
             </div>
             <div className="detail-field">
+              <span className="detail-label">Grupo de clientes</span>
+              <span className="detail-value">{customer.customerGroup ?? '—'}</span>
+            </div>
+            {customer.priceTier && (
+              <div className="detail-field">
+                <span className="detail-label">Nivel de precio</span>
+                <span className="detail-value">
+                  <span className="badge" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>
+                    Nivel {customer.priceTier}
+                  </span>
+                </span>
+              </div>
+            )}
+            <div className="detail-field">
               <span className="detail-label">¿Es Gobierno?</span>
               <span className="detail-value">{customer.isGovernment ? 'Sí' : 'No'}</span>
             </div>

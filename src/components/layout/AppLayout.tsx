@@ -69,9 +69,9 @@ const NAV_OPS: NavEntry[] = [
   {
     label: 'Inventario',
     icon: <Warehouse size={16} aria-hidden="true" />,
-    prefix: '/inventario|/catalogo/articulos',
+    prefix: '/inventario',
     children: [
-      { label: 'Artículos',   icon: <Package size={14} />,  path: '/catalogo/articulos' },
+      { label: 'Artículos',   icon: <Package size={14} />,  path: '/inventario/articulos' },
       { label: 'Stock Actual',icon: <Warehouse size={14} />, path: '/inventario/stock'    },
       { label: 'Historial',   icon: <BarChart3 size={14} />, path: '/inventario/historial' },
       { label: 'Conteos',     icon: <FileText size={14} />,  path: '/inventario/conteos'  },
@@ -380,6 +380,7 @@ function AppLayoutInner() {
   const userRef = useRef<HTMLDivElement>(null)
   const keepAliveRef = useKeepAliveRef()
   const { user, logout } = useAuthStore()
+  const { tabs, activeId, closeTab, multiTab } = useTabs()
   const navigate = useNavigate()
   const location = useLocation()
   const outlet = useOutlet()
@@ -421,6 +422,26 @@ function AppLayoutInner() {
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [])
+
+  // Global keyboard shortcut: Shift+W → close current tab
+  useEffect(() => {
+    if (!multiTab) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.shiftKey && (e.key === 'w' || e.key === 'W')) {
+        if (!activeId) return
+        const tab = tabs.find((t) => t.id === activeId)
+        if (!tab) return
+        if (tab.isDirty) {
+          if (!window.confirm(`"${tab.title}" tiene cambios sin guardar. ¿Cerrar de todas formas?`)) return
+        }
+        e.preventDefault()
+        closeTab(activeId)
+        keepAliveRef.current?.destroy(tab.path)
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [multiTab, activeId, tabs, closeTab, keepAliveRef])
 
   const handleLogout = () => {
     logout()
@@ -587,15 +608,25 @@ function AppLayoutInner() {
 
         {/* ── Main ── */}
         <main className="main" style={{ display: 'flex', flexDirection: 'column' }}>
-          <TabBar keepAliveRef={keepAliveRef} />
+          {!user?.defaultWarehouse && (
+            <div style={{
+              background: 'var(--color-warning-bg, #fff3cd)',
+              color: 'var(--color-warning-text, #856404)',
+              padding: '8px 16px',
+              fontSize: 13,
+              textAlign: 'center',
+              borderBottom: '1px solid var(--color-warning-border, #ffc107)',
+            }}>
+              ⚠️ No tienes un almacén por defecto asignado. Las operaciones de compra e inventario pueden fallar.{' '}
+              <a href="/usuarios" style={{ textDecoration: 'underline', fontWeight: 500, color: 'inherit' }}>Contacta al administrador</a>.
+            </div>
+          )}
+          {multiTab && <TabBar keepAliveRef={keepAliveRef} />}
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            <KeepAlive
-              activeCacheKey={activeTabPath}
-              max={15}
-              cacheNodeRef={keepAliveRef}
-            >
-              {outlet}
-            </KeepAlive>
+            {multiTab
+              ? <KeepAlive activeCacheKey={activeTabPath} max={15} cacheNodeRef={keepAliveRef}>{outlet}</KeepAlive>
+              : outlet
+            }
           </div>
         </main>
       </div>

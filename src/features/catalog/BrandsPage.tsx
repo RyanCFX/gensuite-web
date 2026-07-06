@@ -13,6 +13,8 @@ import {
 } from '@/shared/api/catalog'
 import type { Brand } from '@/shared/api/types'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { useSortState } from '@/shared/hooks/useSortState'
+import { SortableTh } from '@/shared/ui/SortableTh'
 
 const brandSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -28,10 +30,11 @@ export default function BrandsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Brand | null>(null)
   const [toDelete, setToDelete] = useState<Brand | null>(null)
+  const { orderBy, sort } = useSortState()
 
   const { data: brandsData, isLoading, isError } = useQuery({
-    queryKey: ['brands', { category: categoryFilter }],
-    queryFn: () => listBrands({ category: categoryFilter || undefined, limit: 100 }),
+    queryKey: ['brands', { category: categoryFilter, orderBy }],
+    queryFn: () => listBrands({ category: categoryFilter || undefined, limit: 100, orderBy: orderBy || undefined }),
   })
 
   const { data: categoriesData } = useQuery({
@@ -148,7 +151,7 @@ export default function BrandsPage() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Nombre</th>
+              <SortableTh label="Nombre" sortKey="name" orderBy={orderBy} onSort={sort} />
               <th>Descripción</th>
               <th>Categoría</th>
               <th style={{ width: 80 }} />

@@ -9,6 +9,12 @@ export const client = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+function normalizeOrderBy(orderBy: string): string {
+  if (orderBy.startsWith('-')) return `${orderBy.slice(1)} desc`
+  if (!orderBy.includes(' ')) return `${orderBy} asc`
+  return orderBy
+}
+
 client.interceptors.request.use((config) => {
   const token = getToken()
   if (token) {
@@ -18,6 +24,10 @@ client.interceptors.request.use((config) => {
   const tenant = getTenant()
   if (tenant) {
     config.headers['X-Tenant'] = tenant.slug
+  }
+
+  if (config.params?.orderBy) {
+    config.params.orderBy = normalizeOrderBy(config.params.orderBy)
   }
 
   return config

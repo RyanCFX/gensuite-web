@@ -4,11 +4,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { createInvoice, updateInvoice, getInvoice } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
-import { listImpuestosVentas } from '@/shared/api/config'
-import { getItemStock, listItems } from '@/shared/api/catalog'
-import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, ItemStock, Item } from '@/shared/api/types'
+import { listItems, getDefaultPriceTier } from '@/shared/api/catalog'
+import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices } from '@/shared/api/types'
 import { ENDPOINTS } from '@/shared/api/endpoints'
-import { formatDOP } from '@/lib/formatters'
+import { formatDOP, displayId } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
@@ -21,6 +20,9 @@ import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
+import { getUsuario } from '@/shared/api/usuarios'
+import { getUser } from '@/shared/api/storage'
+
 
 type NcfType = 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
 
@@ -32,14 +34,16 @@ interface LineItem {
   rate: number
   amount: number
   discountPct: number
+  salesTaxPct: number
+  salesTaxTemplate: string
   /** Precio base al stockUom — se usa para recalcular al cambiar UOM */
   baseRate: number
   uom: string
-  warehouse: string
-  /** Snapshot del stock por almacén al momento de seleccionar el artículo */
-  stock?: ItemStock
+
   /** Factor de conversión activo (UOM seleccionada / stockUom) */
   conversionFactor: number
+  maxDiscountPct?: number
+  _prices?: ItemPrices
 }
 
 function todayIso() {
@@ -50,36 +54,19 @@ function defaultDueDate() {
   return format(addDays(new Date(), 30), 'yyyy-MM-dd')
 }
 
-// fallback rate used only when no template is selected
-const ITBIS_RATE = 0.18
-
 function calcAmount(qty: number, rate: number, discountPct: number = 0) {
   const base = qty * rate
   const discount = base * (discountPct / 100)
   return Math.round((base - discount) * 100) / 100
 }
 
-// ─── WarehouseSelect — SearchSelect con filtrado local ────────────────────────
-interface WarehouseSelectProps {
-  value: string
-  options: SearchSelectOption[]
-  onChange: (value: string) => void
-}
-function WarehouseSelect({ value, options, onChange }: WarehouseSelectProps) {
-  const [query, setQuery] = useState('')
-  const filtered = options.filter(o =>
-    !query || o.label.toLowerCase().includes(query.toLowerCase()),
-  )
-  return (
-    <SearchSelect
-      value={value}
-      options={filtered}
-      onSearch={setQuery}
-      onChange={(val) => onChange(val)}
-      placeholder="Buscar almacén…"
-      className="items-input"
-    />
-  )
+function maxDiscFromPrices(rate: number, prices: ItemPrices | undefined): number {
+  if (!prices || rate <= 0) return 100
+  const vals = Object.values(prices).filter((v): v is number => v != null)
+  if (vals.length === 0) return 100
+  const minPrice = Math.min(...vals)
+  if (minPrice <= 0) return 100
+  return Math.max(0, (1 - minPrice / rate) * 100)
 }
 
 export default function InvoiceForm() {
@@ -100,14 +87,14 @@ export default function InvoiceForm() {
   const [semaforo, setSemaforo] = useState<SemaforoEntry | null>(null)
   const [loadingSemaforo, setLoadingSemaforo] = useState(false)
   const [initialized, setInitialized] = useState(false)
-  const [taxesAndCharges, setTaxesAndCharges] = useState<string>('')
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
+  const [submitted, setSubmitted] = useState(false)
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
     onBarcode: async (code) => {
-      const res = await listItems({ barcode: code, limit: 1 })
+      const res = await listItems({ barcode: code, limit: 1, validateStock: true })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
       addRow()
@@ -139,8 +126,10 @@ export default function InvoiceForm() {
         baseRate: i.rate,
         amount: i.amount,
         discountPct: (i as any).discountPct ?? 0,
+        salesTaxPct: 0,
+        salesTaxTemplate: '',
         uom: i.uom,
-        warehouse: i?.warehouse ?? '',
+
         conversionFactor: 1,
       })),
     )
@@ -154,26 +143,25 @@ export default function InvoiceForm() {
     enabled: true,
   })
 
+  const { data: defaultPriceTier = 'B' } = useQuery({
+    queryKey: ['defaultPriceTier'],
+    queryFn: getDefaultPriceTier,
+    staleTime: 5 * 60_000,
+  })
+
+  const currentUserEmail = getUser()?.email
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser', currentUserEmail],
+    queryFn: () => getUsuario(currentUserEmail!),
+    enabled: !!currentUserEmail,
+    staleTime: 5 * 60_000,
+  })
+
   const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
     value: c.id,
     label: c.customerName,
     sublabel: c.rnc ?? c.cedula,
   }))
-
-  // ── Tax templates ─────────────────────────────────────────────────────────
-  const { data: taxTemplates } = useQuery({
-    queryKey: ['impuestos-ventas'],
-    queryFn: listImpuestosVentas,
-    staleTime: 5 * 60 * 1000,
-  })
-
-  // Auto-select default template on first load
-  useEffect(() => {
-    if (taxTemplates && !taxesAndCharges) {
-      const def = taxTemplates.find((t) => t.isDefault)
-      if (def) setTaxesAndCharges(def.id)
-    }
-  }, [taxTemplates])
 
   // In edit mode, the selected customer name comes from the invoice until the user picks a new one
   const selectedLabel = isEdit && !customerQuery && existingInvoice && customerId === existingInvoice.customer
@@ -228,11 +216,16 @@ export default function InvoiceForm() {
 
   const updateMutation = useMutation({
     mutationFn: (dto: UpdateInvoiceDto) => updateInvoice(id!, dto),
-    onSuccess: () => {
+    onSuccess: (invoice) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       queryClient.invalidateQueries({ queryKey: ['invoice', id] })
-      toast.success('Factura actualizada')
-      navigate(`/facturacion/facturas/${id}`)
+      if (invoice.id !== id) {
+        toast.success(`Nueva versión creada: ${displayId(invoice.id, invoice.sequence)}`)
+        navigate(`/facturacion/facturas/${invoice.id}`)
+      } else {
+        toast.success(`Versión ${invoice.sequence} guardada como historial`)
+        navigate(`/facturacion/facturas/${invoice.id}`, { replace: true })
+      }
     },
     onError: (err: { message?: string }) => {
       const msg = err?.message ?? ''
@@ -258,61 +251,75 @@ export default function InvoiceForm() {
   }
 
   async function selectCatalogItem(index: number, catalogItem: Item) {
-    // Fetch stock in parallel with state update
-    let stock: ItemStock | undefined
-    try {
-      stock = await getItemStock(catalogItem.id)
-    } catch {
-      stock = undefined
-    }
-
     setItems((prev) =>
       prev.map((row, i) => {
         if (i !== index) return row
-        const baseRate = catalogItem.standardRate ?? 0
+        const tier = selectedCustomer?.priceTier ?? defaultPriceTier ?? 'B'
+        const baseRate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
         return {
           ...row,
           itemCode: catalogItem.id,
           itemLabel: catalogItem.itemName,
-          description: catalogItem.description ?? catalogItem.itemName,
+          description: catalogItem.internalDescription ?? catalogItem.itemName,
           rate: baseRate,
           baseRate,
           amount: calcAmount(row.qty, baseRate, row.discountPct),
-          uom: catalogItem.salesUom ?? catalogItem.stockUom ?? row.uom,
-          warehouse: '',
-          stock,
+          uom: catalogItem.stockUom ?? row.uom,
           conversionFactor: 1,
+          maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
+          _prices: catalogItem.prices,
+          salesTaxPct: catalogItem.salesTaxPct ?? 0,
+          salesTaxTemplate: catalogItem.salesTaxTemplate ?? '',
         }
       }),
     )
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, description: '', rate: 0, amount: 0, discountPct: 0 })
+    updateItem(index, { itemCode: '', itemLabel: undefined, description: '', rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '' })
   }
 
   function onVariantConfirm(selections: VariantSelection[]) {
+    const tier = selectedCustomer?.priceTier ?? defaultPriceTier ?? 'B'
     setItems((prev) => [
       ...prev,
-      ...selections.map((s) => ({
-        itemCode: s.item.id,
-        itemLabel: s.item.itemName,
-        description: s.item.description ?? s.item.itemName,
-        qty: s.qty,
-        rate: s.item.standardRate ?? 0,
-        baseRate: s.item.standardRate ?? 0,
-        amount: calcAmount(s.qty, s.item.standardRate ?? 0, 0),
-        discountPct: 0,
-        uom: s.item.salesUom ?? s.item.stockUom ?? 'Unidad',
-        warehouse: '',
-        conversionFactor: 1,
-      })),
+      ...selections.map((s) => {
+        const rate = s.item.prices?.[tier] ?? s.item.standardRate ?? 0
+        return {
+          itemCode: s.item.id,
+          itemLabel: s.item.itemName,
+          description: s.item.internalDescription ?? s.item.itemName,
+          qty: s.qty,
+          rate,
+          baseRate: rate,
+          amount: calcAmount(s.qty, rate, 0),
+          discountPct: 0,
+          salesTaxPct: s.item.salesTaxPct ?? 0,
+          salesTaxTemplate: s.item.salesTaxTemplate ?? '',
+          uom: s.item.stockUom ?? 'Unidad',
+          conversionFactor: 1,
+          maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
+          _prices: s.item.prices,
+        }
+      }),
     ])
     setVariantTemplate(null)
   }
 
+  // ── Reprice on customer change ───────────────────────────────────────────
+  useEffect(() => {
+    const tier = selectedCustomer?.priceTier ?? defaultPriceTier ?? 'B'
+    setItems((prev) =>
+      prev.map((row) => {
+        if (!row._prices) return row
+        const rate = row._prices[tier] ?? row.rate
+        return { ...row, rate, baseRate: rate, amount: calcAmount(row.qty, rate, row.discountPct) }
+      }),
+    )
+  }, [selectedCustomer?.priceTier, defaultPriceTier])
+
   function addRow() {
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, discountPct: 0, uom: 'Unidad', warehouse: '', conversionFactor: 1 }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', conversionFactor: 1 }])
   }
 
   function removeRow(index: number) {
@@ -322,22 +329,13 @@ export default function InvoiceForm() {
   const subtotal = items.reduce((s, i) => s + i.amount, 0)
   const grossTotal = items.reduce((s, i) => s + i.qty * i.rate, 0)
   const totalDiscount = grossTotal - subtotal
-  const selectedTemplate = taxTemplates?.find((t) => t.id === taxesAndCharges) ?? null
-  const taxRate = selectedTemplate
-    ? selectedTemplate.taxes
-        .filter((l) => l.chargeType === 'On Net Total')
-        .reduce((s, l) => s + l.rate, 0) / 100
-    : ITBIS_RATE
-  const itbis = Math.round(subtotal * taxRate * 100) / 100
-  const total = subtotal + itbis
-  const taxLabel = selectedTemplate
-    ? selectedTemplate.taxes[0]?.description || selectedTemplate.title
-    : 'ITBIS (18%)'
-  const taxPct = Math.round(taxRate * 100)
+  const taxTotal = items.reduce((s, i) => s + (i.amount * i.salesTaxPct / 100), 0)
+  const total = subtotal + taxTotal
 
   // ── Submit ────────────────────────────────────────────────────────────────
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setSubmitted(true)
 
     if (!customerId) {
       toast.error('Selecciona un cliente')
@@ -352,24 +350,16 @@ export default function InvoiceForm() {
       return
     }
 
-    // Validar almacén seleccionado y stock disponible
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
       if (!item.itemCode) continue
-      if (!item.warehouse) {
-        toast.error(`Línea ${i + 1}: selecciona un almacén`)
+      const itemMax = item.maxDiscountPct && item.maxDiscountPct > 0 ? item.maxDiscountPct : 100
+      const userMax = currentUser?.maxDiscountPct && currentUser.maxDiscountPct > 0 ? currentUser.maxDiscountPct : 100
+      const priceLimit = maxDiscFromPrices(item.rate, item._prices)
+      const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
+      if (item.discountPct > effectiveLimit) {
+        toast.error(`Línea ${i + 1}: el descuento supera el límite de ${effectiveLimit}%`)
         return
-      }
-      if (item.stock) {
-        const whEntry = item.stock.warehouses.find(w => w.warehouse === item.warehouse)
-        const availableQty = whEntry?.qty ?? 0
-        // La cantidad ingresada está en la UOM seleccionada; convertir a stockUom para comparar
-        const qtyInStockUom = item.qty * item.conversionFactor
-        if (qtyInStockUom > availableQty) {
-          const disponible = (availableQty / item.conversionFactor).toFixed(4).replace(/\.?0+$/, '')
-          toast.error(`Línea ${i + 1} (${item.itemLabel ?? item.itemCode}): stock insuficiente en "${item.warehouse}". Disponible: ${disponible} ${item.uom}`)
-          return
-        }
       }
     }
 
@@ -380,7 +370,6 @@ export default function InvoiceForm() {
       rate: i.rate,
       discountPct: i.discountPct || undefined,
       uom: i.uom,
-      warehouse: i.warehouse || undefined,
     }))
 
     if (isEdit) {
@@ -389,7 +378,6 @@ export default function InvoiceForm() {
         postingDate,
         dueDate,
         ncfType,
-        taxesAndCharges: taxesAndCharges || undefined,
         items: itemsDto,
         notes: notes || undefined,
       })
@@ -399,7 +387,6 @@ export default function InvoiceForm() {
         postingDate,
         dueDate,
         ncfType,
-        taxesAndCharges: taxesAndCharges || undefined,
         items: itemsDto,
         notes: notes || undefined,
       })
@@ -550,10 +537,10 @@ export default function InvoiceForm() {
                 <tr>
                   <th style={{ minWidth: 200 }}>Artículo</th>
                   <th>Descripción</th>
-                  <th style={{ width: 160 }}>Almacén</th>
                   <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
                   <th style={{ textAlign: 'right', width: 72 }}>Dto. %</th>
+                  <th style={{ textAlign: 'right', width: 80 }}>Impuesto</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 56 }}>UDM</th>
                   <th style={{ width: 40 }} />
@@ -562,7 +549,7 @@ export default function InvoiceForm() {
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+                    <td colSpan={9} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
                       No hay artículos. Agrega uno con el botón de abajo.
                     </td>
                   </tr>
@@ -576,46 +563,49 @@ export default function InvoiceForm() {
                           onSelect={(catalogItem) => selectCatalogItem(index, catalogItem)}
                           onClear={() => clearCatalogItem(index)}
                           onVariantSelect={(t) => setVariantTemplate(t)}
+                          validateStock
                         />
                       </td>
                       <td>
                         <input className="items-input" value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="Descripción" />
                       </td>
                       <td>
-                        {(() => {
-                          const whOptions: SearchSelectOption[] = item.stock
-                            ? item.stock.warehouses.map((w) => {
-                                const avail = (w.qty / item.conversionFactor).toFixed(2).replace(/\.?0+$/, '')
-                                return { value: w.warehouse, label: w.warehouse, sublabel: `${avail} ${item.uom} disp.` }
-                              })
-                            : []
-                          const whEntry = item.stock?.warehouses.find(w => w.warehouse === item.warehouse)
-                          const available = whEntry ? whEntry.qty / item.conversionFactor : null
-                          const overStock = available !== null && item.qty > available
-                          return (
-                            <div>
-                              <WarehouseSelect
-                                value={item.warehouse}
-                                options={whOptions}
-                                onChange={(val) => updateItem(index, { warehouse: val })}
-                              />
-                              {overStock && (
-                                <span style={{ fontSize: 11, color: 'var(--color-danger)', display: 'block', marginTop: 2 }}>
-                                  Disp: {available!.toFixed(2).replace(/\.?0+$/, '')} {item.uom}
-                                </span>
-                              )}
-                            </div>
-                          )
-                        })()}
-                      </td>
-                      <td>
                         <input className="items-input" type="number" min="0" step="1" value={item.qty} onChange={(e) => updateItem(index, { qty: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right' }} />
                       </td>
                       <td>
-                        <input className="items-input" type="number" min="0" step="0.01" value={item.rate} onChange={(e) => updateItem(index, { rate: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right' }} />
+                        <input className="items-input" type="number" min="0" step="0.01" value={item.rate} disabled style={{ textAlign: 'right' }} />
                       </td>
                       <td>
-                        <input className="items-input" type="number" min="0" max="100" step="0.1" value={item.discountPct} onChange={(e) => updateItem(index, { discountPct: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right', width: 56 }} />
+                        {(() => {
+                          const itemMax = item.maxDiscountPct && item.maxDiscountPct > 0 ? item.maxDiscountPct : 100
+                          const userMax = currentUser?.maxDiscountPct && currentUser.maxDiscountPct > 0 ? currentUser.maxDiscountPct : 100
+                          const priceLimit = maxDiscFromPrices(item.rate, item._prices)
+                          const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
+                          return (
+                            <>
+                              <input className={`items-input${item.discountPct > effectiveLimit ? ' items-input-error' : ''}`} type="number" min="0" max="100" step="0.1" value={item.discountPct} onChange={(e) => updateItem(index, { discountPct: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right', width: 56 }} />
+                              {effectiveLimit < 100 && (
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                  máx {effectiveLimit.toFixed(2)}%
+                                </span>
+                              )}
+                              {item.discountPct > effectiveLimit && (
+                                <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                  Supera el límite de {effectiveLimit.toFixed(2)}%
+                                </span>
+                              )}
+                            </>
+                          )
+                        })()}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {item.salesTaxPct > 0 ? (
+                          <span className="td-muted" style={{ fontSize: 12 }}>
+                            {item.salesTaxPct}%
+                          </span>
+                        ) : (
+                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                        )}
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
                       <td>
@@ -644,30 +634,10 @@ export default function InvoiceForm() {
               </button>
             </div>
             <div className="items-total-row">
-              {/* Tax template selector */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Plantilla de impuesto</span>
-                <select
-                  className="ff-select"
-                  style={{ fontSize: 12, padding: '3px 8px', flex: 1 }}
-                  value={taxesAndCharges}
-                  onChange={(e) => setTaxesAndCharges(e.target.value)}
-                >
-                  <option value="">— Sin impuesto —</option>
-                  {taxTemplates?.map((t) => (
-                    <option key={t.id} value={t.id}>{t.title}</option>
-                  ))}
-                </select>
-                {taxTemplates?.length === 0 && (
-                  <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                    No hay templates. <a href="/config/impuestos-ventas" style={{ color: 'var(--color-brand)' }}>Configurar</a>
-                  </span>
-                )}
-              </div>
-              <div className="items-total-line">
+              {/* <div className="items-total-line">
                 <span>Subtotal bruto</span>
                 <span>{formatDOP(grossTotal)}</span>
-              </div>
+              </div> */}
               {totalDiscount > 0 && (
                 <div className="items-total-line" style={{ color: 'var(--text-danger)' }}>
                   <span>Descuento total</span>
@@ -678,10 +648,10 @@ export default function InvoiceForm() {
                 <span>Subtotal neto</span>
                 <span>{formatDOP(subtotal)}</span>
               </div>
-              {taxesAndCharges && (
-                <div className="items-total-line">
-                  <span>{taxLabel} ({taxPct}%)</span>
-                  <span>{formatDOP(itbis)}</span>
+              {taxTotal > 0 && (
+                <div className="items-total-line" style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+                  <span>Impuesto</span>
+                  <span>{formatDOP(taxTotal)}</span>
                 </div>
               )}
               <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
@@ -732,9 +702,9 @@ export default function InvoiceForm() {
           setPinModalOpen(false)
           const itemsDto = items.map((i) => ({
             itemCode: i.itemCode, description: i.description, qty: i.qty, rate: i.rate,
-            discountPct: i.discountPct || undefined, uom: i.uom, warehouse: i.warehouse || undefined,
+            discountPct: i.discountPct || undefined, uom: i.uom,
           }))
-          if (isEdit) updateMutation.mutate({ customer: customerId, postingDate, dueDate, ncfType, taxesAndCharges: taxesAndCharges || undefined, items: itemsDto, notes: notes || undefined })
+          if (isEdit) updateMutation.mutate({ customer: customerId, postingDate, dueDate, ncfType, items: itemsDto, notes: notes || undefined })
           else createMutation.mutate({ customer: customerId, postingDate, dueDate, ncfType, items: itemsDto, notes: notes || undefined })
         }}
         title="Autorización requerida"

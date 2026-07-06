@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getQuotation, submitQuotation, deleteQuotation, convertQuotationToInvoice, amendQuotation } from '@/shared/api/quotations'
-import type { Quotation, AmendmentEntry } from '@/shared/api/types'
-import { ArrowLeft, FileText, Loader2, Send, Trash2, ClipboardList, GitBranch, History } from 'lucide-react'
+import { getQuotation, submitQuotation, deleteQuotation, convertQuotationToInvoice, cancelQuotation, downloadQuotationPdf } from '@/shared/api/quotations'
+import type { Quotation } from '@/shared/api/types'
+import { ArrowLeft, Download, FileText, Loader2, Send, Trash2, ClipboardList, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { NCF_TYPES } from '@/lib/constants'
+import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
 
 const STATUS_BADGE: Record<string, string> = {
   Draft: 'badge-draft',
@@ -79,21 +80,24 @@ export default function QuotationDetail() {
     },
   })
 
-  const amendMutation = useMutation({
-    mutationFn: () => amendQuotation(id!),
-    onSuccess: (result) => {
+  const cancelMutation = useMutation({
+    mutationFn: () => cancelQuotation(id!),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quotations'] })
-      toast.success('Enmienda creada')
-      navigate(`/cotizaciones/${result.newId}`)
+      queryClient.invalidateQueries({ queryKey: ['quotation', id] })
+      toast.success('Cotización cancelada')
     },
     onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al crear enmienda')
+      toast.error(err?.message ?? 'Error al cancelar la cotización')
     },
   })
 
-  const isActionsLoading = submitMutation.isPending || deleteMutation.isPending || convertMutation.isPending || amendMutation.isPending
+  const downloadMutation = useMutation({
+    mutationFn: () => downloadQuotationPdf(id!, `cotizacion-${id}.pdf`),
+    onError: () => toast.error('No se pudo descargar el PDF'),
+  })
 
-  const versionNumber = quotation?.history ? quotation.history.length + 1 : 1
+  const isActionsLoading = submitMutation.isPending || deleteMutation.isPending || convertMutation.isPending || cancelMutation.isPending || downloadMutation.isPending
 
   if (isLoading) {
     return (
@@ -121,8 +125,7 @@ export default function QuotationDetail() {
   const subtotal = quotation.items.reduce((s, i) => s + i.amount, 0)
   const grossTotal = quotation.items.reduce((s, i) => s + i.qty * i.rate, 0)
   const totalDiscount = grossTotal - subtotal
-  const itbis = Math.round(subtotal * 0.18 * 100) / 100
-  const total = subtotal + itbis
+  const total = subtotal
 
   return (
     <div className="page-container">
@@ -132,21 +135,37 @@ export default function QuotationDetail() {
             <ArrowLeft size={14} /> Cotizaciones
           </a>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            Cotización {quotation.id}
+            Cotización {displayId(quotation.id, quotation.sequence)}
             <span className={`badge ${STATUS_BADGE[quotation.status] ?? 'badge-neutral'}`}>
               {STATUS_LABEL[quotation.status] ?? quotation.status}
             </span>
-            {quotation.amendedFrom && (
-              <span className="badge badge-info">Versión {versionNumber}</span>
+            {quotation.sequence > 0 && (
+              <span className="badge badge-info" title="Veces que se ha editado en borrador">
+                Versión {quotation.sequence}
+              </span>
             )}
           </h1>
-          <p className="page-sub">Cliente: {quotation.customerName}</p>
+          <p className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            Cliente: {quotation.customerName}
+            {quotation.amendedFrom && (
+              <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+                · Basada en {quotation.amendedFrom}
+              </span>
+            )}
+          </p>
         </div>
       </div>
 
       <div className="doc-actions-bar">
         {quotation.status === 'draft' && (
           <>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => navigate(`/cotizaciones/${id}/editar`)}
+              disabled={isActionsLoading}
+            >
+              <FileText size={14} /> Editar
+            </button>
             <button
               className="btn btn-primary btn-size-sm"
               onClick={() => submitMutation.mutate()}
@@ -165,14 +184,44 @@ export default function QuotationDetail() {
         )}
         {quotation.status === 'submitted' && (
           <>
+            <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/cotizaciones/${id}/editar`)} disabled={isActionsLoading}>
+              <FileText size={14} /> Editar
+            </button>
+            <button className="btn btn-danger btn-size-sm" onClick={() => cancelMutation.mutate()} disabled={isActionsLoading}>
+              <XCircle size={14} /> Cancelar
+            </button>
             <button className="btn btn-secondary btn-size-sm" onClick={() => setConvertDialogOpen(true)} disabled={isActionsLoading}>
               <FileText size={14} /> Convertir a Factura
             </button>
             <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/pedidos/nuevo?quotation=${id}`)} disabled={isActionsLoading}>
               <ClipboardList size={14} /> Crear Pedido
             </button>
-            <button className="btn btn-ghost btn-size-sm" onClick={() => amendMutation.mutate()} disabled={isActionsLoading}>
-              <GitBranch size={14} /> Enmendar
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => downloadMutation.mutate()}
+              disabled={downloadMutation.isPending}
+            >
+              {downloadMutation.isPending
+                ? <><span className="spinner" /> Descargando…</>
+                : <><Download size={14} /> Descargar PDF</>}
+            </button>
+          </>
+        )}
+        {quotation.status !== 'draft' && quotation.status !== 'submitted' && (
+          <p className="page-sub" style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+            {quotation.status === 'cancelled' ? 'Cotización cancelada' : quotation.status === 'ordered' ? 'Cotización ordenada' : 'Cotización perdida'}
+          </p>
+        )}
+        {quotation.status === 'ordered' && (
+          <>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => downloadMutation.mutate()}
+              disabled={downloadMutation.isPending}
+            >
+              {downloadMutation.isPending
+                ? <><span className="spinner" /> Descargando…</>
+                : <><Download size={14} /> Descargar PDF</>}
             </button>
           </>
         )}
@@ -224,6 +273,7 @@ export default function QuotationDetail() {
               <tr>
                 <th>Código</th>
                 <th>Descripción</th>
+                <th>Notas</th>
                 <th style={{ textAlign: 'right' }}>Cant.</th>
                 <th style={{ textAlign: 'right' }}>Precio Unit.</th>
                 <th style={{ textAlign: 'right', width: 72 }}>Dto. %</th>
@@ -236,6 +286,7 @@ export default function QuotationDetail() {
                 <tr key={i}>
                   <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.itemCode || '—'}</td>
                   <td>{item.description || '—'}</td>
+                  <td style={{ fontSize: 12, color: 'var(--text-tertiary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.notes ?? ''}>{item.notes ?? '—'}</td>
                   <td style={{ textAlign: 'right' }}>{item.qty}</td>
                   <td style={{ textAlign: 'right' }}>
                     {item.discountPct && item.discountPct > 0 ? (
@@ -267,10 +318,6 @@ export default function QuotationDetail() {
               <span>Subtotal neto</span>
               <span>{formatDOP(subtotal)}</span>
             </div>
-            <div className="items-total-line">
-              <span>ITBIS (18%)</span>
-              <span>{formatDOP(itbis)}</span>
-            </div>
             <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
               <span>Total</span>
               <span>{formatDOP(total)}</span>
@@ -279,48 +326,8 @@ export default function QuotationDetail() {
         </div>
       </div>
 
-      {/* Historial de versiones */}
-      {quotation.history && quotation.history.length > 0 && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="card-header">
-            <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <History size={15} /> Historial de versiones
-            </h2>
-          </div>
-          <div className="card-body">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {[...quotation.history]
-                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                .map((entry, idx) => (
-                  <div
-                    key={entry.id}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '12px 0', borderBottom: idx < quotation.history!.length - 1 ? '1px solid var(--border)' : 'none',
-                    }}
-                  >
-                    <div style={{
-                      width: 8, height: 8, borderRadius: '50%',
-                      background: entry.status === 'Cancelled' ? 'var(--color-danger)' : 'var(--color-success)',
-                      flexShrink: 0,
-                    }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 500, fontSize: 13 }}>
-                        Versión {idx + 1} — {entry.id}
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-                        {entry.status === 'Cancelled' ? 'Cancelada' : entry.status} · {formatDate(entry.date)} · {formatDOP(entry.total)}
-                      </div>
-                    </div>
-                    <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/cotizaciones/${entry.id}`)}>
-                      Ver
-                    </button>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Historial */}
+      <DocumentHistoryCard history={quotation.history} basePath="/cotizaciones" currentDocId={quotation.id} />
 
       {convertDialogOpen && (
         <div className="modal-overlay" onClick={() => setConvertDialogOpen(false)}>

@@ -1,6 +1,6 @@
 import { client, unwrap, unwrapPaginated } from './client'
 import { ENDPOINTS } from './endpoints'
-import type { Pedido, CreatePedidoDto, PaginatedResponse, PaginationParams } from './types'
+import type { Pedido, DraftVersion, CreatePedidoDto, PaginatedResponse, PaginationParams } from './types'
 
 export interface ListPedidosParams extends PaginationParams {
   customer?: string
@@ -42,4 +42,21 @@ export async function cancelPedido(id: string) {
 export async function amendPedido(id: string) {
   const res = await client.post<{ success: true; data: { newId: string; amendedFrom: string } }>(ENDPOINTS.pedidos.amend(id))
   return unwrap(res)
+}
+
+export async function getPedidoVersion(id: string, sequence: number) {
+  const res = await client.get<{ success: true; data: DraftVersion }>(ENDPOINTS.pedidos.version(id, sequence))
+  return unwrap(res)
+}
+
+export async function downloadPedidoPdf(id: string, filename?: string): Promise<void> {
+  const res = await client.get<Blob>(ENDPOINTS.pedidos.pdf(id), {
+    responseType: 'blob',
+  })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename ?? `pedido-${id}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
 }

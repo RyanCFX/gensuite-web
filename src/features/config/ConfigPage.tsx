@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTabs } from '@/contexts/TabsContext'
 import { toast } from 'sonner'
 import axios from 'axios'
 import {
@@ -13,10 +14,10 @@ import {
   getPerfil, updatePerfil,
   listImpuestosVentas, createImpuestoVentas, updateImpuestoVentas, deleteImpuestoVentas,
   listImpuestosCompras, createImpuestoCompras, updateImpuestoCompras, deleteImpuestoCompras,
-  listGruposClientes, createGrupoCliente, updateGrupoCliente, deleteGrupoCliente,
   listGruposProveedores, createGrupoProveedor,
 } from '@/shared/api/config'
-import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, CreateTaxTemplateDto, Grupo, GrupoCliente } from '@/shared/api/types'
+import { listCustomerGroups, createCustomerGroup, deleteCustomerGroup } from '@/shared/api/customers'
+import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, CreateTaxTemplateDto, GrupoCliente } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
@@ -998,9 +999,11 @@ function NcfSection() {
 }
 
 // ---- Perfil Section ----
+
 function PerfilSection() {
   const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({ queryKey: ['perfil'], queryFn: getPerfil })
+  const { multiTab, toggleMultiTab } = useTabs()
 
   const [form, setForm] = useState<Record<string, string>>({})
 
@@ -1042,6 +1045,14 @@ function PerfilSection() {
             {saveMutation.isPending ? 'Guardando…' : 'Guardar Perfil'}
           </button>
         </div>
+        <div style={{ borderTop: '1px solid var(--border-default)', margin: '4px 0' }} />
+        <label className="ff-check-wrap" style={{ cursor: 'pointer' }} onClick={toggleMultiTab}>
+          <input type="checkbox" className="ff-check" checked={multiTab} readOnly />
+          <span style={{ fontSize: 13, fontWeight: 500 }}>Multipestañas</span>
+          <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+            {multiTab ? 'Activado — navegación por pestañas internas' : 'Desactivado — navegación simple'}
+          </span>
+        </label>
       </div>
     </div>
   )
@@ -1372,98 +1383,104 @@ const PRICE_TIER_OPTIONS = [
 ]
 
 function GruposClientesSection() {
-  const { data: grupos, isLoading, refetch } = useQuery({ queryKey: ['grupos-clientes'], queryFn: listGruposClientes })
-  const [toDelete, setToDelete] = useState<Grupo | null>(null)
+  const queryClient = useQueryClient()
+  const { data: grupos, isLoading } = useQuery({ queryKey: ['customer-groups'], queryFn: listCustomerGroups })
   const [showForm, setShowForm] = useState(false)
-  const [editTarget, setEditTarget] = useState<Grupo | null>(null)
   const [formName, setFormName] = useState('')
   const [formPriceTier, setFormPriceTier] = useState<string>('')
+  const [toDelete, setToDelete] = useState<GrupoCliente | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const createMutation = useMutation({
-    mutationFn: () => createGrupoCliente({ name: formName }),
-    onSuccess: () => { closeForm(); refetch() },
-  })
-  const updateMutation = useMutation({
-    mutationFn: () => updateGrupoCliente(editTarget!.id!, { name: formName, priceTier: formPriceTier as 'A' | 'B' | 'C' | undefined }),
-    onSuccess: () => { closeForm(); refetch() },
-  })
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteGrupoCliente(toDelete!.id!),
-    onSuccess: () => { setToDelete(null); refetch() },
+    mutationFn: () => createCustomerGroup({ name: formName, priceTier: formPriceTier as 'A' | 'B' | 'C' | undefined, parentGroup: 'All Customer Groups' }),
+    onSuccess: () => {
+      toast.success('Grupo creado')
+      queryClient.invalidateQueries({ queryKey: ['customer-groups'] })
+      setShowForm(false)
+      setFormName('')
+      setFormPriceTier('')
+    },
+    onError: () => toast.error('Error al crear el grupo'),
   })
 
-  function openCreate() {
-    setEditTarget(null)
-    setFormName('')
-    setFormPriceTier('')
-    setShowForm(true)
-  }
-  function openEdit(g: Grupo) {
-    setEditTarget(g)
-    setFormName(g.name)
-    setFormPriceTier('')
-    setShowForm(true)
-  }
-  function closeForm() {
-    setShowForm(false)
-    setEditTarget(null)
-  }
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteCustomerGroup(toDelete!.name),
+    onSuccess: () => {
+      toast.success('Grupo eliminado')
+      queryClient.invalidateQueries({ queryKey: ['customer-groups'] })
+      setToDelete(null)
+      setDeleteError(null)
+    },
+    onError: (err: { response?: { status?: number; data?: { message?: string } } }) => {
+      if (err.response?.status === 409) {
+        setDeleteError(err.response.data?.message ?? 'No se puede eliminar el grupo porque tiene clientes asignados.')
+      } else {
+        toast.error('Error al eliminar el grupo')
+        setToDelete(null)
+      }
+    },
+  })
 
   return (
     <>
-      <div className="config-section">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h2 className="config-section-title">Grupos de Clientes</h2>
-          <button className="btn btn-primary btn-size-sm" onClick={openCreate}>
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Grupos de Clientes</span>
+          <button className="btn btn-primary btn-size-sm" onClick={() => { setShowForm(true); setToDelete(null) }}>
             <Plus size={14} /> Nuevo
           </button>
         </div>
-        {isLoading ? (
-          <p style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>Cargando…</p>
-        ) : !grupos?.length ? (
-          <p style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>No hay grupos de clientes.</p>
-        ) : (
-          <table className="table-config">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Nivel de precio</th>
-                <th style={{ width: 80 }} />
-              </tr>
-            </thead>
-            <tbody>
-              {grupos.map((g) => (
-                <tr key={g.id}>
-                  <td>{g.name}</td>
-                  <td>
-                    <span className="badge" style={{ background: g.priceTier ? 'var(--accent-bg)' : 'var(--surface-sunken)', color: g.priceTier ? 'var(--accent)' : 'var(--text-tertiary)' }}>
-                      {g.priceTier ? `Nivel ${g.priceTier}` : 'Sin nivel'}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <button className="btn btn-ghost btn-size-icon-sm" onClick={() => openEdit(g)}>
-                        <Pencil size={13} />
-                      </button>
-                      <button className="btn btn-ghost btn-size-icon-sm" style={{ color: 'var(--icon-muted)' }} onClick={() => setToDelete(g)}>
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <div>
+          {isLoading
+            ? <span className="skeleton-box" style={{ height: 128, display: 'block', margin: 16 }} />
+            : (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Nombre</th>
+                      <th>Nivel de precio</th>
+                      <th style={{ width: 80 }} />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {!grupos?.length ? (
+                      <tr>
+                        <td colSpan={3} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-tertiary)' }}>
+                          No hay grupos de clientes.
+                        </td>
+                      </tr>
+                    ) : grupos.map((g) => (
+                      <tr key={g.name}>
+                        <td style={{ fontWeight: 500 }}>{g.name}</td>
+                        <td>
+                          <span className="badge" style={{ background: g.priceTier ? 'var(--accent-bg)' : 'var(--surface-sunken)', color: g.priceTier ? 'var(--accent)' : 'var(--text-tertiary)' }}>
+                            {g.priceTier ? `Nivel ${g.priceTier}` : 'Sin nivel'}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-ghost btn-size-icon-sm"
+                            style={{ color: 'var(--icon-muted)' }}
+                            onClick={() => { setToDelete(g); setDeleteError(null); setShowForm(false) }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+        </div>
       </div>
 
-      {/* Create / Edit modal */}
+      {/* Create modal */}
       {showForm && (
-        <div className="modal-overlay" onClick={closeForm}>
+        <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
-              <h2 className="modal-title">{editTarget ? 'Editar Grupo' : 'Nuevo Grupo'}</h2>
-              <button className="modal-close" onClick={closeForm}><X size={16} /></button>
+              <h2 className="modal-title">Nuevo Grupo</h2>
+              <button className="modal-close" onClick={() => setShowForm(false)}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="ff-wrap">
@@ -1481,13 +1498,13 @@ function GruposClientesSection() {
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={closeForm}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancelar</button>
               <button
                 className="btn btn-primary"
-                onClick={() => (editTarget ? updateMutation.mutate() : createMutation.mutate())}
-                disabled={!formName || (editTarget ? updateMutation.isPending : createMutation.isPending)}
+                onClick={() => createMutation.mutate()}
+                disabled={!formName || createMutation.isPending}
               >
-                {(editTarget ? updateMutation.isPending : createMutation.isPending) ? 'Guardando…' : 'Guardar'}
+                {createMutation.isPending ? 'Guardando…' : 'Guardar'}
               </button>
             </div>
           </div>
@@ -1496,22 +1513,33 @@ function GruposClientesSection() {
 
       {/* Delete confirm */}
       {toDelete && (
-        <div className="modal-overlay" onClick={() => setToDelete(null)}>
+        <div className="modal-overlay" onClick={() => { setToDelete(null); setDeleteError(null) }}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">¿Eliminar grupo?</h2>
-              <button className="modal-close" onClick={() => setToDelete(null)}><X size={16} /></button>
+              <button className="modal-close" onClick={() => { setToDelete(null); setDeleteError(null) }}><X size={16} /></button>
             </div>
             <div className="modal-body">
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                Se eliminará <strong>{toDelete.name}</strong>. Esta acción no se puede deshacer.
-              </p>
+              {deleteError ? (
+                <div className="inline-alert inline-alert-danger" style={{ marginBottom: 12 }}>
+                  <FileWarning size={14} />
+                  {deleteError}
+                </div>
+              ) : (
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                  Se eliminará <strong>{toDelete.name}</strong>. Esta acción no se puede deshacer.
+                </p>
+              )}
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setToDelete(null)}>Cancelar</button>
-              <button className="btn btn-danger" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
-                Eliminar
-              </button>
+              <button className="btn btn-secondary" onClick={() => { setToDelete(null); setDeleteError(null) }}>Cancelar</button>
+              {!deleteError ? (
+                <button className="btn btn-danger" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
+                  {deleteMutation.isPending ? 'Eliminando…' : 'Eliminar'}
+                </button>
+              ) : (
+                <button className="btn btn-primary" onClick={() => { setDeleteError(null); setToDelete(null) }}>Entendido</button>
+              )}
             </div>
           </div>
         </div>

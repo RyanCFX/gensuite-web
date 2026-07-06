@@ -203,10 +203,6 @@ export default function GastoDetail() {
               <span className="detail-value">{getFormaPagoLabel(gasto.formaPago606)}</span>
             </div>
             <div className="detail-field">
-              <span className="detail-label">Retención ITBIS</span>
-              <span className="detail-value">{formatDOP(gasto.retencionItbis)}</span>
-            </div>
-            <div className="detail-field">
               <span className="detail-label">Retención ISR</span>
               <span className="detail-value">{formatDOP(gasto.retencionIsr)}</span>
             </div>

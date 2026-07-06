@@ -5,13 +5,21 @@ import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { getCustomer, createCustomer, updateCustomer } from '@/shared/api/customers'
+import { getCustomer, createCustomer, updateCustomer, listCustomerGroups } from '@/shared/api/customers'
 import { validateRNC, validateCedula, formatRNC, formatCedula } from '@/lib/validators/dgii'
-import { CheckCircle2, XCircle, Info, ArrowLeft } from 'lucide-react'
+import { SearchSelect, type SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { CheckCircle2, XCircle, Info, ArrowLeft, HelpCircle } from 'lucide-react'
 
 // NOTE: tipoIdentificacion does NOT exist in CreateCustomerDto/UpdateCustomerDto.
 // It is only used here as a local UI helper to decide which field to show.
 type IdType = 'RNC' | 'Cedula' | 'Pasaporte' | 'NIT' | ''
+
+const ID_TYPE_LABELS: Record<string, string> = {
+  RNC: 'RNC (empresa)',
+  Cedula: 'Cédula',
+  Pasaporte: 'Pasaporte',
+  NIT: 'NIT (extranjero)',
+}
 
 const schema = z.object({
   customerName: z.string().min(1, 'El nombre es requerido'),
@@ -23,6 +31,7 @@ const schema = z.object({
   creditLimit: z.number().min(0).optional(),
   creditDays: z.number().min(0).optional(),
   emailInvoice: z.string().email('Email inválido').optional().or(z.literal('')),
+  customerGroup: z.string().optional(),
 }).superRefine((data, ctx) => {
   // Only validate if the user filled in the field
   if (data.rnc && !validateRNC(data.rnc.replace(/[-\s]/g, ''))) {
@@ -50,6 +59,11 @@ export default function CustomerForm() {
     enabled: isEdit,
   })
 
+  const { data: groupsData } = useQuery({
+    queryKey: ['customer-groups'],
+    queryFn: listCustomerGroups,
+  })
+
   const {
     register, control, handleSubmit, watch, setValue,
     formState: { errors, isSubmitting }, reset,
@@ -65,6 +79,7 @@ export default function CustomerForm() {
       creditLimit: 0,
       creditDays: 30,
       emailInvoice: '',
+      customerGroup: '',
     },
   })
 
@@ -83,6 +98,7 @@ export default function CustomerForm() {
         creditLimit: customer.creditLimit,
         creditDays: customer.creditDays,
         emailInvoice: customer.emailInvoice ?? '',
+        customerGroup: customer.customerGroup ?? '',
       })
     }
   }, [customer, reset])
@@ -124,6 +140,7 @@ export default function CustomerForm() {
       creditLimit: values.hasCredit ? values.creditLimit : undefined,
       creditDays: values.hasCredit ? values.creditDays : undefined,
       emailInvoice: values.emailInvoice || undefined,
+      customerGroup: values.customerGroup || undefined,
     }
     if (isEdit) updateMutation.mutate(payload)
     else createMutation.mutate(payload)
@@ -131,6 +148,12 @@ export default function CustomerForm() {
 
   const hasCredit = watch('hasCredit')
   const isGovernment = watch('isGovernment')
+  const customerGroup = watch('customerGroup')
+  const [groupQuery, setGroupQuery] = useState('')
+  const [groupLabel, setGroupLabel] = useState('')
+  const filteredGroups = (groupsData ?? []).filter((g) => !groupQuery || g.name.toLowerCase().includes(groupQuery.toLowerCase()))
+  const groupOptions: SearchSelectOption[] = filteredGroups.map((g) => ({ value: g.name, label: g.name }))
+  const selectedGroup = groupsData?.find((g) => g.name === customerGroup)
   const rncValue = watch('rnc') ?? ''
   const cedulaValue = watch('cedula') ?? ''
   const rncClean = rncValue.replace(/[-\s]/g, '')
@@ -188,31 +211,42 @@ export default function CustomerForm() {
                   name="customerType"
                   control={control}
                   render={({ field }) => (
-                    <select className="ff-select" value={field.value} onChange={field.onChange}>
-                      <option value="Company">Empresa</option>
-                      <option value="Individual">Individual</option>
-                    </select>
+                    <SearchSelect
+                      id="customerType"
+                      value={field.value}
+                      onChange={(v) => field.onChange(v)}
+                      options={[
+                        { value: 'Company', label: 'Empresa' },
+                        { value: 'Individual', label: 'Individual' },
+                      ]}
+                      selectedLabel={field.value === 'Company' ? 'Empresa' : field.value === 'Individual' ? 'Individual' : ''}
+                      onSearch={() => {}}
+                      placeholder="Seleccionar…"
+                    />
                   )}
                 />
               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label">Tipo de identificación</label>
-                <select
-                  className="ff-select"
+                <SearchSelect
                   value={idType}
-                  onChange={(e) => {
-                    setIdType(e.target.value as IdType)
+                  onChange={(v) => {
+                    setIdType(v as IdType)
                     setValue('rnc', '')
                     setValue('cedula', '')
                   }}
-                >
-                  <option value="">Sin identificación</option>
-                  <option value="RNC">RNC (empresa)</option>
-                  <option value="Cedula">Cédula</option>
-                  <option value="Pasaporte">Pasaporte</option>
-                  <option value="NIT">NIT (extranjero)</option>
-                </select>
+                  options={[
+                    { value: '', label: 'Sin identificación' },
+                    { value: 'RNC', label: 'RNC (empresa)' },
+                    { value: 'Cedula', label: 'Cédula' },
+                    { value: 'Pasaporte', label: 'Pasaporte' },
+                    { value: 'NIT', label: 'NIT (extranjero)' },
+                  ]}
+                  selectedLabel={idType ? ID_TYPE_LABELS[idType] : ''}
+                  onSearch={() => {}}
+                  placeholder="Seleccionar…"
+                />
               </div>
             </div>
 
@@ -279,6 +313,36 @@ export default function CustomerForm() {
                 {...register('emailInvoice')}
               />
               {errors.emailInvoice && <p className="ff-error">{errors.emailInvoice.message}</p>}
+            </div>
+
+            {/* Grupo de clientes */}
+            <div className="form-row">
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="customerGroup">Grupo de clientes</label>
+                <SearchSelect
+                  id="customerGroup"
+                  value={customerGroup ?? ''}
+                  onChange={(v, opt) => {
+                    setValue('customerGroup', opt?.value ?? '')
+                    setGroupLabel(opt?.label ?? '')
+                  }}
+                  options={groupOptions}
+                  selectedLabel={groupLabel}
+                  onSearch={setGroupQuery}
+                  placeholder="Buscar grupo…"
+                />
+              </div>
+              {selectedGroup && selectedGroup.priceTier && (
+                <div className="ff-wrap">
+                  <label className="ff-label">Nivel de precio</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36 }}>
+                    <span className="badge" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>
+                      Nivel {selectedGroup.priceTier}
+                    </span>
+                    <HelpCircle size={13} style={{ color: 'var(--text-tertiary)' }} title="El nivel de precio se hereda del grupo de clientes" />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

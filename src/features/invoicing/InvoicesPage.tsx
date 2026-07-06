@@ -3,9 +3,11 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { listInvoices } from '@/shared/api/invoices'
 import type { ListInvoicesParams } from '@/shared/api/invoices'
-import { Plus, Eye, Search } from 'lucide-react'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { Plus, Eye, Search, GitBranch } from 'lucide-react'
+import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { NCF_TYPES } from '@/lib/constants'
+import { useSortState } from '@/shared/hooks/useSortState'
+import { SortableTh } from '@/shared/ui/SortableTh'
 
 type StatusFilter = 'draft' | 'submitted' | 'cancelled' | 'all'
 type PaymentFilter = 'paid' | 'unpaid' | 'partly_paid' | 'overdue' | 'all'
@@ -42,6 +44,7 @@ export default function InvoicesPage() {
   const [ncfType, setNcfType] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const { orderBy, sort } = useSortState()
 
   const params: ListInvoicesParams = {
     search: search || undefined,
@@ -50,6 +53,7 @@ export default function InvoicesPage() {
     ncfType: ncfType || undefined,
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
+    orderBy: orderBy || undefined,
     limit: 50,
   }
 
@@ -144,14 +148,14 @@ export default function InvoicesPage() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>#</th>
-              <th>Cliente</th>
-              <th>Fecha</th>
+              <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} />
+              <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} />
+              <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} />
               <th>Vence</th>
               <th>NCF</th>
-              <th style={{ textAlign: 'right' }}>Total</th>
+              <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={sort} align="right" />
               <th style={{ textAlign: 'right' }}>Pendiente</th>
-              <th>Estado</th>
+              <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
               <th style={{ textAlign: 'right', width: 64 }}>Ver</th>
             </tr>
           </thead>
@@ -183,7 +187,10 @@ export default function InvoicesPage() {
                   className="table-row-clickable"
                   onClick={() => navigate(`/facturacion/facturas/${inv.id}`)}
                 >
-                  <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{inv.id}</td>
+                  <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    {inv.amendedFrom && <GitBranch size={12} style={{ verticalAlign: 'middle', marginRight: 4, color: 'var(--text-tertiary)' }} />}
+                    {displayId(inv.id, inv.sequence)}
+                  </td>
                   <td style={{ fontWeight: 500 }}>{inv.customerName}</td>
                   <td>{formatDate(inv.postingDate)}</td>
                   <td>{formatDate(inv.dueDate)}</td>

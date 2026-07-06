@@ -9,6 +9,8 @@ import {
   updateAttribute,
 } from '@/shared/api/catalog'
 import type { ItemAttribute, AttributeValue, CreateAttributeDto, UpdateAttributeDto } from '@/shared/api/types'
+import { useSortState } from '@/shared/hooks/useSortState'
+import { SortableTh } from '@/shared/ui/SortableTh'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -402,16 +404,17 @@ export default function AttributesPage() {
   const [editTarget, setEditTarget] = useState<ItemAttribute | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
   const [loadingEdit, setLoadingEdit] = useState<string | null>(null) // id being fetched
+  const { orderBy, sort } = useSortState()
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['attributes'],
-    queryFn: () => listAttributes({ limit: 100 }),
+    queryKey: ['attributes', { orderBy }],
+    queryFn: () => listAttributes({ limit: 100, orderBy: orderBy || undefined }),
   })
 
   // Prefetch on hover
   const { refetch: refetchList } = useQuery({
-    queryKey: ['attributes'],
-    queryFn: () => listAttributes({ limit: 100 }),
+    queryKey: ['attributes', { orderBy }],
+    queryFn: () => listAttributes({ limit: 100, orderBy: orderBy || undefined }),
     enabled: false,
   })
 
@@ -492,7 +495,7 @@ export default function AttributesPage() {
               <table className="data-table" style={{ width: '100%' }}>
                 <thead>
                   <tr>
-                    <th>Nombre</th>
+                    <SortableTh label="Nombre" sortKey="name" orderBy={orderBy} onSort={sort} />
                     <th>Tipo</th>
                     <th># Valores</th>
                     <th style={{ width: 120 }}>Acciones</th>

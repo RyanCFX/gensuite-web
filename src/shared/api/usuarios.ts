@@ -3,6 +3,7 @@ import { ENDPOINTS } from './endpoints'
 import type {
   Usuario,
   CreateUsuarioDto,
+  UpdateUsuarioDto,
   PaginatedResponse,
   PaginationParams,
 } from './types'
@@ -22,7 +23,7 @@ export async function createUsuario(data: CreateUsuarioDto) {
   return unwrap(res)
 }
 
-export async function updateUsuario(email: string, data: Partial<CreateUsuarioDto>) {
+export async function updateUsuario(email: string, data: Partial<UpdateUsuarioDto>) {
   const res = await client.put<{ success: true; data: Usuario }>(ENDPOINTS.usuarios.byEmail(email), data)
   return unwrap(res)
 }

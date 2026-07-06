@@ -24,6 +24,8 @@ export interface ItemSelectProps {
   placeholder?: string
   disabled?: boolean
   onVariantSelect?: (template: Item) => void
+  typeFilter?: 'product' | 'service'
+  validateStock?: boolean
 }
 
 export function ItemSelect({
@@ -34,12 +36,14 @@ export function ItemSelect({
   placeholder = 'Buscar artículo…',
   disabled,
   onVariantSelect,
+  typeFilter,
+  validateStock,
 }: ItemSelectProps) {
   const [query, setQuery] = useState('')
 
   const { data, isLoading } = useQuery({
-    queryKey: ['itemSearch', query],
-    queryFn: () => listItems({ search: query || undefined, disabled: 'false', limit: 15 }),
+    queryKey: ['itemSearch', query, typeFilter],
+    queryFn: () => listItems({ search: query || undefined, disabled: 'false', limit: 15, ...(typeFilter && { type: typeFilter }), ...(validateStock && { validateStock: true }) }),
     enabled: true,
     staleTime: 30_000,
   })

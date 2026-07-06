@@ -6,6 +6,11 @@ export const ENDPOINTS = {
   customers: {
     list: '/customers',
     byId: (id: string) => `/customers/${id}`,
+    groups: {
+      list: '/customers/groups/list',
+      create: '/customers/groups',
+      delete: (name: string) => `/customers/groups/${encodeURIComponent(name)}`,
+    },
   },
   invoices: {
     list: '/invoices',
@@ -14,6 +19,7 @@ export const ENDPOINTS = {
     cancel: (id: string) => `/invoices/${id}/cancel`,
     amend: (id: string) => `/invoices/${id}/amend`,
     pdf: (id: string) => `/invoices/${id}/pdf`,
+    version: (id: string, seq: number) => `/invoices/${id}/versions/${seq}`,
   },
   quotations: {
     list: '/quotations',
@@ -21,6 +27,9 @@ export const ENDPOINTS = {
     submit: (id: string) => `/quotations/${id}/submit`,
     convert: (id: string) => `/quotations/${id}/convert`,
     amend: (id: string) => `/quotations/${id}/amend`,
+    cancel: (id: string) => `/quotations/${id}/cancel`,
+    version: (id: string, seq: number) => `/quotations/${id}/versions/${seq}`,
+    pdf: (id: string) => `/quotations/${id}/pdf`,
   },
   creditNotes: {
     list: '/credit-notes',
@@ -81,6 +90,7 @@ export const ENDPOINTS = {
     cancel: (id: string) => `/compras/${id}/cancel`,
     amend: (id: string) => `/compras/${id}/amend`,
     return: (id: string) => `/compras/${id}/return`,
+    delete: (id: string) => `/compras/${id}`,
   },
   pedidos: {
     list: '/pedidos',
@@ -88,6 +98,8 @@ export const ENDPOINTS = {
     submit: (id: string) => `/pedidos/${id}/submit`,
     cancel: (id: string) => `/pedidos/${id}/cancel`,
     amend: (id: string) => `/pedidos/${id}/amend`,
+    version: (id: string, sequence: number) => `/pedidos/${id}/versions/${sequence}`,
+    pdf: (id: string) => `/pedidos/${id}/pdf`,
   },
   gastos: {
     list: '/gastos',

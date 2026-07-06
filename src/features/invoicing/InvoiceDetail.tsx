@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getInvoice, submitInvoice, cancelInvoice, amendInvoice, downloadInvoicePdf } from '@/shared/api/invoices'
 import { ArrowLeft, Send, XCircle, FileEdit, Download, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { NCF_TYPES } from '@/lib/constants'
+import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
 
 const STATUS_BADGE: Record<string, string> = {
   Draft: 'badge-draft',
@@ -122,10 +123,15 @@ export default function InvoiceDetail() {
             <ArrowLeft size={14} /> Facturas
           </a>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            Factura {invoice.id}
+            Factura {displayId(invoice.id, invoice.sequence)}
             <span className={`badge ${STATUS_BADGE[invoice.status] ?? 'badge-neutral'}`}>
               {STATUS_LABEL[invoice.status] ?? invoice.status}
             </span>
+            {invoice.sequence > 0 && (
+              <span className="badge badge-info" title="Veces que se ha editado en borrador">
+                Versión {invoice.sequence}
+              </span>
+            )}
           </h1>
           <p className="page-sub">
             {invoice.ncf ? `NCF: ${invoice.ncf}` : 'Borrador — NCF pendiente de asignación'}
@@ -221,10 +227,6 @@ export default function InvoiceDetail() {
                 <span className="detail-value">{formatDOP(invoice.subtotal)}</span>
               </div>
               <div className="detail-field">
-                <span className="detail-label">ITBIS (18%)</span>
-                <span className="detail-value">{formatDOP(invoice.taxAmount)}</span>
-              </div>
-              <div className="detail-field">
                 <span className="detail-label">Total</span>
                 <span className="detail-value" style={{ fontSize: 18, fontWeight: 700 }}>{formatDOP(invoice.grandTotal)}</span>
               </div>
@@ -264,6 +266,7 @@ export default function InvoiceDetail() {
               <tr>
                 <th>Código</th>
                 <th>Descripción</th>
+                <th>Notas</th>
                 <th style={{ textAlign: 'right' }}>Cant.</th>
                 <th style={{ textAlign: 'right' }}>Precio Unit.</th>
                 <th style={{ textAlign: 'right', width: 72 }}>Dto. %</th>
@@ -276,6 +279,7 @@ export default function InvoiceDetail() {
                 <tr key={i}>
                   <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.itemCode || '—'}</td>
                   <td>{item.description || '—'}</td>
+                  <td style={{ fontSize: 12, color: 'var(--text-tertiary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.notes ?? ''}>{item.notes ?? '—'}</td>
                   <td style={{ textAlign: 'right' }}>{item.qty}</td>
                   <td style={{ textAlign: 'right' }}>
                     {item.discountPct && item.discountPct > 0 ? (
@@ -304,10 +308,6 @@ export default function InvoiceDetail() {
                 </>
               )
             })()}
-            <div className="items-total-line">
-              <span>ITBIS (18%)</span>
-              <span>{formatDOP(invoice.taxAmount)}</span>
-            </div>
             <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
               <span>Total</span>
               <span>{formatDOP(invoice.grandTotal)}</span>
@@ -321,6 +321,9 @@ export default function InvoiceDetail() {
           </div>
         </div>
       </div>
+
+      {/* Historial */}
+      <DocumentHistoryCard history={invoice.history} basePath="/facturacion/facturas" currentDocId={invoice.id} />
     </div>
   )
 }

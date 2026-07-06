@@ -95,15 +95,12 @@ export default function App() {
             {/* Catálogo */}
             <Route path="/catalogo/categorias" element={<Suspense fallback={<PageLoader />}><CategoriesPage /></Suspense>} />
             <Route path="/catalogo/marcas" element={<Suspense fallback={<PageLoader />}><BrandsPage /></Suspense>} />
-            <Route path="/catalogo/articulos" element={<Suspense fallback={<PageLoader />}><ItemsPage /></Suspense>} />
-            <Route path="/catalogo/articulos/nuevo" element={<Suspense fallback={<PageLoader />}><ItemForm /></Suspense>} />
-            <Route path="/catalogo/articulos/:id" element={<Suspense fallback={<PageLoader />}><ItemDetail /></Suspense>} />
-            <Route path="/catalogo/atributos" element={<Suspense fallback={<PageLoader />}><AttributesPage /></Suspense>} />
             <Route path="/catalogo/combos" element={<Suspense fallback={<PageLoader />}><BundlesPage /></Suspense>} />
 
             {/* Cotizaciones */}
             <Route path="/cotizaciones" element={<Suspense fallback={<PageLoader />}><QuotationsPage /></Suspense>} />
             <Route path="/cotizaciones/nueva" element={<Suspense fallback={<PageLoader />}><QuotationForm /></Suspense>} />
+            <Route path="/cotizaciones/:id/editar" element={<Suspense fallback={<PageLoader />}><QuotationForm /></Suspense>} />
             <Route path="/cotizaciones/:id" element={<Suspense fallback={<PageLoader />}><QuotationDetail /></Suspense>} />
 
             {/* Pedidos de Venta */}
@@ -121,6 +118,10 @@ export default function App() {
             <Route path="/facturacion/notas-debito" element={<Suspense fallback={<PageLoader />}><DebitNotesPage /></Suspense>} />
 
             {/* Inventario */}
+             <Route path="/inventario/articulos" element={<Suspense fallback={<PageLoader />}><ItemsPage /></Suspense>} />
+            <Route path="/inventario/articulos/nuevo" element={<Suspense fallback={<PageLoader />}><ItemForm /></Suspense>} />
+            <Route path="/inventario/articulos/:id" element={<Suspense fallback={<PageLoader />}><ItemDetail /></Suspense>} />
+            <Route path="/catalogo/atributos" element={<Suspense fallback={<PageLoader />}><AttributesPage /></Suspense>} />
             <Route path="/inventario/stock" element={<Suspense fallback={<PageLoader />}><StockPage /></Suspense>} />
             <Route path="/inventario/historial" element={<Suspense fallback={<PageLoader />}><HistoryPage /></Suspense>} />
             <Route path="/inventario/conteos" element={<Suspense fallback={<PageLoader />}><CountsPage /></Suspense>} />
@@ -128,6 +129,7 @@ export default function App() {
             {/* Compras */}
             <Route path="/compras" element={<Suspense fallback={<PageLoader />}><ComprasPage /></Suspense>} />
             <Route path="/compras/nueva" element={<Suspense fallback={<PageLoader />}><CompraForm /></Suspense>} />
+            <Route path="/compras/:id/editar" element={<Suspense fallback={<PageLoader />}><CompraForm /></Suspense>} />
             <Route path="/compras/:id" element={<Suspense fallback={<PageLoader />}><CompraDetail /></Suspense>} />
 
             {/* Gastos */}

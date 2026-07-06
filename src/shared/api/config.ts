@@ -130,11 +130,6 @@ export async function deleteGrupoCliente(id: string) {
   await client.delete(`${ENDPOINTS.config.gruposClientes}/${id}`)
 }
 
-export async function listItemTaxTemplates() {
-  const res = await client.get<{ success: true; data: { id: string; title: string }[] }>(ENDPOINTS.config.itemTaxTemplates)
-  return unwrap(res)
-}
-
 export async function listGruposProveedores() {
   const res = await client.get<{ success: true; data: Grupo[] }>(ENDPOINTS.config.gruposProveedores)
   return unwrap(res)
@@ -238,4 +233,11 @@ export async function updateImpuestoCompras(id: string, data: Partial<CreateTaxT
 
 export async function deleteImpuestoCompras(id: string): Promise<void> {
   await client.delete(ENDPOINTS.config.impuestosComprasById(id))
+}
+
+// ─── Item Tax Templates ────────────────────────────────────────────────────────
+
+export async function listItemTaxTemplates(): Promise<TaxTemplate[]> {
+  const res = await client.get<{ success: true; data: TaxTemplate[] }>(ENDPOINTS.config.itemTaxTemplates)
+  return unwrap(res)
 }

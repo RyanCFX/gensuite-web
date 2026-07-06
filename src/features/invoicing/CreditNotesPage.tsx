@@ -10,6 +10,8 @@ import type { Invoice, CreateCreditNoteDto } from '@/shared/api/types'
 import { Plus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatDOP } from '@/lib/formatters'
+import { useSortState } from '@/shared/hooks/useSortState'
+import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
@@ -51,6 +53,7 @@ const STATUS_LABEL: Record<string, string> = {
 export default function CreditNotesPage() {
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
+  const { orderBy, sort } = useSortState()
 
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('')
@@ -59,8 +62,8 @@ export default function CreditNotesPage() {
   const [noteItems, setNoteItems] = useState<NoteLineItem[]>([])
 
   const { data: notesData, isLoading } = useQuery({
-    queryKey: ['credit-notes'],
-    queryFn: listCreditNotes,
+    queryKey: ['credit-notes', orderBy],
+    queryFn: () => listCreditNotes({ orderBy: orderBy || undefined }),
   })
 
   const { data: invoicesData, isLoading: invoicesLoading } = useQuery({
@@ -139,12 +142,12 @@ export default function CreditNotesPage() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>#</th>
+              <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} />
               <th>Factura Original</th>
-              <th>Cliente</th>
-              <th>Fecha</th>
-              <th style={{ textAlign: 'right' }}>Total</th>
-              <th>Estado</th>
+              <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} />
+              <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} />
+              <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={sort} align="right" />
+              <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
             </tr>
           </thead>
           <tbody>

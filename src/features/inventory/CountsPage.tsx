@@ -5,6 +5,7 @@ import { listCounts, getCountTemplate, createCount, submitCount, type CountTempl
 import { listWarehouses } from '@/shared/api/inventory'
 import { formatDate, formatNumber } from '@/lib/formatters'
 import type { InventoryCount } from '@/shared/api/types'
+import { PageHeader } from '@/components/shared/PageHeader'
 import { Plus, ClipboardList, Send } from 'lucide-react'
 
 const STATUS_BADGE: Record<string, string> = {
@@ -106,84 +107,86 @@ export default function CountsPage() {
 
   return (
     <div className="page-container">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Conteos de Inventario</h1>
-          <p className="page-sub">Gestiona los conteos físicos de inventario</p>
-        </div>
-        <button className="btn btn-primary" onClick={() => setShowNewDialog(true)}>
-          <Plus size={16} /> Nuevo Conteo
-        </button>
-      </div>
+      <PageHeader
+        title="Conteos de Inventario"
+        description="Gestiona los conteos físicos de inventario"
+        action={
+          <button className="btn btn-primary" onClick={() => setShowNewDialog(true)}>
+            <Plus size={16} /> Nuevo Conteo
+          </button>
+        }
+      />
 
-      <div className="table-scroll">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Almacén</th>
-              <th>Estado</th>
-              <th>Artículos</th>
-              <th>Fecha</th>
-              <th style={{ width: 96 }} />
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading
-              ? Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}>
-                    {Array.from({ length: 6 }).map((__, j) => (
-                      <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
-                    ))}
-                  </tr>
-                ))
-              : isError
-                ? (
-                    <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
-                        Error al cargar los conteos
-                      </td>
+      <div className="card">
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Almacén</th>
+                <th>Estado</th>
+                <th>Artículos</th>
+                <th>Fecha</th>
+                <th style={{ width: 96 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading
+                ? Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i}>
+                      {Array.from({ length: 6 }).map((__, j) => (
+                        <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
+                      ))}
                     </tr>
-                  )
-                : data?.items.length === 0
+                  ))
+                : isError
                   ? (
                       <tr>
-                        <td colSpan={6}>
-                          <div className="empty-state">
-                            <div className="empty-title">Sin conteos</div>
-                            <p className="empty-sub">Crea tu primer conteo físico de inventario.</p>
-                            <button className="btn btn-primary btn-size-sm" onClick={() => setShowNewDialog(true)}>
-                              <Plus size={14} /> Nuevo Conteo
-                            </button>
-                          </div>
+                        <td colSpan={6} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
+                          Error al cargar los conteos
                         </td>
                       </tr>
                     )
-                  : data?.items.map((count) => (
-                      <tr key={count.id}>
-                        <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{count.id}</td>
-                        <td>{count.postingDate ?? "—"}</td>
-                        <td>
-                          <span className={`badge ${STATUS_BADGE[count.status] ?? 'badge-neutral'}`}>
-                            {STATUS_LABEL[count.status] ?? count.status}
-                          </span>
-                        </td>
-                        <td className="td-muted">{count.items?.length ?? 0} artículos</td>
-                        <td>{formatDate(count.createdAt)}</td>
-                        <td>
-                          {count.status === 'Draft' && (
-                            <button
-                              className="btn btn-secondary btn-size-sm"
-                              onClick={() => setSubmitTarget(count)}
-                            >
-                              <Send size={13} /> Someter
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-          </tbody>
-        </table>
+                  : data?.items.length === 0
+                    ? (
+                        <tr>
+                          <td colSpan={6}>
+                            <div className="empty-state">
+                              <div className="empty-title">Sin conteos</div>
+                              <p className="empty-sub">Crea tu primer conteo físico de inventario.</p>
+                              <button className="btn btn-primary btn-size-sm" onClick={() => setShowNewDialog(true)}>
+                                <Plus size={14} /> Nuevo Conteo
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    : data?.items.map((count) => (
+                        <tr key={count.id}>
+                          <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{count.id}</td>
+                          <td>{count.postingDate ?? "—"}</td>
+                          <td>
+                            <span className={`badge ${STATUS_BADGE[count.status] ?? 'badge-neutral'}`}>
+                              {STATUS_LABEL[count.status] ?? count.status}
+                            </span>
+                          </td>
+                          <td className="td-muted">{count.items?.length ?? 0} artículos</td>
+                          <td>{formatDate(count.createdAt)}</td>
+                          <td>
+                            {count.status === 'Draft' && (
+                              <button
+                                className="btn btn-secondary btn-size-sm"
+                                onClick={() => setSubmitTarget(count)}
+                              >
+                                <Send size={13} /> Someter
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {showNewDialog && (

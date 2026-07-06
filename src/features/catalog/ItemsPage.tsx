@@ -6,7 +6,11 @@ import { listItems, toggleItem, listCategories, listBrands } from '@/shared/api/
 import type { Item } from '@/shared/api/types'
 import { useDebounce } from '@/lib/useDebounce'
 import { formatDOP } from '@/lib/formatters'
-import { Plus, MoreHorizontal, Eye, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { Plus, Eye, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { useSortState } from '@/shared/hooks/useSortState'
+import { SortableTh } from '@/shared/ui/SortableTh'
 
 const PAGE_SIZE = 20
 
@@ -49,7 +53,7 @@ export default function ItemsPage() {
   const [brandFilter, setBrandFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'disabled'>('active')
   const [page, setPage] = useState(1)
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const { orderBy, sort } = useSortState()
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
@@ -57,7 +61,7 @@ export default function ItemsPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: [
       'items',
-      { search: debouncedSearch, kindFilter, templateFilter, categoryFilter, brandFilter, statusFilter, offset },
+      { search: debouncedSearch, kindFilter, templateFilter, categoryFilter, brandFilter, statusFilter, offset, orderBy },
     ],
     queryFn: () =>
       listItems({
@@ -69,6 +73,7 @@ export default function ItemsPage() {
         isTemplate: templateFilter === 'template' ? true : templateFilter === 'standalone' ? false : undefined,
         limit: PAGE_SIZE,
         offset,
+        orderBy: orderBy || undefined,
       }),
   })
 
@@ -102,21 +107,21 @@ export default function ItemsPage() {
 
   return (
     <div className="page-container">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Artículos</h1>
-          {data && <p className="page-sub">{data.meta.total} artículos</p>}
-        </div>
-        <button className="btn btn-primary" onClick={() => navigate('/catalogo/articulos/nuevo')}>
-          <Plus size={16} />
-          Nuevo Artículo
-        </button>
-      </div>
+      <PageHeader
+        title="Artículos"
+        description={data ? `${data.meta.total} artículos` : undefined}
+        action={
+          <button className="btn btn-primary" onClick={() => navigate('/inventario/articulos/nuevo')}>
+            <Plus size={16} />
+            Nuevo Artículo
+          </button>
+        }
+      />
 
       <div className="filter-bar">
         <div className="filter-bar-left">
           <div className="search-input-wrap">
-            <Search size={15} className="search-input-icon" />
+            <Search size={14} className="search-input-icon" />
             <input
               className="search-input"
               placeholder="Buscar por código o nombre…"
@@ -181,18 +186,19 @@ export default function ItemsPage() {
         </div>
       </div>
 
-      <div className="table-scroll">
-        <table className="data-table">
+      <div className="card">
+        <div className="table-scroll">
+          <table className="data-table">
           <thead>
             <tr>
-              <th>Código</th>
-              <th>Nombre</th>
+              <SortableTh label="Código" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
+              <SortableTh label="Nombre" sortKey="itemName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
               <th>Tipo</th>
               <th>Rol</th>
               <th>Categoría</th>
               <th>Marca</th>
-              <th style={{ textAlign: 'right' }}>Precio</th>
-              <th>Stock</th>
+              <SortableTh label="Precio" sortKey="standardRate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} align="right" />
+              <SortableTh label="Stock" sortKey="currentStock" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
               <th>Estado</th>
               <th style={{ width: 48 }} />
             </tr>
@@ -209,7 +215,7 @@ export default function ItemsPage() {
               : isError
                 ? (
                     <tr>
-                      <td colSpan={10} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
+                      <td colSpan={10} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
                         Error al cargar los artículos
                       </td>
                     </tr>
@@ -217,8 +223,11 @@ export default function ItemsPage() {
                 : data?.items.length === 0
                   ? (
                       <tr>
-                        <td colSpan={10} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-secondary)' }}>
-                          No se encontraron artículos
+                        <td colSpan={10}>
+                          <div className="empty-state">
+                            <p className="empty-title">Sin artículos</p>
+                            <p className="empty-sub">No se encontraron artículos.</p>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -226,7 +235,7 @@ export default function ItemsPage() {
                       <tr
                         key={item.id}
                         className="table-row-clickable"
-                        onClick={() => navigate(`/catalogo/articulos/${item.id}`)}
+                        onClick={() => navigate(`/inventario/articulos/${item.id}`)}
                       >
                         <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.id}</td>
                         <td style={{ fontWeight: 500 }}>{item.itemName}</td>
@@ -236,7 +245,11 @@ export default function ItemsPage() {
                           </span>
                         </td>
                         <td><ItemTypeBadge item={item} /></td>
-                        <td className="td-muted">{item.categoryName ?? '—'}</td>
+                        <td className="td-muted">
+                          {item.subcategoryName
+                            ? `${item.categoryName ?? item.category} > ${item.subcategoryName}`
+                            : item.categoryName ?? item.category ?? '—'}
+                        </td>
                         <td className="td-muted">{item.brandName ?? '—'}</td>
                         <td style={{ textAlign: 'right' }}>
                           {item.hasVariants
@@ -250,74 +263,55 @@ export default function ItemsPage() {
                             : <span className="badge badge-success">Activo</span>}
                         </td>
                         <td onClick={(e) => e.stopPropagation()} className="actions-cell">
-                          <div style={{ position: 'relative' }}>
-                            <button
-                              className="actions-trigger"
-                              onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)}
-                            >
-                              <MoreHorizontal size={16} />
-                            </button>
-                            {openMenuId === item.id && (
-                              <div className="actions-menu">
-                                <button
-                                  className="actions-item"
-                                  onClick={() => { setOpenMenuId(null); navigate(`/catalogo/articulos/${item.id}`) }}
-                                >
-                                  <Eye size={14} />
-                                  Ver detalle
-                                </button>
-                                {item.hasVariants && (
-                                  <button
-                                    className="actions-item"
-                                    onClick={() => { setOpenMenuId(null); navigate(`/catalogo/articulos/${item.id}#variants`) }}
-                                  >
-                                    <Eye size={14} />
-                                    Ver variantes
-                                  </button>
-                                )}
-                                <button
-                                  className="actions-item"
-                                  disabled={toggleMutation.isPending}
-                                  onClick={() => { setOpenMenuId(null); toggleMutation.mutate(item.id) }}
-                                >
-                                  {item.disabled
-                                    ? <><ToggleRight size={14} /> Activar</>
-                                    : <><ToggleLeft size={14} /> Desactivar</>}
-                                </button>
-                              </div>
+                          <ActionsMenu>
+                            <ActionsMenuItem onClick={() => navigate(`/inventario/articulos/${item.id}`)}>
+                              <Eye size={14} /> Ver detalle
+                            </ActionsMenuItem>
+                            {item.hasVariants && (
+                              <ActionsMenuItem onClick={() => navigate(`/inventario/articulos/${item.id}#variants`)}>
+                                <Eye size={14} /> Ver variantes
+                              </ActionsMenuItem>
                             )}
-                          </div>
+                            <ActionsMenuItem disabled={toggleMutation.isPending} onClick={() => toggleMutation.mutate(item.id)}>
+                              {item.disabled
+                                ? <><ToggleRight size={14} /> Activar</>
+                                : <><ToggleLeft size={14} /> Desactivar</>}
+                            </ActionsMenuItem>
+                          </ActionsMenu>
                         </td>
                       </tr>
                     ))}
           </tbody>
         </table>
-      </div>
-
-      {data && data.meta.total > PAGE_SIZE && (
-        <div className="pagination">
-          <span className="pagination-info">
-            Mostrando {offset + 1}–{Math.min(offset + PAGE_SIZE, data.meta.total)} de {data.meta.total}
-          </span>
-          <div className="pagination-controls">
-            <button
-              className="btn btn-ghost btn-size-icon-sm"
-              disabled={page === 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span style={{ fontSize: 13 }}>Página {page} de {totalPages}</span>
-            <button
-              className="btn btn-ghost btn-size-icon-sm"
-              disabled={!data.meta.hasMore}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
         </div>
-      )}
+
+        {data && data.meta.total > PAGE_SIZE && (
+          <div className="pagination">
+            <span className="pagination-info">
+              Mostrando {offset + 1}–{Math.min(offset + PAGE_SIZE, data.meta.total)} de {data.meta.total}
+            </span>
+            <div className="pagination-controls">
+              <button
+                className="btn btn-ghost btn-size-icon-sm"
+                disabled={page === 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '0 8px' }}>
+                {page} / {totalPages}
+              </span>
+              <button
+                className="btn btn-ghost btn-size-icon-sm"
+                disabled={!data.meta.hasMore}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

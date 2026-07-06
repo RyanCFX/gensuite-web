@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { useNavigate } from 'react-router-dom'
-import { createQuotation, updateQuotation } from '@/shared/api/quotations'
+import { useNavigate, useParams } from 'react-router-dom'
+import { createQuotation, updateQuotation, getQuotation } from '@/shared/api/quotations'
 import { listCustomers } from '@/shared/api/customers'
-import type { CreateQuotationDto } from '@/shared/api/types'
+import { getDefaultPriceTier } from '@/shared/api/catalog'
+import type { CreateQuotationDto, ItemPrices } from '@/shared/api/types'
 import type { Item } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
-import { formatDOP } from '@/lib/formatters'
+import { formatDOP, displayId } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Trash2, Loader2, ShieldAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
@@ -20,6 +21,8 @@ import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { listItems } from '@/shared/api/catalog'
 import { client } from '@/shared/api/client'
+import { getUsuario } from '@/shared/api/usuarios'
+import { getUser } from '@/shared/api/storage'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,12 +34,14 @@ interface LineItem {
   rate: number
   amount: number
   discountPct: number
+  salesTaxPct: number
+  salesTaxTemplate: string
   uom: string
+  _prices?: ItemPrices
+  maxDiscountPct?: number
 }
 
-interface QuotationFormProps {
-  editId?: string
-}
+
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -48,21 +53,32 @@ function defaultValidTill() {
   return format(addDays(new Date(), 15), 'yyyy-MM-dd')
 }
 
-const ITBIS_RATE = 0.18
-
 function calcAmount(qty: number, rate: number, discountPct: number = 0) {
   const base = qty * rate
   const discount = base * (discountPct / 100)
   return Math.round((base - discount) * 100) / 100
 }
 
+function maxDiscFromPrices(rate: number, prices: ItemPrices | undefined): number {
+  if (!prices || rate <= 0) return 100
+  const vals = Object.values(prices).filter((v): v is number => v != null)
+  if (vals.length === 0) return 100
+  const minPrice = Math.min(...vals)
+  if (minPrice <= 0) return 100
+  return Math.max(0, (1 - minPrice / rate) * 100)
+}
+
 // ─── Form ─────────────────────────────────────────────────────────────────────
 
-export default function QuotationForm({ editId }: QuotationFormProps) {
+export default function QuotationForm() {
+  const { id } = useParams<{ id: string }>()
+  const isEdit = !!id
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   const [customerId, setCustomerId] = useState('')
+  const [customerName, setCustomerName] = useState('')
+  const [customerPriceTier, setCustomerPriceTier] = useState<keyof ItemPrices | undefined>(undefined)
   const [customerQuery, setCustomerQuery] = useState('')
   const [date, setDate] = useState(todayIso())
   const [validTill, setValidTill] = useState(defaultValidTill())
@@ -71,11 +87,40 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
   const [submitted, setSubmitted] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
+  const [initialized, setInitialized] = useState(false)
+
+  // ── Load existing quotation when editing ─────────────────────────────────
+  const { data: existingQuotation, isLoading: loadingQuotation } = useQuery({
+    queryKey: ['quotation', id],
+    queryFn: () => getQuotation(id!),
+    enabled: isEdit,
+  })
+
+  useEffect(() => {
+    if (!existingQuotation || initialized) return
+    setCustomerId(existingQuotation.customer)
+    setCustomerName(existingQuotation.customerName)
+    setDate(existingQuotation.date)
+    setValidTill(existingQuotation.validTill ?? defaultValidTill())
+    setItems(existingQuotation.items.map((i) => ({
+      itemCode: i.itemCode,
+      description: i.description,
+      qty: i.qty,
+      rate: i.rate,
+      amount: i.amount,
+      discountPct: i.discountPct ?? 0,
+      salesTaxPct: 0,
+      salesTaxTemplate: '',
+      uom: i.uom,
+    })))
+    setNotes(existingQuotation.notes ?? '')
+    setInitialized(true)
+  }, [existingQuotation, initialized])
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
     onBarcode: async (code) => {
-      const res = await listItems({ barcode: code, limit: 1 })
+      const res = await listItems({ barcode: code, limit: 1, validateStock: true })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
       addRow()
@@ -89,6 +134,20 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
     queryKey: ['customerSearch', customerQuery],
     queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
     enabled: true,
+  })
+
+  const { data: defaultPriceTier = 'B' } = useQuery({
+    queryKey: ['defaultPriceTier'],
+    queryFn: getDefaultPriceTier,
+    staleTime: 5 * 60_000,
+  })
+
+  const currentUserEmail = getUser()?.email
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser', currentUserEmail],
+    queryFn: () => getUsuario(currentUserEmail!),
+    enabled: !!currentUserEmail,
+    staleTime: 5 * 60_000,
   })
 
   const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
@@ -112,12 +171,17 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (dto: Partial<CreateQuotationDto>) => updateQuotation(editId!, dto),
+    mutationFn: (dto: Partial<CreateQuotationDto>) => updateQuotation(id!, dto),
     onSuccess: (quotation) => {
       queryClient.invalidateQueries({ queryKey: ['quotations'] })
-      queryClient.invalidateQueries({ queryKey: ['quotation', editId] })
-      toast.success('Cotización actualizada')
-      navigate(`/cotizaciones/${quotation.id}`)
+      queryClient.invalidateQueries({ queryKey: ['quotation', id] })
+      if (quotation.id !== id) {
+        toast.success(`Nueva versión creada: ${displayId(quotation.id, quotation.sequence)}`)
+        navigate(`/cotizaciones/${quotation.id}`)
+      } else {
+        toast.success(`Versión ${quotation.sequence} guardada como historial`)
+        navigate(`/cotizaciones/${quotation.id}`, { replace: true })
+      }
     },
     onError: (err: { message?: string }) => {
       handleError(err)
@@ -141,7 +205,7 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
       })),
       notes: notes || undefined,
     }
-    if (editId) updateMutation.mutate(dto)
+    if (id) updateMutation.mutate(dto)
     else createMutation.mutate(dto)
   }
 
@@ -170,47 +234,72 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
   }
 
   function onVariantConfirm(selections: VariantSelection[]) {
+    const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
     setItems((prev) => [
       ...prev,
-      ...selections.map((s) => ({
-        itemCode: s.item.id,
-        itemLabel: s.item.itemName,
-        description: s.item.description ?? s.item.itemName,
-        qty: s.qty,
-        rate: s.item.standardRate ?? 0,
-        amount: calcAmount(s.qty, s.item.standardRate ?? 0, 0),
-        discountPct: 0,
-        uom: s.item.salesUom ?? s.item.stockUom ?? 'Unidad',
-      })),
+      ...selections.map((s) => {
+        const rate = s.item.prices?.[tier] ?? s.item.standardRate ?? 0
+        return {
+          itemCode: s.item.id,
+          itemLabel: s.item.itemName,
+          description: s.item.internalDescription ?? s.item.itemName,
+          qty: s.qty,
+          rate,
+          amount: calcAmount(s.qty, rate, 0),
+          discountPct: 0,
+          salesTaxPct: s.item.salesTaxPct ?? 0,
+          salesTaxTemplate: s.item.salesTaxTemplate ?? '',
+          uom: s.item.stockUom ?? 'Unidad',
+          maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
+          _prices: s.item.prices,
+        }
+      }),
     ])
     setVariantTemplate(null)
   }
 
   function selectCatalogItem(index: number, catalogItem: Item) {
+    const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
     setItems((prev) =>
       prev.map((row, i) => {
         if (i !== index) return row
-        const rate = catalogItem.standardRate ?? 0
+        const rate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
         return {
           ...row,
           itemCode: catalogItem.id,
           itemLabel: catalogItem.itemName,
-          description: catalogItem.description ?? catalogItem.itemName,
+          description: catalogItem.internalDescription ?? catalogItem.itemName,
           rate,
           amount: calcAmount(row.qty, rate, row.discountPct),
+          maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
+          uom: catalogItem.stockUom ?? row.uom,
+          _prices: catalogItem.prices,
+          salesTaxPct: catalogItem.salesTaxPct ?? 0,
+          salesTaxTemplate: catalogItem.salesTaxTemplate ?? '',
         }
       }),
     )
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, description: '', rate: 0, amount: 0, discountPct: 0 })
+    updateItem(index, { itemCode: '', itemLabel: undefined, description: '', rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '' })
   }
+
+  // ── Reprice on customer change ───────────────────────────────────────────
+  useEffect(() => {
+    const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
+    setItems((prev) =>
+      prev.map((row) => {
+        if (!row._prices) return row
+        const rate = row._prices[tier] ?? row.rate
+        return { ...row, rate, amount: calcAmount(row.qty, rate, row.discountPct) }
+      }),
+    )
+  }, [customerPriceTier, defaultPriceTier])
 
   function addRow() {
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, uom: 'Unidad' }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad' }])
   }
-
   function removeRow(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index))
   }
@@ -218,8 +307,8 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
   const subtotal = items.reduce((s, i) => s + i.amount, 0)
   const grossTotal = items.reduce((s, i) => s + i.qty * i.rate, 0)
   const totalDiscount = grossTotal - subtotal
-  const itbis = Math.round(subtotal * ITBIS_RATE * 100) / 100
-  const total = subtotal + itbis
+  const taxTotal = items.reduce((s, i) => s + (i.amount * i.salesTaxPct / 100), 0)
+  const total = subtotal + taxTotal
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
@@ -251,12 +340,30 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
         toast.error(`Artículo #${num}: la unidad (UDM) es requerida`)
         return
       }
+      const itemMax = row.maxDiscountPct && row.maxDiscountPct > 0 ? row.maxDiscountPct : 100
+      const userMax = currentUser?.maxDiscountPct && currentUser.maxDiscountPct > 0 ? currentUser.maxDiscountPct : 100
+      const priceLimit = maxDiscFromPrices(row.rate, row._prices)
+      const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
+      if (row.discountPct > effectiveLimit) {
+        toast.error(`Artículo #${num}: el descuento supera el límite de ${effectiveLimit}%`)
+        return
+      }
     }
 
     submitDto()
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+
+  if (isEdit && loadingQuotation) {
+    return (
+      <div className="page-container">
+        <div className="skeleton-box" style={{ width: 220, height: 24, marginBottom: 8 }} />
+        <div className="skeleton-box" style={{ width: '100%', height: 180, borderRadius: 'var(--radius-lg)', marginBottom: 16 }} />
+        <div className="skeleton-box" style={{ width: '100%', height: 280, borderRadius: 'var(--radius-lg)' }} />
+      </div>
+    )
+  }
 
   return (
     <div className="page-container">
@@ -265,7 +372,7 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
           <a className="page-back-link" onClick={() => navigate('/cotizaciones')}>
             <ArrowLeft size={14} /> Cotizaciones
           </a>
-          <h1 className="page-title">{editId ? 'Editar Cotización' : 'Nueva Cotización'}</h1>
+          <h1 className="page-title">{id ? 'Editar Cotización' : 'Nueva Cotización'}</h1>
         </div>
       </div>
 
@@ -282,8 +389,15 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
                 <SearchSelect
                   id="customer"
                   value={customerId}
-                  onChange={(id, opt) => setCustomerId(id === '' ? '' : (opt?.value ?? id))}
+                  onChange={(id, opt) => {
+                    const cid = id === '' ? '' : (opt?.value ?? id)
+                    setCustomerId(cid)
+                    setCustomerName(opt?.label ?? '')
+                    const c = cid && customersData?.items?.find((c) => c.id === cid)
+                    setCustomerPriceTier(c?.priceTier)
+                  }}
                   options={customerOptions}
+                  selectedLabel={customerName}
                   onSearch={setCustomerQuery}
                   loading={loadingCustomers}
                   placeholder="Buscar cliente…"
@@ -331,6 +445,7 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
                   <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
                   <th style={{ textAlign: 'right', width: 80 }}>Dto. %</th>
+                  <th style={{ textAlign: 'right', width: 80 }}>Impuesto</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 72 }}>UDM</th>
                   <th style={{ width: 40 }} />
@@ -339,7 +454,7 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+                    <td colSpan={8} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
                       No hay artículos. Agrega uno con el botón de abajo.
                     </td>
                   </tr>
@@ -354,6 +469,7 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
                           onSelect={(catalogItem) => selectCatalogItem(index, catalogItem)}
                           onClear={() => clearCatalogItem(index)}
                           onVariantSelect={(t) => setVariantTemplate(t)}
+                          validateStock
                         />
                       </td>
 
@@ -379,7 +495,6 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
                         />
                       </td>
 
-                      {/* Precio — editable, pre-llenado con standardRate del catálogo */}
                       <td>
                         <input
                           className={`items-input${submitted && (!item.rate || item.rate <= 0) ? ' items-input-error' : ''}`}
@@ -387,25 +502,54 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
                           min="0"
                           step="0.01"
                           value={item.rate}
-                          onChange={(e) => updateItem(index, { rate: parseFloat(e.target.value) || 0 })}
+                          disabled
                           style={{ textAlign: 'right' }}
                         />
                       </td>
 
                       {/* Descuento */}
                       <td>
-                        <input
-                          className="items-input"
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          value={item.discountPct}
-                          onChange={(e) => updateItem(index, { discountPct: parseFloat(e.target.value) || 0 })}
-                          style={{ textAlign: 'right', width: 64 }}
-                        />
+                        {(() => {
+                          const itemMax = item.maxDiscountPct && item.maxDiscountPct > 0 ? item.maxDiscountPct : 100
+                          const userMax = currentUser?.maxDiscountPct && currentUser.maxDiscountPct > 0 ? currentUser.maxDiscountPct : 100
+                          const priceLimit = maxDiscFromPrices(item.rate, item._prices)
+                          const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
+                          return (
+                            <>
+                              <input
+                                className={`items-input${submitted && item.discountPct > effectiveLimit ? ' items-input-error' : ''}`}
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                value={item.discountPct}
+                                onChange={(e) => updateItem(index, { discountPct: parseFloat(e.target.value) || 0 })}
+                                style={{ textAlign: 'right', width: 64 }}
+                              />
+                              {effectiveLimit < 100 && (
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                  máx {effectiveLimit.toFixed(2)}%
+                                </span>
+                              )}
+                              {item.discountPct > effectiveLimit && (
+                                <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                  Supera el límite de {effectiveLimit.toFixed(2)}%
+                                </span>
+                              )}
+                            </>
+                          )
+                        })()}
                       </td>
 
+                      <td style={{ textAlign: 'right' }}>
+                        {item.salesTaxPct > 0 ? (
+                          <span className="td-muted" style={{ fontSize: 12 }}>
+                            {item.salesTaxPct}%
+                          </span>
+                        ) : (
+                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                        )}
+                      </td>
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
 
                       <td>
@@ -445,14 +589,16 @@ export default function QuotationForm({ editId }: QuotationFormProps) {
                   <span>-{formatDOP(totalDiscount)}</span>
                 </div>
               )}
-            <div className="items-total-line">
+            {/* <div className="items-total-line">
               <span>Subtotal neto</span>
               <span>{formatDOP(subtotal)}</span>
-            </div>
-            <div className="items-total-line">
-              <span>ITBIS (18%)</span>
-              <span>{formatDOP(itbis)}</span>
-            </div>
+            </div> */}
+              {taxTotal > 0 && (
+                <div className="items-total-line" style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+                  <span>Impuesto</span>
+                  <span>{formatDOP(taxTotal)}</span>
+                </div>
+              )}
               <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
                 <span>Total</span>
                 <span>{formatDOP(total)}</span>

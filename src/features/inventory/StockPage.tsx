@@ -2,13 +2,19 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { listInventory, listWarehouses } from '@/shared/api/inventory'
 import { formatDOP, formatNumber } from '@/lib/formatters'
+import { PageHeader } from '@/components/shared/PageHeader'
 import { DollarSign, TrendingUp, Package } from 'lucide-react'
+import { useSortState } from '@/shared/hooks/useSortState'
+import { SortableTh } from '@/shared/ui/SortableTh'
+import { useAuthStore } from '@/stores/auth.store'
 
 export default function StockPage() {
+  const authUser = useAuthStore((s) => s.user)
   const [warehouse, setWarehouse] = useState<string>('all')
   const [category, setCategory] = useState('')
   const [brand, setBrand] = useState('')
   const [stockFilter, setStockFilter] = useState<string>('all')
+  const { orderBy, sort } = useSortState()
 
   const { data: warehouses } = useQuery({
     queryKey: ['warehouses'],
@@ -16,11 +22,12 @@ export default function StockPage() {
   })
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['inventory', { warehouse, stockFilter }],
+    queryKey: ['inventory', { warehouse, stockFilter, orderBy }],
     queryFn: () =>
       listInventory({
         warehouse: warehouse !== 'all' ? warehouse : undefined,
         limit: 100,
+        orderBy: orderBy || undefined,
       }),
   })
 
@@ -53,12 +60,10 @@ export default function StockPage() {
 
   return (
     <div className="page-container">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Stock Actual</h1>
-          <p className="page-sub">Vista del inventario por almacén</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Stock Actual"
+        description="Vista del inventario por almacén"
+      />
 
       <div className="stats-row">
         <div className="stat-card">
@@ -92,6 +97,17 @@ export default function StockPage() {
         </div>
       </div>
 
+      {authUser?.defaultWarehouse && (
+        <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="badge badge-info">
+            Viendo: {authUser.defaultWarehouse}
+          </span>
+          <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+            {warehouse !== 'all' ? `(filtro manual: ${warehouse})` : 'almacén por defecto'}
+          </span>
+        </div>
+      )}
+
       <div className="filter-bar">
         <div className="filter-bar-left">
           <select className="filter-select" value={warehouse} onChange={(e) => setWarehouse(e.target.value)}>
@@ -122,75 +138,77 @@ export default function StockPage() {
         </div>
       </div>
 
-      <div className="table-scroll">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Nombre</th>
-              <th>Almacén</th>
-              <th>Categoría</th>
-              <th style={{ textAlign: 'right' }}>Stock</th>
-              <th style={{ textAlign: 'right' }}>Costo Unit.</th>
-              <th style={{ textAlign: 'right' }}>Precio Venta</th>
-              <th style={{ textAlign: 'right' }}>Inversión</th>
-              <th style={{ textAlign: 'right' }}>Valor Venta</th>
-              <th style={{ textAlign: 'right' }}>Ganancia</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading
-              ? Array.from({ length: 8 }).map((_, i) => (
-                  <tr key={i}>
-                    {Array.from({ length: 11 }).map((__, j) => (
-                      <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
-                    ))}
-                  </tr>
-                ))
-              : isError
-                ? (
-                    <tr>
-                      <td colSpan={11} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
-                        Error al cargar el inventario
-                      </td>
+      <div className="card">
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <SortableTh label="Código" sortKey="itemCode" orderBy={orderBy} onSort={sort} />
+                <SortableTh label="Nombre" sortKey="itemName" orderBy={orderBy} onSort={sort} />
+                <th>Almacén</th>
+                <th>Categoría</th>
+                <SortableTh label="Stock" sortKey="currentStock" orderBy={orderBy} onSort={sort} align="right" />
+                <th style={{ textAlign: 'right' }}>Costo Unit.</th>
+                <th style={{ textAlign: 'right' }}>Precio Venta</th>
+                <th style={{ textAlign: 'right' }}>Inversión</th>
+                <th style={{ textAlign: 'right' }}>Valor Venta</th>
+                <th style={{ textAlign: 'right' }}>Ganancia</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading
+                ? Array.from({ length: 8 }).map((_, i) => (
+                    <tr key={i}>
+                      {Array.from({ length: 11 }).map((__, j) => (
+                        <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
+                      ))}
                     </tr>
-                  )
-                : items.length === 0
+                  ))
+                : isError
                   ? (
                       <tr>
-                        <td colSpan={11}>
-                          <div className="empty-state">
-                            <div className="empty-title">Sin artículos</div>
-                            <p className="empty-sub">No hay artículos en inventario con los filtros seleccionados.</p>
-                          </div>
+                        <td colSpan={11} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
+                          Error al cargar el inventario
                         </td>
                       </tr>
                     )
-                  : items.map((item) => {
-                      const status = getStockStatus(item.actualQty)
-                      return (
-                        <tr key={`${item.itemCode}-${item.warehouse}`}>
-                          <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.itemCode}</td>
-                          <td style={{ fontWeight: 500 }}>{item.itemName}</td>
-                          <td className="td-muted">{item.warehouse}</td>
-                          <td className="td-muted">{item.category ?? '—'}</td>
-                          <td style={{ textAlign: 'right' }}>{formatNumber(item.actualQty)}</td>
-                          <td style={{ textAlign: 'right' }}>{formatDOP(item.valuationRate)}</td>
-                          <td style={{ textAlign: 'right' }}>{formatDOP(item.standardRate)}</td>
-                          <td style={{ textAlign: 'right' }}>{formatDOP(item.investmentValue)}</td>
-                          <td style={{ textAlign: 'right' }}>{formatDOP(item.saleValue)}</td>
-                          <td style={{ textAlign: 'right' }}>{formatDOP(item.potentialProfit)}</td>
-                          <td>
-                            <span className={`badge ${stockBadgeClass[status]}`}>
-                              {stockLabel[status]}
-                            </span>
+                  : items.length === 0
+                    ? (
+                        <tr>
+                          <td colSpan={11}>
+                            <div className="empty-state">
+                              <div className="empty-title">Sin artículos</div>
+                              <p className="empty-sub">No hay artículos en inventario con los filtros seleccionados.</p>
+                            </div>
                           </td>
                         </tr>
                       )
-                    })}
-          </tbody>
-        </table>
+                    : items.map((item) => {
+                        const status = getStockStatus(item.actualQty)
+                        return (
+                          <tr key={`${item.itemCode}-${item.warehouse}`}>
+                            <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.itemCode}</td>
+                            <td style={{ fontWeight: 500 }}>{item.itemName}</td>
+                            <td className="td-muted">{item.warehouse}</td>
+                            <td className="td-muted">{item.category ?? '—'}</td>
+                            <td style={{ textAlign: 'right' }}>{formatNumber(item.actualQty)}</td>
+                            <td style={{ textAlign: 'right' }}>{formatDOP(item.valuationRate)}</td>
+                            <td style={{ textAlign: 'right' }}>{formatDOP(item.standardRate)}</td>
+                            <td style={{ textAlign: 'right' }}>{formatDOP(item.investmentValue)}</td>
+                            <td style={{ textAlign: 'right' }}>{formatDOP(item.saleValue)}</td>
+                            <td style={{ textAlign: 'right' }}>{formatDOP(item.potentialProfit)}</td>
+                            <td>
+                              <span className={`badge ${stockBadgeClass[status]}`}>
+                                {stockLabel[status]}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )

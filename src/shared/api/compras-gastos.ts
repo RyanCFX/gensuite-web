@@ -53,6 +53,11 @@ export async function amendCompra(id: string) {
   return unwrap(res)
 }
 
+export async function deleteCompra(id: string) {
+  const res = await client.delete<{ success: true; data: Compra }>(ENDPOINTS.compras.delete(id))
+  return unwrap(res)
+}
+
 export async function returnCompra(id: string, items: { itemCode: string; qty: number }[]) {
   const res = await client.post<{ success: true; data: Compra }>(ENDPOINTS.compras.return(id), { items })
   return unwrap(res)

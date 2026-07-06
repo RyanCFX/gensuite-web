@@ -37,3 +37,8 @@ export function formatPct(n?: number | null): string {
   if (n == null) return '0%'
   return `${n.toFixed(1)}%`
 }
+
+export function displayId(id: string, sequence?: number | null): string {
+  if (sequence && sequence > 0) return `${id}-${sequence}`
+  return id
+}

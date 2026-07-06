@@ -5,7 +5,10 @@ import { toast } from 'sonner'
 import { listCustomers, deleteCustomer } from '@/shared/api/customers'
 import type { Customer } from '@/shared/api/types'
 import { useDebounce } from '@/lib/useDebounce'
-import { Plus, MoreHorizontal, Pencil, Ban, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { Plus, Pencil, Ban, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
+import { useSortState } from '@/shared/hooks/useSortState'
+import { SortableTh } from '@/shared/ui/SortableTh'
 
 const PAGE_SIZE = 20
 
@@ -17,19 +20,20 @@ export default function CustomersPage() {
   const [showDisabled, setShowDisabled] = useState(false)
   const [page, setPage] = useState(1)
   const [toDisable, setToDisable] = useState<Customer | null>(null)
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const { orderBy, sort } = useSortState()
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['customers', { search: debouncedSearch, showDisabled, offset }],
+    queryKey: ['customers', { search: debouncedSearch, showDisabled, offset, orderBy }],
     queryFn: () =>
       listCustomers({
         search: debouncedSearch || undefined,
         disabled: showDisabled || undefined,
         limit: PAGE_SIZE,
         offset,
+        orderBy: orderBy || undefined,
       }),
   })
 
@@ -103,9 +107,10 @@ export default function CustomersPage() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Nombre</th>
+              <SortableTh label="Nombre" sortKey="customerName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
               <th>RNC / Cédula</th>
               <th>Tipo</th>
+              <th>Grupo</th>
               <th>Tiene Crédito</th>
               <th>Estado</th>
               <th style={{ width: 48 }} />
@@ -115,7 +120,7 @@ export default function CustomersPage() {
             {isLoading
               ? Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 6 }).map((__, j) => (
+                    {Array.from({ length: 7 }).map((__, j) => (
                       <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                     ))}
                   </tr>
@@ -123,7 +128,7 @@ export default function CustomersPage() {
               : isError
                 ? (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
                         Error al cargar los clientes
                       </td>
                     </tr>
@@ -131,7 +136,7 @@ export default function CustomersPage() {
                 : data?.items.length === 0
                   ? (
                       <tr>
-                        <td colSpan={6} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-secondary)' }}>
+                        <td colSpan={7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-secondary)' }}>
                           No se encontraron clientes
                         </td>
                       </tr>
@@ -145,6 +150,7 @@ export default function CustomersPage() {
                         <td style={{ fontWeight: 500 }}>{customer.customerName}</td>
                         <td className="td-muted">{getIdentifier(customer)}</td>
                         <td>{customer.customerType === 'Company' ? 'Empresa' : 'Individual'}</td>
+                        <td className="td-muted">{customer.customerGroup ?? '—'}</td>
                         <td>
                           {customer.hasCredit
                             ? <span className="badge badge-success">Sí</span>
@@ -156,40 +162,16 @@ export default function CustomersPage() {
                             : <span className="badge badge-success">Activo</span>}
                         </td>
                         <td onClick={(e) => e.stopPropagation()} className="actions-cell">
-                          <div style={{ position: 'relative' }}>
-                            <button
-                              className="actions-trigger"
-                              onClick={() => setOpenMenuId(openMenuId === customer.id ? null : customer.id)}
-                            >
-                              <MoreHorizontal size={16} />
-                            </button>
-                            {openMenuId === customer.id && (
-                              <div className="actions-menu">
-                                <button
-                                  className="actions-item"
-                                  onClick={() => {
-                                    setOpenMenuId(null)
-                                    navigate(`/clientes/${customer.id}/editar`)
-                                  }}
-                                >
-                                  <Pencil size={14} />
-                                  Editar
-                                </button>
-                                {!customer.disabled && (
-                                  <button
-                                    className="actions-item actions-item-danger"
-                                    onClick={() => {
-                                      setOpenMenuId(null)
-                                      setToDisable(customer)
-                                    }}
-                                  >
-                                    <Ban size={14} />
-                                    Desactivar
-                                  </button>
-                                )}
-                              </div>
+                          <ActionsMenu>
+                            <ActionsMenuItem onClick={() => navigate(`/clientes/${customer.id}/editar`)}>
+                              <Pencil size={14} /> Editar
+                            </ActionsMenuItem>
+                            {!customer.disabled && (
+                              <ActionsMenuItem danger onClick={() => setToDisable(customer)}>
+                                <Ban size={14} /> Desactivar
+                              </ActionsMenuItem>
                             )}
-                          </div>
+                          </ActionsMenu>
                         </td>
                       </tr>
                     ))}

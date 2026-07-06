@@ -4,6 +4,7 @@ import type {
   Invoice,
   CreateInvoiceDto,
   UpdateInvoiceDto,
+  DraftVersion,
   PaginatedResponse,
   PaginationParams,
 } from './types'
@@ -49,6 +50,11 @@ export async function cancelInvoice(id: string) {
 
 export async function amendInvoice(id: string) {
   const res = await client.post<{ success: true; data: Invoice }>(ENDPOINTS.invoices.amend(id))
+  return unwrap(res)
+}
+
+export async function getInvoiceVersion(id: string, sequence: number) {
+  const res = await client.get<{ success: true; data: DraftVersion }>(ENDPOINTS.invoices.version(id, sequence))
   return unwrap(res)
 }
 

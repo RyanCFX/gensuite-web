@@ -7,16 +7,19 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { formatDOP } from '@/lib/formatters'
 import { Plus, Trash2, X, Loader2 } from 'lucide-react'
+import { useSortState } from '@/shared/hooks/useSortState'
+import { SortableTh } from '@/shared/ui/SortableTh'
 
 export default function BundlesPage() {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [toDelete, setToDelete] = useState<Bundle | null>(null)
+  const { orderBy, sort } = useSortState()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['bundles'],
-    queryFn: () => listBundles({ limit: 100 }),
+    queryKey: ['bundles', { orderBy }],
+    queryFn: () => listBundles({ limit: 100, orderBy: orderBy || undefined }),
   })
 
   const deleteMutation = useMutation({
@@ -42,11 +45,11 @@ export default function BundlesPage() {
           <table className="table-config">
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>Componentes</th>
-                <th>Precio A</th>
-                <th>Precio B</th>
-                <th>Precio C</th>
+                <SortableTh label="Nombre" sortKey="itemName" orderBy={orderBy} onSort={sort} />
+                <th>Artículos</th>
+                <SortableTh label="Precio A" sortKey="priceA" orderBy={orderBy} onSort={sort} />
+                <SortableTh label="Precio B" sortKey="priceB" orderBy={orderBy} onSort={sort} />
+                <SortableTh label="Precio C" sortKey="priceC" orderBy={orderBy} onSort={sort} />
                 <th style={{ width: 80 }} />
               </tr>
             </thead>
@@ -59,12 +62,12 @@ export default function BundlesPage() {
                 data.items.map((b) => (
                   <tr key={b.id}>
                     <td style={{ fontWeight: 500 }}>{b.itemName}</td>
-                    <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                      {b.components.map((c) => c.itemName ?? c.itemCode).join(', ')}
+                    <td>
+                      {b.totalItems} Artículos
                     </td>
-                    <td>{b.priceA ? formatDOP(b.priceA) : '—'}</td>
-                    <td>{b.priceB ? formatDOP(b.priceB) : '—'}</td>
-                    <td>{b.priceC ? formatDOP(b.priceC) : '—'}</td>
+                    <td>{b.prices?.A ? formatDOP(b.prices.A) : '—'}</td>
+                    <td>{b.prices?.B ? formatDOP(b.prices.B) : '—'}</td>
+                    <td>{b.prices?.C ? formatDOP(b.prices.C) : '—'}</td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
                         <button className="btn btn-ghost btn-size-icon-sm" onClick={() => { setEditId(b.id); setShowForm(true) }}>
@@ -109,6 +112,7 @@ export default function BundlesPage() {
 function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: () => void }) {
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
+  const [itemCode, setItemCode] = useState('')
   const [priceA, setPriceA] = useState('')
   const [priceB, setPriceB] = useState('')
   const [priceC, setPriceC] = useState('')
@@ -123,9 +127,10 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
   const [initialized, setInitialized] = useState(false)
   if (existing && !initialized) {
     setName(existing.itemName)
-    setPriceA(existing.priceA?.toString() ?? '')
-    setPriceB(existing.priceB?.toString() ?? '')
-    setPriceC(existing.priceC?.toString() ?? '')
+    setItemCode(existing.id)
+    setPriceA(existing.prices?.A?.toString() ?? '')
+    setPriceB(existing.prices?.B?.toString() ?? '')
+    setPriceC(existing.prices?.C?.toString() ?? '')
     setComponents(existing.components.map((c) => ({ itemCode: c.itemCode, itemLabel: c.itemName, qty: c.qty })))
     setInitialized(true)
   }
@@ -133,6 +138,7 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
   const createMutation = useMutation({
     mutationFn: () => createBundle({
       itemName: name,
+      itemCode: itemCode || undefined,
       components: components.map((c) => ({ itemCode: c.itemCode, qty: c.qty })),
       priceA: priceA ? parseFloat(priceA) : undefined,
       priceB: priceB ? parseFloat(priceB) : undefined,
@@ -145,6 +151,7 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
   const updateMutation = useMutation({
     mutationFn: () => updateBundle(editId!, {
       itemName: name,
+      itemCode: itemCode || undefined,
       components: components.map((c) => ({ itemCode: c.itemCode, qty: c.qty })),
       priceA: priceA ? parseFloat(priceA) : undefined,
       priceB: priceB ? parseFloat(priceB) : undefined,
@@ -190,9 +197,15 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
         ) : (
           <form onSubmit={handleSubmit}>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div className="ff-wrap">
-                <label className="ff-label ff-required">Nombre del combo</label>
-                <input className="ff-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Combo Oficina Básica" />
+              <div className="form-row">
+                <div className="ff-wrap">
+                  <label className="ff-label ff-required">Nombre del combo</label>
+                  <input className="ff-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Combo Oficina Básica" />
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label">Código</label>
+                  <input className="ff-input" value={itemCode} onChange={(e) => setItemCode(e.target.value)} placeholder="Ej: COMBO-001" />
+                </div>
               </div>
 
               <div className="ff-wrap">
@@ -218,7 +231,7 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
                           />
                         </div>
                         <div className="ff-wrap" style={{ width: 100 }}>
-                          <input className="ff-input" type="number" min="0.001" step="1" value={comp.qty} onChange={(e) => updateComponent(idx, { qty: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right' }} />
+                          <input className="ff-input" type="number" min="1" step="1" value={comp.qty} onChange={(e) => updateComponent(idx, { qty: parseInt(e.target.value) || 0 })} style={{ textAlign: 'right' }} />
                         </div>
                         <button type="button" className="btn btn-ghost btn-size-icon-sm" style={{ marginTop: 2 }} onClick={() => removeComponent(idx)}>
                           <Trash2 size={13} />

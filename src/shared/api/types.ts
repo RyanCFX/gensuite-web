@@ -22,6 +22,7 @@ export interface PaginationMeta {
   limit: number
   offset: number
   hasMore: boolean
+  defaultPriceTier?: 'A' | 'B' | 'C'
 }
 
 export interface ApiErrorResponse {
@@ -56,6 +57,8 @@ export interface AuthUser {
   email: string
   full_name: string
   roles: string[]
+  defaultWarehouse?: string
+  warehouses?: string[]
 }
 
 export interface LoginResponse {
@@ -71,6 +74,8 @@ export interface JwtPayload {
   tenant: string
   ak: string
   ask: string
+  defaultWarehouse?: string
+  warehouses?: string[]
   iat: number
   exp: number
 }
@@ -97,6 +102,8 @@ export interface Customer {
   birthday?: string
   photo?: string
   disabled: boolean
+  customerGroup?: string
+  priceTier?: 'A' | 'B' | 'C'
   createdAt: string
   modifiedAt: string
 }
@@ -118,6 +125,7 @@ export interface CreateCustomerDto {
   emailInvoice?: string
   birthday?: string
   photo?: string
+  customerGroup?: string
 }
 
 export type UpdateCustomerDto = Partial<Omit<CreateCustomerDto, 'customerType'>> & {
@@ -182,7 +190,7 @@ export type UpdateProveedorDto = Partial<CreateProveedorDto>
 
 export interface InvoiceItem {
   itemCode: string
-  description: string
+  description?: string
   qty: number
   rate: number
   discountPct?: number
@@ -190,6 +198,7 @@ export interface InvoiceItem {
   amount: number
   uom: string
   warehouse?: string
+  notes?: string
 }
 
 export interface Invoice {
@@ -203,12 +212,13 @@ export interface Invoice {
   ncf?: string
   ncfType?: string
   subtotal: number
-  taxAmount: number
   grandTotal: number
   outstandingAmount: number
   items: InvoiceItem[]
   notes?: string
   amendedFrom?: string
+  sequence: number
+  history?: AmendmentEntry[]
   createdAt: string
   modifiedAt: string
 }
@@ -218,10 +228,9 @@ export interface CreateInvoiceDto {
   postingDate: string
   dueDate?: string
   ncfType: 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
-  taxesAndCharges?: string
   items: {
     itemCode: string
-    description: string
+    description?: string
     qty: number
     rate: number
     uom?: string
@@ -235,10 +244,9 @@ export interface UpdateInvoiceDto {
   postingDate?: string
   dueDate?: string
   ncfType?: 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
-  taxesAndCharges?: string
   items?: {
     itemCode: string
-    description: string
+    description?: string
     qty: number
     rate: number
     uom?: string
@@ -251,13 +259,14 @@ export interface UpdateInvoiceDto {
 
 export interface QuotationItem {
   itemCode: string
-  description: string
+  description?: string
   qty: number
   rate: number
   discountPct?: number
   discountedRate?: number
   amount: number
   uom: string
+  notes?: string
 }
 
 export interface Quotation {
@@ -270,7 +279,10 @@ export interface Quotation {
   items: QuotationItem[]
   notes?: string
   amendedFrom?: string
+  sequence: number
   history?: AmendmentEntry[]
+  grandTotal?: number
+  message?: string
 }
 
 export interface CreateQuotationDto {
@@ -279,7 +291,7 @@ export interface CreateQuotationDto {
   validTill?: string
   items: {
     itemCode: string
-    description: string
+    description?: string
     qty: number
     rate: number
     uom?: string
@@ -363,10 +375,9 @@ export interface BundleComponent {
 export interface Bundle {
   id: string
   itemName: string
+  totalItems?: number
   components: BundleComponent[]
-  priceA?: number
-  priceB?: number
-  priceC?: number
+  prices?: { A?: number; B?: number; C?: number }
   disabled: boolean
 }
 
@@ -393,6 +404,8 @@ export interface Item {
   itemName: string
   category: string
   categoryName?: string
+  subcategory?: string
+  subcategoryName?: string
   brand?: string
   brandName?: string
   type: 'product' | 'service'
@@ -400,7 +413,7 @@ export interface Item {
   prices?: ItemPrices
   valuationRate?: number
   currentStock?: number
-  description?: string
+  internalDescription?: string
   shortName?: string
   notes?: string
   hasWarranty?: boolean
@@ -409,8 +422,6 @@ export interface Item {
   image?: string
   disabled: boolean
   stockUom?: string
-  purchaseUom?: string
-  salesUom?: string
   uoms?: ItemUomConversion[]
   hasVariants?: boolean
   variantOf?: string
@@ -420,15 +431,21 @@ export interface Item {
   marginB?: number
   marginC?: number
   allowsDiscount?: boolean
-  minDiscountPct?: number
+  maxDiscountPct?: number
   trackingType?: 'none' | 'batch' | 'serial'
-  taxTemplate?: string
+  purchaseTaxTemplate?: string
+  purchaseTaxPct?: number
+  salesTaxTemplate?: string
+  salesTaxPct?: number
+  purchasePriceDate?: string
+  salesPriceDate?: string
 }
 
 export interface CreateItemDto {
   itemCode?: string           // optional, BFF can auto-generate
   itemName: string
   category: string
+  subcategory?: string
   brand?: string
   type: 'product' | 'service'
   standardRate?: number       // deprecated — use prices
@@ -437,7 +454,7 @@ export interface CreateItemDto {
   priceB?: number
   priceC?: number
   valuationRate?: number
-  description?: string        // now means internal description (#6)
+  internalDescription?: string
   shortName?: string
   notes?: string
   hasWarranty?: boolean
@@ -446,9 +463,6 @@ export interface CreateItemDto {
   image?: string
   defaultWarehouse?: string
   stockUom?: string
-  purchaseUom?: string
-  salesUom?: string
-  uoms?: ItemUomConversion[]
   hasVariants?: boolean
   attributes?: { attribute: string }[]  // for templates: just attribute names
   priceMode?: 'manual' | 'cost_plus'
@@ -456,9 +470,10 @@ export interface CreateItemDto {
   marginB?: number
   marginC?: number
   allowsDiscount?: boolean
-  minDiscountPct?: number
+  maxDiscountPct?: number
   trackingType?: 'none' | 'batch' | 'serial'
-  taxTemplate?: string
+  purchaseTaxTemplate?: string
+  salesTaxTemplate?: string
 }
 
 export type UpdateItemDto = Partial<CreateItemDto>
@@ -468,12 +483,32 @@ export interface GrupoCliente extends Grupo {
   priceTier?: 'A' | 'B' | 'C'
 }
 
-// Amendment history for quotations / pedidos
+export interface DraftVersion {
+  sequence: number
+  savedAt: string
+  id: string
+  grandTotal: number
+  items: Array<{ itemCode: string; description: string; qty: number; rate: number; amount: number }>
+  status: string
+}
+
+// Amendment history for quotations / pedidos / invoices
 export interface AmendmentEntry {
   id: string
-  date: string
+  date?: string
   status: string
-  total: number
+  total?: number
+  grandTotal?: number
+  items?: Array<{ itemCode: string; description: string; qty: number; rate: number; amount: number; notes?: string }>
+  amendedFrom?: string | null
+  createdAt?: string
+  sequence?: number
+}
+
+/* @deprecated Use AmendmentEntry[] directly */
+export interface DocumentHistory {
+  drafts?: Array<{ version: number; savedAt: string; id: string; grandTotal?: number }>
+  amendments?: AmendmentEntry[]
 }
 
 // Pedido de Venta (Sales Order)
@@ -485,6 +520,7 @@ export interface PedidoItem {
   amount: number
   uom?: string
   discountPct?: number
+  notes?: string
 }
 
 export interface Pedido {
@@ -493,10 +529,11 @@ export interface Pedido {
   customerName: string
   transactionDate: string
   deliveryDate?: string
-  status: 'draft' | 'submitted' | 'cancelled'
+  status: 'draft' | 'submitted' | 'cancelled' | 'completed'
   items: PedidoItem[]
   notes?: string
   amendedFrom?: string
+  sequence: number
   history?: AmendmentEntry[]
   quotation?: string
   facturaId?: string
@@ -513,6 +550,7 @@ export interface CreatePedidoDto {
     qty: number
     rate: number
     discountPct?: number
+    warehouse?: string
   }[]
   quotation?: string
 }
@@ -556,18 +594,6 @@ export interface VerifyPinResponse {
   valid: boolean
   userId: string
   canOverridePrice: boolean
-}
-
-// Item Tax Templates (for #13)
-export interface ItemTaxTemplate {
-  id: string
-  title: string
-}
-
-// Customer with price tier (#14)
-export interface CustomerWithPriceTier {
-  customerGroup?: string
-  priceTier?: 'A' | 'B' | 'C'
 }
 
 export interface Category {
@@ -719,13 +745,6 @@ export interface CreateCountDto {
 // ─── Compra (Purchase Invoice — update_stock=1) ───────────────────────────────
 // CompraItemDto has NO description field.
 
-export interface CompraTax {
-  chargeType: string
-  accountHead: string
-  rate: number
-  description?: string
-}
-
 export interface CompraItem {
   itemCode: string
   qty: number
@@ -733,6 +752,8 @@ export interface CompraItem {
   amount: number
   warehouse?: string
   uom?: string
+  serials?: string[]
+  batches?: { batchId: string; expiryDate?: string; qty: number }[]
   // NOTE: no "description" in CompraItemDto per BFF schema
 }
 
@@ -745,12 +766,10 @@ export interface Compra {
   status: 'draft' | 'submitted' | 'cancelled'
   currency: string
   items: CompraItem[]
-  taxes?: CompraTax[]
   grandTotal: number
   ncfProveedor?: string
   tipoBienes606?: string
   formaPago606?: string
-  retencionItbis?: number
   retencionIsr?: number
   tipoPago?: 'Contado' | 'Crédito'
   amendedFrom?: string
@@ -768,19 +787,13 @@ export interface CreateCompraDto {
     rate: number
     warehouse?: string
     uom?: string
+    serials?: string[]
+    batches?: { batchId: string; expiryDate?: string; qty: number }[]
     // NO description
-  }[]
-  taxesAndCharges?: string
-  taxes?: {
-    chargeType: string
-    accountHead: string
-    rate: number
-    description?: string
   }[]
   ncfProveedor?: string
   tipoBienes606?: string
   formaPago606?: string
-  retencionItbis?: number
   retencionIsr?: number
   tipoPago?: 'Contado' | 'Crédito'
 }
@@ -813,7 +826,6 @@ export interface Gasto {
   tipoComprobante?: 'B01' | 'B13' | 'B14' | 'B15' | 'B16' | 'B17' | 'E31'
   tipoBienes606?: string
   formaPago606?: string
-  retencionItbis?: number
   retencionIsr?: number
   categoriaGasto?: 'Operativo' | 'Administrativo' | 'Ventas' | 'Financiero'
   esDeducible?: boolean
@@ -833,12 +845,10 @@ export interface CreateGastoDto {
     uom?: string
     description?: string     // allowed in GastoItemDto
   }[]
-  taxesAndCharges?: string
   ncfProveedor?: string
   tipoComprobante?: 'B01' | 'B13' | 'B14' | 'B15' | 'B16' | 'B17' | 'E31'
   tipoBienes606?: string
   formaPago606?: string
-  retencionItbis?: number
   retencionIsr?: number
   categoriaGasto?: 'Operativo' | 'Administrativo' | 'Ventas' | 'Financiero'
   esDeducible?: boolean
@@ -859,6 +869,9 @@ export interface Usuario {
   timeZone?: string
   mobileNo?: string
   lastActive?: string
+  maxDiscountPct?: number
+  warehouses?: string[]
+  defaultWarehouse?: string
 }
 
 export interface CreateUsuarioDto {
@@ -871,6 +884,7 @@ export interface CreateUsuarioDto {
   timeZone?: string
   sendWelcomeEmail?: boolean
   warehouses?: string[]
+  maxDiscountPct?: number
 }
 
 export interface UpdateUsuarioDto {
@@ -879,6 +893,8 @@ export interface UpdateUsuarioDto {
   mobileNo?: string
   roles?: string[]
   warehouses?: string[]
+  defaultWarehouse?: string
+  maxDiscountPct?: number
 }
 
 export interface Role {

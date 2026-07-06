@@ -3,6 +3,7 @@ import { ENDPOINTS } from './endpoints'
 import type {
   Customer,
   CreateCustomerDto,
+  GrupoCliente,
   PaginatedResponse,
   PaginationParams,
 } from './types'
@@ -33,4 +34,20 @@ export async function updateCustomer(id: string, data: Partial<CreateCustomerDto
 
 export async function deleteCustomer(id: string) {
   await client.delete(ENDPOINTS.customers.byId(id))
+}
+
+// ─── Customer Groups ────────────────────────────────────────────────────────
+
+export async function listCustomerGroups() {
+  const res = await client.get<{ success: true; data: GrupoCliente[] }>(ENDPOINTS.customers.groups.list)
+  return unwrap(res)
+}
+
+export async function createCustomerGroup(data: { name: string; priceTier?: 'A' | 'B' | 'C'; parentGroup?: string }) {
+  const res = await client.post<{ success: true; data: GrupoCliente }>(ENDPOINTS.customers.groups.create, data)
+  return unwrap(res)
+}
+
+export async function deleteCustomerGroup(name: string) {
+  await client.delete(ENDPOINTS.customers.groups.delete(name))
 }

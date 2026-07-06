@@ -6,6 +6,8 @@ import { formatDate, formatDOP } from '@/lib/formatters'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Plus, Search, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react'
 import { useDebounce } from '@/lib/useDebounce'
+import { useSortState } from '@/shared/hooks/useSortState'
+import { SortableTh } from '@/shared/ui/SortableTh'
 
 const PAGE_SIZE = 25
 
@@ -13,16 +15,18 @@ export default function JournalPage() {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const { orderBy, sort } = useSortState()
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['journal-entries', { search: debouncedSearch, offset }],
+    queryKey: ['journal-entries', { search: debouncedSearch, offset, orderBy }],
     queryFn: () => listJournalEntries({
       search: debouncedSearch || undefined,
       limit: PAGE_SIZE,
       offset,
+      orderBy: orderBy || undefined,
     }),
   })
 
@@ -64,8 +68,8 @@ export default function JournalPage() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Fecha</th>
+              <SortableTh label="ID" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
+              <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
               <th>Tipo</th>
               <th>Descripción</th>
               <th style={{ textAlign: 'right' }}>Total Débitos</th>
