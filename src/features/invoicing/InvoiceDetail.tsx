@@ -1,7 +1,11 @@
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getInvoice, submitInvoice, cancelInvoice, amendInvoice, downloadInvoicePdf } from '@/shared/api/invoices'
-import { ArrowLeft, Send, XCircle, FileEdit, Download, Pencil } from 'lucide-react'
+import { getCustomer } from '@/shared/api/customers'
+import { listMetodosPago } from '@/shared/api/config'
+import type { SubmitInvoiceDto } from '@/shared/api/types'
+import { ArrowLeft, Send, XCircle, FileEdit, Download, Pencil, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { NCF_TYPES } from '@/lib/constants'
@@ -23,23 +27,71 @@ export default function InvoiceDetail() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
+  const [payCash, setPayCash] = useState(false)
+  const [modeOfPayment, setModeOfPayment] = useState('')
+  const [creditErrorOpen, setCreditErrorOpen] = useState(false)
+  const [creditErrorMsg, setCreditErrorMsg] = useState('')
+
   const { data: invoice, isLoading } = useQuery({
     queryKey: ['invoice', id],
     queryFn: () => getInvoice(id!),
     enabled: !!id,
   })
 
+  const { data: customer } = useQuery({
+    queryKey: ['customer', invoice?.customer],
+    queryFn: () => getCustomer(invoice!.customer),
+    enabled: !!invoice?.customer && invoice.status === 'draft',
+  })
+
+  const { data: metodos } = useQuery({
+    queryKey: ['metodos-pago'],
+    queryFn: listMetodosPago,
+    enabled: invoice?.status === 'draft',
+    staleTime: 5 * 60_000,
+  })
+
+  const noCredit = invoice?.status === 'draft' && customer?.hasCredit === false
+  const showCashSelector = noCredit || payCash
+
   const submitMutation = useMutation({
-    mutationFn: () => submitInvoice(id!),
-    onSuccess: () => {
+    mutationFn: (body?: SubmitInvoiceDto) => submitInvoice(id!, body),
+    onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       queryClient.invalidateQueries({ queryKey: ['invoice', id] })
-      toast.success('Factura sometida — NCF asignado')
+      setCreditErrorOpen(false)
+      setPayCash(false)
+      setModeOfPayment('')
+      toast.success(
+        updated.paymentStatus === 'paid'
+          ? 'Factura sometida y cobrada al contado'
+          : 'Factura sometida — NCF asignado',
+      )
     },
     onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al someter la factura')
+      const msg = err?.message ?? ''
+      if (/excede\s+el\s+cr[eé]dito\s+disponible/i.test(msg)) {
+        setCreditErrorMsg(msg)
+        setCreditErrorOpen(true)
+        return
+      }
+      toast.error(msg || 'Error al someter la factura')
     },
   })
+
+  function handleSubmitClick() {
+    if (showCashSelector) {
+      if (!modeOfPayment) { toast.error('Selecciona un método de pago'); return }
+      submitMutation.mutate({ payCash: true, modeOfPayment })
+    } else {
+      submitMutation.mutate(undefined)
+    }
+  }
+
+  function handleCashRetry() {
+    if (!modeOfPayment) { toast.error('Selecciona un método de pago'); return }
+    submitMutation.mutate({ payCash: true, modeOfPayment })
+  }
 
   const cancelMutation = useMutation({
     mutationFn: () => cancelInvoice(id!),
@@ -141,18 +193,47 @@ export default function InvoiceDetail() {
 
       <div className="doc-actions-bar">
         {invoice.status === 'draft' && (
-          <>
-            <button
-              className="btn btn-secondary btn-size-sm"
-              onClick={() => navigate(`/facturacion/facturas/${id}/editar`)}
-              disabled={isActionsLoading}
-            >
-              <Pencil size={14} /> Editar
-            </button>
-            <button className="btn btn-primary btn-size-sm" onClick={() => submitMutation.mutate()} disabled={isActionsLoading}>
-              <Send size={14} /> Someter
-            </button>
-          </>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-secondary btn-size-sm"
+                onClick={() => navigate(`/facturacion/facturas/${id}/editar`)}
+                disabled={isActionsLoading}
+              >
+                <Pencil size={14} /> Editar
+              </button>
+
+              {!noCredit && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                  <input type="checkbox" checked={payCash} onChange={(e) => setPayCash(e.target.checked)} />
+                  Cobrar al contado
+                </label>
+              )}
+
+              {showCashSelector && (
+                <select
+                  className="ff-select"
+                  style={{ width: 200, height: 32 }}
+                  value={modeOfPayment}
+                  onChange={(e) => setModeOfPayment(e.target.value)}
+                >
+                  <option value="">Método de pago…</option>
+                  {metodos?.filter((m) => !m.disabled).map((m) => (
+                    <option key={m.name} value={m.name}>{m.name}</option>
+                  ))}
+                </select>
+              )}
+
+              <button className="btn btn-primary btn-size-sm" onClick={handleSubmitClick} disabled={isActionsLoading}>
+                <Send size={14} /> Someter
+              </button>
+            </div>
+            {noCredit && (
+              <p style={{ fontSize: 12, color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 4, margin: 0 }}>
+                <AlertTriangle size={12} /> Este cliente no tiene crédito habilitado — se cobrará al contado.
+              </p>
+            )}
+          </div>
         )}
         {invoice.status === 'submitted' && (
           <>
@@ -324,6 +405,47 @@ export default function InvoiceDetail() {
 
       {/* Historial */}
       <DocumentHistoryCard history={invoice.history} basePath="/facturacion/facturas" currentDocId={invoice.id} />
+
+      {/* Modal: crédito excedido al someter */}
+      {creditErrorOpen && (
+        <div className="modal-overlay" onClick={() => setCreditErrorOpen(false)}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlertTriangle size={16} style={{ color: 'var(--error-text)' }} /> Crédito excedido
+              </h2>
+              <button className="modal-close" onClick={() => setCreditErrorOpen(false)}>×</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{creditErrorMsg}</p>
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="modeOfPaymentRetry">Método de pago <span className="ff-required">*</span></label>
+                <select
+                  id="modeOfPaymentRetry"
+                  className="ff-select"
+                  value={modeOfPayment}
+                  onChange={(e) => setModeOfPayment(e.target.value)}
+                >
+                  <option value="">Seleccionar…</option>
+                  {metodos?.filter((m) => !m.disabled).map((m) => (
+                    <option key={m.name} value={m.name}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={() => setCreditErrorOpen(false)}>Volver</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCashRetry}
+                disabled={submitMutation.isPending}
+              >
+                <Send size={14} /> Cobrar al contado y someter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

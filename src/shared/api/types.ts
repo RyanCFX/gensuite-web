@@ -255,6 +255,14 @@ export interface UpdateInvoiceDto {
   notes?: string
 }
 
+// POST /invoices/:id/submit — optional body to control cash vs. credit at submit time
+export interface SubmitInvoiceDto {
+  /** Force cash payment even if the customer has credit. */
+  payCash?: boolean
+  /** ERPNext Mode of Payment name. Required whenever the invoice is paid cash (forced or automatic). */
+  modeOfPayment?: string
+}
+
 // ─── Quotation ────────────────────────────────────────────────────────────────
 
 export interface QuotationItem {
