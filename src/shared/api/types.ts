@@ -209,6 +209,7 @@ export interface Invoice {
   customerName: string
   postingDate: string
   dueDate: string
+  branch?: string | null
   ncf?: string
   ncfType?: string
   subtotal: number
@@ -231,6 +232,7 @@ export interface CreateInvoiceDto {
   customer: string
   postingDate: string
   dueDate?: string
+  branch?: string
   ncfType: 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
   items: {
     itemCode: string
@@ -276,6 +278,7 @@ export interface Quotation {
   customerName: string
   date: string
   validTill: string
+  branch?: string | null
   status: 'draft' | 'submitted' | 'ordered' | 'lost' | 'cancelled'
   items: QuotationItem[]
   notes?: string
@@ -290,6 +293,7 @@ export interface CreateQuotationDto {
   customer: string
   date: string               // required per API
   validTill?: string
+  branch?: string
   items: {
     itemCode: string
     description?: string
@@ -579,6 +583,7 @@ export interface Pedido {
   customerName: string
   transactionDate: string
   deliveryDate?: string
+  branch?: string | null
   status: 'draft' | 'submitted' | 'cancelled' | 'completed'
   items: PedidoItem[]
   notes?: string
@@ -599,6 +604,7 @@ export interface CreatePedidoDto {
   customer: string
   transactionDate?: string
   deliveryDate?: string
+  branch?: string
   items: {
     itemCode: string
     qty: number
@@ -793,6 +799,74 @@ export interface Warehouse {
   parent?: string
 }
 
+// ─── Sucursales (Branches) ─────────────────────────────────────────────────────
+
+export interface Sucursal {
+  id: string
+  name: string
+  warehouseCount: number
+}
+
+export interface CreateSucursalDto {
+  name: string
+}
+
+export type UpdateSucursalDto = Partial<CreateSucursalDto>
+
+export interface UsuarioSucursales {
+  branches: string[]
+  defaultBranch: string | null
+}
+
+export interface UsuarioAlmacenesPermitidos {
+  warehouses: string[]
+}
+
+// ─── Transferencias (Warehouse Transfers) ──────────────────────────────────────
+
+export interface TransferenciaItem {
+  itemCode: string
+  itemName?: string
+  qty: number
+}
+
+export interface Transferencia {
+  id: string
+  status: 'draft' | 'in_transit' | 'completed' | 'cancelled'
+  fromWarehouse: string
+  toWarehouse: string
+  notes?: string
+  items: TransferenciaItem[]
+  confirmationId: string | null
+  createdAt: string
+}
+
+export interface CreateTransferenciaDto {
+  fromWarehouse: string
+  toWarehouse: string
+  items: { itemCode: string; qty: number }[]
+  notes?: string
+}
+
+// Config → Almacenes (distinct resource/endpoint from Inventory → Warehouse)
+export interface AlmacenListItem {
+  name: string
+  disabled: boolean
+  branch?: string | null
+  warehouseType?: string
+}
+
+export interface CreateAlmacenDto {
+  warehouseName: string
+  warehouseType?: string
+  city?: string
+  parentWarehouse?: string
+  account?: string
+  branch?: string
+}
+
+export type UpdateAlmacenDto = Partial<CreateAlmacenDto>
+
 export interface InventoryHistory {
   itemCode: string
   itemName: string
@@ -863,6 +937,7 @@ export interface Compra {
   supplierName: string
   postingDate: string
   dueDate: string
+  branch?: string | null
   status: 'draft' | 'submitted' | 'cancelled'
   currency: string
   items: CompraItem[]
@@ -879,6 +954,7 @@ export interface CreateCompraDto {
   supplier: string
   postingDate: string
   dueDate?: string
+  branch?: string
   currency?: string
   conversionRate?: number
   items: {
@@ -972,6 +1048,8 @@ export interface Usuario {
   maxDiscountPct?: number
   warehouses?: string[]
   defaultWarehouse?: string
+  branches?: string[]
+  defaultBranch?: string
 }
 
 export interface CreateUsuarioDto {
@@ -995,6 +1073,8 @@ export interface UpdateUsuarioDto {
   warehouses?: string[]
   defaultWarehouse?: string
   maxDiscountPct?: number
+  branches?: string[]
+  defaultBranch?: string
 }
 
 export interface Role {
@@ -1049,6 +1129,7 @@ export interface Empresa {
   itemCodeMode?: 'manual' | 'auto' | 'prefix_auto'
   defaultWarehouse?: string
   defaultPriceTipo?: 'A' | 'B' | 'C'
+  transitWarehouse?: string | null
 }
 
 export interface UpdateEmpresaDto {
@@ -1065,6 +1146,7 @@ export interface UpdateEmpresaDto {
   itemCodeMode?: 'manual' | 'auto' | 'prefix_auto'
   defaultWarehouse?: string
   defaultPriceTipo?: 'A' | 'B' | 'C'
+  transitWarehouse?: string
 }
 
 export interface CobrosConfig {

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { listInvoices } from '@/shared/api/invoices'
 import type { ListInvoicesParams } from '@/shared/api/invoices'
+import { listSucursales } from '@/shared/api/sucursales'
 import { Plus, Eye, Search, GitBranch } from 'lucide-react'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { NCF_TYPES } from '@/lib/constants'
@@ -44,7 +45,14 @@ export default function InvoicesPage() {
   const [ncfType, setNcfType] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [branch, setBranch] = useState('')
   const { orderBy, sort } = useSortState()
+
+  const { data: sucursalesData } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+  })
+  const sucursales = sucursalesData?.items ?? []
 
   const params: ListInvoicesParams = {
     search: search || undefined,
@@ -53,6 +61,7 @@ export default function InvoicesPage() {
     ncfType: ncfType || undefined,
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
+    branch: branch || undefined,
     orderBy: orderBy || undefined,
     limit: 50,
   }
@@ -124,6 +133,12 @@ export default function InvoicesPage() {
             <option value="">Todos los tipos NCF</option>
             {NCF_TYPES.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+          <select className="filter-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
+            <option value="">Todas las sucursales</option>
+            {sucursales.map((s) => (
+              <option key={s.id} value={s.name}>{s.name}</option>
             ))}
           </select>
           <input

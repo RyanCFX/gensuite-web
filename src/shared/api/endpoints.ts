@@ -123,9 +123,21 @@ export const ENDPOINTS = {
     byEmail: (email: string) => `/usuarios/${email}`,
     enable: (email: string) => `/usuarios/${email}/enable`,
     resetPassword: (email: string) => `/usuarios/${email}/reset-password`,
+    sucursales: (email: string) => `/usuarios/${encodeURIComponent(email)}/sucursales`,
+    almacenesPermitidos: (email: string) => `/usuarios/${encodeURIComponent(email)}/almacenes-permitidos`,
   },
   roles: {
     list: '/roles',
+  },
+  sucursales: {
+    list: '/sucursales',
+    byId: (id: string) => `/sucursales/${encodeURIComponent(id)}`,
+  },
+  transferencias: {
+    list: '/transferencias',
+    byId: (id: string) => `/transferencias/${encodeURIComponent(id)}`,
+    confirmar: (id: string) => `/transferencias/${encodeURIComponent(id)}/confirmar`,
+    cancelar: (id: string) => `/transferencias/${encodeURIComponent(id)}/cancelar`,
   },
   cuentas: {
     list: '/cuentas',

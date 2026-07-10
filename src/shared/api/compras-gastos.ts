@@ -16,6 +16,7 @@ export interface ListComprasParams extends PaginationParams {
   status?: string
   fromDate?: string
   toDate?: string
+  branch?: string
 }
 
 export async function listCompras(params?: ListComprasParams) {

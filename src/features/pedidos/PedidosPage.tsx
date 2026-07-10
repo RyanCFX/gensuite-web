@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { listPedidos, cancelPedido } from '@/shared/api/pedidos'
 import type { Pedido } from '@/shared/api/types'
 import type { ListPedidosParams } from '@/shared/api/pedidos'
+import { listSucursales } from '@/shared/api/sucursales'
 import { displayId, formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, Eye, Search, X, Loader2, Copy, PackageOpen } from 'lucide-react'
 import { toast } from 'sonner'
@@ -30,13 +31,21 @@ export default function PedidosPage() {
   const [toDate, setToDate] = useState('')
   const [toCancel, setToCancel] = useState<Pedido | null>(null)
   const [onlyLayaway, setOnlyLayaway] = useState(false)
+  const [branch, setBranch] = useState('')
   const { orderBy, sort } = useSortState()
+
+  const { data: sucursalesData } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+  })
+  const sucursales = sucursalesData?.items ?? []
 
   const params: ListPedidosParams = {
     search: search || undefined,
     status: status === 'all' ? undefined : status as ListPedidosParams['status'],
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
+    branch: branch || undefined,
     orderBy: orderBy || undefined,
     isLayaway: onlyLayaway || undefined,
     limit: 50,
@@ -84,6 +93,12 @@ export default function PedidosPage() {
             <option value="draft">Borrador</option>
             <option value="submitted">En Proceso</option>
             <option value="cancelled">Cancelado</option>
+          </select>
+          <select className="filter-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
+            <option value="">Todas las sucursales</option>
+            {sucursales.map((s) => (
+              <option key={s.id} value={s.name}>{s.name}</option>
+            ))}
           </select>
           <input
             type="date"

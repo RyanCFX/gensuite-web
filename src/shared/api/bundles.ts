@@ -7,7 +7,11 @@ export interface ListBundlesParams extends PaginationParams {
 }
 
 export async function listBundles(params?: ListBundlesParams) {
-  const res = await client.get<PaginatedResponse<Bundle>>(ENDPOINTS.catalog.bundles.list, { params })
+  // NOTE: el backend rechaza `disabled` con 400 ("property disabled should not exist") —
+  // no lo soporta todavía en GET /catalog/bundles. Filtramos por ese campo en el cliente
+  // (ver BundlesPage.tsx / ItemSelect.tsx) en vez de mandarlo en la query.
+  const { disabled: _disabled, ...rest } = params ?? {}
+  const res = await client.get<PaginatedResponse<Bundle>>(ENDPOINTS.catalog.bundles.list, { params: rest })
   return unwrapPaginated(res)
 }
 

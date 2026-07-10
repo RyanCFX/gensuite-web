@@ -45,6 +45,7 @@ const UsuariosPage    = lazy(() => import('@/features/usuarios/UsuariosPage'))
 const ReportesPage    = lazy(() => import('@/features/reportes/ReportesPage'))
 const EmpresaConfig   = lazy(() => import('@/features/config/EmpresaConfig'))
 const NcfPage         = lazy(() => import('@/features/config/NcfPage'))
+const SucursalesPage  = lazy(() => import('@/features/config/SucursalesPage'))
 const ConfigPage      = lazy(() => import('@/features/config/ConfigPage'))
 const CuentasPage     = lazy(() => import('@/features/cuentas/CuentasPage'))
 const CuentaDetail    = lazy(() => import('@/features/cuentas/CuentaDetail'))
@@ -59,6 +60,9 @@ const BundlesPage       = lazy(() => import('@/features/bundles/BundlesPage'))
 const PedidosPage       = lazy(() => import('@/features/pedidos/PedidosPage'))
 const PedidoDetail      = lazy(() => import('@/features/pedidos/PedidoDetail'))
 const PedidoForm        = lazy(() => import('@/features/pedidos/PedidoForm'))
+const TransferenciasPage = lazy(() => import('@/features/transferencias/TransferenciasPage'))
+const TransferenciaForm  = lazy(() => import('@/features/transferencias/TransferenciaForm'))
+const TransferenciaDetail = lazy(() => import('@/features/transferencias/TransferenciaDetail'))
 
 function PageLoader() {
   return (
@@ -108,6 +112,11 @@ export default function App() {
             <Route path="/pedidos/nuevo" element={<Suspense fallback={<PageLoader />}><PedidoForm /></Suspense>} />
             <Route path="/pedidos/:id" element={<Suspense fallback={<PageLoader />}><PedidoDetail /></Suspense>} />
             <Route path="/pedidos/:id/editar" element={<Suspense fallback={<PageLoader />}><PedidoForm /></Suspense>} />
+
+            {/* Transferencias entre almacenes */}
+            <Route path="/transferencias" element={<Suspense fallback={<PageLoader />}><TransferenciasPage /></Suspense>} />
+            <Route path="/transferencias/nueva" element={<Suspense fallback={<PageLoader />}><TransferenciaForm /></Suspense>} />
+            <Route path="/transferencias/:id" element={<Suspense fallback={<PageLoader />}><TransferenciaDetail /></Suspense>} />
 
             {/* Facturación */}
             <Route path="/facturacion/facturas" element={<Suspense fallback={<PageLoader />}><InvoicesPage /></Suspense>} />
@@ -178,8 +187,9 @@ export default function App() {
 
             {/* Configuración */}
             <Route path="/config/empresa" element={<Suspense fallback={<PageLoader />}><EmpresaConfig /></Suspense>} />
-            {/* /config/ncf must be before /config/:seccion to avoid being caught as seccion='ncf' */}
+            {/* /config/ncf and /config/sucursales must be before /config/:seccion to avoid being caught as seccion */}
             <Route path="/config/ncf" element={<Suspense fallback={<PageLoader />}><NcfPage /></Suspense>} />
+            <Route path="/config/sucursales" element={<Suspense fallback={<PageLoader />}><SucursalesPage /></Suspense>} />
             <Route path="/config/:seccion" element={<Suspense fallback={<PageLoader />}><ConfigPage /></Suspense>} />
             <Route path="/config" element={<Navigate to="/config/empresa" replace />} />
 

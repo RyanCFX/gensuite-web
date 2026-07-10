@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getEmpresa, updateEmpresa, getCuentasEmpresa, updateCuentasEmpresa, listAlmacenes } from '@/shared/api/config'
-import type { Empresa, CuentasEmpresa, Warehouse } from '@/shared/api/types'
+import type { Empresa, CuentasEmpresa, AlmacenListItem } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { REGIMENES_FISCALES } from '@/lib/constants'
 import { Building2, Save } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 export default function EmpresaConfig() {
   const queryClient = useQueryClient()
@@ -52,8 +53,9 @@ export default function EmpresaConfig() {
   // ── Warehouses lookup ──────────────────────────────────────────────────────
   const { data: warehouses } = useQuery({
     queryKey: ['almacenes'],
-    queryFn: listAlmacenes,
+    queryFn: () => listAlmacenes(),
   })
+  const transitWarehouses = (warehouses ?? []).filter((w) => w.warehouseType === 'Transit')
 
   // ── Cuentas por Defecto tab state ──────────────────────────────────────────
   const { data: cuentasData, isLoading: cuentasLoading } = useQuery({
@@ -263,11 +265,32 @@ export default function EmpresaConfig() {
                       onChange={(e) => set('defaultWarehouse', e.target.value || undefined)}
                     >
                       <option value="">Sin predeterminado</option>
-                      {(warehouses ?? []).map((w: Warehouse) => (
-                        <option key={w.id} value={w.name}>{w.name}</option>
+                      {(warehouses ?? []).map((w: AlmacenListItem) => (
+                        <option key={w.name} value={w.name}>{w.name}</option>
                       ))}
                     </select>
                     <p className="ff-hint">Se usará al crear documentos si el usuario no tiene almacén asignado</p>
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">Almacén de Tránsito</label>
+                    <select
+                      className="ff-select"
+                      value={form.transitWarehouse ?? ''}
+                      onChange={(e) => set('transitWarehouse', e.target.value || undefined)}
+                    >
+                      <option value="">Sin configurar</option>
+                      {transitWarehouses.map((w) => (
+                        <option key={w.name} value={w.name}>{w.name}</option>
+                      ))}
+                    </select>
+                    {transitWarehouses.length === 0 ? (
+                      <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
+                        No hay ningún almacén de tipo "Tránsito" todavía. Crea uno primero en{' '}
+                        <Link to="/config/almacenes">Configuración → Almacenes</Link> con tipo "Transit".
+                      </p>
+                    ) : (
+                      <p className="ff-hint">Requerido para poder crear transferencias entre almacenes/sucursales.</p>
+                    )}
                   </div>
                   <div className="ff-wrap">
                     <label className="ff-label">Nivel de precio por defecto</label>

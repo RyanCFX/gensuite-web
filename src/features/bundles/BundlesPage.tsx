@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { listBundles, getBundle, createBundle, updateBundle, deleteBundle } from '@/shared/api/bundles'
@@ -6,26 +6,53 @@ import type { Bundle, BundleComponent } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { formatDOP } from '@/lib/formatters'
-import { Plus, Trash2, X, Loader2 } from 'lucide-react'
+import { useDebounce } from '@/lib/useDebounce'
+import { Plus, Trash2, X, Loader2, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+
+const PAGE_SIZE = 20
 
 export default function BundlesPage() {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [toDelete, setToDelete] = useState<Bundle | null>(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'disabled'>('active')
+  const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
 
+  const debouncedSearch = useDebounce(search, 300)
+  const offset = (page - 1) * PAGE_SIZE
+
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value)
+    setPage(1)
+  }, [])
+
   const { data, isLoading } = useQuery({
-    queryKey: ['bundles', { orderBy }],
-    queryFn: () => listBundles({ limit: 100, orderBy: orderBy || undefined }),
+    queryKey: ['bundles', { search: debouncedSearch, offset, orderBy }],
+    queryFn: () => listBundles({
+      search: debouncedSearch || undefined,
+      limit: PAGE_SIZE,
+      offset,
+      orderBy: orderBy || undefined,
+    }),
   })
+
+  // El backend no soporta filtrar por `disabled` en la query (rechaza la propiedad) —
+  // filtramos en el cliente sobre la página ya traída, como workaround temporal.
+  const filteredItems = (data?.items ?? []).filter((b) =>
+    statusFilter === 'all' ? true : statusFilter === 'disabled' ? b.disabled : !b.disabled,
+  )
+
+  const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteBundle(id),
-    onSuccess: () => { toast.success('Combo eliminado'); queryClient.invalidateQueries({ queryKey: ['bundles'] }); setToDelete(null) },
-    onError: () => toast.error('Error al eliminar el combo'),
+    onSuccess: () => { toast.success('Combo desactivado'); queryClient.invalidateQueries({ queryKey: ['bundles'] }); setToDelete(null) },
+    onError: () => toast.error('Error al desactivar el combo'),
   })
 
   return (
@@ -41,6 +68,26 @@ export default function BundlesPage() {
       />
 
       <div className="card">
+        <div style={{ display: 'flex', gap: 8, padding: '12px 16px', borderBottom: '1px solid var(--border-default)' }}>
+          <div className="search-input-wrap">
+            <Search size={14} className="search-input-icon" />
+            <input
+              className="search-input"
+              placeholder="Buscar combo por nombre…"
+              value={search}
+              onChange={handleSearchChange}
+            />
+          </div>
+          <select
+            className="filter-select"
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value as 'all' | 'active' | 'disabled'); setPage(1) }}
+          >
+            <option value="all">Todos</option>
+            <option value="active">Activos</option>
+            <option value="disabled">Desactivados</option>
+          </select>
+        </div>
         <div className="table-wrap">
           <table className="table-config">
             <thead>
@@ -50,16 +97,17 @@ export default function BundlesPage() {
                 <SortableTh label="Precio A" sortKey="priceA" orderBy={orderBy} onSort={sort} />
                 <SortableTh label="Precio B" sortKey="priceB" orderBy={orderBy} onSort={sort} />
                 <SortableTh label="Precio C" sortKey="priceC" orderBy={orderBy} onSort={sort} />
+                <th>Estado</th>
                 <th style={{ width: 80 }} />
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32 }}><Loader2 size={20} className="spin" /></td></tr>
-              ) : !data?.items?.length ? (
-                <tr><td colSpan={6}><div className="empty-state"><p className="empty-title">Sin combos</p><p className="empty-sub">Crea el primer combo de artículos.</p></div></td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 32 }}><Loader2 size={20} className="spin" /></td></tr>
+              ) : filteredItems.length === 0 ? (
+                <tr><td colSpan={7}><div className="empty-state"><p className="empty-title">Sin combos</p><p className="empty-sub">Crea el primer combo de artículos.</p></div></td></tr>
               ) : (
-                data.items.map((b) => (
+                filteredItems.map((b) => (
                   <tr key={b.id}>
                     <td style={{ fontWeight: 500 }}>{b.itemName}</td>
                     <td>
@@ -69,13 +117,20 @@ export default function BundlesPage() {
                     <td>{b.prices?.B ? formatDOP(b.prices.B) : '—'}</td>
                     <td>{b.prices?.C ? formatDOP(b.prices.C) : '—'}</td>
                     <td>
+                      {b.disabled
+                        ? <span className="badge badge-neutral">Inactivo</span>
+                        : <span className="badge badge-success">Activo</span>}
+                    </td>
+                    <td>
                       <div style={{ display: 'flex', gap: 4 }}>
                         <button className="btn btn-ghost btn-size-icon-sm" onClick={() => { setEditId(b.id); setShowForm(true) }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
                         </button>
-                        <button className="btn btn-ghost btn-size-icon-sm" style={{ color: 'var(--icon-muted)' }} onClick={() => setToDelete(b)}>
-                          <Trash2 size={14} />
-                        </button>
+                        {!b.disabled && (
+                          <button className="btn btn-ghost btn-size-icon-sm" style={{ color: 'var(--icon-muted)' }} onClick={() => setToDelete(b)}>
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -84,6 +139,24 @@ export default function BundlesPage() {
             </tbody>
           </table>
         </div>
+        {data && data.meta.total > PAGE_SIZE && (
+          <div className="pagination">
+            <span className="pagination-info">
+              Mostrando {offset + 1}–{Math.min(offset + PAGE_SIZE, data.meta.total)} de {data.meta.total}
+            </span>
+            <div className="pagination-controls">
+              <button className="btn btn-ghost btn-size-icon-sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+                <ChevronLeft size={14} />
+              </button>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '0 8px' }}>
+                {page} / {totalPages}
+              </span>
+              <button className="btn btn-ghost btn-size-icon-sm" disabled={!data.meta.hasMore} onClick={() => setPage((p) => p + 1)}>
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {showForm && <BundleFormModal editId={editId} onClose={() => { setShowForm(false); setEditId(null) }} />}
@@ -92,15 +165,15 @@ export default function BundlesPage() {
         <div className="modal-overlay" onClick={() => setToDelete(null)}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
-              <h2 className="modal-title">¿Eliminar combo?</h2>
+              <h2 className="modal-title">¿Desactivar combo?</h2>
               <button className="modal-close" onClick={() => setToDelete(null)}><X size={16} /></button>
             </div>
             <div className="modal-body">
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Se eliminará <strong>{toDelete.itemName}</strong>. Esta acción no se puede deshacer.</p>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Se desactivará <strong>{toDelete.itemName}</strong> y dejará de aparecer en los listados activos. Podrás seguir viéndolo con el filtro "Desactivados".</p>
             </div>
             <div className="modal-foot">
               <button className="btn btn-secondary" onClick={() => setToDelete(null)}>Cancelar</button>
-              <button className="btn btn-danger" onClick={() => deleteMutation.mutate(toDelete.id)} disabled={deleteMutation.isPending}>Eliminar</button>
+              <button className="btn btn-danger" onClick={() => deleteMutation.mutate(toDelete.id)} disabled={deleteMutation.isPending}>Desactivar</button>
             </div>
           </div>
         </div>
@@ -116,7 +189,8 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
   const [priceA, setPriceA] = useState('')
   const [priceB, setPriceB] = useState('')
   const [priceC, setPriceC] = useState('')
-  const [components, setComponents] = useState<{ itemCode: string; itemLabel?: string; qty: number }[]>([])
+  const [components, setComponents] = useState<{ itemCode: string; itemLabel?: string; qty: number; stockQty?: number }[]>([])
+  const [submitted, setSubmitted] = useState(false)
 
   const { data: existing, isLoading: loadingExisting } = useQuery({
     queryKey: ['bundle', editId],
@@ -131,7 +205,7 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
     setPriceA(existing.prices?.A?.toString() ?? '')
     setPriceB(existing.prices?.B?.toString() ?? '')
     setPriceC(existing.prices?.C?.toString() ?? '')
-    setComponents(existing.components.map((c) => ({ itemCode: c.itemCode, itemLabel: c.itemName, qty: c.qty })))
+    setComponents(existing.components.map((c) => ({ itemCode: c.itemCode, itemLabel: c.itemName, qty: c.qty, stockQty: c.stockQty })))
     setInitialized(true)
   }
 
@@ -167,7 +241,7 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
     setComponents((prev) => [...prev, { itemCode: '', qty: 1 }])
   }
 
-  function updateComponent(index: number, patch: Partial<{ itemCode: string; itemLabel?: string; qty: number }>) {
+  function updateComponent(index: number, patch: Partial<{ itemCode: string; itemLabel?: string; qty: number; stockQty?: number }>) {
     setComponents((prev) => prev.map((c, i) => i === index ? { ...c, ...patch } : c))
   }
 
@@ -175,12 +249,18 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
     setComponents((prev) => prev.filter((_, i) => i !== index))
   }
 
+  const duplicateItemCodes = new Set(
+    components.map((c) => c.itemCode).filter((code, i, arr) => code && arr.indexOf(code) !== arr.lastIndexOf(code)),
+  )
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setSubmitted(true)
     if (!name) { toast.error('El nombre del combo es requerido'); return }
-    if (components.length === 0) { toast.error('Agrega al menos un componente'); return }
-    const invalid = components.some((c) => !c.itemCode)
-    if (invalid) { toast.error('Todos los componentes deben tener un artículo seleccionado'); return }
+    if (components.length < 2) { toast.error('Un combo requiere al menos 2 componentes'); return }
+    if (components.some((c) => !c.itemCode)) { toast.error('Todos los componentes deben tener un artículo seleccionado'); return }
+    if (components.some((c) => !c.qty || c.qty <= 0)) { toast.error('La cantidad de cada componente debe ser mayor a 0'); return }
+    if (duplicateItemCodes.size > 0) { toast.error('No se puede repetir el mismo artículo como componente'); return }
     if (editId) updateMutation.mutate()
     else createMutation.mutate()
   }
@@ -219,25 +299,47 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
                   <p className="ff-hint">Agrega artículos que formarán parte de este combo.</p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {components.map((comp, idx) => (
-                      <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                        <div className="ff-wrap" style={{ flex: 1 }}>
-                          <ItemSelect
-                            value={comp.itemCode}
-                            selectedLabel={comp.itemLabel}
-                            onSelect={(item) => updateComponent(idx, { itemCode: item.id, itemLabel: item.itemName })}
-                            onClear={() => updateComponent(idx, { itemCode: '', itemLabel: undefined })}
-                            placeholder="Buscar artículo…"
-                          />
+                    {submitted && components.length < 2 && (
+                      <p className="ff-error">Un combo requiere al menos 2 componentes.</p>
+                    )}
+                    {components.map((comp, idx) => {
+                      const isDuplicate = !!comp.itemCode && duplicateItemCodes.has(comp.itemCode)
+                      return (
+                        <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                            <div className="ff-wrap" style={{ flex: 1 }}>
+                              <ItemSelect
+                                value={comp.itemCode}
+                                selectedLabel={comp.itemLabel}
+                                onSelect={(item) => updateComponent(idx, { itemCode: item.id, itemLabel: item.itemName, stockQty: undefined })}
+                                onClear={() => updateComponent(idx, { itemCode: '', itemLabel: undefined, stockQty: undefined })}
+                                placeholder="Buscar artículo…"
+                              />
+                            </div>
+                            <div className="ff-wrap" style={{ width: 100 }}>
+                              <input
+                                className={`ff-input${submitted && (!comp.qty || comp.qty <= 0) ? ' ff-input-error' : ''}`}
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={comp.qty}
+                                onChange={(e) => updateComponent(idx, { qty: parseInt(e.target.value) || 0 })}
+                                style={{ textAlign: 'right' }}
+                              />
+                            </div>
+                            <button type="button" className="btn btn-ghost btn-size-icon-sm" style={{ marginTop: 2 }} onClick={() => removeComponent(idx)}>
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                          {isDuplicate && (
+                            <p className="ff-error" style={{ margin: 0 }}>Este artículo ya está agregado como componente.</p>
+                          )}
+                          {comp.stockQty != null && (
+                            <p className="ff-hint" style={{ margin: 0 }}>Stock disponible: {comp.stockQty}</p>
+                          )}
                         </div>
-                        <div className="ff-wrap" style={{ width: 100 }}>
-                          <input className="ff-input" type="number" min="1" step="1" value={comp.qty} onChange={(e) => updateComponent(idx, { qty: parseInt(e.target.value) || 0 })} style={{ textAlign: 'right' }} />
-                        </div>
-                        <button type="button" className="btn btn-ghost btn-size-icon-sm" style={{ marginTop: 2 }} onClick={() => removeComponent(idx)}>
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>

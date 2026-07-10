@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listCompras } from '@/shared/api/compras-gastos'
+import { listSucursales } from '@/shared/api/sucursales'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
@@ -17,19 +18,27 @@ export default function ComprasPage() {
   const [status, setStatus] = useState<string>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [branch, setBranch] = useState('')
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
 
   const offset = (page - 1) * PAGE_SIZE
 
+  const { data: sucursalesData } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+  })
+  const sucursales = sucursalesData?.items ?? []
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['compras', { supplier, status, fromDate, toDate, offset, orderBy }],
+    queryKey: ['compras', { supplier, status, fromDate, toDate, branch, offset, orderBy }],
     queryFn: () =>
       listCompras({
         supplier: supplier || undefined,
         status: status !== 'all' ? status : undefined,
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
+        branch: branch || undefined,
         orderBy: orderBy || undefined,
         limit: PAGE_SIZE,
         offset,
@@ -72,6 +81,16 @@ export default function ComprasPage() {
               <option value="Draft">Borrador</option>
               <option value="Submitted">Sometido</option>
               <option value="Cancelled">Anulado</option>
+            </select>
+            <select
+              className="filter-select"
+              value={branch}
+              onChange={(e) => { setBranch(e.target.value); setPage(1) }}
+            >
+              <option value="">Todas las sucursales</option>
+              {sucursales.map((s) => (
+                <option key={s.id} value={s.name}>{s.name}</option>
+              ))}
             </select>
             <input
               type="date"

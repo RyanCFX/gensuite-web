@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { listQuotations } from '@/shared/api/quotations'
 import type { ListQuotationsParams } from '@/shared/api/quotations'
+import { listSucursales } from '@/shared/api/sucursales'
 import { Plus, Eye, Search, GitBranch, Copy } from 'lucide-react'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -31,13 +32,21 @@ export default function QuotationsPage() {
   const [status, setStatus] = useState<StatusFilter>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [branch, setBranch] = useState('')
   const { orderBy, sort } = useSortState()
+
+  const { data: sucursalesData } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+  })
+  const sucursales = sucursalesData?.items ?? []
 
   const params: ListQuotationsParams = {
     search: search || undefined,
     status: status === 'all' ? undefined : status,
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
+    branch: branch || undefined,
     orderBy: orderBy || undefined,
     limit: 50,
   }
@@ -84,6 +93,12 @@ export default function QuotationsPage() {
             <option value="ordered">Ordenado</option>
             <option value="lost">Perdido</option>
             <option value="cancelled">Cancelado</option>
+          </select>
+          <select className="filter-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
+            <option value="">Todas las sucursales</option>
+            {sucursales.map((s) => (
+              <option key={s.id} value={s.name}>{s.name}</option>
+            ))}
           </select>
           <input
             type="date"

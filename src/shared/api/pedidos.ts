@@ -18,6 +18,7 @@ export interface ListPedidosParams extends PaginationParams {
   fromDate?: string
   toDate?: string
   isLayaway?: boolean
+  branch?: string
 }
 
 export async function listPedidos(params?: ListPedidosParams) {

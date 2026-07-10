@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Package, FileText, Receipt, Warehouse,
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
   ChevronRight, LogOut, Menu, Building2, UserCog, Sun, Moon,
-  Shield, X, BookOpen, ClipboardList, Percent, Calendar, Lock, BookText, Tag,
+  Shield, X, BookOpen, ClipboardList, Percent, Calendar, Lock, BookText, Tag, MapPin,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth.store'
 import { CommandPalette } from './CommandPalette'
@@ -69,12 +69,13 @@ const NAV_OPS: NavEntry[] = [
   {
     label: 'Inventario',
     icon: <Warehouse size={16} aria-hidden="true" />,
-    prefix: '/inventario',
+    prefix: '/inventario|/transferencias',
     children: [
       { label: 'Artículos',   icon: <Package size={14} />,  path: '/inventario/articulos' },
       { label: 'Stock Actual',icon: <Warehouse size={14} />, path: '/inventario/stock'    },
       { label: 'Historial',   icon: <BarChart3 size={14} />, path: '/inventario/historial' },
       { label: 'Conteos',     icon: <FileText size={14} />,  path: '/inventario/conteos'  },
+      { label: 'Transferencias', icon: <Truck size={14} />,  path: '/transferencias'      },
     ],
   },
   { label: 'Compras',    icon: <ShoppingCart size={16} aria-hidden="true" />, path: '/compras'    },
@@ -117,6 +118,7 @@ const NAV_CONFIG: NavEntry = {
   prefix: '/config',
   children: [
     { label: 'Empresa',            icon: <Building2 size={14} />,   path: '/config/empresa'           },
+    { label: 'Sucursales',         icon: <MapPin size={14} />,      path: '/config/sucursales'        },
     { label: 'Cobranza',           icon: <Wallet size={14} />,      path: '/config/cobros'            },
     { label: 'Facturación',        icon: <FileText size={14} />,    path: '/config/facturacion'       },
     { label: 'Almacenes',          icon: <Warehouse size={14} />,   path: '/config/almacenes'         },

@@ -41,6 +41,9 @@ function getTitleForPath(pathname: string): string {
     [/^\/pedidos\/(.+)\/editar$/, (m) => `Editar Pedido: ${m[1]}`],
     [/^\/pedidos\/(.+)$/, (m) => `Pedido: ${m[1]}`],
     [/^\/pedidos$/, 'Pedidos'],
+    [/^\/transferencias\/nueva$/, 'Nueva Transferencia'],
+    [/^\/transferencias\/(.+)$/, (m) => `Transferencia: ${m[1]}`],
+    [/^\/transferencias$/, 'Transferencias'],
     [/^\/facturacion\/facturas\/nueva$/, 'Nueva Factura'],
     [/^\/facturacion\/facturas\/(.+)\/editar$/, 'Editar Factura'],
     [/^\/facturacion\/facturas\/(.+)$/, (m) => `Factura: ${m[1]}`],
@@ -79,13 +82,23 @@ function getTitleForPath(pathname: string): string {
     [/^\/contabilidad\/libro-mayor$/, 'Libro Mayor'],
     [/^\/config\/empresa$/, 'Empresa'],
     [/^\/config\/ncf$/, 'Secuencias NCF'],
+    [/^\/config\/sucursales$/, 'Sucursales'],
     [/^\/config\/(.+)$/, (m) => `Config: ${m[1]}`],
     [/^\/config$/, 'Configuración'],
   ]
 
   for (const [pattern, title] of rules) {
     const m = pathname.match(pattern)
-    if (m) return typeof title === 'string' ? title : title(m)
+    if (m) {
+      if (typeof title === 'string') return title
+      // Los IDs de ERPNext suelen ser el "name" del registro (ej. "Juan Perez"),
+      // que llega URL-encoded en el pathname (ej. "Juan%20Perez") — decodificar antes de mostrar.
+      const decoded = m.map((seg, i) => {
+        if (i === 0 || seg == null) return seg
+        try { return decodeURIComponent(seg) } catch { return seg }
+      }) as RegExpMatchArray
+      return title(decoded)
+    }
   }
   return pathname
 }

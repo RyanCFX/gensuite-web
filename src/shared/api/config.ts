@@ -20,6 +20,9 @@ import type {
   CreateTaxTemplateDto,
   FacturacionConfig,
   LayawayConfig,
+  AlmacenListItem,
+  CreateAlmacenDto,
+  UpdateAlmacenDto,
 } from './types'
 
 export async function getEmpresa() {
@@ -77,19 +80,20 @@ export async function updateMetodoPago(id: string, data: Partial<MetodoPago>) {
   return unwrap(res)
 }
 
-export async function listAlmacenes() {
-  const res = await client.get<{ success: true; data: { name: string; disabled: boolean }[] }>(
+export async function listAlmacenes(params?: { branch?: string }) {
+  const res = await client.get<{ success: true; data: AlmacenListItem[] }>(
     ENDPOINTS.config.almacenes,
+    { params },
   )
   return unwrap(res)
 }
 
-export async function createAlmacen(data: { warehouseName: string }) {
+export async function createAlmacen(data: CreateAlmacenDto) {
   const res = await client.post<{ success: true; data: unknown }>(ENDPOINTS.config.almacenes, data)
   return unwrap(res)
 }
 
-export async function updateAlmacen(id: string, data: Partial<{ warehouseName: string }>) {
+export async function updateAlmacen(id: string, data: UpdateAlmacenDto) {
   const res = await client.put<{ success: true; data: unknown }>(`${ENDPOINTS.config.almacenes}/${id}`, data)
   return unwrap(res)
 }

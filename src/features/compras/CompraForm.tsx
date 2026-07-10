@@ -5,6 +5,9 @@ import { toast } from 'sonner'
 import { createCompra, updateCompra, getCompra } from '@/shared/api/compras-gastos'
 import { listSuppliers } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
+import { listAlmacenes } from '@/shared/api/config'
+import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
+import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateCompraDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { TIPO_BIENES_606, FORMA_PAGO_606 } from '@/lib/constants'
@@ -43,6 +46,7 @@ function emptyItem(defaultWh?: string): ItemRow {
 }
 
 const NCF_REGEX = /^[BE]\d{10}$/
+const SYSTEM_MANAGER_ROLE = 'System Manager'
 
 function onVariantConfirm(
   selections: VariantSelection[],
@@ -429,6 +433,7 @@ export default function CompraForm() {
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0])
   const [dueDate, setDueDate] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem(defaultWh)])
+  const [branch, setBranch] = useState('')
 
   const [ncfProveedor, setNcfProveedor] = useState('')
   const [tipoBienes606, setTipoBienes606] = useState('')
@@ -460,10 +465,47 @@ export default function CompraForm() {
     sublabel: s.rnc ?? s.cedula,
   }))
 
-  const { data: warehouses } = useQuery({
+  // Sin sucursal elegida: todos los almacenes del tenant (comportamiento actual).
+  // Con sucursal elegida: solo los almacenes de esa sucursal.
+  const { data: warehousesAll } = useQuery({
     queryKey: ['warehouses'],
     queryFn: listWarehouses,
+    enabled: !branch,
   })
+  const { data: warehousesForBranch } = useQuery({
+    queryKey: ['almacenes', { branch }],
+    queryFn: () => listAlmacenes({ branch }),
+    enabled: !!branch,
+  })
+  const warehouses = branch ? warehousesForBranch : warehousesAll
+
+  // ── Sucursal (branch) selector ────────────────────────────────────────────
+  const { data: currentUserDetail } = useQuery({
+    queryKey: ['currentUser', authUser?.email],
+    queryFn: () => getUsuario(authUser!.email),
+    enabled: !!authUser?.email,
+    staleTime: 5 * 60_000,
+  })
+  const isSystemManager = currentUserDetail?.roles?.includes(SYSTEM_MANAGER_ROLE) ?? false
+  const { data: myBranches, refetch: refetchMyBranches } = useQuery({
+    queryKey: ['usuarioSucursales', authUser?.email],
+    queryFn: () => getUsuarioSucursales(authUser!.email),
+    enabled: !!authUser?.email,
+    staleTime: 60_000,
+  })
+  const { data: allSucursales } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+    enabled: isSystemManager,
+    staleTime: 60_000,
+  })
+  const branchOptions = isSystemManager
+    ? (allSucursales?.items.map((s) => s.name) ?? [])
+    : (myBranches?.branches ?? [])
+
+  useEffect(() => {
+    if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
+  }, [myBranches])
 
   const { isLoading: loadingEdit } = useQuery({
     queryKey: ['compra', id],
@@ -487,6 +529,11 @@ export default function CompraForm() {
     },
     onError: (error) => {
       const apiErr = error as { code?: string; message?: string; statusCode?: number }
+      if (apiErr?.message?.toLowerCase().includes('no tienes acceso a la sucursal')) {
+        refetchMyBranches()
+        toast.error(`${apiErr.message} Tus sucursales asignadas se actualizaron, vuelve a intentar.`)
+        return
+      }
       if (apiErr?.statusCode === 400 && apiErr?.message) {
         // Try to match inline errors to specific items by itemCode mention
         const msg = apiErr.message
@@ -552,6 +599,7 @@ export default function CompraForm() {
       supplier: supplierId,
       postingDate,
       dueDate: dueDate || undefined,
+      branch: branch || undefined,
       items: items.map((i) => ({
         itemCode: i.itemCode,
         description: i.description,
@@ -665,6 +713,16 @@ export default function CompraForm() {
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
                   />
+                </div>
+
+                <div className="ff-wrap">
+                  <label className="ff-label">Sucursal</label>
+                  <select className="ff-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
+                    <option value="">Sin especificar</option>
+                    {branchOptions.map((b) => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>

@@ -18,6 +18,7 @@ export interface ListInvoicesParams extends PaginationParams {
   toDate?: string
   paymentStatus?: 'paid' | 'unpaid' | 'partly_paid' | 'overdue'
   ncfType?: string
+  branch?: string
 }
 
 export async function listInvoices(params?: ListInvoicesParams) {

@@ -5,7 +5,7 @@ import { createPedido, updatePedido, getPedido, getPedidoDuplicateSource } from 
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getQuotation } from '@/shared/api/quotations'
 import { getLayawayConfig } from '@/shared/api/config'
-import type { Item, ItemPrices, CreatePedidoDto } from '@/shared/api/types'
+import type { Item, ItemPrices, CreatePedidoDto, Bundle } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDOP } from '@/lib/formatters'
@@ -20,12 +20,16 @@ import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { listItems, getDefaultPriceTier } from '@/shared/api/catalog'
 import { client } from '@/shared/api/client'
-import { getUsuario } from '@/shared/api/usuarios'
+import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
+import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
+
+const SYSTEM_MANAGER_ROLE = 'System Manager'
 
 interface LineItem {
   itemCode: string
   itemLabel?: string
+  itemType?: 'product' | 'service' | 'combo'
   description: string
   qty: number
   rate: number
@@ -75,6 +79,7 @@ export default function PedidoForm() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [isLayaway, setIsLayaway] = useState(false)
+  const [branch, setBranch] = useState('')
 
   const { data: layawayConfig } = useQuery({
     queryKey: ['layaway-config'],
@@ -158,6 +163,7 @@ export default function PedidoForm() {
       uom: i.uom ?? 'Unidad',
     })))
     setNotes(existing.notes ?? '')
+    setBranch(existing.branch ?? '')
     setLoaded(true)
   }, [existing])
 
@@ -181,11 +187,38 @@ export default function PedidoForm() {
 
   const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({ value: c.id, label: c.customerName, sublabel: c.rnc ?? c.cedula }))
 
+  // ── Sucursal (branch) selector ────────────────────────────────────────────
+  const isSystemManager = currentUser?.roles?.includes(SYSTEM_MANAGER_ROLE) ?? false
+  const { data: myBranches, refetch: refetchMyBranches } = useQuery({
+    queryKey: ['usuarioSucursales', currentUserEmail],
+    queryFn: () => getUsuarioSucursales(currentUserEmail!),
+    enabled: !!currentUserEmail,
+    staleTime: 60_000,
+  })
+  const { data: allSucursales } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+    enabled: isSystemManager,
+    staleTime: 60_000,
+  })
+  const branchOptions = isSystemManager
+    ? (allSucursales?.items.map((s) => s.name) ?? [])
+    : (myBranches?.branches ?? [])
+
+  useEffect(() => {
+    if (myBranches?.defaultBranch && !branch && !isEdit) setBranch(myBranches.defaultBranch)
+  }, [myBranches])
+
   function handleError(err: unknown) {
     const msg = (err as any)?.message ?? ''
     setSubmitError(msg)
     if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) {
       setPinModalOpen(true)
+      return
+    }
+    if (msg.toLowerCase().includes('no tienes acceso a la sucursal')) {
+      refetchMyBranches()
+      toast.error(`${msg} Tus sucursales asignadas se actualizaron, vuelve a intentar.`)
       return
     }
     toast.error(msg || 'Error al guardar el pedido')
@@ -220,12 +253,32 @@ export default function PedidoForm() {
         ...row,
         itemCode: catalogItem.id,
         itemLabel: catalogItem.itemName,
+        itemType: catalogItem.type,
         description: catalogItem.internalDescription ?? catalogItem.itemName,
         rate,
         amount: calcAmount(row.qty, rate, row.discountPct),
         uom: catalogItem.stockUom ?? row.uom,
         maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
         _prices: catalogItem.prices,
+      }
+    }))
+  }
+  function selectBundle(index: number, bundle: Bundle) {
+    const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
+    setItems((prev) => prev.map((row, i) => {
+      if (i !== index) return row
+      const rate = bundle.prices?.[tier] ?? 0
+      return {
+        ...row,
+        itemCode: bundle.id,
+        itemLabel: bundle.itemName,
+        itemType: 'combo',
+        description: bundle.itemName,
+        rate,
+        amount: calcAmount(row.qty, rate, row.discountPct),
+        uom: '',
+        maxDiscountPct: undefined,
+        _prices: bundle.prices,
       }
     }))
   }
@@ -238,6 +291,7 @@ export default function PedidoForm() {
         return {
           itemCode: s.item.id,
           itemLabel: s.item.itemName,
+          itemType: s.item.type,
           description: s.item.internalDescription ?? s.item.itemName,
           qty: s.qty,
           rate,
@@ -279,8 +333,8 @@ export default function PedidoForm() {
       rate: i.rate,
       discountPct: i.discountPct || undefined,
     }))
-    if (isEdit) updateMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, items: itemsDto, quotation: quotationId || undefined })
-    else createMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, items: itemsDto, quotation: quotationId || undefined, isLayaway: isLayaway || undefined })
+    if (isEdit) updateMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, branch: branch || undefined, items: itemsDto, quotation: quotationId || undefined })
+    else createMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, branch: branch || undefined, items: itemsDto, quotation: quotationId || undefined, isLayaway: isLayaway || undefined })
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -357,6 +411,15 @@ export default function PedidoForm() {
                 <label className="ff-label">Entrega estimada</label>
                 <input type="date" className="ff-input" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
               </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Sucursal</label>
+                <select className="ff-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
+                  <option value="">Sin especificar</option>
+                  {branchOptions.map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {!isEdit && (
@@ -402,7 +465,7 @@ export default function PedidoForm() {
                   items.map((item, index) => (
                     <tr key={index}>
                       <td>
-                        <ItemSelect value={item.itemCode} selectedLabel={item.itemLabel} onSelect={(ci) => selectCatalogItem(index, ci)} onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, description: '', rate: 0, amount: 0, discountPct: 0 })} onVariantSelect={(t) => setVariantTemplate(t)} validateStock />
+                        <ItemSelect value={item.itemCode} selectedLabel={item.itemLabel} onSelect={(ci) => selectCatalogItem(index, ci)} onSelectBundle={(b) => selectBundle(index, b)} includeBundles onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0 })} onVariantSelect={(t) => setVariantTemplate(t)} validateStock />
                       </td>
                       <td>
                         <input className="items-input" value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="Descripción" />
@@ -438,7 +501,11 @@ export default function PedidoForm() {
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
                       <td>
-                        <UomSelect value={item.uom} onChange={(v) => updateItem(index, { uom: v })} itemCode={item.itemCode || undefined} />
+                        {item.itemType === 'service' || item.itemType === 'combo' ? (
+                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                        ) : (
+                          <UomSelect value={item.uom} onChange={(v) => updateItem(index, { uom: v })} itemCode={item.itemCode || undefined} />
+                        )}
                       </td>
                       <td>
                         <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeRow(index)}>

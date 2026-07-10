@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   listUsuarios, createUsuario, updateUsuario, enableUsuario, deleteUsuario, resetPasswordUsuario, listRoles,
+  getUsuarioSucursales, getUsuarioAlmacenesPermitidos,
 } from '@/shared/api/usuarios'
-import { listAlmacenes } from '@/shared/api/config'
-import type { Usuario, CreateUsuarioDto, UpdateUsuarioDto, Warehouse } from '@/shared/api/types'
+import { listSucursales } from '@/shared/api/sucursales'
+import type { Usuario, CreateUsuarioDto, UpdateUsuarioDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { formatDate } from '@/lib/formatters'
 import { Plus, Ban, KeyRound, UserCheck, Pencil, X } from 'lucide-react'
@@ -13,8 +14,8 @@ import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { useAuthStore } from '@/stores/auth.store'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+
+const SYSTEM_MANAGER_ROLE = 'System Manager'
 
 type ConfirmType = { type: 'disable'; user: Usuario } | { type: 'enable'; user: Usuario } | null
 
@@ -32,9 +33,8 @@ export default function UsuariosPage() {
   const [lastName, setLastName] = useState('')
   const [maxDiscountPct, setMaxDiscountPct] = useState(0)
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
-  const [selectedWarehouses, setSelectedWarehouses] = useState<string[]>([])
-  const [defaultWarehouse, setDefaultWarehouse] = useState('')
-  const [whSearch, setWhSearch] = useState('')
+  const [selectedBranches, setSelectedBranches] = useState<string[]>([])
+  const [defaultBranch, setDefaultBranch] = useState('')
   const { orderBy, sort } = useSortState()
 
   const { data, isLoading, isError } = useQuery({
@@ -47,10 +47,30 @@ export default function UsuariosPage() {
     queryFn: listRoles,
   })
 
-  const { data: warehouses } = useQuery({
-    queryKey: ['almacenes'],
-    queryFn: listAlmacenes,
+  const { data: sucursalesData } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
   })
+  const sucursales = sucursalesData?.items ?? []
+
+  const { data: usuarioSucursales } = useQuery({
+    queryKey: ['usuarioSucursales', editingUser?.email],
+    queryFn: () => getUsuarioSucursales(editingUser!.email),
+    enabled: !!editingUser,
+  })
+
+  const { data: almacenesPermitidos } = useQuery({
+    queryKey: ['usuarioAlmacenesPermitidos', editingUser?.email],
+    queryFn: () => getUsuarioAlmacenesPermitidos(editingUser!.email),
+    enabled: !!editingUser,
+  })
+
+  useEffect(() => {
+    if (usuarioSucursales) {
+      setSelectedBranches(usuarioSucursales.branches)
+      setDefaultBranch(usuarioSucursales.defaultBranch ?? '')
+    }
+  }, [usuarioSucursales])
 
   const createMutation = useMutation({
     mutationFn: (dto: CreateUsuarioDto) => createUsuario(dto),
@@ -98,20 +118,7 @@ export default function UsuariosPage() {
     onError: () => toast.error('Error al enviar el email'),
   })
 
-  const allWarehouses = (warehouses ?? []) as Warehouse[]
-  const availableWarehouses = editingUser?.warehouses?.length
-    ? allWarehouses.filter((w) => editingUser.warehouses?.includes(w.name))
-    : allWarehouses
-
-  const warehouseOptions: SearchSelectOption[] = useMemo(
-    () => availableWarehouses.map((w) => ({ value: w.name, label: w.name })),
-    [availableWarehouses],
-  )
-
-  const filteredWarehouseOptions = useMemo(() => {
-    const q = whSearch.toLowerCase()
-    return warehouseOptions.filter((o) => !q || o.label.toLowerCase().includes(q))
-  }, [warehouseOptions, whSearch])
+  const isSystemManager = selectedRoles.includes(SYSTEM_MANAGER_ROLE)
 
   function openEdit(user: Usuario) {
     setEditingUser(user)
@@ -120,8 +127,8 @@ export default function UsuariosPage() {
     setLastName(user.lastName ?? '')
     setMaxDiscountPct(user.maxDiscountPct ?? 0)
     setSelectedRoles(user.roles)
-    setSelectedWarehouses(user.warehouses ?? [])
-    setDefaultWarehouse(user.defaultWarehouse ?? '')
+    setSelectedBranches([])
+    setDefaultBranch('')
     setShowForm(true)
   }
 
@@ -131,8 +138,8 @@ export default function UsuariosPage() {
     setLastName('')
     setMaxDiscountPct(0)
     setSelectedRoles([])
-    setSelectedWarehouses([])
-    setDefaultWarehouse('')
+    setSelectedBranches([])
+    setDefaultBranch('')
     setEditingUser(null)
     setShowForm(false)
   }
@@ -147,21 +154,21 @@ export default function UsuariosPage() {
     e.preventDefault()
     if (!email || !firstName) { toast.error('Email y nombre son requeridos'); return }
     const maxDisc = maxDiscountPct > 0 ? maxDiscountPct : 0
-    const payload: Partial<UpdateUsuarioDto> = {
-      firstName,
-      lastName: lastName || undefined,
-      maxDiscountPct: maxDisc,
-      roles: selectedRoles,
-      warehouses: selectedWarehouses.length > 0 ? selectedWarehouses : undefined,
-      defaultWarehouse: defaultWarehouse || undefined,
-    }
     if (editingUser) {
+      const payload: Partial<UpdateUsuarioDto> = {
+        firstName,
+        lastName: lastName || undefined,
+        maxDiscountPct: maxDisc,
+        roles: selectedRoles,
+        branches: isSystemManager ? undefined : selectedBranches,
+        defaultBranch: isSystemManager ? undefined : (defaultBranch || undefined),
+      }
       updateMutation.mutate({ email, data: payload })
-      if (email === authUser?.email && defaultWarehouse !== authUser.defaultWarehouse) {
-        toast.success('Almacén por defecto actualizado. Cierra sesión y vuelve a entrar para que los cambios tomen efecto.')
+      if (email === authUser?.email && defaultBranch !== usuarioSucursales?.defaultBranch) {
+        toast.success('Sucursal por defecto actualizada. Cierra sesión y vuelve a entrar para que los cambios tomen efecto.')
       }
     } else {
-      createMutation.mutate({ email, firstName, lastName: lastName || undefined, maxDiscountPct: maxDisc, roles: selectedRoles, warehouses: selectedWarehouses.length > 0 ? selectedWarehouses : undefined })
+      createMutation.mutate({ email, firstName, lastName: lastName || undefined, maxDiscountPct: maxDisc, roles: selectedRoles })
     }
   }
 
@@ -349,62 +356,77 @@ export default function UsuariosPage() {
                   </div>
                 </div>
 
-                <div className="ff-wrap">
-                  <label className="ff-label">Almacenes asignados</label>
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: 8,
-                    maxHeight: 160,
-                    overflowY: 'auto',
-                    border: '1px solid var(--border-default)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: 12,
-                  }}>
-                    {(warehouses ?? []).length === 0 ? (
-                      <p style={{ fontSize: 13, color: 'var(--text-tertiary)', gridColumn: '1 / -1' }}>
-                        No hay almacenes configurados.
-                      </p>
-                    ) : (
-                      (warehouses ?? []).map((w: Warehouse) => (
-                        <label key={w.id} className="ff-check-wrap">
-                          <input
-                            type="checkbox"
-                            className="ff-check"
-                            checked={selectedWarehouses.includes(w.name)}
-                            onChange={() =>
-                              setSelectedWarehouses((prev) =>
-                                prev.includes(w.name)
-                                  ? prev.filter((x) => x !== w.name)
-                                  : [...prev, w.name],
-                              )
-                            }
-                          />
-                          <span style={{ fontSize: 13 }}>{w.name}</span>
-                        </label>
-                      ))
-                    )}
-                  </div>
-                  <p className="ff-hint">El usuario solo podrá facturar desde estos almacenes.</p>
-                </div>
-
                 {editingUser && (
-                  <div className="ff-wrap">
-                    <label className="ff-label">Almacén por defecto</label>
-                    <SearchSelect
-                      value={defaultWarehouse}
-                      onChange={(val) => setDefaultWarehouse(val)}
-                      options={filteredWarehouseOptions}
-                      onSearch={setWhSearch}
-                      selectedLabel={defaultWarehouse || ''}
-                      placeholder="Sin almacén por defecto"
-                    />
-                    <p className="ff-hint">
-                      {selectedWarehouses.length > 0
-                        ? 'Solo se muestran los almacenes asignados al usuario.'
-                        : 'Se muestran todos los almacenes disponibles.'}
-                    </p>
-                  </div>
+                  <>
+                    {isSystemManager ? (
+                      <div className="ff-wrap">
+                        <label className="ff-label">Sucursales asignadas</label>
+                        <p className="ff-hint" style={{ color: 'var(--color-brand)' }}>
+                          Este usuario tiene acceso a todas las sucursales (rol System Manager). No es necesario asignarle sucursales explícitas.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="ff-wrap">
+                          <label className="ff-label">Sucursales asignadas</label>
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: 8,
+                            maxHeight: 160,
+                            overflowY: 'auto',
+                            border: '1px solid var(--border-default)',
+                            borderRadius: 'var(--radius-md)',
+                            padding: 12,
+                          }}>
+                            {sucursales.length === 0 ? (
+                              <p style={{ fontSize: 13, color: 'var(--text-tertiary)', gridColumn: '1 / -1' }}>
+                                No hay sucursales configuradas.
+                              </p>
+                            ) : (
+                              sucursales.map((s) => (
+                                <label key={s.id} className="ff-check-wrap">
+                                  <input
+                                    type="checkbox"
+                                    className="ff-check"
+                                    checked={selectedBranches.includes(s.name)}
+                                    onChange={() =>
+                                      setSelectedBranches((prev) =>
+                                        prev.includes(s.name)
+                                          ? prev.filter((x) => x !== s.name)
+                                          : [...prev, s.name],
+                                      )
+                                    }
+                                  />
+                                  <span style={{ fontSize: 13 }}>{s.name}</span>
+                                </label>
+                              ))
+                            )}
+                          </div>
+                          <p className="ff-hint">El usuario solo podrá crear documentos desde estas sucursales.</p>
+                        </div>
+
+                        <div className="ff-wrap">
+                          <label className="ff-label">Sucursal por defecto</label>
+                          <select className="ff-select" value={defaultBranch} onChange={(e) => setDefaultBranch(e.target.value)}>
+                            <option value="">Sin sucursal por defecto</option>
+                            {selectedBranches.map((b) => (
+                              <option key={b} value={b}>{b}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </>
+                    )}
+
+                    {almacenesPermitidos && almacenesPermitidos.warehouses.length > 0 && (
+                      <div className="ff-wrap">
+                        <label className="ff-label">Almacenes heredados</label>
+                        <p className="ff-hint">
+                          Según sus sucursales asignadas, este usuario tiene acceso a: {almacenesPermitidos.warehouses.join(', ')}.
+                        </p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               <div className="modal-foot">

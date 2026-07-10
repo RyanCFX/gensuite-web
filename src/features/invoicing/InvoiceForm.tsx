@@ -5,7 +5,7 @@ import { createInvoice } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
 import { listItems, getDefaultPriceTier } from '@/shared/api/catalog'
-import type { CreateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices } from '@/shared/api/types'
+import type { CreateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle } from '@/shared/api/types'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react'
@@ -20,8 +20,11 @@ import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
-import { getUsuario } from '@/shared/api/usuarios'
+import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
+import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
+
+const SYSTEM_MANAGER_ROLE = 'System Manager'
 
 
 type NcfType = 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
@@ -29,6 +32,7 @@ type NcfType = 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
 interface LineItem {
   itemCode: string
   itemLabel?: string
+  itemType?: 'product' | 'service' | 'combo'
   description: string
   qty: number
   rate: number
@@ -86,6 +90,7 @@ export default function InvoiceForm() {
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
   const [submitted, setSubmitted] = useState(false)
+  const [branch, setBranch] = useState('')
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
@@ -118,6 +123,28 @@ export default function InvoiceForm() {
     enabled: !!currentUserEmail,
     staleTime: 5 * 60_000,
   })
+
+  // ── Sucursal (branch) selector ────────────────────────────────────────────
+  const isSystemManager = currentUser?.roles?.includes(SYSTEM_MANAGER_ROLE) ?? false
+  const { data: myBranches, refetch: refetchMyBranches } = useQuery({
+    queryKey: ['usuarioSucursales', currentUserEmail],
+    queryFn: () => getUsuarioSucursales(currentUserEmail!),
+    enabled: !!currentUserEmail,
+    staleTime: 60_000,
+  })
+  const { data: allSucursales } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+    enabled: isSystemManager,
+    staleTime: 60_000,
+  })
+  const branchOptions = isSystemManager
+    ? (allSucursales?.items.map((s) => s.name) ?? [])
+    : (myBranches?.branches ?? [])
+
+  useEffect(() => {
+    if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
+  }, [myBranches])
 
   const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
     value: c.id,
@@ -167,6 +194,11 @@ export default function InvoiceForm() {
     onError: (err: { message?: string }) => {
       const msg = err?.message ?? ''
       if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) { setPinModalOpen(true); return }
+      if (msg.toLowerCase().includes('no tienes acceso a la sucursal')) {
+        refetchMyBranches()
+        toast.error(`${msg} Tus sucursales asignadas se actualizaron, vuelve a intentar.`)
+        return
+      }
       toast.error(msg || 'Error al crear la factura')
     },
   })
@@ -197,6 +229,7 @@ export default function InvoiceForm() {
           ...row,
           itemCode: catalogItem.id,
           itemLabel: catalogItem.itemName,
+          itemType: catalogItem.type,
           description: catalogItem.internalDescription ?? catalogItem.itemName,
           rate: baseRate,
           baseRate,
@@ -213,7 +246,33 @@ export default function InvoiceForm() {
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, description: '', rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '' })
+    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '' })
+  }
+
+  function selectBundle(index: number, bundle: Bundle) {
+    setItems((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row
+        const tier = selectedCustomer?.priceTier ?? defaultPriceTier ?? 'B'
+        const baseRate = bundle.prices?.[tier] ?? 0
+        return {
+          ...row,
+          itemCode: bundle.id,
+          itemLabel: bundle.itemName,
+          itemType: 'combo',
+          description: bundle.itemName,
+          rate: baseRate,
+          baseRate,
+          amount: calcAmount(row.qty, baseRate, row.discountPct),
+          uom: '',
+          conversionFactor: 1,
+          maxDiscountPct: undefined,
+          _prices: bundle.prices,
+          salesTaxPct: 0,
+          salesTaxTemplate: '',
+        }
+      }),
+    )
   }
 
   function onVariantConfirm(selections: VariantSelection[]) {
@@ -225,6 +284,7 @@ export default function InvoiceForm() {
         return {
           itemCode: s.item.id,
           itemLabel: s.item.itemName,
+          itemType: s.item.type,
           description: s.item.internalDescription ?? s.item.itemName,
           qty: s.qty,
           rate,
@@ -313,6 +373,7 @@ export default function InvoiceForm() {
       customer: customerId,
       postingDate,
       dueDate,
+      branch: branch || undefined,
       ncfType,
       items: itemsDto,
       notes: notes || undefined,
@@ -425,6 +486,16 @@ export default function InvoiceForm() {
                   </p>
                 )}
               </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="branch">Sucursal</label>
+                <select id="branch" className="ff-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
+                  <option value="">Sin especificar</option>
+                  {branchOptions.map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {semaforo?.semaforo === 'rojo' && (
@@ -470,6 +541,8 @@ export default function InvoiceForm() {
                           value={item.itemCode}
                           selectedLabel={item.itemLabel}
                           onSelect={(catalogItem) => selectCatalogItem(index, catalogItem)}
+                          onSelectBundle={(b) => selectBundle(index, b)}
+                          includeBundles
                           onClear={() => clearCatalogItem(index)}
                           onVariantSelect={(t) => setVariantTemplate(t)}
                           validateStock
@@ -518,14 +591,18 @@ export default function InvoiceForm() {
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
                       <td>
-                        <UomSelect
-                          value={item.uom}
-                          onChange={(v, factor) => {
-                            const newRate = Math.round(item.baseRate * factor * 10000) / 10000
-                            updateItem(index, { uom: v, rate: newRate, conversionFactor: factor })
-                          }}
-                          itemCode={item.itemCode || undefined}
-                        />
+                        {item.itemType === 'service' || item.itemType === 'combo' ? (
+                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                        ) : (
+                          <UomSelect
+                            value={item.uom}
+                            onChange={(v, factor) => {
+                              const newRate = Math.round(item.baseRate * factor * 10000) / 10000
+                              updateItem(index, { uom: v, rate: newRate, conversionFactor: factor })
+                            }}
+                            itemCode={item.itemCode || undefined}
+                          />
+                        )}
                       </td>
                       <td>
                         <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeRow(index)}>
@@ -613,7 +690,7 @@ export default function InvoiceForm() {
             itemCode: i.itemCode, description: i.description, qty: i.qty, rate: i.rate,
             discountPct: i.discountPct || undefined, uom: i.uom,
           }))
-          createMutation.mutate({ customer: customerId, postingDate, dueDate, ncfType, items: itemsDto, notes: notes || undefined })
+          createMutation.mutate({ customer: customerId, postingDate, dueDate, branch: branch || undefined, ncfType, items: itemsDto, notes: notes || undefined })
         }}
         title="Autorización requerida"
         description="El descuento supera tu límite. Ingresa el PIN de un administrador."

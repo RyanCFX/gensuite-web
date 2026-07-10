@@ -14,6 +14,7 @@ export interface ListQuotationsParams extends PaginationParams {
   status?: 'draft' | 'submitted' | 'ordered' | 'lost' | 'cancelled' | 'all'
   fromDate?: string
   toDate?: string
+  branch?: string
 }
 
 export async function listQuotations(params?: ListQuotationsParams) {

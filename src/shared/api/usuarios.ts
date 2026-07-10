@@ -6,6 +6,8 @@ import type {
   UpdateUsuarioDto,
   PaginatedResponse,
   PaginationParams,
+  UsuarioSucursales,
+  UsuarioAlmacenesPermitidos,
 } from './types'
 
 export async function listUsuarios(params?: PaginationParams) {
@@ -44,5 +46,20 @@ export async function resetPasswordUsuario(email: string) {
 // NOTE: /roles returns string[] (not Role[]) — e.g. ["Administrator", "Accounts User", ...]
 export async function listRoles(): Promise<string[]> {
   const res = await client.get<{ success: true; data: string[] }>(ENDPOINTS.roles.list)
+  return unwrap(res)
+}
+
+export async function getUsuarioSucursales(email: string) {
+  const res = await client.get<{ success: true; data: UsuarioSucursales }>(ENDPOINTS.usuarios.sucursales(email))
+  return unwrap(res)
+}
+
+export async function updateUsuarioSucursales(email: string, branches: string[]) {
+  const res = await client.put<{ success: true; data: UsuarioSucursales }>(ENDPOINTS.usuarios.sucursales(email), { branches })
+  return unwrap(res)
+}
+
+export async function getUsuarioAlmacenesPermitidos(email: string) {
+  const res = await client.get<{ success: true; data: UsuarioAlmacenesPermitidos }>(ENDPOINTS.usuarios.almacenesPermitidos(email))
   return unwrap(res)
 }

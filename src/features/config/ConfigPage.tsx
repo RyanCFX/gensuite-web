@@ -17,6 +17,7 @@ import {
   listGruposProveedores, createGrupoProveedor,
   getFacturacionConfig, updateFacturacionConfig,
 } from '@/shared/api/config'
+import { listSucursales } from '@/shared/api/sucursales'
 import { listCustomerGroups, createCustomerGroup, deleteCustomerGroup } from '@/shared/api/customers'
 import { listRoles } from '@/shared/api/usuarios'
 import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, CreateTaxTemplateDto, GrupoCliente, FacturacionConfig } from '@/shared/api/types'
@@ -121,20 +122,34 @@ function AlmacenesSection() {
   const queryClient = useQueryClient()
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
+  const [newBranch, setNewBranch] = useState('')
+  const [newWarehouseType, setNewWarehouseType] = useState('')
   const [toDelete, setToDelete] = useState<string | null>(null)
-  const [editTarget, setEditTarget] = useState<{ name: string; } | null>(null)
+  const [editTarget, setEditTarget] = useState<{ name: string; branch?: string | null; warehouseType?: string } | null>(null)
   const [editWarehouseAccount, setEditWarehouseAccount] = useState('')
+  const [editBranch, setEditBranch] = useState('')
+  const [editWarehouseType, setEditWarehouseType] = useState('')
+  const [branchFilter, setBranchFilter] = useState('')
 
-  const { data, isLoading } = useQuery({ queryKey: ['almacenes'], queryFn: listAlmacenes })
+  const { data, isLoading } = useQuery({
+    queryKey: ['almacenes', { branch: branchFilter }],
+    queryFn: () => listAlmacenes({ branch: branchFilter || undefined }),
+  })
+
+  const { data: sucursalesData } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+  })
+  const sucursales = sucursalesData?.items ?? []
 
   const createMutation = useMutation({
-    mutationFn: () => createAlmacen({ warehouseName: newName }),
-    onSuccess: () => { toast.success('Almacén creado'); queryClient.invalidateQueries({ queryKey: ['almacenes'] }); setShowNew(false); setNewName('') },
+    mutationFn: () => createAlmacen({ warehouseName: newName, branch: newBranch || undefined, warehouseType: newWarehouseType || undefined }),
+    onSuccess: () => { toast.success('Almacén creado'); queryClient.invalidateQueries({ queryKey: ['almacenes'] }); setShowNew(false); setNewName(''); setNewBranch(''); setNewWarehouseType('') },
     onError: () => toast.error('Error al crear el almacén'),
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data: d }: { id: string; data: Partial<{ warehouseName: string; account: string }> }) =>
+    mutationFn: ({ id, data: d }: { id: string; data: Partial<{ warehouseName: string; account: string; branch: string; warehouseType: string }> }) =>
       updateAlmacen(id, d),
     onSuccess: () => { toast.success('Almacén actualizado'); queryClient.invalidateQueries({ queryKey: ['almacenes'] }); setEditTarget(null) },
     onError: () => toast.error('Error al actualizar el almacén'),
@@ -146,9 +161,11 @@ function AlmacenesSection() {
     onError: () => toast.error('Error al eliminar el almacén'),
   })
 
-  function openEdit(a: { name: string; }) {
+  function openEdit(a: { name: string; branch?: string | null; warehouseType?: string }) {
     setEditTarget(a)
     setEditWarehouseAccount('')
+    setEditWarehouseType(a.warehouseType ?? '')
+    setEditBranch(a.branch ?? '')
     setToDelete(null)
   }
 
@@ -157,9 +174,17 @@ function AlmacenesSection() {
       <div className="card">
         <div className="card-header">
           <span className="card-title">Almacenes</span>
-          <button className="btn btn-primary btn-size-sm" onClick={() => setShowNew(true)}>
-            <Plus size={14} />Nuevo
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <select className="filter-select" value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
+              <option value="">Todas las sucursales</option>
+              {sucursales.map((s) => (
+                <option key={s.id} value={s.name}>{s.name}</option>
+              ))}
+            </select>
+            <button className="btn btn-primary btn-size-sm" onClick={() => setShowNew(true)}>
+              <Plus size={14} />Nuevo
+            </button>
+          </div>
         </div>
         <div>
           {isLoading
@@ -169,6 +194,8 @@ function AlmacenesSection() {
                   <thead>
                     <tr>
                       <th>Nombre</th>
+                      <th>Sucursal</th>
+                      <th>Tipo</th>
                       <th>Estado</th>
                       <th style={{ width: 80 }} />
                     </tr>
@@ -177,6 +204,8 @@ function AlmacenesSection() {
                     {data?.map((a) => (
                       <tr key={a.name}>
                         <td style={{ fontWeight: 500 }}>{a.name}</td>
+                        <td className="td-muted">{a.branch ?? '—'}</td>
+                        <td className="td-muted">{a.warehouseType === 'Transit' ? <span className="badge badge-neutral">Tránsito</span> : (a.warehouseType ?? '—')}</td>
                         <td>
                           {a.disabled
                             ? <span className="badge badge-error">Inactivo</span>
@@ -214,10 +243,27 @@ function AlmacenesSection() {
               <h2 className="modal-title">Nuevo Almacén</h2>
               <button className="modal-close" onClick={() => setShowNew(false)}><X size={16} /></button>
             </div>
-            <div className="modal-body">
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="ff-wrap">
                 <label className="ff-label">Nombre del almacén</label>
                 <input className="ff-input" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Almacén Principal" />
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Sucursal</label>
+                <select className="ff-select" value={newBranch} onChange={(e) => setNewBranch(e.target.value)}>
+                  <option value="">Sin asignar</option>
+                  {sucursales.map((s) => (
+                    <option key={s.id} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Tipo de Almacén</label>
+                <select className="ff-select" value={newWarehouseType} onChange={(e) => setNewWarehouseType(e.target.value)}>
+                  <option value="">Estándar</option>
+                  <option value="Transit">Tránsito</option>
+                </select>
+                <p className="ff-hint">"Tránsito" se usa como punto intermedio en transferencias entre almacenes.</p>
               </div>
             </div>
             <div className="modal-foot">
@@ -239,6 +285,22 @@ function AlmacenesSection() {
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="ff-wrap">
+                <label className="ff-label">Sucursal</label>
+                <select className="ff-select" value={editBranch} onChange={(e) => setEditBranch(e.target.value)}>
+                  <option value="">Sin asignar</option>
+                  {sucursales.map((s) => (
+                    <option key={s.id} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Tipo de Almacén</label>
+                <select className="ff-select" value={editWarehouseType} onChange={(e) => setEditWarehouseType(e.target.value)}>
+                  <option value="">Estándar</option>
+                  <option value="Transit">Tránsito</option>
+                </select>
+              </div>
+              <div className="ff-wrap">
                 <label className="ff-label">Cuenta de Inventario</label>
                 <AccountSelect
                   value={editWarehouseAccount}
@@ -252,7 +314,7 @@ function AlmacenesSection() {
               <button className="btn btn-secondary" onClick={() => setEditTarget(null)}>Cancelar</button>
               <button
                 className="btn btn-primary"
-                onClick={() => updateMutation.mutate({ id: editTarget.name, data: { account: editWarehouseAccount || undefined } })}
+                onClick={() => updateMutation.mutate({ id: editTarget.name, data: { account: editWarehouseAccount || undefined, branch: editBranch || undefined, warehouseType: editWarehouseType || undefined } })}
                 disabled={updateMutation.isPending}
               >
                 {updateMutation.isPending ? 'Guardando…' : 'Guardar'}

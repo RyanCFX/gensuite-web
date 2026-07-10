@@ -12,7 +12,8 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { listItems } from '@/shared/api/catalog'
-import type { Item } from '@/shared/api/types'
+import { listBundles } from '@/shared/api/bundles'
+import type { Item, Bundle } from '@/shared/api/types'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
@@ -26,6 +27,9 @@ export interface ItemSelectProps {
   onVariantSelect?: (template: Item) => void
   typeFilter?: 'product' | 'service'
   validateStock?: boolean
+  /** Incluye combos (Product Bundle) en los resultados de búsqueda — para líneas de venta */
+  includeBundles?: boolean
+  onSelectBundle?: (bundle: Bundle) => void
 }
 
 export function ItemSelect({
@@ -38,6 +42,8 @@ export function ItemSelect({
   onVariantSelect,
   typeFilter,
   validateStock,
+  includeBundles,
+  onSelectBundle,
 }: ItemSelectProps) {
   const [query, setQuery] = useState('')
 
@@ -48,12 +54,28 @@ export function ItemSelect({
     staleTime: 30_000,
   })
 
-  const options: SearchSelectOption[] = (data?.items ?? []).map((item) => ({
-    value: item.id,
-    label: item.itemName,
-    // Muestra el código como sublabel solo cuando es distinto del nombre
-    sublabel: item.id !== item.itemName ? item.id : undefined,
-  }))
+  const { data: bundlesData, isLoading: bundlesLoading } = useQuery({
+    queryKey: ['bundleSearch', query],
+    // El backend no soporta filtrar por `disabled` en la query — se filtra en el cliente abajo.
+    queryFn: () => listBundles({ search: query || undefined, limit: 10 }),
+    enabled: !!includeBundles,
+    staleTime: 30_000,
+  })
+  const activeBundles = (bundlesData?.items ?? []).filter((b) => !b.disabled)
+
+  const options: SearchSelectOption[] = [
+    ...(data?.items ?? []).map((item) => ({
+      value: item.id,
+      label: item.itemName,
+      // Muestra el código como sublabel solo cuando es distinto del nombre
+      sublabel: item.id !== item.itemName ? item.id : undefined,
+    })),
+    ...(includeBundles ? activeBundles.map((bundle) => ({
+      value: bundle.id,
+      label: bundle.itemName,
+      sublabel: 'Combo',
+    })) : []),
+  ]
 
   return (
     <SearchSelect
@@ -62,13 +84,17 @@ export function ItemSelect({
       onChange={(val) => {
         if (!val) { onClear(); return }
         const found = data?.items.find((i) => i.id === val)
-        if (!found) return
-        if (found.hasVariants && onVariantSelect) { onVariantSelect(found); return }
-        onSelect(found)
+        if (found) {
+          if (found.hasVariants && onVariantSelect) { onVariantSelect(found); return }
+          onSelect(found)
+          return
+        }
+        const foundBundle = activeBundles.find((b) => b.id === val)
+        if (foundBundle && onSelectBundle) onSelectBundle(foundBundle)
       }}
       options={options}
       onSearch={setQuery}
-      loading={isLoading}
+      loading={isLoading || (!!includeBundles && bundlesLoading)}
       placeholder={placeholder}
       disabled={disabled}
     />

@@ -5,7 +5,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { createQuotation, updateQuotation, getQuotation, getQuotationDuplicateSource } from '@/shared/api/quotations'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getDefaultPriceTier } from '@/shared/api/catalog'
-import type { CreateQuotationDto, ItemPrices } from '@/shared/api/types'
+import type { CreateQuotationDto, ItemPrices, Bundle } from '@/shared/api/types'
 import type { Item } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
@@ -21,14 +21,18 @@ import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { listItems } from '@/shared/api/catalog'
 import { client } from '@/shared/api/client'
-import { getUsuario } from '@/shared/api/usuarios'
+import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
+import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
+
+const SYSTEM_MANAGER_ROLE = 'System Manager'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface LineItem {
   itemCode: string
   itemLabel?: string
+  itemType?: 'product' | 'service' | 'combo'
   description: string
   qty: number
   rate: number
@@ -90,6 +94,7 @@ export default function QuotationForm() {
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
   const [initialized, setInitialized] = useState(false)
+  const [branch, setBranch] = useState('')
 
   // ── Load existing quotation when editing ─────────────────────────────────
   const { data: existingQuotation, isLoading: loadingQuotation } = useQuery({
@@ -116,6 +121,7 @@ export default function QuotationForm() {
       uom: i.uom,
     })))
     setNotes(existingQuotation.notes ?? '')
+    setBranch(existingQuotation.branch ?? '')
     setInitialized(true)
   }, [existingQuotation, initialized])
 
@@ -189,6 +195,28 @@ export default function QuotationForm() {
     staleTime: 5 * 60_000,
   })
 
+  // ── Sucursal (branch) selector ────────────────────────────────────────────
+  const isSystemManager = currentUser?.roles?.includes(SYSTEM_MANAGER_ROLE) ?? false
+  const { data: myBranches, refetch: refetchMyBranches } = useQuery({
+    queryKey: ['usuarioSucursales', currentUserEmail],
+    queryFn: () => getUsuarioSucursales(currentUserEmail!),
+    enabled: !!currentUserEmail,
+    staleTime: 60_000,
+  })
+  const { data: allSucursales } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+    enabled: isSystemManager,
+    staleTime: 60_000,
+  })
+  const branchOptions = isSystemManager
+    ? (allSucursales?.items.map((s) => s.name) ?? [])
+    : (myBranches?.branches ?? [])
+
+  useEffect(() => {
+    if (myBranches?.defaultBranch && !branch && !isEdit) setBranch(myBranches.defaultBranch)
+  }, [myBranches])
+
   const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
     value: c.id,
     label: c.customerName,
@@ -234,6 +262,7 @@ export default function QuotationForm() {
       customer: customerId,
       date,
       validTill,
+      branch: branch || undefined,
       items: items.map((i) => ({
         itemCode: i.itemCode,
         description: i.description,
@@ -252,6 +281,11 @@ export default function QuotationForm() {
     const msg = err?.message ?? ''
     if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) {
       setPinModalOpen(true)
+      return
+    }
+    if (msg.toLowerCase().includes('no tienes acceso a la sucursal')) {
+      refetchMyBranches()
+      toast.error(`${msg} Tus sucursales asignadas se actualizaron, vuelve a intentar.`)
       return
     }
     toast.error(msg || 'Error al guardar la cotización')
@@ -281,6 +315,7 @@ export default function QuotationForm() {
         return {
           itemCode: s.item.id,
           itemLabel: s.item.itemName,
+          itemType: s.item.type,
           description: s.item.internalDescription ?? s.item.itemName,
           qty: s.qty,
           rate,
@@ -307,6 +342,7 @@ export default function QuotationForm() {
           ...row,
           itemCode: catalogItem.id,
           itemLabel: catalogItem.itemName,
+          itemType: catalogItem.type,
           description: catalogItem.internalDescription ?? catalogItem.itemName,
           rate,
           amount: calcAmount(row.qty, rate, row.discountPct),
@@ -320,8 +356,32 @@ export default function QuotationForm() {
     )
   }
 
+  function selectBundle(index: number, bundle: Bundle) {
+    const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
+    setItems((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row
+        const rate = bundle.prices?.[tier] ?? 0
+        return {
+          ...row,
+          itemCode: bundle.id,
+          itemLabel: bundle.itemName,
+          itemType: 'combo',
+          description: bundle.itemName,
+          rate,
+          amount: calcAmount(row.qty, rate, row.discountPct),
+          maxDiscountPct: undefined,
+          uom: '',
+          _prices: bundle.prices,
+          salesTaxPct: 0,
+          salesTaxTemplate: '',
+        }
+      }),
+    )
+  }
+
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, description: '', rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '' })
+    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '' })
   }
 
   // ── Reprice on customer change ───────────────────────────────────────────
@@ -375,7 +435,7 @@ export default function QuotationForm() {
         toast.error(`Artículo #${num}: el precio unitario es requerido`)
         return
       }
-      if (!row.uom) {
+      if (row.itemType !== 'service' && row.itemType !== 'combo' && !row.uom) {
         toast.error(`Artículo #${num}: la unidad (UDM) es requerida`)
         return
       }
@@ -466,6 +526,16 @@ export default function QuotationForm() {
                   onChange={(e) => setValidTill(e.target.value)}
                 />
               </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="branch">Sucursal</label>
+                <select id="branch" className="ff-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
+                  <option value="">Sin especificar</option>
+                  {branchOptions.map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -506,6 +576,8 @@ export default function QuotationForm() {
                           value={item.itemCode}
                           selectedLabel={item.itemLabel}
                           onSelect={(catalogItem) => selectCatalogItem(index, catalogItem)}
+                          onSelectBundle={(b) => selectBundle(index, b)}
+                          includeBundles
                           onClear={() => clearCatalogItem(index)}
                           onVariantSelect={(t) => setVariantTemplate(t)}
                           validateStock
@@ -592,12 +664,16 @@ export default function QuotationForm() {
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
 
                       <td>
-                        <UomSelect
-                          value={item.uom}
-                          onChange={(v) => updateItem(index, { uom: v })}
-                          itemCode={item.itemCode || undefined}
-                          error={submitted && !item.uom}
-                        />
+                        {item.itemType === 'service' || item.itemType === 'combo' ? (
+                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                        ) : (
+                          <UomSelect
+                            value={item.uom}
+                            onChange={(v) => updateItem(index, { uom: v })}
+                            itemCode={item.itemCode || undefined}
+                            error={submitted && !item.uom}
+                          />
+                        )}
                       </td>
 
                       <td>
