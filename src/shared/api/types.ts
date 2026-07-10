@@ -331,6 +331,8 @@ export interface CreditNote {
   ncf?: string
   postingDate: string
   createdAt: string
+  /** true si ya fue reembolsada en efectivo/transferencia; false = sigue como saldo a favor pendiente */
+  refunded?: boolean
 }
 
 export interface CreateCreditNoteDto {
@@ -343,6 +345,38 @@ export interface CreateCreditNoteDto {
     uom?: string
   }[]
   reason?: string
+}
+
+// POST /credit-notes/:id/refund — reembolsa una nota de crédito existente (refunded: false)
+export interface RefundCreditNoteDto {
+  modeOfPayment: string
+  amount: number
+}
+
+// ─── Devoluciones (return flow) ────────────────────────────────────────────────
+
+// POST /devoluciones
+export interface DevolucionDto {
+  invoiceId: string
+  /** Si se omite, se devuelve la factura completa (todas las líneas, cantidad total) */
+  items?: {
+    itemCode: string
+    qty: number
+  }[]
+  resolution: 'refund' | 'credit_note_only'
+  /** Obligatorio solo si resolution === 'refund' */
+  refundModeOfPayment?: string
+  reason: string
+}
+
+export interface DevolucionResult {
+  creditNoteId: string
+  ncf?: string
+  resolution: 'refund' | 'credit_note_only'
+  grandTotal: number
+  /** Solo presente si resolution === 'refund' */
+  paymentEntryId?: string
+  message?: string
 }
 
 export interface DebitNote {
@@ -555,6 +589,10 @@ export interface Pedido {
   facturaId?: string
   createdAt: string
   modifiedAt: string
+  /** Apartado (layaway) — presentes cuando isLayaway === true */
+  isLayaway?: boolean
+  layawayVencido?: boolean
+  layawayDiasRestantes?: number
 }
 
 export interface CreatePedidoDto {
@@ -569,9 +607,42 @@ export interface CreatePedidoDto {
     warehouse?: string
   }[]
   quotation?: string
+  /** Marca el pedido como apartado (layaway) — reserva stock al someter, no genera factura de inmediato */
+  isLayaway?: boolean
 }
 
 export type UpdatePedidoDto = Partial<CreatePedidoDto>
+
+// POST /pedidos/:id/submit — respuesta distinta cuando el pedido es un apartado
+export interface SubmitPedidoResult {
+  facturaId?: string
+  pedidoId?: string
+  isLayaway?: boolean
+  stockReserved?: boolean
+  message?: string
+  warning?: string
+}
+
+// POST /pedidos/:id/facturar-apartado
+export interface FacturarApartadoResult {
+  pedidoId: string
+  facturaId: string
+  message?: string
+}
+
+// POST /pedidos/:id/cancelar-apartado
+export interface CancelarApartadoDto {
+  reason: string
+  remanente?: 'saldo_favor' | 'devolucion'
+  modeOfPayment?: string
+}
+
+// GET/PUT /config/apartados
+export interface LayawayConfig {
+  porcentajeMinimoAnticipo: number
+  diasMaximoApartado: number
+  remanenteDefault: 'saldo_favor' | 'devolucion'
+}
 
 // GET /pedidos/:id/duplicate-source — no notes at document level, items have no uom
 export interface DuplicatePedidoSource {
@@ -1167,6 +1238,8 @@ export interface CreateCobroDto {
   referencias?: {
     invoiceId: string
     allocatedAmount: number
+    /** Requerido en 'Sales Order' para aplicar el anticipo a un pedido de apartado; default (factura) si se omite */
+    referenceDoctype?: 'Sales Order' | 'Sales Invoice'
   }[]
 }
 

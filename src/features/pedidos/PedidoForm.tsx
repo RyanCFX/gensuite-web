@@ -4,13 +4,14 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { createPedido, updatePedido, getPedido, getPedidoDuplicateSource } from '@/shared/api/pedidos'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getQuotation } from '@/shared/api/quotations'
+import { getLayawayConfig } from '@/shared/api/config'
 import type { Item, ItemPrices, CreatePedidoDto } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDOP } from '@/lib/formatters'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
-import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Loader2, PackageOpen } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
 import { PinModal } from '@/components/shared/PinModal'
@@ -73,6 +74,14 @@ export default function PedidoForm() {
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [pinModalOpen, setPinModalOpen] = useState(false)
+  const [isLayaway, setIsLayaway] = useState(false)
+
+  const { data: layawayConfig } = useQuery({
+    queryKey: ['layaway-config'],
+    queryFn: getLayawayConfig,
+    enabled: !isEdit,
+    staleTime: 5 * 60_000,
+  })
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
@@ -271,7 +280,7 @@ export default function PedidoForm() {
       discountPct: i.discountPct || undefined,
     }))
     if (isEdit) updateMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, items: itemsDto, quotation: quotationId || undefined })
-    else createMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, items: itemsDto, quotation: quotationId || undefined })
+    else createMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, items: itemsDto, quotation: quotationId || undefined, isLayaway: isLayaway || undefined })
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -349,6 +358,24 @@ export default function PedidoForm() {
                 <input type="date" className="ff-input" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
               </div>
             </div>
+
+            {!isEdit && (
+              <div style={{ marginTop: 16 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                  <input type="checkbox" checked={isLayaway} onChange={(e) => setIsLayaway(e.target.checked)} />
+                  <PackageOpen size={14} style={{ color: 'var(--text-secondary)' }} />
+                  Es un apartado (layaway)
+                </label>
+                {isLayaway && (
+                  <p className="ff-hint" style={{ marginTop: 6 }}>
+                    Al someter el pedido se reservará el stock y no se generará factura de inmediato.
+                    {layawayConfig && (
+                      <> Anticipo mínimo requerido: <strong>{layawayConfig.porcentajeMinimoAnticipo}%</strong> del total del pedido.</>
+                    )}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

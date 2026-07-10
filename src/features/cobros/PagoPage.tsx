@@ -3,10 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { registerPago } from '@/shared/api/cobros'
 import { listInvoices } from '@/shared/api/invoices'
+import { listPedidos } from '@/shared/api/pedidos'
 import { listCustomers } from '@/shared/api/customers'
-import { listMetodosPago } from '@/shared/api/config'
+import { listMetodosPago, getLayawayConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { CheckCircle2, AlertTriangle, Wallet } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, Wallet, PackageOpen } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { formatDOP } from '@/lib/formatters'
@@ -18,6 +19,15 @@ interface ReferenciaRow {
   postingDate: string
   checked: boolean
   allocatedAmount: number
+}
+
+interface PedidoReferenciaRow {
+  pedidoId: string
+  grandTotal: number
+  transactionDate: string
+  checked: boolean
+  allocatedAmount: number
+  minRequired: number
 }
 
 export default function PagoPage() {
@@ -33,6 +43,7 @@ export default function PagoPage() {
   const [postingDate, setPostingDate] = useState(new Date().toISOString().slice(0, 10))
   const [referencias, setReferencias] = useState<ReferenciaRow[]>([])
   const [advancePayment, setAdvancePayment] = useState(false)
+  const [pedidoReferencias, setPedidoReferencias] = useState<PedidoReferenciaRow[]>([])
 
   // ── Customer search ──────────────────────────────────────────────────────
 
@@ -76,6 +87,54 @@ export default function PagoPage() {
     )
   }, [customerId, invoicesData, advancePayment])
 
+  // ── Apartados (layaway) pendientes de anticipo ───────────────────────────
+
+  const { data: layawayConfig } = useQuery({
+    queryKey: ['layaway-config'],
+    queryFn: getLayawayConfig,
+    staleTime: 5 * 60_000,
+  })
+
+  const { data: pedidosData, isLoading: pedidosLoading } = useQuery({
+    queryKey: ['pedidos-layaway-pending', customerId],
+    queryFn: () => listPedidos({ customer: customerId, isLayaway: true, status: 'submitted', limit: 50 }),
+    enabled: !!customerId && !advancePayment,
+    staleTime: 30_000,
+  })
+
+  useEffect(() => {
+    if (!customerId || advancePayment) { setPedidoReferencias([]); return }
+    const pedidos = (pedidosData?.items ?? []).filter((p) => !p.facturaId)
+    const pct = layawayConfig?.porcentajeMinimoAnticipo ?? 0
+    setPedidoReferencias(
+      pedidos.map((p) => {
+        const grandTotal = p.items.reduce((s, i) => s + i.amount, 0)
+        return {
+          pedidoId: p.id,
+          grandTotal,
+          transactionDate: p.transactionDate,
+          checked: false,
+          allocatedAmount: Math.round(grandTotal * pct) / 100,
+          minRequired: Math.round(grandTotal * pct) / 100,
+        }
+      }),
+    )
+  }, [customerId, pedidosData, advancePayment, layawayConfig])
+
+  function togglePedidoReferencia(pedidoId: string) {
+    setPedidoReferencias((prev) =>
+      prev.map((r) => (r.pedidoId === pedidoId ? { ...r, checked: !r.checked } : r)),
+    )
+  }
+
+  function setPedidoAllocated(pedidoId: string, value: number) {
+    setPedidoReferencias((prev) =>
+      prev.map((r) => (r.pedidoId === pedidoId ? { ...r, allocatedAmount: value } : r)),
+    )
+  }
+
+  const checkedPedidoRefs = pedidoReferencias.filter((r) => r.checked)
+
   // ── Métodos de pago ──────────────────────────────────────────────────────
 
   const { data: metodos } = useQuery({
@@ -99,6 +158,7 @@ export default function PagoPage() {
 
   const checkedRefs = referencias.filter((r) => r.checked)
   const totalAllocated = checkedRefs.reduce((s, r) => s + r.allocatedAmount, 0)
+    + checkedPedidoRefs.reduce((s, r) => s + r.allocatedAmount, 0)
   const diff = Math.round((paidAmount - totalAllocated) * 100) / 100
 
   // ── Mutation ─────────────────────────────────────────────────────────────
@@ -110,6 +170,8 @@ export default function PagoPage() {
       queryClient.invalidateQueries({ queryKey: ['aging'] })
       queryClient.invalidateQueries({ queryKey: ['semaforo'] })
       queryClient.invalidateQueries({ queryKey: ['invoices-pending', customerId] })
+      queryClient.invalidateQueries({ queryKey: ['pedidos-layaway-pending', customerId] })
+      queryClient.invalidateQueries({ queryKey: ['pedidos'] })
       setCustomerId('')
       setCustomerQuery('')
       setPaidAmount(0)
@@ -119,6 +181,7 @@ export default function PagoPage() {
       setRemarks('')
       setPostingDate(new Date().toISOString().slice(0, 10))
       setReferencias([])
+      setPedidoReferencias([])
       setAdvancePayment(false)
     },
     onError: (err: { message?: string }) => {
@@ -134,6 +197,22 @@ export default function PagoPage() {
     if (!paidAmount || paidAmount <= 0) { toast.error('Ingresa un monto válido'); return }
     if (!modeOfPayment) { toast.error('Selecciona un método de pago'); return }
 
+    for (const ref of checkedPedidoRefs) {
+      if (ref.allocatedAmount < ref.minRequired) {
+        toast.error(`El anticipo de ${ref.pedidoId} debe ser al menos ${formatDOP(ref.minRequired)} (${layawayConfig?.porcentajeMinimoAnticipo ?? 0}% del total)`)
+        return
+      }
+    }
+
+    const allReferencias = [
+      ...checkedRefs.map((r) => ({ invoiceId: r.invoiceId, allocatedAmount: r.allocatedAmount })),
+      ...checkedPedidoRefs.map((r) => ({
+        invoiceId: r.pedidoId,
+        allocatedAmount: r.allocatedAmount,
+        referenceDoctype: 'Sales Order' as const,
+      })),
+    ]
+
     pagoMutation.mutate({
       customer: customerId,
       postingDate,
@@ -142,9 +221,7 @@ export default function PagoPage() {
       referenceNo: referenceNo || undefined,
       referenceDate: referenceDate || undefined,
       remarks: remarks || undefined,
-      referencias: checkedRefs.length > 0
-        ? checkedRefs.map((r) => ({ invoiceId: r.invoiceId, allocatedAmount: r.allocatedAmount }))
-        : undefined,
+      referencias: allReferencias.length > 0 ? allReferencias : undefined,
     })
   }
 
@@ -398,6 +475,82 @@ export default function PagoPage() {
               </>
             )}
           </div>
+
+          {/* ── Apartados — Anticipo Pendiente ───────────────────────────── */}
+          {!advancePayment && customerId && (pedidosLoading || pedidoReferencias.length > 0) && (
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <PackageOpen size={16} /> Apartados — Anticipo Pendiente
+                </span>
+                {checkedPedidoRefs.length > 0 && (
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                    {checkedPedidoRefs.length} seleccionado{checkedPedidoRefs.length !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+
+              {pedidosLoading ? (
+                <div className="card-body" style={{ textAlign: 'center', padding: '24px 0' }}>
+                  <span className="spinner spinner-brand spinner-sm" />
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="items-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: 36 }} />
+                        <th>Pedido</th>
+                        <th style={{ textAlign: 'right' }}>Total</th>
+                        <th style={{ textAlign: 'right' }}>Mínimo requerido</th>
+                        <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pedidoReferencias.map((ref) => (
+                        <tr key={ref.pedidoId} style={{ opacity: ref.checked ? 1 : 0.6 }}>
+                          <td style={{ textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={ref.checked}
+                              onChange={() => togglePedidoReferencia(ref.pedidoId)}
+                              style={{ cursor: 'pointer', accentColor: 'var(--color-brand)' }}
+                            />
+                          </td>
+                          <td>
+                            <span style={{ fontWeight: 500, fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                              {ref.pedidoId}
+                            </span>
+                            <br />
+                            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{ref.transactionDate}</span>
+                          </td>
+                          <td style={{ textAlign: 'right', fontSize: 13 }}>{formatDOP(ref.grandTotal)}</td>
+                          <td style={{ textAlign: 'right', fontSize: 13, color: 'var(--text-secondary)' }}>{formatDOP(ref.minRequired)}</td>
+                          <td>
+                            <input
+                              className={`items-input${ref.checked && ref.allocatedAmount < ref.minRequired ? ' items-input-error' : ''}`}
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              style={{ textAlign: 'right' }}
+                              value={ref.allocatedAmount || ''}
+                              disabled={!ref.checked}
+                              onChange={(e) => setPedidoAllocated(ref.pedidoId, parseFloat(e.target.value) || 0)}
+                            />
+                            {ref.checked && ref.allocatedAmount < ref.minRequired && (
+                              <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                Mínimo {formatDOP(ref.minRequired)}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
           <button
             type="submit"

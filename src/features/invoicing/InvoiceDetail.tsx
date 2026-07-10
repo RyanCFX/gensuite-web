@@ -5,8 +5,9 @@ import { getInvoice, submitInvoice, cancelInvoice, amendInvoice, downloadInvoice
 import { getCustomer } from '@/shared/api/customers'
 import { getSaldoFavor } from '@/shared/api/cobros'
 import { listMetodosPago } from '@/shared/api/config'
+import { createDevolucion } from '@/shared/api/devoluciones'
 import type { ApiError, SubmitInvoiceDto } from '@/shared/api/types'
-import { ArrowLeft, Send, XCircle, FileEdit, Download, AlertTriangle, Ban, Wallet } from 'lucide-react'
+import { ArrowLeft, Send, XCircle, FileEdit, Download, AlertTriangle, Ban, Wallet, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatDateTime, formatDOP, displayId } from '@/lib/formatters'
 import { NCF_TYPES } from '@/lib/constants'
@@ -35,6 +36,12 @@ export default function InvoiceDetail() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [cancelForbiddenMsg, setCancelForbiddenMsg] = useState('')
+  const [returnModalOpen, setReturnModalOpen] = useState(false)
+  const [returnFullInvoice, setReturnFullInvoice] = useState(true)
+  const [returnRows, setReturnRows] = useState<{ itemCode: string; description: string; qtyPurchased: number; qty: number; checked: boolean }[]>([])
+  const [returnResolution, setReturnResolution] = useState<'refund' | 'credit_note_only'>('credit_note_only')
+  const [returnModeOfPayment, setReturnModeOfPayment] = useState('')
+  const [returnReason, setReturnReason] = useState('')
 
   const { data: invoice, isLoading } = useQuery({
     queryKey: ['invoice', id],
@@ -51,7 +58,7 @@ export default function InvoiceDetail() {
   const { data: metodos } = useQuery({
     queryKey: ['metodos-pago'],
     queryFn: listMetodosPago,
-    enabled: invoice?.status === 'draft',
+    enabled: invoice?.status === 'draft' || invoice?.status === 'submitted',
     staleTime: 5 * 60_000,
   })
 
@@ -150,6 +157,58 @@ export default function InvoiceDetail() {
   }
 
   const cancelReasonValid = cancelReason.trim().length >= 10 && cancelReason.trim().length <= 500
+
+  function openReturnModal() {
+    setReturnFullInvoice(true)
+    setReturnRows((invoice?.items ?? []).map((i) => ({
+      itemCode: i.itemCode,
+      description: i.description || i.itemCode,
+      qtyPurchased: i.qty,
+      qty: i.qty,
+      checked: false,
+    })))
+    setReturnResolution('credit_note_only')
+    setReturnModeOfPayment('')
+    setReturnReason('')
+    setReturnModalOpen(true)
+  }
+
+  function toggleReturnRow(itemCode: string) {
+    setReturnRows((prev) => prev.map((r) => (r.itemCode === itemCode ? { ...r, checked: !r.checked } : r)))
+  }
+
+  function setReturnRowQty(itemCode: string, qty: number) {
+    setReturnRows((prev) => prev.map((r) => (r.itemCode === itemCode ? { ...r, qty } : r)))
+  }
+
+  const returnCheckedRows = returnRows.filter((r) => r.checked)
+  const returnReasonValid = returnReason.trim().length >= 10 && returnReason.trim().length <= 500
+  const returnModeValid = returnResolution !== 'refund' || !!returnModeOfPayment
+  const returnItemsValid = returnFullInvoice || (
+    returnCheckedRows.length > 0 && returnCheckedRows.every((r) => r.qty > 0 && r.qty <= r.qtyPurchased)
+  )
+  const canConfirmReturn = returnReasonValid && returnModeValid && returnItemsValid
+
+  const devolucionMutation = useMutation({
+    mutationFn: () => createDevolucion({
+      invoiceId: id!,
+      items: returnFullInvoice ? undefined : returnCheckedRows.map((r) => ({ itemCode: r.itemCode, qty: r.qty })),
+      resolution: returnResolution,
+      refundModeOfPayment: returnResolution === 'refund' ? returnModeOfPayment : undefined,
+      reason: returnReason.trim(),
+    }),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
+      toast.success(result.message ?? 'Devolución procesada correctamente')
+      setReturnModalOpen(false)
+      navigate('/facturacion/notas-credito')
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? 'Error al procesar la devolución')
+    },
+  })
 
   const amendMutation = useMutation({
     mutationFn: () => amendInvoice(id!),
@@ -297,6 +356,9 @@ export default function InvoiceDetail() {
               {downloadMutation.isPending
                 ? <><span className="spinner" /> Descargando…</>
                 : <><Download size={14} /> Descargar PDF</>}
+            </button>
+            <button className="btn btn-secondary btn-size-sm" onClick={openReturnModal} disabled={isActionsLoading}>
+              <RotateCcw size={14} /> Devolver producto(s)
             </button>
             <button className="btn btn-danger btn-size-sm" onClick={openCancelModal} disabled={isActionsLoading}>
               <XCircle size={14} /> Cancelar
@@ -603,6 +665,132 @@ export default function InvoiceDetail() {
                 disabled={!cancelReasonValid || cancelMutation.isPending}
               >
                 <Ban size={14} /> Confirmar cancelación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: devolver producto(s) */}
+      {returnModalOpen && (
+        <div className="modal-overlay" onClick={() => setReturnModalOpen(false)}>
+          <div className="modal-box modal-box-lg" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-head">
+              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <RotateCcw size={16} /> Devolver producto(s)
+              </h2>
+              <button className="modal-close" onClick={() => setReturnModalOpen(false)}>×</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={returnFullInvoice}
+                  onChange={(e) => setReturnFullInvoice(e.target.checked)}
+                />
+                Devolver la factura completa
+              </label>
+
+              {!returnFullInvoice && (
+                <div className="items-table-wrap">
+                  <table className="items-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: 36 }} />
+                        <th>Artículo</th>
+                        <th style={{ textAlign: 'right', width: 100 }}>Comprado</th>
+                        <th style={{ textAlign: 'right', width: 120 }}>Cant. a devolver</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {returnRows.map((row) => (
+                        <tr key={row.itemCode} style={{ opacity: row.checked ? 1 : 0.6 }}>
+                          <td style={{ textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={row.checked}
+                              onChange={() => toggleReturnRow(row.itemCode)}
+                              style={{ cursor: 'pointer', accentColor: 'var(--color-brand)' }}
+                            />
+                          </td>
+                          <td>
+                            <span style={{ fontWeight: 500 }}>{row.description}</span>
+                            <br />
+                            <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--text-tertiary)' }}>{row.itemCode}</span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>{row.qtyPurchased}</td>
+                          <td>
+                            <input
+                              className={`items-input${row.checked && (row.qty <= 0 || row.qty > row.qtyPurchased) ? ' items-input-error' : ''}`}
+                              type="number"
+                              min="0"
+                              max={row.qtyPurchased}
+                              step="1"
+                              style={{ textAlign: 'right' }}
+                              value={row.qty}
+                              disabled={!row.checked}
+                              onChange={(e) => setReturnRowQty(row.itemCode, parseFloat(e.target.value) || 0)}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="ff-wrap">
+                <label className="ff-label ff-required">¿Qué hacer con el monto?</label>
+                <select
+                  className="ff-select"
+                  value={returnResolution}
+                  onChange={(e) => setReturnResolution(e.target.value as 'refund' | 'credit_note_only')}
+                >
+                  <option value="credit_note_only">Saldo a favor</option>
+                  <option value="refund">Reembolsar ahora</option>
+                </select>
+              </div>
+
+              {returnResolution === 'refund' && (
+                <div className="ff-wrap">
+                  <label className="ff-label ff-required" htmlFor="returnModeOfPayment">Método de pago del reembolso</label>
+                  <select
+                    id="returnModeOfPayment"
+                    className="ff-select"
+                    value={returnModeOfPayment}
+                    onChange={(e) => setReturnModeOfPayment(e.target.value)}
+                  >
+                    <option value="">Seleccionar…</option>
+                    {metodos?.filter((m) => !m.disabled).map((m) => (
+                      <option key={m.name} value={m.name}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="ff-wrap">
+                <label className="ff-label ff-required" htmlFor="returnReason">Motivo de la devolución</label>
+                <textarea
+                  id="returnReason"
+                  className="ff-textarea"
+                  rows={3}
+                  value={returnReason}
+                  onChange={(e) => setReturnReason(e.target.value)}
+                  placeholder="Describe el motivo de la devolución (mínimo 10 caracteres)"
+                  maxLength={500}
+                />
+                <p className="ff-hint">{returnReason.trim().length}/500 caracteres (mínimo 10)</p>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={() => setReturnModalOpen(false)}>Volver</button>
+              <button
+                className="btn btn-primary"
+                onClick={() => devolucionMutation.mutate()}
+                disabled={!canConfirmReturn || devolucionMutation.isPending}
+              >
+                {devolucionMutation.isPending && <span className="spinner" />}
+                <RotateCcw size={14} /> Confirmar devolución
               </button>
             </div>
           </div>

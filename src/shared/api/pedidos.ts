@@ -1,12 +1,23 @@
 import { client, unwrap, unwrapPaginated } from './client'
 import { ENDPOINTS } from './endpoints'
-import type { Pedido, DraftVersion, CreatePedidoDto, DuplicatePedidoSource, PaginatedResponse, PaginationParams } from './types'
+import type {
+  Pedido,
+  DraftVersion,
+  CreatePedidoDto,
+  DuplicatePedidoSource,
+  SubmitPedidoResult,
+  FacturarApartadoResult,
+  CancelarApartadoDto,
+  PaginatedResponse,
+  PaginationParams,
+} from './types'
 
 export interface ListPedidosParams extends PaginationParams {
   customer?: string
   status?: 'draft' | 'submitted' | 'cancelled' | 'all'
   fromDate?: string
   toDate?: string
+  isLayaway?: boolean
 }
 
 export async function listPedidos(params?: ListPedidosParams) {
@@ -30,12 +41,29 @@ export async function updatePedido(id: string, data: Partial<CreatePedidoDto>) {
 }
 
 export async function submitPedido(id: string) {
-  const res = await client.post<{ success: true; data: { facturaId: string } }>(ENDPOINTS.pedidos.submit(id))
+  const res = await client.post<{ success: true; data: SubmitPedidoResult }>(ENDPOINTS.pedidos.submit(id))
   return unwrap(res)
 }
 
 export async function cancelPedido(id: string) {
   const res = await client.post<{ success: true; data: Pedido }>(ENDPOINTS.pedidos.cancel(id))
+  return unwrap(res)
+}
+
+// POST /pedidos/:id/facturar-apartado — genera la factura Draft del apartado cuando el cliente regresa
+export async function facturarApartado(id: string) {
+  const res = await client.post<{ success: true; data: FacturarApartadoResult }>(
+    ENDPOINTS.pedidos.facturarApartado(id),
+  )
+  return unwrap(res)
+}
+
+// POST /pedidos/:id/cancelar-apartado
+export async function cancelarApartado(id: string, data: CancelarApartadoDto) {
+  const res = await client.post<{ success: true; data: Pedido }>(
+    ENDPOINTS.pedidos.cancelarApartado(id),
+    data,
+  )
   return unwrap(res)
 }
 

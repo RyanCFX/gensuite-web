@@ -7031,6 +7031,53 @@
         ]
       }
     },
+    "/api/v1/credit-notes/{id}/refund": {
+      "post": {
+        "operationId": "CreditNotesController_refund",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundCreditNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reembolsa en efectivo/transferencia el monto de una nota de crédito ya sometida (en vez de dejarlo como saldo a favor del cliente). Método de pago libre.",
+        "tags": [
+          "Notas de Crédito y Débito"
+        ]
+      }
+    },
     "/api/v1/debit-notes": {
       "get": {
         "operationId": "DebitNotesController_findAll",
@@ -9748,7 +9795,91 @@
             "bearer": []
           }
         ],
-        "summary": "Someter pedido y crear factura Draft vinculada",
+        "summary": "Someter pedido. Si es un apartado (isLayaway), reserva stock físicamente y NO factura todavía (ver POST /:id/facturar-apartado); si no, crea la factura Draft vinculada de inmediato.",
+        "tags": [
+          "Pedidos de Venta"
+        ]
+      }
+    },
+    "/api/v1/pedidos/{id}/facturar-apartado": {
+      "post": {
+        "operationId": "PedidosController_facturarApartado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Genera la factura de un apartado ya sometido (con stock reservado), cuando el cliente regresa a retirar el producto, al precio congelado del pedido.",
+        "tags": [
+          "Pedidos de Venta"
+        ]
+      }
+    },
+    "/api/v1/pedidos/{id}/cancelar-apartado": {
+      "post": {
+        "operationId": "PedidosController_cancelarApartado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelarApartadoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancela un apartado: libera la reserva de stock, resuelve el anticipo pagado (saldo a favor o devolución) y cancela el pedido con motivo obligatorio. Sin penalización.",
         "tags": [
           "Pedidos de Venta"
         ]
@@ -9862,6 +9993,45 @@
         "summary": "Descargar pedido de venta en PDF",
         "tags": [
           "Pedidos de Venta"
+        ]
+      }
+    },
+    "/api/v1/devoluciones": {
+      "post": {
+        "operationId": "DevolucionesController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDevolucionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Procesa una devolución completa: crea y somete la nota de crédito (con motivo obligatorio), y opcionalmente reembolsa el monto en efectivo/transferencia. El producto vuelve a inventario automáticamente al someter la nota de crédito. Para listar/ver devoluciones use GET /credit-notes (is_return=1) — el detalle incluye \"refunded\" para saber si ya se reembolsó.",
+        "tags": [
+          "Devoluciones"
         ]
       }
     }
@@ -12047,7 +12217,7 @@
           },
           "rate": {
             "type": "number",
-            "description": "Precio unitario de la factura original"
+            "description": "No se usa — el precio se toma siempre de la factura original vía make_sales_return. Se mantiene el campo por compatibilidad, puede omitirse."
           },
           "uom": {
             "type": "string"
@@ -12055,8 +12225,7 @@
         },
         "required": [
           "itemCode",
-          "qty",
-          "rate"
+          "qty"
         ]
       },
       "CreateCreditNoteDto": {
@@ -12071,6 +12240,7 @@
             "type": "string"
           },
           "items": {
+            "description": "Items y cantidades a devolver (devolución parcial). Si se omite, se devuelve la factura completa (todas las líneas, cantidad total).",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CreditNoteItemDto"
@@ -12083,8 +12253,25 @@
         },
         "required": [
           "originalInvoice",
-          "postingDate",
-          "items"
+          "postingDate"
+        ]
+      },
+      "RefundCreditNoteDto": {
+        "type": "object",
+        "properties": {
+          "modeOfPayment": {
+            "type": "string",
+            "example": "Efectivo RD",
+            "description": "Método de pago a usar para el reembolso — libre, no tiene que coincidir con el de la venta original."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Monto a reembolsar (no puede exceder el total de la nota de crédito)"
+          }
+        },
+        "required": [
+          "modeOfPayment",
+          "amount"
         ]
       },
       "CreateDebitNoteDto": {
@@ -12415,6 +12602,91 @@
         "required": [
           "customer",
           "items"
+        ]
+      },
+      "CancelarApartadoDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500,
+            "description": "Motivo obligatorio de la cancelación del apartado (auditoría)."
+          },
+          "remanente": {
+            "type": "string",
+            "enum": [
+              "saldo_favor",
+              "devolucion"
+            ],
+            "description": "Qué hacer con el anticipo pagado. Si se omite, se usa el default configurado en GET/PUT /config/apartados (Layaway Config)."
+          },
+          "modeOfPayment": {
+            "type": "string",
+            "example": "Efectivo RD",
+            "description": "Requerido si remanente es \"devolucion\" — método de pago para el reembolso."
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "DevolucionItemDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "example": "PROD-001"
+          },
+          "qty": {
+            "type": "number",
+            "description": "Cantidad a devolver (positiva)"
+          }
+        },
+        "required": [
+          "itemCode",
+          "qty"
+        ]
+      },
+      "CreateDevolucionDto": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string",
+            "example": "SINV-0042",
+            "description": "ID de la factura original a devolver"
+          },
+          "items": {
+            "description": "Items y cantidades a devolver (devolución parcial). Si se omite, se devuelve la factura completa.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DevolucionItemDto"
+            }
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "refund",
+              "credit_note_only"
+            ],
+            "description": "\"refund\": reembolsa el monto en efectivo/transferencia. \"credit_note_only\": el monto queda como saldo a favor del cliente (nota de crédito sin reembolso)."
+          },
+          "refundModeOfPayment": {
+            "type": "string",
+            "example": "Efectivo RD",
+            "description": "Requerido si resolution es \"refund\"."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500,
+            "description": "Motivo obligatorio de la devolución (auditoría)."
+          }
+        },
+        "required": [
+          "invoiceId",
+          "resolution",
+          "reason"
         ]
       }
     }

@@ -19,6 +19,7 @@ import type {
   TaxTemplate,
   CreateTaxTemplateDto,
   FacturacionConfig,
+  LayawayConfig,
 } from './types'
 
 export async function getEmpresa() {
@@ -48,6 +49,16 @@ export async function getFacturacionConfig() {
 
 export async function updateFacturacionConfig(data: Partial<FacturacionConfig>) {
   const res = await client.put<{ success: true; data: FacturacionConfig }>(ENDPOINTS.config.facturacion, data)
+  return unwrap(res)
+}
+
+export async function getLayawayConfig() {
+  const res = await client.get<{ success: true; data: LayawayConfig }>(ENDPOINTS.config.apartados)
+  return unwrap(res)
+}
+
+export async function updateLayawayConfig(data: Partial<LayawayConfig>) {
+  const res = await client.put<{ success: true; data: LayawayConfig }>(ENDPOINTS.config.apartados, data)
   return unwrap(res)
 }
 

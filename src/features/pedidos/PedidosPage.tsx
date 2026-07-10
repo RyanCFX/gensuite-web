@@ -5,7 +5,7 @@ import { listPedidos, cancelPedido } from '@/shared/api/pedidos'
 import type { Pedido } from '@/shared/api/types'
 import type { ListPedidosParams } from '@/shared/api/pedidos'
 import { displayId, formatDate, formatDOP } from '@/lib/formatters'
-import { Plus, Eye, Search, X, Loader2, Copy } from 'lucide-react'
+import { Plus, Eye, Search, X, Loader2, Copy, PackageOpen } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -29,6 +29,7 @@ export default function PedidosPage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [toCancel, setToCancel] = useState<Pedido | null>(null)
+  const [onlyLayaway, setOnlyLayaway] = useState(false)
   const { orderBy, sort } = useSortState()
 
   const params: ListPedidosParams = {
@@ -37,6 +38,7 @@ export default function PedidosPage() {
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
     orderBy: orderBy || undefined,
+    isLayaway: onlyLayaway || undefined,
     limit: 50,
   }
 
@@ -98,6 +100,11 @@ export default function PedidosPage() {
             onChange={(e) => setToDate(e.target.value)}
             style={{ width: 144 }}
           />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+            <input type="checkbox" checked={onlyLayaway} onChange={(e) => setOnlyLayaway(e.target.checked)} />
+            <PackageOpen size={14} style={{ color: 'var(--text-secondary)' }} />
+            Solo apartados
+          </label>
         </div>
       </div>
 
@@ -149,10 +156,19 @@ export default function PedidosPage() {
                     <td>{formatDate(p.transactionDate)}</td>
                     <td>{p.deliveryDate ? formatDate(p.deliveryDate) : <span className="td-dim">—</span>}</td>
                     <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(itemTotal)}</td>
-                    <td>
+                    <td style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                       <span className={`badge ${STATUS_BADGE[p.status] ?? 'badge-neutral'}`}>
                         {STATUS_LABEL[p.status] ?? p.status}
                       </span>
+                      {p.isLayaway && (
+                        <span
+                          className={`badge ${p.layawayVencido ? 'badge-error' : 'badge-info'}`}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                          title={p.layawayVencido ? 'Apartado vencido' : `${p.layawayDiasRestantes ?? '—'} días restantes`}
+                        >
+                          <PackageOpen size={11} /> Apartado{p.layawayVencido ? ' vencido' : ''}
+                        </span>
+                      )}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <button

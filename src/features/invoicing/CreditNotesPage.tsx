@@ -4,10 +4,12 @@ import {
   listCreditNotes,
   createCreditNote,
   submitCreditNote,
+  refundCreditNote,
 } from '@/shared/api/notes'
 import { listInvoices } from '@/shared/api/invoices'
+import { listMetodosPago } from '@/shared/api/config'
 import type { Invoice, CreateCreditNoteDto } from '@/shared/api/types'
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus, Loader2, Wallet } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -21,7 +23,7 @@ interface NoteItem {
   rate: number
 }
 
-interface CreditNote {
+interface CreditNoteRow {
   id: string
   originalInvoice: string
   invoiceName?: string
@@ -31,6 +33,8 @@ interface CreditNote {
   status: 'Draft' | 'Submitted' | 'Cancelled'
   reason?: string
   items: NoteItem[]
+  /** true si ya fue reembolsada en efectivo/transferencia; false = sigue como saldo a favor pendiente */
+  refunded?: boolean
 }
 
 interface NoteLineItem {
@@ -60,10 +64,20 @@ export default function CreditNotesPage() {
   const [invoiceQuery, setInvoiceQuery] = useState('')
   const [reason, setReason] = useState('')
   const [noteItems, setNoteItems] = useState<NoteLineItem[]>([])
+  const [refundTarget, setRefundTarget] = useState<CreditNoteRow | null>(null)
+  const [refundAmount, setRefundAmount] = useState(0)
+  const [refundModeOfPayment, setRefundModeOfPayment] = useState('')
 
   const { data: notesData, isLoading } = useQuery({
     queryKey: ['credit-notes', orderBy],
     queryFn: () => listCreditNotes({ orderBy: orderBy || undefined }),
+  })
+
+  const { data: metodos } = useQuery({
+    queryKey: ['metodos-pago'],
+    queryFn: listMetodosPago,
+    enabled: !!refundTarget,
+    staleTime: 5 * 60_000,
   })
 
   const { data: invoicesData, isLoading: invoicesLoading } = useQuery({
@@ -79,11 +93,11 @@ export default function CreditNotesPage() {
     label: inv.customerName ?? inv.id,
     sublabel: (inv.ncf ?? inv.id) + ' — ' + formatDate(inv.postingDate),
   }))
-  const notes = (Array.isArray(notesData) ? notesData : []) as CreditNote[]
+  const notes = (Array.isArray(notesData) ? notesData : []) as unknown as CreditNoteRow[]
 
   const createMutation = useMutation({
-    mutationFn: (dto: CreateCreditNoteDto) => createCreditNote(dto) as Promise<CreditNote>,
-    onSuccess: async (note: CreditNote) => {
+    mutationFn: (dto: CreateCreditNoteDto) => createCreditNote(dto) as unknown as Promise<CreditNoteRow>,
+    onSuccess: async (note: CreditNoteRow) => {
       await submitCreditNote(note.id)
       queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
       toast.success('Nota de crédito creada y sometida (NCF B04 asignado)')
@@ -102,6 +116,33 @@ export default function CreditNotesPage() {
     setReason('')
     setNoteItems([])
   }
+
+  const refundMutation = useMutation({
+    mutationFn: () => refundCreditNote(refundTarget!.id, { modeOfPayment: refundModeOfPayment, amount: refundAmount }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
+      toast.success('Nota de crédito reembolsada')
+      closeRefundModal()
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? 'Error al reembolsar la nota de crédito')
+    },
+  })
+
+  function openRefundModal(note: CreditNoteRow) {
+    setRefundTarget(note)
+    setRefundAmount(note.grandTotal ?? 0)
+    setRefundModeOfPayment('')
+  }
+
+  function closeRefundModal() {
+    setRefundTarget(null)
+    setRefundAmount(0)
+    setRefundModeOfPayment('')
+  }
+
+  const refundAmountValid = refundAmount > 0 && refundAmount <= (refundTarget?.grandTotal ?? 0)
+  const canConfirmRefund = refundAmountValid && !!refundModeOfPayment
 
   function updateNoteItem(index: number, patch: Partial<NoteLineItem>) {
     setNoteItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)))
@@ -148,20 +189,21 @@ export default function CreditNotesPage() {
               <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} />
               <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={sort} align="right" />
               <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
+              <th>Reembolso</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 6 }).map((__, j) => (
+                  {Array.from({ length: 7 }).map((__, j) => (
                     <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                   ))}
                 </tr>
               ))
             ) : notes.length === 0 ? (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={7}>
                   <div className="empty-state">
                     <div className="empty-title">Sin notas de crédito</div>
                     <p className="empty-sub">Crea una nota de crédito para procesar una devolución.</p>
@@ -183,6 +225,23 @@ export default function CreditNotesPage() {
                     <span className={`badge ${STATUS_BADGE[note.status] ?? 'badge-neutral'}`}>
                       {STATUS_LABEL[note.status] ?? note.status}
                     </span>
+                  </td>
+                  <td>
+                    {note.status !== 'Submitted' ? (
+                      <span className="td-dim">—</span>
+                    ) : note.refunded ? (
+                      <span className="badge badge-success">Reembolsada</span>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="badge badge-warning">Saldo a favor disponible</span>
+                        <button
+                          className="btn btn-ghost btn-size-sm"
+                          onClick={() => openRefundModal(note)}
+                        >
+                          <Wallet size={13} /> Reembolsar
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))
@@ -302,6 +361,65 @@ export default function CreditNotesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {refundTarget && (
+        <div className="modal-overlay" onClick={closeRefundModal}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Wallet size={16} /> Reembolsar nota de crédito
+              </h2>
+              <button className="modal-close" onClick={closeRefundModal}>×</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                {refundTarget.id} — Total disponible: {formatDOP(refundTarget.grandTotal)}
+              </p>
+              <div className="ff-wrap">
+                <label className="ff-label ff-required" htmlFor="refundAmount">Monto a reembolsar</label>
+                <input
+                  id="refundAmount"
+                  className={`ff-input${!refundAmountValid ? ' items-input-error' : ''}`}
+                  type="number"
+                  min="0.01"
+                  max={refundTarget.grandTotal}
+                  step="0.01"
+                  value={refundAmount || ''}
+                  onChange={(e) => setRefundAmount(parseFloat(e.target.value) || 0)}
+                />
+                {!refundAmountValid && (
+                  <p className="ff-hint" style={{ color: 'red' }}>El monto debe ser mayor a 0 y no exceder {formatDOP(refundTarget.grandTotal)}</p>
+                )}
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label ff-required" htmlFor="refundModeOfPayment">Método de pago</label>
+                <select
+                  id="refundModeOfPayment"
+                  className="ff-select"
+                  value={refundModeOfPayment}
+                  onChange={(e) => setRefundModeOfPayment(e.target.value)}
+                >
+                  <option value="">Seleccionar…</option>
+                  {metodos?.filter((m) => !m.disabled).map((m) => (
+                    <option key={m.name} value={m.name}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={closeRefundModal}>Volver</button>
+              <button
+                className="btn btn-primary"
+                onClick={() => refundMutation.mutate()}
+                disabled={!canConfirmRefund || refundMutation.isPending}
+              >
+                {refundMutation.isPending && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
+                <Wallet size={14} /> Confirmar reembolso
+              </button>
+            </div>
           </div>
         </div>
       )}

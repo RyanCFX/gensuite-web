@@ -37,6 +37,10 @@ export const ENDPOINTS = {
     list: '/credit-notes',
     byId: (id: string) => `/credit-notes/${id}`,
     submit: (id: string) => `/credit-notes/${id}/submit`,
+    refund: (id: string) => `/credit-notes/${id}/refund`,
+  },
+  devoluciones: {
+    create: '/devoluciones',
   },
   debitNotes: {
     list: '/debit-notes',
@@ -103,6 +107,8 @@ export const ENDPOINTS = {
     version: (id: string, sequence: number) => `/pedidos/${id}/versions/${sequence}`,
     pdf: (id: string) => `/pedidos/${id}/pdf`,
     duplicateSource: (id: string) => `/pedidos/${id}/duplicate-source`,
+    facturarApartado: (id: string) => `/pedidos/${id}/facturar-apartado`,
+    cancelarApartado: (id: string) => `/pedidos/${id}/cancelar-apartado`,
   },
   gastos: {
     list: '/gastos',
@@ -155,6 +161,7 @@ export const ENDPOINTS = {
     itemTaxTemplates: '/config/item-tax-templates',
     gruposClientesById: (id: string) => `/config/grupos-clientes/${encodeURIComponent(id)}`,
     facturacion: '/config/facturacion',
+    apartados: '/config/apartados',
   },
   ejercicioFiscal: {
     list: '/config/ejercicio-fiscal',
@@ -169,7 +176,7 @@ export const ENDPOINTS = {
     submit: (id: string) => `/contabilidad/cierre-periodo/${encodeURIComponent(id)}/submit`,
   },
   cobros: {
-    list: '/cobros/lista',
+    list: '/cobros',
     pendientes: '/cobros/pendientes',
     aging: '/cobros/aging',
     semaforo: '/cobros/semaforo',
