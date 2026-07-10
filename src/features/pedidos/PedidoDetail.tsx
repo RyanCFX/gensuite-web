@@ -5,7 +5,7 @@ import { getPedido, submitPedido, cancelPedido, amendPedido, downloadPedidoPdf }
 import { PageHeader } from '@/components/shared/PageHeader'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
 import { displayId, formatDate, formatDOP } from '@/lib/formatters'
-import { ArrowLeft, Download, Send, Trash2, GitBranch, Loader2, FileText, History } from 'lucide-react'
+import { ArrowLeft, Download, Send, Trash2, GitBranch, Loader2, FileText, History, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 
 const STATUS_BADGE: Record<string, string> = {
@@ -85,6 +85,13 @@ export default function PedidoDetail() {
       />
 
       <div className="doc-actions-bar">
+        <button
+          className="btn btn-secondary btn-size-sm"
+          onClick={() => navigate(`/pedidos/nuevo?duplicate=${id}`)}
+          disabled={isPending}
+        >
+          <Copy size={14} /> Duplicar
+        </button>
         {pedido.status === 'draft' && (
           <>
             <button className="btn btn-primary btn-size-sm" onClick={() => submitMutation.mutate()} disabled={isPending}>

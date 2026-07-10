@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { createPedido, updatePedido, getPedido } from '@/shared/api/pedidos'
-import { listCustomers } from '@/shared/api/customers'
+import { createPedido, updatePedido, getPedido, getPedidoDuplicateSource } from '@/shared/api/pedidos'
+import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getQuotation } from '@/shared/api/quotations'
 import type { Item, ItemPrices, CreatePedidoDto } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
@@ -55,6 +55,7 @@ export default function PedidoForm() {
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
   const quotationId = searchParams.get('quotation')
+  const duplicateId = searchParams.get('duplicate')
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const isEdit = !!id
@@ -103,6 +104,29 @@ export default function PedidoForm() {
       setNotes(q.notes ?? '')
     }).catch(() => toast.error('Error al cargar la cotización'))
   }, [quotationId, loaded, isEdit])
+
+  // Duplicar: precargar desde un pedido existente (no crea nada en el backend)
+  useEffect(() => {
+    if (!duplicateId || loaded || isEdit || quotationId) return
+    setLoaded(true)
+    getPedidoDuplicateSource(duplicateId).then((src) => {
+      setCustomerId(src.customer)
+      setTransactionDate(todayIso())
+      setItems(src.items.map((i) => ({
+        itemCode: i.itemCode,
+        description: i.description ?? '',
+        qty: i.qty,
+        rate: i.rate,
+        amount: calcAmount(i.qty, i.rate, i.discountPct ?? 0),
+        discountPct: i.discountPct ?? 0,
+        uom: 'Unidad',
+      })))
+      getCustomer(src.customer).then((c) => {
+        setCustomerName(c.customerName)
+        setCustomerPriceTier(c.priceTier)
+      }).catch(() => {})
+    }).catch(() => toast.error('Error al cargar el pedido a duplicar'))
+  }, [duplicateId, loaded, isEdit, quotationId])
 
   // Load existing pedido
   const { data: existing } = useQuery({

@@ -20,6 +20,7 @@ export const ENDPOINTS = {
     amend: (id: string) => `/invoices/${id}/amend`,
     pdf: (id: string) => `/invoices/${id}/pdf`,
     version: (id: string, seq: number) => `/invoices/${id}/versions/${seq}`,
+    aplicarSaldoFavor: (id: string) => `/invoices/${id}/aplicar-saldo-favor`,
   },
   quotations: {
     list: '/quotations',
@@ -30,6 +31,7 @@ export const ENDPOINTS = {
     cancel: (id: string) => `/quotations/${id}/cancel`,
     version: (id: string, seq: number) => `/quotations/${id}/versions/${seq}`,
     pdf: (id: string) => `/quotations/${id}/pdf`,
+    duplicateSource: (id: string) => `/quotations/${id}/duplicate-source`,
   },
   creditNotes: {
     list: '/credit-notes',
@@ -100,6 +102,7 @@ export const ENDPOINTS = {
     amend: (id: string) => `/pedidos/${id}/amend`,
     version: (id: string, sequence: number) => `/pedidos/${id}/versions/${sequence}`,
     pdf: (id: string) => `/pedidos/${id}/pdf`,
+    duplicateSource: (id: string) => `/pedidos/${id}/duplicate-source`,
   },
   gastos: {
     list: '/gastos',
@@ -151,6 +154,7 @@ export const ENDPOINTS = {
     impuestosComprasById: (id: string) => `/config/impuestos-compras/${encodeURIComponent(id)}`,
     itemTaxTemplates: '/config/item-tax-templates',
     gruposClientesById: (id: string) => `/config/grupos-clientes/${encodeURIComponent(id)}`,
+    facturacion: '/config/facturacion',
   },
   ejercicioFiscal: {
     list: '/config/ejercicio-fiscal',
@@ -174,6 +178,7 @@ export const ENDPOINTS = {
     byId: (id: string) => `/cobros/${id}`,
     submit: (id: string) => `/cobros/${id}/submit`,
     cancel: (id: string) => `/cobros/${id}/cancel`,
+    saldoFavor: (customerId: string) => `/cobros/saldo-favor/${customerId}`,
   },
   reportes: {
     ventas: '/reportes/ventas',

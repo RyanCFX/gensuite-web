@@ -18,6 +18,7 @@ import type {
   UpdateCuentasEmpresaDto,
   TaxTemplate,
   CreateTaxTemplateDto,
+  FacturacionConfig,
 } from './types'
 
 export async function getEmpresa() {
@@ -37,6 +38,16 @@ export async function getCobrosConfig() {
 
 export async function updateCobrosConfig(data: Partial<CobrosConfig>) {
   const res = await client.put<{ success: true; data: CobrosConfig }>(ENDPOINTS.config.cobros, data)
+  return unwrap(res)
+}
+
+export async function getFacturacionConfig() {
+  const res = await client.get<{ success: true; data: FacturacionConfig }>(ENDPOINTS.config.facturacion)
+  return unwrap(res)
+}
+
+export async function updateFacturacionConfig(data: Partial<FacturacionConfig>) {
+  const res = await client.put<{ success: true; data: FacturacionConfig }>(ENDPOINTS.config.facturacion, data)
   return unwrap(res)
 }
 

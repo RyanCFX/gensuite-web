@@ -6,6 +6,7 @@ import type {
   SemaforoResult,
   PaymentEntry,
   RegisterPagoDto,
+  SaldoFavorResult,
   PaginatedResponse,
   PaginationParams,
 } from './types'
@@ -84,5 +85,15 @@ export async function getHistorialPagos(customerId: string, params?: PaginationP
 
 export async function registerPago(data: RegisterPagoDto) {
   const res = await client.post<{ success: true; data: PaymentEntry }>(ENDPOINTS.cobros.list, data)
+  return unwrap(res)
+}
+
+// ─── Saldo a favor ────────────────────────────────────────────────────────────
+// GET /cobros/saldo-favor/:customerId
+
+export async function getSaldoFavor(customerId: string) {
+  const res = await client.get<{ success: true; data: SaldoFavorResult }>(
+    ENDPOINTS.cobros.saldoFavor(customerId),
+  )
   return unwrap(res)
 }

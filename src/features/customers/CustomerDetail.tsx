@@ -3,11 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getCustomer, deleteCustomer } from '@/shared/api/customers'
-import { getSemaforoByCustomer } from '@/shared/api/cobros'
+import { getSemaforoByCustomer, getSaldoFavor } from '@/shared/api/cobros'
 import { client } from '@/shared/api/client'
 import type { Invoice } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { Pencil, Ban, Building2, User, ArrowLeft } from 'lucide-react'
+import { Pencil, Ban, Building2, User, ArrowLeft, Wallet } from 'lucide-react'
 
 function SemaforoIndicator({ customerId }: { customerId: string }) {
   const { data: entry } = useQuery({
@@ -38,6 +38,27 @@ function SemaforoIndicator({ customerId }: { customerId: string }) {
           <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
             ({(entry.pctUsado ?? 0).toFixed(1)}% utilizado — {formatDOP(entry.balance)} de {formatDOP(entry.creditLimit)})
           </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SaldoFavorIndicator({ customerId }: { customerId: string }) {
+  const { data: saldo } = useQuery({
+    queryKey: ['saldo-favor', customerId],
+    queryFn: () => getSaldoFavor(customerId),
+    retry: false,
+  })
+
+  if (!saldo || saldo.balance <= 0) return null
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card-body">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Wallet size={16} style={{ color: 'var(--success-text)' }} />
+          <span style={{ fontWeight: 500 }}>Saldo a favor: {formatDOP(saldo.balance)}</span>
         </div>
       </div>
     </div>
@@ -180,6 +201,7 @@ export default function CustomerDetail() {
       </div>
 
       {customer.hasCredit && id && <SemaforoIndicator customerId={id} />}
+      {id && <SaldoFavorIndicator customerId={id} />}
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">

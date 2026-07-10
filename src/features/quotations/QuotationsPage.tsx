@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { listQuotations } from '@/shared/api/quotations'
 import type { ListQuotationsParams } from '@/shared/api/quotations'
-import { Plus, Eye, Search, GitBranch } from 'lucide-react'
+import { Plus, Eye, Search, GitBranch, Copy } from 'lucide-react'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -160,6 +160,13 @@ export default function QuotationsPage() {
                       </span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
+                      <button
+                        className="btn btn-ghost btn-size-icon-sm"
+                        title="Duplicar"
+                        onClick={(e) => { e.stopPropagation(); navigate(`/cotizaciones/nueva?duplicate=${q.id}`) }}
+                      >
+                        <Copy size={14} />
+                      </button>
                       <button
                         className="btn btn-ghost btn-size-icon-sm"
                         onClick={(e) => { e.stopPropagation(); navigate(`/cotizaciones/${q.id}`) }}

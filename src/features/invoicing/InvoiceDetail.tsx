@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getInvoice, submitInvoice, cancelInvoice, amendInvoice, downloadInvoicePdf } from '@/shared/api/invoices'
+import { getInvoice, submitInvoice, cancelInvoice, amendInvoice, downloadInvoicePdf, aplicarSaldoFavor } from '@/shared/api/invoices'
 import { getCustomer } from '@/shared/api/customers'
+import { getSaldoFavor } from '@/shared/api/cobros'
 import { listMetodosPago } from '@/shared/api/config'
-import type { SubmitInvoiceDto } from '@/shared/api/types'
-import { ArrowLeft, Send, XCircle, FileEdit, Download, Pencil, AlertTriangle } from 'lucide-react'
+import type { ApiError, SubmitInvoiceDto } from '@/shared/api/types'
+import { ArrowLeft, Send, XCircle, FileEdit, Download, AlertTriangle, Ban, Wallet } from 'lucide-react'
 import { toast } from 'sonner'
-import { formatDate, formatDOP, displayId } from '@/lib/formatters'
+import { formatDate, formatDateTime, formatDOP, displayId } from '@/lib/formatters'
 import { NCF_TYPES } from '@/lib/constants'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
 
@@ -31,6 +32,9 @@ export default function InvoiceDetail() {
   const [modeOfPayment, setModeOfPayment] = useState('')
   const [creditErrorOpen, setCreditErrorOpen] = useState(false)
   const [creditErrorMsg, setCreditErrorMsg] = useState('')
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelForbiddenMsg, setCancelForbiddenMsg] = useState('')
 
   const { data: invoice, isLoading } = useQuery({
     queryKey: ['invoice', id],
@@ -49,6 +53,27 @@ export default function InvoiceDetail() {
     queryFn: listMetodosPago,
     enabled: invoice?.status === 'draft',
     staleTime: 5 * 60_000,
+  })
+
+  const { data: saldoFavor } = useQuery({
+    queryKey: ['saldo-favor', invoice?.customer],
+    queryFn: () => getSaldoFavor(invoice!.customer),
+    enabled: !!invoice?.customer && invoice.status === 'draft',
+  })
+
+  const [saldoAmounts, setSaldoAmounts] = useState<Record<string, number>>({})
+
+  const applySaldoMutation = useMutation({
+    mutationFn: ({ paymentEntryId, amount }: { paymentEntryId: string; amount: number }) =>
+      aplicarSaldoFavor(id!, { paymentEntryId, amount }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      queryClient.invalidateQueries({ queryKey: ['saldo-favor', invoice?.customer] })
+      toast.success('Saldo a favor aplicado')
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? 'Error al aplicar el saldo a favor')
+    },
   })
 
   const noCredit = invoice?.status === 'draft' && customer?.hasCredit === false
@@ -94,16 +119,37 @@ export default function InvoiceDetail() {
   }
 
   const cancelMutation = useMutation({
-    mutationFn: () => cancelInvoice(id!),
+    mutationFn: (reason: string) => cancelInvoice(id!, { reason }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       queryClient.invalidateQueries({ queryKey: ['invoice', id] })
       toast.success('Factura cancelada')
+      setCancelModalOpen(false)
+      setCancelReason('')
+      setCancelForbiddenMsg('')
     },
-    onError: (err: { message?: string }) => {
+    onError: (err: ApiError) => {
+      if (err?.statusCode === 409) {
+        toast.error('La factura ya está cancelada.')
+        queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+        setCancelModalOpen(false)
+        return
+      }
+      if (err?.statusCode === 403) {
+        setCancelForbiddenMsg(err.message || 'No tienes permiso para cancelar esta factura.')
+        return
+      }
       toast.error(err?.message ?? 'Error al cancelar la factura')
     },
   })
+
+  function openCancelModal() {
+    setCancelReason('')
+    setCancelForbiddenMsg('')
+    setCancelModalOpen(true)
+  }
+
+  const cancelReasonValid = cancelReason.trim().length >= 10 && cancelReason.trim().length <= 500
 
   const amendMutation = useMutation({
     mutationFn: () => amendInvoice(id!),
@@ -191,16 +237,22 @@ export default function InvoiceDetail() {
         </div>
       </div>
 
+      {invoice.status === 'cancelled' && invoice.cancellationReason && (
+        <div className="inline-alert inline-alert-error" style={{ marginBottom: 16 }}>
+          <XCircle size={16} />
+          <span>
+            Cancelada por <strong>{invoice.cancelledBy ?? 'usuario desconocido'}</strong>
+            {invoice.cancelledAt ? ` el ${formatDateTime(invoice.cancelledAt)}` : ''}: {invoice.cancellationReason}
+          </span>
+        </div>
+      )}
+
       <div className="doc-actions-bar">
         {invoice.status === 'draft' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <button
-                className="btn btn-secondary btn-size-sm"
-                onClick={() => navigate(`/facturacion/facturas/${id}/editar`)}
-                disabled={isActionsLoading}
-              >
-                <Pencil size={14} /> Editar
+              <button className="btn btn-danger btn-size-sm" onClick={openCancelModal} disabled={isActionsLoading}>
+                <Ban size={14} /> Cancelar
               </button>
 
               {!noCredit && (
@@ -246,7 +298,7 @@ export default function InvoiceDetail() {
                 ? <><span className="spinner" /> Descargando…</>
                 : <><Download size={14} /> Descargar PDF</>}
             </button>
-            <button className="btn btn-danger btn-size-sm" onClick={() => cancelMutation.mutate()} disabled={isActionsLoading}>
+            <button className="btn btn-danger btn-size-sm" onClick={openCancelModal} disabled={isActionsLoading}>
               <XCircle size={14} /> Cancelar
             </button>
           </>
@@ -336,6 +388,71 @@ export default function InvoiceDetail() {
           )}
         </div>
       </div>
+
+      {invoice.status === 'draft' && saldoFavor && saldoFavor.balance > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header">
+            <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Wallet size={16} /> Aplicar saldo a favor disponible
+            </h2>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              Total disponible: {formatDOP(saldoFavor.balance)}
+            </span>
+          </div>
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Origen</th>
+                  <th>Fecha</th>
+                  <th>Método</th>
+                  <th style={{ textAlign: 'right' }}>Disponible</th>
+                  <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
+                  <th style={{ width: 100 }} />
+                </tr>
+              </thead>
+              <tbody>
+                {saldoFavor.entries.map((entry) => (
+                  <tr key={entry.paymentEntryId}>
+                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{entry.paymentEntryId}</td>
+                    <td>{formatDate(entry.postingDate)}</td>
+                    <td>{entry.modeOfPayment}</td>
+                    <td style={{ textAlign: 'right' }}>{formatDOP(entry.unallocatedAmount)}</td>
+                    <td>
+                      <input
+                        className="items-input"
+                        type="number"
+                        min="0.01"
+                        max={entry.unallocatedAmount}
+                        step="0.01"
+                        style={{ textAlign: 'right' }}
+                        value={saldoAmounts[entry.paymentEntryId] ?? entry.unallocatedAmount}
+                        onChange={(e) => setSaldoAmounts((prev) => ({ ...prev, [entry.paymentEntryId]: parseFloat(e.target.value) || 0 }))}
+                      />
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-secondary btn-size-sm"
+                        disabled={applySaldoMutation.isPending}
+                        onClick={() => {
+                          const amount = saldoAmounts[entry.paymentEntryId] ?? entry.unallocatedAmount
+                          if (!amount || amount <= 0 || amount > entry.unallocatedAmount) {
+                            toast.error('El monto debe ser mayor a 0 y no exceder el saldo disponible')
+                            return
+                          }
+                          applySaldoMutation.mutate({ paymentEntryId: entry.paymentEntryId, amount })
+                        }}
+                      >
+                        Aplicar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <div className="card-header">
@@ -441,6 +558,51 @@ export default function InvoiceDetail() {
                 disabled={submitMutation.isPending}
               >
                 <Send size={14} /> Cobrar al contado y someter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: cancelar factura con motivo obligatorio */}
+      {cancelModalOpen && (
+        <div className="modal-overlay" onClick={() => setCancelModalOpen(false)}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Ban size={16} style={{ color: 'var(--error-text)' }} /> Cancelar factura
+              </h2>
+              <button className="modal-close" onClick={() => setCancelModalOpen(false)}>×</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {cancelForbiddenMsg && (
+                <div className="inline-alert inline-alert-warn">
+                  <AlertTriangle size={16} />
+                  <span>{cancelForbiddenMsg}</span>
+                </div>
+              )}
+              <div className="ff-wrap">
+                <label className="ff-label ff-required" htmlFor="cancelReason">Motivo de cancelación</label>
+                <textarea
+                  id="cancelReason"
+                  className="ff-textarea"
+                  rows={3}
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="Describe el motivo de la cancelación (mínimo 10 caracteres)"
+                  maxLength={500}
+                />
+                <p className="ff-hint">{cancelReason.trim().length}/500 caracteres (mínimo 10)</p>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={() => setCancelModalOpen(false)}>Volver</button>
+              <button
+                className="btn btn-danger"
+                onClick={() => cancelMutation.mutate(cancelReason.trim())}
+                disabled={!cancelReasonValid || cancelMutation.isPending}
+              >
+                <Ban size={14} /> Confirmar cancelación
               </button>
             </div>
           </div>

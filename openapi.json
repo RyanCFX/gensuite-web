@@ -609,51 +609,6 @@
         "tags": [
           "Invoices"
         ]
-      },
-      "put": {
-        "operationId": "InvoicesController_update",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateInvoiceDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Actualizar factura en borrador",
-        "tags": [
-          "Invoices"
-        ]
       }
     },
     "/api/v1/invoices/{id}/versions/{sequence}": {
@@ -701,6 +656,53 @@
         ]
       }
     },
+    "/api/v1/invoices/{id}/aplicar-saldo-favor": {
+      "post": {
+        "operationId": "InvoicesController_aplicarSaldoFavor",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AplicarSaldoFavorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Aplica un saldo a favor del cliente (Payment Entry con unallocated_amount) a esta factura en Draft, vía la tabla nativa \"advances\" de Sales Invoice. No cancela ni reescribe el Payment Entry.",
+        "tags": [
+          "Invoices"
+        ]
+      }
+    },
     "/api/v1/invoices/{id}/submit": {
       "post": {
         "operationId": "InvoicesController_submit",
@@ -722,6 +724,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitInvoiceDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": ""
@@ -732,7 +744,7 @@
             "bearer": []
           }
         ],
-        "summary": "Submit invoice (assigns NCF)",
+        "summary": "Submit invoice (assigns NCF). Cobra al contado si el cliente no tiene crédito o si se envía payCash.",
         "tags": [
           "Invoices"
         ]
@@ -759,6 +771,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelInvoiceDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": ""
@@ -769,7 +791,7 @@
             "bearer": []
           }
         ],
-        "summary": "Cancel submitted invoice",
+        "summary": "Cancelar factura (Draft o Submitted). No es una edición: la factura nunca se puede modificar, solo cancelarse con un motivo obligatorio. Cancelar una Submitted con NCF asignado requiere uno de los roles configurados en GET/PUT /config/facturacion (default: Sales Manager).",
         "tags": [
           "Invoices"
         ]
@@ -4394,6 +4416,138 @@
         ]
       }
     },
+    "/api/v1/config/facturacion": {
+      "get": {
+        "operationId": "ConfigController_getFacturacionConfig",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configuración de facturación: roles autorizados para cancelar facturas sometidas",
+        "tags": [
+          "Configuración"
+        ]
+      },
+      "put": {
+        "operationId": "ConfigController_updateFacturacionConfig",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFacturacionConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar configuración de facturación",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/apartados": {
+      "get": {
+        "operationId": "ConfigController_getLayawayConfig",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configuración de apartados: anticipo mínimo, plazo máximo y remanente al cancelar",
+        "tags": [
+          "Configuración"
+        ]
+      },
+      "put": {
+        "operationId": "ConfigController_updateLayawayConfig",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLayawayConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar configuración de apartados",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
     "/api/v1/config/metodos-pago": {
       "get": {
         "operationId": "ConfigController_getMetodosPago",
@@ -6507,6 +6661,43 @@
         ]
       }
     },
+    "/api/v1/quotations/{id}/duplicate-source": {
+      "get": {
+        "operationId": "QuotationsController_getDuplicateSource",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Datos de la cotización en el formato de creación (para precargar el formulario de \"duplicar\"). No crea ningún documento.",
+        "tags": [
+          "Cotizaciones"
+        ]
+      }
+    },
     "/api/v1/quotations/{id}/submit": {
       "post": {
         "operationId": "QuotationsController_submit",
@@ -6623,6 +6814,43 @@
           }
         ],
         "summary": "Convertir cotización en factura Draft",
+        "tags": [
+          "Cotizaciones"
+        ]
+      }
+    },
+    "/api/v1/quotations/{id}/pdf": {
+      "get": {
+        "operationId": "QuotationsController_getPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Descargar cotización en PDF",
         "tags": [
           "Cotizaciones"
         ]
@@ -7231,6 +7459,43 @@
           }
         ],
         "summary": "Historial de cobros (Payment Entries) de un cliente",
+        "tags": [
+          "Cuentas por Cobrar"
+        ]
+      }
+    },
+    "/api/v1/cobros/saldo-favor/{customerId}": {
+      "get": {
+        "operationId": "CobrosController_getSaldoFavor",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Saldo a favor disponible del cliente (Payment Entries con unallocated_amount \u003E 0, ej. anticipos sin aplicar a ninguna factura). Sin expiración.",
         "tags": [
           "Cuentas por Cobrar"
         ]
@@ -9234,6 +9499,15 @@
               "example": "createdAt desc",
               "type": "string"
             }
+          },
+          {
+            "name": "isLayaway",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar solo pedidos marcados como apartado (layaway)",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -9406,6 +9680,43 @@
         ]
       }
     },
+    "/api/v1/pedidos/{id}/duplicate-source": {
+      "get": {
+        "operationId": "PedidosController_getDuplicateSource",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Datos del pedido en el formato de creación (para precargar el formulario de \"duplicar\"). No crea ningún documento.",
+        "tags": [
+          "Pedidos de Venta"
+        ]
+      }
+    },
     "/api/v1/pedidos/{id}/submit": {
       "post": {
         "operationId": "PedidosController_submit",
@@ -9512,6 +9823,43 @@
           }
         ],
         "summary": "Enmendar pedido (cancel + nueva versión)",
+        "tags": [
+          "Pedidos de Venta"
+        ]
+      }
+    },
+    "/api/v1/pedidos/{id}/pdf": {
+      "get": {
+        "operationId": "PedidosController_getPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Descargar pedido de venta en PDF",
         "tags": [
           "Pedidos de Venta"
         ]
@@ -9835,44 +10183,51 @@
           "items"
         ]
       },
-      "UpdateInvoiceDto": {
+      "AplicarSaldoFavorDto": {
         "type": "object",
         "properties": {
-          "customer": {
+          "paymentEntryId": {
             "type": "string",
-            "example": "CUST-0001"
+            "example": "ACC-PAY-2026-00001",
+            "description": "Payment Entry con saldo a favor (unallocated_amount) del mismo cliente de la factura"
           },
-          "postingDate": {
-            "type": "string"
+          "amount": {
+            "type": "number",
+            "description": "Monto del saldo a favor a aplicar a esta factura (no puede exceder el unallocated_amount del Payment Entry)"
+          }
+        },
+        "required": [
+          "paymentEntryId",
+          "amount"
+        ]
+      },
+      "SubmitInvoiceDto": {
+        "type": "object",
+        "properties": {
+          "payCash": {
+            "type": "boolean",
+            "description": "Fuerza el cobro al contado aunque el cliente tenga crédito establecido."
           },
-          "dueDate": {
-            "type": "string"
-          },
-          "ncfType": {
+          "modeOfPayment": {
             "type": "string",
-            "enum": [
-              "B01",
-              "B02",
-              "B14",
-              "B15",
-              "B16"
-            ]
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/InvoiceItemDto"
-            }
-          },
-          "notes": {
-            "type": "string"
-          },
-          "salesOrder": {
-            "type": "string",
-            "example": "SONO-2026-00001",
-            "description": "Pedido de venta al que pertenece esta factura. ERPNext actualiza el estado del pedido automáticamente."
+            "example": "Efectivo",
+            "description": "Mode of Payment a usar. Requerido cuando la factura se cobra al contado (ya sea porque el cliente no tiene crédito, o porque se envió payCash=true)."
           }
         }
+      },
+      "CancelInvoiceDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500,
+            "description": "Motivo obligatorio de la cancelación. Queda registrado como Comment en el documento (auditoría)."
+          }
+        },
+        "required": [
+          "reason"
+        ]
       },
       "CreateCategoryDto": {
         "type": "object",
@@ -11169,6 +11524,44 @@
           }
         }
       },
+      "UpdateFacturacionConfigDto": {
+        "type": "object",
+        "properties": {
+          "rolesCancelacionFactura": {
+            "default": [
+              "Sales Manager"
+            ],
+            "description": "Roles autorizados para cancelar una factura ya sometida (con NCF asignado). Cancelar una factura en Borrador no requiere ninguno de estos roles.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UpdateLayawayConfigDto": {
+        "type": "object",
+        "properties": {
+          "porcentajeMinimoAnticipo": {
+            "type": "number",
+            "default": 30,
+            "description": "% mínimo del total del pedido que debe pagarse como anticipo para poder apartar"
+          },
+          "diasMaximoApartado": {
+            "type": "number",
+            "default": 30,
+            "description": "Días tras los cuales un apartado se considera vencido (solo informativo, no se cancela solo)"
+          },
+          "remanenteDefault": {
+            "type": "string",
+            "enum": [
+              "saldo_favor",
+              "devolucion"
+            ],
+            "default": "saldo_favor"
+          }
+        }
+      },
       "CreateMetodoPagoDto": {
         "type": "object",
         "properties": {
@@ -11726,11 +12119,20 @@
           "invoiceId": {
             "type": "string",
             "example": "SINV-0042",
-            "description": "ID de la factura a saldar"
+            "description": "ID del documento a saldar (Sales Invoice o Sales Order, según referenceDoctype)"
+          },
+          "referenceDoctype": {
+            "type": "string",
+            "enum": [
+              "Sales Invoice",
+              "Sales Order"
+            ],
+            "default": "Sales Invoice",
+            "description": "Doctype del documento referenciado. \"Sales Order\" se usa para anticipos de apartados (layaway) — el pedido debe estar sometido."
           },
           "allocatedAmount": {
             "type": "number",
-            "description": "Monto a aplicar de este cobro a esta factura"
+            "description": "Monto a aplicar de este cobro a este documento"
           }
         },
         "required": [
@@ -11768,7 +12170,7 @@
             "type": "string"
           },
           "referencias": {
-            "description": "Facturas a las que aplica el cobro. Si se omite, el cobro queda sin aplicar.",
+            "description": "Facturas a las que aplica el cobro. Si se omite (o se envía vacío), el cobro queda sin aplicar y, al someterlo, ERPNext registra el monto completo como saldo a favor del cliente (Payment Entry.unallocated_amount) — este es el mecanismo nativo de \"cobro anticipado\". Ver GET /cobros/saldo-favor/:customerId para consultarlo, y POST /invoices/:id/aplicar-saldo-favor para aplicarlo a una factura en Draft.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CobroReferenciaDto"
@@ -12003,6 +12405,11 @@
             "type": "string",
             "example": "QUOT-0001",
             "description": "Cotización de origen"
+          },
+          "isLayaway": {
+            "type": "boolean",
+            "default": false,
+            "description": "Marca este pedido como un apartado (layaway): al someterlo se reserva físicamente el stock (Stock Reservation Entry) y NO se genera factura de inmediato — se factura después con POST /pedidos/:id/facturar-apartado cuando el cliente regresa a retirar el producto."
           }
         },
         "required": [

@@ -3,8 +3,9 @@ import { ENDPOINTS } from './endpoints'
 import type {
   Invoice,
   CreateInvoiceDto,
-  UpdateInvoiceDto,
+  CancelInvoiceDto,
   SubmitInvoiceDto,
+  AplicarSaldoFavorDto,
   DraftVersion,
   PaginatedResponse,
   PaginationParams,
@@ -34,18 +35,16 @@ export async function createInvoice(data: CreateInvoiceDto) {
   return unwrap(res)
 }
 
-export async function updateInvoice(id: string, data: UpdateInvoiceDto) {
-  const res = await client.put<{ success: true; data: Invoice }>(ENDPOINTS.invoices.byId(id), data)
-  return unwrap(res)
-}
-
 export async function submitInvoice(id: string, data?: SubmitInvoiceDto) {
   const res = await client.post<{ success: true; data: Invoice }>(ENDPOINTS.invoices.submit(id), data)
   return unwrap(res)
 }
 
-export async function cancelInvoice(id: string) {
-  const res = await client.post<{ success: true; data: Invoice }>(ENDPOINTS.invoices.cancel(id))
+export async function cancelInvoice(id: string, data: CancelInvoiceDto) {
+  const res = await client.post<{ success: true; data: { message: string; reason: string } }>(
+    ENDPOINTS.invoices.cancel(id),
+    data,
+  )
   return unwrap(res)
 }
 
@@ -56,6 +55,15 @@ export async function amendInvoice(id: string) {
 
 export async function getInvoiceVersion(id: string, sequence: number) {
   const res = await client.get<{ success: true; data: DraftVersion }>(ENDPOINTS.invoices.version(id, sequence))
+  return unwrap(res)
+}
+
+// POST /invoices/:id/aplicar-saldo-favor — solo funciona con la factura en Draft
+export async function aplicarSaldoFavor(id: string, data: AplicarSaldoFavorDto) {
+  const res = await client.post<{ success: true; data: Invoice }>(
+    ENDPOINTS.invoices.aplicarSaldoFavor(id),
+    data,
+  )
   return unwrap(res)
 }
 

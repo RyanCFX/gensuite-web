@@ -5,7 +5,7 @@ import { listPedidos, cancelPedido } from '@/shared/api/pedidos'
 import type { Pedido } from '@/shared/api/types'
 import type { ListPedidosParams } from '@/shared/api/pedidos'
 import { displayId, formatDate, formatDOP } from '@/lib/formatters'
-import { Plus, Eye, Search, X, Loader2 } from 'lucide-react'
+import { Plus, Eye, Search, X, Loader2, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -155,6 +155,13 @@ export default function PedidosPage() {
                       </span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
+                      <button
+                        className="btn btn-ghost btn-size-icon-sm"
+                        title="Duplicar"
+                        onClick={(e) => { e.stopPropagation(); navigate(`/pedidos/nuevo?duplicate=${p.id}`) }}
+                      >
+                        <Copy size={14} />
+                      </button>
                       {p.status === 'draft' ? (
                         <button
                           className="btn btn-ghost btn-size-icon-sm"

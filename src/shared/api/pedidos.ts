@@ -1,6 +1,6 @@
 import { client, unwrap, unwrapPaginated } from './client'
 import { ENDPOINTS } from './endpoints'
-import type { Pedido, DraftVersion, CreatePedidoDto, PaginatedResponse, PaginationParams } from './types'
+import type { Pedido, DraftVersion, CreatePedidoDto, DuplicatePedidoSource, PaginatedResponse, PaginationParams } from './types'
 
 export interface ListPedidosParams extends PaginationParams {
   customer?: string
@@ -46,6 +46,14 @@ export async function amendPedido(id: string) {
 
 export async function getPedidoVersion(id: string, sequence: number) {
   const res = await client.get<{ success: true; data: DraftVersion }>(ENDPOINTS.pedidos.version(id, sequence))
+  return unwrap(res)
+}
+
+// GET /pedidos/:id/duplicate-source — read-only, no side effects
+export async function getPedidoDuplicateSource(id: string) {
+  const res = await client.get<{ success: true; data: DuplicatePedidoSource }>(
+    ENDPOINTS.pedidos.duplicateSource(id),
+  )
   return unwrap(res)
 }
 

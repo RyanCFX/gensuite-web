@@ -4,6 +4,7 @@ import type {
   Quotation,
   CreateQuotationDto,
   DraftVersion,
+  DuplicateQuotationSource,
   PaginatedResponse,
   PaginationParams,
 } from './types'
@@ -65,6 +66,14 @@ export async function amendQuotation(id: string) {
 
 export async function cancelQuotation(id: string) {
   const res = await client.post<{ success: true; data: Quotation }>(ENDPOINTS.quotations.cancel(id))
+  return unwrap(res)
+}
+
+// GET /quotations/:id/duplicate-source — read-only, no side effects
+export async function getQuotationDuplicateSource(id: string) {
+  const res = await client.get<{ success: true; data: DuplicateQuotationSource }>(
+    ENDPOINTS.quotations.duplicateSource(id),
+  )
   return unwrap(res)
 }
 

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { useNavigate, useParams } from 'react-router-dom'
-import { createQuotation, updateQuotation, getQuotation } from '@/shared/api/quotations'
-import { listCustomers } from '@/shared/api/customers'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { createQuotation, updateQuotation, getQuotation, getQuotationDuplicateSource } from '@/shared/api/quotations'
+import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getDefaultPriceTier } from '@/shared/api/catalog'
 import type { CreateQuotationDto, ItemPrices } from '@/shared/api/types'
 import type { Item } from '@/shared/api/types'
@@ -75,6 +75,8 @@ export default function QuotationForm() {
   const isEdit = !!id
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [searchParams] = useSearchParams()
+  const duplicateId = searchParams.get('duplicate')
 
   const [customerId, setCustomerId] = useState('')
   const [customerName, setCustomerName] = useState('')
@@ -116,6 +118,43 @@ export default function QuotationForm() {
     setNotes(existingQuotation.notes ?? '')
     setInitialized(true)
   }, [existingQuotation, initialized])
+
+  // ── Duplicar: precargar desde una cotización existente (no crea nada) ────
+  const { data: duplicateSource } = useQuery({
+    queryKey: ['quotation-duplicate-source', duplicateId],
+    queryFn: () => getQuotationDuplicateSource(duplicateId!),
+    enabled: !isEdit && !!duplicateId,
+  })
+
+  const { data: duplicateCustomer } = useQuery({
+    queryKey: ['customer', duplicateSource?.customer],
+    queryFn: () => getCustomer(duplicateSource!.customer),
+    enabled: !isEdit && !!duplicateSource?.customer,
+  })
+
+  useEffect(() => {
+    if (isEdit || !duplicateSource || initialized) return
+    setCustomerId(duplicateSource.customer)
+    setItems(duplicateSource.items.map((i) => ({
+      itemCode: i.itemCode,
+      description: i.description ?? '',
+      qty: i.qty,
+      rate: i.rate,
+      amount: calcAmount(i.qty, i.rate, i.discountPct ?? 0),
+      discountPct: i.discountPct ?? 0,
+      salesTaxPct: 0,
+      salesTaxTemplate: '',
+      uom: i.uom ?? 'Unidad',
+    })))
+    setNotes(duplicateSource.notes ?? '')
+    setInitialized(true)
+  }, [duplicateSource, isEdit, initialized])
+
+  useEffect(() => {
+    if (!duplicateCustomer) return
+    setCustomerName(duplicateCustomer.customerName)
+    setCustomerPriceTier(duplicateCustomer.priceTier)
+  }, [duplicateCustomer])
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({

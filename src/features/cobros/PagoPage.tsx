@@ -6,7 +6,7 @@ import { listInvoices } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { listMetodosPago } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { CheckCircle2, AlertTriangle } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, Wallet } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { formatDOP } from '@/lib/formatters'
@@ -32,6 +32,7 @@ export default function PagoPage() {
   const [remarks, setRemarks] = useState('')
   const [postingDate, setPostingDate] = useState(new Date().toISOString().slice(0, 10))
   const [referencias, setReferencias] = useState<ReferenciaRow[]>([])
+  const [advancePayment, setAdvancePayment] = useState(false)
 
   // ── Customer search ──────────────────────────────────────────────────────
 
@@ -53,13 +54,13 @@ export default function PagoPage() {
     queryKey: ['invoices-pending', customerId],
     queryFn: () =>
       listInvoices({ customer: customerId, status: 'submitted', paymentStatus: 'unpaid', limit: 50 }),
-    enabled: !!customerId,
+    enabled: !!customerId && !advancePayment,
     staleTime: 30_000,
   })
 
   // Sync invoice rows when customer or invoice data changes
   useEffect(() => {
-    if (!customerId) { setReferencias([]); return }
+    if (!customerId || advancePayment) { setReferencias([]); return }
     const invoices = invoicesData?.items ?? []
     setReferencias(
       invoices
@@ -73,7 +74,7 @@ export default function PagoPage() {
           allocatedAmount: inv.outstandingAmount,
         })),
     )
-  }, [customerId, invoicesData])
+  }, [customerId, invoicesData, advancePayment])
 
   // ── Métodos de pago ──────────────────────────────────────────────────────
 
@@ -118,6 +119,7 @@ export default function PagoPage() {
       setRemarks('')
       setPostingDate(new Date().toISOString().slice(0, 10))
       setReferencias([])
+      setAdvancePayment(false)
     },
     onError: (err: { message?: string }) => {
       toast.error(err?.message ?? 'Error al registrar el cobro')
@@ -184,6 +186,17 @@ export default function PagoPage() {
                   error={!customerId}
                 />
               </div>
+
+              {/* Cobro anticipado / sin aplicar a factura */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={advancePayment}
+                  onChange={(e) => setAdvancePayment(e.target.checked)}
+                />
+                <Wallet size={14} style={{ color: 'var(--text-secondary)' }} />
+                Cobro anticipado — no aplicar a ninguna factura (queda como saldo a favor del cliente)
+              </label>
 
               <div className="form-row">
                 {/* Fecha */}
@@ -278,7 +291,11 @@ export default function PagoPage() {
               )}
             </div>
 
-            {!customerId ? (
+            {advancePayment ? (
+              <div className="card-body" style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
+                Cobro anticipado — no se aplicará a ninguna factura.
+              </div>
+            ) : !customerId ? (
               <div className="card-body" style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
                 Selecciona un cliente para ver sus facturas pendientes
               </div>

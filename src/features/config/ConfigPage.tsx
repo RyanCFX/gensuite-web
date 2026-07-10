@@ -15,9 +15,11 @@ import {
   listImpuestosVentas, createImpuestoVentas, updateImpuestoVentas, deleteImpuestoVentas,
   listImpuestosCompras, createImpuestoCompras, updateImpuestoCompras, deleteImpuestoCompras,
   listGruposProveedores, createGrupoProveedor,
+  getFacturacionConfig, updateFacturacionConfig,
 } from '@/shared/api/config'
 import { listCustomerGroups, createCustomerGroup, deleteCustomerGroup } from '@/shared/api/customers'
-import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, CreateTaxTemplateDto, GrupoCliente } from '@/shared/api/types'
+import { listRoles } from '@/shared/api/usuarios'
+import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, CreateTaxTemplateDto, GrupoCliente, FacturacionConfig } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
@@ -1548,6 +1550,84 @@ function GruposClientesSection() {
   )
 }
 
+// ---- Facturación Config Section ----
+function FacturacionConfigSection() {
+  const queryClient = useQueryClient()
+  const { data, isLoading } = useQuery({ queryKey: ['facturacion-config'], queryFn: getFacturacionConfig })
+  const { data: roles } = useQuery({ queryKey: ['roles'], queryFn: listRoles, staleTime: 5 * 60_000 })
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([])
+
+  useEffect(() => { if (data) setSelectedRoles(data.rolesCancelacionFactura ?? []) }, [data])
+
+  const saveMutation = useMutation({
+    mutationFn: (dto: Partial<FacturacionConfig>) => updateFacturacionConfig(dto),
+    onSuccess: () => {
+      toast.success('Configuración de facturación actualizada')
+      queryClient.invalidateQueries({ queryKey: ['facturacion-config'] })
+    },
+    onError: () => toast.error('Error al guardar'),
+  })
+
+  if (isLoading) return <span className="skeleton-box" style={{ height: 200, display: 'block' }} />
+
+  function toggleRole(name: string) {
+    setSelectedRoles((prev) => (prev.includes(name) ? prev.filter((r) => r !== name) : [...prev, name]))
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">Configuración de Facturación</span>
+      </div>
+      <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div className="ff-wrap">
+          <label className="ff-label">Roles autorizados para cancelar facturas sometidas</label>
+          <p className="ff-hint" style={{ marginBottom: 8 }}>
+            Solo usuarios con alguno de estos roles de ERPNext pueden cancelar una factura ya sometida (con NCF asignado).
+          </p>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 8,
+            maxHeight: 200,
+            overflowY: 'auto',
+            border: '1px solid var(--border-default)',
+            borderRadius: 'var(--radius-md)',
+            padding: 12,
+          }}>
+            {(roles ?? []).length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text-tertiary)', gridColumn: '1 / -1' }}>
+                No hay roles disponibles.
+              </p>
+            ) : (
+              (roles ?? []).map((role) => (
+                <label key={role} className="ff-check-wrap">
+                  <input
+                    type="checkbox"
+                    className="ff-check"
+                    checked={selectedRoles.includes(role)}
+                    onChange={() => toggleRole(role)}
+                  />
+                  <span style={{ fontSize: 13 }}>{role}</span>
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            className="btn btn-primary btn-size-sm"
+            onClick={() => saveMutation.mutate({ rolesCancelacionFactura: selectedRoles })}
+            disabled={saveMutation.isPending}
+          >
+            <Save size={14} /> Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ---- Main ConfigPage ----
 const SECTION_TITLES: Record<string, string> = {
   cobros: 'Configuración de Cobranza',
@@ -1561,6 +1641,7 @@ const SECTION_TITLES: Record<string, string> = {
   'ejercicio-fiscal': 'Ejercicio Fiscal',
   perfil: 'Mi Perfil',
   'grupos-clientes': 'Grupos de Clientes',
+  facturacion: 'Configuración de Facturación',
 }
 
 export default function ConfigPage() {
@@ -1579,6 +1660,7 @@ export default function ConfigPage() {
     'ejercicio-fiscal': <EjercicioFiscalSection />,
     perfil: <PerfilSection />,
     'grupos-clientes': <GruposClientesSection />,
+    facturacion: <FacturacionConfigSection />,
   }
 
   return (

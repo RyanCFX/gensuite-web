@@ -118,6 +118,7 @@ const NAV_CONFIG: NavEntry = {
   children: [
     { label: 'Empresa',            icon: <Building2 size={14} />,   path: '/config/empresa'           },
     { label: 'Cobranza',           icon: <Wallet size={14} />,      path: '/config/cobros'            },
+    { label: 'Facturación',        icon: <FileText size={14} />,    path: '/config/facturacion'       },
     { label: 'Almacenes',          icon: <Warehouse size={14} />,   path: '/config/almacenes'         },
     { label: 'Métodos de Pago',    icon: <CreditCard size={14} />,  path: '/config/metodos-pago'      },
     { label: 'Unidades de Medida', icon: <Settings size={14} />,    path: '/config/uom'               },

@@ -221,6 +221,10 @@ export interface Invoice {
   history?: AmendmentEntry[]
   createdAt: string
   modifiedAt: string
+  /** Present when status === 'cancelled' and the cancellation was registered with a reason. */
+  cancellationReason?: string
+  cancelledBy?: string
+  cancelledAt?: string
 }
 
 export interface CreateInvoiceDto {
@@ -239,20 +243,9 @@ export interface CreateInvoiceDto {
   notes?: string
 }
 
-export interface UpdateInvoiceDto {
-  customer?: string
-  postingDate?: string
-  dueDate?: string
-  ncfType?: 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
-  items?: {
-    itemCode: string
-    description?: string
-    qty: number
-    rate: number
-    uom?: string
-    discountPct?: number
-  }[]
-  notes?: string
+// POST /invoices/:id/cancel — reason is mandatory, 10-500 chars
+export interface CancelInvoiceDto {
+  reason: string
 }
 
 // POST /invoices/:id/submit — optional body to control cash vs. credit at submit time
@@ -309,6 +302,21 @@ export interface CreateQuotationDto {
 }
 
 export type UpdateQuotationDto = Partial<CreateQuotationDto>
+
+// GET /quotations/:id/duplicate-source
+export interface DuplicateQuotationSource {
+  customer: string
+  items: {
+    itemCode: string
+    description?: string
+    qty: number
+    rate: number
+    uom?: string
+    discountPct?: number
+    warehouse?: string
+  }[]
+  notes?: string
+}
 
 // ─── Credit / Debit Notes ─────────────────────────────────────────────────────
 // CreateCreditNoteDto: originalInvoice (not invoiceId), postingDate required.
@@ -564,6 +572,19 @@ export interface CreatePedidoDto {
 }
 
 export type UpdatePedidoDto = Partial<CreatePedidoDto>
+
+// GET /pedidos/:id/duplicate-source — no notes at document level, items have no uom
+export interface DuplicatePedidoSource {
+  customer: string
+  items: {
+    itemCode: string
+    description?: string
+    qty: number
+    rate: number
+    discountPct?: number
+    warehouse?: string
+  }[]
+}
 
 // Batch / Serial inventory tracking
 export interface InventoryLote {
@@ -986,6 +1007,11 @@ export interface CobrosConfig {
   enviarRecordatorioAutomatico: boolean
 }
 
+// GET/PUT /config/facturacion
+export interface FacturacionConfig {
+  rolesCancelacionFactura: string[]
+}
+
 export interface MetodoPago {
   name: string
   type: 'Cash' | 'Bank' | 'General'
@@ -1146,6 +1172,28 @@ export interface CreateCobroDto {
 
 // Alias for backward compat in existing pages
 export type RegisterPagoDto = CreateCobroDto
+
+// ─── Saldo a favor (cobro anticipado / sobrepago) ────────────────────────────
+
+// GET /cobros/saldo-favor/:customerId
+export interface SaldoFavorEntry {
+  paymentEntryId: string
+  unallocatedAmount: number
+  postingDate: string
+  modeOfPayment: string
+}
+
+export interface SaldoFavorResult {
+  customer: string
+  balance: number
+  entries: SaldoFavorEntry[]
+}
+
+// POST /invoices/:id/aplicar-saldo-favor
+export interface AplicarSaldoFavorDto {
+  paymentEntryId: string
+  amount: number
+}
 
 // ─── Reportes ─────────────────────────────────────────────────────────────────
 

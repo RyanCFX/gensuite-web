@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useParams } from 'react-router-dom'
-import { createInvoice, updateInvoice, getInvoice } from '@/shared/api/invoices'
+import { useNavigate } from 'react-router-dom'
+import { createInvoice } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
 import { listItems, getDefaultPriceTier } from '@/shared/api/catalog'
-import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices } from '@/shared/api/types'
+import type { CreateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices } from '@/shared/api/types'
 import { ENDPOINTS } from '@/shared/api/endpoints'
-import { formatDOP, displayId } from '@/lib/formatters'
+import { formatDOP } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
@@ -72,9 +72,6 @@ function maxDiscFromPrices(rate: number, prices: ItemPrices | undefined): number
 export default function InvoiceForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  // When `:id` is present in the URL we're in edit mode
-  const { id } = useParams<{ id?: string }>()
-  const isEdit = Boolean(id)
 
   const [customerId, setCustomerId] = useState('')
   const [customerQuery, setCustomerQuery] = useState('')
@@ -86,7 +83,6 @@ export default function InvoiceForm() {
   const [notes, setNotes] = useState('')
   const [semaforo, setSemaforo] = useState<SemaforoEntry | null>(null)
   const [loadingSemaforo, setLoadingSemaforo] = useState(false)
-  const [initialized, setInitialized] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
   const [submitted, setSubmitted] = useState(false)
@@ -101,40 +97,6 @@ export default function InvoiceForm() {
       setTimeout(() => selectCatalogItem(items.length, item), 0)
     },
   })
-
-  // ── Load existing invoice when editing ────────────────────────────────────
-  const { data: existingInvoice, isLoading: loadingInvoice } = useQuery({
-    queryKey: ['invoice', id],
-    queryFn: () => getInvoice(id!),
-    enabled: isEdit,
-  })
-
-  // Pre-populate form once the existing invoice loads
-  useEffect(() => {
-    if (!existingInvoice || initialized) return
-    setCustomerId(existingInvoice.customer)
-    setPostingDate(existingInvoice.postingDate)
-    setDueDate(existingInvoice.dueDate ?? defaultDueDate())
-    setNcfType((existingInvoice.ncfType as NcfType) ?? 'B02')
-    setNotes(existingInvoice.notes ?? '')
-    setItems(
-      existingInvoice.items.map((i) => ({
-        itemCode: i.itemCode,
-        description: i.description,
-        qty: i.qty,
-        rate: i.rate,
-        baseRate: i.rate,
-        amount: i.amount,
-        discountPct: (i as any).discountPct ?? 0,
-        salesTaxPct: 0,
-        salesTaxTemplate: '',
-        uom: i.uom,
-
-        conversionFactor: 1,
-      })),
-    )
-    setInitialized(true)
-  }, [existingInvoice, initialized])
 
   // ── Customer search ───────────────────────────────────────────────────────
   const { data: customersData, isLoading: loadingCustomers } = useQuery({
@@ -162,11 +124,6 @@ export default function InvoiceForm() {
     label: c.customerName,
     sublabel: c.rnc ?? c.cedula,
   }))
-
-  // In edit mode, the selected customer name comes from the invoice until the user picks a new one
-  const selectedLabel = isEdit && !customerQuery && existingInvoice && customerId === existingInvoice.customer
-    ? existingInvoice.customerName
-    : undefined
 
   // ── Semaforo ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -214,27 +171,7 @@ export default function InvoiceForm() {
     },
   })
 
-  const updateMutation = useMutation({
-    mutationFn: (dto: UpdateInvoiceDto) => updateInvoice(id!, dto),
-    onSuccess: (invoice) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] })
-      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
-      if (invoice.id !== id) {
-        toast.success(`Nueva versión creada: ${displayId(invoice.id, invoice.sequence)}`)
-        navigate(`/facturacion/facturas/${invoice.id}`)
-      } else {
-        toast.success(`Versión ${invoice.sequence} guardada como historial`)
-        navigate(`/facturacion/facturas/${invoice.id}`, { replace: true })
-      }
-    },
-    onError: (err: { message?: string }) => {
-      const msg = err?.message ?? ''
-      if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) { setPinModalOpen(true); return }
-      toast.error(msg || 'Error al actualizar la factura')
-    },
-  })
-
-  const isSaving = createMutation.isPending || updateMutation.isPending
+  const isSaving = createMutation.isPending
 
   // ── Line item helpers ─────────────────────────────────────────────────────
   function updateItem(index: number, patch: Partial<LineItem>) {
@@ -372,25 +309,14 @@ export default function InvoiceForm() {
       uom: i.uom,
     }))
 
-    if (isEdit) {
-      updateMutation.mutate({
-        customer: customerId,
-        postingDate,
-        dueDate,
-        ncfType,
-        items: itemsDto,
-        notes: notes || undefined,
-      })
-    } else {
-      createMutation.mutate({
-        customer: customerId,
-        postingDate,
-        dueDate,
-        ncfType,
-        items: itemsDto,
-        notes: notes || undefined,
-      })
-    }
+    createMutation.mutate({
+      customer: customerId,
+      postingDate,
+      dueDate,
+      ncfType,
+      items: itemsDto,
+      notes: notes || undefined,
+    })
   }
 
   const semaforoStatusClass: Record<string, string> = {
@@ -404,30 +330,14 @@ export default function InvoiceForm() {
     rojo: 'Límite excedido',
   }
 
-  // ── Loading skeleton while fetching existing invoice ─────────────────────
-  if (isEdit && loadingInvoice) {
-    return (
-      <div className="page-container">
-        <div className="skeleton-box" style={{ width: 220, height: 24, marginBottom: 8 }} />
-        <div className="skeleton-box" style={{ width: '100%', height: 180, borderRadius: 'var(--radius-lg)', marginBottom: 16 }} />
-        <div className="skeleton-box" style={{ width: '100%', height: 280, borderRadius: 'var(--radius-lg)' }} />
-      </div>
-    )
-  }
-
   return (
     <div className="page-container">
       <div className="page-header">
         <div>
-          <a className="page-back-link" onClick={() => navigate(isEdit ? `/facturacion/facturas/${id}` : '/facturacion/facturas')}>
-            <ArrowLeft size={14} /> {isEdit ? `Factura ${id}` : 'Facturas'}
+          <a className="page-back-link" onClick={() => navigate('/facturacion/facturas')}>
+            <ArrowLeft size={14} /> Facturas
           </a>
-          <h1 className="page-title">{isEdit ? 'Editar Factura' : 'Nueva Factura'}</h1>
-          {isEdit && (
-            <p className="page-sub" style={{ color: 'var(--color-warning)' }}>
-              Solo facturas en borrador pueden ser editadas
-            </p>
-          )}
+          <h1 className="page-title">Nueva Factura</h1>
         </div>
       </div>
 
@@ -443,7 +353,6 @@ export default function InvoiceForm() {
                 <SearchSelect
                   id="customer"
                   value={customerId}
-                  selectedLabel={selectedLabel}
                   onChange={(val, _opt) => {
                     setCustomerId(val)
                     if (!val) {
@@ -681,7 +590,7 @@ export default function InvoiceForm() {
           <button
             type="button"
             className="btn btn-ghost"
-            onClick={() => navigate(isEdit ? `/facturacion/facturas/${id}` : '/facturacion/facturas')}
+            onClick={() => navigate('/facturacion/facturas')}
           >
             Cancelar
           </button>
@@ -689,7 +598,7 @@ export default function InvoiceForm() {
             {isSaving
               ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
               : <Save size={15} />}
-            {isEdit ? 'Guardar Cambios' : 'Guardar Borrador'}
+            Guardar Borrador
           </button>
         </div>
       </form>
@@ -704,8 +613,7 @@ export default function InvoiceForm() {
             itemCode: i.itemCode, description: i.description, qty: i.qty, rate: i.rate,
             discountPct: i.discountPct || undefined, uom: i.uom,
           }))
-          if (isEdit) updateMutation.mutate({ customer: customerId, postingDate, dueDate, ncfType, items: itemsDto, notes: notes || undefined })
-          else createMutation.mutate({ customer: customerId, postingDate, dueDate, ncfType, items: itemsDto, notes: notes || undefined })
+          createMutation.mutate({ customer: customerId, postingDate, dueDate, ncfType, items: itemsDto, notes: notes || undefined })
         }}
         title="Autorización requerida"
         description="El descuento supera tu límite. Ingresa el PIN de un administrador."

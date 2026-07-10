@@ -112,7 +112,6 @@ export default function App() {
             {/* Facturación */}
             <Route path="/facturacion/facturas" element={<Suspense fallback={<PageLoader />}><InvoicesPage /></Suspense>} />
             <Route path="/facturacion/facturas/nueva" element={<Suspense fallback={<PageLoader />}><InvoiceForm /></Suspense>} />
-            <Route path="/facturacion/facturas/:id/editar" element={<Suspense fallback={<PageLoader />}><InvoiceForm /></Suspense>} />
             <Route path="/facturacion/facturas/:id" element={<Suspense fallback={<PageLoader />}><InvoiceDetail /></Suspense>} />
             <Route path="/facturacion/notas-credito" element={<Suspense fallback={<PageLoader />}><CreditNotesPage /></Suspense>} />
             <Route path="/facturacion/notas-debito" element={<Suspense fallback={<PageLoader />}><DebitNotesPage /></Suspense>} />

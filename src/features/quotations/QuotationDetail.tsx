@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getQuotation, submitQuotation, deleteQuotation, convertQuotationToInvoice, cancelQuotation, downloadQuotationPdf } from '@/shared/api/quotations'
 import type { Quotation } from '@/shared/api/types'
-import { ArrowLeft, Download, FileText, Loader2, Send, Trash2, ClipboardList, XCircle } from 'lucide-react'
+import { ArrowLeft, Download, FileText, Loader2, Send, Trash2, ClipboardList, XCircle, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { NCF_TYPES } from '@/lib/constants'
@@ -157,6 +157,13 @@ export default function QuotationDetail() {
       </div>
 
       <div className="doc-actions-bar">
+        <button
+          className="btn btn-secondary btn-size-sm"
+          onClick={() => navigate(`/cotizaciones/nueva?duplicate=${id}`)}
+          disabled={isActionsLoading}
+        >
+          <Copy size={14} /> Duplicar
+        </button>
         {quotation.status === 'draft' && (
           <>
             <button
