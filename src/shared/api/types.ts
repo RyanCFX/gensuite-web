@@ -357,6 +357,41 @@ export interface RefundCreditNoteDto {
   amount: number
 }
 
+// POST /credit-notes/:id/aplicar-a-factura — invoiceId es obligatorio, siempre se enlaza a una factura
+export interface AplicarCreditNoteDto {
+  invoiceId: string
+  amount?: number
+}
+
+// La respuesta es siempre la Invoice actualizada (ver tipo Invoice)
+export type AplicarCreditNoteResult = Invoice
+
+// GET /credit-notes/saldo-favor/:customerId
+export interface CreditNoteAppliedTo {
+  invoiceId: string
+  paymentEntryId: string
+  amount: number
+}
+
+export interface CreditNoteSaldoFavorEntry {
+  creditNoteId: string
+  ncf?: string
+  postingDate: string
+  grandTotal: number
+  refundedAmount: number
+  appliedAmount: number
+  /** Caso raro: convertido a crédito pero sin aplicar a ninguna factura (ej. tras deshacer una aplicación) */
+  unappliedConvertedAmount: number
+  availableAmount: number
+  appliedTo: CreditNoteAppliedTo[]
+}
+
+export interface CreditNoteSaldoFavorResult {
+  customer: string
+  balance: number
+  entries: CreditNoteSaldoFavorEntry[]
+}
+
 // ─── Devoluciones (return flow) ────────────────────────────────────────────────
 
 // POST /devoluciones
@@ -1331,11 +1366,22 @@ export type RegisterPagoDto = CreateCobroDto
 // ─── Saldo a favor (cobro anticipado / sobrepago) ────────────────────────────
 
 // GET /cobros/saldo-favor/:customerId
+export interface SaldoFavorAppliedTo {
+  invoiceId: string
+  allocatedAmount: number
+}
+
 export interface SaldoFavorEntry {
   paymentEntryId: string
   unallocatedAmount: number
   postingDate: string
   modeOfPayment: string
+  /** Monto ya comprometido/aplicado a facturas (via appliedTo) */
+  committedAmount: number
+  /** Monto realmente libre para aplicar a una factura nueva (unallocatedAmount neto de lo ya comprometido) */
+  availableAmount: number
+  /** Facturas a las que ya se aplicó este Payment Entry */
+  appliedTo: SaldoFavorAppliedTo[]
 }
 
 export interface SaldoFavorResult {

@@ -68,6 +68,11 @@ export async function aplicarSaldoFavor(id: string, data: AplicarSaldoFavorDto) 
   return unwrap(res)
 }
 
+// DELETE /invoices/:id/aplicar-saldo-favor/:paymentEntryId — deshace la aplicación de un saldo a favor
+export async function removerSaldoFavor(id: string, paymentEntryId: string) {
+  await client.delete(ENDPOINTS.invoices.removerSaldoFavor(id, paymentEntryId))
+}
+
 export async function downloadInvoicePdf(id: string, filename?: string): Promise<void> {
   const res = await client.get<Blob>(ENDPOINTS.invoices.pdf(id), {
     responseType: 'blob',

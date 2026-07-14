@@ -5,6 +5,9 @@ import type {
   CreateDebitNoteDto,
   CreditNote,
   RefundCreditNoteDto,
+  AplicarCreditNoteDto,
+  AplicarCreditNoteResult,
+  CreditNoteSaldoFavorResult,
   PaginationParams,
 } from './types'
 
@@ -38,6 +41,28 @@ export async function submitCreditNote(id: string) {
 // POST /credit-notes/:id/refund — reembolsa una nota de crédito que quedó como saldo a favor
 export async function refundCreditNote(id: string, data: RefundCreditNoteDto) {
   const res = await client.post<{ success: true; data: CreditNote }>(ENDPOINTS.creditNotes.refund(id), data)
+  return unwrap(res)
+}
+
+// POST /credit-notes/:id/aplicar-a-factura — invoiceId obligatorio, se enlaza y aplica de inmediato a esa factura
+export async function aplicarCreditNoteAFactura(id: string, data: AplicarCreditNoteDto) {
+  const res = await client.post<{ success: true; data: AplicarCreditNoteResult }>(
+    ENDPOINTS.creditNotes.aplicarAFactura(id),
+    data,
+  )
+  return unwrap(res)
+}
+
+// DELETE /credit-notes/:id/aplicar-a-factura/:invoiceId — deshace la aplicación a esa factura (solo si sigue en Draft)
+export async function removerCreditNoteAplicada(id: string, invoiceId: string) {
+  await client.delete(ENDPOINTS.creditNotes.removerAplicacion(id, invoiceId))
+}
+
+// GET /credit-notes/saldo-favor/:customerId
+export async function getCreditNoteSaldoFavor(customerId: string) {
+  const res = await client.get<{ success: true; data: CreditNoteSaldoFavorResult }>(
+    ENDPOINTS.creditNotes.saldoFavor(customerId),
+  )
   return unwrap(res)
 }
 

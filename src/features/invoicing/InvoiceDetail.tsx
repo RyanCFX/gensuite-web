@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getInvoice, submitInvoice, cancelInvoice, amendInvoice, downloadInvoicePdf, aplicarSaldoFavor } from '@/shared/api/invoices'
+import { getInvoice, submitInvoice, cancelInvoice, amendInvoice, downloadInvoicePdf, aplicarSaldoFavor, removerSaldoFavor } from '@/shared/api/invoices'
 import { getCustomer } from '@/shared/api/customers'
 import { getSaldoFavor } from '@/shared/api/cobros'
+import { getCreditNoteSaldoFavor, aplicarCreditNoteAFactura, removerCreditNoteAplicada } from '@/shared/api/notes'
 import { listMetodosPago } from '@/shared/api/config'
 import { createDevolucion } from '@/shared/api/devoluciones'
 import type { ApiError, SubmitInvoiceDto } from '@/shared/api/types'
-import { ArrowLeft, Send, XCircle, FileEdit, Download, AlertTriangle, Ban, Wallet, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Send, XCircle, FileEdit, Download, AlertTriangle, Ban, Wallet, RotateCcw, Receipt } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatDateTime, formatDOP, displayId } from '@/lib/formatters'
 import { NCF_TYPES } from '@/lib/constants'
@@ -65,7 +66,7 @@ export default function InvoiceDetail() {
   const { data: saldoFavor } = useQuery({
     queryKey: ['saldo-favor', invoice?.customer],
     queryFn: () => getSaldoFavor(invoice!.customer),
-    enabled: !!invoice?.customer && invoice.status === 'draft',
+    enabled: !!invoice?.customer && (invoice.status === 'draft' || invoice.status === 'submitted'),
   })
 
   const [saldoAmounts, setSaldoAmounts] = useState<Record<string, number>>({})
@@ -73,15 +74,81 @@ export default function InvoiceDetail() {
   const applySaldoMutation = useMutation({
     mutationFn: ({ paymentEntryId, amount }: { paymentEntryId: string; amount: number }) =>
       aplicarSaldoFavor(id!, { paymentEntryId, amount }),
-    onSuccess: () => {
+    onSuccess: (_updated, variables) => {
       queryClient.invalidateQueries({ queryKey: ['invoice', id] })
       queryClient.invalidateQueries({ queryKey: ['saldo-favor', invoice?.customer] })
-      toast.success('Saldo a favor aplicado')
+      toast.success(`Saldo a favor de ${formatDOP(variables.amount)} aplicado. Somete la factura para reconciliarlo.`)
     },
     onError: (err: { message?: string }) => {
       toast.error(err?.message ?? 'Error al aplicar el saldo a favor')
     },
   })
+
+  const removeSaldoMutation = useMutation({
+    mutationFn: (paymentEntryId: string) => removerSaldoFavor(id!, paymentEntryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      queryClient.invalidateQueries({ queryKey: ['saldo-favor', invoice?.customer] })
+      toast.success('Saldo a favor removido de esta factura')
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? 'Error al remover el saldo a favor')
+    },
+  })
+
+  const { data: creditNoteSaldo } = useQuery({
+    queryKey: ['credit-note-saldo-favor', invoice?.customer],
+    queryFn: () => getCreditNoteSaldoFavor(invoice!.customer),
+    enabled: !!invoice?.customer && (invoice.status === 'draft' || invoice.status === 'submitted'),
+  })
+
+  const [creditNoteAmounts, setCreditNoteAmounts] = useState<Record<string, number>>({})
+
+  const applyCreditNoteMutation = useMutation({
+    mutationFn: ({ creditNoteId, amount }: { creditNoteId: string; amount: number }) =>
+      aplicarCreditNoteAFactura(creditNoteId, { invoiceId: id!, amount }),
+    onSuccess: (_updated, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      queryClient.invalidateQueries({ queryKey: ['credit-note-saldo-favor', invoice?.customer] })
+      toast.success(`Nota de crédito de ${formatDOP(variables.amount)} aplicada. Somete la factura para reconciliarla.`)
+    },
+    onError: (err: ApiError) => {
+      if (err?.statusCode === 409) {
+        // Ya estaba aplicada a esta factura (doble clic, reintento, o otra pestaña) — refrescar para reflejar el estado real
+        queryClient.invalidateQueries({ queryKey: ['credit-note-saldo-favor', invoice?.customer] })
+      }
+      toast.error(err?.message ?? 'Error al aplicar la nota de crédito')
+    },
+  })
+
+  const removeCreditNoteMutation = useMutation({
+    mutationFn: (creditNoteId: string) => removerCreditNoteAplicada(creditNoteId, id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      queryClient.invalidateQueries({ queryKey: ['credit-note-saldo-favor', invoice?.customer] })
+      toast.success('Nota de crédito removida de esta factura')
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? 'Error al remover la nota de crédito')
+    },
+  })
+
+  // Total del saldo a favor ya aplicado a ESTA factura (sum de appliedTo de todos los Payment Entry)
+  const creditoAplicadoSaldoFavor = (saldoFavor?.entries ?? []).reduce((sum, entry) => {
+    const applied = entry.appliedTo?.find((a) => a.invoiceId === id)
+    return sum + (applied?.allocatedAmount ?? 0)
+  }, 0)
+
+  // Total de notas de crédito ya aplicadas a ESTA factura
+  const creditoAplicadoNotas = (creditNoteSaldo?.entries ?? []).reduce((sum, entry) => {
+    const applied = entry.appliedTo?.find((a) => a.invoiceId === id)
+    return sum + (applied?.amount ?? 0)
+  }, 0)
+
+  const creditoAplicado = creditoAplicadoSaldoFavor + creditoAplicadoNotas
+  // Lo que realmente queda pendiente en esta factura (antes de someter) — el backend valida contra esto,
+  // no contra el grandTotal bruto, ya que puede haber crédito ya aplicado previamente.
+  const pendingAmount = invoice ? Math.max(0, invoice.grandTotal - creditoAplicado) : 0
 
   const noCredit = invoice?.status === 'draft' && customer?.hasCredit === false
   const showCashSelector = noCredit || payCash
@@ -418,14 +485,6 @@ export default function InvoiceDetail() {
           {invoice.status === 'submitted' && (
             <div style={{ paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: 24 }}>
               <div className="detail-field">
-                <span className="detail-label">Subtotal</span>
-                <span className="detail-value">{formatDOP(invoice.subtotal)}</span>
-              </div>
-              <div className="detail-field">
-                <span className="detail-label">Total</span>
-                <span className="detail-value" style={{ fontSize: 18, fontWeight: 700 }}>{formatDOP(invoice.grandTotal)}</span>
-              </div>
-              <div className="detail-field">
                 <span className="detail-label">Pendiente</span>
                 <span className="detail-value" style={{ fontWeight: 700, color: outstandingColor }}>{formatDOP(invoice.outstandingAmount)}</span>
               </div>
@@ -451,68 +510,236 @@ export default function InvoiceDetail() {
         </div>
       </div>
 
-      {invoice.status === 'draft' && saldoFavor && saldoFavor.balance > 0 && (
+      {invoice.status === 'draft' && saldoFavor && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header">
             <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Wallet size={16} /> Aplicar saldo a favor disponible
             </h2>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-              Total disponible: {formatDOP(saldoFavor.balance)}
-            </span>
+            {saldoFavor.entries.length && (
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                Total disponible: {formatDOP(saldoFavor.balance)}
+              </span>
+            )}
           </div>
-          <div className="table-scroll">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Origen</th>
-                  <th>Fecha</th>
-                  <th>Método</th>
-                  <th style={{ textAlign: 'right' }}>Disponible</th>
-                  <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
-                  <th style={{ width: 100 }} />
-                </tr>
-              </thead>
-              <tbody>
-                {saldoFavor.entries.map((entry) => (
-                  <tr key={entry.paymentEntryId}>
-                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{entry.paymentEntryId}</td>
-                    <td>{formatDate(entry.postingDate)}</td>
-                    <td>{entry.modeOfPayment}</td>
-                    <td style={{ textAlign: 'right' }}>{formatDOP(entry.unallocatedAmount)}</td>
-                    <td>
-                      <input
-                        className="items-input"
-                        type="number"
-                        min="0.01"
-                        max={entry.unallocatedAmount}
-                        step="0.01"
-                        style={{ textAlign: 'right' }}
-                        value={saldoAmounts[entry.paymentEntryId] ?? entry.unallocatedAmount}
-                        onChange={(e) => setSaldoAmounts((prev) => ({ ...prev, [entry.paymentEntryId]: parseFloat(e.target.value) || 0 }))}
-                      />
-                    </td>
-                    <td>
-                      <button
-                        className="btn btn-secondary btn-size-sm"
-                        disabled={applySaldoMutation.isPending}
-                        onClick={() => {
-                          const amount = saldoAmounts[entry.paymentEntryId] ?? entry.unallocatedAmount
-                          if (!amount || amount <= 0 || amount > entry.unallocatedAmount) {
-                            toast.error('El monto debe ser mayor a 0 y no exceder el saldo disponible')
-                            return
-                          }
-                          applySaldoMutation.mutate({ paymentEntryId: entry.paymentEntryId, amount })
-                        }}
-                      >
-                        Aplicar
-                      </button>
-                    </td>
+          {!saldoFavor.entries.length ? (
+            <div className="card-body">
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+                Este cliente no tiene saldo a favor disponible.
+              </p>
+            </div>
+          ) : (
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Origen</th>
+                    <th>Fecha</th>
+                    <th>Método</th>
+                    <th style={{ textAlign: 'right' }}>Disponible</th>
+                    <th style={{ textAlign: 'right' }}>Comprometido</th>
+                    <th style={{ textAlign: 'right' }}>Disponible neto</th>
+                    <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
+                    <th style={{ width: 140 }} />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {saldoFavor.entries.map((entry) => {
+                    const defaultAmount = Math.min(entry.availableAmount, pendingAmount || entry.availableAmount)
+                    const fullyCommitted = entry.availableAmount <= 0.01
+                    const appliedToThisInvoice = entry.appliedTo?.find((a) => a.invoiceId === id)
+                    return (
+                      <tr key={entry.paymentEntryId}>
+                        <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{entry.paymentEntryId}</td>
+                        <td>{formatDate(entry.postingDate)}</td>
+                        <td>{entry.modeOfPayment}</td>
+                        <td style={{ textAlign: 'right' }}>{formatDOP(entry.unallocatedAmount)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatDOP(entry.committedAmount)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatDOP(entry.availableAmount)}</td>
+                        <td>
+                          {!fullyCommitted && (
+                            <input
+                              className="items-input"
+                              type="number"
+                              min="0.01"
+                              max={entry.availableAmount}
+                              step="0.01"
+                              style={{ textAlign: 'right' }}
+                              value={saldoAmounts[entry.paymentEntryId] ?? defaultAmount}
+                              onChange={(e) => setSaldoAmounts((prev) => ({ ...prev, [entry.paymentEntryId]: parseFloat(e.target.value) || 0 }))}
+                            />
+                          )}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                            {fullyCommitted && (
+                              <span className="badge badge-neutral" style={{ whiteSpace: 'nowrap' }}>100% comprometido</span>
+                            )}
+                            {!fullyCommitted && (
+                              <button
+                                className="btn btn-secondary btn-size-sm"
+                                disabled={applySaldoMutation.isPending}
+                                onClick={() => {
+                                  const amount = saldoAmounts[entry.paymentEntryId] ?? defaultAmount
+                                  if (!amount || amount <= 0 || amount > entry.availableAmount) {
+                                    toast.error('El monto debe ser mayor a 0 y no exceder el saldo disponible')
+                                    return
+                                  }
+                                  applySaldoMutation.mutate({ paymentEntryId: entry.paymentEntryId, amount })
+                                }}
+                              >
+                                Aplicar
+                              </button>
+                            )}
+                            {appliedToThisInvoice && (
+                              <button
+                                className="btn btn-ghost btn-size-sm"
+                                style={{ color: 'var(--color-error, var(--error-text))' }}
+                                disabled={removeSaldoMutation.isPending}
+                                onClick={() => removeSaldoMutation.mutate(entry.paymentEntryId)}
+                                title={`Aplicado a esta factura: ${formatDOP(appliedToThisInvoice.allocatedAmount)}`}
+                              >
+                                Deshacer
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {invoice.status === 'draft' && creditNoteSaldo && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header">
+            <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Receipt size={16} /> Notas de crédito
+            </h2>
+            {creditNoteSaldo.balance > 0 && (
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                Total disponible: {formatDOP(creditNoteSaldo.balance)}
+              </span>
+            )}
           </div>
+          {creditNoteSaldo.entries.length === 0 ? (
+            <div className="card-body">
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+                Este cliente no tiene notas de crédito disponibles.
+              </p>
+            </div>
+          ) : (
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>NCF</th>
+                    <th>Fecha</th>
+                    <th style={{ textAlign: 'right' }}>Total</th>
+                    <th style={{ textAlign: 'right' }}>Reembolsado</th>
+                    <th style={{ textAlign: 'right' }}>Aplicado</th>
+                    <th style={{ textAlign: 'right' }}>Disponible</th>
+                    <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
+                    <th style={{ width: 140 }} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {creditNoteSaldo.entries.map((entry) => {
+                    const defaultAmount = Math.min(entry.availableAmount, pendingAmount || entry.availableAmount)
+                    const fullyUsed = entry.availableAmount <= 0.01
+                    const appliedToThisInvoice = entry.appliedTo?.find((a) => a.invoiceId === id)
+                    return (
+                      <tr key={entry.creditNoteId}>
+                        <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{entry.ncf ?? entry.creditNoteId}</td>
+                        <td>{formatDate(entry.postingDate)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatDOP(entry.grandTotal)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatDOP(entry.refundedAmount)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatDOP(entry.appliedAmount)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatDOP(entry.availableAmount)}</td>
+                        <td>
+                          {!fullyUsed && !appliedToThisInvoice && (
+                            <input
+                              className="items-input"
+                              type="number"
+                              min="0.01"
+                              max={entry.availableAmount}
+                              step="0.01"
+                              style={{ textAlign: 'right' }}
+                              value={creditNoteAmounts[entry.creditNoteId] ?? defaultAmount}
+                              onChange={(e) => setCreditNoteAmounts((prev) => ({ ...prev, [entry.creditNoteId]: parseFloat(e.target.value) || 0 }))}
+                            />
+                          )}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                            {fullyUsed && !appliedToThisInvoice && (
+                              <span className="badge badge-neutral" style={{ whiteSpace: 'nowrap' }}>Agotada</span>
+                            )}
+                            {!fullyUsed && !appliedToThisInvoice && (
+                              <button
+                                className="btn btn-secondary btn-size-sm"
+                                disabled={applyCreditNoteMutation.isPending}
+                                onClick={() => {
+                                  const amount = creditNoteAmounts[entry.creditNoteId] ?? defaultAmount
+                                  if (!amount || amount <= 0 || amount > entry.availableAmount) {
+                                    toast.error('El monto debe ser mayor a 0 y no exceder el saldo disponible')
+                                    return
+                                  }
+                                  applyCreditNoteMutation.mutate({ creditNoteId: entry.creditNoteId, amount })
+                                }}
+                              >
+                                Aplicar
+                              </button>
+                            )}
+                            {appliedToThisInvoice && (
+                              <>
+                                <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                                  Aplicado: {formatDOP(appliedToThisInvoice.amount)}
+                                </span>
+                                <button
+                                  className="btn btn-ghost btn-size-sm"
+                                  style={{ color: 'var(--color-error, var(--error-text))' }}
+                                  disabled={removeCreditNoteMutation.isPending}
+                                  onClick={() => removeCreditNoteMutation.mutate(entry.creditNoteId)}
+                                  title="Deshacer aplicación — para cambiar el monto, deshaz y vuelve a aplicar"
+                                >
+                                  Quitar
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {invoice.status === 'submitted' && invoice.outstandingAmount > 0 && saldoFavor && saldoFavor.balance > 0 && (
+        <div className="inline-alert" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Wallet size={16} />
+          <span>
+            Este cliente tiene {formatDOP(saldoFavor.balance)} de saldo a favor disponible, pero solo se puede aplicar a facturas en borrador.
+            Esta funcionalidad para facturas sometidas aún no está disponible.
+          </span>
+        </div>
+      )}
+
+      {invoice.status === 'submitted' && invoice.outstandingAmount > 0 && creditNoteSaldo && creditNoteSaldo.balance > 0 && (
+        <div className="inline-alert" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Receipt size={16} />
+          <span>
+            Este cliente tiene {formatDOP(creditNoteSaldo.balance)} en notas de crédito disponibles, pero solo se pueden aplicar a facturas en borrador.
+            Esta funcionalidad para facturas sometidas aún no está disponible.
+          </span>
         </div>
       )}
 
@@ -564,14 +791,23 @@ export default function InvoiceDetail() {
                 <>
                   <div className="items-total-line"><span>Subtotal bruto</span><span>{formatDOP(gross)}</span></div>
                   {discount > 0 && <div className="items-total-line" style={{ color: 'var(--text-danger)' }}><span>Descuento total</span><span>-{formatDOP(discount)}</span></div>}
-                  <div className="items-total-line"><span>Subtotal neto</span><span>{formatDOP(invoice.subtotal)}</span></div>
                 </>
               )
             })()}
+            <div className="items-total-line"><span>Impuestos</span><span>{formatDOP(invoice.grandTotal - invoice.subtotal)}</span></div>
+            {creditoAplicado > 0 && (
+              <div className="items-total-line" style={{ color: 'var(--color-success)' }}><span>Crédito</span><span>-{formatDOP(creditoAplicado)}</span></div>
+            )}
             <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
               <span>Total</span>
               <span>{formatDOP(invoice.grandTotal)}</span>
             </div>
+            {creditoAplicado > 0 && (
+              <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
+                <span>Total después de crédito</span>
+                <span>{formatDOP(invoice.grandTotal - creditoAplicado)}</span>
+              </div>
+            )}
             {invoice.status === 'submitted' && (
               <div className="items-total-line" style={{ color: outstandingColor, fontWeight: 600 }}>
                 <span>Pendiente</span>

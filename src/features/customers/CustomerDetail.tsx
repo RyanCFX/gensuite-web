@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getCustomer, deleteCustomer } from '@/shared/api/customers'
 import { getSemaforoByCustomer, getSaldoFavor } from '@/shared/api/cobros'
+import { getInvoice } from '@/shared/api/invoices'
+import { getCreditNoteSaldoFavor, removerCreditNoteAplicada } from '@/shared/api/notes'
 import { client } from '@/shared/api/client'
 import type { Invoice } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { Pencil, Ban, Building2, User, ArrowLeft, Wallet } from 'lucide-react'
+import { Pencil, Ban, Building2, User, ArrowLeft, Wallet, Receipt, X } from 'lucide-react'
 
 function SemaforoIndicator({ customerId }: { customerId: string }) {
   const { data: entry } = useQuery({
@@ -60,6 +62,124 @@ function SaldoFavorIndicator({ customerId }: { customerId: string }) {
           <Wallet size={16} style={{ color: 'var(--success-text)' }} />
           <span style={{ fontWeight: 500 }}>Saldo a favor: {formatDOP(saldo.balance)}</span>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function CreditNotesIndicator({ customerId }: { customerId: string }) {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+
+  const { data: saldo } = useQuery({
+    queryKey: ['credit-note-saldo-favor', customerId],
+    queryFn: () => getCreditNoteSaldoFavor(customerId),
+    retry: false,
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: ({ creditNoteId, invoiceId }: { creditNoteId: string; invoiceId: string }) =>
+      removerCreditNoteAplicada(creditNoteId, invoiceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['credit-note-saldo-favor', customerId] })
+      toast.success('Nota de crédito removida de esa factura')
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? 'Error al remover la nota de crédito — solo se puede deshacer mientras la factura destino siga en Borrador')
+    },
+  })
+
+  const appliedInvoiceIds = Array.from(
+    new Set((saldo?.entries ?? []).flatMap((entry) => entry.appliedTo.map((a) => a.invoiceId))),
+  )
+
+  const invoiceStatusQueries = useQueries({
+    queries: appliedInvoiceIds.map((invoiceId) => ({
+      queryKey: ['invoice', invoiceId],
+      queryFn: () => getInvoice(invoiceId),
+    })),
+  })
+
+  const invoiceStatusById = Object.fromEntries(
+    appliedInvoiceIds.map((invoiceId, i) => [invoiceId, invoiceStatusQueries[i]?.data?.status]),
+  )
+
+  if (!saldo || saldo.entries.length === 0) return null
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card-header">
+        <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Receipt size={16} style={{ color: 'var(--success-text)' }} /> Notas de Crédito
+        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {saldo.balance > 0 && (
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              Disponible: {formatDOP(saldo.balance)}
+            </span>
+          )}
+          <button className="btn btn-ghost btn-size-sm" onClick={() => navigate('/facturacion/notas-credito')}>
+            Ver todas
+          </button>
+        </div>
+      </div>
+      <div className="table-scroll">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>NCF</th>
+              <th>Fecha</th>
+              <th style={{ textAlign: 'right' }}>Total</th>
+              <th style={{ textAlign: 'right' }}>Reembolsado</th>
+              <th style={{ textAlign: 'right' }}>Disponible</th>
+              <th>Aplicada a</th>
+            </tr>
+          </thead>
+          <tbody>
+            {saldo.entries.map((entry) => (
+              <tr key={entry.creditNoteId}>
+                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{entry.ncf ?? entry.creditNoteId}</td>
+                <td className="td-muted">{formatDate(entry.postingDate)}</td>
+                <td style={{ textAlign: 'right' }}>{formatDOP(entry.grandTotal)}</td>
+                <td style={{ textAlign: 'right' }}>{formatDOP(entry.refundedAmount)}</td>
+                <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(entry.availableAmount)}</td>
+                <td>
+                  {entry.appliedTo.length === 0 ? (
+                    <span className="td-dim">—</span>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {entry.appliedTo.map((a) => {
+                        const invoiceStatus = invoiceStatusById[a.invoiceId]
+                        const canUndo = invoiceStatus === 'draft'
+                        return (
+                        <div key={a.invoiceId} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                          <span>
+                            <button
+                              style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+                              onClick={() => navigate(`/facturacion/facturas/${a.invoiceId}`)}
+                            >
+                              {a.invoiceId}
+                            </button>
+                            {' '}— {formatDOP(a.amount)}
+                          </span>
+                          <button
+                            className="btn btn-ghost btn-size-icon-sm"
+                            title={canUndo ? 'Deshacer' : 'Solo se puede deshacer mientras la factura siga en Borrador'}
+                            disabled={!canUndo || removeMutation.isPending}
+                            onClick={() => removeMutation.mutate({ creditNoteId: entry.creditNoteId, invoiceId: a.invoiceId })}
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   )
@@ -202,6 +322,7 @@ export default function CustomerDetail() {
 
       {customer.hasCredit && id && <SemaforoIndicator customerId={id} />}
       {id && <SaldoFavorIndicator customerId={id} />}
+      {id && <CreditNotesIndicator customerId={id} />}
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">

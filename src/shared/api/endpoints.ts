@@ -21,6 +21,7 @@ export const ENDPOINTS = {
     pdf: (id: string) => `/invoices/${id}/pdf`,
     version: (id: string, seq: number) => `/invoices/${id}/versions/${seq}`,
     aplicarSaldoFavor: (id: string) => `/invoices/${id}/aplicar-saldo-favor`,
+    removerSaldoFavor: (id: string, paymentEntryId: string) => `/invoices/${id}/aplicar-saldo-favor/${paymentEntryId}`,
   },
   quotations: {
     list: '/quotations',
@@ -38,6 +39,9 @@ export const ENDPOINTS = {
     byId: (id: string) => `/credit-notes/${id}`,
     submit: (id: string) => `/credit-notes/${id}/submit`,
     refund: (id: string) => `/credit-notes/${id}/refund`,
+    aplicarAFactura: (id: string) => `/credit-notes/${id}/aplicar-a-factura`,
+    removerAplicacion: (id: string, invoiceId: string) => `/credit-notes/${id}/aplicar-a-factura/${invoiceId}`,
+    saldoFavor: (customerId: string) => `/credit-notes/saldo-favor/${customerId}`,
   },
   devoluciones: {
     create: '/devoluciones',

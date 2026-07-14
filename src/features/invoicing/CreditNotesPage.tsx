@@ -5,11 +5,15 @@ import {
   createCreditNote,
   submitCreditNote,
   refundCreditNote,
+  aplicarCreditNoteAFactura,
+  removerCreditNoteAplicada,
+  getCreditNoteSaldoFavor,
 } from '@/shared/api/notes'
-import { listInvoices } from '@/shared/api/invoices'
+import { listInvoices, getInvoice } from '@/shared/api/invoices'
 import { listMetodosPago } from '@/shared/api/config'
-import type { Invoice, CreateCreditNoteDto } from '@/shared/api/types'
-import { Plus, Loader2, Wallet } from 'lucide-react'
+import type { Invoice, CreateCreditNoteDto, ApiError } from '@/shared/api/types'
+import { Plus, Loader2, Wallet, ArrowRightLeft } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -25,12 +29,14 @@ interface NoteItem {
 
 interface CreditNoteRow {
   id: string
-  originalInvoice: string
+  /** Factura contra la que se emitió esta nota — el campo real de la API es `returnAgainst`, no `originalInvoice` */
+  returnAgainst: string
   invoiceName?: string
   customerName?: string
-  date?: string
+  postingDate?: string
+  /** Viene negativo desde la API (es una factura de signo invertido) — usar Math.abs() para mostrarlo/aplicarlo como monto */
   grandTotal?: number
-  status: 'Draft' | 'Submitted' | 'Cancelled'
+  status: string
   reason?: string
   items: NoteItem[]
   /** true si ya fue reembolsada en efectivo/transferencia; false = sigue como saldo a favor pendiente */
@@ -43,19 +49,21 @@ interface NoteLineItem {
   rate: number
 }
 
+// El backend devuelve el status en minúscula ("submitted"), no en Title Case.
 const STATUS_BADGE: Record<string, string> = {
-  Draft: 'badge-draft',
-  Submitted: 'badge-submitted',
-  Cancelled: 'badge-cancelled',
+  draft: 'badge-draft',
+  submitted: 'badge-submitted',
+  cancelled: 'badge-cancelled',
 }
 const STATUS_LABEL: Record<string, string> = {
-  Draft: 'Borrador',
-  Submitted: 'Sometido',
-  Cancelled: 'Cancelado',
+  draft: 'Borrador',
+  submitted: 'Sometido',
+  cancelled: 'Cancelado',
 }
 
 export default function CreditNotesPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [modalOpen, setModalOpen] = useState(false)
   const { orderBy, sort } = useSortState()
 
@@ -67,6 +75,13 @@ export default function CreditNotesPage() {
   const [refundTarget, setRefundTarget] = useState<CreditNoteRow | null>(null)
   const [refundAmount, setRefundAmount] = useState(0)
   const [refundModeOfPayment, setRefundModeOfPayment] = useState('')
+
+  // ── Aplicar a factura / convertir a saldo a favor ─────────────────────────
+  const [applyTarget, setApplyTarget] = useState<CreditNoteRow | null>(null)
+  const [applyInvoiceId, setApplyInvoiceId] = useState('')
+  const [applyInvoiceLabel, setApplyInvoiceLabel] = useState('')
+  const [applyInvoiceQuery, setApplyInvoiceQuery] = useState('')
+  const [applyAmount, setApplyAmount] = useState(0)
 
   const { data: notesData, isLoading } = useQuery({
     queryKey: ['credit-notes', orderBy],
@@ -131,9 +146,101 @@ export default function CreditNotesPage() {
 
   function openRefundModal(note: CreditNoteRow) {
     setRefundTarget(note)
-    setRefundAmount(note.grandTotal ?? 0)
+    setRefundAmount(Math.abs(note.grandTotal ?? 0))
     setRefundModeOfPayment('')
   }
+
+  // La nota de crédito no expone el `customer` directamente — lo obtenemos de su factura original.
+  const { data: applyOriginalInvoice } = useQuery({
+    queryKey: ['invoice', applyTarget?.returnAgainst],
+    queryFn: () => getInvoice(applyTarget!.returnAgainst),
+    enabled: !!applyTarget,
+  })
+
+  const { data: applyInvoicesData, isLoading: applyInvoicesLoading } = useQuery({
+    queryKey: ['invoices-for-credit-apply', applyOriginalInvoice?.customer, applyInvoiceQuery],
+    queryFn: () => listInvoices({ customer: applyOriginalInvoice!.customer, search: applyInvoiceQuery || undefined, status: 'all', limit: 20 }),
+    enabled: !!applyTarget && !!applyOriginalInvoice?.customer,
+  })
+
+  const applyInvoiceOptions: SearchSelectOption[] = (applyInvoicesData?.items ?? []).map((inv) => ({
+    value: inv.id,
+    label: inv.ncf ?? inv.id,
+    sublabel: `${formatDate(inv.postingDate)} — ${formatDOP(inv.grandTotal)} (${inv.status})`,
+  }))
+
+  // Para saber si applyTarget ya está aplicada a la factura seleccionada (evita el 409 del backend)
+  const { data: applyCreditNoteSaldo } = useQuery({
+    queryKey: ['credit-note-saldo-favor', applyOriginalInvoice?.customer],
+    queryFn: () => getCreditNoteSaldoFavor(applyOriginalInvoice!.customer),
+    enabled: !!applyTarget && !!applyOriginalInvoice?.customer,
+  })
+
+  const applyTargetEntry = applyCreditNoteSaldo?.entries.find((e) => e.creditNoteId === applyTarget?.id)
+  const alreadyAppliedToSelected = applyInvoiceId
+    ? applyTargetEntry?.appliedTo.find((a) => a.invoiceId === applyInvoiceId)
+    : undefined
+  const selectedApplyInvoiceStatus = applyInvoicesData?.items.find((i) => i.id === applyInvoiceId)?.status
+  const canUndoApply = selectedApplyInvoiceStatus === 'draft'
+
+  const applyMutation = useMutation({
+    mutationFn: () => aplicarCreditNoteAFactura(applyTarget!.id, {
+      invoiceId: applyInvoiceId,
+      amount: applyAmount || undefined,
+    }),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
+      queryClient.invalidateQueries({ queryKey: ['invoice', result.id] })
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      toast.success('Aplicado a la factura correctamente')
+      navigate(`/facturacion/facturas/${result.id}`)
+      closeApplyModal()
+    },
+    onError: (err: ApiError) => {
+      if (err?.statusCode === 400) {
+        toast.error('Selecciona una factura destino para aplicar la nota de crédito')
+        return
+      }
+      if (err?.statusCode === 409) {
+        toast.error(err.message)
+        queryClient.invalidateQueries({ queryKey: ['credit-note-saldo-favor', applyOriginalInvoice?.customer] })
+        return
+      }
+      toast.error(err?.message ?? 'Error al aplicar la nota de crédito')
+    },
+  })
+
+  const removeApplyMutation = useMutation({
+    mutationFn: () => removerCreditNoteAplicada(applyTarget!.id, applyInvoiceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-note-saldo-favor', applyOriginalInvoice?.customer] })
+      queryClient.invalidateQueries({ queryKey: ['invoice', applyInvoiceId] })
+      toast.success('Aplicación deshecha — ya puedes volver a aplicar con un nuevo monto')
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? 'Error al deshacer la aplicación — solo es posible mientras la factura siga en Borrador')
+    },
+  })
+
+  function openApplyModal(note: CreditNoteRow) {
+    setApplyTarget(note)
+    setApplyInvoiceId('')
+    setApplyInvoiceLabel('')
+    setApplyInvoiceQuery('')
+    setApplyAmount(Math.abs(note.grandTotal ?? 0))
+  }
+
+  function closeApplyModal() {
+    setApplyTarget(null)
+    setApplyInvoiceId('')
+    setApplyInvoiceLabel('')
+    setApplyInvoiceQuery('')
+    setApplyAmount(0)
+  }
+
+  const applyAmountValid = applyAmount > 0
+  const canConfirmApply = applyAmountValid && !!applyInvoiceId && !alreadyAppliedToSelected
 
   function closeRefundModal() {
     setRefundTarget(null)
@@ -141,7 +248,7 @@ export default function CreditNotesPage() {
     setRefundModeOfPayment('')
   }
 
-  const refundAmountValid = refundAmount > 0 && refundAmount <= (refundTarget?.grandTotal ?? 0)
+  const refundAmountValid = refundAmount > 0 && refundAmount <= Math.abs(refundTarget?.grandTotal ?? 0)
   const canConfirmRefund = refundAmountValid && !!refundModeOfPayment
 
   function updateNoteItem(index: number, patch: Partial<NoteLineItem>) {
@@ -214,20 +321,22 @@ export default function CreditNotesPage() {
                 </td>
               </tr>
             ) : (
-              notes.map((note) => (
+              notes.map((note) => {
+                const statusLower = (note.status ?? '').toLowerCase()
+                return (
                 <tr key={note.id}>
                   <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.id}</td>
-                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.originalInvoice}</td>
+                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.returnAgainst}</td>
                   <td>{note.customerName ?? '—'}</td>
-                  <td>{formatDate(note.date)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(note.grandTotal)}</td>
+                  <td>{formatDate(note.postingDate)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(Math.abs(note.grandTotal ?? 0))}</td>
                   <td>
-                    <span className={`badge ${STATUS_BADGE[note.status] ?? 'badge-neutral'}`}>
-                      {STATUS_LABEL[note.status] ?? note.status}
+                    <span className={`badge ${STATUS_BADGE[statusLower] ?? 'badge-neutral'}`}>
+                      {STATUS_LABEL[statusLower] ?? note.status}
                     </span>
                   </td>
                   <td>
-                    {note.status !== 'Submitted' ? (
+                    {statusLower !== 'submitted' ? (
                       <span className="td-dim">—</span>
                     ) : note.refunded ? (
                       <span className="badge badge-success">Reembolsada</span>
@@ -240,11 +349,18 @@ export default function CreditNotesPage() {
                         >
                           <Wallet size={13} /> Reembolsar
                         </button>
+                        <button
+                          className="btn btn-ghost btn-size-sm"
+                          onClick={() => openApplyModal(note)}
+                        >
+                          <ArrowRightLeft size={13} /> Aplicar a factura
+                        </button>
                       </div>
                     )}
                   </td>
                 </tr>
-              ))
+                )
+              })
             )}
           </tbody>
         </table>
@@ -376,7 +492,7 @@ export default function CreditNotesPage() {
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                {refundTarget.id} — Total disponible: {formatDOP(refundTarget.grandTotal)}
+                {refundTarget.id} — Total disponible: {formatDOP(Math.abs(refundTarget.grandTotal ?? 0))}
               </p>
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="refundAmount">Monto a reembolsar</label>
@@ -385,13 +501,13 @@ export default function CreditNotesPage() {
                   className={`ff-input${!refundAmountValid ? ' items-input-error' : ''}`}
                   type="number"
                   min="0.01"
-                  max={refundTarget.grandTotal}
+                  max={Math.abs(refundTarget.grandTotal ?? 0)}
                   step="0.01"
                   value={refundAmount || ''}
                   onChange={(e) => setRefundAmount(parseFloat(e.target.value) || 0)}
                 />
                 {!refundAmountValid && (
-                  <p className="ff-hint" style={{ color: 'red' }}>El monto debe ser mayor a 0 y no exceder {formatDOP(refundTarget.grandTotal)}</p>
+                  <p className="ff-hint" style={{ color: 'red' }}>El monto debe ser mayor a 0 y no exceder {formatDOP(Math.abs(refundTarget.grandTotal ?? 0))}</p>
                 )}
               </div>
               <div className="ff-wrap">
@@ -419,6 +535,96 @@ export default function CreditNotesPage() {
                 {refundMutation.isPending && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
                 <Wallet size={14} /> Confirmar reembolso
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {applyTarget && (
+        <div className="modal-overlay" onClick={closeApplyModal}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <ArrowRightLeft size={16} /> Aplicar nota de crédito
+              </h2>
+              <button className="modal-close" onClick={closeApplyModal}>×</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                {applyTarget.id} — Total de la nota: {formatDOP(Math.abs(applyTarget.grandTotal ?? 0))}
+              </p>
+
+              <div className="ff-wrap">
+                <label className="ff-label ff-required">Factura destino</label>
+                <SearchSelect
+                  value={applyInvoiceId}
+                  selectedLabel={applyInvoiceLabel}
+                  onChange={(val, opt) => {
+                    setApplyInvoiceId(val)
+                    setApplyInvoiceLabel(opt?.label ?? '')
+                  }}
+                  options={applyInvoiceOptions}
+                  onSearch={setApplyInvoiceQuery}
+                  loading={applyInvoicesLoading}
+                  placeholder="Buscar factura del cliente…"
+                  error={!applyInvoiceId}
+                />
+                <p className="ff-hint">
+                  Se aplicará directamente a la factura seleccionada.
+                </p>
+                {!applyInvoiceId && (
+                  <p className="ff-hint" style={{ color: 'red' }}>Selecciona una factura destino</p>
+                )}
+              </div>
+
+              {alreadyAppliedToSelected ? (
+                <div className="inline-alert" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Wallet size={16} />
+                  <span>
+                    Esta nota ya está aplicada a esta factura por {formatDOP(alreadyAppliedToSelected.amount)}.
+                    Para cambiar el monto, deshaz la aplicación y vuelve a aplicarla.
+                  </span>
+                </div>
+              ) : (
+                <div className="ff-wrap">
+                  <label className="ff-label ff-required" htmlFor="applyAmount">Monto a aplicar</label>
+                  <input
+                    id="applyAmount"
+                    className={`ff-input${!applyAmountValid ? ' items-input-error' : ''}`}
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={applyAmount || ''}
+                    onChange={(e) => setApplyAmount(parseFloat(e.target.value) || 0)}
+                  />
+                  <p className="ff-hint">
+                    Prellenado con el total de la nota — si excede el saldo restante realmente disponible (ya sea porque hay reembolsos o conversiones previas), el sistema te lo indicará.
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={closeApplyModal}>Cancelar</button>
+              {alreadyAppliedToSelected ? (
+                <button
+                  className="btn btn-danger"
+                  onClick={() => removeApplyMutation.mutate()}
+                  disabled={!canUndoApply || removeApplyMutation.isPending}
+                  title={canUndoApply ? undefined : 'Solo se puede deshacer mientras la factura siga en Borrador'}
+                >
+                  {removeApplyMutation.isPending && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
+                  Deshacer aplicación
+                </button>
+              ) : (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => applyMutation.mutate()}
+                  disabled={!canConfirmApply || applyMutation.isPending}
+                >
+                  {applyMutation.isPending && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
+                  Aplicar a factura
+                </button>
+              )}
             </div>
           </div>
         </div>
