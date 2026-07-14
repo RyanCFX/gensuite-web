@@ -135,7 +135,8 @@ export default function PedidoDetail() {
   const subtotal = pedido.items.reduce((s, i) => s + i.amount, 0)
   const grossTotal = pedido.items.reduce((s, i) => s + i.qty * i.rate, 0)
   const totalDiscount = grossTotal - subtotal
-  const total = subtotal
+  const taxAmount = pedido.taxAmount ?? 0
+  const total = pedido.grandTotal ?? subtotal + taxAmount
 
   return (
     <div className="page-container">
@@ -293,6 +294,7 @@ export default function PedidoDetail() {
                 <th style={{ textAlign: 'right' }}>Precio Unit.</th>
                 <th style={{ textAlign: 'right', width: 72 }}>Dto. %</th>
                 <th style={{ textAlign: 'right' }}>Importe</th>
+                <th style={{ textAlign: 'right' }}>Impuesto</th>
                 <th>UDM</th>
               </tr>
             </thead>
@@ -303,16 +305,10 @@ export default function PedidoDetail() {
                   <td>{item.description || '—'}</td>
                   <td style={{ fontSize: 12, color: 'var(--text-tertiary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.notes ?? ''}>{item.notes ?? '—'}</td>
                   <td style={{ textAlign: 'right' }}>{item.qty}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    {item.discountPct && item.discountPct > 0 ? (
-                      <>
-                        <span style={{ textDecoration: 'line-through', color: 'var(--text-tertiary)', marginRight: 4 }}>{formatDOP(item.rate)}</span>
-                        {formatDOP(item.discountedRate ?? item.rate)}
-                      </>
-                    ) : formatDOP(item.rate)}
-                  </td>
+                  <td style={{ textAlign: 'right' }}>{formatDOP(item.rate)}</td>
                   <td style={{ textAlign: 'right' }}>{item.discountPct ? `${item.discountPct}%` : '—'}</td>
                   <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
+                  <td style={{ textAlign: 'right' }} title={`${item.taxRate}%`}>{formatDOP(item.taxAmount)}</td>
                   <td>{item.uom || '—'}</td>
                 </tr>
               ))}
@@ -321,7 +317,8 @@ export default function PedidoDetail() {
           <div className="items-total-row">
             <div className="items-total-line"><span>Subtotal bruto</span><span>{formatDOP(grossTotal)}</span></div>
             {totalDiscount > 0 && <div className="items-total-line" style={{ color: 'var(--text-danger)' }}><span>Descuento total</span><span>-{formatDOP(totalDiscount)}</span></div>}
-            <div className="items-total-line"><span>Subtotal neto</span><span>{formatDOP(subtotal)}</span></div>
+            {/*<div className="items-total-line"><span>Subtotal neto</span><span>{formatDOP(subtotal)}</span></div>*/}
+            <div className="items-total-line"><span>Impuesto</span><span>{formatDOP(taxAmount)}</span></div>
             <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}><span>Total</span><span>{formatDOP(total)}</span></div>
           </div>
         </div>

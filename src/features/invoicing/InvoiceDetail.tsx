@@ -700,15 +700,23 @@ export default function InvoiceDetail() {
                                 <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                                   Aplicado: {formatDOP(appliedToThisInvoice.amount)}
                                 </span>
-                                <button
-                                  className="btn btn-ghost btn-size-sm"
-                                  style={{ color: 'var(--color-error, var(--error-text))' }}
-                                  disabled={removeCreditNoteMutation.isPending}
-                                  onClick={() => removeCreditNoteMutation.mutate(entry.creditNoteId)}
-                                  title="Deshacer aplicación — para cambiar el monto, deshaz y vuelve a aplicar"
+                                <span
+                                  className={`badge ${appliedToThisInvoice.status === 'reconciled' ? 'badge-success' : 'badge-warning'}`}
+                                  style={{ whiteSpace: 'nowrap' }}
                                 >
-                                  Quitar
-                                </button>
+                                  {appliedToThisInvoice.status === 'reconciled' ? 'Reconciliada' : 'Pendiente'}
+                                </span>
+                                {appliedToThisInvoice.status === 'pending' && (
+                                  <button
+                                    className="btn btn-ghost btn-size-sm"
+                                    style={{ color: 'var(--color-error, var(--error-text))' }}
+                                    disabled={removeCreditNoteMutation.isPending}
+                                    onClick={() => removeCreditNoteMutation.mutate(entry.creditNoteId)}
+                                    title="Deshacer aplicación — para cambiar el monto, deshaz y vuelve a aplicar"
+                                  >
+                                    Quitar
+                                  </button>
+                                )}
                               </>
                             )}
                           </div>

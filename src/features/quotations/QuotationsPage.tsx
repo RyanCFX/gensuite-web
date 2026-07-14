@@ -154,7 +154,7 @@ export default function QuotationsPage() {
               </tr>
             ) : (
               quotations.map((q) => {
-                const itemTotal = q.items.reduce((s, i) => s + i.amount, 0)
+                const itemTotal = q.grandTotal ?? q.items.reduce((s, i) => s + i.amount, 0) + (q.taxAmount ?? 0)
                 return (
                   <tr
                     key={q.id}

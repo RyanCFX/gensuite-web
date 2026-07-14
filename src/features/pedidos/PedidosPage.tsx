@@ -159,7 +159,7 @@ export default function PedidosPage() {
               </tr>
             ) : (
               pedidos.map((p) => {
-                const itemTotal = p.items.reduce((s, i) => s + i.amount, 0)
+                const itemTotal = p.grandTotal ?? p.items.reduce((s, i) => s + i.amount, 0) + (p.taxAmount ?? 0)
                 return (
                   <tr
                     key={p.id}

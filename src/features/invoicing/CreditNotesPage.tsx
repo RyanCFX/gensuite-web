@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   listCreditNotes,
@@ -11,8 +11,8 @@ import {
 } from '@/shared/api/notes'
 import { listInvoices, getInvoice } from '@/shared/api/invoices'
 import { listMetodosPago } from '@/shared/api/config'
-import type { Invoice, CreateCreditNoteDto, ApiError } from '@/shared/api/types'
-import { Plus, Loader2, Wallet, ArrowRightLeft } from 'lucide-react'
+import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo } from '@/shared/api/types'
+import { Plus, Loader2, Wallet, ArrowRightLeft, ChevronDown, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { formatDate, formatDOP } from '@/lib/formatters'
@@ -41,6 +41,11 @@ interface CreditNoteRow {
   items: NoteItem[]
   /** true si ya fue reembolsada en efectivo/transferencia; false = sigue como saldo a favor pendiente */
   refunded?: boolean
+  /** Los siguientes solo vienen presentes para notas ya Sometidas */
+  refundedAmount?: number
+  appliedAmount?: number
+  availableAmount?: number
+  appliedTo?: CreditNoteAppliedTo[]
 }
 
 interface NoteLineItem {
@@ -49,22 +54,30 @@ interface NoteLineItem {
   rate: number
 }
 
-// El backend devuelve el status en minúscula ("submitted"), no en Title Case.
+// El backend devuelve el status en minúscula. Una vez Sometida, `status` deja de ser "submitted"
+// y pasa a ser el resumen de uso (available/partially_used/fully_used).
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
   submitted: 'badge-submitted',
   cancelled: 'badge-cancelled',
+  available: 'badge-success',
+  partially_used: 'badge-warning',
+  fully_used: 'badge-neutral',
 }
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Borrador',
   submitted: 'Sometido',
   cancelled: 'Cancelado',
+  available: 'Disponible',
+  partially_used: 'Parcialmente usada',
+  fully_used: 'Agotada',
 }
 
 export default function CreditNotesPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [modalOpen, setModalOpen] = useState(false)
+  const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null)
   const { orderBy, sort } = useSortState()
 
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
@@ -95,6 +108,20 @@ export default function CreditNotesPage() {
     staleTime: 5 * 60_000,
   })
 
+  // El listado de facturas (GET /invoices) no incluye `items[]` — solo el detalle (GET /invoices/:id) lo tiene.
+  // Se necesita el detalle completo para poder poblar/editar los artículos a devolver.
+  const { data: selectedInvoiceDetail } = useQuery({
+    queryKey: ['invoice', selectedInvoiceId],
+    queryFn: () => getInvoice(selectedInvoiceId),
+    enabled: !!selectedInvoiceId,
+  })
+
+  useEffect(() => {
+    if (selectedInvoiceDetail && selectedInvoiceDetail.id === selectedInvoiceId) {
+      setNoteItems(selectedInvoiceDetail.items.map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate })))
+    }
+  }, [selectedInvoiceDetail, selectedInvoiceId])
+
   const { data: invoicesData, isLoading: invoicesLoading } = useQuery({
     queryKey: ['invoices-submitted', invoiceQuery],
     queryFn: () => listInvoices({ status: 'submitted', search: invoiceQuery || undefined, limit: 20 }),
@@ -109,6 +136,11 @@ export default function CreditNotesPage() {
     sublabel: (inv.ncf ?? inv.id) + ' — ' + formatDate(inv.postingDate),
   }))
   const notes = (Array.isArray(notesData) ? notesData : []) as unknown as CreditNoteRow[]
+
+  // Artículos de la factura original que aún no están en la nota (para poder re-agregarlos tras quitarlos)
+  const availableToAdd = (selectedInvoiceDetail?.items ?? []).filter(
+    (i) => !noteItems.some((n) => n.itemCode === i.itemCode),
+  )
 
   const createMutation = useMutation({
     mutationFn: (dto: CreateCreditNoteDto) => createCreditNote(dto) as unknown as Promise<CreditNoteRow>,
@@ -157,9 +189,26 @@ export default function CreditNotesPage() {
     enabled: !!applyTarget,
   })
 
+  // Facturas destino válidas: en Draft (sin paymentStatus aún) o Sometidas con saldo pendiente
+  // (unpaid/partial) — no tiene sentido ofrecer una factura ya paid como destino.
   const { data: applyInvoicesData, isLoading: applyInvoicesLoading } = useQuery({
     queryKey: ['invoices-for-credit-apply', applyOriginalInvoice?.customer, applyInvoiceQuery],
-    queryFn: () => listInvoices({ customer: applyOriginalInvoice!.customer, search: applyInvoiceQuery || undefined, status: 'all', limit: 20 }),
+    queryFn: async () => {
+      const customer = applyOriginalInvoice!.customer
+      const search = applyInvoiceQuery || undefined
+      const [draft, unpaid, partial] = await Promise.all([
+        listInvoices({ customer, search, status: 'draft', limit: 20 }),
+        listInvoices({ customer, search, status: 'submitted', paymentStatus: 'unpaid', limit: 20 }),
+        listInvoices({ customer, search, status: 'submitted', paymentStatus: 'partial', limit: 20 }),
+      ])
+      const seen = new Set<string>()
+      const items = [...draft.items, ...unpaid.items, ...partial.items].filter((inv) => {
+        if (seen.has(inv.id)) return false
+        seen.add(inv.id)
+        return true
+      })
+      return { items, meta: draft.meta }
+    },
     enabled: !!applyTarget && !!applyOriginalInvoice?.customer,
   })
 
@@ -180,8 +229,7 @@ export default function CreditNotesPage() {
   const alreadyAppliedToSelected = applyInvoiceId
     ? applyTargetEntry?.appliedTo.find((a) => a.invoiceId === applyInvoiceId)
     : undefined
-  const selectedApplyInvoiceStatus = applyInvoicesData?.items.find((i) => i.id === applyInvoiceId)?.status
-  const canUndoApply = selectedApplyInvoiceStatus === 'draft'
+  const canUndoApply = alreadyAppliedToSelected?.status === 'pending'
 
   const applyMutation = useMutation({
     mutationFn: () => aplicarCreditNoteAFactura(applyTarget!.id, {
@@ -290,6 +338,7 @@ export default function CreditNotesPage() {
         <table className="data-table">
           <thead>
             <tr>
+              <th style={{ width: 28 }} />
               <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} />
               <th>Factura Original</th>
               <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} />
@@ -303,14 +352,14 @@ export default function CreditNotesPage() {
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 7 }).map((__, j) => (
+                  {Array.from({ length: 8 }).map((__, j) => (
                     <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                   ))}
                 </tr>
               ))
             ) : notes.length === 0 ? (
               <tr>
-                <td colSpan={7}>
+                <td colSpan={8}>
                   <div className="empty-state">
                     <div className="empty-title">Sin notas de crédito</div>
                     <p className="empty-sub">Crea una nota de crédito para procesar una devolución.</p>
@@ -323,8 +372,25 @@ export default function CreditNotesPage() {
             ) : (
               notes.map((note) => {
                 const statusLower = (note.status ?? '').toLowerCase()
+                // Estos campos solo vienen presentes una vez Sometida la nota.
+                const isSubmittedWithUsageInfo = note.availableAmount !== undefined
+                const hasAppliedTo = (note.appliedTo?.length ?? 0) > 0
+                const isExpanded = expandedNoteId === note.id
+                const canAct = isSubmittedWithUsageInfo && (note.availableAmount ?? 0) > 0
                 return (
-                <tr key={note.id}>
+                <Fragment key={note.id}>
+                <tr>
+                  <td>
+                    {hasAppliedTo && (
+                      <button
+                        className="btn btn-ghost btn-size-icon-sm"
+                        onClick={() => setExpandedNoteId(isExpanded ? null : note.id)}
+                        title="Ver facturas aplicadas"
+                      >
+                        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      </button>
+                    )}
+                  </td>
                   <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.id}</td>
                   <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.returnAgainst}</td>
                   <td>{note.customerName ?? '—'}</td>
@@ -336,29 +402,57 @@ export default function CreditNotesPage() {
                     </span>
                   </td>
                   <td>
-                    {statusLower !== 'submitted' ? (
+                    {!isSubmittedWithUsageInfo ? (
                       <span className="td-dim">—</span>
-                    ) : note.refunded ? (
-                      <span className="badge badge-success">Reembolsada</span>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span className="badge badge-warning">Saldo a favor disponible</span>
-                        <button
-                          className="btn btn-ghost btn-size-sm"
-                          onClick={() => openRefundModal(note)}
-                        >
-                          <Wallet size={13} /> Reembolsar
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-size-sm"
-                          onClick={() => openApplyModal(note)}
-                        >
-                          <ArrowRightLeft size={13} /> Aplicar a factura
-                        </button>
+                        {note.refunded && (
+                          <span className="badge badge-success">Reembolsada: {formatDOP(note.refundedAmount ?? 0)}</span>
+                        )}
+                        {canAct && (
+                          <>
+                            <button
+                              className="btn btn-ghost btn-size-sm"
+                              onClick={() => openRefundModal(note)}
+                            >
+                              <Wallet size={13} /> Reembolsar
+                            </button>
+                            <button
+                              className="btn btn-ghost btn-size-sm"
+                              onClick={() => openApplyModal(note)}
+                            >
+                              <ArrowRightLeft size={13} /> Aplicar a factura
+                            </button>
+                          </>
+                        )}
                       </div>
                     )}
                   </td>
                 </tr>
+                {isExpanded && hasAppliedTo && (
+                  <tr>
+                    <td />
+                    <td colSpan={7} style={{ padding: '0 0 12px 12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {note.appliedTo!.map((a) => (
+                          <div key={a.invoiceId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                            <button
+                              style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+                              onClick={() => navigate(`/facturacion/facturas/${a.invoiceId}`)}
+                            >
+                              {a.invoiceId}
+                            </button>
+                            <span>— {formatDOP(a.amount)}</span>
+                            <span className={`badge ${a.status === 'reconciled' ? 'badge-success' : 'badge-warning'}`}>
+                              {a.status === 'reconciled' ? 'Reconciliada' : 'Pendiente'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
                 )
               })
             )}
@@ -382,16 +476,8 @@ export default function CreditNotesPage() {
                     value={selectedInvoiceId}
                     onChange={(id, _opt) => {
                       setSelectedInvoiceId(id)
-                      if (!id) {
-                        setSelectedInvoice(null)
-                        setNoteItems([])
-                      } else {
-                        const inv = submittedInvoices.find((i) => i.id === id) ?? null
-                        setSelectedInvoice(inv)
-                        if (inv) {
-                          setNoteItems(inv.items.map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate })))
-                        }
-                      }
+                      setNoteItems([])
+                      setSelectedInvoice(id ? (submittedInvoices.find((i) => i.id === id) ?? null) : null)
                     }}
                     options={invoiceOptions}
                     onSearch={setInvoiceQuery}
@@ -421,9 +507,35 @@ export default function CreditNotesPage() {
                   />
                 </div>
 
-                {noteItems.length > 0 && (
-                  <div>
-                    <label className="ff-label">Artículos a devolver</label>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <label className="ff-label" style={{ margin: 0 }}>Artículos a devolver</label>
+                    {selectedInvoice && availableToAdd.length > 0 && (
+                      <select
+                        className="ff-select"
+                        style={{ width: 240, height: 30 }}
+                        value=""
+                        onChange={(e) => {
+                          const item = selectedInvoiceDetail?.items.find((i) => i.itemCode === e.target.value)
+                          if (item) setNoteItems((prev) => [...prev, { itemCode: item.itemCode, qty: item.qty, rate: item.rate }])
+                        }}
+                      >
+                        <option value="">+ Agregar artículo…</option>
+                        {availableToAdd.map((i) => (
+                          <option key={i.itemCode} value={i.itemCode}>{i.itemCode}{i.description ? ` — ${i.description}` : ''}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  {noteItems.length === 0 ? (
+                    <p className="ff-hint">
+                      {!selectedInvoice
+                        ? 'Selecciona primero la factura original para poder elegir sus artículos.'
+                        : selectedInvoiceDetail?.id !== selectedInvoiceId
+                          ? 'Cargando artículos de la factura…'
+                          : 'Agrega al menos un artículo de la factura usando el selector de arriba.'}
+                    </p>
+                  ) : (
                     <div className="items-table-wrap" style={{ marginTop: 4 }}>
                       <table className="items-table">
                         <thead>
@@ -466,8 +578,8 @@ export default function CreditNotesPage() {
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
               <div className="modal-foot">
                 <button type="button" className="btn btn-ghost" onClick={handleCloseModal}>Cancelar</button>
@@ -581,8 +693,14 @@ export default function CreditNotesPage() {
                 <div className="inline-alert" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Wallet size={16} />
                   <span>
-                    Esta nota ya está aplicada a esta factura por {formatDOP(alreadyAppliedToSelected.amount)}.
-                    Para cambiar el monto, deshaz la aplicación y vuelve a aplicarla.
+                    Esta nota ya está aplicada a esta factura por {formatDOP(alreadyAppliedToSelected.amount)}
+                    {' '}
+                    <span className={`badge ${alreadyAppliedToSelected.status === 'reconciled' ? 'badge-success' : 'badge-warning'}`}>
+                      {alreadyAppliedToSelected.status === 'reconciled' ? 'Reconciliada' : 'Pendiente'}
+                    </span>
+                    {alreadyAppliedToSelected.status === 'pending'
+                      ? '. Para cambiar el monto, deshaz la aplicación y vuelve a aplicarla.'
+                      : '. Ya fue reconciliada contra la factura sometida — no se puede deshacer.'}
                   </span>
                 </div>
               ) : (
@@ -610,7 +728,7 @@ export default function CreditNotesPage() {
                   className="btn btn-danger"
                   onClick={() => removeApplyMutation.mutate()}
                   disabled={!canUndoApply || removeApplyMutation.isPending}
-                  title={canUndoApply ? undefined : 'Solo se puede deshacer mientras la factura siga en Borrador'}
+                  title={canUndoApply ? undefined : 'Ya reconciliada — no se puede deshacer'}
                 >
                   {removeApplyMutation.isPending && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
                   Deshacer aplicación

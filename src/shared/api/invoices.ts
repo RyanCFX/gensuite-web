@@ -16,7 +16,7 @@ export interface ListInvoicesParams extends PaginationParams {
   status?: 'draft' | 'submitted' | 'cancelled' | 'all'
   fromDate?: string
   toDate?: string
-  paymentStatus?: 'paid' | 'unpaid' | 'partly_paid' | 'overdue'
+  paymentStatus?: 'paid' | 'unpaid' | 'partial' | 'overdue'
   ncfType?: string
   branch?: string
 }

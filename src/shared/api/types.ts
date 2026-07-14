@@ -226,6 +226,8 @@ export interface Invoice {
   cancellationReason?: string
   cancelledBy?: string
   cancelledAt?: string
+  /** Notas de crédito enlazadas mientras esta factura sigue en Draft (sin efecto contable aún) — se vacía sola al someter */
+  pendingCreditNotes?: { creditNoteId: string; amount: number }[]
 }
 
 export interface CreateInvoiceDto {
@@ -270,6 +272,8 @@ export interface QuotationItem {
   amount: number
   uom: string
   notes?: string
+  taxRate: number
+  taxAmount: number
 }
 
 export interface Quotation {
@@ -286,6 +290,7 @@ export interface Quotation {
   sequence: number
   history?: AmendmentEntry[]
   grandTotal?: number
+  taxAmount?: number
   message?: string
 }
 
@@ -328,7 +333,11 @@ export interface DuplicateQuotationSource {
 
 export interface CreditNote {
   id: string
-  status: 'Draft' | 'Submitted' | 'Cancelled'
+  /**
+   * 'Draft' | 'Cancelled' se mantienen literales. Una vez Sometida, el backend reemplaza el valor
+   * por un resumen de uso listo para badge — ya no llega 'Submitted' en ese caso.
+   */
+  status: 'Draft' | 'Submitted' | 'Cancelled' | 'available' | 'partially_used' | 'fully_used'
   originalInvoice: string
   reason?: string
   grandTotal: number
@@ -337,6 +346,11 @@ export interface CreditNote {
   createdAt: string
   /** true si ya fue reembolsada en efectivo/transferencia; false = sigue como saldo a favor pendiente */
   refunded?: boolean
+  /** Los siguientes solo vienen presentes para notas ya Sometidas (Draft no los incluye) */
+  refundedAmount?: number
+  appliedAmount?: number
+  availableAmount?: number
+  appliedTo?: CreditNoteAppliedTo[]
 }
 
 export interface CreateCreditNoteDto {
@@ -369,8 +383,11 @@ export type AplicarCreditNoteResult = Invoice
 // GET /credit-notes/saldo-favor/:customerId
 export interface CreditNoteAppliedTo {
   invoiceId: string
-  paymentEntryId: string
   amount: number
+  /** 'pending' = factura destino aún en Draft (enlace sin efecto contable); 'reconciled' = factura sometida y ya reconciliada contra ERPNext */
+  status: 'pending' | 'reconciled'
+  /** Journal Entry real de la reconciliación — solo presente cuando status === 'reconciled' */
+  journalEntryId: string | null
 }
 
 export interface CreditNoteSaldoFavorEntry {
@@ -380,8 +397,6 @@ export interface CreditNoteSaldoFavorEntry {
   grandTotal: number
   refundedAmount: number
   appliedAmount: number
-  /** Caso raro: convertido a crédito pero sin aplicar a ninguna factura (ej. tras deshacer una aplicación) */
-  unappliedConvertedAmount: number
   availableAmount: number
   appliedTo: CreditNoteAppliedTo[]
 }
@@ -588,7 +603,7 @@ export interface AmendmentEntry {
   status: string
   total?: number
   grandTotal?: number
-  items?: Array<{ itemCode: string; description: string; qty: number; rate: number; amount: number; notes?: string }>
+  items?: Array<{ itemCode: string; description: string; qty: number; rate: number; amount: number; notes?: string; taxRate?: number; taxAmount?: number }>
   amendedFrom?: string | null
   createdAt?: string
   sequence?: number
@@ -610,6 +625,8 @@ export interface PedidoItem {
   uom?: string
   discountPct?: number
   notes?: string
+  taxRate: number
+  taxAmount: number
 }
 
 export interface Pedido {
@@ -629,6 +646,8 @@ export interface Pedido {
   facturaId?: string
   createdAt: string
   modifiedAt: string
+  grandTotal?: number
+  taxAmount?: number
   /** Apartado (layaway) — presentes cuando isLayaway === true */
   isLayaway?: boolean
   layawayVencido?: boolean

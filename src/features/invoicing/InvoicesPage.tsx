@@ -11,7 +11,7 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 
 type StatusFilter = 'draft' | 'submitted' | 'cancelled' | 'all'
-type PaymentFilter = 'paid' | 'unpaid' | 'partly_paid' | 'overdue' | 'all'
+type PaymentFilter = 'paid' | 'unpaid' | 'partial' | 'overdue' | 'all'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -125,7 +125,7 @@ export default function InvoicesPage() {
           <select className="filter-select" value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value as PaymentFilter)}>
             <option value="all">Todo estado pago</option>
             <option value="unpaid">Pendiente</option>
-            <option value="partly_paid">Parcial</option>
+            <option value="partial">Parcial</option>
             <option value="paid">Pagado</option>
             <option value="overdue">Vencido</option>
           </select>

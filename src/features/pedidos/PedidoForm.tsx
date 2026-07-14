@@ -523,7 +523,7 @@ export default function PedidoForm() {
             <div className="items-total-row">
               <div className="items-total-line"><span>Subtotal bruto</span><span>{formatDOP(grossTotal)}</span></div>
               {totalDiscount > 0 && <div className="items-total-line" style={{ color: 'var(--text-danger)' }}><span>Descuento total</span><span>-{formatDOP(totalDiscount)}</span></div>}
-              <div className="items-total-line"><span>Subtotal neto</span><span>{formatDOP(subtotal)}</span></div>
+              {/*<div className="items-total-line"><span>Subtotal neto</span><span>{formatDOP(subtotal)}</span></div>*/}
               <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}><span>Total</span><span>{formatDOP(total)}</span></div>
             </div>
           </div>

@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getCustomer, deleteCustomer } from '@/shared/api/customers'
 import { getSemaforoByCustomer, getSaldoFavor } from '@/shared/api/cobros'
-import { getInvoice } from '@/shared/api/invoices'
 import { getCreditNoteSaldoFavor, removerCreditNoteAplicada } from '@/shared/api/notes'
 import { client } from '@/shared/api/client'
 import type { Invoice } from '@/shared/api/types'
@@ -89,21 +88,6 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
     },
   })
 
-  const appliedInvoiceIds = Array.from(
-    new Set((saldo?.entries ?? []).flatMap((entry) => entry.appliedTo.map((a) => a.invoiceId))),
-  )
-
-  const invoiceStatusQueries = useQueries({
-    queries: appliedInvoiceIds.map((invoiceId) => ({
-      queryKey: ['invoice', invoiceId],
-      queryFn: () => getInvoice(invoiceId),
-    })),
-  })
-
-  const invoiceStatusById = Object.fromEntries(
-    appliedInvoiceIds.map((invoiceId, i) => [invoiceId, invoiceStatusQueries[i]?.data?.status]),
-  )
-
   if (!saldo || saldo.entries.length === 0) return null
 
   return (
@@ -149,8 +133,7 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {entry.appliedTo.map((a) => {
-                        const invoiceStatus = invoiceStatusById[a.invoiceId]
-                        const canUndo = invoiceStatus === 'draft'
+                        const canUndo = a.status === 'pending'
                         return (
                         <div key={a.invoiceId} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
                           <span>
@@ -162,14 +145,19 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
                             </button>
                             {' '}— {formatDOP(a.amount)}
                           </span>
-                          <button
-                            className="btn btn-ghost btn-size-icon-sm"
-                            title={canUndo ? 'Deshacer' : 'Solo se puede deshacer mientras la factura siga en Borrador'}
-                            disabled={!canUndo || removeMutation.isPending}
-                            onClick={() => removeMutation.mutate({ creditNoteId: entry.creditNoteId, invoiceId: a.invoiceId })}
-                          >
-                            <X size={12} />
-                          </button>
+                          <span className={`badge ${a.status === 'reconciled' ? 'badge-success' : 'badge-warning'}`} style={{ whiteSpace: 'nowrap' }}>
+                            {a.status === 'reconciled' ? 'Reconciliada' : 'Pendiente'}
+                          </span>
+                          {canUndo && (
+                            <button
+                              className="btn btn-ghost btn-size-icon-sm"
+                              title="Deshacer"
+                              disabled={removeMutation.isPending}
+                              onClick={() => removeMutation.mutate({ creditNoteId: entry.creditNoteId, invoiceId: a.invoiceId })}
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
                         </div>
                         )
                       })}

@@ -125,7 +125,8 @@ export default function QuotationDetail() {
   const subtotal = quotation.items.reduce((s, i) => s + i.amount, 0)
   const grossTotal = quotation.items.reduce((s, i) => s + i.qty * i.rate, 0)
   const totalDiscount = grossTotal - subtotal
-  const total = subtotal
+  const taxAmount = quotation.taxAmount ?? 0
+  const total = quotation.grandTotal ?? subtotal + taxAmount
 
   return (
     <div className="page-container">
@@ -285,6 +286,7 @@ export default function QuotationDetail() {
                 <th style={{ textAlign: 'right' }}>Precio Unit.</th>
                 <th style={{ textAlign: 'right', width: 72 }}>Dto. %</th>
                 <th style={{ textAlign: 'right' }}>Importe</th>
+                <th style={{ textAlign: 'right' }}>Impuesto</th>
                 <th>UDM</th>
               </tr>
             </thead>
@@ -305,6 +307,7 @@ export default function QuotationDetail() {
                   </td>
                   <td style={{ textAlign: 'right' }}>{item.discountPct ? `${item.discountPct}%` : '—'}</td>
                   <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
+                  <td style={{ textAlign: 'right' }} title={`${item.taxRate}%`}>{formatDOP(item.taxAmount)}</td>
                   <td>{item.uom || '—'}</td>
                 </tr>
               ))}
@@ -321,9 +324,13 @@ export default function QuotationDetail() {
                 <span>-{formatDOP(totalDiscount)}</span>
               </div>
             )}
-            <div className="items-total-line">
+            {/*<div className="items-total-line">
               <span>Subtotal neto</span>
               <span>{formatDOP(subtotal)}</span>
+            </div>*/}
+            <div className="items-total-line">
+              <span>Impuesto</span>
+              <span>{formatDOP(taxAmount)}</span>
             </div>
             <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
               <span>Total</span>

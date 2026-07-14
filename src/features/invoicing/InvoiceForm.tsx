@@ -630,10 +630,10 @@ export default function InvoiceForm() {
                   <span>-{formatDOP(totalDiscount)}</span>
                 </div>
               )}
-              <div className="items-total-line">
+              {/*<div className="items-total-line">
                 <span>Subtotal neto</span>
                 <span>{formatDOP(subtotal)}</span>
-              </div>
+              </div>*/}
               {taxTotal > 0 && (
                 <div className="items-total-line" style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
                   <span>Impuesto</span>
