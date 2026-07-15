@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, Fragment } from 'react'
 import { useNavigate, useLocation, useOutlet } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Package, FileText, Receipt, Warehouse,
@@ -628,7 +628,9 @@ function AppLayoutInner() {
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {multiTab
               ? <KeepAlive activeCacheKey={activeTabPath} max={15} cacheNodeRef={keepAliveRef}>{outlet}</KeepAlive>
-              : outlet
+              // Sin multipestañas, cada navegación debe partir de cero — se fuerza remount
+              // con la key de la navegación para no arrastrar estado (filtros, formularios) de la vista anterior.
+              : <Fragment key={location.key}>{outlet}</Fragment>
             }
           </div>
         </main>
