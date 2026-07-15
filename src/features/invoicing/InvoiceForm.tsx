@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { createInvoice } from '@/shared/api/invoices'
@@ -91,6 +91,8 @@ export default function InvoiceForm() {
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
   const [submitted, setSubmitted] = useState(false)
   const [branch, setBranch] = useState('')
+  const [ncfTypeSearch, setNcfTypeSearch] = useState('')
+  const [branchSearch, setBranchSearch] = useState('')
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
@@ -138,13 +140,31 @@ export default function InvoiceForm() {
     enabled: isSystemManager,
     staleTime: 60_000,
   })
-  const branchOptions = isSystemManager
-    ? (allSucursales?.items.map((s) => s.name) ?? [])
-    : (myBranches?.branches ?? [])
+  const branchOptions = useMemo(
+    () => (isSystemManager ? (allSucursales?.items.map((s) => s.name) ?? []) : (myBranches?.branches ?? [])),
+    [isSystemManager, allSucursales, myBranches],
+  )
+
+  const branchSelectOptions: SearchSelectOption[] = useMemo(() => {
+    const q = branchSearch.toLowerCase()
+    return branchOptions
+      .filter((b) => !q || b.toLowerCase().includes(q))
+      .map((b) => ({ value: b, label: b }))
+  }, [branchOptions, branchSearch])
+
+  const ncfTypeOptions: SearchSelectOption[] = useMemo(() => {
+    const q = ncfTypeSearch.toLowerCase()
+    return NCF_TYPES.filter((t) => !q || t.label.toLowerCase().includes(q))
+  }, [ncfTypeSearch])
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
   }, [myBranches])
+
+  // Si solo hay una sucursal disponible, se selecciona sola y el select se bloquea.
+  useEffect(() => {
+    if (branchOptions.length === 1 && branch !== branchOptions[0]) setBranch(branchOptions[0])
+  }, [branchOptions, branch])
 
   const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
     value: c.id,
@@ -470,16 +490,15 @@ export default function InvoiceForm() {
 
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="ncfType">Tipo NCF</label>
-                <select
+                <SearchSelect
                   id="ncfType"
-                  className="ff-select"
                   value={ncfType}
-                  onChange={(e) => setNcfType(e.target.value as NcfType)}
-                >
-                  {NCF_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
+                  selectedLabel={NCF_TYPES.find((t) => t.value === ncfType)?.label ?? ''}
+                  onChange={(val) => setNcfType((val || 'B02') as NcfType)}
+                  options={ncfTypeOptions}
+                  onSearch={setNcfTypeSearch}
+                  className="ff-select"
+                />
                 {ncfType === 'B01' && !selectedCustomer?.rnc && (
                   <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
                     B01 requiere RNC del cliente
@@ -489,12 +508,17 @@ export default function InvoiceForm() {
 
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="branch">Sucursal</label>
-                <select id="branch" className="ff-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
-                  <option value="">Sin especificar</option>
-                  {branchOptions.map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
+                <SearchSelect
+                  id="branch"
+                  value={branch}
+                  selectedLabel={branch}
+                  onChange={(val) => setBranch(val)}
+                  options={branchSelectOptions}
+                  onSearch={setBranchSearch}
+                  placeholder="Sin especificar"
+                  className="ff-select"
+                  disabled={branchOptions.length === 1}
+                />
               </div>
             </div>
 

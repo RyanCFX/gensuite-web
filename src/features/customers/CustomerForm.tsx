@@ -148,7 +148,16 @@ export default function CustomerForm() {
 
   const hasCredit = watch('hasCredit')
   const isGovernment = watch('isGovernment')
+  const customerType = watch('customerType')
   const customerGroup = watch('customerGroup')
+
+  // Si el cliente es Empresa, la identificación siempre es RNC — se fuerza y se bloquea el selector.
+  useEffect(() => {
+    if (customerType === 'Company' && idType !== 'RNC') {
+      setIdType('RNC')
+      setValue('cedula', '')
+    }
+  }, [customerType, idType, setValue])
   const [groupQuery, setGroupQuery] = useState('')
   const [groupLabel, setGroupLabel] = useState('')
   const filteredGroups = (groupsData ?? []).filter((g) => !groupQuery || g.name.toLowerCase().includes(groupQuery.toLowerCase()))
@@ -244,6 +253,7 @@ export default function CustomerForm() {
                     { value: 'NIT', label: 'NIT (extranjero)' },
                   ]}
                   selectedLabel={idType ? ID_TYPE_LABELS[idType] : ''}
+                  disabled={customerType === 'Company'}
                   onSearch={() => {}}
                   placeholder="Seleccionar…"
                 />

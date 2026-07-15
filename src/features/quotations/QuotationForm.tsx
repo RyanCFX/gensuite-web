@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -95,6 +95,7 @@ export default function QuotationForm() {
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
   const [initialized, setInitialized] = useState(false)
   const [branch, setBranch] = useState('')
+  const [branchSearch, setBranchSearch] = useState('')
 
   // ── Load existing quotation when editing ─────────────────────────────────
   const { data: existingQuotation, isLoading: loadingQuotation } = useQuery({
@@ -209,9 +210,17 @@ export default function QuotationForm() {
     enabled: isSystemManager,
     staleTime: 60_000,
   })
-  const branchOptions = isSystemManager
-    ? (allSucursales?.items.map((s) => s.name) ?? [])
-    : (myBranches?.branches ?? [])
+  const branchOptions = useMemo(
+    () => (isSystemManager ? (allSucursales?.items.map((s) => s.name) ?? []) : (myBranches?.branches ?? [])),
+    [isSystemManager, allSucursales, myBranches],
+  )
+
+  const branchSelectOptions: SearchSelectOption[] = useMemo(() => {
+    const q = branchSearch.toLowerCase()
+    return branchOptions
+      .filter((b) => !q || b.toLowerCase().includes(q))
+      .map((b) => ({ value: b, label: b }))
+  }, [branchOptions, branchSearch])
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch && !isEdit) setBranch(myBranches.defaultBranch)
@@ -529,12 +538,16 @@ export default function QuotationForm() {
 
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="branch">Sucursal</label>
-                <select id="branch" className="ff-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
-                  <option value="">Sin especificar</option>
-                  {branchOptions.map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
+                <SearchSelect
+                  id="branch"
+                  value={branch}
+                  selectedLabel={branch}
+                  onChange={(val) => setBranch(val)}
+                  options={branchSelectOptions}
+                  onSearch={setBranchSearch}
+                  placeholder="Sin especificar"
+                  className="ff-select"
+                />
               </div>
             </div>
           </div>

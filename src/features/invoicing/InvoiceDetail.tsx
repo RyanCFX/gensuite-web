@@ -1,309 +1,489 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useParams, useNavigate } from 'react-router-dom'
-import { getInvoice, submitInvoice, cancelInvoice, amendInvoice, downloadInvoicePdf, aplicarSaldoFavor, removerSaldoFavor } from '@/shared/api/invoices'
-import { getCustomer } from '@/shared/api/customers'
-import { getSaldoFavor } from '@/shared/api/cobros'
-import { getCreditNoteSaldoFavor, aplicarCreditNoteAFactura, removerCreditNoteAplicada } from '@/shared/api/notes'
-import { listMetodosPago } from '@/shared/api/config'
-import { createDevolucion } from '@/shared/api/devoluciones'
-import type { ApiError, SubmitInvoiceDto } from '@/shared/api/types'
-import { ArrowLeft, Send, XCircle, FileEdit, Download, AlertTriangle, Ban, Wallet, RotateCcw, Receipt } from 'lucide-react'
-import { toast } from 'sonner'
-import { formatDate, formatDateTime, formatDOP, displayId } from '@/lib/formatters'
-import { NCF_TYPES } from '@/lib/constants'
-import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
+import { useState, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  getInvoice,
+  submitInvoice,
+  cancelInvoice,
+  amendInvoice,
+  downloadInvoicePdf,
+  aplicarSaldoFavor,
+  removerSaldoFavor,
+} from "@/shared/api/invoices";
+import { getCustomer } from "@/shared/api/customers";
+import { getSaldoFavor } from "@/shared/api/cobros";
+import {
+  getCreditNoteSaldoFavor,
+  aplicarCreditNoteAFactura,
+  removerCreditNoteAplicada,
+} from "@/shared/api/notes";
+import { listMetodosPago } from "@/shared/api/config";
+import { createDevolucion } from "@/shared/api/devoluciones";
+import type { ApiError, SubmitInvoiceDto } from "@/shared/api/types";
+import {
+  ArrowLeft,
+  Send,
+  XCircle,
+  FileEdit,
+  Download,
+  AlertTriangle,
+  Ban,
+  Wallet,
+  RotateCcw,
+  Receipt,
+} from "lucide-react";
+import { toast } from "sonner";
+import {
+  formatDate,
+  formatDateTime,
+  formatDOP,
+  displayId,
+} from "@/lib/formatters";
+import { NCF_TYPES } from "@/lib/constants";
+import { DocumentHistoryCard } from "@/components/shared/DocumentHistoryCard";
+import { SearchSelect } from "@/shared/ui/SearchSelect";
+import type { SearchSelectOption } from "@/shared/ui/SearchSelect";
+
+const CREDIT_NOTE_MODE_OF_PAYMENT = "Nota de crédito";
+
+const RETURN_RESOLUTION_OPTIONS: SearchSelectOption[] = [
+  { value: "credit_note_only", label: "Saldo a favor" },
+  { value: "refund", label: "Reembolsar ahora" },
+];
 
 const STATUS_BADGE: Record<string, string> = {
-  Draft: 'badge-draft',
-  Submitted: 'badge-submitted',
-  Cancelled: 'badge-cancelled',
-}
+  Draft: "badge-draft",
+  Submitted: "badge-submitted",
+  Cancelled: "badge-cancelled",
+};
 const STATUS_LABEL: Record<string, string> = {
-  Draft: 'Borrador',
-  Submitted: 'Sometido',
-  Cancelled: 'Cancelado',
-}
+  Draft: "Borrador",
+  Submitted: "Sometido",
+  Cancelled: "Cancelado",
+};
 
 export default function InvoiceDetail() {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const [payCash, setPayCash] = useState(false)
-  const [modeOfPayment, setModeOfPayment] = useState('')
-  const [creditErrorOpen, setCreditErrorOpen] = useState(false)
-  const [creditErrorMsg, setCreditErrorMsg] = useState('')
-  const [cancelModalOpen, setCancelModalOpen] = useState(false)
-  const [cancelReason, setCancelReason] = useState('')
-  const [cancelForbiddenMsg, setCancelForbiddenMsg] = useState('')
-  const [returnModalOpen, setReturnModalOpen] = useState(false)
-  const [returnFullInvoice, setReturnFullInvoice] = useState(true)
-  const [returnRows, setReturnRows] = useState<{ itemCode: string; description: string; qtyPurchased: number; qty: number; checked: boolean }[]>([])
-  const [returnResolution, setReturnResolution] = useState<'refund' | 'credit_note_only'>('credit_note_only')
-  const [returnModeOfPayment, setReturnModeOfPayment] = useState('')
-  const [returnReason, setReturnReason] = useState('')
+  const [payCash, setPayCash] = useState(false);
+  const [modeOfPayment, setModeOfPayment] = useState("");
+  const [creditErrorOpen, setCreditErrorOpen] = useState(false);
+  const [creditErrorMsg, setCreditErrorMsg] = useState("");
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelForbiddenMsg, setCancelForbiddenMsg] = useState("");
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnFullInvoice, setReturnFullInvoice] = useState(true);
+  const [returnRows, setReturnRows] = useState<
+    {
+      itemCode: string;
+      description: string;
+      qtyPurchased: number;
+      qty: number;
+      checked: boolean;
+    }[]
+  >([]);
+  const [returnResolution, setReturnResolution] = useState<
+    "refund" | "credit_note_only"
+  >("credit_note_only");
+  const [returnModeOfPayment, setReturnModeOfPayment] = useState("");
+  const [returnReason, setReturnReason] = useState("");
+
+  const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState("");
+  const [modeOfPaymentRetrySearch, setModeOfPaymentRetrySearch] = useState("");
+  const [returnResolutionSearch, setReturnResolutionSearch] = useState("");
+  const [returnModeOfPaymentSearch, setReturnModeOfPaymentSearch] =
+    useState("");
 
   const { data: invoice, isLoading } = useQuery({
-    queryKey: ['invoice', id],
+    queryKey: ["invoice", id],
     queryFn: () => getInvoice(id!),
     enabled: !!id,
-  })
+  });
 
   const { data: customer } = useQuery({
-    queryKey: ['customer', invoice?.customer],
+    queryKey: ["customer", invoice?.customer],
     queryFn: () => getCustomer(invoice!.customer),
-    enabled: !!invoice?.customer && invoice.status === 'draft',
-  })
+    enabled: !!invoice?.customer && invoice.status === "draft",
+  });
 
   const { data: metodos } = useQuery({
-    queryKey: ['metodos-pago'],
+    queryKey: ["metodos-pago"],
     queryFn: listMetodosPago,
-    enabled: invoice?.status === 'draft' || invoice?.status === 'submitted',
+    enabled: invoice?.status === "draft" || invoice?.status === "submitted",
     staleTime: 5 * 60_000,
-  })
+  });
+
+  const metodosOptions: SearchSelectOption[] = useMemo(() => {
+    const q = modeOfPaymentSearch.toLowerCase();
+    return (metodos ?? [])
+      .filter((m) => !m.disabled)
+      .filter((m) => !q || m.name.toLowerCase().includes(q))
+      .map((m) => ({ value: m.name, label: m.name }));
+  }, [metodos, modeOfPaymentSearch]);
+
+  const metodosRetryOptions: SearchSelectOption[] = useMemo(() => {
+    const q = modeOfPaymentRetrySearch.toLowerCase();
+    return (metodos ?? [])
+      .filter((m) => !m.disabled)
+      .filter((m) => !q || m.name.toLowerCase().includes(q))
+      .map((m) => ({ value: m.name, label: m.name }));
+  }, [metodos, modeOfPaymentRetrySearch]);
+
+  const returnModeOptions: SearchSelectOption[] = useMemo(() => {
+    const q = returnModeOfPaymentSearch.toLowerCase();
+    return (metodos ?? [])
+      .filter((m) => !m.disabled)
+      .filter((m) => !q || m.name.toLowerCase().includes(q))
+      .map((m) => ({ value: m.name, label: m.name }));
+  }, [metodos, returnModeOfPaymentSearch]);
+
+  const returnResolutionOptions: SearchSelectOption[] = useMemo(() => {
+    const q = returnResolutionSearch.toLowerCase();
+    return RETURN_RESOLUTION_OPTIONS.filter(
+      (o) => !q || o.label.toLowerCase().includes(q),
+    );
+  }, [returnResolutionSearch]);
 
   const { data: saldoFavor } = useQuery({
-    queryKey: ['saldo-favor', invoice?.customer],
+    queryKey: ["saldo-favor", invoice?.customer],
     queryFn: () => getSaldoFavor(invoice!.customer),
-    enabled: !!invoice?.customer && (invoice.status === 'draft' || invoice.status === 'submitted'),
-  })
+    enabled:
+      !!invoice?.customer &&
+      (invoice.status === "draft" || invoice.status === "submitted"),
+  });
 
-  const [saldoAmounts, setSaldoAmounts] = useState<Record<string, number>>({})
+  const [saldoAmounts, setSaldoAmounts] = useState<Record<string, number>>({});
 
   const applySaldoMutation = useMutation({
-    mutationFn: ({ paymentEntryId, amount }: { paymentEntryId: string; amount: number }) =>
-      aplicarSaldoFavor(id!, { paymentEntryId, amount }),
+    mutationFn: ({
+      paymentEntryId,
+      amount,
+    }: {
+      paymentEntryId: string;
+      amount: number;
+    }) => aplicarSaldoFavor(id!, { paymentEntryId, amount }),
     onSuccess: (_updated, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
-      queryClient.invalidateQueries({ queryKey: ['saldo-favor', invoice?.customer] })
-      toast.success(`Saldo a favor de ${formatDOP(variables.amount)} aplicado. Somete la factura para reconciliarlo.`)
+      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      queryClient.invalidateQueries({
+        queryKey: ["saldo-favor", invoice?.customer],
+      });
+      toast.success(
+        `Saldo a favor de ${formatDOP(variables.amount)} aplicado. Somete la factura para reconciliarlo.`,
+      );
     },
     onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al aplicar el saldo a favor')
+      toast.error(err?.message ?? "Error al aplicar el saldo a favor");
     },
-  })
+  });
 
   const removeSaldoMutation = useMutation({
-    mutationFn: (paymentEntryId: string) => removerSaldoFavor(id!, paymentEntryId),
+    mutationFn: (paymentEntryId: string) =>
+      removerSaldoFavor(id!, paymentEntryId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
-      queryClient.invalidateQueries({ queryKey: ['saldo-favor', invoice?.customer] })
-      toast.success('Saldo a favor removido de esta factura')
+      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      queryClient.invalidateQueries({
+        queryKey: ["saldo-favor", invoice?.customer],
+      });
+      toast.success("Saldo a favor removido de esta factura");
     },
     onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al remover el saldo a favor')
+      toast.error(err?.message ?? "Error al remover el saldo a favor");
     },
-  })
+  });
 
   const { data: creditNoteSaldo } = useQuery({
-    queryKey: ['credit-note-saldo-favor', invoice?.customer],
+    queryKey: ["credit-note-saldo-favor", invoice?.customer],
     queryFn: () => getCreditNoteSaldoFavor(invoice!.customer),
-    enabled: !!invoice?.customer && (invoice.status === 'draft' || invoice.status === 'submitted'),
-  })
+    enabled:
+      !!invoice?.customer &&
+      (invoice.status === "draft" || invoice.status === "submitted"),
+  });
 
-  const [creditNoteAmounts, setCreditNoteAmounts] = useState<Record<string, number>>({})
+  const [creditNoteAmounts, setCreditNoteAmounts] = useState<
+    Record<string, number>
+  >({});
 
   const applyCreditNoteMutation = useMutation({
-    mutationFn: ({ creditNoteId, amount }: { creditNoteId: string; amount: number }) =>
-      aplicarCreditNoteAFactura(creditNoteId, { invoiceId: id!, amount }),
+    mutationFn: ({
+      creditNoteId,
+      amount,
+    }: {
+      creditNoteId: string;
+      amount: number;
+    }) => aplicarCreditNoteAFactura(creditNoteId, { invoiceId: id!, amount }),
     onSuccess: (_updated, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
-      queryClient.invalidateQueries({ queryKey: ['credit-note-saldo-favor', invoice?.customer] })
-      toast.success(`Nota de crédito de ${formatDOP(variables.amount)} aplicada. Somete la factura para reconciliarla.`)
+      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      queryClient.invalidateQueries({
+        queryKey: ["credit-note-saldo-favor", invoice?.customer],
+      });
+      toast.success(
+        `Nota de crédito de ${formatDOP(variables.amount)} aplicada. Somete la factura para reconciliarla.`,
+      );
     },
     onError: (err: ApiError) => {
       if (err?.statusCode === 409) {
         // Ya estaba aplicada a esta factura (doble clic, reintento, o otra pestaña) — refrescar para reflejar el estado real
-        queryClient.invalidateQueries({ queryKey: ['credit-note-saldo-favor', invoice?.customer] })
+        queryClient.invalidateQueries({
+          queryKey: ["credit-note-saldo-favor", invoice?.customer],
+        });
       }
-      toast.error(err?.message ?? 'Error al aplicar la nota de crédito')
+      toast.error(err?.message ?? "Error al aplicar la nota de crédito");
     },
-  })
+  });
 
   const removeCreditNoteMutation = useMutation({
-    mutationFn: (creditNoteId: string) => removerCreditNoteAplicada(creditNoteId, id!),
+    mutationFn: (creditNoteId: string) =>
+      removerCreditNoteAplicada(creditNoteId, id!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
-      queryClient.invalidateQueries({ queryKey: ['credit-note-saldo-favor', invoice?.customer] })
-      toast.success('Nota de crédito removida de esta factura')
+      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      queryClient.invalidateQueries({
+        queryKey: ["credit-note-saldo-favor", invoice?.customer],
+      });
+      toast.success("Nota de crédito removida de esta factura");
     },
     onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al remover la nota de crédito')
+      toast.error(err?.message ?? "Error al remover la nota de crédito");
     },
-  })
+  });
 
   // Total del saldo a favor ya aplicado a ESTA factura (sum de appliedTo de todos los Payment Entry)
-  const creditoAplicadoSaldoFavor = (saldoFavor?.entries ?? []).reduce((sum, entry) => {
-    const applied = entry.appliedTo?.find((a) => a.invoiceId === id)
-    return sum + (applied?.allocatedAmount ?? 0)
-  }, 0)
+  const creditoAplicadoSaldoFavor = (saldoFavor?.entries ?? []).reduce(
+    (sum, entry) => {
+      const applied = entry.appliedTo?.find((a) => a.invoiceId === id);
+      return sum + (applied?.allocatedAmount ?? 0);
+    },
+    0,
+  );
 
   // Total de notas de crédito ya aplicadas a ESTA factura
-  const creditoAplicadoNotas = (creditNoteSaldo?.entries ?? []).reduce((sum, entry) => {
-    const applied = entry.appliedTo?.find((a) => a.invoiceId === id)
-    return sum + (applied?.amount ?? 0)
-  }, 0)
+  const creditoAplicadoNotas = (creditNoteSaldo?.entries ?? []).reduce(
+    (sum, entry) => {
+      const applied = entry.appliedTo?.find((a) => a.invoiceId === id);
+      return sum + (applied?.amount ?? 0);
+    },
+    0,
+  );
 
-  const creditoAplicado = creditoAplicadoSaldoFavor + creditoAplicadoNotas
+  const creditoAplicado = creditoAplicadoSaldoFavor + creditoAplicadoNotas;
   // Lo que realmente queda pendiente en esta factura (antes de someter) — el backend valida contra esto,
   // no contra el grandTotal bruto, ya que puede haber crédito ya aplicado previamente.
-  const pendingAmount = invoice ? Math.max(0, invoice.grandTotal - creditoAplicado) : 0
+  const pendingAmount = invoice
+    ? Math.max(0, invoice.grandTotal - creditoAplicado)
+    : 0;
 
-  const noCredit = invoice?.status === 'draft' && customer?.hasCredit === false
-  const showCashSelector = noCredit || payCash
+  const noCredit = invoice?.status === "draft" && customer?.hasCredit === false;
+  // Cubierta al 100% por crédito ya aplicado (saldo a favor y/o notas de crédito) — no hace falta cobrar al contado.
+  const paidByCreditNote =
+    !!invoice &&
+    invoice.status === "draft" &&
+    invoice.grandTotal > 0 &&
+    creditoAplicado > 0 &&
+    pendingAmount <= 0.01;
+  const showCashSelector = !paidByCreditNote && (noCredit || payCash);
 
   const submitMutation = useMutation({
     mutationFn: (body?: SubmitInvoiceDto) => submitInvoice(id!, body),
     onSuccess: (updated) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] })
-      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
-      setCreditErrorOpen(false)
-      setPayCash(false)
-      setModeOfPayment('')
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      setCreditErrorOpen(false);
+      setPayCash(false);
+      setModeOfPayment("");
       toast.success(
-        updated.paymentStatus === 'paid'
-          ? 'Factura sometida y cobrada al contado'
-          : 'Factura sometida — NCF asignado',
-      )
+        updated.paymentStatus === "paid"
+          ? "Factura sometida y cobrada al contado"
+          : "Factura sometida — NCF asignado",
+      );
     },
     onError: (err: { message?: string }) => {
-      const msg = err?.message ?? ''
+      const msg = err?.message ?? "";
       if (/excede\s+el\s+cr[eé]dito\s+disponible/i.test(msg)) {
-        setCreditErrorMsg(msg)
-        setCreditErrorOpen(true)
-        return
+        setCreditErrorMsg(msg);
+        setCreditErrorOpen(true);
+        return;
       }
-      toast.error(msg || 'Error al someter la factura')
+      toast.error(msg || "Error al someter la factura");
     },
-  })
+  });
 
   function handleSubmitClick() {
     if (showCashSelector) {
-      if (!modeOfPayment) { toast.error('Selecciona un método de pago'); return }
-      submitMutation.mutate({ payCash: true, modeOfPayment })
+      if (!modeOfPayment) {
+        toast.error("Selecciona un método de pago");
+        return;
+      }
+      submitMutation.mutate({ payCash: true, modeOfPayment });
     } else {
-      submitMutation.mutate(undefined)
+      submitMutation.mutate(undefined);
     }
   }
 
   function handleCashRetry() {
-    if (!modeOfPayment) { toast.error('Selecciona un método de pago'); return }
-    submitMutation.mutate({ payCash: true, modeOfPayment })
+    if (!modeOfPayment) {
+      toast.error("Selecciona un método de pago");
+      return;
+    }
+    submitMutation.mutate({ payCash: true, modeOfPayment });
   }
 
   const cancelMutation = useMutation({
     mutationFn: (reason: string) => cancelInvoice(id!, { reason }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] })
-      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
-      toast.success('Factura cancelada')
-      setCancelModalOpen(false)
-      setCancelReason('')
-      setCancelForbiddenMsg('')
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      toast.success("Factura cancelada");
+      setCancelModalOpen(false);
+      setCancelReason("");
+      setCancelForbiddenMsg("");
     },
     onError: (err: ApiError) => {
       if (err?.statusCode === 409) {
-        toast.error('La factura ya está cancelada.')
-        queryClient.invalidateQueries({ queryKey: ['invoice', id] })
-        setCancelModalOpen(false)
-        return
+        toast.error("La factura ya está cancelada.");
+        queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+        setCancelModalOpen(false);
+        return;
       }
       if (err?.statusCode === 403) {
-        setCancelForbiddenMsg(err.message || 'No tienes permiso para cancelar esta factura.')
-        return
+        setCancelForbiddenMsg(
+          err.message || "No tienes permiso para cancelar esta factura.",
+        );
+        return;
       }
-      toast.error(err?.message ?? 'Error al cancelar la factura')
+      toast.error(err?.message ?? "Error al cancelar la factura");
     },
-  })
+  });
 
   function openCancelModal() {
-    setCancelReason('')
-    setCancelForbiddenMsg('')
-    setCancelModalOpen(true)
+    setCancelReason("");
+    setCancelForbiddenMsg("");
+    setCancelModalOpen(true);
   }
 
-  const cancelReasonValid = cancelReason.trim().length >= 10 && cancelReason.trim().length <= 500
+  const cancelReasonValid =
+    cancelReason.trim().length >= 10 && cancelReason.trim().length <= 500;
 
   function openReturnModal() {
-    setReturnFullInvoice(true)
-    setReturnRows((invoice?.items ?? []).map((i) => ({
-      itemCode: i.itemCode,
-      description: i.description || i.itemCode,
-      qtyPurchased: i.qty,
-      qty: i.qty,
-      checked: false,
-    })))
-    setReturnResolution('credit_note_only')
-    setReturnModeOfPayment('')
-    setReturnReason('')
-    setReturnModalOpen(true)
+    setReturnFullInvoice(true);
+    setReturnRows(
+      (invoice?.items ?? []).map((i) => ({
+        itemCode: i.itemCode,
+        description: i.description || i.itemCode,
+        qtyPurchased: i.qty,
+        qty: i.qty,
+        checked: false,
+      })),
+    );
+    setReturnResolution("credit_note_only");
+    setReturnModeOfPayment("");
+    setReturnReason("");
+    setReturnModalOpen(true);
   }
 
   function toggleReturnRow(itemCode: string) {
-    setReturnRows((prev) => prev.map((r) => (r.itemCode === itemCode ? { ...r, checked: !r.checked } : r)))
+    setReturnRows((prev) =>
+      prev.map((r) =>
+        r.itemCode === itemCode ? { ...r, checked: !r.checked } : r,
+      ),
+    );
   }
 
   function setReturnRowQty(itemCode: string, qty: number) {
-    setReturnRows((prev) => prev.map((r) => (r.itemCode === itemCode ? { ...r, qty } : r)))
+    setReturnRows((prev) =>
+      prev.map((r) => (r.itemCode === itemCode ? { ...r, qty } : r)),
+    );
   }
 
-  const returnCheckedRows = returnRows.filter((r) => r.checked)
-  const returnReasonValid = returnReason.trim().length >= 10 && returnReason.trim().length <= 500
-  const returnModeValid = returnResolution !== 'refund' || !!returnModeOfPayment
-  const returnItemsValid = returnFullInvoice || (
-    returnCheckedRows.length > 0 && returnCheckedRows.every((r) => r.qty > 0 && r.qty <= r.qtyPurchased)
-  )
-  const canConfirmReturn = returnReasonValid && returnModeValid && returnItemsValid
+  const returnCheckedRows = returnRows.filter((r) => r.checked);
+  const returnReasonValid =
+    returnReason.trim().length >= 10 && returnReason.trim().length <= 500;
+  const returnModeValid =
+    returnResolution !== "refund" || !!returnModeOfPayment;
+  const returnItemsValid =
+    returnFullInvoice ||
+    (returnCheckedRows.length > 0 &&
+      returnCheckedRows.every((r) => r.qty > 0 && r.qty <= r.qtyPurchased));
+  const canConfirmReturn =
+    returnReasonValid && returnModeValid && returnItemsValid;
 
   const devolucionMutation = useMutation({
-    mutationFn: () => createDevolucion({
-      invoiceId: id!,
-      items: returnFullInvoice ? undefined : returnCheckedRows.map((r) => ({ itemCode: r.itemCode, qty: r.qty })),
-      resolution: returnResolution,
-      refundModeOfPayment: returnResolution === 'refund' ? returnModeOfPayment : undefined,
-      reason: returnReason.trim(),
-    }),
+    mutationFn: () =>
+      createDevolucion({
+        invoiceId: id!,
+        items: returnFullInvoice
+          ? undefined
+          : returnCheckedRows.map((r) => ({
+              itemCode: r.itemCode,
+              qty: r.qty,
+            })),
+        resolution: returnResolution,
+        refundModeOfPayment:
+          returnResolution === "refund" ? returnModeOfPayment : undefined,
+        reason: returnReason.trim(),
+      }),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] })
-      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
-      queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
-      toast.success(result.message ?? 'Devolución procesada correctamente')
-      setReturnModalOpen(false)
-      navigate('/facturacion/notas-credito')
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      queryClient.invalidateQueries({ queryKey: ["credit-notes"] });
+      toast.success(result.message ?? "Devolución procesada correctamente");
+      setReturnModalOpen(false);
+      navigate("/facturacion/notas-credito");
     },
     onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al procesar la devolución')
+      toast.error(err?.message ?? "Error al procesar la devolución");
     },
-  })
+  });
 
   const amendMutation = useMutation({
     mutationFn: () => amendInvoice(id!),
     onSuccess: (newInvoice) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] })
-      toast.success('Enmienda creada como borrador')
-      navigate(`/facturacion/facturas/${newInvoice.id}`)
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      toast.success("Enmienda creada como borrador");
+      navigate(`/facturacion/facturas/${newInvoice.id}`);
     },
     onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al enmendar la factura')
+      toast.error(err?.message ?? "Error al enmendar la factura");
     },
-  })
+  });
 
-  const isActionsLoading = submitMutation.isPending || cancelMutation.isPending || amendMutation.isPending
+  const isActionsLoading =
+    submitMutation.isPending ||
+    cancelMutation.isPending ||
+    amendMutation.isPending;
 
   const downloadMutation = useMutation({
     mutationFn: () => downloadInvoicePdf(id!, `factura-${id}.pdf`),
-    onError: () => toast.error('No se pudo descargar el PDF'),
-  })
+    onError: () => toast.error("No se pudo descargar el PDF"),
+  });
 
   if (isLoading) {
     return (
       <div className="page-container">
-        <div className="skeleton-box" style={{ width: 280, height: 28, marginBottom: 8 }} />
-        <div className="skeleton-box" style={{ width: '100%', height: 160, borderRadius: 'var(--radius-lg)', marginBottom: 16 }} />
-        <div className="skeleton-box" style={{ width: '100%', height: 256, borderRadius: 'var(--radius-lg)' }} />
+        <div
+          className="skeleton-box"
+          style={{ width: 280, height: 28, marginBottom: 8 }}
+        />
+        <div
+          className="skeleton-box"
+          style={{
+            width: "100%",
+            height: 160,
+            borderRadius: "var(--radius-lg)",
+            marginBottom: 16,
+          }}
+        />
+        <div
+          className="skeleton-box"
+          style={{
+            width: "100%",
+            height: 256,
+            borderRadius: "var(--radius-lg)",
+          }}
+        />
       </div>
-    )
+    );
   }
 
   if (!invoice) {
@@ -311,129 +491,246 @@ export default function InvoiceDetail() {
       <div className="page-container">
         <div className="empty-state">
           <div className="empty-title">Factura no encontrada</div>
-          <button className="btn btn-ghost btn-size-sm" onClick={() => navigate('/facturacion/facturas')}>
+          <button
+            className="btn btn-ghost btn-size-sm"
+            onClick={() => navigate("/facturacion/facturas")}
+          >
             Volver a facturas
           </button>
         </div>
       </div>
-    )
+    );
   }
 
-  const ncfLabel = NCF_TYPES.find((t) => t.value === invoice.ncfType)?.label
-  const ps = invoice.paymentStatus
+  const ncfLabel = NCF_TYPES.find((t) => t.value === invoice.ncfType)?.label;
+  const ps = invoice.paymentStatus;
 
-  const outstandingColor = ps === 'paid'
-    ? 'var(--color-success)'
-    : ps === 'partly_paid'
-    ? 'var(--color-brand)'
-    : 'var(--color-error)'
+  const outstandingColor =
+    ps === "paid"
+      ? "var(--color-success)"
+      : ps === "partly_paid"
+        ? "var(--color-brand)"
+        : "var(--color-error)";
 
   const PAYMENT_BADGE: Record<string, string> = {
-    unpaid: 'badge-warning',
-    partly_paid: 'badge-info',
-    paid: 'badge-success',
-  }
+    unpaid: "badge-warning",
+    partly_paid: "badge-info",
+    paid: "badge-success",
+  };
   const PAYMENT_LABEL: Record<string, string> = {
-    unpaid: 'Pendiente',
-    partly_paid: 'Parcial',
-    paid: 'Pagado',
-  }
+    unpaid: "Pendiente",
+    partly_paid: "Parcial",
+    paid: "Pagado",
+  };
 
   return (
     <div className="page-container">
       <div className="page-header">
         <div>
-          <a className="page-back-link" onClick={() => navigate('/facturacion/facturas')}>
+          <a
+            className="page-back-link"
+            onClick={() => navigate("/facturacion/facturas")}
+          >
             <ArrowLeft size={14} /> Facturas
           </a>
-          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h1
+            className="page-title"
+            style={{ display: "flex", alignItems: "center", gap: 8 }}
+          >
             Factura {displayId(invoice.id, invoice.sequence)}
-            <span className={`badge ${STATUS_BADGE[invoice.status] ?? 'badge-neutral'}`}>
+            <span
+              className={`badge ${STATUS_BADGE[invoice.status] ?? "badge-neutral"}`}
+            >
               {STATUS_LABEL[invoice.status] ?? invoice.status}
             </span>
             {invoice.sequence > 0 && (
-              <span className="badge badge-info" title="Veces que se ha editado en borrador">
+              <span
+                className="badge badge-info"
+                title="Veces que se ha editado en borrador"
+              >
                 Versión {invoice.sequence}
               </span>
             )}
           </h1>
           <p className="page-sub">
-            {invoice.ncf ? `NCF: ${invoice.ncf}` : 'Borrador — NCF pendiente de asignación'}
+            {invoice.ncf
+              ? `NCF: ${invoice.ncf}`
+              : "Borrador — NCF pendiente de asignación"}
           </p>
         </div>
       </div>
 
-      {invoice.status === 'cancelled' && invoice.cancellationReason && (
-        <div className="inline-alert inline-alert-error" style={{ marginBottom: 16 }}>
+      {invoice.status === "cancelled" && invoice.cancellationReason && (
+        <div
+          className="inline-alert inline-alert-error"
+          style={{ marginBottom: 16 }}
+        >
           <XCircle size={16} />
           <span>
-            Cancelada por <strong>{invoice.cancelledBy ?? 'usuario desconocido'}</strong>
-            {invoice.cancelledAt ? ` el ${formatDateTime(invoice.cancelledAt)}` : ''}: {invoice.cancellationReason}
+            Cancelada por{" "}
+            <strong>{invoice.cancelledBy ?? "usuario desconocido"}</strong>
+            {invoice.cancelledAt
+              ? ` el ${formatDateTime(invoice.cancelledAt)}`
+              : ""}
+            : {invoice.cancellationReason}
           </span>
         </div>
       )}
 
       <div className="doc-actions-bar">
-        {invoice.status === 'draft' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <button className="btn btn-danger btn-size-sm" onClick={openCancelModal} disabled={isActionsLoading}>
+        {invoice.status === "draft" && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              width: "100%",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
+              <button
+                className="btn btn-danger btn-size-sm"
+                onClick={openCancelModal}
+                disabled={isActionsLoading}
+              >
                 <Ban size={14} /> Cancelar
               </button>
 
-              {!noCredit && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
-                  <input type="checkbox" checked={payCash} onChange={(e) => setPayCash(e.target.checked)} />
+              {!noCredit && !paidByCreditNote && (
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    userSelect: "none",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={payCash}
+                    onChange={(e) => setPayCash(e.target.checked)}
+                  />
                   Cobrar al contado
                 </label>
               )}
 
-              {showCashSelector && (
-                <select
-                  className="ff-select"
-                  style={{ width: 200, height: 32 }}
-                  value={modeOfPayment}
-                  onChange={(e) => setModeOfPayment(e.target.value)}
-                >
-                  <option value="">Método de pago…</option>
-                  {metodos?.filter((m) => !m.disabled).map((m) => (
-                    <option key={m.name} value={m.name}>{m.name}</option>
-                  ))}
-                </select>
-              )}
+              <div>
+                {paidByCreditNote ? (
+                  <SearchSelect
+                    value={CREDIT_NOTE_MODE_OF_PAYMENT}
+                    selectedLabel={CREDIT_NOTE_MODE_OF_PAYMENT}
+                    onChange={() => {}}
+                    options={[]}
+                    onSearch={() => {}}
+                    disabled
+                    className="ff-select"
+                  />
+                ) : (
+                  showCashSelector && (
+                    <SearchSelect
+                      value={modeOfPayment}
+                      selectedLabel={
+                        metodos?.find((m) => m.name === modeOfPayment)?.name ??
+                        ""
+                      }
+                      onChange={(val) => setModeOfPayment(val)}
+                      options={metodosOptions}
+                      onSearch={setModeOfPaymentSearch}
+                      placeholder="Método de pago…"
+                      className="ff-select"
+                    />
+                  )
+                )}
+              </div>
 
-              <button className="btn btn-primary btn-size-sm" onClick={handleSubmitClick} disabled={isActionsLoading}>
+              <button
+                className="btn btn-primary btn-size-sm"
+                onClick={handleSubmitClick}
+                disabled={isActionsLoading}
+              >
                 <Send size={14} /> Someter
               </button>
             </div>
-            {noCredit && (
-              <p style={{ fontSize: 12, color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 4, margin: 0 }}>
-                <AlertTriangle size={12} /> Este cliente no tiene crédito habilitado — se cobrará al contado.
+            {noCredit && !paidByCreditNote && (
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-tertiary)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  margin: 0,
+                }}
+              >
+                <AlertTriangle size={12} /> Este cliente no tiene crédito
+                habilitado — se cobrará al contado.
+              </p>
+            )}
+            {paidByCreditNote && (
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-tertiary)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  margin: 0,
+                }}
+              >
+                <Wallet size={12} /> Cubierta al 100% por saldo a favor / nota
+                de crédito aplicada — se someterá sin cobro adicional.
               </p>
             )}
           </div>
         )}
-        {invoice.status === 'submitted' && (
+        {invoice.status === "submitted" && (
           <>
             <button
               className="btn btn-secondary btn-size-sm"
               onClick={() => downloadMutation.mutate()}
               disabled={downloadMutation.isPending}
             >
-              {downloadMutation.isPending
-                ? <><span className="spinner" /> Descargando…</>
-                : <><Download size={14} /> Descargar PDF</>}
+              {downloadMutation.isPending ? (
+                <>
+                  <span className="spinner" /> Descargando…
+                </>
+              ) : (
+                <>
+                  <Download size={14} /> Descargar PDF
+                </>
+              )}
             </button>
-            <button className="btn btn-secondary btn-size-sm" onClick={openReturnModal} disabled={isActionsLoading}>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={openReturnModal}
+              disabled={isActionsLoading}
+            >
               <RotateCcw size={14} /> Devolver producto(s)
             </button>
-            <button className="btn btn-danger btn-size-sm" onClick={openCancelModal} disabled={isActionsLoading}>
+            <button
+              className="btn btn-danger btn-size-sm"
+              onClick={openCancelModal}
+              disabled={isActionsLoading}
+            >
               <XCircle size={14} /> Cancelar
             </button>
           </>
         )}
-        {invoice.status === 'cancelled' && (
-          <button className="btn btn-secondary btn-size-sm" onClick={() => amendMutation.mutate()} disabled={isActionsLoading}>
+        {invoice.status === "cancelled" && (
+          <button
+            className="btn btn-secondary btn-size-sm"
+            onClick={() => amendMutation.mutate()}
+            disabled={isActionsLoading}
+          >
             <FileEdit size={14} /> Enmendar
           </button>
         )}
@@ -443,7 +740,10 @@ export default function InvoiceDetail() {
         <div className="card-header">
           <h2 className="card-title">Información de la Factura</h2>
         </div>
-        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div
+          className="card-body"
+          style={{ display: "flex", flexDirection: "column", gap: 20 }}
+        >
           <div className="fields-grid">
             <div className="detail-field">
               <span className="detail-label">Cliente</span>
@@ -451,30 +751,62 @@ export default function InvoiceDetail() {
             </div>
             <div className="detail-field">
               <span className="detail-label">Fecha</span>
-              <span className="detail-value">{formatDate(invoice.postingDate)}</span>
+              <span className="detail-value">
+                {formatDate(invoice.postingDate)}
+              </span>
             </div>
             <div className="detail-field">
               <span className="detail-label">Vencimiento</span>
-              <span className="detail-value">{formatDate(invoice.dueDate)}</span>
+              <span className="detail-value">
+                {formatDate(invoice.dueDate)}
+              </span>
             </div>
             <div className="detail-field">
               <span className="detail-label">NCF</span>
-              <span className="detail-value" style={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                {invoice.ncf ?? <em style={{ fontStyle: 'italic', fontWeight: 400, color: 'var(--text-secondary)' }}>Pendiente</em>}
+              <span
+                className="detail-value"
+                style={{ fontFamily: "monospace", fontWeight: 600 }}
+              >
+                {invoice.ncf ?? (
+                  <em
+                    style={{
+                      fontStyle: "italic",
+                      fontWeight: 400,
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    Pendiente
+                  </em>
+                )}
               </span>
             </div>
             <div className="detail-field">
               <span className="detail-label">Tipo NCF</span>
               <span className="detail-value">
-                {ncfLabel ? <span className="badge badge-neutral">{ncfLabel}</span> : '—'}
+                {ncfLabel ? (
+                  <span className="badge badge-neutral">{ncfLabel}</span>
+                ) : (
+                  "—"
+                )}
               </span>
             </div>
             {invoice.amendedFrom && (
               <div className="detail-field">
                 <span className="detail-label">Enmienda de</span>
                 <button
-                  style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--color-brand)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                  onClick={() => navigate(`/facturacion/facturas/${invoice.amendedFrom}`)}
+                  style={{
+                    fontSize: 12,
+                    fontFamily: "monospace",
+                    color: "var(--color-brand)",
+                    textDecoration: "underline",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                  onClick={() =>
+                    navigate(`/facturacion/facturas/${invoice.amendedFrom}`)
+                  }
                 >
                   {invoice.amendedFrom}
                 </button>
@@ -482,17 +814,32 @@ export default function InvoiceDetail() {
             )}
           </div>
 
-          {invoice.status === 'submitted' && (
-            <div style={{ paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+          {invoice.status === "submitted" && (
+            <div
+              style={{
+                paddingTop: 16,
+                borderTop: "1px solid var(--border)",
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 24,
+              }}
+            >
               <div className="detail-field">
                 <span className="detail-label">Pendiente</span>
-                <span className="detail-value" style={{ fontWeight: 700, color: outstandingColor }}>{formatDOP(invoice.outstandingAmount)}</span>
+                <span
+                  className="detail-value"
+                  style={{ fontWeight: 700, color: outstandingColor }}
+                >
+                  {formatDOP(invoice.outstandingAmount)}
+                </span>
               </div>
               {ps && (
                 <div className="detail-field">
                   <span className="detail-label">Estado de Pago</span>
                   <span className="detail-value">
-                    <span className={`badge ${PAYMENT_BADGE[ps] ?? 'badge-neutral'}`}>
+                    <span
+                      className={`badge ${PAYMENT_BADGE[ps] ?? "badge-neutral"}`}
+                    >
                       {PAYMENT_LABEL[ps] ?? ps}
                     </span>
                   </span>
@@ -502,29 +849,50 @@ export default function InvoiceDetail() {
           )}
 
           {invoice.notes && (
-            <div style={{ paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-              <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>Notas</p>
-              <p style={{ fontSize: 13, whiteSpace: 'pre-line' }}>{invoice.notes}</p>
+            <div
+              style={{ paddingTop: 16, borderTop: "1px solid var(--border)" }}
+            >
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-secondary)",
+                  marginBottom: 4,
+                }}
+              >
+                Notas
+              </p>
+              <p style={{ fontSize: 13, whiteSpace: "pre-line" }}>
+                {invoice.notes}
+              </p>
             </div>
           )}
         </div>
       </div>
 
-      {invoice.status === 'draft' && saldoFavor && (
+      {invoice.status === "draft" && saldoFavor && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header">
-            <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <h2
+              className="card-title"
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
               <Wallet size={16} /> Aplicar saldo a favor disponible
             </h2>
             {saldoFavor.entries.length && (
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
                 Total disponible: {formatDOP(saldoFavor.balance)}
               </span>
             )}
           </div>
           {!saldoFavor.entries.length ? (
             <div className="card-body">
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "var(--text-secondary)",
+                  margin: 0,
+                }}
+              >
                 Este cliente no tiene saldo a favor disponible.
               </p>
             </div>
@@ -536,26 +904,41 @@ export default function InvoiceDetail() {
                     <th>Origen</th>
                     <th>Fecha</th>
                     <th>Método</th>
-                    <th style={{ textAlign: 'right' }}>Disponible</th>
-                    <th style={{ textAlign: 'right' }}>Comprometido</th>
-                    <th style={{ textAlign: 'right' }}>Disponible neto</th>
-                    <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
+                    <th style={{ textAlign: "right" }}>Disponible</th>
+                    <th style={{ textAlign: "right" }}>Comprometido</th>
+                    <th style={{ textAlign: "right" }}>Disponible neto</th>
+                    <th style={{ textAlign: "right", width: 140 }}>
+                      Monto a aplicar
+                    </th>
                     <th style={{ width: 140 }} />
                   </tr>
                 </thead>
                 <tbody>
                   {saldoFavor.entries.map((entry) => {
-                    const defaultAmount = Math.min(entry.availableAmount, pendingAmount || entry.availableAmount)
-                    const fullyCommitted = entry.availableAmount <= 0.01
-                    const appliedToThisInvoice = entry.appliedTo?.find((a) => a.invoiceId === id)
+                    const defaultAmount = Math.min(
+                      entry.availableAmount,
+                      pendingAmount || entry.availableAmount,
+                    );
+                    const fullyCommitted = entry.availableAmount <= 0.01;
+                    const appliedToThisInvoice = entry.appliedTo?.find(
+                      (a) => a.invoiceId === id,
+                    );
                     return (
                       <tr key={entry.paymentEntryId}>
-                        <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{entry.paymentEntryId}</td>
+                        <td style={{ fontFamily: "monospace", fontSize: 12 }}>
+                          {entry.paymentEntryId}
+                        </td>
                         <td>{formatDate(entry.postingDate)}</td>
                         <td>{entry.modeOfPayment}</td>
-                        <td style={{ textAlign: 'right' }}>{formatDOP(entry.unallocatedAmount)}</td>
-                        <td style={{ textAlign: 'right' }}>{formatDOP(entry.committedAmount)}</td>
-                        <td style={{ textAlign: 'right' }}>{formatDOP(entry.availableAmount)}</td>
+                        <td style={{ textAlign: "right" }}>
+                          {formatDOP(entry.unallocatedAmount)}
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          {formatDOP(entry.committedAmount)}
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          {formatDOP(entry.availableAmount)}
+                        </td>
                         <td>
                           {!fullyCommitted && (
                             <input
@@ -564,28 +947,60 @@ export default function InvoiceDetail() {
                               min="0.01"
                               max={entry.availableAmount}
                               step="0.01"
-                              style={{ textAlign: 'right' }}
-                              value={saldoAmounts[entry.paymentEntryId] ?? defaultAmount}
-                              onChange={(e) => setSaldoAmounts((prev) => ({ ...prev, [entry.paymentEntryId]: parseFloat(e.target.value) || 0 }))}
+                              style={{ textAlign: "right" }}
+                              value={
+                                saldoAmounts[entry.paymentEntryId] ??
+                                defaultAmount
+                              }
+                              onChange={(e) =>
+                                setSaldoAmounts((prev) => ({
+                                  ...prev,
+                                  [entry.paymentEntryId]:
+                                    parseFloat(e.target.value) || 0,
+                                }))
+                              }
                             />
                           )}
                         </td>
                         <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "flex-end",
+                              gap: 4,
+                            }}
+                          >
                             {fullyCommitted && (
-                              <span className="badge badge-neutral" style={{ whiteSpace: 'nowrap' }}>100% comprometido</span>
+                              <span
+                                className="badge badge-neutral"
+                                style={{ whiteSpace: "nowrap" }}
+                              >
+                                100% comprometido
+                              </span>
                             )}
                             {!fullyCommitted && (
                               <button
                                 className="btn btn-secondary btn-size-sm"
                                 disabled={applySaldoMutation.isPending}
                                 onClick={() => {
-                                  const amount = saldoAmounts[entry.paymentEntryId] ?? defaultAmount
-                                  if (!amount || amount <= 0 || amount > entry.availableAmount) {
-                                    toast.error('El monto debe ser mayor a 0 y no exceder el saldo disponible')
-                                    return
+                                  const amount =
+                                    saldoAmounts[entry.paymentEntryId] ??
+                                    defaultAmount;
+                                  if (
+                                    !amount ||
+                                    amount <= 0 ||
+                                    amount > entry.availableAmount
+                                  ) {
+                                    toast.error(
+                                      "El monto debe ser mayor a 0 y no exceder el saldo disponible",
+                                    );
+                                    return;
                                   }
-                                  applySaldoMutation.mutate({ paymentEntryId: entry.paymentEntryId, amount })
+                                  applySaldoMutation.mutate({
+                                    paymentEntryId: entry.paymentEntryId,
+                                    amount,
+                                  });
                                 }}
                               >
                                 Aplicar
@@ -594,9 +1009,16 @@ export default function InvoiceDetail() {
                             {appliedToThisInvoice && (
                               <button
                                 className="btn btn-ghost btn-size-sm"
-                                style={{ color: 'var(--color-error, var(--error-text))' }}
+                                style={{
+                                  color:
+                                    "var(--color-error, var(--error-text))",
+                                }}
                                 disabled={removeSaldoMutation.isPending}
-                                onClick={() => removeSaldoMutation.mutate(entry.paymentEntryId)}
+                                onClick={() =>
+                                  removeSaldoMutation.mutate(
+                                    entry.paymentEntryId,
+                                  )
+                                }
                                 title={`Aplicado a esta factura: ${formatDOP(appliedToThisInvoice.allocatedAmount)}`}
                               >
                                 Deshacer
@@ -605,7 +1027,7 @@ export default function InvoiceDetail() {
                           </div>
                         </td>
                       </tr>
-                    )
+                    );
                   })}
                 </tbody>
               </table>
@@ -614,21 +1036,30 @@ export default function InvoiceDetail() {
         </div>
       )}
 
-      {invoice.status === 'draft' && creditNoteSaldo && (
+      {invoice.status === "draft" && creditNoteSaldo && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header">
-            <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <h2
+              className="card-title"
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
               <Receipt size={16} /> Notas de crédito
             </h2>
             {creditNoteSaldo.balance > 0 && (
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
                 Total disponible: {formatDOP(creditNoteSaldo.balance)}
               </span>
             )}
           </div>
           {creditNoteSaldo.entries.length === 0 ? (
             <div className="card-body">
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "var(--text-secondary)",
+                  margin: 0,
+                }}
+              >
                 Este cliente no tiene notas de crédito disponibles.
               </p>
             </div>
@@ -639,27 +1070,44 @@ export default function InvoiceDetail() {
                   <tr>
                     <th>NCF</th>
                     <th>Fecha</th>
-                    <th style={{ textAlign: 'right' }}>Total</th>
-                    <th style={{ textAlign: 'right' }}>Reembolsado</th>
-                    <th style={{ textAlign: 'right' }}>Aplicado</th>
-                    <th style={{ textAlign: 'right' }}>Disponible</th>
-                    <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
+                    <th style={{ textAlign: "right" }}>Total</th>
+                    <th style={{ textAlign: "right" }}>Reembolsado</th>
+                    <th style={{ textAlign: "right" }}>Aplicado</th>
+                    <th style={{ textAlign: "right" }}>Disponible</th>
+                    <th style={{ textAlign: "right", width: 140 }}>
+                      Monto a aplicar
+                    </th>
                     <th style={{ width: 140 }} />
                   </tr>
                 </thead>
                 <tbody>
                   {creditNoteSaldo.entries.map((entry) => {
-                    const defaultAmount = Math.min(entry.availableAmount, pendingAmount || entry.availableAmount)
-                    const fullyUsed = entry.availableAmount <= 0.01
-                    const appliedToThisInvoice = entry.appliedTo?.find((a) => a.invoiceId === id)
+                    const defaultAmount = Math.min(
+                      entry.availableAmount,
+                      pendingAmount || entry.availableAmount,
+                    );
+                    const fullyUsed = entry.availableAmount <= 0.01;
+                    const appliedToThisInvoice = entry.appliedTo?.find(
+                      (a) => a.invoiceId === id,
+                    );
                     return (
                       <tr key={entry.creditNoteId}>
-                        <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{entry.ncf ?? entry.creditNoteId}</td>
+                        <td style={{ fontFamily: "monospace", fontSize: 12 }}>
+                          {entry.ncf ?? entry.creditNoteId}
+                        </td>
                         <td>{formatDate(entry.postingDate)}</td>
-                        <td style={{ textAlign: 'right' }}>{formatDOP(entry.grandTotal)}</td>
-                        <td style={{ textAlign: 'right' }}>{formatDOP(entry.refundedAmount)}</td>
-                        <td style={{ textAlign: 'right' }}>{formatDOP(entry.appliedAmount)}</td>
-                        <td style={{ textAlign: 'right' }}>{formatDOP(entry.availableAmount)}</td>
+                        <td style={{ textAlign: "right" }}>
+                          {formatDOP(entry.grandTotal)}
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          {formatDOP(entry.refundedAmount)}
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          {formatDOP(entry.appliedAmount)}
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          {formatDOP(entry.availableAmount)}
+                        </td>
                         <td>
                           {!fullyUsed && !appliedToThisInvoice && (
                             <input
@@ -668,28 +1116,60 @@ export default function InvoiceDetail() {
                               min="0.01"
                               max={entry.availableAmount}
                               step="0.01"
-                              style={{ textAlign: 'right' }}
-                              value={creditNoteAmounts[entry.creditNoteId] ?? defaultAmount}
-                              onChange={(e) => setCreditNoteAmounts((prev) => ({ ...prev, [entry.creditNoteId]: parseFloat(e.target.value) || 0 }))}
+                              style={{ textAlign: "right" }}
+                              value={
+                                creditNoteAmounts[entry.creditNoteId] ??
+                                defaultAmount
+                              }
+                              onChange={(e) =>
+                                setCreditNoteAmounts((prev) => ({
+                                  ...prev,
+                                  [entry.creditNoteId]:
+                                    parseFloat(e.target.value) || 0,
+                                }))
+                              }
                             />
                           )}
                         </td>
                         <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "flex-end",
+                              gap: 4,
+                            }}
+                          >
                             {fullyUsed && !appliedToThisInvoice && (
-                              <span className="badge badge-neutral" style={{ whiteSpace: 'nowrap' }}>Agotada</span>
+                              <span
+                                className="badge badge-neutral"
+                                style={{ whiteSpace: "nowrap" }}
+                              >
+                                Agotada
+                              </span>
                             )}
                             {!fullyUsed && !appliedToThisInvoice && (
                               <button
                                 className="btn btn-secondary btn-size-sm"
                                 disabled={applyCreditNoteMutation.isPending}
                                 onClick={() => {
-                                  const amount = creditNoteAmounts[entry.creditNoteId] ?? defaultAmount
-                                  if (!amount || amount <= 0 || amount > entry.availableAmount) {
-                                    toast.error('El monto debe ser mayor a 0 y no exceder el saldo disponible')
-                                    return
+                                  const amount =
+                                    creditNoteAmounts[entry.creditNoteId] ??
+                                    defaultAmount;
+                                  if (
+                                    !amount ||
+                                    amount <= 0 ||
+                                    amount > entry.availableAmount
+                                  ) {
+                                    toast.error(
+                                      "El monto debe ser mayor a 0 y no exceder el saldo disponible",
+                                    );
+                                    return;
                                   }
-                                  applyCreditNoteMutation.mutate({ creditNoteId: entry.creditNoteId, amount })
+                                  applyCreditNoteMutation.mutate({
+                                    creditNoteId: entry.creditNoteId,
+                                    amount,
+                                  });
                                 }}
                               >
                                 Aplicar
@@ -697,21 +1177,39 @@ export default function InvoiceDetail() {
                             )}
                             {appliedToThisInvoice && (
                               <>
-                                <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                                  Aplicado: {formatDOP(appliedToThisInvoice.amount)}
+                                <span
+                                  style={{
+                                    fontSize: 12,
+                                    color: "var(--text-secondary)",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  Aplicado:{" "}
+                                  {formatDOP(appliedToThisInvoice.amount)}
                                 </span>
                                 <span
-                                  className={`badge ${appliedToThisInvoice.status === 'reconciled' ? 'badge-success' : 'badge-warning'}`}
-                                  style={{ whiteSpace: 'nowrap' }}
+                                  className={`badge ${appliedToThisInvoice.status === "reconciled" ? "badge-success" : "badge-warning"}`}
+                                  style={{ whiteSpace: "nowrap" }}
                                 >
-                                  {appliedToThisInvoice.status === 'reconciled' ? 'Reconciliada' : 'Pendiente'}
+                                  {appliedToThisInvoice.status === "reconciled"
+                                    ? "Reconciliada"
+                                    : "Pendiente"}
                                 </span>
-                                {appliedToThisInvoice.status === 'pending' && (
+                                {appliedToThisInvoice.status === "pending" && (
                                   <button
                                     className="btn btn-ghost btn-size-sm"
-                                    style={{ color: 'var(--color-error, var(--error-text))' }}
-                                    disabled={removeCreditNoteMutation.isPending}
-                                    onClick={() => removeCreditNoteMutation.mutate(entry.creditNoteId)}
+                                    style={{
+                                      color:
+                                        "var(--color-error, var(--error-text))",
+                                    }}
+                                    disabled={
+                                      removeCreditNoteMutation.isPending
+                                    }
+                                    onClick={() =>
+                                      removeCreditNoteMutation.mutate(
+                                        entry.creditNoteId,
+                                      )
+                                    }
                                     title="Deshacer aplicación — para cambiar el monto, deshaz y vuelve a aplicar"
                                   >
                                     Quitar
@@ -722,7 +1220,7 @@ export default function InvoiceDetail() {
                           </div>
                         </td>
                       </tr>
-                    )
+                    );
                   })}
                 </tbody>
               </table>
@@ -731,25 +1229,51 @@ export default function InvoiceDetail() {
         </div>
       )}
 
-      {invoice.status === 'submitted' && invoice.outstandingAmount > 0 && saldoFavor && saldoFavor.balance > 0 && (
-        <div className="inline-alert" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Wallet size={16} />
-          <span>
-            Este cliente tiene {formatDOP(saldoFavor.balance)} de saldo a favor disponible, pero solo se puede aplicar a facturas en borrador.
-            Esta funcionalidad para facturas sometidas aún no está disponible.
-          </span>
-        </div>
-      )}
+      {invoice.status === "submitted" &&
+        invoice.outstandingAmount > 0 &&
+        saldoFavor &&
+        saldoFavor.balance > 0 && (
+          <div
+            className="inline-alert"
+            style={{
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <Wallet size={16} />
+            <span>
+              Este cliente tiene {formatDOP(saldoFavor.balance)} de saldo a
+              favor disponible, pero solo se puede aplicar a facturas en
+              borrador. Esta funcionalidad para facturas sometidas aún no está
+              disponible.
+            </span>
+          </div>
+        )}
 
-      {invoice.status === 'submitted' && invoice.outstandingAmount > 0 && creditNoteSaldo && creditNoteSaldo.balance > 0 && (
-        <div className="inline-alert" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Receipt size={16} />
-          <span>
-            Este cliente tiene {formatDOP(creditNoteSaldo.balance)} en notas de crédito disponibles, pero solo se pueden aplicar a facturas en borrador.
-            Esta funcionalidad para facturas sometidas aún no está disponible.
-          </span>
-        </div>
-      )}
+      {invoice.status === "submitted" &&
+        invoice.outstandingAmount > 0 &&
+        creditNoteSaldo &&
+        creditNoteSaldo.balance > 0 && (
+          <div
+            className="inline-alert"
+            style={{
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <Receipt size={16} />
+            <span>
+              Este cliente tiene {formatDOP(creditNoteSaldo.balance)} en notas
+              de crédito disponibles, pero solo se pueden aplicar a facturas en
+              borrador. Esta funcionalidad para facturas sometidas aún no está
+              disponible.
+            </span>
+          </div>
+        )}
 
       <div className="card">
         <div className="card-header">
@@ -762,62 +1286,122 @@ export default function InvoiceDetail() {
                 <th>Código</th>
                 <th>Descripción</th>
                 <th>Notas</th>
-                <th style={{ textAlign: 'right' }}>Cant.</th>
-                <th style={{ textAlign: 'right' }}>Precio Unit.</th>
-                <th style={{ textAlign: 'right', width: 72 }}>Dto. %</th>
-                <th style={{ textAlign: 'right' }}>Importe</th>
+                <th style={{ textAlign: "right" }}>Cant.</th>
+                <th style={{ textAlign: "right" }}>Precio Unit.</th>
+                <th style={{ textAlign: "right", width: 72 }}>Dto. %</th>
+                <th style={{ textAlign: "right" }}>Importe</th>
                 <th>UDM</th>
               </tr>
             </thead>
             <tbody>
               {invoice.items.map((item, i) => (
                 <tr key={i}>
-                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.itemCode || '—'}</td>
-                  <td>{item.description || '—'}</td>
-                  <td style={{ fontSize: 12, color: 'var(--text-tertiary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.notes ?? ''}>{item.notes ?? '—'}</td>
-                  <td style={{ textAlign: 'right' }}>{item.qty}</td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td style={{ fontFamily: "monospace", fontSize: 12 }}>
+                    {item.itemCode || "—"}
+                  </td>
+                  <td>{item.description || "—"}</td>
+                  <td
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-tertiary)",
+                      maxWidth: 160,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                    title={item.notes ?? ""}
+                  >
+                    {item.notes ?? "—"}
+                  </td>
+                  <td style={{ textAlign: "right" }}>{item.qty}</td>
+                  <td style={{ textAlign: "right" }}>
                     {item.discountPct && item.discountPct > 0 ? (
                       <>
-                        <span style={{ textDecoration: 'line-through', color: 'var(--text-tertiary)', marginRight: 4 }}>{formatDOP(item.rate)}</span>
+                        <span
+                          style={{
+                            textDecoration: "line-through",
+                            color: "var(--text-tertiary)",
+                            marginRight: 4,
+                          }}
+                        >
+                          {formatDOP(item.rate)}
+                        </span>
                         {formatDOP(item.discountedRate ?? item.rate)}
                       </>
-                    ) : formatDOP(item.rate)}
+                    ) : (
+                      formatDOP(item.rate)
+                    )}
                   </td>
-                  <td style={{ textAlign: 'right' }}>{item.discountPct ? `${item.discountPct}%` : '—'}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
-                  <td>{item.uom || '—'}</td>
+                  <td style={{ textAlign: "right" }}>
+                    {item.discountPct ? `${item.discountPct}%` : "—"}
+                  </td>
+                  <td style={{ textAlign: "right", fontWeight: 500 }}>
+                    {formatDOP(item.amount)}
+                  </td>
+                  <td>{item.uom || "—"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
           <div className="items-total-row">
             {(() => {
-              const gross = invoice.items.reduce((s, i) => s + i.qty * i.rate, 0)
-              const discount = gross - invoice.subtotal
+              const gross = invoice.items.reduce(
+                (s, i) => s + i.qty * i.rate,
+                0,
+              );
+              const discount = gross - invoice.subtotal;
               return (
                 <>
-                  <div className="items-total-line"><span>Subtotal bruto</span><span>{formatDOP(gross)}</span></div>
-                  {discount > 0 && <div className="items-total-line" style={{ color: 'var(--text-danger)' }}><span>Descuento total</span><span>-{formatDOP(discount)}</span></div>}
+                  <div className="items-total-line">
+                    <span>Subtotal bruto</span>
+                    <span>{formatDOP(gross)}</span>
+                  </div>
+                  {discount > 0 && (
+                    <div
+                      className="items-total-line"
+                      style={{ color: "var(--text-danger)" }}
+                    >
+                      <span>Descuento total</span>
+                      <span>-{formatDOP(discount)}</span>
+                    </div>
+                  )}
                 </>
-              )
+              );
             })()}
-            <div className="items-total-line"><span>Impuestos</span><span>{formatDOP(invoice.grandTotal - invoice.subtotal)}</span></div>
+            <div className="items-total-line">
+              <span>Impuestos</span>
+              <span>{formatDOP(invoice.grandTotal - invoice.subtotal)}</span>
+            </div>
             {creditoAplicado > 0 && (
-              <div className="items-total-line" style={{ color: 'var(--color-success)' }}><span>Crédito</span><span>-{formatDOP(creditoAplicado)}</span></div>
+              <div
+                className="items-total-line"
+                style={{ color: "var(--color-success)" }}
+              >
+                <span>Crédito</span>
+                <span>-{formatDOP(creditoAplicado)}</span>
+              </div>
             )}
-            <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
+            <div
+              className="items-total-line"
+              style={{ fontWeight: 700, fontSize: 15 }}
+            >
               <span>Total</span>
               <span>{formatDOP(invoice.grandTotal)}</span>
             </div>
             {creditoAplicado > 0 && (
-              <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
+              <div
+                className="items-total-line"
+                style={{ fontWeight: 700, fontSize: 15 }}
+              >
                 <span>Total después de crédito</span>
                 <span>{formatDOP(invoice.grandTotal - creditoAplicado)}</span>
               </div>
             )}
-            {invoice.status === 'submitted' && (
-              <div className="items-total-line" style={{ color: outstandingColor, fontWeight: 600 }}>
+            {invoice.status === "submitted" && (
+              <div
+                className="items-total-line"
+                style={{ color: outstandingColor, fontWeight: 600 }}
+              >
                 <span>Pendiente</span>
                 <span>{formatDOP(invoice.outstandingAmount)}</span>
               </div>
@@ -827,37 +1411,72 @@ export default function InvoiceDetail() {
       </div>
 
       {/* Historial */}
-      <DocumentHistoryCard history={invoice.history} basePath="/facturacion/facturas" currentDocId={invoice.id} />
+      <DocumentHistoryCard
+        history={invoice.history}
+        basePath="/facturacion/facturas"
+        currentDocId={invoice.id}
+      />
 
       {/* Modal: crédito excedido al someter */}
       {creditErrorOpen && (
-        <div className="modal-overlay" onClick={() => setCreditErrorOpen(false)}>
-          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onClick={() => setCreditErrorOpen(false)}
+        >
+          <div
+            className="modal-box modal-box-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-head">
-              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <AlertTriangle size={16} style={{ color: 'var(--error-text)' }} /> Crédito excedido
+              <h2
+                className="modal-title"
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <AlertTriangle
+                  size={16}
+                  style={{ color: "var(--error-text)" }}
+                />{" "}
+                Crédito excedido
               </h2>
-              <button className="modal-close" onClick={() => setCreditErrorOpen(false)}>×</button>
+              <button
+                className="modal-close"
+                onClick={() => setCreditErrorOpen(false)}
+              >
+                ×
+              </button>
             </div>
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{creditErrorMsg}</p>
+            <div
+              className="modal-body"
+              style={{ display: "flex", flexDirection: "column", gap: 14 }}
+            >
+              <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                {creditErrorMsg}
+              </p>
               <div className="ff-wrap">
-                <label className="ff-label" htmlFor="modeOfPaymentRetry">Método de pago <span className="ff-required">*</span></label>
-                <select
+                <label className="ff-label" htmlFor="modeOfPaymentRetry">
+                  Método de pago <span className="ff-required">*</span>
+                </label>
+                <SearchSelect
                   id="modeOfPaymentRetry"
-                  className="ff-select"
                   value={modeOfPayment}
-                  onChange={(e) => setModeOfPayment(e.target.value)}
-                >
-                  <option value="">Seleccionar…</option>
-                  {metodos?.filter((m) => !m.disabled).map((m) => (
-                    <option key={m.name} value={m.name}>{m.name}</option>
-                  ))}
-                </select>
+                  selectedLabel={
+                    metodos?.find((m) => m.name === modeOfPayment)?.name ?? ""
+                  }
+                  onChange={(val) => setModeOfPayment(val)}
+                  options={metodosRetryOptions}
+                  onSearch={setModeOfPaymentRetrySearch}
+                  placeholder="Seleccionar…"
+                  className="ff-select"
+                />
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setCreditErrorOpen(false)}>Volver</button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setCreditErrorOpen(false)}
+              >
+                Volver
+              </button>
               <button
                 className="btn btn-primary"
                 onClick={handleCashRetry}
@@ -872,15 +1491,33 @@ export default function InvoiceDetail() {
 
       {/* Modal: cancelar factura con motivo obligatorio */}
       {cancelModalOpen && (
-        <div className="modal-overlay" onClick={() => setCancelModalOpen(false)}>
-          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onClick={() => setCancelModalOpen(false)}
+        >
+          <div
+            className="modal-box modal-box-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-head">
-              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Ban size={16} style={{ color: 'var(--error-text)' }} /> Cancelar factura
+              <h2
+                className="modal-title"
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <Ban size={16} style={{ color: "var(--error-text)" }} />{" "}
+                Cancelar factura
               </h2>
-              <button className="modal-close" onClick={() => setCancelModalOpen(false)}>×</button>
+              <button
+                className="modal-close"
+                onClick={() => setCancelModalOpen(false)}
+              >
+                ×
+              </button>
             </div>
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div
+              className="modal-body"
+              style={{ display: "flex", flexDirection: "column", gap: 14 }}
+            >
               {cancelForbiddenMsg && (
                 <div className="inline-alert inline-alert-warn">
                   <AlertTriangle size={16} />
@@ -888,7 +1525,9 @@ export default function InvoiceDetail() {
                 </div>
               )}
               <div className="ff-wrap">
-                <label className="ff-label ff-required" htmlFor="cancelReason">Motivo de cancelación</label>
+                <label className="ff-label ff-required" htmlFor="cancelReason">
+                  Motivo de cancelación
+                </label>
                 <textarea
                   id="cancelReason"
                   className="ff-textarea"
@@ -898,11 +1537,18 @@ export default function InvoiceDetail() {
                   placeholder="Describe el motivo de la cancelación (mínimo 10 caracteres)"
                   maxLength={500}
                 />
-                <p className="ff-hint">{cancelReason.trim().length}/500 caracteres (mínimo 10)</p>
+                <p className="ff-hint">
+                  {cancelReason.trim().length}/500 caracteres (mínimo 10)
+                </p>
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setCancelModalOpen(false)}>Volver</button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setCancelModalOpen(false)}
+              >
+                Volver
+              </button>
               <button
                 className="btn btn-danger"
                 onClick={() => cancelMutation.mutate(cancelReason.trim())}
@@ -917,16 +1563,43 @@ export default function InvoiceDetail() {
 
       {/* Modal: devolver producto(s) */}
       {returnModalOpen && (
-        <div className="modal-overlay" onClick={() => setReturnModalOpen(false)}>
-          <div className="modal-box modal-box-lg" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+        <div
+          className="modal-overlay"
+          onClick={() => setReturnModalOpen(false)}
+        >
+          <div
+            className="modal-box modal-box-lg"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxHeight: "90vh", overflowY: "auto" }}
+          >
             <div className="modal-head">
-              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <h2
+                className="modal-title"
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
                 <RotateCcw size={16} /> Devolver producto(s)
               </h2>
-              <button className="modal-close" onClick={() => setReturnModalOpen(false)}>×</button>
+              <button
+                className="modal-close"
+                onClick={() => setReturnModalOpen(false)}
+              >
+                ×
+              </button>
             </div>
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+            <div
+              className="modal-body"
+              style={{ display: "flex", flexDirection: "column", gap: 16 }}
+            >
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={returnFullInvoice}
@@ -942,38 +1615,65 @@ export default function InvoiceDetail() {
                       <tr>
                         <th style={{ width: 36 }} />
                         <th>Artículo</th>
-                        <th style={{ textAlign: 'right', width: 100 }}>Comprado</th>
-                        <th style={{ textAlign: 'right', width: 120 }}>Cant. a devolver</th>
+                        <th style={{ textAlign: "right", width: 100 }}>
+                          Comprado
+                        </th>
+                        <th style={{ textAlign: "right", width: 120 }}>
+                          Cant. a devolver
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {returnRows.map((row) => (
-                        <tr key={row.itemCode} style={{ opacity: row.checked ? 1 : 0.6 }}>
-                          <td style={{ textAlign: 'center' }}>
+                        <tr
+                          key={row.itemCode}
+                          style={{ opacity: row.checked ? 1 : 0.6 }}
+                        >
+                          <td style={{ textAlign: "center" }}>
                             <input
                               type="checkbox"
                               checked={row.checked}
                               onChange={() => toggleReturnRow(row.itemCode)}
-                              style={{ cursor: 'pointer', accentColor: 'var(--color-brand)' }}
+                              style={{
+                                cursor: "pointer",
+                                accentColor: "var(--color-brand)",
+                              }}
                             />
                           </td>
                           <td>
-                            <span style={{ fontWeight: 500 }}>{row.description}</span>
+                            <span style={{ fontWeight: 500 }}>
+                              {row.description}
+                            </span>
                             <br />
-                            <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--text-tertiary)' }}>{row.itemCode}</span>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontFamily: "monospace",
+                                color: "var(--text-tertiary)",
+                              }}
+                            >
+                              {row.itemCode}
+                            </span>
                           </td>
-                          <td style={{ textAlign: 'right' }}>{row.qtyPurchased}</td>
+                          <td style={{ textAlign: "right" }}>
+                            {row.qtyPurchased}
+                          </td>
                           <td>
                             <input
-                              className={`items-input${row.checked && (row.qty <= 0 || row.qty > row.qtyPurchased) ? ' items-input-error' : ''}`}
+                              className={`items-input${row.checked && (row.qty <= 0 || row.qty > row.qtyPurchased) ? " items-input-error" : ""}`}
                               type="number"
                               min="0"
                               max={row.qtyPurchased}
                               step="1"
-                              style={{ textAlign: 'right' }}
+                              style={{ textAlign: "right" }}
                               value={row.qty}
                               disabled={!row.checked}
-                              onChange={(e) => setReturnRowQty(row.itemCode, parseFloat(e.target.value) || 0)}
+                              onChange={(e) =>
+                                setReturnRowQty(
+                                  row.itemCode,
+                                  parseFloat(e.target.value) || 0,
+                                )
+                              }
                             />
                           </td>
                         </tr>
@@ -984,36 +1684,57 @@ export default function InvoiceDetail() {
               )}
 
               <div className="ff-wrap">
-                <label className="ff-label ff-required">¿Qué hacer con el monto?</label>
-                <select
-                  className="ff-select"
+                <label className="ff-label ff-required">
+                  ¿Qué hacer con el monto?
+                </label>
+                <SearchSelect
                   value={returnResolution}
-                  onChange={(e) => setReturnResolution(e.target.value as 'refund' | 'credit_note_only')}
-                >
-                  <option value="credit_note_only">Saldo a favor</option>
-                  <option value="refund">Reembolsar ahora</option>
-                </select>
+                  selectedLabel={
+                    RETURN_RESOLUTION_OPTIONS.find(
+                      (o) => o.value === returnResolution,
+                    )?.label ?? ""
+                  }
+                  onChange={(val) =>
+                    setReturnResolution(
+                      (val || "credit_note_only") as
+                        | "refund"
+                        | "credit_note_only",
+                    )
+                  }
+                  options={returnResolutionOptions}
+                  onSearch={setReturnResolutionSearch}
+                  className="ff-select"
+                />
               </div>
 
-              {returnResolution === 'refund' && (
+              {returnResolution === "refund" && (
                 <div className="ff-wrap">
-                  <label className="ff-label ff-required" htmlFor="returnModeOfPayment">Método de pago del reembolso</label>
-                  <select
-                    id="returnModeOfPayment"
-                    className="ff-select"
-                    value={returnModeOfPayment}
-                    onChange={(e) => setReturnModeOfPayment(e.target.value)}
+                  <label
+                    className="ff-label ff-required"
+                    htmlFor="returnModeOfPayment"
                   >
-                    <option value="">Seleccionar…</option>
-                    {metodos?.filter((m) => !m.disabled).map((m) => (
-                      <option key={m.name} value={m.name}>{m.name}</option>
-                    ))}
-                  </select>
+                    Método de pago del reembolso
+                  </label>
+                  <SearchSelect
+                    id="returnModeOfPayment"
+                    value={returnModeOfPayment}
+                    selectedLabel={
+                      metodos?.find((m) => m.name === returnModeOfPayment)
+                        ?.name ?? ""
+                    }
+                    onChange={(val) => setReturnModeOfPayment(val)}
+                    options={returnModeOptions}
+                    onSearch={setReturnModeOfPaymentSearch}
+                    placeholder="Seleccionar…"
+                    className="ff-select"
+                  />
                 </div>
               )}
 
               <div className="ff-wrap">
-                <label className="ff-label ff-required" htmlFor="returnReason">Motivo de la devolución</label>
+                <label className="ff-label ff-required" htmlFor="returnReason">
+                  Motivo de la devolución
+                </label>
                 <textarea
                   id="returnReason"
                   className="ff-textarea"
@@ -1023,11 +1744,18 @@ export default function InvoiceDetail() {
                   placeholder="Describe el motivo de la devolución (mínimo 10 caracteres)"
                   maxLength={500}
                 />
-                <p className="ff-hint">{returnReason.trim().length}/500 caracteres (mínimo 10)</p>
+                <p className="ff-hint">
+                  {returnReason.trim().length}/500 caracteres (mínimo 10)
+                </p>
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setReturnModalOpen(false)}>Volver</button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setReturnModalOpen(false)}
+              >
+                Volver
+              </button>
               <button
                 className="btn btn-primary"
                 onClick={() => devolucionMutation.mutate()}
@@ -1041,5 +1769,5 @@ export default function InvoiceDetail() {
         </div>
       )}
     </div>
-  )
+  );
 }

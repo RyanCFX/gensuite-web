@@ -10,6 +10,7 @@ import { Plus, Eye, Search, X, Loader2, Copy, PackageOpen } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -133,7 +134,7 @@ export default function PedidosPage() {
               <th>Entrega</th>
               <th style={{ textAlign: 'right' }}>Total</th>
               <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
-              <th style={{ textAlign: 'right', width: 64 }}>Ver</th>
+              <th style={{ width: 48 }} />
             </tr>
           </thead>
           <tbody>
@@ -171,10 +172,11 @@ export default function PedidosPage() {
                     <td>{formatDate(p.transactionDate)}</td>
                     <td>{p.deliveryDate ? formatDate(p.deliveryDate) : <span className="td-dim">—</span>}</td>
                     <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(itemTotal)}</td>
-                    <td style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    <td style={{ display: 'flex', flexWrap: 'wrap', alignItems:'center', gap: 4 }}>
                       <span className={`badge ${STATUS_BADGE[p.status] ?? 'badge-neutral'}`}>
                         {STATUS_LABEL[p.status] ?? p.status}
                       </span>
+
                       {p.isLayaway && (
                         <span
                           className={`badge ${p.layawayVencido ? 'badge-error' : 'badge-info'}`}
@@ -185,30 +187,20 @@ export default function PedidosPage() {
                         </span>
                       )}
                     </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <button
-                        className="btn btn-ghost btn-size-icon-sm"
-                        title="Duplicar"
-                        onClick={(e) => { e.stopPropagation(); navigate(`/pedidos/nuevo?duplicate=${p.id}`) }}
-                      >
-                        <Copy size={14} />
-                      </button>
-                      {p.status === 'draft' ? (
-                        <button
-                          className="btn btn-ghost btn-size-icon-sm"
-                          style={{ color: 'var(--icon-muted)' }}
-                          onClick={(e) => { e.stopPropagation(); setToCancel(p) }}
-                        >
-                          <X size={14} />
-                        </button>
-                      ) : (
-                        <button
-                          className="btn btn-ghost btn-size-icon-sm"
-                          onClick={(e) => { e.stopPropagation(); navigate(`/pedidos/${p.id}`) }}
-                        >
-                          <Eye size={15} />
-                        </button>
-                      )}
+                    <td onClick={(e) => e.stopPropagation()} className="actions-cell">
+                      <ActionsMenu>
+                        <ActionsMenuItem onClick={() => navigate(`/pedidos/${p.id}`)}>
+                          <Eye size={14} /> Ver
+                        </ActionsMenuItem>
+                        <ActionsMenuItem onClick={() => navigate(`/pedidos/nuevo?duplicate=${p.id}`)}>
+                          <Copy size={14} /> Duplicar
+                        </ActionsMenuItem>
+                        {p.status === 'draft' && (
+                          <ActionsMenuItem danger onClick={() => setToCancel(p)}>
+                            <X size={14} /> Cancelar
+                          </ActionsMenuItem>
+                        )}
+                      </ActionsMenu>
                     </td>
                   </tr>
                 )
