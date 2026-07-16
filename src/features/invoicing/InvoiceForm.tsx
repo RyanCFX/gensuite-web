@@ -209,7 +209,7 @@ export default function InvoiceForm() {
     onSuccess: (invoice) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       toast.success('Factura creada como borrador')
-      navigate(`/facturacion/facturas/${invoice.id}`)
+      navigate(`/facturas/${invoice.id}`)
     },
     onError: (err: { message?: string }) => {
       const msg = err?.message ?? ''
@@ -415,7 +415,7 @@ export default function InvoiceForm() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <a className="page-back-link" onClick={() => navigate('/facturacion/facturas')}>
+          <a className="page-back-link" onClick={() => navigate('/facturas')}>
             <ArrowLeft size={14} /> Facturas
           </a>
           <h1 className="page-title">Nueva Factura</h1>
@@ -691,7 +691,7 @@ export default function InvoiceForm() {
           <button
             type="button"
             className="btn btn-ghost"
-            onClick={() => navigate('/facturacion/facturas')}
+            onClick={() => navigate('/facturas')}
           >
             Cancelar
           </button>

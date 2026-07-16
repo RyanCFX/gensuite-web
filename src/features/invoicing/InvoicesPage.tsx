@@ -99,7 +99,7 @@ export default function InvoicesPage() {
           <h1 className="page-title">Facturas</h1>
           <p className="page-sub">Gestiona tus facturas de venta y comprobantes fiscales</p>
         </div>
-        <button className="btn btn-primary" onClick={() => navigate('/facturacion/facturas/nueva')}>
+        <button className="btn btn-primary" onClick={() => navigate('/facturas/nueva')}>
           <Plus size={16} />
           Nueva Factura
         </button>
@@ -189,7 +189,7 @@ export default function InvoicesPage() {
                   <div className="empty-state">
                     <div className="empty-title">Sin facturas</div>
                     <p className="empty-sub">Crea tu primera factura para comenzar.</p>
-                    <button className="btn btn-primary btn-size-sm" onClick={() => navigate('/facturacion/facturas/nueva')}>
+                    <button className="btn btn-primary btn-size-sm" onClick={() => navigate('/facturas/nueva')}>
                       <Plus size={14} /> Nueva Factura
                     </button>
                   </div>
@@ -200,7 +200,7 @@ export default function InvoicesPage() {
                 <tr
                   key={inv.id}
                   className="table-row-clickable"
-                  onClick={() => navigate(`/facturacion/facturas/${inv.id}`)}
+                  onClick={() => navigate(`/facturas/${inv.id}`)}
                 >
                   <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>
                     {inv.amendedFrom && <GitBranch size={12} style={{ verticalAlign: 'middle', marginRight: 4, color: 'var(--text-tertiary)' }} />}
@@ -222,7 +222,7 @@ export default function InvoicesPage() {
                   <td style={{ textAlign: 'right' }}>
                     <button
                       className="btn btn-ghost btn-size-icon-sm"
-                      onClick={(e) => { e.stopPropagation(); navigate(`/facturacion/facturas/${inv.id}`) }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/facturas/${inv.id}`) }}
                     >
                       <Eye size={15} />
                     </button>

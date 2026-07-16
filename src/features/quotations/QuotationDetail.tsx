@@ -70,9 +70,9 @@ export default function QuotationDetail() {
       setConvertDialogOpen(false)
       const invoice = result as Quotation & { invoiceId?: string }
       if (invoice.invoiceId) {
-        navigate(`/facturacion/facturas/${invoice.invoiceId}`)
+        navigate(`/facturas/${invoice.invoiceId}`)
       } else {
-        navigate('/facturacion/facturas')
+        navigate('/facturas')
       }
     },
     onError: (err: { message?: string }) => {

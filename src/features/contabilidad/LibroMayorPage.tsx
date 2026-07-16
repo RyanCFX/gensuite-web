@@ -18,7 +18,7 @@ function today(): string {
 
 function voucherLink(voucherType: string, voucherNo: string): string | null {
   switch (voucherType) {
-    case 'Sales Invoice':    return `/facturacion/facturas/${voucherNo}`
+    case 'Sales Invoice':    return `/facturas/${voucherNo}`
     case 'Purchase Invoice': return `/compras/${voucherNo}`
     case 'Payment Entry':    return `/cobros/${voucherNo}`
     case 'Journal Entry':    return `/asientos/${voucherNo}`

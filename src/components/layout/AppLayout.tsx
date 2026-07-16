@@ -51,18 +51,12 @@ const NAV_CATALOG: NavEntry = {
 }
 
 const NAV_VENTAS: NavEntry[] = [
-  { label: 'Cotizaciones', icon: <FileText size={16} aria-hidden="true" />, path: '/cotizaciones' },
-  { label: 'Pedidos',      icon: <ClipboardList size={16} aria-hidden="true" />, path: '/pedidos' },
-  {
-    label: 'Facturación',
-    icon: <Receipt size={16} aria-hidden="true" />,
-    prefix: '/facturacion',
-    children: [
-      { label: 'Facturas',         icon: <Receipt size={14} />, path: '/facturacion/facturas'      },
-      { label: 'Notas de Crédito', icon: <FileText size={14} />, path: '/facturacion/notas-credito' },
-      { label: 'Notas de Débito',  icon: <FileText size={14} />, path: '/facturacion/notas-debito'  },
-    ],
-  },
+  { label: 'Cotizaciones',     icon: <FileText size={16} aria-hidden="true" />, path: '/cotizaciones' },
+  { label: 'Pedidos',          icon: <ClipboardList size={16} aria-hidden="true" />, path: '/pedidos' },
+  { label: 'Facturas',         icon: <Receipt size={16} aria-hidden="true" />, path: '/facturas'      },
+  { label: 'Notas de Crédito', icon: <FileText size={16} aria-hidden="true" />, path: '/notas-credito' },
+  { label: 'Notas de Débito',  icon: <FileText size={16} aria-hidden="true" />, path: '/notas-debito'  },
+  { label: 'Devoluciones',     icon: <FileText size={16} aria-hidden="true" />, path: '/devoluciones'  },
 ]
 
 const NAV_OPS: NavEntry[] = [

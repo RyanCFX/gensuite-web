@@ -102,7 +102,7 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
               Disponible: {formatDOP(saldo.balance)}
             </span>
           )}
-          <button className="btn btn-ghost btn-size-sm" onClick={() => navigate('/facturacion/notas-credito')}>
+          <button className="btn btn-ghost btn-size-sm" onClick={() => navigate('/notas-credito')}>
             Ver todas
           </button>
         </div>
@@ -139,7 +139,7 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
                           <span>
                             <button
                               style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
-                              onClick={() => navigate(`/facturacion/facturas/${a.invoiceId}`)}
+                              onClick={() => navigate(`/facturas/${a.invoiceId}`)}
                             >
                               {a.invoiceId}
                             </button>

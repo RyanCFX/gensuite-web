@@ -140,12 +140,16 @@ export default function InvoiceDetail() {
       .map((m) => ({ value: m.name, label: m.name }));
   }, [metodos, returnModeOfPaymentSearch]);
 
+  // Si la factura original tiene saldo pendiente (venta a crédito sin pagar), el backend
+  // rechaza resolution="refund" con 400 — no se ofrece esa opción en el selector.
+  const hasOutstandingBalance = (invoice?.outstandingAmount ?? 0) > 0;
+
   const returnResolutionOptions: SearchSelectOption[] = useMemo(() => {
     const q = returnResolutionSearch.toLowerCase();
-    return RETURN_RESOLUTION_OPTIONS.filter(
+    return RETURN_RESOLUTION_OPTIONS.filter((o) => o.value !== "refund" || !hasOutstandingBalance).filter(
       (o) => !q || o.label.toLowerCase().includes(q),
     );
-  }, [returnResolutionSearch]);
+  }, [returnResolutionSearch, hasOutstandingBalance]);
 
   const { data: saldoFavor } = useQuery({
     queryKey: ["saldo-favor", invoice?.customer],
@@ -427,11 +431,13 @@ export default function InvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["invoice", id] });
       queryClient.invalidateQueries({ queryKey: ["credit-notes"] });
-      toast.success(result.message ?? "Devolución procesada correctamente");
+      toast.success(result.message ?? "Devolución procesada correctamente", {
+        duration: result.appliedToOriginalInvoice ? 8000 : undefined,
+      });
       setReturnModalOpen(false);
-      navigate("/facturacion/notas-credito");
+      navigate("/notas-credito");
     },
-    onError: (err: { message?: string }) => {
+    onError: (err: ApiError) => {
       toast.error(err?.message ?? "Error al procesar la devolución");
     },
   });
@@ -441,7 +447,7 @@ export default function InvoiceDetail() {
     onSuccess: (newInvoice) => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("Enmienda creada como borrador");
-      navigate(`/facturacion/facturas/${newInvoice.id}`);
+      navigate(`/facturas/${newInvoice.id}`);
     },
     onError: (err: { message?: string }) => {
       toast.error(err?.message ?? "Error al enmendar la factura");
@@ -493,7 +499,7 @@ export default function InvoiceDetail() {
           <div className="empty-title">Factura no encontrada</div>
           <button
             className="btn btn-ghost btn-size-sm"
-            onClick={() => navigate("/facturacion/facturas")}
+            onClick={() => navigate("/facturas")}
           >
             Volver a facturas
           </button>
@@ -529,7 +535,7 @@ export default function InvoiceDetail() {
         <div>
           <a
             className="page-back-link"
-            onClick={() => navigate("/facturacion/facturas")}
+            onClick={() => navigate("/facturas")}
           >
             <ArrowLeft size={14} /> Facturas
           </a>
@@ -805,7 +811,7 @@ export default function InvoiceDetail() {
                     padding: 0,
                   }}
                   onClick={() =>
-                    navigate(`/facturacion/facturas/${invoice.amendedFrom}`)
+                    navigate(`/facturas/${invoice.amendedFrom}`)
                   }
                 >
                   {invoice.amendedFrom}
@@ -1413,7 +1419,7 @@ export default function InvoiceDetail() {
       {/* Historial */}
       <DocumentHistoryCard
         history={invoice.history}
-        basePath="/facturacion/facturas"
+        basePath="/facturas"
         currentDocId={invoice.id}
       />
 
@@ -1705,6 +1711,14 @@ export default function InvoiceDetail() {
                   onSearch={setReturnResolutionSearch}
                   className="ff-select"
                 />
+                {hasOutstandingBalance && (
+                  <p className="ff-hint">
+                    Esta factura tiene {formatDOP(invoice.outstandingAmount)}{" "}
+                    pendiente de cobro — la nota de crédito se aplicará
+                    automáticamente a ese pendiente, por eso "Reembolsar
+                    ahora" no está disponible.
+                  </p>
+                )}
               </div>
 
               {returnResolution === "refund" && (

@@ -428,9 +428,64 @@ export interface DevolucionResult {
   ncf?: string
   resolution: 'refund' | 'credit_note_only'
   grandTotal: number
-  /** Solo presente si resolution === 'refund' */
+  /** true si la nota de crédito se concilió automáticamente contra el saldo pendiente de la factura original */
+  appliedToOriginalInvoice: boolean
+  /** Monto aplicado a la factura original (0 si no aplicó) */
+  appliedAmount: number
+  /** grandTotal - appliedAmount — lo que quedó disponible sin aplicar (saldo a favor) */
+  remainingAvailable: number
+  /** Solo presente si resolution === 'refund' tuvo éxito (sin pendiente en la factura) */
   paymentEntryId?: string
   message?: string
+}
+
+// GET /devoluciones (lista) — mismo shape que GET /credit-notes
+export type DevolucionListItem = CreditNote
+
+// GET /devoluciones/:id (detalle)
+export interface DevolucionOriginalInvoice {
+  id: string
+  customer: string
+  customerName: string
+  postingDate: string
+  ncf?: string
+  ncfType?: string
+  grandTotal: number
+  outstandingAmount: number
+  status: 'draft' | 'submitted' | 'cancelled'
+}
+
+export interface DevolucionItem {
+  itemCode: string
+  description?: string
+  qty: number
+  rate: number
+  amount: number
+  uom?: string
+}
+
+export interface DevolucionDetail {
+  creditNoteId: string
+  ncf?: string
+  ncfType?: string
+  postingDate: string
+  reason: string
+  documentStatus: 'draft' | 'submitted' | 'cancelled'
+  customer: string
+  customerName: string
+  items: DevolucionItem[]
+  grandTotal: number
+  refunded: boolean
+  refundedAmount: number
+  appliedAmount: number
+  availableAmount: number
+  appliedTo: CreditNoteAppliedTo[]
+  /** Solo presente si documentStatus === 'submitted' */
+  usageStatus?: 'available' | 'partially_used' | 'fully_used'
+  /** null solo si falló traer la factura original (raro) */
+  originalInvoice: DevolucionOriginalInvoice | null
+  createdAt: string
+  modifiedAt: string
 }
 
 export interface DebitNote {

@@ -241,7 +241,7 @@ export default function CreditNotesPage() {
       queryClient.invalidateQueries({ queryKey: ['invoice', result.id] })
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       toast.success('Aplicado a la factura correctamente')
-      navigate(`/facturacion/facturas/${result.id}`)
+      navigate(`/facturas/${result.id}`)
       closeApplyModal()
     },
     onError: (err: ApiError) => {
@@ -438,7 +438,7 @@ export default function CreditNotesPage() {
                           <div key={a.invoiceId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
                             <button
                               style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
-                              onClick={() => navigate(`/facturacion/facturas/${a.invoiceId}`)}
+                              onClick={() => navigate(`/facturas/${a.invoiceId}`)}
                             >
                               {a.invoiceId}
                             </button>

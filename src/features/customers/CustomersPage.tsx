@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { listCustomers, deleteCustomer } from '@/shared/api/customers'
-import type { Customer } from '@/shared/api/types'
+import type { Customer, ApiError } from '@/shared/api/types'
 import { useDebounce } from '@/lib/useDebounce'
 import { Plus, Pencil, Ban, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
@@ -44,8 +44,8 @@ export default function CustomersPage() {
       queryClient.invalidateQueries({ queryKey: ['customers'] })
       setToDisable(null)
     },
-    onError: () => {
-      toast.error('Error al desactivar el cliente')
+    onError: (err: ApiError) => {
+      toast.error(err?.message ?? 'Error al desactivar el cliente')
     },
   })
 

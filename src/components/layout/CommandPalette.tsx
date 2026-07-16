@@ -34,10 +34,11 @@ const ALL_ITEMS: SearchItem[] = [
   // ── Ventas ─────────────────────────────────────────────────────────────────
   { id: 'cotizaciones', label: 'Cotizaciones',         group: 'Ventas',       path: '/cotizaciones',                   icon: <FileText size={15} />, keywords: 'quotations cotizar presupuesto' },
   { id: 'cot-nueva',    label: 'Nueva Cotización',     group: 'Ventas',       path: '/cotizaciones/nueva',             icon: <FileText size={15} />, keywords: 'crear cotizacion' },
-  { id: 'facturas',     label: 'Facturas',             group: 'Ventas',       path: '/facturacion/facturas',           icon: <Receipt size={15} />, keywords: 'invoices facturacion ventas' },
-  { id: 'fact-nueva',   label: 'Nueva Factura',        group: 'Ventas',       path: '/facturacion/facturas/nueva',     icon: <Receipt size={15} />, keywords: 'crear factura invoice' },
-  { id: 'notas-credito', label: 'Notas de Crédito',   group: 'Ventas',       path: '/facturacion/notas-credito',      icon: <Receipt size={15} />, keywords: 'credit note devolucion ncf b04' },
-  { id: 'notas-debito',  label: 'Notas de Débito',    group: 'Ventas',       path: '/facturacion/notas-debito',       icon: <Receipt size={15} />, keywords: 'debit note cargo ncf b03' },
+  { id: 'facturas',     label: 'Facturas',             group: 'Ventas',       path: '/facturas',           icon: <Receipt size={15} />, keywords: 'invoices facturacion ventas' },
+  { id: 'fact-nueva',   label: 'Nueva Factura',        group: 'Ventas',       path: '/facturas/nueva',     icon: <Receipt size={15} />, keywords: 'crear factura invoice' },
+  { id: 'notas-credito', label: 'Notas de Crédito',   group: 'Ventas',       path: '/notas-credito',      icon: <Receipt size={15} />, keywords: 'credit note devolucion ncf b04' },
+  { id: 'notas-debito',  label: 'Notas de Débito',    group: 'Ventas',       path: '/notas-debito',       icon: <Receipt size={15} />, keywords: 'debit note cargo ncf b03' },
+  { id: 'devoluciones',  label: 'Devoluciones',       group: 'Ventas',       path: '/devoluciones',       icon: <Receipt size={15} />, keywords: 'return devolucion nota credito' },
 
   // ── Inventario ─────────────────────────────────────────────────────────────
   { id: 'stock',        label: 'Stock Actual',         group: 'Inventario',   path: '/inventario/stock',               icon: <Warehouse size={15} />, keywords: 'inventory stock almacen warehouse' },

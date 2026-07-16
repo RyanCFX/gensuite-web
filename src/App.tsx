@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import AppLayout from '@/components/layout/AppLayout'
 import LoginPage from '@/pages/LoginPage'
+import NotFoundPage from '@/pages/NotFoundPage'
 
 // Lazy-loaded pages
 import { lazy, Suspense } from 'react'
@@ -24,6 +25,8 @@ const InvoiceDetail   = lazy(() => import('@/features/invoicing/InvoiceDetail'))
 const InvoiceForm     = lazy(() => import('@/features/invoicing/InvoiceForm'))
 const CreditNotesPage = lazy(() => import('@/features/invoicing/CreditNotesPage'))
 const DebitNotesPage  = lazy(() => import('@/features/invoicing/DebitNotesPage'))
+const DevolucionesPage = lazy(() => import('@/features/invoicing/DevolucionesPage'))
+const DevolucionDetail = lazy(() => import('@/features/invoicing/DevolucionDetail'))
 const StockPage       = lazy(() => import('@/features/inventory/StockPage'))
 const HistoryPage     = lazy(() => import('@/features/inventory/HistoryPage'))
 const CountsPage      = lazy(() => import('@/features/inventory/CountsPage'))
@@ -119,11 +122,13 @@ export default function App() {
             <Route path="/transferencias/:id" element={<Suspense fallback={<PageLoader />}><TransferenciaDetail /></Suspense>} />
 
             {/* Facturación */}
-            <Route path="/facturacion/facturas" element={<Suspense fallback={<PageLoader />}><InvoicesPage /></Suspense>} />
-            <Route path="/facturacion/facturas/nueva" element={<Suspense fallback={<PageLoader />}><InvoiceForm /></Suspense>} />
-            <Route path="/facturacion/facturas/:id" element={<Suspense fallback={<PageLoader />}><InvoiceDetail /></Suspense>} />
-            <Route path="/facturacion/notas-credito" element={<Suspense fallback={<PageLoader />}><CreditNotesPage /></Suspense>} />
-            <Route path="/facturacion/notas-debito" element={<Suspense fallback={<PageLoader />}><DebitNotesPage /></Suspense>} />
+            <Route path="/facturas" element={<Suspense fallback={<PageLoader />}><InvoicesPage /></Suspense>} />
+            <Route path="/facturas/nueva" element={<Suspense fallback={<PageLoader />}><InvoiceForm /></Suspense>} />
+            <Route path="/facturas/:id" element={<Suspense fallback={<PageLoader />}><InvoiceDetail /></Suspense>} />
+            <Route path="/notas-credito" element={<Suspense fallback={<PageLoader />}><CreditNotesPage /></Suspense>} />
+            <Route path="/notas-debito" element={<Suspense fallback={<PageLoader />}><DebitNotesPage /></Suspense>} />
+            <Route path="/devoluciones" element={<Suspense fallback={<PageLoader />}><DevolucionesPage /></Suspense>} />
+            <Route path="/devoluciones/:id" element={<Suspense fallback={<PageLoader />}><DevolucionDetail /></Suspense>} />
 
             {/* Inventario */}
              <Route path="/inventario/articulos" element={<Suspense fallback={<PageLoader />}><ItemsPage /></Suspense>} />
@@ -193,9 +198,10 @@ export default function App() {
             <Route path="/config/:seccion" element={<Suspense fallback={<PageLoader />}><ConfigPage /></Suspense>} />
             <Route path="/config" element={<Navigate to="/config/empresa" replace />} />
 
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
         </Route>
+
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   )

@@ -45,6 +45,8 @@ export const ENDPOINTS = {
   },
   devoluciones: {
     create: '/devoluciones',
+    list: '/devoluciones',
+    byId: (id: string) => `/devoluciones/${id}`,
   },
   debitNotes: {
     list: '/debit-notes',

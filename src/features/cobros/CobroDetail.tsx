@@ -213,7 +213,7 @@ export default function CobroDetail() {
                   <tr
                     key={ref.invoiceId}
                     className="data-table-row-link"
-                    onClick={() => navigate(`/facturacion/facturas/${ref.invoiceId}`)}
+                    onClick={() => navigate(`/facturas/${ref.invoiceId}`)}
                   >
                     <td>
                       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }}>

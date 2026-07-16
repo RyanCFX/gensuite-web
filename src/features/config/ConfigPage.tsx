@@ -1073,7 +1073,8 @@ function PerfilSection() {
 
   useEffect(() => {
     if (data && typeof data === 'object') {
-      setForm(data as Record<string, string>)
+      const { roles: _roles, ...rest } = data as Record<string, string>
+      setForm(rest)
     }
   }, [data])
 

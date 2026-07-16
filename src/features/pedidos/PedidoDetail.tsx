@@ -55,7 +55,7 @@ export default function PedidoDetail() {
         setStockWarning(result.stockReserved === false ? (result.warning ?? 'El stock no pudo reservarse.') : null)
       } else {
         toast.success('Pedido facturado correctamente')
-        if (result.facturaId) navigate(`/facturacion/facturas/${result.facturaId}`)
+        if (result.facturaId) navigate(`/facturas/${result.facturaId}`)
       }
     },
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al someter el pedido'),
@@ -110,7 +110,7 @@ export default function PedidoDetail() {
       queryClient.invalidateQueries({ queryKey: ['pedidos'] })
       queryClient.invalidateQueries({ queryKey: ['pedido', id] })
       toast.success(result.message ?? 'Factura generada desde el apartado')
-      navigate(`/facturacion/facturas/${result.facturaId}`)
+      navigate(`/facturas/${result.facturaId}`)
     },
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al facturar el apartado'),
   })
