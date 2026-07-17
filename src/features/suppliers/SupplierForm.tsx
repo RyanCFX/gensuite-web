@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { getSupplier, createSupplier, updateSupplier } from '@/shared/api/suppliers'
+import type { ApiError } from '@/shared/api/types'
 import { listGruposProveedores } from '@/shared/api/config'
 import { validateRNC, validateCedula, formatRNC, formatCedula } from '@/lib/validators/dgii'
 import { TIPO_IDENTIFICACION } from '@/lib/constants'
@@ -79,6 +80,7 @@ export default function SupplierForm() {
     handleSubmit,
     watch,
     setValue,
+    setError,
     formState: { errors, isSubmitting },
     reset,
   } = useForm<FormValues>({
@@ -154,7 +156,12 @@ export default function SupplierForm() {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] })
       navigate('/proveedores')
     },
-    onError: (err: { message?: string }) => {
+    onError: (err: ApiError) => {
+      if (err?.statusCode === 409) {
+        toast.error(err.message)
+        setError(watch('tipoIdentificacion') === 'Cedula' ? 'cedula' : 'rnc', { type: 'manual', message: err.message })
+        return
+      }
       toast.error(err?.message ?? 'Error al crear el proveedor')
     },
   })
@@ -167,7 +174,12 @@ export default function SupplierForm() {
       queryClient.invalidateQueries({ queryKey: ['supplier', id] })
       navigate(`/proveedores/${id}`)
     },
-    onError: (err: { message?: string }) => {
+    onError: (err: ApiError) => {
+      if (err?.statusCode === 409) {
+        toast.error(err.message)
+        setError(watch('tipoIdentificacion') === 'Cedula' ? 'cedula' : 'rnc', { type: 'manual', message: err.message })
+        return
+      }
       toast.error(err?.message ?? 'Error al actualizar el proveedor')
     },
   })

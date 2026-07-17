@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { getCustomer, createCustomer, updateCustomer, listCustomerGroups } from '@/shared/api/customers'
+import type { ApiError } from '@/shared/api/types'
 import { validateRNC, validateCedula, formatRNC, formatCedula } from '@/lib/validators/dgii'
 import { SearchSelect, type SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { CheckCircle2, XCircle, Info, ArrowLeft, HelpCircle } from 'lucide-react'
@@ -65,7 +66,7 @@ export default function CustomerForm() {
   })
 
   const {
-    register, control, handleSubmit, watch, setValue,
+    register, control, handleSubmit, watch, setValue, setError,
     formState: { errors, isSubmitting }, reset,
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -110,7 +111,12 @@ export default function CustomerForm() {
       queryClient.invalidateQueries({ queryKey: ['customers'] })
       navigate(`/clientes/${data.id}`)
     },
-    onError: (err: { message?: string }) => {
+    onError: (err: ApiError) => {
+      if (err?.statusCode === 409) {
+        toast.error(err.message)
+        setError(idType === 'Cedula' ? 'cedula' : 'rnc', { type: 'manual', message: err.message })
+        return
+      }
       toast.error(err?.message ?? 'Error al crear el cliente')
     },
   })
@@ -123,7 +129,12 @@ export default function CustomerForm() {
       queryClient.invalidateQueries({ queryKey: ['customer', id] })
       navigate(`/clientes/${id}`)
     },
-    onError: (err: { message?: string }) => {
+    onError: (err: ApiError) => {
+      if (err?.statusCode === 409) {
+        toast.error(err.message)
+        setError(idType === 'Cedula' ? 'cedula' : 'rnc', { type: 'manual', message: err.message })
+        return
+      }
       toast.error(err?.message ?? 'Error al actualizar el cliente')
     },
   })
