@@ -5,17 +5,30 @@ import { listGastos, getGastoResumen } from '@/shared/api/compras-gastos'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { CATEGORIA_GASTO } from '@/lib/constants'
+import { NCF_TYPES_COMPRA } from '@/lib/constants'
 import { Plus, ChevronLeft, ChevronRight, Search, Receipt } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 
 const PAGE_SIZE = 20
 
-interface GastoResumen {
-  totalDeducible?: number
-  totalNoDeducible?: number
-  total?: number
+interface GastoResumenResponse {
+  month: string
+  total: number
+  byDeducible: {
+    'Deducible'?: number
+    'No Deducible'?: number
+  }
+  count: number
+}
+
+function normalizeResumen(raw: unknown): { totalDeducible: number; totalNoDeducible: number; count: number } {
+  const resumen = raw as GastoResumenResponse | undefined
+  return {
+    totalDeducible: resumen?.byDeducible?.['Deducible'] ?? 0,
+    totalNoDeducible: resumen?.byDeducible?.['No Deducible'] ?? 0,
+    count: resumen?.count ?? 0,
+  }
 }
 
 export default function GastosPage() {
@@ -25,7 +38,7 @@ export default function GastosPage() {
   const [month] = useState(currentMonth)
   const [supplier, setSupplier] = useState('')
   const [status, setStatus] = useState<string>('all')
-  const [categoriaGasto, setCategoriaGasto] = useState<string>('all')
+  const [tipoComprobante, setTipoComprobante] = useState<string>('all')
   const [esDeducible, setEsDeducible] = useState<string>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -40,11 +53,13 @@ export default function GastosPage() {
   })
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['gastos', { supplier, status, categoriaGasto, esDeducible, fromDate, toDate, offset, orderBy }],
+    queryKey: ['gastos', { supplier, status, tipoComprobante, esDeducible, fromDate, toDate, offset, orderBy }],
     queryFn: () =>
       listGastos({
         supplier: supplier || undefined,
         status: status !== 'all' ? status : undefined,
+        tipoComprobante: tipoComprobante !== 'all' ? tipoComprobante : undefined,
+        esDeducible: esDeducible !== 'all' ? esDeducible === 'true' : undefined,
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
         orderBy: orderBy || undefined,
@@ -54,7 +69,7 @@ export default function GastosPage() {
   })
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
-  const resumenTyped = resumen as GastoResumen | undefined
+  const resumenTyped = normalizeResumen(resumen)
 
   return (
     <div className="page-container">
@@ -101,6 +116,9 @@ export default function GastosPage() {
             </div>
           </div>
         </div>
+        <p className="td-muted" style={{ fontSize: 12, margin: '-12px 0 0' }}>
+          Solo incluye gastos sometidos, no borradores.
+        </p>
 
         {/* Filters */}
         <div className="filter-bar">
@@ -116,14 +134,14 @@ export default function GastosPage() {
             </div>
             <select className="filter-select" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1) }}>
               <option value="all">Todos</option>
-              <option value="Draft">Borrador</option>
-              <option value="Submitted">Sometido</option>
-              <option value="Cancelled">Anulado</option>
+              <option value="draft">Borrador</option>
+              <option value="submitted">Sometido</option>
+              <option value="cancelled">Anulado</option>
             </select>
-            <select className="filter-select" value={categoriaGasto} onChange={(e) => { setCategoriaGasto(e.target.value); setPage(1) }}>
-              <option value="all">Todas las categorías</option>
-              {CATEGORIA_GASTO.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
+            <select className="filter-select" value={tipoComprobante} onChange={(e) => { setTipoComprobante(e.target.value); setPage(1) }}>
+              <option value="all">Todos los NCF</option>
+              {NCF_TYPES_COMPRA.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </select>
             <select className="filter-select" value={esDeducible} onChange={(e) => { setEsDeducible(e.target.value); setPage(1) }}>

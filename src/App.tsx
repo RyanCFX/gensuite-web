@@ -148,6 +148,7 @@ export default function App() {
             {/* Gastos */}
             <Route path="/gastos" element={<Suspense fallback={<PageLoader />}><GastosPage /></Suspense>} />
             <Route path="/gastos/nuevo" element={<Suspense fallback={<PageLoader />}><GastoForm /></Suspense>} />
+            <Route path="/gastos/:id/editar" element={<Suspense fallback={<PageLoader />}><GastoForm /></Suspense>} />
             <Route path="/gastos/:id" element={<Suspense fallback={<PageLoader />}><GastoDetail /></Suspense>} />
 
             {/* Proveedores */}

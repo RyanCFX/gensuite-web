@@ -71,6 +71,8 @@ export interface ListGastosParams extends PaginationParams {
   status?: string
   fromDate?: string
   toDate?: string
+  tipoComprobante?: string
+  esDeducible?: boolean
 }
 
 export async function listGastos(params?: ListGastosParams) {

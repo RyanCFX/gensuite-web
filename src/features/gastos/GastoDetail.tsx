@@ -7,7 +7,12 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { TIPO_BIENES_606, FORMA_PAGO_606 } from '@/lib/constants'
-import { Send, X, RotateCcw, Info } from 'lucide-react'
+import { Send, X, RotateCcw, Info, FileText, AlertCircle } from 'lucide-react'
+
+function apiErrorMessage(error: unknown, fallback: string) {
+  const apiErr = error as { message?: string }
+  return apiErr?.message || fallback
+}
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | null
 
@@ -32,19 +37,19 @@ export default function GastoDetail() {
   const submitMutation = useMutation({
     mutationFn: () => submitGasto(id!),
     onSuccess: () => { toast.success('Gasto sometido'); invalidate() },
-    onError: () => toast.error('Error al someter el gasto'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al someter el gasto')),
   })
 
   const cancelMutation = useMutation({
     mutationFn: () => cancelGasto(id!),
     onSuccess: () => { toast.success('Gasto anulado'); invalidate() },
-    onError: () => toast.error('Error al anular el gasto'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al anular el gasto')),
   })
 
   const amendMutation = useMutation({
     mutationFn: () => amendGasto(id!),
     onSuccess: (data) => { toast.success('Enmienda creada'); queryClient.invalidateQueries({ queryKey: ['gastos'] }); navigate(`/gastos/${data.id}`) },
-    onError: () => toast.error('Error al enmendar el gasto'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al enmendar el gasto')),
   })
 
   function handleConfirm() {
@@ -57,6 +62,10 @@ export default function GastoDetail() {
 
   function getTipoBienesLabel(v?: string) { return TIPO_BIENES_606.find((t) => t.value === v)?.label ?? v ?? '—' }
   function getFormaPagoLabel(v?: string) { return FORMA_PAGO_606.find((f) => f.value === v)?.label ?? v ?? '—' }
+
+  const missing606 = !!gasto && (!gasto.tipoBienes606 || !gasto.formaPago606)
+  const b17Violation = !!gasto && gasto.tipoComprobante === 'B17' && gasto.grandTotal > 50
+  const blockSubmit = missing606 || b17Violation
 
   if (isLoading) {
     return (
@@ -93,17 +102,27 @@ export default function GastoDetail() {
         description={gasto.supplierName}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {gasto.status === 'Draft' && (
+            {gasto.status === 'draft' && (
               <>
-                <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmAction('submit')}>
-                  <Send size={14} />Someter
+                <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/gastos/${id}/editar`)}>
+                  <FileText size={14} />Editar
                 </button>
-                <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmAction('cancel')}>
-                  <X size={14} />Anular
+                <button
+                  className="btn btn-primary btn-size-sm"
+                  onClick={() => setConfirmAction('submit')}
+                  disabled={blockSubmit}
+                  title={blockSubmit ? 'Completa los campos 606 requeridos y respeta el límite de Gastos Menores antes de someter' : undefined}
+                >
+                  <Send size={14} />Someter
                 </button>
               </>
             )}
-            {gasto.status === 'Submitted' && (
+            {gasto.status === 'submitted' && (
+              <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmAction('cancel')}>
+                <X size={14} />Anular
+              </button>
+            )}
+            {gasto.status === 'cancelled' && (
               <button className="btn btn-secondary btn-size-sm" onClick={() => setConfirmAction('amend')}>
                 <RotateCcw size={14} />Enmendar
               </button>
@@ -118,7 +137,21 @@ export default function GastoDetail() {
           {gasto.esDeducible
             ? <span className="badge badge-success">Deducible</span>
             : <span className="badge badge-default">No deducible</span>}
+          {gasto.amendedFrom && (
+            <span className="badge badge-default">Enmienda de {gasto.amendedFrom}</span>
+          )}
         </div>
+
+        {gasto.status === 'draft' && blockSubmit && (
+          <div className="inline-alert inline-alert-error">
+            <AlertCircle size={16} />
+            {missing606 && b17Violation
+              ? 'Faltan los campos 606 (Tipo de Bienes / Forma de Pago) y el total supera el límite de Gastos Menores (RD$50.00) — no se puede someter.'
+              : missing606
+                ? 'Faltan los campos 606 requeridos (Tipo de Bienes / Forma de Pago) — complétalos antes de someter.'
+                : `Gastos Menores (B17) no pueden superar RD$50.00. Total actual: ${formatDOP(gasto.grandTotal)}.`}
+          </div>
+        )}
 
         <div className="card">
           <div className="card-header">
@@ -140,6 +173,10 @@ export default function GastoDetail() {
             <div className="detail-field">
               <span className="detail-label">Total</span>
               <span className="detail-value" style={{ fontSize: 18, fontWeight: 700 }}>{formatDOP(gasto.grandTotal)}</span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">Pendiente</span>
+              <span className="detail-value">{formatDOP(gasto.outstandingAmount ?? 0)}</span>
             </div>
           </div>
         </div>
@@ -205,6 +242,10 @@ export default function GastoDetail() {
             <div className="detail-field">
               <span className="detail-label">Retención ISR</span>
               <span className="detail-value">{formatDOP(gasto.retencionIsr)}</span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">Retención ITBIS</span>
+              <span className="detail-value">{formatDOP(gasto.retencionItbis)}</span>
             </div>
           </div>
         </div>

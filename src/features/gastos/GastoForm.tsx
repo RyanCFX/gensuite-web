@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useCallback, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { createGasto } from '@/shared/api/compras-gastos'
+import { createGasto, updateGasto, getGasto } from '@/shared/api/compras-gastos'
 import { listSuppliers } from '@/shared/api/suppliers'
 import type { CreateGastoDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -32,8 +32,11 @@ const B17_MAX = 50
 export default function GastoForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { id } = useParams<{ id?: string }>()
+  const isEdit = !!id
 
   const [supplierId, setSupplierId] = useState('')
+  const [supplierLabel, setSupplierLabel] = useState('')
   const [supplierQuery, setSupplierQuery] = useState('')
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0])
   const [dueDate, setDueDate] = useState('')
@@ -46,6 +49,51 @@ export default function GastoForm() {
   const [categoriaGasto, setCategoriaGasto] = useState<string>('')
   const [esDeducible, setEsDeducible] = useState(true)
   const [retencionIsr, setRetencionIsr] = useState(0)
+  const [retencionItbis, setRetencionItbis] = useState(0)
+
+  const { data: gastoData, isLoading: loadingEdit } = useQuery({
+    queryKey: ['gasto', id],
+    queryFn: () => getGasto(id!),
+    enabled: isEdit,
+  })
+
+  // Precarga del formulario al editar un gasto en Draft.
+  /* eslint-disable react-hooks/set-state-in-effect -- sincroniza el form local
+     con la data del servidor una sola vez, cuando llega la respuesta de edición */
+  useEffect(() => {
+    if (!gastoData) return
+    if (gastoData.status !== 'draft') {
+      toast.error('Solo se pueden editar gastos en borrador')
+      navigate(`/gastos/${gastoData.id}`, { replace: true })
+      return
+    }
+    setSupplierId(gastoData.supplier)
+    setSupplierLabel(gastoData.supplierName)
+    setPostingDate(gastoData.postingDate.split('T')[0])
+    setDueDate(gastoData.dueDate ? gastoData.dueDate.split('T')[0] : '')
+    setItems(
+      gastoData.items.length > 0
+        ? gastoData.items.map((i) => ({
+            itemCode: i.itemCode,
+            itemLabel: i.itemName,
+            description: i.description ?? '',
+            qty: i.qty,
+            rate: i.rate,
+            uom: i.uom ?? 'Nos',
+          }))
+        : [emptyItem()],
+    )
+    setNcfProveedor(gastoData.ncfProveedor ?? '')
+    setTipoComprobante(gastoData.tipoComprobante ?? '')
+    setTipoBienes606(gastoData.tipoBienes606 ?? '')
+    setFormaPago606(gastoData.formaPago606 ?? '')
+    setCategoriaGasto(gastoData.categoriaGasto ?? '')
+    setEsDeducible(gastoData.esDeducible ?? true)
+    setRetencionIsr(gastoData.retencionIsr ?? 0)
+    setRetencionItbis(gastoData.retencionItbis ?? 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gastoData])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
     queryKey: ['supplierSearch', supplierQuery],
@@ -60,13 +108,17 @@ export default function GastoForm() {
   }))
 
   const saveMutation = useMutation({
-    mutationFn: (dto: CreateGastoDto) => createGasto(dto),
+    mutationFn: (dto: CreateGastoDto) => (isEdit ? updateGasto(id!, dto) : createGasto(dto)),
     onSuccess: (data) => {
-      toast.success('Gasto creado')
+      toast.success(isEdit ? 'Gasto actualizado' : 'Gasto creado')
       queryClient.invalidateQueries({ queryKey: ['gastos'] })
+      queryClient.invalidateQueries({ queryKey: ['gasto', data.id] })
       navigate(`/gastos/${data.id}`)
     },
-    onError: () => toast.error('Error al guardar el gasto'),
+    onError: (error) => {
+      const apiErr = error as { message?: string }
+      toast.error(apiErr?.message ?? 'Error al guardar el gasto')
+    },
   })
 
   const subtotal = items.reduce((sum, i) => sum + i.qty * i.rate, 0)
@@ -102,7 +154,8 @@ export default function GastoForm() {
     e.preventDefault()
     if (!supplierId) { toast.error('Selecciona un proveedor'); return }
     if (ncfProveedor && !NCF_REGEX.test(ncfProveedor)) { toast.error('NCF inválido (formato: B/E seguido de 10 dígitos)'); return }
-    if (b17Error) { toast.error('Gastos Menores (B17) no pueden superar RD$50.00'); return }
+    // La regla B17 y los campos 606 requeridos se validan al Someter, no al
+    // guardar el borrador — un Draft debe poder guardarse siempre.
 
     const dto: CreateGastoDto = {
       supplier: supplierId,
@@ -121,6 +174,8 @@ export default function GastoForm() {
       formaPago606: formaPago606 || undefined,
       categoriaGasto: categoriaGasto as CreateGastoDto['categoriaGasto'] || undefined,
       esDeducible,
+      retencionIsr: retencionIsr || undefined,
+      retencionItbis: retencionItbis || undefined,
     }
     saveMutation.mutate(dto)
   }
@@ -131,8 +186,14 @@ export default function GastoForm() {
         ← Volver
       </button>
 
-      <PageHeader title="Nuevo Gasto" description="Registra un gasto sin movimiento de inventario" />
+      <PageHeader
+        title={isEdit ? 'Editar Gasto' : 'Nuevo Gasto'}
+        description="Registra un gasto sin movimiento de inventario"
+      />
 
+      {isEdit && loadingEdit ? (
+        <span className="skeleton-box" style={{ height: 256, width: '100%', display: 'block' }} />
+      ) : (
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div>
           {/* Header */}
@@ -147,7 +208,8 @@ export default function GastoForm() {
                   <SearchSelect
                     id="supplier"
                     value={supplierId}
-                    onChange={(id, opt) => setSupplierId(id === '' ? '' : (opt?.value ?? id))}
+                    selectedLabel={supplierLabel}
+                    onChange={(newId, opt) => { setSupplierId(newId === '' ? '' : (opt?.value ?? newId)); setSupplierLabel(opt?.label ?? '') }}
                     options={supplierOptions}
                     onSearch={setSupplierQuery}
                     loading={suppliersLoading}
@@ -303,6 +365,11 @@ export default function GastoForm() {
                 <input type="number" min="0" step="0.01" className="ff-input" value={retencionIsr} onChange={(e) => setRetencionIsr(parseFloat(e.target.value) || 0)} />
               </div>
 
+              <div className="ff-wrap">
+                <label className="ff-label">Retención ITBIS (RD$)</label>
+                <input type="number" min="0" step="0.01" className="ff-input" value={retencionItbis} onChange={(e) => setRetencionItbis(parseFloat(e.target.value) || 0)} />
+              </div>
+
               <div className="ff-wrap" style={{ justifyContent: 'flex-end' }}>
                 <label className="ff-check-wrap">
                   <input
@@ -319,12 +386,13 @@ export default function GastoForm() {
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
             <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={saveMutation.isPending || b17Error}>
-              {saveMutation.isPending ? 'Guardando…' : 'Guardar Borrador'}
+            <button type="submit" className="btn btn-primary" disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? 'Guardando…' : isEdit ? 'Guardar Cambios' : 'Guardar Borrador'}
             </button>
           </div>
         </div>
       </form>
+      )}
     </div>
   )
 }

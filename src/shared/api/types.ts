@@ -1090,6 +1090,7 @@ export type UpdateCompraDto = Partial<CreateCompraDto>
 
 export interface GastoItem {
   itemCode: string
+  itemName?: string
   qty: number
   rate: number
   amount: number
@@ -1103,18 +1104,23 @@ export interface Gasto {
   supplierName: string
   postingDate: string
   dueDate: string
-  status: 'Draft' | 'Submitted' | 'Cancelled'
+  status: 'draft' | 'submitted' | 'cancelled'
   currency: string
   items: GastoItem[]
+  total: number
   grandTotal: number
+  outstandingAmount: number
   ncfProveedor?: string
   tipoComprobante?: 'B01' | 'B13' | 'B14' | 'B15' | 'B16' | 'B17' | 'E31'
   tipoBienes606?: string
   formaPago606?: string
+  retencionItbis?: number
   retencionIsr?: number
   categoriaGasto?: 'Operativo' | 'Administrativo' | 'Ventas' | 'Financiero'
   esDeducible?: boolean
   amendedFrom?: string
+  createdAt?: string
+  modifiedAt?: string
 }
 
 export interface CreateGastoDto {
@@ -1134,6 +1140,7 @@ export interface CreateGastoDto {
   tipoComprobante?: 'B01' | 'B13' | 'B14' | 'B15' | 'B16' | 'B17' | 'E31'
   tipoBienes606?: string
   formaPago606?: string
+  retencionItbis?: number
   retencionIsr?: number
   categoriaGasto?: 'Operativo' | 'Administrativo' | 'Ventas' | 'Financiero'
   esDeducible?: boolean

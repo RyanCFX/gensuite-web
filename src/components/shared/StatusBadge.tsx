@@ -8,6 +8,10 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
   Cancelled: 'cancelled',
   Ordered: 'ordered',
   Lost: 'lost',
+  // Algunos BFF (ej. Gastos) devuelven el status en minúscula.
+  draft: 'draft',
+  submitted: 'submitted',
+  cancelled: 'cancelled',
 }
 
 interface StatusBadgeProps {

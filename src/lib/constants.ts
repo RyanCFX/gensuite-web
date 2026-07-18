@@ -49,6 +49,11 @@ export const DOC_STATUS_LABELS: Record<string, string> = {
   Cancelled: 'Cancelado',
   Ordered: 'Ordenado',
   Lost: 'Perdido',
+  // Algunos BFF (ej. Gastos) devuelven el status en minúscula — se mapean
+  // a las mismas etiquetas para evitar mostrar el valor crudo sin traducir.
+  draft: 'Borrador',
+  submitted: 'Sometido',
+  cancelled: 'Cancelado',
 }
 
 export const DOC_STATUS_COLOR: Record<string, string> = {
@@ -57,6 +62,9 @@ export const DOC_STATUS_COLOR: Record<string, string> = {
   Cancelled: 'badge--red',
   Ordered: 'badge--blue',
   Lost: 'badge--orange',
+  draft: 'badge--gray',
+  submitted: 'badge--green',
+  cancelled: 'badge--red',
 }
 
 export const TIPO_IDENTIFICACION = [
