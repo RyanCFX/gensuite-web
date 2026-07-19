@@ -15,6 +15,8 @@ export interface PaginatedResponse<T> {
   success: true
   data: T[]
   meta: PaginationMeta
+  /** Presente cuando el doctype subyacente aún no fue migrado en ERPNext — no es un error. */
+  note?: string
 }
 
 export interface PaginationMeta {
@@ -885,6 +887,85 @@ export interface InventoryItem {
   investmentValue: number  // qty × costo
   saleValue: number        // qty × precio venta
   potentialProfit: number
+  /** Nombres de las ubicaciones (Zona/Rack) asignadas a este artículo en este almacén */
+  ubicaciones?: string[]
+}
+
+// ─── Zonas y Ubicaciones (organización física dentro del almacén) ─────────────
+// Puramente organizacional — NO afecta el stock (que sigue siendo por Almacén).
+// Jerarquía fija: Almacén → Zona → Ubicación/Rack.
+
+export interface ZonaResponseDto {
+  id: string
+  zonaName: string
+  warehouse: string
+  code?: string
+  descripcion?: string
+  disabled: boolean
+  ubicacionCount?: number
+}
+
+export interface CreateZonaDto {
+  zonaName: string
+  warehouse: string
+  code?: string
+  descripcion?: string
+}
+
+export interface UpdateZonaDto {
+  zonaName?: string
+  code?: string
+  descripcion?: string
+  disabled?: boolean
+}
+
+export interface UbicacionResponseDto {
+  id: string
+  ubicacionName: string
+  zona: string
+  /** Heredado de la zona — solo lectura */
+  warehouse: string
+  code?: string
+  descripcion?: string
+  disabled: boolean
+}
+
+export interface CreateUbicacionDto {
+  ubicacionName: string
+  zona: string
+  code?: string
+  descripcion?: string
+}
+
+export interface UpdateUbicacionDto {
+  ubicacionName?: string
+  code?: string
+  descripcion?: string
+  disabled?: boolean
+}
+
+export interface ItemUbicacionResponseDto {
+  id: string
+  itemCode: string
+  warehouse: string
+  ubicacionId: string
+  ubicacionName?: string
+  zonaName?: string
+  esPrincipal: boolean
+  notas?: string
+}
+
+export interface AssignItemUbicacionDto {
+  itemCode: string
+  warehouse: string
+  ubicacionId: string
+  esPrincipal?: boolean
+  notas?: string
+}
+
+export interface UpdateItemUbicacionDto {
+  esPrincipal?: boolean
+  notas?: string
 }
 
 export interface InventorySummary {

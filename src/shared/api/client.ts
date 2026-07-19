@@ -74,6 +74,7 @@ export function unwrapPaginated<T>(response: { data: PaginatedResponse<T> }) {
   return {
     items: response.data.data,
     meta: response.data.meta,
+    note: response.data.note,
   }
 }
 

@@ -672,7 +672,7 @@ export default function CompraForm() {
       />
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Header fields */}
           <div className="card">
             <div className="card-header">

@@ -234,128 +234,10 @@ export default function PagoPage() {
         description="Registra un pago recibido de un cliente"
       />
 
-      <div style={{ maxWidth: 640 }}>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: 20, alignItems: 'start' }}>
 
-          {/* ── Información del Pago ─────────────────────────────────────── */}
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <CheckCircle2 size={18} style={{ color: 'var(--success-text)' }} aria-hidden="true" />
-                Información del Pago
-              </span>
-            </div>
-            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-              {/* Cliente */}
-              <div className="ff-wrap">
-                <label className="ff-label">
-                  Cliente <span className="ff-required">*</span>
-                </label>
-                <SearchSelect
-                  id="customer"
-                  value={customerId}
-                  onChange={(id, opt) => setCustomerId(id === '' ? '' : (opt?.value ?? id))}
-                  options={customerOptions}
-                  onSearch={setCustomerQuery}
-                  loading={customersLoading}
-                  placeholder="Buscar cliente…"
-                  error={!customerId}
-                />
-              </div>
-
-              {/* Cobro anticipado / sin aplicar a factura */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
-                <input
-                  type="checkbox"
-                  checked={advancePayment}
-                  onChange={(e) => setAdvancePayment(e.target.checked)}
-                />
-                <Wallet size={14} style={{ color: 'var(--text-secondary)' }} />
-                Cobro anticipado — no aplicar a ninguna factura (queda como saldo a favor del cliente)
-              </label>
-
-              <div className="form-row">
-                {/* Fecha */}
-                <div className="ff-wrap">
-                  <label className="ff-label">Fecha <span className="ff-required">*</span></label>
-                  <input
-                    type="date"
-                    className="ff-input"
-                    value={postingDate}
-                    onChange={(e) => setPostingDate(e.target.value)}
-                    required
-                  />
-                </div>
-
-                {/* Monto */}
-                <div className="ff-wrap">
-                  <label className="ff-label">Monto (RD$) <span className="ff-required">*</span></label>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    className="ff-input"
-                    value={paidAmount || ''}
-                    onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Método de pago */}
-              <div className="ff-wrap">
-                <label className="ff-label">Método de Pago <span className="ff-required">*</span></label>
-                <select
-                  className="ff-select"
-                  value={modeOfPayment}
-                  onChange={(e) => setModeOfPayment(e.target.value)}
-                  required
-                >
-                  <option value="">Seleccionar método…</option>
-                  {metodos?.filter((m) => !m.disabled).map((m) => (
-                    <option key={m.name} value={m.name}>{m.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Referencia */}
-              <div className="form-row">
-                <div className="ff-wrap">
-                  <label className="ff-label">No. de Referencia</label>
-                  <input
-                    className="ff-input"
-                    placeholder="# cheque, transferencia…"
-                    value={referenceNo}
-                    onChange={(e) => setReferenceNo(e.target.value)}
-                  />
-                </div>
-                <div className="ff-wrap">
-                  <label className="ff-label">Fecha de Referencia</label>
-                  <input
-                    type="date"
-                    className="ff-input"
-                    value={referenceDate}
-                    onChange={(e) => setReferenceDate(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Notas */}
-              <div className="ff-wrap">
-                <label className="ff-label">Notas</label>
-                <textarea
-                  className="ff-textarea"
-                  rows={2}
-                  placeholder="Observaciones opcionales…"
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                />
-              </div>
-
-            </div>
-          </div>
+        {/* ════════════════ COLUMNA IZQUIERDA — facturas / apartados ════════════════ */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
           {/* ── Facturas a Aplicar ───────────────────────────────────────── */}
           <div className="card">
@@ -551,6 +433,127 @@ export default function PagoPage() {
               )}
             </div>
           )}
+        </div>
+
+        {/* ════════════════ COLUMNA DERECHA — información del pago ════════════════ */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <CheckCircle2 size={18} style={{ color: 'var(--success-text)' }} aria-hidden="true" />
+                Información del Pago
+              </span>
+            </div>
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* Cliente */}
+              <div className="ff-wrap">
+                <label className="ff-label">
+                  Cliente <span className="ff-required">*</span>
+                </label>
+                <SearchSelect
+                  id="customer"
+                  value={customerId}
+                  onChange={(id, opt) => setCustomerId(id === '' ? '' : (opt?.value ?? id))}
+                  options={customerOptions}
+                  onSearch={setCustomerQuery}
+                  loading={customersLoading}
+                  placeholder="Buscar cliente…"
+                  error={!customerId}
+                />
+              </div>
+
+              {/* Cobro anticipado / sin aplicar a factura */}
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={advancePayment}
+                  onChange={(e) => setAdvancePayment(e.target.checked)}
+                  style={{ marginTop: 2 }}
+                />
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Wallet size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+                  Cobro anticipado — no aplicar a ninguna factura (queda como saldo a favor del cliente)
+                </span>
+              </label>
+
+              {/* Fecha */}
+              <div className="ff-wrap">
+                <label className="ff-label">Fecha <span className="ff-required">*</span></label>
+                <input
+                  type="date"
+                  className="ff-input"
+                  value={postingDate}
+                  onChange={(e) => setPostingDate(e.target.value)}
+                  required
+                />
+              </div>
+
+              {/* Monto */}
+              <div className="ff-wrap">
+                <label className="ff-label">Monto (RD$) <span className="ff-required">*</span></label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  className="ff-input"
+                  value={paidAmount || ''}
+                  onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+
+              {/* Método de pago */}
+              <div className="ff-wrap">
+                <label className="ff-label">Método de Pago <span className="ff-required">*</span></label>
+                <select
+                  className="ff-select"
+                  value={modeOfPayment}
+                  onChange={(e) => setModeOfPayment(e.target.value)}
+                  required
+                >
+                  <option value="">Seleccionar método…</option>
+                  {metodos?.filter((m) => !m.disabled).map((m) => (
+                    <option key={m.name} value={m.name}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Referencia */}
+              <div className="ff-wrap">
+                <label className="ff-label">No. de Referencia</label>
+                <input
+                  className="ff-input"
+                  placeholder="# cheque, transferencia…"
+                  value={referenceNo}
+                  onChange={(e) => setReferenceNo(e.target.value)}
+                />
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Fecha de Referencia</label>
+                <input
+                  type="date"
+                  className="ff-input"
+                  value={referenceDate}
+                  onChange={(e) => setReferenceDate(e.target.value)}
+                />
+              </div>
+
+              {/* Notas */}
+              <div className="ff-wrap">
+                <label className="ff-label">Notas</label>
+                <textarea
+                  className="ff-textarea"
+                  rows={2}
+                  placeholder="Observaciones opcionales…"
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                />
+              </div>
+
+            </div>
+          </div>
 
           <button
             type="submit"
@@ -562,9 +565,9 @@ export default function PagoPage() {
               ? <><span className="spinner spinner-white spinner-sm" /> Registrando…</>
               : 'Registrar Cobro'}
           </button>
+        </div>
 
-        </form>
-      </div>
+      </form>
     </div>
   )
 }

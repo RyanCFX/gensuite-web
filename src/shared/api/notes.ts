@@ -16,6 +16,7 @@ export interface ListNotesParams extends PaginationParams {
   status?: string
   fromDate?: string
   toDate?: string
+  customer?: string
 }
 
 export async function listCreditNotes(params?: ListNotesParams) {

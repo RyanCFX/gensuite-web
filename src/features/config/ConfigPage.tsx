@@ -1064,6 +1064,15 @@ function NcfSection() {
 
 // ---- Perfil Section ----
 
+// Campos que el usuario no puede editar directamente desde este formulario.
+const PERFIL_DISABLED_FIELDS = new Set(['email', 'fullName', 'timeZone'])
+// Campos que no se muestran en absoluto (no aplican a este formulario).
+const PERFIL_HIDDEN_FIELDS = new Set(['language'])
+// Overrides de label para campos cuyo nombre auto-generado no es el deseado.
+const PERFIL_LABEL_OVERRIDES: Record<string, string> = {
+  timeZone: 'Zona Horaria',
+}
+
 function PerfilSection() {
   const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({ queryKey: ['perfil'], queryFn: getPerfil })
@@ -1073,7 +1082,9 @@ function PerfilSection() {
 
   useEffect(() => {
     if (data && typeof data === 'object') {
-      const { roles: _roles, ...rest } = data as Record<string, string>
+      const rest = { ...(data as Record<string, string>) }
+      delete rest.roles
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- precarga el form al llegar el perfil del backend
       setForm(rest)
     }
   }, [data])
@@ -1084,6 +1095,15 @@ function PerfilSection() {
     onError: () => toast.error('Error al actualizar el perfil'),
   })
 
+  // El nombre completo no se edita directamente — se deriva en vivo de Nombre + Apellido.
+  function updateNamePart(key: 'firstName' | 'lastName', value: string) {
+    setForm((prev) => {
+      const next = { ...prev, [key]: value }
+      next.fullName = [next.firstName, next.lastName].filter(Boolean).join(' ').trim()
+      return next
+    })
+  }
+
   if (isLoading) return <span className="skeleton-box" style={{ height: 192, display: 'block' }} />
 
   return (
@@ -1092,18 +1112,29 @@ function PerfilSection() {
         <span className="card-title">Mi Perfil</span>
       </div>
       <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {Object.entries(form).map(([key, value]) => (
-          <div key={key} className="ff-wrap">
-            <label className="ff-label" style={{ textTransform: 'capitalize' }}>
-              {key.replace(/([A-Z])/g, ' $1').trim()}
-            </label>
-            <input
-              className="ff-input"
-              value={value ?? ''}
-              onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
-            />
-          </div>
-        ))}
+        {Object.entries(form)
+          .filter(([key]) => !PERFIL_HIDDEN_FIELDS.has(key))
+          .map(([key, value]) => {
+            const isDisabled = PERFIL_DISABLED_FIELDS.has(key)
+            const isNamePart = key === 'firstName' || key === 'lastName'
+            return (
+              <div key={key} className="ff-wrap">
+                <label className="ff-label" style={{ textTransform: 'capitalize' }}>
+                  {PERFIL_LABEL_OVERRIDES[key] ?? key.replace(/([A-Z])/g, ' $1').trim()}
+                </label>
+                <input
+                  className="ff-input"
+                  value={value ?? ''}
+                  disabled={isDisabled}
+                  onChange={(e) => (
+                    isNamePart
+                      ? updateNamePart(key as 'firstName' | 'lastName', e.target.value)
+                      : setForm((prev) => ({ ...prev, [key]: e.target.value }))
+                  )}
+                />
+              </div>
+            )
+          })}
         <div>
           <button className="btn btn-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
             <Save size={16} />

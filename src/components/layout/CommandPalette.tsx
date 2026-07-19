@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Package, FileText, Receipt, Warehouse,
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
-  Shield, Building2, UserCog, BookOpen, ClipboardList,
+  Shield, Building2, UserCog, BookOpen, ClipboardList, MapPin,
   Search, ArrowRight,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -44,6 +44,7 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'stock',        label: 'Stock Actual',         group: 'Inventario',   path: '/inventario/stock',               icon: <Warehouse size={15} />, keywords: 'inventory stock almacen warehouse' },
   { id: 'historial-inv', label: 'Historial de Stock',  group: 'Inventario',   path: '/inventario/historial',           icon: <Warehouse size={15} />, keywords: 'movimientos inventario history' },
   { id: 'conteos',      label: 'Conteos Físicos',      group: 'Inventario',   path: '/inventario/conteos',             icon: <Warehouse size={15} />, keywords: 'physical count conteo inventario' },
+  { id: 'zonas',        label: 'Zonas y Ubicaciones',  group: 'Inventario',   path: '/inventario/zonas',               icon: <MapPin size={15} />, keywords: 'zonas ubicaciones racks almacen location warehouse' },
 
   // ── Compras & Gastos ───────────────────────────────────────────────────────
   { id: 'compras',      label: 'Compras',              group: 'Operaciones',  path: '/compras',                        icon: <ShoppingCart size={15} />, keywords: 'purchase compras proveedores 606' },

@@ -220,8 +220,8 @@ export default function SupplierForm() {
 
       <PageHeader title={isEdit ? 'Editar Proveedor' : 'Nuevo Proveedor'} />
 
-      <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 720 }}>
-        <div>
+      <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: 20, alignItems: 'start' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* General info */}
           <div className="card">
             <div className="card-header">
@@ -363,7 +363,10 @@ export default function SupplierForm() {
               </div>
             </div>
           </div>
+        </div>
 
+        {/* ════════════════ COLUMNA DERECHA ════════════════ */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Proveedor Exterior */}
           <div className="card">
             <div className="card-header">
@@ -404,7 +407,7 @@ export default function SupplierForm() {
               <span className="card-title">Cuenta Bancaria</span>
             </div>
             <div className="card-body">
-              <div className="form-row">
+              <div className="form-section">
                 <div className="ff-wrap">
                   <label className="ff-label">Banco</label>
                   <input className="ff-input" {...register('banco')} placeholder="Ej: Banco Popular" />
@@ -435,15 +438,16 @@ export default function SupplierForm() {
               </div>
             </div>
           </div>
+        </div>
 
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Guardando…' : isEdit ? 'Guardar Cambios' : 'Crear Proveedor'}
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>
-              Cancelar
-            </button>
-          </div>
+        {/* ════════════════ BOTONES (ancho completo) ════════════════ */}
+        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>
+            Cancelar
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+            {isSubmitting ? 'Guardando…' : isEdit ? 'Guardar Cambios' : 'Crear Proveedor'}
+          </button>
         </div>
       </form>
     </div>

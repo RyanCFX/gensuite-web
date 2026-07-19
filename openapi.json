@@ -519,6 +519,24 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Sucursal Norte",
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeItems",
+            "required": false,
+            "in": "query",
+            "description": "Si es true, incluye los items de cada factura en el listado.",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -697,7 +715,52 @@
             "bearer": []
           }
         ],
-        "summary": "Aplica un saldo a favor del cliente (Payment Entry con unallocated_amount) a esta factura en Draft, vía la tabla nativa \"advances\" de Sales Invoice. No cancela ni reescribe el Payment Entry.",
+        "summary": "Aplica un saldo a favor del cliente (Payment Entry con unallocated_amount) a esta factura. Funciona tanto en Draft (tabla nativa \"advances\") como en Submitted (Payment Reconciliation Tool). Nunca cancela ni reescribe el Payment Entry.",
+        "tags": [
+          "Invoices"
+        ]
+      }
+    },
+    "/api/v1/invoices/{id}/aplicar-saldo-favor/{paymentEntryId}": {
+      "delete": {
+        "operationId": "InvoicesController_quitarSaldoFavor",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentEntryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retira un saldo a favor previamente aplicado a esta factura en borrador (quita la fila de advances[]; el Payment Entry no se toca, el saldo vuelve a estar disponible). Solo funciona en Draft.",
         "tags": [
           "Invoices"
         ]
@@ -2036,6 +2099,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3171,6 +3242,653 @@
         ]
       }
     },
+    "/api/v1/inventory/zonas": {
+      "get": {
+        "operationId": "ZonasController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por almacén",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeDisabled",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar zonas de almacén con paginación",
+        "tags": [
+          "Inventario — Zonas"
+        ]
+      },
+      "post": {
+        "operationId": "ZonasController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateZonaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear zona dentro de un almacén",
+        "tags": [
+          "Inventario — Zonas"
+        ]
+      }
+    },
+    "/api/v1/inventory/zonas/{id}": {
+      "get": {
+        "operationId": "ZonasController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obtener zona por ID",
+        "tags": [
+          "Inventario — Zonas"
+        ]
+      },
+      "put": {
+        "operationId": "ZonasController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateZonaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar zona",
+        "tags": [
+          "Inventario — Zonas"
+        ]
+      },
+      "delete": {
+        "operationId": "ZonasController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar zona (falla si tiene ubicaciones asociadas)",
+        "tags": [
+          "Inventario — Zonas"
+        ]
+      }
+    },
+    "/api/v1/inventory/ubicaciones": {
+      "get": {
+        "operationId": "UbicacionesController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "zona",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por zona",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por almacén",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeDisabled",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar ubicaciones/racks con paginación",
+        "tags": [
+          "Inventario — Ubicaciones"
+        ]
+      },
+      "post": {
+        "operationId": "UbicacionesController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUbicacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear ubicación/rack dentro de una zona",
+        "tags": [
+          "Inventario — Ubicaciones"
+        ]
+      }
+    },
+    "/api/v1/inventory/ubicaciones/item/{itemCode}": {
+      "get": {
+        "operationId": "UbicacionesController_findByItem",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar ubicaciones asignadas a un artículo",
+        "tags": [
+          "Inventario — Ubicaciones"
+        ]
+      }
+    },
+    "/api/v1/inventory/ubicaciones/asignar": {
+      "post": {
+        "operationId": "UbicacionesController_assign",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignItemUbicacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Asignar un artículo a una ubicación dentro de un almacén",
+        "tags": [
+          "Inventario — Ubicaciones"
+        ]
+      }
+    },
+    "/api/v1/inventory/ubicaciones/asignar/{id}": {
+      "put": {
+        "operationId": "UbicacionesController_updateAssignment",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateItemUbicacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar una asignación artículo-ubicación",
+        "tags": [
+          "Inventario — Ubicaciones"
+        ]
+      },
+      "delete": {
+        "operationId": "UbicacionesController_unassign",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Quitar una asignación artículo-ubicación",
+        "tags": [
+          "Inventario — Ubicaciones"
+        ]
+      }
+    },
+    "/api/v1/inventory/ubicaciones/{id}": {
+      "get": {
+        "operationId": "UbicacionesController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obtener ubicación/rack por ID",
+        "tags": [
+          "Inventario — Ubicaciones"
+        ]
+      },
+      "put": {
+        "operationId": "UbicacionesController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUbicacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar ubicación/rack",
+        "tags": [
+          "Inventario — Ubicaciones"
+        ]
+      },
+      "delete": {
+        "operationId": "UbicacionesController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar ubicación/rack (falla si tiene artículos asignados)",
+        "tags": [
+          "Inventario — Ubicaciones"
+        ]
+      }
+    },
     "/api/v1/compras": {
       "get": {
         "operationId": "ComprasController_findAll",
@@ -3261,6 +3979,15 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Sucursal Norte",
               "type": "string"
             }
           }
@@ -4255,6 +4982,125 @@
         ]
       }
     },
+    "/api/v1/usuarios/{email}/sucursales": {
+      "get": {
+        "operationId": "UsuariosController_getSucursales",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sucursales asignadas a este usuario",
+        "tags": [
+          "Usuarios"
+        ]
+      },
+      "put": {
+        "operationId": "UsuariosController_assignSucursales",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignSucursalesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reemplaza el set de sucursales asignadas a este usuario",
+        "tags": [
+          "Usuarios"
+        ]
+      }
+    },
+    "/api/v1/usuarios/{email}/almacenes-permitidos": {
+      "get": {
+        "operationId": "UsuariosController_getAlmacenesPermitidos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Almacenes permitidos para este usuario (derivados de sus sucursales asignadas)",
+        "tags": [
+          "Usuarios"
+        ]
+      }
+    },
     "/api/v1/roles": {
       "get": {
         "operationId": "RolesController_getRoles",
@@ -4669,6 +5515,14 @@
             "name": "X-Tenant",
             "in": "header",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": true,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -6454,6 +7308,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Sucursal Norte",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -6902,6 +7765,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "customer",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por id de cliente",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -6914,7 +7786,7 @@
             "bearer": []
           }
         ],
-        "summary": "Listar notas de crédito (Sales Invoice con is_return=1)",
+        "summary": "Listar notas de crédito (Sales Invoice con is_return=1), opcionalmente por cliente",
         "tags": [
           "Notas de Crédito y Débito"
         ]
@@ -6952,6 +7824,43 @@
           }
         ],
         "summary": "Crear nota de crédito (devolución — NCF tipo B04)",
+        "tags": [
+          "Notas de Crédito y Débito"
+        ]
+      }
+    },
+    "/api/v1/credit-notes/saldo-favor/{customerId}": {
+      "get": {
+        "operationId": "CreditNotesController_getSaldoFavor",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Notas de crédito sometidas de un cliente, con su uso detallado: cuánto se reembolsó en efectivo, cuánto está aplicado a qué factura(s), y cuánto queda disponible. Mismo shape conceptual que GET /cobros/saldo-favor/:customerId.",
         "tags": [
           "Notas de Crédito y Débito"
         ]
@@ -7073,6 +7982,98 @@
           }
         ],
         "summary": "Reembolsa en efectivo/transferencia el monto de una nota de crédito ya sometida (en vez de dejarlo como saldo a favor del cliente). Método de pago libre.",
+        "tags": [
+          "Notas de Crédito y Débito"
+        ]
+      }
+    },
+    "/api/v1/credit-notes/{id}/aplicar-a-factura": {
+      "post": {
+        "operationId": "CreditNotesController_aplicarAFactura",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AplicarCreditoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Aplica una nota de crédito sometida directamente a una factura (invoiceId obligatorio) — nunca genera un Payment Entry ni saldo a favor genérico. Si la factura ya está Sometida, se reconcilia de inmediato en ERPNext (Journal Entry nativo tipo \"Credit Note\"). Si sigue en Draft, solo se registra el enlace (sin efecto contable); se reconcilia automáticamente al someter esa factura. Deshacer solo es posible mientras la aplicación siga pendiente (ver DELETE :id/aplicar-a-factura/:invoiceId).",
+        "tags": [
+          "Notas de Crédito y Débito"
+        ]
+      }
+    },
+    "/api/v1/credit-notes/{id}/aplicar-a-factura/{invoiceId}": {
+      "delete": {
+        "operationId": "CreditNotesController_deshacerAplicacion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deshace el enlace de esta nota de crédito con una factura — solo posible mientras siga pendiente (factura destino todavía en Draft, sin reconciliar). Una vez reconciliada de verdad (factura sometida), no se puede deshacer desde acá. La nota de crédito vuelve a estar disponible para aplicarla a otra factura.",
         "tags": [
           "Notas de Crédito y Débito"
         ]
@@ -9555,6 +10556,15 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Sucursal Norte",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -9997,6 +11007,77 @@
       }
     },
     "/api/v1/devoluciones": {
+      "get": {
+        "operationId": "DevolucionesController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customer",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por id de cliente",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lista las devoluciones (notas de crédito generadas por este flujo). Mismo dataset que GET /credit-notes, expuesto acá para no depender de conocer ese endpoint.",
+        "tags": [
+          "Devoluciones"
+        ]
+      },
       "post": {
         "operationId": "DevolucionesController_create",
         "parameters": [
@@ -10029,9 +11110,481 @@
             "bearer": []
           }
         ],
-        "summary": "Procesa una devolución completa: crea y somete la nota de crédito (con motivo obligatorio), y opcionalmente reembolsa el monto en efectivo/transferencia. El producto vuelve a inventario automáticamente al someter la nota de crédito. Para listar/ver devoluciones use GET /credit-notes (is_return=1) — el detalle incluye \"refunded\" para saber si ya se reembolsó.",
+        "summary": "Procesa una devolución completa: crea y somete la nota de crédito (con motivo obligatorio). Si la factura original todavía tiene saldo pendiente de cobro (venta a crédito), la nota de crédito se concilia automáticamente contra ese pendiente (y \"refund\" queda bloqueado mientras exista ese saldo); si no tiene pendiente, se reembolsa en efectivo/transferencia o queda como saldo a favor, según \"resolution\". El producto vuelve a inventario automáticamente al someter la nota de crédito.",
         "tags": [
           "Devoluciones"
+        ]
+      }
+    },
+    "/api/v1/devoluciones/{id}": {
+      "get": {
+        "operationId": "DevolucionesController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle completo de una devolución: la nota de crédito generada (motivo, items, estado de uso — reembolsada/aplicada/disponible) y un resumen de la factura ORIGINAL que se devolvió (NCF, montos, si quedó saldada tras la conciliación automática).",
+        "tags": [
+          "Devoluciones"
+        ]
+      }
+    },
+    "/api/v1/sucursales": {
+      "get": {
+        "operationId": "SucursalesController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar sucursales con paginación",
+        "tags": [
+          "Sucursales"
+        ]
+      },
+      "post": {
+        "operationId": "SucursalesController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSucursalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear sucursal",
+        "tags": [
+          "Sucursales"
+        ]
+      }
+    },
+    "/api/v1/sucursales/{id}": {
+      "get": {
+        "operationId": "SucursalesController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obtener sucursal por ID",
+        "tags": [
+          "Sucursales"
+        ]
+      },
+      "put": {
+        "operationId": "SucursalesController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSucursalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renombrar sucursal",
+        "tags": [
+          "Sucursales"
+        ]
+      },
+      "delete": {
+        "operationId": "SucursalesController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar sucursal (falla si tiene almacenes asociados)",
+        "tags": [
+          "Sucursales"
+        ]
+      }
+    },
+    "/api/v1/transferencias": {
+      "get": {
+        "operationId": "TransferenciasController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "in_transit",
+                "completed",
+                "cancelled"
+              ]
+            }
+          },
+          {
+            "name": "warehouse",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por almacén origen o destino",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar transferencias entre almacenes con estado calculado (draft/in_transit/completed/cancelled)",
+        "tags": [
+          "Transferencias"
+        ]
+      },
+      "post": {
+        "operationId": "TransferenciasController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTransferenciaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear solicitud de transferencia (paso 1: origen → tránsito, sometido)",
+        "tags": [
+          "Transferencias"
+        ]
+      }
+    },
+    "/api/v1/transferencias/{id}": {
+      "get": {
+        "operationId": "TransferenciasController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una transferencia",
+        "tags": [
+          "Transferencias"
+        ]
+      }
+    },
+    "/api/v1/transferencias/{id}/confirmar": {
+      "post": {
+        "operationId": "TransferenciasController_confirm",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirmar recepción (paso 2: tránsito → destino final, sometido). Requiere pertenecer a la sucursal destino.",
+        "tags": [
+          "Transferencias"
+        ]
+      }
+    },
+    "/api/v1/transferencias/{id}/cancelar": {
+      "post": {
+        "operationId": "TransferenciasController_cancel",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar la solicitud si aún no fue confirmada (el stock regresa al origen)",
+        "tags": [
+          "Transferencias"
         ]
       }
     }
@@ -10344,6 +11897,11 @@
             "type": "string",
             "example": "SONO-2026-00001",
             "description": "Pedido de venta al que pertenece esta factura. ERPNext actualiza el estado del pedido automáticamente."
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se usa la sucursal por defecto del usuario. Se valida contra las sucursales asignadas al usuario."
           }
         },
         "required": [
@@ -10939,6 +12497,8 @@
             "type": "string"
           },
           "components": {
+            "minItems": 2,
+            "description": "Mínimo 2 componentes. Ninguno puede ser a su vez un combo (no se permite anidar).",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BundleComponentDto"
@@ -11224,6 +12784,133 @@
           "items"
         ]
       },
+      "CreateZonaDto": {
+        "type": "object",
+        "properties": {
+          "zonaName": {
+            "type": "string",
+            "example": "Refrigerados"
+          },
+          "warehouse": {
+            "type": "string",
+            "example": "Almacén Principal"
+          },
+          "code": {
+            "type": "string",
+            "example": "ZR-01"
+          },
+          "descripcion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "zonaName",
+          "warehouse"
+        ]
+      },
+      "UpdateZonaDto": {
+        "type": "object",
+        "properties": {
+          "zonaName": {
+            "type": "string",
+            "example": "Refrigerados"
+          },
+          "code": {
+            "type": "string",
+            "example": "ZR-01"
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "disabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AssignItemUbicacionDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "description": "Código del artículo (Item)"
+          },
+          "warehouse": {
+            "type": "string",
+            "description": "Almacén al que pertenece la ubicación"
+          },
+          "ubicacionId": {
+            "type": "string",
+            "description": "ID de la ubicación/rack (Almacen Ubicacion)"
+          },
+          "esPrincipal": {
+            "type": "boolean",
+            "default": false,
+            "description": "Marca esta como la ubicación principal del artículo en este almacén"
+          },
+          "notas": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemCode",
+          "warehouse",
+          "ubicacionId"
+        ]
+      },
+      "UpdateItemUbicacionDto": {
+        "type": "object",
+        "properties": {
+          "esPrincipal": {
+            "type": "boolean"
+          },
+          "notas": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateUbicacionDto": {
+        "type": "object",
+        "properties": {
+          "ubicacionName": {
+            "type": "string",
+            "example": "Rack A-03"
+          },
+          "zona": {
+            "type": "string",
+            "description": "ID de la zona (Almacen Zona) a la que pertenece"
+          },
+          "code": {
+            "type": "string",
+            "example": "A-03"
+          },
+          "descripcion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ubicacionName",
+          "zona"
+        ]
+      },
+      "UpdateUbicacionDto": {
+        "type": "object",
+        "properties": {
+          "ubicacionName": {
+            "type": "string",
+            "example": "Rack A-03"
+          },
+          "code": {
+            "type": "string",
+            "example": "A-03"
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "disabled": {
+            "type": "boolean"
+          }
+        }
+      },
       "BatchLineDto": {
         "type": "object",
         "properties": {
@@ -11342,6 +13029,11 @@
               "Contado",
               "Crédito"
             ]
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal desde la que se registra la compra. Si se omite, se usa la sucursal por defecto del usuario. Se valida contra las sucursales asignadas al usuario."
           }
         },
         "required": [
@@ -11400,6 +13092,11 @@
               "Contado",
               "Crédito"
             ]
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal desde la que se registra la compra. Si se omite, se usa la sucursal por defecto del usuario. Se valida contra las sucursales asignadas al usuario."
           }
         }
       },
@@ -11571,7 +13268,7 @@
             "example": [
               "Almacén Principal - JB"
             ],
-            "description": "Almacenes permitidos para este usuario",
+            "description": "DEPRECADO: usar `branches`. Se mantiene por retrocompatibilidad de datos históricos, ya no es la fuente de verdad de permisos.",
             "type": "array",
             "items": {
               "type": "string"
@@ -11582,12 +13279,46 @@
             "example": "Almacén Principal - JB",
             "description": "Almacén activo por defecto. Se usa en compras, ventas e inventario."
           },
+          "branches": {
+            "example": [
+              "Sucursal Norte"
+            ],
+            "description": "Sucursales asignadas a este usuario. Los almacenes permitidos se calculan a partir de estas (custom_branch de cada Warehouse).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "defaultBranch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal preseleccionada por defecto para este usuario."
+          },
           "maxDiscountPct": {
             "type": "number",
             "example": 15,
             "description": "Descuento máximo (%) que puede aplicar este usuario en ventas. 0 = sin permiso de descuento."
           }
         }
+      },
+      "AssignSucursalesDto": {
+        "type": "object",
+        "properties": {
+          "branches": {
+            "example": [
+              "Sucursal Norte",
+              "Sucursal Sur"
+            ],
+            "description": "Reemplaza por completo el set de sucursales asignadas al usuario",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "branches"
+        ]
       },
       "UpdateEmpresaDto": {
         "type": "object",
@@ -11650,6 +13381,11 @@
               "C"
             ],
             "description": "Precio default cuando el cliente no tiene clasificación"
+          },
+          "transitWarehouse": {
+            "type": "string",
+            "example": "Tránsito - JB",
+            "description": "Almacén virtual (warehouse_type=Transit) usado como paso intermedio en transferencias entre almacenes/sucursales."
           }
         }
       },
@@ -11793,6 +13529,11 @@
           "parentWarehouse": {
             "type": "string",
             "description": "Almacén padre para jerarquía"
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal a la que pertenece este almacén"
           }
         },
         "required": [
@@ -11821,6 +13562,11 @@
             "type": "string",
             "example": "Stock en mano - JB",
             "description": "Cuenta GL de inventario asociada a este almacén"
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal a la que pertenece este almacén"
           }
         }
       },
@@ -12196,6 +13942,11 @@
           },
           "notes": {
             "type": "string"
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se usa la sucursal por defecto del usuario. Se valida contra las sucursales asignadas al usuario."
           }
         },
         "required": [
@@ -12272,6 +14023,23 @@
         "required": [
           "modeOfPayment",
           "amount"
+        ]
+      },
+      "AplicarCreditoDto": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string",
+            "example": "ACC-SINV-2026-00013",
+            "description": "Factura (Draft o sometida) a la que aplicar el saldo de inmediato. Obligatorio — una nota de crédito siempre debe enlazarse a una factura concreta, nunca queda como saldo a favor genérico sin destino."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Monto a mover desde la nota de crédito. Si se omite, usa el saldo restante completo de la nota."
+          }
+        },
+        "required": [
+          "invoiceId"
         ]
       },
       "CreateDebitNoteDto": {
@@ -12597,6 +14365,11 @@
             "type": "boolean",
             "default": false,
             "description": "Marca este pedido como un apartado (layaway): al someterlo se reserva físicamente el stock (Stock Reservation Entry) y NO se genera factura de inmediato — se factura después con POST /pedidos/:id/facturar-apartado cuando el cliente regresa a retirar el producto."
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se usa la sucursal por defecto del usuario. Se valida contra las sucursales asignadas al usuario."
           }
         },
         "required": [
@@ -12669,7 +14442,7 @@
               "refund",
               "credit_note_only"
             ],
-            "description": "\"refund\": reembolsa el monto en efectivo/transferencia. \"credit_note_only\": el monto queda como saldo a favor del cliente (nota de crédito sin reembolso)."
+            "description": "\"refund\": reembolsa el monto en efectivo/transferencia — SOLO permitido si la factura original ya no tiene saldo pendiente de cobro (outstanding_amount = 0); si la factura original fue vendida a crédito y aún debe dinero, se rechaza con 400 y debe usarse \"credit_note_only\". \"credit_note_only\": el monto queda como saldo a favor del cliente. Si la factura original tiene saldo pendiente, la nota de crédito se aplica AUTOMÁTICAMENTE a ese pendiente (hasta el menor entre el total de la nota de crédito y el pendiente); cualquier remanente queda disponible sin aplicar."
           },
           "refundModeOfPayment": {
             "type": "string",
@@ -12687,6 +14460,71 @@
           "invoiceId",
           "resolution",
           "reason"
+        ]
+      },
+      "CreateSucursalDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Sucursal Norte"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateSucursalDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Sucursal Norte"
+          }
+        }
+      },
+      "TransferenciaItemDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "example": "PROD-001"
+          },
+          "qty": {
+            "type": "number",
+            "example": 5
+          }
+        },
+        "required": [
+          "itemCode",
+          "qty"
+        ]
+      },
+      "CreateTransferenciaDto": {
+        "type": "object",
+        "properties": {
+          "fromWarehouse": {
+            "type": "string",
+            "example": "Almacén Norte - JB"
+          },
+          "toWarehouse": {
+            "type": "string",
+            "example": "Almacén Sur - JB"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferenciaItemDto"
+            }
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fromWarehouse",
+          "toWarehouse",
+          "items"
         ]
       }
     }

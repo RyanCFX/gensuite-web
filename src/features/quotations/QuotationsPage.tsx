@@ -1,38 +1,43 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { listQuotations } from '@/shared/api/quotations'
+import { listQuotations, cancelQuotation } from '@/shared/api/quotations'
 import type { ListQuotationsParams } from '@/shared/api/quotations'
+import type { Quotation } from '@/shared/api/types'
 import { listSucursales } from '@/shared/api/sucursales'
-import { Plus, Eye, Search, GitBranch, Copy } from 'lucide-react'
+import { Plus, Eye, Search, GitBranch, Copy, X, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 
 type StatusFilter = 'draft' | 'submitted' | 'ordered' | 'lost' | 'cancelled' | 'all'
 
 const STATUS_BADGE: Record<string, string> = {
-  Draft: 'badge-draft',
-  Submitted: 'badge-submitted',
-  Ordered: 'badge-info',
-  Lost: 'badge-warning',
-  Cancelled: 'badge-cancelled',
+  draft: 'badge-draft',
+  submitted: 'badge-submitted',
+  ordered: 'badge-info',
+  lost: 'badge-warning',
+  cancelled: 'badge-cancelled',
 }
 const STATUS_LABEL: Record<string, string> = {
-  Draft: 'Borrador',
-  Submitted: 'Sometido',
-  Ordered: 'Ordenado',
-  Lost: 'Perdido',
-  Cancelled: 'Cancelado',
+  draft: 'Borrador',
+  submitted: 'Sometido',
+  ordered: 'Ordenado',
+  lost: 'Perdido',
+  cancelled: 'Cancelado',
 }
 
 export default function QuotationsPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [branch, setBranch] = useState('')
+  const [toCancel, setToCancel] = useState<Quotation | null>(null)
   const { orderBy, sort } = useSortState()
 
   const { data: sucursalesData } = useQuery({
@@ -57,6 +62,12 @@ export default function QuotationsPage() {
   })
 
   const quotations = data?.items ?? []
+
+  const cancelMutation = useMutation({
+    mutationFn: () => cancelQuotation(toCancel!.id),
+    onSuccess: () => { toast.success('Cotización cancelada'); queryClient.invalidateQueries({ queryKey: ['quotations'] }); setToCancel(null) },
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al cancelar la cotización'),
+  })
 
   return (
     <div className="page-container">
@@ -128,7 +139,7 @@ export default function QuotationsPage() {
               <th>Válida hasta</th>
               <th style={{ textAlign: 'right' }}>Total</th>
               <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
-              <th style={{ textAlign: 'right', width: 64 }}>Ver</th>
+              <th style={{ width: 48 }} />
             </tr>
           </thead>
           <tbody>
@@ -174,20 +185,20 @@ export default function QuotationsPage() {
                         {STATUS_LABEL[q.status] ?? q.status}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <button
-                        className="btn btn-ghost btn-size-icon-sm"
-                        title="Duplicar"
-                        onClick={(e) => { e.stopPropagation(); navigate(`/cotizaciones/nueva?duplicate=${q.id}`) }}
-                      >
-                        <Copy size={14} />
-                      </button>
-                      <button
-                        className="btn btn-ghost btn-size-icon-sm"
-                        onClick={(e) => { e.stopPropagation(); navigate(`/cotizaciones/${q.id}`) }}
-                      >
-                        <Eye size={15} />
-                      </button>
+                    <td onClick={(e) => e.stopPropagation()} className="actions-cell">
+                      <ActionsMenu>
+                        <ActionsMenuItem onClick={() => navigate(`/cotizaciones/${q.id}`)}>
+                          <Eye size={14} /> Ver
+                        </ActionsMenuItem>
+                        <ActionsMenuItem onClick={() => navigate(`/cotizaciones/nueva?duplicate=${q.id}`)}>
+                          <Copy size={14} /> Duplicar
+                        </ActionsMenuItem>
+                        {q.status === 'draft' && (
+                          <ActionsMenuItem danger onClick={() => setToCancel(q)}>
+                            <X size={14} /> Cancelar
+                          </ActionsMenuItem>
+                        )}
+                      </ActionsMenu>
                     </td>
                   </tr>
                 )
@@ -202,6 +213,27 @@ export default function QuotationsPage() {
           <span className="pagination-info">
             Mostrando {quotations.length} de {data.meta.total} cotizaciones
           </span>
+        </div>
+      )}
+
+      {toCancel && (
+        <div className="modal-overlay" onClick={() => setToCancel(null)}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title">Cancelar cotización</h2>
+              <button className="modal-close" onClick={() => setToCancel(null)}><X size={16} /></button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Se cancelará la cotización <strong>{toCancel.id}</strong>.</p>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={() => setToCancel(null)}>Volver</button>
+              <button className="btn btn-danger" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending}>
+                {cancelMutation.isPending ? <Loader2 size={14} className="spinner" /> : null}
+                Cancelar Cotización
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

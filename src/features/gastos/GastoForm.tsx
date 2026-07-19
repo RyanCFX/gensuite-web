@@ -195,7 +195,7 @@ export default function GastoForm() {
         <span className="skeleton-box" style={{ height: 256, width: '100%', display: 'block' }} />
       ) : (
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Header */}
           <div className="card">
             <div className="card-header">

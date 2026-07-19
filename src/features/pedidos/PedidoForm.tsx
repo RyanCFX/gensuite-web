@@ -11,7 +11,9 @@ import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDOP } from '@/lib/formatters'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
-import { ArrowLeft, Save, Plus, Trash2, Loader2, PackageOpen } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, PackageOpen } from 'lucide-react'
+import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
+import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
 import { PinModal } from '@/components/shared/PinModal'
@@ -76,6 +78,7 @@ export default function PedidoForm() {
   const [submitted, setSubmitted] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
+  const [viewItemCode, setViewItemCode] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [isLayaway, setIsLayaway] = useState(false)
@@ -507,10 +510,18 @@ export default function PedidoForm() {
                           <UomSelect value={item.uom} onChange={(v) => updateItem(index, { uom: v })} itemCode={item.itemCode || undefined} />
                         )}
                       </td>
-                      <td>
-                        <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeRow(index)}>
-                          <Trash2 size={13} />
-                        </button>
+                      <td onClick={(e) => e.stopPropagation()} className="actions-cell">
+                        <ActionsMenu>
+                          <ActionsMenuItem
+                            onClick={() => setViewItemCode(item.itemCode)}
+                            disabled={!item.itemCode}
+                          >
+                            <Eye size={14} /> Ver detalle
+                          </ActionsMenuItem>
+                          <ActionsMenuItem danger onClick={() => removeRow(index)}>
+                            <Trash2 size={14} /> Eliminar
+                          </ActionsMenuItem>
+                        </ActionsMenu>
                       </td>
                     </tr>
                   ))
@@ -551,6 +562,10 @@ export default function PedidoForm() {
           onConfirm={onVariantConfirm}
           onClose={() => setVariantTemplate(null)}
         />
+      )}
+
+      {viewItemCode && (
+        <ItemDetailModal itemCode={viewItemCode} onClose={() => setViewItemCode(null)} />
       )}
 
       <PinModal

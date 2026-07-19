@@ -8,7 +8,9 @@ import { listItems, getDefaultPriceTier } from '@/shared/api/catalog'
 import type { CreateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle } from '@/shared/api/types'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP } from '@/lib/formatters'
-import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2 } from 'lucide-react'
+import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
+import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
 import { NCF_TYPES } from '@/lib/constants'
@@ -89,6 +91,7 @@ export default function InvoiceForm() {
   const [loadingSemaforo, setLoadingSemaforo] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
+  const [viewItemCode, setViewItemCode] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
   const [branch, setBranch] = useState('')
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
@@ -628,10 +631,18 @@ export default function InvoiceForm() {
                           />
                         )}
                       </td>
-                      <td>
-                        <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeRow(index)}>
-                          <Trash2 size={13} />
-                        </button>
+                      <td onClick={(e) => e.stopPropagation()} className="actions-cell">
+                        <ActionsMenu>
+                          <ActionsMenuItem
+                            onClick={() => setViewItemCode(item.itemCode)}
+                            disabled={!item.itemCode}
+                          >
+                            <Eye size={14} /> Ver detalle
+                          </ActionsMenuItem>
+                          <ActionsMenuItem danger onClick={() => removeRow(index)}>
+                            <Trash2 size={14} /> Eliminar
+                          </ActionsMenuItem>
+                        </ActionsMenu>
                       </td>
                     </tr>
                   ))
@@ -726,6 +737,10 @@ export default function InvoiceForm() {
           onConfirm={onVariantConfirm}
           onClose={() => setVariantTemplate(null)}
         />
+      )}
+
+      {viewItemCode && (
+        <ItemDetailModal itemCode={viewItemCode} onClose={() => setViewItemCode(null)} />
       )}
     </div>
   )

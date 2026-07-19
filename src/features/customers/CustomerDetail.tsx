@@ -102,7 +102,7 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
               Disponible: {formatDOP(saldo.balance)}
             </span>
           )}
-          <button className="btn btn-ghost btn-size-sm" onClick={() => navigate('/notas-credito')}>
+          <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/notas-credito?customer=${customerId}`)}>
             Ver todas
           </button>
         </div>
@@ -253,8 +253,8 @@ export default function CustomerDetail() {
       queryClient.invalidateQueries({ queryKey: ['customers'] })
       navigate('/clientes')
     },
-    onError: () => {
-      toast.error('Error al desactivar el cliente')
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? 'Error al desactivar el cliente')
     },
   })
 

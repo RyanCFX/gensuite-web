@@ -69,6 +69,7 @@ const NAV_OPS: NavEntry[] = [
       { label: 'Stock Actual',icon: <Warehouse size={14} />, path: '/inventario/stock'    },
       { label: 'Historial',   icon: <BarChart3 size={14} />, path: '/inventario/historial' },
       { label: 'Conteos',     icon: <FileText size={14} />,  path: '/inventario/conteos'  },
+      { label: 'Zonas y Ubicaciones', icon: <MapPin size={14} />, path: '/inventario/zonas' },
       { label: 'Transferencias', icon: <Truck size={14} />,  path: '/transferencias'      },
     ],
   },

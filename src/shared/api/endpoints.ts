@@ -94,6 +94,17 @@ export const ENDPOINTS = {
       byId: (id: string) => `/inventory/counts/${id}`,
       submit: (id: string) => `/inventory/counts/${id}/submit`,
     },
+    zonas: {
+      list: '/inventory/zonas',
+      byId: (id: string) => `/inventory/zonas/${id}`,
+    },
+    ubicaciones: {
+      list: '/inventory/ubicaciones',
+      byId: (id: string) => `/inventory/ubicaciones/${id}`,
+      byItem: (itemCode: string) => `/inventory/ubicaciones/item/${itemCode}`,
+      asignar: '/inventory/ubicaciones/asignar',
+      asignarById: (id: string) => `/inventory/ubicaciones/asignar/${id}`,
+    },
   },
   compras: {
     list: '/compras',

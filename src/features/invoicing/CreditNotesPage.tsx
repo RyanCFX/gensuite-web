@@ -11,9 +11,10 @@ import {
 } from '@/shared/api/notes'
 import { listInvoices, getInvoice } from '@/shared/api/invoices'
 import { listMetodosPago } from '@/shared/api/config'
+import { listCustomers, getCustomer } from '@/shared/api/customers'
 import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo } from '@/shared/api/types'
 import { Plus, Loader2, Wallet, ArrowRightLeft, ChevronDown, ChevronRight } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -76,9 +77,37 @@ const STATUS_LABEL: Record<string, string> = {
 export default function CreditNotesPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [modalOpen, setModalOpen] = useState(false)
   const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null)
   const { orderBy, sort } = useSortState()
+
+  // ── Filtro por cliente (preseleccionado si viene ?customer= desde Clientes) ──
+  const [customerId, setCustomerId] = useState(searchParams.get('customer') ?? '')
+  const [customerLabel, setCustomerLabel] = useState('')
+  const [customerQuery, setCustomerQuery] = useState('')
+
+  const { data: preselectedCustomer } = useQuery({
+    queryKey: ['customer', customerId],
+    queryFn: () => getCustomer(customerId),
+    enabled: !!customerId && !customerLabel,
+  })
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza el label del cliente preseleccionado (?customer= en la URL)
+    if (preselectedCustomer) setCustomerLabel(preselectedCustomer.customerName)
+  }, [preselectedCustomer])
+
+  const { data: customersData, isLoading: customersLoading } = useQuery({
+    queryKey: ['customerSearch', customerQuery],
+    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
+  })
+
+  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
+    value: c.id,
+    label: c.customerName,
+    sublabel: c.rnc ?? c.cedula,
+  }))
 
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('')
@@ -97,8 +126,8 @@ export default function CreditNotesPage() {
   const [applyAmount, setApplyAmount] = useState(0)
 
   const { data: notesData, isLoading } = useQuery({
-    queryKey: ['credit-notes', orderBy],
-    queryFn: () => listCreditNotes({ orderBy: orderBy || undefined }),
+    queryKey: ['credit-notes', orderBy, customerId],
+    queryFn: () => listCreditNotes({ orderBy: orderBy || undefined, customer: customerId || undefined }),
   })
 
   const { data: metodos } = useQuery({
@@ -118,6 +147,7 @@ export default function CreditNotesPage() {
 
   useEffect(() => {
     if (selectedInvoiceDetail && selectedInvoiceDetail.id === selectedInvoiceId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- precarga los artículos al llegar el detalle de la factura seleccionada
       setNoteItems(selectedInvoiceDetail.items.map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate })))
     }
   }, [selectedInvoiceDetail, selectedInvoiceId])
@@ -334,6 +364,22 @@ export default function CreditNotesPage() {
         </button>
       </div>
 
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <div style={{ width: 260 }}>
+            <SearchSelect
+              value={customerId}
+              selectedLabel={customerLabel}
+              onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
+              options={customerOptions}
+              onSearch={setCustomerQuery}
+              loading={customersLoading}
+              placeholder="Filtrar por cliente…"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className="table-scroll">
         <table className="data-table">
           <thead>
@@ -474,7 +520,7 @@ export default function CreditNotesPage() {
                   <SearchSelect
                     id="invoice"
                     value={selectedInvoiceId}
-                    onChange={(id, _opt) => {
+                    onChange={(id) => {
                       setSelectedInvoiceId(id)
                       setNoteItems([])
                       setSelectedInvoice(id ? (submittedInvoices.find((i) => i.id === id) ?? null) : null)

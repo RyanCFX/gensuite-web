@@ -3,9 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getItem, toggleItem, listItemVariants, generateVariants, createVariant, getAttribute } from '@/shared/api/catalog'
+import { listWarehouses } from '@/shared/api/inventory'
+import { listZonas } from '@/shared/api/zonas'
+import { listUbicaciones, getItemUbicaciones, assignItemUbicacion, unassignItemUbicacion } from '@/shared/api/ubicaciones'
 import { formatDOP } from '@/lib/formatters'
-import { ToggleLeft, ToggleRight, Package, ArrowLeft, X } from 'lucide-react'
-import type { Item, GenerateVariantsResult, ItemAttribute } from '@/shared/api/types'
+import { ToggleLeft, ToggleRight, Package, ArrowLeft, X, MapPin, Trash2, Info } from 'lucide-react'
+import type { Item, GenerateVariantsResult, ItemAttribute, ApiError } from '@/shared/api/types'
 
 // ─── Generate Confirm Modal ───────────────────────────────────────────────────
 
@@ -330,6 +333,214 @@ function VariantsPanel({ itemId, item }: { itemId: string; item: Item }) {
           onSuccess={() => {
             setShowCreateVariant(false)
             qc.invalidateQueries({ queryKey: ['item-variants', itemId] })
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── Asignar Ubicación Modal ──────────────────────────────────────────────────
+
+function AssignUbicacionModal({
+  itemCode,
+  warehouse,
+  onClose,
+  onSuccess,
+}: {
+  itemCode: string
+  warehouse: string
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [zonaId, setZonaId] = useState('')
+  const [ubicacionId, setUbicacionId] = useState('')
+  const [esPrincipal, setEsPrincipal] = useState(false)
+  const [notas, setNotas] = useState('')
+
+  const { data: zonasData } = useQuery({
+    queryKey: ['zonas', warehouse],
+    queryFn: () => listZonas({ warehouse, limit: 100 }),
+  })
+  const zonas = zonasData?.items ?? []
+
+  const { data: ubicacionesData } = useQuery({
+    queryKey: ['ubicaciones', zonaId],
+    queryFn: () => listUbicaciones({ zona: zonaId, limit: 100 }),
+    enabled: !!zonaId,
+  })
+  const ubicaciones = ubicacionesData?.items ?? []
+
+  const assignMutation = useMutation({
+    mutationFn: () => assignItemUbicacion({ itemCode, warehouse, ubicacionId, esPrincipal, notas: notas || undefined }),
+    onSuccess: () => {
+      toast.success('Ubicación asignada')
+      onSuccess()
+    },
+    onError: (err: ApiError) => toast.error(err?.message ?? 'Error al asignar la ubicación'),
+  })
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2 className="modal-title">Asignar ubicación</h2>
+          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="ff-wrap">
+            <label className="ff-label ff-required">Zona</label>
+            <select className="ff-select" value={zonaId} onChange={(e) => { setZonaId(e.target.value); setUbicacionId('') }}>
+              <option value="">Seleccionar zona…</option>
+              {zonas.map((z) => (
+                <option key={z.id} value={z.id}>{z.zonaName}</option>
+              ))}
+            </select>
+            {zonasData && zonas.length === 0 && (
+              <p className="ff-hint">Este almacén no tiene zonas todavía. Créalas en Inventario → Zonas y Ubicaciones.</p>
+            )}
+          </div>
+          <div className="ff-wrap">
+            <label className="ff-label ff-required">Ubicación / Rack</label>
+            <select className="ff-select" value={ubicacionId} onChange={(e) => setUbicacionId(e.target.value)} disabled={!zonaId}>
+              <option value="">Seleccionar ubicación…</option>
+              {ubicaciones.map((u) => (
+                <option key={u.id} value={u.id}>{u.ubicacionName}</option>
+              ))}
+            </select>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+            <input type="checkbox" checked={esPrincipal} onChange={(e) => setEsPrincipal(e.target.checked)} />
+            Marcar como principal
+          </label>
+          <div className="ff-wrap">
+            <label className="ff-label">Notas</label>
+            <textarea className="ff-textarea" rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Opcional" />
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button
+            className="btn btn-primary"
+            onClick={() => assignMutation.mutate()}
+            disabled={!ubicacionId || assignMutation.isPending}
+          >
+            {assignMutation.isPending ? 'Guardando…' : 'Asignar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Panel de Ubicaciones ─────────────────────────────────────────────────────
+
+function UbicacionesPanel({ itemCode }: { itemCode: string }) {
+  const queryClient = useQueryClient()
+  const [warehouse, setWarehouse] = useState('')
+  const [showAssign, setShowAssign] = useState(false)
+
+  const { data: warehouses } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: listWarehouses,
+  })
+
+  // Selecciona el primer almacén disponible por defecto
+  const activeWarehouse = warehouse || warehouses?.[0]?.id || ''
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['item-ubicaciones', itemCode, activeWarehouse],
+    queryFn: () => getItemUbicaciones(itemCode, activeWarehouse),
+    enabled: !!activeWarehouse,
+  })
+
+  const asignaciones = data?.items ?? []
+
+  const unassignMutation = useMutation({
+    mutationFn: (id: string) => unassignItemUbicacion(id),
+    onSuccess: () => {
+      toast.success('Ubicación removida')
+      queryClient.invalidateQueries({ queryKey: ['item-ubicaciones', itemCode, activeWarehouse] })
+    },
+    onError: (err: ApiError) => toast.error(err?.message ?? 'Error al remover la ubicación'),
+  })
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card-header">
+        <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <MapPin size={15} style={{ color: 'var(--text-secondary)' }} /> Ubicaciones
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {(warehouses?.length ?? 0) > 1 && (
+            <select className="filter-select" value={activeWarehouse} onChange={(e) => setWarehouse(e.target.value)}>
+              {warehouses?.map((w) => (
+                <option key={w.id} value={w.id}>{w.name}</option>
+              ))}
+            </select>
+          )}
+          <button className="btn btn-primary btn-size-sm" onClick={() => setShowAssign(true)} disabled={!activeWarehouse}>
+            + Asignar ubicación
+          </button>
+        </div>
+      </div>
+
+      {data?.note && (
+        <div className="card-body" style={{ paddingBottom: 0 }}>
+          <div className="inline-alert inline-alert-info">
+            <Info size={16} />
+            Esta función requiere actualizar la app localizacion_rd en el servidor. Contacta al equipo técnico.
+          </div>
+        </div>
+      )}
+
+      <div className="card-body">
+        {isLoading ? (
+          <span className="skeleton-box" style={{ height: 60, display: 'block' }} />
+        ) : asignaciones.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+            Sin ubicaciones asignadas en este almacén.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {asignaciones.map((a) => (
+              <div
+                key={a.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                  border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)',
+                }}
+              >
+                <MapPin size={14} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontWeight: 500, fontSize: 13 }}>
+                    {a.zonaName ?? '—'} / {a.ubicacionName ?? a.ubicacionId}
+                  </span>
+                  {a.notas && <span style={{ display: 'block', fontSize: 11, color: 'var(--text-tertiary)' }}>{a.notas}</span>}
+                </div>
+                {a.esPrincipal && <span className="badge badge-success">Principal</span>}
+                <button
+                  className="btn btn-ghost btn-size-icon-sm"
+                  style={{ color: 'var(--icon-muted)' }}
+                  onClick={() => unassignMutation.mutate(a.id)}
+                  disabled={unassignMutation.isPending}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {showAssign && activeWarehouse && (
+        <AssignUbicacionModal
+          itemCode={itemCode}
+          warehouse={activeWarehouse}
+          onClose={() => setShowAssign(false)}
+          onSuccess={() => {
+            setShowAssign(false)
+            queryClient.invalidateQueries({ queryKey: ['item-ubicaciones', itemCode, activeWarehouse] })
           }}
         />
       )}
@@ -683,6 +894,10 @@ export default function ItemDetail() {
             )}
           </div>
         </div>
+      )}
+
+      {item.type === 'product' && !item.hasVariants && !item.variantOf && (
+        <UbicacionesPanel itemCode={item.id} />
       )}
 
       <div className="card">

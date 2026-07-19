@@ -30,6 +30,7 @@ const DevolucionDetail = lazy(() => import('@/features/invoicing/DevolucionDetai
 const StockPage       = lazy(() => import('@/features/inventory/StockPage'))
 const HistoryPage     = lazy(() => import('@/features/inventory/HistoryPage'))
 const CountsPage      = lazy(() => import('@/features/inventory/CountsPage'))
+const ZonasPage       = lazy(() => import('@/features/inventory/ZonasPage'))
 const ComprasPage     = lazy(() => import('@/features/compras/ComprasPage'))
 const CompraDetail    = lazy(() => import('@/features/compras/CompraDetail'))
 const CompraForm      = lazy(() => import('@/features/compras/CompraForm'))
@@ -138,6 +139,7 @@ export default function App() {
             <Route path="/inventario/stock" element={<Suspense fallback={<PageLoader />}><StockPage /></Suspense>} />
             <Route path="/inventario/historial" element={<Suspense fallback={<PageLoader />}><HistoryPage /></Suspense>} />
             <Route path="/inventario/conteos" element={<Suspense fallback={<PageLoader />}><CountsPage /></Suspense>} />
+            <Route path="/inventario/zonas" element={<Suspense fallback={<PageLoader />}><ZonasPage /></Suspense>} />
 
             {/* Compras */}
             <Route path="/compras" element={<Suspense fallback={<PageLoader />}><ComprasPage /></Suspense>} />
