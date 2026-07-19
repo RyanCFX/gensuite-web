@@ -216,6 +216,8 @@ export interface Invoice {
   ncfType?: string
   subtotal: number
   grandTotal: number
+  /** Monto total de impuestos del documento (Sales Taxes and Charges), si se aplicó un template */
+  taxAmount?: number
   outstandingAmount: number
   items: InvoiceItem[]
   notes?: string
@@ -247,6 +249,8 @@ export interface CreateInvoiceDto {
     discountPct?: number
   }[]
   notes?: string
+  /** ID de un Sales Taxes and Charges Template (/config/impuestos-ventas). Si se omite, se usa el default de la compañía si existe. */
+  taxesTemplate?: string
 }
 
 // POST /invoices/:id/cancel — reason is mandatory, 10-500 chars
@@ -310,6 +314,8 @@ export interface CreateQuotationDto {
     discountPct?: number
   }[]
   notes?: string
+  /** ID de un Sales Taxes and Charges Template (/config/impuestos-ventas). Si se omite, se usa el default de la compañía si existe. */
+  taxesTemplate?: string
 }
 
 export type UpdateQuotationDto = Partial<CreateQuotationDto>
@@ -531,6 +537,7 @@ export interface BundleComponent {
   itemName?: string
   qty: number
   stockQty?: number
+  uom?: string
 }
 
 export interface Bundle {
@@ -540,15 +547,19 @@ export interface Bundle {
   components: BundleComponent[]
   prices?: { A?: number; B?: number; C?: number }
   disabled: boolean
+  /** UdM del artículo combo en sí (no de sus componentes). Default backend: 'Nos'. */
+  itemUom?: string
 }
 
 export interface CreateBundleDto {
   itemCode?: string
   itemName: string
-  components: { itemCode: string; qty: number }[]
+  components: { itemCode: string; qty: number; uom?: string }[]
   priceA?: number
   priceB?: number
   priceC?: number
+  /** UdM del artículo combo en sí. Opcional, default backend: 'Nos'. */
+  itemUom?: string
 }
 
 export type UpdateBundleDto = Partial<CreateBundleDto>
@@ -1132,6 +1143,8 @@ export interface Compra {
   currency: string
   items: CompraItem[]
   grandTotal: number
+  /** Monto total de impuestos del documento (Purchase Taxes and Charges), si se aplicó un template */
+  taxAmount?: number
   ncfProveedor?: string
   tipoBienes606?: string
   formaPago606?: string
@@ -1162,6 +1175,8 @@ export interface CreateCompraDto {
   formaPago606?: string
   retencionIsr?: number
   tipoPago?: 'Contado' | 'Crédito'
+  /** ID de un Purchase Taxes and Charges Template (/config/impuestos-compras). Si se omite, se usa el default de la compañía si existe. */
+  taxesTemplate?: string
 }
 
 export type UpdateCompraDto = Partial<CreateCompraDto>
@@ -1287,11 +1302,18 @@ export type TaxChargeType =
   | 'On Previous Row Total'
   | 'On Item Quantity'
 
+export type TaxLineCategory = 'Valuation and Total' | 'Valuation' | 'Total'
+export type TaxLineAddDeduct = 'Add' | 'Deduct'
+
 export interface TaxTemplateLine {
   chargeType: TaxChargeType
   accountHead: string
   rate: number
   description?: string
+  /** Solo aplica a impuestos de COMPRA. Se ignora si el template es de ventas. */
+  category?: TaxLineCategory
+  /** Solo aplica a impuestos de COMPRA. Se ignora si el template es de ventas. */
+  addDeductTax?: TaxLineAddDeduct
 }
 
 export interface TaxTemplate {
@@ -1305,6 +1327,27 @@ export interface CreateTaxTemplateDto {
   title: string
   isDefault?: boolean
   taxes: TaxTemplateLine[]
+}
+
+// ─── Item Tax Templates (impuesto por artículo — distinto de TaxTemplate de documento) ────────
+
+export interface ItemTaxLine {
+  /** Cuenta contable del impuesto */
+  taxType: string
+  rate: number
+  /** Si es true, el artículo queda exento de este impuesto (tasa 0 explícita) */
+  notApplicable?: boolean
+}
+
+export interface ItemTaxTemplate {
+  id: string
+  title: string
+  taxes: ItemTaxLine[]
+}
+
+export interface CreateItemTaxTemplateDto {
+  title: string
+  taxes: ItemTaxLine[]
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────

@@ -188,6 +188,7 @@ export const ENDPOINTS = {
     impuestosCompras: '/config/impuestos-compras',
     impuestosComprasById: (id: string) => `/config/impuestos-compras/${encodeURIComponent(id)}`,
     itemTaxTemplates: '/config/item-tax-templates',
+    itemTaxTemplatesById: (id: string) => `/config/item-tax-templates/${encodeURIComponent(id)}`,
     gruposClientesById: (id: string) => `/config/grupos-clientes/${encodeURIComponent(id)}`,
     facturacion: '/config/facturacion',
     apartados: '/config/apartados',

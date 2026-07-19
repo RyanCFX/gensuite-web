@@ -5,6 +5,7 @@ import { listBundles, getBundle, createBundle, updateBundle, deleteBundle } from
 import type { Bundle, BundleComponent } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
+import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDOP } from '@/lib/formatters'
 import { useDebounce } from '@/lib/useDebounce'
 import { Plus, Trash2, X, Loader2, Search, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -93,6 +94,7 @@ export default function BundlesPage() {
             <thead>
               <tr>
                 <SortableTh label="Nombre" sortKey="itemName" orderBy={orderBy} onSort={sort} />
+                <th>UdM</th>
                 <th>Artículos</th>
                 <SortableTh label="Precio A" sortKey="priceA" orderBy={orderBy} onSort={sort} />
                 <SortableTh label="Precio B" sortKey="priceB" orderBy={orderBy} onSort={sort} />
@@ -103,14 +105,15 @@ export default function BundlesPage() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 32 }}><Loader2 size={20} className="spin" /></td></tr>
+                <tr><td colSpan={8} style={{ textAlign: 'center', padding: 32 }}><Loader2 size={20} className="spin" /></td></tr>
               ) : filteredItems.length === 0 ? (
-                <tr><td colSpan={7}><div className="empty-state"><p className="empty-title">Sin combos</p><p className="empty-sub">Crea el primer combo de artículos.</p></div></td></tr>
+                <tr><td colSpan={8}><div className="empty-state"><p className="empty-title">Sin combos</p><p className="empty-sub">Crea el primer combo de artículos.</p></div></td></tr>
               ) : (
                 filteredItems.map((b) => (
                   <tr key={b.id}>
                     <td style={{ fontWeight: 500 }}>{b.itemName}</td>
-                    <td>
+                    <td>{b.itemUom || 'Nos'}</td>
+                    <td title={b.components?.map((c) => `${c.itemName ?? c.itemCode} — ${c.qty} ${c.uom ?? ''}`).join('\n')}>
                       {b.totalItems} Artículos
                     </td>
                     <td>{b.prices?.A ? formatDOP(b.prices.A) : '—'}</td>
@@ -189,7 +192,8 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
   const [priceA, setPriceA] = useState('')
   const [priceB, setPriceB] = useState('')
   const [priceC, setPriceC] = useState('')
-  const [components, setComponents] = useState<{ itemCode: string; itemLabel?: string; qty: number; stockQty?: number }[]>([])
+  const [itemUom, setItemUom] = useState('')
+  const [components, setComponents] = useState<{ itemCode: string; itemLabel?: string; qty: number; stockQty?: number; uom?: string }[]>([])
   const [submitted, setSubmitted] = useState(false)
 
   const { data: existing, isLoading: loadingExisting } = useQuery({
@@ -205,7 +209,8 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
     setPriceA(existing.prices?.A?.toString() ?? '')
     setPriceB(existing.prices?.B?.toString() ?? '')
     setPriceC(existing.prices?.C?.toString() ?? '')
-    setComponents(existing.components.map((c) => ({ itemCode: c.itemCode, itemLabel: c.itemName, qty: c.qty, stockQty: c.stockQty })))
+    setItemUom(existing.itemUom ?? '')
+    setComponents(existing.components.map((c) => ({ itemCode: c.itemCode, itemLabel: c.itemName, qty: c.qty, stockQty: c.stockQty, uom: c.uom })))
     setInitialized(true)
   }
 
@@ -213,10 +218,11 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
     mutationFn: () => createBundle({
       itemName: name,
       itemCode: itemCode || undefined,
-      components: components.map((c) => ({ itemCode: c.itemCode, qty: c.qty })),
+      components: components.map((c) => ({ itemCode: c.itemCode, qty: c.qty, uom: c.uom || undefined })),
       priceA: priceA ? parseFloat(priceA) : undefined,
       priceB: priceB ? parseFloat(priceB) : undefined,
       priceC: priceC ? parseFloat(priceC) : undefined,
+      itemUom: itemUom || undefined,
     }),
     onSuccess: () => { toast.success('Combo creado'); queryClient.invalidateQueries({ queryKey: ['bundles'] }); onClose() },
     onError: () => toast.error('Error al crear el combo'),
@@ -225,11 +231,11 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
   const updateMutation = useMutation({
     mutationFn: () => updateBundle(editId!, {
       itemName: name,
-      itemCode: itemCode || undefined,
-      components: components.map((c) => ({ itemCode: c.itemCode, qty: c.qty })),
+      components: components.map((c) => ({ itemCode: c.itemCode, qty: c.qty, uom: c.uom || undefined })),
       priceA: priceA ? parseFloat(priceA) : undefined,
       priceB: priceB ? parseFloat(priceB) : undefined,
       priceC: priceC ? parseFloat(priceC) : undefined,
+      itemUom: itemUom || undefined,
     }),
     onSuccess: () => { toast.success('Combo actualizado'); queryClient.invalidateQueries({ queryKey: ['bundles'] }); onClose() },
     onError: () => toast.error('Error al actualizar el combo'),
@@ -241,7 +247,7 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
     setComponents((prev) => [...prev, { itemCode: '', qty: 1 }])
   }
 
-  function updateComponent(index: number, patch: Partial<{ itemCode: string; itemLabel?: string; qty: number; stockQty?: number }>) {
+  function updateComponent(index: number, patch: Partial<{ itemCode: string; itemLabel?: string; qty: number; stockQty?: number; uom?: string }>) {
     setComponents((prev) => prev.map((c, i) => i === index ? { ...c, ...patch } : c))
   }
 
@@ -284,7 +290,18 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
                 </div>
                 <div className="ff-wrap">
                   <label className="ff-label">Código</label>
-                  <input className="ff-input" value={itemCode} onChange={(e) => setItemCode(e.target.value)} placeholder="Ej: COMBO-001" />
+                  <input
+                    className="ff-input"
+                    value={itemCode}
+                    onChange={(e) => setItemCode(e.target.value)}
+                    placeholder="Ej: COMBO-001"
+                    disabled={!!editId}
+                    title={editId ? 'El código no se puede modificar una vez creado el combo' : undefined}
+                  />
+                </div>
+                <div className="ff-wrap" style={{ maxWidth: 160 }}>
+                  <label className="ff-label">Unidad de Medida del Combo</label>
+                  <UomSelect value={itemUom || 'Nos'} onChange={(v) => setItemUom(v)} />
                 </div>
               </div>
 
@@ -316,7 +333,7 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
                                 placeholder="Buscar artículo…"
                               />
                             </div>
-                            <div className="ff-wrap" style={{ width: 100 }}>
+                            <div className="ff-wrap" style={{ width: 90 }}>
                               <input
                                 className={`ff-input${submitted && (!comp.qty || comp.qty <= 0) ? ' ff-input-error' : ''}`}
                                 type="number"
@@ -325,6 +342,13 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
                                 value={comp.qty}
                                 onChange={(e) => updateComponent(idx, { qty: parseInt(e.target.value) || 0 })}
                                 style={{ textAlign: 'right' }}
+                              />
+                            </div>
+                            <div className="ff-wrap" style={{ width: 120 }}>
+                              <UomSelect
+                                value={comp.uom ?? ''}
+                                onChange={(v) => updateComponent(idx, { uom: v })}
+                                itemCode={comp.itemCode || undefined}
                               />
                             </div>
                             <button type="button" className="btn btn-ghost btn-size-icon-sm" style={{ marginTop: 2 }} onClick={() => removeComponent(idx)}>

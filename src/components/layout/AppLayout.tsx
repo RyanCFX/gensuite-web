@@ -123,6 +123,7 @@ const NAV_CONFIG: NavEntry = {
     { label: 'Secuencias NCF',     icon: <Shield size={14} />,      path: '/config/ncf'               },
     { label: 'Impuestos Ventas',   icon: <Percent size={14} />,     path: '/config/impuestos-ventas'  },
     { label: 'Impuestos Compras',  icon: <Percent size={14} />,     path: '/config/impuestos-compras' },
+    { label: 'Impuestos Artículo', icon: <Percent size={14} />,     path: '/config/impuestos-articulo'},
     { label: 'Ejercicio Fiscal',   icon: <Calendar size={14} />,    path: '/config/ejercicio-fiscal'  },
     { label: 'Grupos de Clientes', icon: <Users size={14} />,       path: '/config/grupos-clientes'   },
     { label: 'Usuarios',           icon: <UserCog size={14} />,     path: '/usuarios'                 },

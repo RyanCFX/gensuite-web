@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { listWarehouses } from '@/shared/api/inventory'
@@ -7,6 +7,8 @@ import { listUbicaciones, createUbicacion, updateUbicacion, deleteUbicacion } fr
 import type { ZonaResponseDto, UbicacionResponseDto, ApiError } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Plus, Pencil, Trash2, X, MapPin, Info } from 'lucide-react'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 // ─── Banner "doctype no instalado" ─────────────────────────────────────────
 
@@ -50,6 +52,21 @@ function ZonasSection({
 
   const zonas = data?.items ?? []
   const readOnly = !!data?.note
+
+  // Si el almacén tiene una sola zona, la seleccionamos automáticamente.
+  // Se guarda en un ref para no volver a forzarla si el usuario la deselecciona
+  // manualmente (click de nuevo sobre la fila) mientras siga en el mismo almacén.
+  const autoSelectedWarehouseRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (autoSelectedWarehouseRef.current !== warehouse) {
+      autoSelectedWarehouseRef.current = null
+    }
+    if (zonas.length === 1 && autoSelectedWarehouseRef.current !== warehouse) {
+      autoSelectedWarehouseRef.current = warehouse
+      onSelectZona(zonas[0])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [warehouse, zonas.length, zonas[0]?.id])
 
   function openCreate() {
     setEditTarget(null)
@@ -486,6 +503,8 @@ function UbicacionesSection({ zona }: { zona: ZonaResponseDto }) {
 
 export default function ZonasPage() {
   const [warehouse, setWarehouse] = useState('')
+  const [warehouseLabel, setWarehouseLabel] = useState('')
+  const [warehouseQuery, setWarehouseQuery] = useState('')
   const [selectedZona, setSelectedZona] = useState<ZonaResponseDto | null>(null)
 
   const { data: warehouses } = useQuery({
@@ -493,8 +512,13 @@ export default function ZonasPage() {
     queryFn: listWarehouses,
   })
 
-  function handleWarehouseChange(w: string) {
+  const warehouseOptions: SearchSelectOption[] = (warehouses ?? [])
+    .filter((w) => w.name.toLowerCase().includes(warehouseQuery.toLowerCase()))
+    .map((w) => ({ value: w.id, label: w.name }))
+
+  function handleWarehouseChange(w: string, opt: SearchSelectOption | null) {
     setWarehouse(w)
+    setWarehouseLabel(opt?.label ?? '')
     setSelectedZona(null)
   }
 
@@ -507,12 +531,16 @@ export default function ZonasPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <select className="filter-select" value={warehouse} onChange={(e) => handleWarehouseChange(e.target.value)}>
-            <option value="">Selecciona un almacén…</option>
-            {warehouses?.map((w) => (
-              <option key={w.id} value={w.id}>{w.name}</option>
-            ))}
-          </select>
+          <div style={{ width: 260 }}>
+            <SearchSelect
+              value={warehouse}
+              selectedLabel={warehouseLabel}
+              onChange={handleWarehouseChange}
+              options={warehouseOptions}
+              onSearch={setWarehouseQuery}
+              placeholder="Selecciona un almacén…"
+            />
+          </div>
         </div>
       </div>
 

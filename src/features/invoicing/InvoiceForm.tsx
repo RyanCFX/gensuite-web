@@ -5,6 +5,7 @@ import { createInvoice } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
 import { listItems, getDefaultPriceTier } from '@/shared/api/catalog'
+import { listImpuestosVentas } from '@/shared/api/config'
 import type { CreateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle } from '@/shared/api/types'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP } from '@/lib/formatters'
@@ -96,6 +97,8 @@ export default function InvoiceForm() {
   const [branch, setBranch] = useState('')
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
   const [branchSearch, setBranchSearch] = useState('')
+  const [taxesTemplate, setTaxesTemplate] = useState('')
+  const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
@@ -159,6 +162,19 @@ export default function InvoiceForm() {
     const q = ncfTypeSearch.toLowerCase()
     return NCF_TYPES.filter((t) => !q || t.label.toLowerCase().includes(q))
   }, [ncfTypeSearch])
+
+  // ── Impuesto del documento (Sales Taxes and Charges Template) ────────────
+  const { data: taxesTemplates } = useQuery({
+    queryKey: ['impuestos-ventas'],
+    queryFn: listImpuestosVentas,
+    staleTime: 5 * 60_000,
+  })
+  const taxesTemplateOptions: SearchSelectOption[] = useMemo(() => {
+    const q = taxesTemplateSearch.toLowerCase()
+    return (taxesTemplates ?? [])
+      .filter((t) => !q || t.title.toLowerCase().includes(q))
+      .map((t) => ({ value: String(t.id), label: t.title }))
+  }, [taxesTemplates, taxesTemplateSearch])
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
@@ -287,7 +303,7 @@ export default function InvoiceForm() {
           rate: baseRate,
           baseRate,
           amount: calcAmount(row.qty, baseRate, row.discountPct),
-          uom: '',
+          uom: bundle.itemUom ?? '',
           conversionFactor: 1,
           maxDiscountPct: undefined,
           _prices: bundle.prices,
@@ -389,7 +405,7 @@ export default function InvoiceForm() {
       qty: i.qty,
       rate: i.rate,
       discountPct: i.discountPct || undefined,
-      uom: i.uom,
+      uom: i.uom || undefined,
     }))
 
     createMutation.mutate({
@@ -400,6 +416,7 @@ export default function InvoiceForm() {
       ncfType,
       items: itemsDto,
       notes: notes || undefined,
+      taxesTemplate: taxesTemplate || undefined,
     })
   }
 
@@ -522,6 +539,21 @@ export default function InvoiceForm() {
                   className="ff-select"
                   disabled={branchOptions.length === 1}
                 />
+              </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
+                <SearchSelect
+                  id="taxesTemplate"
+                  value={taxesTemplate}
+                  onChange={(val) => setTaxesTemplate(val)}
+                  options={taxesTemplateOptions}
+                  onSearch={setTaxesTemplateSearch}
+                  selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
+                  placeholder="Usar el default de la compañía"
+                  className="ff-select"
+                />
+                <p className="ff-hint">Impuesto aplicado al total de la factura (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
               </div>
             </div>
 
@@ -665,10 +697,10 @@ export default function InvoiceForm() {
                   <span>-{formatDOP(totalDiscount)}</span>
                 </div>
               )}
-              {/*<div className="items-total-line">
-                <span>Subtotal neto</span>
+              <div className="items-total-line">
+                <span>Subtotal</span>
                 <span>{formatDOP(subtotal)}</span>
-              </div>*/}
+              </div>
               {taxTotal > 0 && (
                 <div className="items-total-line" style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
                   <span>Impuesto</span>
@@ -723,9 +755,9 @@ export default function InvoiceForm() {
           setPinModalOpen(false)
           const itemsDto = items.map((i) => ({
             itemCode: i.itemCode, description: i.description, qty: i.qty, rate: i.rate,
-            discountPct: i.discountPct || undefined, uom: i.uom,
+            discountPct: i.discountPct || undefined, uom: i.uom || undefined,
           }))
-          createMutation.mutate({ customer: customerId, postingDate, dueDate, branch: branch || undefined, ncfType, items: itemsDto, notes: notes || undefined })
+          createMutation.mutate({ customer: customerId, postingDate, dueDate, branch: branch || undefined, ncfType, items: itemsDto, notes: notes || undefined, taxesTemplate: taxesTemplate || undefined })
         }}
         title="Autorización requerida"
         description="El descuento supera tu límite. Ingresa el PIN de un administrador."

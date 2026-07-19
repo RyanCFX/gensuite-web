@@ -40,19 +40,19 @@ export default function CompraDetail() {
         toast.info(`Se actualizaron los precios de ${updatedPrices} artículo(s) (modo sobre costo)`)
       }
     },
-    onError: () => toast.error('Error al someter la compra'),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al someter la compra'),
   })
 
   const cancelMutation = useMutation({
     mutationFn: () => cancelCompra(id!),
     onSuccess: () => { toast.success('Compra anulada'); queryClient.invalidateQueries({ queryKey: ['compra', id] }); queryClient.invalidateQueries({ queryKey: ['compras'] }); setConfirmAction(null) },
-    onError: () => toast.error('Error al anular la compra'),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al anular la compra'),
   })
 
   const amendMutation = useMutation({
     mutationFn: () => amendCompra(id!),
     onSuccess: (data) => { toast.success('Enmienda creada'); queryClient.invalidateQueries({ queryKey: ['compras'] }); navigate(`/compras/${data.id}`) },
-    onError: () => toast.error('Error al enmendar la compra'),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al enmendar la compra'),
   })
 
   const deleteMutation = useMutation({
@@ -76,7 +76,7 @@ export default function CompraDetail() {
       return returnCompra(id!, items)
     },
     onSuccess: () => { toast.success('Devolución registrada'); queryClient.invalidateQueries({ queryKey: ['compra', id] }); queryClient.invalidateQueries({ queryKey: ['compras'] }); setShowReturn(false) },
-    onError: () => toast.error('Error al registrar la devolución'),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al registrar la devolución'),
   })
 
   function handleConfirm() {
@@ -187,6 +187,12 @@ export default function CompraDetail() {
               <span className="detail-label">Vencimiento</span>
               <span className="detail-value">{formatDate(compra.dueDate)}</span>
             </div>
+            {!!compra.taxAmount && (
+              <div className="detail-field">
+                <span className="detail-label">Impuestos</span>
+                <span className="detail-value">{formatDOP(compra.taxAmount)}</span>
+              </div>
+            )}
             <div className="detail-field">
               <span className="detail-label">Total</span>
               <span className="detail-value" style={{ fontSize: 18, fontWeight: 700 }}>{formatDOP(compra.grandTotal)}</span>

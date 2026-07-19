@@ -14,13 +14,14 @@ import {
   getPerfil, updatePerfil,
   listImpuestosVentas, createImpuestoVentas, updateImpuestoVentas, deleteImpuestoVentas,
   listImpuestosCompras, createImpuestoCompras, updateImpuestoCompras, deleteImpuestoCompras,
+  listItemTaxTemplates, createItemTaxTemplate, updateItemTaxTemplate, deleteItemTaxTemplate,
   listGruposProveedores, createGrupoProveedor,
   getFacturacionConfig, updateFacturacionConfig,
 } from '@/shared/api/config'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listCustomerGroups, createCustomerGroup, deleteCustomerGroup } from '@/shared/api/customers'
 import { listRoles } from '@/shared/api/usuarios'
-import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, CreateTaxTemplateDto, GrupoCliente, FacturacionConfig } from '@/shared/api/types'
+import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, TaxLineCategory, TaxLineAddDeduct, CreateTaxTemplateDto, ItemTaxTemplate, ItemTaxLine, CreateItemTaxTemplateDto, GrupoCliente, FacturacionConfig } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
@@ -1090,7 +1091,10 @@ function PerfilSection() {
   }, [data])
 
   const saveMutation = useMutation({
-    mutationFn: () => updatePerfil(form),
+    mutationFn: () => updatePerfil({
+      firstName: form.firstName,
+      lastName: form.lastName,
+    }),
     onSuccess: () => { toast.success('Perfil actualizado'); queryClient.invalidateQueries({ queryKey: ['perfil'] }) },
     onError: () => toast.error('Error al actualizar el perfil'),
   })
@@ -1166,6 +1170,17 @@ const CHARGE_TYPE_OPTIONS: TaxChargeType[] = [
 function emptyTaxLine(): TaxTemplateLine {
   return { chargeType: 'On Net Total', accountHead: '', rate: 18, description: '' }
 }
+
+const TAX_CATEGORY_OPTIONS: { value: TaxLineCategory; label: string }[] = [
+  { value: 'Total', label: 'Total' },
+  { value: 'Valuation', label: 'Costo del artículo' },
+  { value: 'Valuation and Total', label: 'Total y costo' },
+]
+
+const TAX_ADD_DEDUCT_OPTIONS: { value: TaxLineAddDeduct; label: string }[] = [
+  { value: 'Add', label: 'Sumar' },
+  { value: 'Deduct', label: 'Restar (retención)' },
+]
 
 interface TaxTemplatesSectionProps {
   kind: 'ventas' | 'compras'
@@ -1243,6 +1258,9 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
   })
 
   const label = kind === 'ventas' ? 'Ventas' : 'Compras'
+  const sectionDescription = kind === 'ventas'
+    ? 'Impuesto aplicado al TOTAL de cotizaciones y facturas de venta completas (ej. ITBIS 18% sobre el monto total del documento). No confundir con el impuesto por artículo, que se configura en "Impuestos por Artículo".'
+    : 'Impuesto aplicado al TOTAL de compras completas. Incluye campos adicionales para retenciones (ej. ITBIS/ISR retenido al proveedor, que se RESTA del monto a pagar) y afectación al costo del inventario (landed cost). No confundir con el impuesto por artículo, que se configura en "Impuestos por Artículo".'
 
   return (
     <>
@@ -1252,6 +1270,9 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
           <button className="btn btn-primary btn-size-sm" onClick={openCreate}>
             <Plus size={14} /> Nuevo
           </button>
+        </div>
+        <div className="card-body" style={{ paddingTop: 0, paddingBottom: 12 }}>
+          <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>{sectionDescription}</p>
         </div>
         <div>
           {isLoading
@@ -1280,8 +1301,14 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
                           <td style={{ fontWeight: 500 }}>{t.title}</td>
                           <td className="td-muted">
                             {t.taxes.map((l, i) => (
-                              <span key={i} style={{ display: 'block', fontSize: 12 }}>
+                              <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '2px 0' }}>
                                 {l.description || l.chargeType} — {l.rate}%
+                                {kind === 'compras' && l.category && (
+                                  <span className="badge badge-neutral" style={{ fontSize: 10 }}>{TAX_CATEGORY_OPTIONS.find((o) => o.value === l.category)?.label ?? l.category}</span>
+                                )}
+                                {kind === 'compras' && l.addDeductTax === 'Deduct' && (
+                                  <span className="badge badge-warning" style={{ fontSize: 10 }}>Retención</span>
+                                )}
                               </span>
                             ))}
                           </td>
@@ -1363,7 +1390,13 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
                         <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Tipo de cargo</th>
                         <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Cuenta GL</th>
                         <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11, width: 80 }}>Tasa %</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Descripción</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Descripción *</th>
+                        {kind === 'compras' && (
+                          <>
+                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Afecta</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Tipo</th>
+                          </>
+                        )}
                         <th style={{ width: 36 }} />
                       </tr>
                     </thead>
@@ -1403,9 +1436,301 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
                             <input
                               className="ff-input"
                               style={{ fontSize: 12, padding: '4px 8px' }}
-                              placeholder="Opcional"
+                              placeholder="Ej: ITBIS 18%"
                               value={line.description ?? ''}
                               onChange={(e) => updateTaxLine(idx, { description: e.target.value })}
+                            />
+                          </td>
+                          {kind === 'compras' && (
+                            <>
+                              <td style={{ padding: '6px 8px' }}>
+                                <select
+                                  className="ff-select"
+                                  style={{ fontSize: 12, padding: '4px 8px' }}
+                                  value={line.category ?? ''}
+                                  onChange={(e) => updateTaxLine(idx, { category: (e.target.value || undefined) as TaxLineCategory | undefined })}
+                                >
+                                  <option value="">—</option>
+                                  {TAX_CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                </select>
+                              </td>
+                              <td style={{ padding: '6px 8px' }}>
+                                <select
+                                  className="ff-select"
+                                  style={{ fontSize: 12, padding: '4px 8px' }}
+                                  value={line.addDeductTax ?? ''}
+                                  onChange={(e) => updateTaxLine(idx, { addDeductTax: (e.target.value || undefined) as TaxLineAddDeduct | undefined })}
+                                >
+                                  <option value="">—</option>
+                                  {TAX_ADD_DEDUCT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                </select>
+                              </td>
+                            </>
+                          )}
+                          <td style={{ padding: '4px 6px', textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-size-icon-sm"
+                              style={{ color: 'var(--icon-muted)' }}
+                              onClick={() => setFormTaxes((prev) => prev.filter((_, i) => i !== idx))}
+                              disabled={formTaxes.length === 1}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={closeForm}>Cancelar</button>
+              <button
+                className="btn btn-primary"
+                onClick={() => saveMutation.mutate()}
+                disabled={!formTitle || formTaxes.some((l) => !l.accountHead || !l.description?.trim()) || saveMutation.isPending}
+              >
+                {saveMutation.isPending ? 'Guardando…' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm */}
+      {toDelete && (
+        <div className="modal-overlay" onClick={() => setToDelete(null)}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title">¿Eliminar template?</h2>
+              <button className="modal-close" onClick={() => setToDelete(null)}><X size={16} /></button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                Se eliminará <strong>{toDelete.title}</strong>. Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={() => setToDelete(null)}>Cancelar</button>
+              <button
+                className="btn btn-danger"
+                onClick={() => deleteMutation.mutate(toDelete.id)}
+                disabled={deleteMutation.isPending}
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ---- Item Tax Templates Section (impuesto por artículo — distinto del de documento) ----
+function emptyItemTaxLine(): ItemTaxLine {
+  return { taxType: '', rate: 18, notApplicable: false }
+}
+
+function ItemTaxTemplatesSection() {
+  const queryClient = useQueryClient()
+  const { data, isLoading } = useQuery({ queryKey: ['item-tax-templates'], queryFn: listItemTaxTemplates })
+
+  const [showForm, setShowForm] = useState(false)
+  const [editTarget, setEditTarget] = useState<ItemTaxTemplate | null>(null)
+  const [toDelete, setToDelete] = useState<ItemTaxTemplate | null>(null)
+
+  const [formTitle, setFormTitle] = useState('')
+  const [formTaxes, setFormTaxes] = useState<ItemTaxLine[]>([emptyItemTaxLine()])
+
+  function openCreate() {
+    setEditTarget(null)
+    setFormTitle('')
+    setFormTaxes([emptyItemTaxLine()])
+    setShowForm(true)
+  }
+
+  function openEdit(t: ItemTaxTemplate) {
+    setEditTarget(t)
+    setFormTitle(t.title)
+    setFormTaxes(t.taxes.length > 0 ? t.taxes.map((l) => ({ ...l })) : [emptyItemTaxLine()])
+    setShowForm(true)
+  }
+
+  function closeForm() {
+    setShowForm(false)
+    setEditTarget(null)
+  }
+
+  function updateTaxLine(idx: number, patch: Partial<ItemTaxLine>) {
+    setFormTaxes((prev) => prev.map((l, i) => i === idx ? { ...l, ...patch } : l))
+  }
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const dto: CreateItemTaxTemplateDto = { title: formTitle, taxes: formTaxes }
+      return editTarget ? updateItemTaxTemplate(editTarget.id, dto) : createItemTaxTemplate(dto)
+    },
+    onSuccess: () => {
+      toast.success(editTarget ? 'Plantilla actualizada' : 'Plantilla creada')
+      queryClient.invalidateQueries({ queryKey: ['item-tax-templates'] })
+      closeForm()
+    },
+    onError: () => toast.error('Error al guardar el template'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteItemTaxTemplate(id),
+    onSuccess: () => {
+      toast.success('Plantilla eliminada')
+      queryClient.invalidateQueries({ queryKey: ['item-tax-templates'] })
+      setToDelete(null)
+    },
+    onError: () => toast.error('Error al eliminar el template'),
+  })
+
+  return (
+    <>
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Impuestos por Artículo</span>
+          <button className="btn btn-primary btn-size-sm" onClick={openCreate}>
+            <Plus size={14} /> Nuevo
+          </button>
+        </div>
+        <div className="card-body" style={{ paddingTop: 0, paddingBottom: 12 }}>
+          <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>
+            Impuesto asociado a un artículo específico — se usa para excepciones donde un artículo individual
+            tiene una tasa distinta al general (ej. exento de ITBIS). Se asigna por artículo en "Impuesto de
+            Compra"/"Impuesto de Venta" dentro del formulario de cada artículo, NO aquí.
+          </p>
+        </div>
+        <div>
+          {isLoading
+            ? <span className="skeleton-box" style={{ height: 128, display: 'block', margin: 16 }} />
+            : !data || data.length === 0
+              ? (
+                  <div className="card-body">
+                    <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                      No hay templates configurados. Crea uno con el botón <strong>Nuevo</strong>.
+                    </p>
+                  </div>
+                )
+              : (
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Título</th>
+                        <th>Tasas</th>
+                        <th style={{ width: 80 }} />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.map((t) => (
+                        <tr key={t.id}>
+                          <td style={{ fontWeight: 500 }}>{t.title}</td>
+                          <td className="td-muted">
+                            {t.taxes.map((l, i) => (
+                              <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '2px 0' }}>
+                                {l.taxType} — {l.notApplicable ? 'Exento' : `${l.rate}%`}
+                              </span>
+                            ))}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button className="btn btn-ghost btn-size-icon-sm" onClick={() => openEdit(t)}>
+                                <Pencil size={13} />
+                              </button>
+                              <button
+                                className="btn btn-ghost btn-size-icon-sm"
+                                style={{ color: 'var(--icon-muted)' }}
+                                onClick={() => setToDelete(t)}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+        </div>
+      </div>
+
+      {/* Create / Edit modal */}
+      {showForm && (
+        <div className="modal-overlay" onClick={closeForm}>
+          <div className="modal-box" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title">{editTarget ? 'Editar Plantilla' : 'Nueva Plantilla'} — Impuesto por Artículo</h2>
+              <button className="modal-close" onClick={closeForm}><X size={16} /></button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="ff-wrap">
+                <label className="ff-label ff-required">Título</label>
+                <input
+                  className="ff-input"
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
+                  placeholder="ITBIS 18% Artículo"
+                />
+              </div>
+
+              {/* Tax lines table */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <label className="ff-label" style={{ marginBottom: 0 }}>Tasas</label>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-size-sm"
+                    onClick={() => setFormTaxes((prev) => [...prev, emptyItemTaxLine()])}
+                  >
+                    <Plus size={14} /> Agregar tasa
+                  </button>
+                </div>
+                <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: 'var(--surface-sunken)' }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Cuenta GL</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11, width: 80 }}>Tasa %</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Exento</th>
+                        <th style={{ width: 36 }} />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {formTaxes.map((line, idx) => (
+                        <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}>
+                          <td style={{ padding: '6px 8px', minWidth: 220 }}>
+                            <AccountSelect
+                              value={line.taxType}
+                              onChange={(id) => updateTaxLine(idx, { taxType: id })}
+                              placeholder="Buscar cuenta GL…"
+                              ledgerOnly
+                            />
+                          </td>
+                          <td style={{ padding: '6px 8px' }}>
+                            <input
+                              className="ff-input"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              style={{ fontSize: 12, padding: '4px 8px', textAlign: 'right' }}
+                              value={line.rate}
+                              onChange={(e) => updateTaxLine(idx, { rate: parseFloat(e.target.value) || 0 })}
+                              disabled={line.notApplicable}
+                            />
+                          </td>
+                          <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={!!line.notApplicable}
+                              onChange={(e) => updateTaxLine(idx, { notApplicable: e.target.checked })}
+                              style={{ width: 16, height: 16 }}
+                              title="Exento — el artículo queda excluido de este impuesto"
                             />
                           </td>
                           <td style={{ padding: '4px 6px', textAlign: 'center' }}>
@@ -1431,7 +1756,7 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
               <button
                 className="btn btn-primary"
                 onClick={() => saveMutation.mutate()}
-                disabled={!formTitle || formTaxes.some((l) => !l.accountHead) || saveMutation.isPending}
+                disabled={!formTitle || formTaxes.some((l) => !l.taxType) || saveMutation.isPending}
               >
                 {saveMutation.isPending ? 'Guardando…' : 'Guardar'}
               </button>
@@ -1732,6 +2057,7 @@ const SECTION_TITLES: Record<string, string> = {
   ncf: 'Secuencias NCF',
   'impuestos-ventas': 'Impuestos — Ventas',
   'impuestos-compras': 'Impuestos — Compras',
+  'impuestos-articulo': 'Impuestos por Artículo',
   'ejercicio-fiscal': 'Ejercicio Fiscal',
   perfil: 'Mi Perfil',
   'grupos-clientes': 'Grupos de Clientes',
@@ -1751,6 +2077,7 @@ export default function ConfigPage() {
     ncf: <NcfSection />,
     'impuestos-ventas': <TaxTemplatesSection kind="ventas" />,
     'impuestos-compras': <TaxTemplatesSection kind="compras" />,
+    'impuestos-articulo': <ItemTaxTemplatesSection />,
     'ejercicio-fiscal': <EjercicioFiscalSection />,
     perfil: <PerfilSection />,
     'grupos-clientes': <GruposClientesSection />,

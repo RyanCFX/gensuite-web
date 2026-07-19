@@ -279,7 +279,7 @@ export default function PedidoForm() {
         description: bundle.itemName,
         rate,
         amount: calcAmount(row.qty, rate, row.discountPct),
-        uom: '',
+        uom: bundle.itemUom ?? '',
         maxDiscountPct: undefined,
         _prices: bundle.prices,
       }

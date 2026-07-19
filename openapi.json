@@ -1521,6 +1521,15 @@
               "default": false,
               "type": "boolean"
             }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar artículos por sucursal — solo muestra artículos con stock en almacenes de esa sucursal, y desglosa stock por almacén en stockByWarehouse.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -6935,7 +6944,161 @@
             "bearer": []
           }
         ],
-        "summary": "Listar Item Tax Templates disponibles para asignar a artículos",
+        "summary": "Listar Item Tax Templates (con sus tasas) disponibles para asignar a artículos",
+        "tags": [
+          "Configuración"
+        ]
+      },
+      "post": {
+        "operationId": "ConfigController_createItemTaxTemplate",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateItemTaxTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear Item Tax Template",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/item-tax-templates/{id}": {
+      "get": {
+        "operationId": "ConfigController_getItemTaxTemplate",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obtener un Item Tax Template por ID",
+        "tags": [
+          "Configuración"
+        ]
+      },
+      "put": {
+        "operationId": "ConfigController_updateItemTaxTemplate",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateItemTaxTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar Item Tax Template",
+        "tags": [
+          "Configuración"
+        ]
+      },
+      "delete": {
+        "operationId": "ConfigController_deleteItemTaxTemplate",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar Item Tax Template",
         "tags": [
           "Configuración"
         ]
@@ -11902,6 +12065,11 @@
             "type": "string",
             "example": "Sucursal Norte",
             "description": "Sucursal desde la que se emite el documento. Si se omite, se usa la sucursal por defecto del usuario. Se valida contra las sucursales asignadas al usuario."
+          },
+          "taxesTemplate": {
+            "type": "string",
+            "example": "Dominican Republic Tax - JB",
+            "description": "ID del template de impuestos del documento (Sales Taxes and Charges Template, ver /config/impuestos-ventas). Si se omite, se usa el template marcado como default para la compañía, si existe."
           }
         },
         "required": [
@@ -12480,6 +12648,10 @@
           "qty": {
             "type": "number",
             "example": 1
+          },
+          "uom": {
+            "type": "string",
+            "description": "UOM de este componente. Si se omite, ERPNext la toma del stock_uom del artículo."
           }
         },
         "required": [
@@ -12503,6 +12675,11 @@
             "items": {
               "$ref": "#/components/schemas/BundleComponentDto"
             }
+          },
+          "itemUom": {
+            "type": "string",
+            "default": "Nos",
+            "description": "UOM del artículo combo en sí (no de sus componentes)."
           },
           "priceA": {
             "type": "number"
@@ -12530,6 +12707,10 @@
             "items": {
               "$ref": "#/components/schemas/BundleComponentDto"
             }
+          },
+          "itemUom": {
+            "type": "string",
+            "description": "UOM del artículo combo en sí (no de sus componentes)."
           },
           "priceA": {
             "type": "number"
@@ -13034,6 +13215,11 @@
             "type": "string",
             "example": "Sucursal Norte",
             "description": "Sucursal desde la que se registra la compra. Si se omite, se usa la sucursal por defecto del usuario. Se valida contra las sucursales asignadas al usuario."
+          },
+          "taxesTemplate": {
+            "type": "string",
+            "example": "Dominican Republic Tax - JB",
+            "description": "ID del template de impuestos del documento (Purchase Taxes and Charges Template, ver /config/impuestos-compras). Si se omite, se usa el template marcado como default para la compañía, si existe."
           }
         },
         "required": [
@@ -13097,6 +13283,11 @@
             "type": "string",
             "example": "Sucursal Norte",
             "description": "Sucursal desde la que se registra la compra. Si se omite, se usa la sucursal por defecto del usuario. Se valida contra las sucursales asignadas al usuario."
+          },
+          "taxesTemplate": {
+            "type": "string",
+            "example": "Dominican Republic Tax - JB",
+            "description": "ID del template de impuestos del documento (Purchase Taxes and Charges Template, ver /config/impuestos-compras). Si se omite, se usa el template marcado como default para la compañía, si existe."
           }
         }
       },
@@ -13786,6 +13977,23 @@
           "description": {
             "type": "string",
             "example": "ITBIS 18%"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "Valuation and Total",
+              "Valuation",
+              "Total"
+            ],
+            "description": "Solo aplica a impuestos de COMPRA. Determina si el cargo afecta la valuación del inventario (costo del artículo), el total a pagar, o ambos. Se ignora si el template es de ventas."
+          },
+          "addDeductTax": {
+            "type": "string",
+            "enum": [
+              "Add",
+              "Deduct"
+            ],
+            "description": "Solo aplica a impuestos de COMPRA. \"Deduct\" para retenciones (ITBIS/ISR) que restan del monto a pagar al proveedor. Se ignora si el template es de ventas."
           }
         },
         "required": [
@@ -13833,6 +14041,64 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/TaxLineDto"
+            }
+          }
+        }
+      },
+      "ItemTaxLineDto": {
+        "type": "object",
+        "properties": {
+          "taxType": {
+            "type": "string",
+            "example": "ITBIS por Pagar - JB",
+            "description": "Cuenta contable (Account) del impuesto"
+          },
+          "rate": {
+            "type": "number",
+            "example": 18,
+            "description": "Tasa en porcentaje"
+          },
+          "notApplicable": {
+            "type": "boolean",
+            "default": false,
+            "description": "Si es true, el artículo queda exento de este impuesto (tasa 0 explícita, distinto de no tener el impuesto en la lista)"
+          }
+        },
+        "required": [
+          "taxType",
+          "rate"
+        ]
+      },
+      "CreateItemTaxTemplateDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "ITBIS 18% Artículo"
+          },
+          "taxes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemTaxLineDto"
+            }
+          }
+        },
+        "required": [
+          "title",
+          "taxes"
+        ]
+      },
+      "UpdateItemTaxTemplateDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "ITBIS 18% Artículo"
+          },
+          "taxes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemTaxLineDto"
             }
           }
         }
@@ -13947,6 +14213,11 @@
             "type": "string",
             "example": "Sucursal Norte",
             "description": "Sucursal desde la que se emite el documento. Si se omite, se usa la sucursal por defecto del usuario. Se valida contra las sucursales asignadas al usuario."
+          },
+          "taxesTemplate": {
+            "type": "string",
+            "example": "Dominican Republic Tax - JB",
+            "description": "ID del template de impuestos del documento (Sales Taxes and Charges Template, ver /config/impuestos-ventas). Si se omite, se usa el template marcado como default para la compañía, si existe."
           }
         },
         "required": [

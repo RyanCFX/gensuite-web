@@ -5,6 +5,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { createQuotation, updateQuotation, getQuotation, getQuotationDuplicateSource } from '@/shared/api/quotations'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getDefaultPriceTier } from '@/shared/api/catalog'
+import { listImpuestosVentas } from '@/shared/api/config'
 import type { CreateQuotationDto, ItemPrices, Bundle } from '@/shared/api/types'
 import type { Item } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
@@ -99,6 +100,8 @@ export default function QuotationForm() {
   const [initialized, setInitialized] = useState(false)
   const [branch, setBranch] = useState('')
   const [branchSearch, setBranchSearch] = useState('')
+  const [taxesTemplate, setTaxesTemplate] = useState('')
+  const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
 
   // ── Load existing quotation when editing ─────────────────────────────────
   const { data: existingQuotation, isLoading: loadingQuotation } = useQuery({
@@ -229,6 +232,19 @@ export default function QuotationForm() {
     if (myBranches?.defaultBranch && !branch && !isEdit) setBranch(myBranches.defaultBranch)
   }, [myBranches])
 
+  // ── Impuesto del documento (Sales Taxes and Charges Template) ────────────
+  const { data: taxesTemplates } = useQuery({
+    queryKey: ['impuestos-ventas'],
+    queryFn: listImpuestosVentas,
+    staleTime: 5 * 60_000,
+  })
+  const taxesTemplateOptions: SearchSelectOption[] = useMemo(() => {
+    const q = taxesTemplateSearch.toLowerCase()
+    return (taxesTemplates ?? [])
+      .filter((t) => !q || t.title.toLowerCase().includes(q))
+      .map((t) => ({ value: String(t.id), label: t.title }))
+  }, [taxesTemplates, taxesTemplateSearch])
+
   const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
     value: c.id,
     label: c.customerName,
@@ -281,9 +297,10 @@ export default function QuotationForm() {
         qty: i.qty,
         rate: i.rate,
         discountPct: i.discountPct || undefined,
-        uom: i.uom,
+        uom: i.uom || undefined,
       })),
       notes: notes || undefined,
+      taxesTemplate: taxesTemplate || undefined,
     }
     if (id) updateMutation.mutate(dto)
     else createMutation.mutate(dto)
@@ -383,7 +400,7 @@ export default function QuotationForm() {
           rate,
           amount: calcAmount(row.qty, rate, row.discountPct),
           maxDiscountPct: undefined,
-          uom: '',
+          uom: bundle.itemUom ?? '',
           _prices: bundle.prices,
           salesTaxPct: 0,
           salesTaxTemplate: '',
@@ -551,6 +568,20 @@ export default function QuotationForm() {
                   placeholder="Sin especificar"
                   className="ff-select"
                 />
+              </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
+                <SearchSelect
+                  id="taxesTemplate"
+                  value={taxesTemplate}
+                  onChange={(val) => setTaxesTemplate(val)}
+                  options={taxesTemplateOptions}
+                  onSearch={setTaxesTemplateSearch}
+                  selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
+                  placeholder="Usar el default de la compañía"
+                />
+                <p className="ff-hint">Impuesto aplicado al total del documento (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
               </div>
             </div>
           </div>

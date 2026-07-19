@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { createCompra, updateCompra, getCompra } from '@/shared/api/compras-gastos'
 import { listSuppliers } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
-import { listAlmacenes } from '@/shared/api/config'
+import { listAlmacenes, listImpuestosCompras } from '@/shared/api/config'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateCompraDto } from '@/shared/api/types'
@@ -429,11 +429,14 @@ export default function CompraForm() {
   const defaultWh = authUser?.defaultWarehouse ?? ''
 
   const [supplierId, setSupplierId] = useState('')
+  const [supplierName, setSupplierName] = useState('')
   const [supplierQuery, setSupplierQuery] = useState('')
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0])
   const [dueDate, setDueDate] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem(defaultWh)])
   const [branch, setBranch] = useState('')
+  const [taxesTemplate, setTaxesTemplate] = useState('')
+  const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
 
   const [ncfProveedor, setNcfProveedor] = useState('')
   const [tipoBienes606, setTipoBienes606] = useState('')
@@ -506,6 +509,16 @@ export default function CompraForm() {
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
   }, [myBranches])
+
+  // ── Impuesto del documento (Purchase Taxes and Charges Template) ────────
+  const { data: taxesTemplates } = useQuery({
+    queryKey: ['impuestos-compras'],
+    queryFn: listImpuestosCompras,
+    staleTime: 5 * 60_000,
+  })
+  const taxesTemplateOptions: SearchSelectOption[] = (taxesTemplates ?? [])
+    .filter((t) => !taxesTemplateSearch || t.title.toLowerCase().includes(taxesTemplateSearch.toLowerCase()))
+    .map((t) => ({ value: String(t.id), label: t.title }))
 
   const { isLoading: loadingEdit } = useQuery({
     queryKey: ['compra', id],
@@ -614,6 +627,7 @@ export default function CompraForm() {
       tipoBienes606: tipoBienes606 || undefined,
       formaPago606: formaPago606 || undefined,
       tipoPago,
+      taxesTemplate: taxesTemplate || undefined,
     }
     saveMutation.mutate(dto)
   }
@@ -685,7 +699,8 @@ export default function CompraForm() {
                   <SearchSelect
                     id="supplier"
                     value={supplierId}
-                    onChange={(id, opt) => setSupplierId(id === '' ? '' : (opt?.value ?? id))}
+                    selectedLabel={supplierName}
+                    onChange={(id, opt) => { setSupplierId(id === '' ? '' : (opt?.value ?? id)); setSupplierName(opt?.label ?? '') }}
                     options={supplierOptions}
                     onSearch={setSupplierQuery}
                     loading={suppliersLoading}
@@ -723,6 +738,20 @@ export default function CompraForm() {
                       <option key={b} value={b}>{b}</option>
                     ))}
                   </select>
+                </div>
+
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
+                  <SearchSelect
+                    id="taxesTemplate"
+                    value={taxesTemplate}
+                    onChange={(val) => setTaxesTemplate(val)}
+                    options={taxesTemplateOptions}
+                    onSearch={setTaxesTemplateSearch}
+                    selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
+                    placeholder="Usar el default de la compañía"
+                  />
+                  <p className="ff-hint">Impuesto aplicado al total de la compra (ej. ITBIS 18%, retenciones). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
                 </div>
               </div>
             </div>

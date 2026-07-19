@@ -18,6 +18,8 @@ import type {
   UpdateCuentasEmpresaDto,
   TaxTemplate,
   CreateTaxTemplateDto,
+  ItemTaxTemplate,
+  CreateItemTaxTemplateDto,
   FacturacionConfig,
   LayawayConfig,
   AlmacenListItem,
@@ -263,7 +265,26 @@ export async function deleteImpuestoCompras(id: string): Promise<void> {
 
 // ─── Item Tax Templates ────────────────────────────────────────────────────────
 
-export async function listItemTaxTemplates(): Promise<TaxTemplate[]> {
-  const res = await client.get<{ success: true; data: TaxTemplate[] }>(ENDPOINTS.config.itemTaxTemplates)
+export async function listItemTaxTemplates(): Promise<ItemTaxTemplate[]> {
+  const res = await client.get<{ success: true; data: ItemTaxTemplate[] }>(ENDPOINTS.config.itemTaxTemplates)
   return unwrap(res)
+}
+
+export async function getItemTaxTemplate(id: string): Promise<ItemTaxTemplate> {
+  const res = await client.get<{ success: true; data: ItemTaxTemplate }>(ENDPOINTS.config.itemTaxTemplatesById(id))
+  return unwrap(res)
+}
+
+export async function createItemTaxTemplate(data: CreateItemTaxTemplateDto): Promise<ItemTaxTemplate> {
+  const res = await client.post<{ success: true; data: ItemTaxTemplate }>(ENDPOINTS.config.itemTaxTemplates, data)
+  return unwrap(res)
+}
+
+export async function updateItemTaxTemplate(id: string, data: Partial<CreateItemTaxTemplateDto>): Promise<ItemTaxTemplate> {
+  const res = await client.put<{ success: true; data: ItemTaxTemplate }>(ENDPOINTS.config.itemTaxTemplatesById(id), data)
+  return unwrap(res)
+}
+
+export async function deleteItemTaxTemplate(id: string): Promise<void> {
+  await client.delete(ENDPOINTS.config.itemTaxTemplatesById(id))
 }

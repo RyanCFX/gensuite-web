@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { createItem, listCategories, listBrands } from '@/shared/api/catalog'
 import { listWarehouses } from '@/shared/api/inventory'
-import { listUOMs, getEmpresa, listItemTaxTemplates, listImpuestosVentas } from '@/shared/api/config'
+import { listUOMs, getEmpresa, listItemTaxTemplates } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -45,6 +45,28 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
+const TYPE_OPTIONS_ALL = [
+  { value: 'product', label: 'Producto' },
+  { value: 'service', label: 'Servicio' },
+]
+
+const PRICE_MODE_OPTIONS_ALL = [
+  { value: 'manual', label: 'Manual' },
+  { value: 'cost_plus', label: 'Sobre costo' },
+]
+
+const TRACKING_OPTIONS_ALL = [
+  { value: 'none', label: 'Ninguno' },
+  { value: 'batch', label: 'Por lote' },
+  { value: 'serial', label: 'Por número de serie' },
+]
+
+const BARCODE_TYPE_OPTIONS_ALL = [
+  { value: 'EAN', label: 'EAN' },
+  { value: 'UPC', label: 'UPC' },
+  { value: 'CODE-128', label: 'CODE-128' },
+]
+
 export default function ItemForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -81,15 +103,12 @@ export default function ItemForm() {
     staleTime: 5 * 60_000,
   })
 
-  const { data: taxTemplates } = useQuery({
-    queryKey: ['taxTemplates'],
+  // "Impuesto de Compra"/"Impuesto de Venta" del artículo son Item Tax Template — mismo
+  // doctype para ambos campos, distinto de los templates de impuesto de documento
+  // (impuestos-ventas/impuestos-compras) que aplican al total de cotizaciones/facturas/compras.
+  const { data: itemTaxTemplates } = useQuery({
+    queryKey: ['item-tax-templates'],
     queryFn: listItemTaxTemplates,
-    staleTime: 5 * 60_000,
-  })
-
-  const { data: salesTaxes } = useQuery({
-    queryKey: ['salesTaxes'],
-    queryFn: listImpuestosVentas,
     staleTime: 5 * 60_000,
   })
 
@@ -225,6 +244,11 @@ export default function ItemForm() {
   const [uomSearch, setUomSearch] = useState('')
   const [purchaseTaxSearch, setPurchaseTaxSearch] = useState('')
   const [salesTaxSearch, setSalesTaxSearch] = useState('')
+  const [typeSearch, setTypeSearch] = useState('')
+  const [priceModeSearch, setPriceModeSearch] = useState('')
+  const [warehouseSearch, setWarehouseSearch] = useState('')
+  const [trackingSearch, setTrackingSearch] = useState('')
+  const [barcodeTypeSearch, setBarcodeTypeSearch] = useState('')
 
   const uomOptions: SearchSelectOption[] = useMemo(() => {
     const q = uomSearch.toLowerCase()
@@ -255,17 +279,44 @@ export default function ItemForm() {
 
   const purchaseTaxOptions: SearchSelectOption[] = useMemo(() => {
     const q = purchaseTaxSearch.toLowerCase()
-    return (taxTemplates ?? [])
+    return (itemTaxTemplates ?? [])
       .filter((t) => !q || t.title.toLowerCase().includes(q))
       .map((t) => ({ value: String(t.id), label: t.title }))
-  }, [taxTemplates, purchaseTaxSearch])
+  }, [itemTaxTemplates, purchaseTaxSearch])
 
   const salesTaxOptions: SearchSelectOption[] = useMemo(() => {
     const q = salesTaxSearch.toLowerCase()
-    return (taxTemplates ?? [])
+    return (itemTaxTemplates ?? [])
       .filter((t) => !q || t.title.toLowerCase().includes(q))
       .map((t) => ({ value: String(t.id), label: t.title }))
-  }, [taxTemplates, salesTaxSearch])
+  }, [itemTaxTemplates, salesTaxSearch])
+
+  const typeOptions: SearchSelectOption[] = useMemo(() => {
+    const q = typeSearch.toLowerCase()
+    return TYPE_OPTIONS_ALL.filter((o) => !q || o.label.toLowerCase().includes(q))
+  }, [typeSearch])
+
+  const priceModeOptions: SearchSelectOption[] = useMemo(() => {
+    const q = priceModeSearch.toLowerCase()
+    return PRICE_MODE_OPTIONS_ALL.filter((o) => !q || o.label.toLowerCase().includes(q))
+  }, [priceModeSearch])
+
+  const warehouseOptions: SearchSelectOption[] = useMemo(() => {
+    const q = warehouseSearch.toLowerCase()
+    return warehouses
+      .filter((w) => !q || w.name.toLowerCase().includes(q))
+      .map((w) => ({ value: w.id, label: w.name }))
+  }, [warehouses, warehouseSearch])
+
+  const trackingOptions: SearchSelectOption[] = useMemo(() => {
+    const q = trackingSearch.toLowerCase()
+    return TRACKING_OPTIONS_ALL.filter((o) => !q || o.label.toLowerCase().includes(q))
+  }, [trackingSearch])
+
+  const barcodeTypeOptions: SearchSelectOption[] = useMemo(() => {
+    const q = barcodeTypeSearch.toLowerCase()
+    return BARCODE_TYPE_OPTIONS_ALL.filter((o) => !q || o.label.toLowerCase().includes(q))
+  }, [barcodeTypeSearch])
 
   const selectedCategoryLabel = parentCategories.find((c) => c.id === watchedCategory)?.name ?? ''
 
@@ -287,13 +338,9 @@ export default function ItemForm() {
   }, [watchedCategory, setValue])
 
   const taxRate = useMemo(() => {
-    const selected = taxTemplates?.find((t) => String(t.id) === watchedSalesTaxTemplate)
-    if (!selected) return 0
-    const matched = (salesTaxes ?? []).find(
-      (st) => st.title.toLowerCase() === selected.title.toLowerCase() || st.id === selected.id,
-    )
-    return matched?.taxes?.reduce((sum, t) => sum + t.rate, 0) ?? 0
-  }, [taxTemplates, salesTaxes, watchedSalesTaxTemplate])
+    const selected = itemTaxTemplates?.find((t) => String(t.id) === watchedSalesTaxTemplate)
+    return selected?.taxes?.reduce((sum, t) => sum + (t.notApplicable ? 0 : t.rate), 0) ?? 0
+  }, [itemTaxTemplates, watchedSalesTaxTemplate])
 
   const taxMultiplier = 1 + taxRate / 100
 
@@ -343,10 +390,20 @@ export default function ItemForm() {
               <div className="form-row">
                 <div className="ff-wrap">
                   <label className="ff-label" htmlFor="type">Tipo <span className="ff-required">*</span></label>
-                  <select id="type" className="ff-select" {...register('type')}>
-                    <option value="product">Producto</option>
-                    <option value="service">Servicio</option>
-                  </select>
+                  <Controller
+                    name="type"
+                    control={control}
+                    render={({ field }) => (
+                      <SearchSelect
+                        id="type"
+                        value={field.value}
+                        onChange={(val) => field.onChange(val)}
+                        options={typeOptions}
+                        onSearch={setTypeSearch}
+                        selectedLabel={TYPE_OPTIONS_ALL.find((o) => o.value === field.value)?.label ?? ''}
+                      />
+                    )}
+                  />
                 </div>
 
                 <div className="ff-wrap">
@@ -610,7 +667,7 @@ export default function ItemForm() {
                 </div>
               )}
               <div className="ff-wrap">
-                <label className="ff-label" htmlFor="purchaseTaxTemplate">Impuesto</label>
+                <label className="ff-label" htmlFor="purchaseTaxTemplate">Impuesto de Compra</label>
                 <Controller
                   name="purchaseTaxTemplate"
                   control={control}
@@ -621,12 +678,12 @@ export default function ItemForm() {
                       onChange={(val) => field.onChange(val)}
                       options={purchaseTaxOptions}
                       onSearch={setPurchaseTaxSearch}
-                      selectedLabel={taxTemplates?.find((t) => String(t.id) === field.value)?.title ?? ''}
+                      selectedLabel={itemTaxTemplates?.find((t) => String(t.id) === field.value)?.title ?? ''}
                       placeholder="Sin impuesto"
                     />
                   )}
                 />
-                <p className="ff-hint">Se aplica automáticamente en compras y gastos</p>
+                <p className="ff-hint">Excepción de impuesto para este artículo en compras y gastos (Item Tax Template)</p>
               </div>
             </div>
           </div>
@@ -638,10 +695,20 @@ export default function ItemForm() {
 
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="priceMode">Modo de precio</label>
-                <select id="priceMode" className="ff-select" {...register('priceMode')}>
-                  <option value="manual">Manual</option>
-                  <option value="cost_plus">Sobre costo</option>
-                </select>
+                <Controller
+                  name="priceMode"
+                  control={control}
+                  render={({ field }) => (
+                    <SearchSelect
+                      id="priceMode"
+                      value={field.value ?? ''}
+                      onChange={(val) => field.onChange(val)}
+                      options={priceModeOptions}
+                      onSearch={setPriceModeSearch}
+                      selectedLabel={PRICE_MODE_OPTIONS_ALL.find((o) => o.value === field.value)?.label ?? ''}
+                    />
+                  )}
+                />
               </div>
 
               <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -696,7 +763,7 @@ export default function ItemForm() {
 
               <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="salesTaxTemplate">Impuesto</label>
+                  <label className="ff-label" htmlFor="salesTaxTemplate">Impuesto de Venta</label>
                   <Controller
                     name="salesTaxTemplate"
                     control={control}
@@ -707,7 +774,7 @@ export default function ItemForm() {
                         onChange={(val) => field.onChange(val)}
                         options={salesTaxOptions}
                         onSearch={setSalesTaxSearch}
-                        selectedLabel={taxTemplates?.find((t) => String(t.id) === field.value)?.title ?? ''}
+                        selectedLabel={itemTaxTemplates?.find((t) => String(t.id) === field.value)?.title ?? ''}
                         placeholder="Sin impuesto"
                       />
                     )}
@@ -717,7 +784,7 @@ export default function ItemForm() {
                       Tasa de impuesto: {taxRate}%
                     </p>
                   )}
-                  <p className="ff-hint">Se aplica automáticamente en cotizaciones, pedidos y facturas</p>
+                  <p className="ff-hint">Excepción de impuesto para este artículo en cotizaciones, pedidos y facturas (Item Tax Template)</p>
                 </div>
               </div>
 
@@ -794,16 +861,15 @@ export default function ItemForm() {
                             value={bc.barcode}
                             onChange={(e) => setBarcodes(prev => prev.map((b, i) => i === idx ? { ...b, barcode: e.target.value } : b))}
                           />
-                          <select
-                            className="ff-select"
-                            style={{ width: 110 }}
-                            value={bc.barcodeType}
-                            onChange={(e) => setBarcodes(prev => prev.map((b, i) => i === idx ? { ...b, barcodeType: e.target.value } : b))}
-                          >
-                            <option value="EAN">EAN</option>
-                            <option value="UPC">UPC</option>
-                            <option value="CODE-128">CODE-128</option>
-                          </select>
+                          <div style={{ width: 110 }}>
+                            <SearchSelect
+                              value={bc.barcodeType}
+                              onChange={(val) => setBarcodes(prev => prev.map((b, i) => i === idx ? { ...b, barcodeType: val } : b))}
+                              options={barcodeTypeOptions}
+                              onSearch={setBarcodeTypeSearch}
+                              selectedLabel={BARCODE_TYPE_OPTIONS_ALL.find((o) => o.value === bc.barcodeType)?.label ?? ''}
+                            />
+                          </div>
                           <button
                             type="button"
                             className="btn btn-ghost btn-size-icon-sm"
@@ -827,18 +893,38 @@ export default function ItemForm() {
               <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div className="ff-wrap">
                   <label className="ff-label" htmlFor="defaultWarehouse">Almacén por defecto</label>
-                  <select id="defaultWarehouse" className="ff-select" {...register('defaultWarehouse')}>
-                    <option value="">Sin asignar</option>
-                    {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                  </select>
+                  <Controller
+                    name="defaultWarehouse"
+                    control={control}
+                    render={({ field }) => (
+                      <SearchSelect
+                        id="defaultWarehouse"
+                        value={field.value ?? ''}
+                        onChange={(val) => field.onChange(val)}
+                        options={warehouseOptions}
+                        onSearch={setWarehouseSearch}
+                        selectedLabel={warehouses.find((w) => w.id === field.value)?.name ?? ''}
+                        placeholder="Sin asignar"
+                      />
+                    )}
+                  />
                 </div>
                 <div className="ff-wrap">
                   <label className="ff-label" htmlFor="trackingType">Seguimiento</label>
-                  <select id="trackingType" className="ff-select" {...register('trackingType')}>
-                    <option value="none">Ninguno</option>
-                    <option value="batch">Por lote</option>
-                    <option value="serial">Por número de serie</option>
-                  </select>
+                  <Controller
+                    name="trackingType"
+                    control={control}
+                    render={({ field }) => (
+                      <SearchSelect
+                        id="trackingType"
+                        value={field.value ?? 'none'}
+                        onChange={(val) => field.onChange(val)}
+                        options={trackingOptions}
+                        onSearch={setTrackingSearch}
+                        selectedLabel={TRACKING_OPTIONS_ALL.find((o) => o.value === (field.value ?? 'none'))?.label ?? ''}
+                      />
+                    )}
+                  />
                 </div>
               </div>
             </div>
