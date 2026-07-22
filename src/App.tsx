@@ -43,6 +43,7 @@ const SupplierForm    = lazy(() => import('@/features/suppliers/SupplierForm'))
 const AgingPage       = lazy(() => import('@/features/cobros/AgingPage'))
 const SemaforoPage    = lazy(() => import('@/features/cobros/SemaforoPage'))
 const PagoPage        = lazy(() => import('@/features/cobros/PagoPage'))
+const CajaPage        = lazy(() => import('@/features/caja/CajaPage'))
 const CobrosPage      = lazy(() => import('@/features/cobros/CobrosPage'))
 const CobroDetail     = lazy(() => import('@/features/cobros/CobroDetail'))
 const UsuariosPage    = lazy(() => import('@/features/usuarios/UsuariosPage'))
@@ -165,6 +166,9 @@ export default function App() {
             <Route path="/cobros/aging" element={<Suspense fallback={<PageLoader />}><AgingPage /></Suspense>} />
             <Route path="/cobros/semaforo" element={<Suspense fallback={<PageLoader />}><SemaforoPage /></Suspense>} />
             <Route path="/cobros/:id" element={<Suspense fallback={<PageLoader />}><CobroDetail /></Suspense>} />
+
+            {/* Caja */}
+            <Route path="/caja" element={<Suspense fallback={<PageLoader />}><CajaPage /></Suspense>} />
 
             {/* Usuarios */}
             <Route path="/usuarios" element={<Suspense fallback={<PageLoader />}><UsuariosPage /></Suspense>} />

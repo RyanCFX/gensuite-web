@@ -79,6 +79,7 @@ const NAV_OPS: NavEntry[] = [
 ]
 
 const NAV_FINANZAS: NavItem[] = [
+  { label: 'Caja',            icon: <Wallet size={16} aria-hidden="true" />,        path: '/caja'            },
   { label: 'Cobros',          icon: <ClipboardList size={16} aria-hidden="true" />, path: '/cobros/lista'    },
   { label: 'Registrar Cobro', icon: <Wallet size={16} aria-hidden="true" />,        path: '/cobros/pago'     },
   { label: 'Aging CxC',      icon: <BarChart3 size={16} aria-hidden="true" />,      path: '/cobros/aging'    },

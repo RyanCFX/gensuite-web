@@ -64,9 +64,15 @@ export function SearchSelect({
 
   // Debounce the search query
   const debouncedQuery = useDebounce(inputValue, debounceMs)
+  // Callers frequently pass an inline onSearch (e.g. closing over a row index), which gets a new
+  // identity every render. Depending on `onSearch` directly below would re-fire this effect after
+  // every state update it causes — an infinite loop. Read it from a ref instead so the effect only
+  // depends on values that should actually retrigger it.
+  const onSearchRef = useRef(onSearch)
+  useEffect(() => { onSearchRef.current = onSearch })
   useEffect(() => {
-    if (open) onSearch(debouncedQuery)
-  }, [debouncedQuery, open, onSearch])
+    if (open) onSearchRef.current(debouncedQuery)
+  }, [debouncedQuery, open])
 
   // Reset focused index when options change
   useEffect(() => { setFocusedIdx(-1) }, [options])

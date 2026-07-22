@@ -222,6 +222,10 @@ export const ENDPOINTS = {
     cancel: (id: string) => `/cobros/${id}/cancel`,
     saldoFavor: (customerId: string) => `/cobros/saldo-favor/${customerId}`,
   },
+  caja: {
+    pendientes: '/caja/pendientes',
+    cobrar: (invoiceId: string) => `/caja/facturas/${invoiceId}/cobrar`,
+  },
   reportes: {
     ventas: '/reportes/ventas',
     balanceGeneral: '/reportes/balance-general',
