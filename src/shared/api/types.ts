@@ -232,6 +232,35 @@ export interface Invoice {
   cancelledAt?: string
   /** Notas de crédito enlazadas mientras esta factura sigue en Draft (sin efecto contable aún) — se vacía sola al someter */
   pendingCreditNotes?: { creditNoteId: string; amount: number }[]
+  /** Solo presente cuando status === 'draft'. Artículos (o componentes de combo) que aún necesitan
+   *  que se les asigne serial/lote manualmente — vacío si no hay nada pendiente. */
+  pendingTracking?: PendingTrackingEntry[]
+  /** Líneas de pago realmente cobradas al someter (vacío si quedó a crédito, sin cobrar). */
+  paymentLines?: PaymentLine[]
+  /** Desglose de vuelto entregado (vacío si no aplica o el flujo es "directo"). */
+  vueltoDetalle?: VueltoLine[]
+}
+
+export interface PendingTrackingEntry {
+  itemCode: string
+  /** Si viene de un Combo, el itemCode del combo (ej. "COMBO-0001") */
+  parentItem?: string
+  warehouse: string
+  qty: number
+  trackingType: 'serial' | 'batch'
+}
+
+export interface BatchAllocation {
+  batchId: string
+  qty: number
+}
+
+export interface ComponentTracking {
+  /** Código del componente del combo (no el del combo en sí) */
+  itemCode: string
+  /** Seriales específicos a vender de este componente (debe coincidir en cantidad con lo que aporta el combo) */
+  serials?: string[]
+  batches?: BatchAllocation[]
 }
 
 export interface CreateInvoiceDto {
@@ -247,6 +276,10 @@ export interface CreateInvoiceDto {
     rate: number
     uom?: string
     discountPct?: number
+    /** Almacén desde el que se descuenta el stock. Si se omite, ERPNext usa el almacén por defecto del artículo. */
+    warehouse?: string
+    /** Solo cuando itemCode es un Combo y algún componente tiene tracking de serial/lote. */
+    componentTracking?: ComponentTracking[]
   }[]
   notes?: string
   /** ID de un Sales Taxes and Charges Template (/config/impuestos-ventas). Si se omite, se usa el default de la compañía si existe. */
@@ -262,8 +295,14 @@ export interface CancelInvoiceDto {
 export interface SubmitInvoiceDto {
   /** Force cash payment even if the customer has credit. */
   payCash?: boolean
-  /** ERPNext Mode of Payment name. Required whenever the invoice is paid cash (forced or automatic). */
+  /** @deprecated usar `payments`. No enviar junto con `payments` — el backend rechaza con 400 si ambos vienen. */
   modeOfPayment?: string
+  /** Líneas de pago (uno o más métodos). La suma debe coincidir con el monto a cobrar. */
+  payments?: PaymentLine[]
+  /** Desglose de denominaciones del vuelto entregado. Solo aplica si flujoCobro==="caja". Requiere `tenderedCash`. */
+  vuelto?: VueltoLine[]
+  /** Efectivo entregado por el cliente. Requerido si se envía `vuelto`. */
+  tenderedCash?: number
 }
 
 // ─── Quotation ────────────────────────────────────────────────────────────────
@@ -312,6 +351,8 @@ export interface CreateQuotationDto {
     rate: number
     uom?: string
     discountPct?: number
+    /** Almacén de entrega. Si se omite, se usa el almacén por defecto del usuario. */
+    warehouse?: string
   }[]
   notes?: string
   /** ID de un Sales Taxes and Charges Template (/config/impuestos-ventas). Si se omite, se usa el default de la compañía si existe. */
@@ -585,6 +626,8 @@ export interface Item {
   prices?: ItemPrices
   valuationRate?: number
   currentStock?: number
+  /** Presente solo cuando se filtra GET /catalog/items?branch=... — stock por almacén de esa sucursal */
+  stockByWarehouse?: Record<string, number>
   internalDescription?: string
   shortName?: string
   notes?: string
@@ -649,6 +692,34 @@ export interface CreateItemDto {
 }
 
 export type UpdateItemDto = Partial<CreateItemDto>
+
+// PUT /catalog/items/:id/precios — atajo para actualizar solo precios (y modo de precio/márgenes),
+// sin el payload completo de edición. Todos los campos opcionales; solo se actualiza lo que se
+// manda. Si el modo efectivo es 'cost_plus', el backend ignora priceA/B/C y calcula los precios
+// a partir de purchasePrice + los márgenes; si es 'manual', priceA/B/C se guardan tal cual.
+export interface UpdateItemPricesDto {
+  /** Precio de compra (valuation_rate) */
+  purchasePrice?: number
+  /** Precio de venta general/base */
+  standardRate?: number
+  /** Solo aplica si el modo efectivo es 'manual' — se ignora en 'cost_plus' */
+  priceA?: number
+  priceB?: number
+  priceC?: number
+  priceMode?: 'manual' | 'cost_plus'
+  /** % de margen — solo relevante si priceMode (efectivo) es 'cost_plus' */
+  marginA?: number
+  marginB?: number
+  marginC?: number
+}
+
+export interface ItemPricesResult {
+  id: string
+  purchasePrice: number
+  standardRate: number
+  priceMode: 'manual' | 'cost_plus'
+  prices: ItemPrices
+}
 
 // Brand with price tier on customer groups
 export interface GrupoCliente extends Grupo {
@@ -1051,6 +1122,10 @@ export interface CreateTransferenciaDto {
 
 // Config → Almacenes (distinct resource/endpoint from Inventory → Warehouse)
 export interface AlmacenListItem {
+  /** Nombre completo del almacén en ERPNext (ej. "Bodega Principal - JB") — es lo que hay que
+   *  mandar como `warehouse` en líneas de documentos y lo que usa `stockByWarehouse`. */
+  id: string
+  /** Nombre corto/amigable para mostrar (ej. "Bodega Principal") */
   name: string
   disabled: boolean
   branch?: string | null
@@ -1403,6 +1478,8 @@ export interface CobrosConfig {
 // GET/PUT /config/facturacion
 export interface FacturacionConfig {
   rolesCancelacionFactura: string[]
+  /** "directo": un solo método de pago al cobrar (default, histórico). "caja": múltiples métodos + vuelto. */
+  flujoCobro: 'directo' | 'caja'
 }
 
 export interface MetodoPago {
@@ -1410,6 +1487,45 @@ export interface MetodoPago {
   type: 'Cash' | 'Bank' | 'General'
   codigo606?: string
   disabled: boolean
+}
+
+// GET /config/bancos — catálogo nativo ERPNext (Bank), solo lectura
+export interface Banco {
+  id: string
+  name: string
+}
+
+// GET/POST/PUT /config/denominaciones — catálogo de billetes/monedas para el desglose de vuelto
+export interface Denominacion {
+  id: string
+  denominacion: string
+  valor: number
+  activo: boolean
+}
+
+export interface CreateDenominacionDto {
+  denominacion: string
+  valor: number
+  activo?: boolean
+}
+
+export interface UpdateDenominacionDto {
+  valor?: number
+  activo?: boolean
+}
+
+export interface PaymentLine {
+  modeOfPayment: string
+  amount: number
+  cardNumber?: string
+  authorizationCode?: string
+  bank?: string
+  checkNumber?: string
+}
+
+export interface VueltoLine {
+  denominacion: string
+  cantidad: number
 }
 
 export interface ListaPrecio {

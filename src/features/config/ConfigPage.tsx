@@ -17,11 +17,12 @@ import {
   listItemTaxTemplates, createItemTaxTemplate, updateItemTaxTemplate, deleteItemTaxTemplate,
   listGruposProveedores, createGrupoProveedor,
   getFacturacionConfig, updateFacturacionConfig,
+  listDenominaciones, createDenominacion, updateDenominacion,
 } from '@/shared/api/config'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listCustomerGroups, createCustomerGroup, deleteCustomerGroup } from '@/shared/api/customers'
 import { listRoles } from '@/shared/api/usuarios'
-import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, TaxLineCategory, TaxLineAddDeduct, CreateTaxTemplateDto, ItemTaxTemplate, ItemTaxLine, CreateItemTaxTemplateDto, GrupoCliente, FacturacionConfig } from '@/shared/api/types'
+import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, TaxLineCategory, TaxLineAddDeduct, CreateTaxTemplateDto, ItemTaxTemplate, ItemTaxLine, CreateItemTaxTemplateDto, GrupoCliente, FacturacionConfig, Denominacion } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
@@ -1975,8 +1976,14 @@ function FacturacionConfigSection() {
   const { data, isLoading } = useQuery({ queryKey: ['facturacion-config'], queryFn: getFacturacionConfig })
   const { data: roles } = useQuery({ queryKey: ['roles'], queryFn: listRoles, staleTime: 5 * 60_000 })
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
+  const [flujoCobro, setFlujoCobro] = useState<'directo' | 'caja'>('directo')
 
-  useEffect(() => { if (data) setSelectedRoles(data.rolesCancelacionFactura ?? []) }, [data])
+  useEffect(() => {
+    if (data) {
+      setSelectedRoles(data.rolesCancelacionFactura ?? [])
+      setFlujoCobro(data.flujoCobro ?? 'directo')
+    }
+  }, [data])
 
   const saveMutation = useMutation({
     mutationFn: (dto: Partial<FacturacionConfig>) => updateFacturacionConfig(dto),
@@ -1999,6 +2006,22 @@ function FacturacionConfigSection() {
         <span className="card-title">Configuración de Facturación</span>
       </div>
       <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div className="ff-wrap">
+          <label className="ff-label">Flujo de cobro al someter</label>
+          <p className="ff-hint" style={{ marginBottom: 8 }}>
+            "Directo": se cobra con un solo método de pago, sin vuelto (comportamiento histórico). "Caja": habilita
+            cobrar con múltiples métodos de pago simultáneos y el registro opcional de vuelto.
+          </p>
+          <select
+            className="ff-select"
+            style={{ maxWidth: 240 }}
+            value={flujoCobro}
+            onChange={(e) => setFlujoCobro(e.target.value as 'directo' | 'caja')}
+          >
+            <option value="directo">Directo</option>
+            <option value="caja">Caja</option>
+          </select>
+        </div>
         <div className="ff-wrap">
           <label className="ff-label">Roles autorizados para cancelar facturas sometidas</label>
           <p className="ff-hint" style={{ marginBottom: 8 }}>
@@ -2036,7 +2059,7 @@ function FacturacionConfigSection() {
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button
             className="btn btn-primary btn-size-sm"
-            onClick={() => saveMutation.mutate({ rolesCancelacionFactura: selectedRoles })}
+            onClick={() => saveMutation.mutate({ rolesCancelacionFactura: selectedRoles, flujoCobro })}
             disabled={saveMutation.isPending}
           >
             <Save size={14} /> Guardar
@@ -2044,6 +2067,159 @@ function FacturacionConfigSection() {
         </div>
       </div>
     </div>
+  )
+}
+
+// ---- Denominaciones Section ----
+function DenominacionesSection() {
+  const queryClient = useQueryClient()
+  const [showNew, setShowNew] = useState(false)
+  const [newDenominacion, setNewDenominacion] = useState('')
+  const [newValor, setNewValor] = useState(0)
+  const [newActivo, setNewActivo] = useState(true)
+  const [editTarget, setEditTarget] = useState<Denominacion | null>(null)
+  const [editValor, setEditValor] = useState(0)
+  const [editActivo, setEditActivo] = useState(true)
+
+  const { data, isLoading } = useQuery({ queryKey: ['denominaciones'], queryFn: listDenominaciones })
+
+  const createMutation = useMutation({
+    mutationFn: () => createDenominacion({ denominacion: newDenominacion, valor: newValor, activo: newActivo }),
+    onSuccess: () => {
+      toast.success('Denominación creada')
+      queryClient.invalidateQueries({ queryKey: ['denominaciones'] })
+      setShowNew(false)
+      setNewDenominacion('')
+      setNewValor(0)
+      setNewActivo(true)
+    },
+    onError: () => toast.error('Error al crear la denominación'),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: () => updateDenominacion(editTarget!.id, { valor: editValor, activo: editActivo }),
+    onSuccess: () => {
+      toast.success('Denominación actualizada')
+      queryClient.invalidateQueries({ queryKey: ['denominaciones'] })
+      setEditTarget(null)
+    },
+    onError: () => toast.error('Error al actualizar la denominación'),
+  })
+
+  function openEdit(d: Denominacion) {
+    setEditTarget(d)
+    setEditValor(d.valor)
+    setEditActivo(d.activo)
+    setShowNew(false)
+  }
+
+  return (
+    <>
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Denominaciones</span>
+          <button className="btn btn-primary btn-size-sm" onClick={() => setShowNew(true)}>
+            <Plus size={14} />Nueva
+          </button>
+        </div>
+        <div>
+          {isLoading
+            ? <span className="skeleton-box" style={{ height: 128, display: 'block', margin: 16 }} />
+            : (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Denominación</th>
+                      <th>Valor</th>
+                      <th>Estado</th>
+                      <th style={{ width: 48 }} />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data?.map((d) => (
+                      <tr key={d.id}>
+                        <td style={{ fontWeight: 500 }}>{d.denominacion}</td>
+                        <td className="td-muted">{d.valor}</td>
+                        <td>
+                          {d.activo
+                            ? <span className="badge badge-success">Activo</span>
+                            : <span className="badge badge-error">Inactivo</span>}
+                        </td>
+                        <td>
+                          <button className="btn btn-ghost btn-size-icon-sm" onClick={() => openEdit(d)}>
+                            <Pencil size={13} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+        </div>
+      </div>
+
+      {showNew && (
+        <div className="modal-overlay" onClick={() => setShowNew(false)}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title">Nueva Denominación</h2>
+              <button className="modal-close" onClick={() => setShowNew(false)}><X size={16} /></button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="ff-wrap">
+                <label className="ff-label">Nombre</label>
+                <input className="ff-input" value={newDenominacion} onChange={(e) => setNewDenominacion(e.target.value)} placeholder="RD$2000" />
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Valor</label>
+                <input className="ff-input" type="number" min="0" step="0.01" value={newValor} onChange={(e) => setNewValor(Number(e.target.value) || 0)} />
+              </div>
+              <label className="ff-check-wrap">
+                <input type="checkbox" className="ff-check" checked={newActivo} onChange={(e) => setNewActivo(e.target.checked)} />
+                <span style={{ fontSize: 13 }}>Activo</span>
+              </label>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={() => setShowNew(false)}>Cancelar</button>
+              <button
+                className="btn btn-primary"
+                onClick={() => createMutation.mutate()}
+                disabled={!newDenominacion || newValor <= 0 || createMutation.isPending}
+              >
+                {createMutation.isPending ? 'Creando…' : 'Crear'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editTarget && (
+        <div className="modal-overlay" onClick={() => setEditTarget(null)}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title">Editar Denominación</h2>
+              <button className="modal-close" onClick={() => setEditTarget(null)}><X size={16} /></button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="ff-wrap">
+                <label className="ff-label">Valor</label>
+                <input className="ff-input" type="number" min="0" step="0.01" value={editValor} onChange={(e) => setEditValor(Number(e.target.value) || 0)} />
+              </div>
+              <label className="ff-check-wrap">
+                <input type="checkbox" className="ff-check" checked={editActivo} onChange={(e) => setEditActivo(e.target.checked)} />
+                <span style={{ fontSize: 13 }}>Activo</span>
+              </label>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={() => setEditTarget(null)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? 'Guardando…' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -2062,6 +2238,7 @@ const SECTION_TITLES: Record<string, string> = {
   perfil: 'Mi Perfil',
   'grupos-clientes': 'Grupos de Clientes',
   facturacion: 'Configuración de Facturación',
+  denominaciones: 'Denominaciones',
 }
 
 export default function ConfigPage() {
@@ -2082,6 +2259,7 @@ export default function ConfigPage() {
     perfil: <PerfilSection />,
     'grupos-clientes': <GruposClientesSection />,
     facturacion: <FacturacionConfigSection />,
+    denominaciones: <DenominacionesSection />,
   }
 
   return (

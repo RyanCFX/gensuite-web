@@ -9,6 +9,7 @@ import {
   downloadInvoicePdf,
   aplicarSaldoFavor,
   removerSaldoFavor,
+  asignarTrackingFactura,
 } from "@/shared/api/invoices";
 import { getCustomer } from "@/shared/api/customers";
 import { getSaldoFavor } from "@/shared/api/cobros";
@@ -17,9 +18,17 @@ import {
   aplicarCreditNoteAFactura,
   removerCreditNoteAplicada,
 } from "@/shared/api/notes";
-import { listMetodosPago } from "@/shared/api/config";
+import { listMetodosPago, getFacturacionConfig, listDenominaciones } from "@/shared/api/config";
 import { createDevolucion } from "@/shared/api/devoluciones";
-import type { ApiError, SubmitInvoiceDto } from "@/shared/api/types";
+import { getItem } from "@/shared/api/catalog";
+import { getBundle } from "@/shared/api/bundles";
+import type { ApiError, SubmitInvoiceDto, ComponentTracking } from "@/shared/api/types";
+import { PaymentLinesEditor } from "@/components/shared/PaymentLinesEditor";
+import {
+  EMPTY_PAYMENT_LINES_VALUE,
+  isPaymentLinesValid,
+  buildSubmitPayload,
+} from "@/lib/paymentLines";
 import {
   ArrowLeft,
   Send,
@@ -31,6 +40,7 @@ import {
   Wallet,
   RotateCcw,
   Receipt,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -43,6 +53,8 @@ import { NCF_TYPES } from "@/lib/constants";
 import { DocumentHistoryCard } from "@/components/shared/DocumentHistoryCard";
 import { SearchSelect } from "@/shared/ui/SearchSelect";
 import type { SearchSelectOption } from "@/shared/ui/SearchSelect";
+import { ComponentTrackingModal } from "@/components/shared/ComponentTrackingModal";
+import type { TrackedComponent } from "@/components/shared/ComponentTrackingModal";
 
 const CREDIT_NOTE_MODE_OF_PAYMENT = "Nota de crédito";
 
@@ -69,8 +81,12 @@ export default function InvoiceDetail() {
 
   const [payCash, setPayCash] = useState(false);
   const [modeOfPayment, setModeOfPayment] = useState("");
+  const [cashPayments, setCashPayments] = useState(EMPTY_PAYMENT_LINES_VALUE);
   const [creditErrorOpen, setCreditErrorOpen] = useState(false);
   const [creditErrorMsg, setCreditErrorMsg] = useState("");
+  const [lastSubmitBody, setLastSubmitBody] = useState<SubmitInvoiceDto | undefined>(undefined);
+  const [trackingRecovery, setTrackingRecovery] = useState<TrackedComponent | null>(null);
+  const [trackingRecoveryLoading, setTrackingRecoveryLoading] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelForbiddenMsg, setCancelForbiddenMsg] = useState("");
@@ -115,6 +131,22 @@ export default function InvoiceDetail() {
     enabled: invoice?.status === "draft" || invoice?.status === "submitted",
     staleTime: 5 * 60_000,
   });
+
+  const { data: denominaciones } = useQuery({
+    queryKey: ["denominaciones"],
+    queryFn: listDenominaciones,
+    enabled: invoice?.status === "draft",
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ["facturacion-config"],
+    queryFn: getFacturacionConfig,
+    enabled: invoice?.status === "draft",
+    staleTime: 5 * 60_000,
+  });
+  // Si la llamada falla o el campo no viene, se trata como "directo" (comportamiento histórico/seguro).
+  const flujoCobro = facturacionConfig?.flujoCobro ?? "directo";
 
   const metodosOptions: SearchSelectOption[] = useMemo(() => {
     const q = modeOfPaymentSearch.toLowerCase();
@@ -296,6 +328,7 @@ export default function InvoiceDetail() {
       setCreditErrorOpen(false);
       setPayCash(false);
       setModeOfPayment("");
+      setCashPayments(EMPTY_PAYMENT_LINES_VALUE);
       toast.success(
         updated.paymentStatus === "paid"
           ? "Factura sometida y cobrada al contado"
@@ -309,28 +342,147 @@ export default function InvoiceDetail() {
         setCreditErrorOpen(true);
         return;
       }
+      if (/serial\s*no|batch\s*no/i.test(msg) && /mandatory/i.test(msg)) {
+        resolveTrackingError(msg);
+        return;
+      }
       toast.error(msg || "Error al someter la factura");
     },
   });
 
-  function handleSubmitClick() {
-    if (showCashSelector) {
-      if (!modeOfPayment) {
-        toast.error("Selecciona un método de pago");
+  // Cuando ERPNext no pudo auto-asignar serial/lote al someter, ubica a qué línea/almacén
+  // pertenece el artículo del mensaje de error (puede ser una línea directa o un componente
+  // de un Combo) para abrir el selector correcto.
+  async function resolveTrackingError(msg: string) {
+    const match = msg.match(/item\s+([A-Za-z0-9_.-]+)/i);
+    const parsedCode = match?.[1];
+    if (!parsedCode || !invoice) {
+      toast.error(msg);
+      return;
+    }
+    setTrackingRecoveryLoading(true);
+    try {
+      const directLine = invoice.items.find((i) => i.itemCode === parsedCode);
+      if (directLine) {
+        const item = await getItem(parsedCode).catch(() => null);
+        setTrackingRecovery({
+          itemCode: parsedCode,
+          itemName: item?.itemName,
+          trackingType: item?.trackingType === "batch" ? "batch" : "serial",
+          qtyNeeded: directLine.qty,
+          warehouse: directLine.warehouse,
+        });
         return;
       }
-      submitMutation.mutate({ payCash: true, modeOfPayment });
+
+      // No es una línea directa — busca entre los Combos de la factura cuál lo incluye como componente.
+      for (const line of invoice.items) {
+        try {
+          const bundle = await getBundle(line.itemCode);
+          const comp = bundle.components.find((c) => c.itemCode === parsedCode);
+          if (comp) {
+            const item = await getItem(parsedCode).catch(() => null);
+            setTrackingRecovery({
+              itemCode: parsedCode,
+              itemName: item?.itemName ?? comp.itemName,
+              trackingType: item?.trackingType === "batch" ? "batch" : "serial",
+              qtyNeeded: comp.qty * line.qty,
+              warehouse: line.warehouse,
+            });
+            return;
+          }
+        } catch {
+          // La línea no es un Combo — se ignora y se sigue buscando en las demás.
+        }
+      }
+
+      // No se pudo ubicar la línea/almacén exacto — igual se muestra el selector con lo disponible.
+      const item = await getItem(parsedCode).catch(() => null);
+      setTrackingRecovery({
+        itemCode: parsedCode,
+        itemName: item?.itemName,
+        trackingType: item?.trackingType === "batch" ? "batch" : "serial",
+        qtyNeeded: 1,
+      });
+    } finally {
+      setTrackingRecoveryLoading(false);
+    }
+  }
+
+  const assignTrackingRecoveryMutation = useMutation({
+    mutationFn: (tracking: ComponentTracking[]) =>
+      asignarTrackingFactura(id!, tracking),
+    onSuccess: () => {
+      setTrackingRecovery(null);
+      toast.success("Serial/lote asignado — reintentando someter la factura…");
+      submitMutation.mutate(lastSubmitBody);
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? "No se pudo asignar el serial/lote");
+    },
+  });
+
+  // Asignación proactiva desde la sección "Pendiente de serial/lote" — no fuerza el submit,
+  // solo refresca el detalle para que pendingTracking se actualice.
+  const [pendingTrackingModalOpen, setPendingTrackingModalOpen] = useState(false);
+  const assignPendingTrackingMutation = useMutation({
+    mutationFn: (tracking: ComponentTracking[]) =>
+      asignarTrackingFactura(id!, tracking),
+    onSuccess: () => {
+      setPendingTrackingModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      toast.success("Serial/lote asignado");
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? "No se pudo asignar el serial/lote");
+    },
+  });
+
+  function buildCashSubmitBody(): SubmitInvoiceDto {
+    if (flujoCobro === "caja") {
+      return { payCash: true, ...buildSubmitPayload(cashPayments) };
+    }
+    return { payCash: true, payments: [{ modeOfPayment, amount: pendingAmount }] };
+  }
+
+  function isCashReadyToSubmit(): boolean {
+    if (flujoCobro === "caja") {
+      return isPaymentLinesValid(cashPayments, pendingAmount, metodos ?? [], denominaciones ?? []);
+    }
+    return !!modeOfPayment;
+  }
+
+  function handleSubmitClick() {
+    if (showCashSelector) {
+      if (!isCashReadyToSubmit()) {
+        toast.error(
+          flujoCobro === "caja"
+            ? "Verifica que el total ingresado coincida con el monto a cobrar"
+            : "Selecciona un método de pago",
+        );
+        return;
+      }
+      const body = buildCashSubmitBody();
+      setLastSubmitBody(body);
+      submitMutation.mutate(body);
     } else {
+      setLastSubmitBody(undefined);
       submitMutation.mutate(undefined);
     }
   }
 
   function handleCashRetry() {
-    if (!modeOfPayment) {
-      toast.error("Selecciona un método de pago");
+    if (!isCashReadyToSubmit()) {
+      toast.error(
+        flujoCobro === "caja"
+          ? "Verifica que el total ingresado coincida con el monto a cobrar"
+          : "Selecciona un método de pago",
+      );
       return;
     }
-    submitMutation.mutate({ payCash: true, modeOfPayment });
+    const body = buildCashSubmitBody();
+    setLastSubmitBody(body);
+    submitMutation.mutate(body);
   }
 
   const cancelMutation = useMutation({
@@ -629,43 +781,65 @@ export default function InvoiceDetail() {
                 </label>
               )}
 
-              <div>
-                {paidByCreditNote ? (
-                  <SearchSelect
-                    value={CREDIT_NOTE_MODE_OF_PAYMENT}
-                    selectedLabel={CREDIT_NOTE_MODE_OF_PAYMENT}
-                    onChange={() => {}}
-                    options={[]}
-                    onSearch={() => {}}
-                    disabled
-                    className="ff-select"
-                  />
-                ) : (
-                  showCashSelector && (
+              {(paidByCreditNote || flujoCobro !== "caja" || !showCashSelector) && (
+                <div>
+                  {paidByCreditNote ? (
                     <SearchSelect
-                      value={modeOfPayment}
-                      selectedLabel={
-                        metodos?.find((m) => m.name === modeOfPayment)?.name ??
-                        ""
-                      }
-                      onChange={(val) => setModeOfPayment(val)}
-                      options={metodosOptions}
-                      onSearch={setModeOfPaymentSearch}
-                      placeholder="Método de pago…"
+                      value={CREDIT_NOTE_MODE_OF_PAYMENT}
+                      selectedLabel={CREDIT_NOTE_MODE_OF_PAYMENT}
+                      onChange={() => {}}
+                      options={[]}
+                      onSearch={() => {}}
+                      disabled
                       className="ff-select"
                     />
-                  )
-                )}
-              </div>
+                  ) : (
+                    showCashSelector && (
+                      <SearchSelect
+                        value={modeOfPayment}
+                        selectedLabel={
+                          metodos?.find((m) => m.name === modeOfPayment)?.name ??
+                          ""
+                        }
+                        onChange={(val) => setModeOfPayment(val)}
+                        options={metodosOptions}
+                        onSearch={setModeOfPaymentSearch}
+                        placeholder="Método de pago…"
+                        className="ff-select"
+                      />
+                    )
+                  )}
+                </div>
+              )}
 
-              <button
-                className="btn btn-primary btn-size-sm"
-                onClick={handleSubmitClick}
-                disabled={isActionsLoading}
-              >
-                <Send size={14} /> Someter
-              </button>
+              {!(flujoCobro === "caja" && showCashSelector && !paidByCreditNote) && (
+                <button
+                  className="btn btn-primary btn-size-sm"
+                  onClick={handleSubmitClick}
+                  disabled={isActionsLoading}
+                >
+                  <Send size={14} /> Someter
+                </button>
+              )}
             </div>
+
+            {flujoCobro === "caja" && showCashSelector && !paidByCreditNote && (
+              <>
+                <PaymentLinesEditor
+                  amountDue={pendingAmount}
+                  value={cashPayments}
+                  onChange={setCashPayments}
+                />
+                <button
+                  className="btn btn-primary btn-size-sm"
+                  style={{ alignSelf: "flex-start" }}
+                  onClick={handleSubmitClick}
+                  disabled={isActionsLoading || !isCashReadyToSubmit()}
+                >
+                  <Send size={14} /> Someter
+                </button>
+              </>
+            )}
             {noCredit && !paidByCreditNote && (
               <p
                 style={{
@@ -851,6 +1025,81 @@ export default function InvoiceDetail() {
                   </span>
                 </div>
               )}
+            </div>
+          )}
+
+          {invoice.status === "submitted" && (invoice.paymentLines?.length ?? 0) > 0 && (
+            <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-secondary)",
+                  marginBottom: 8,
+                }}
+              >
+                Pagos
+              </p>
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Método</th>
+                      <th style={{ textAlign: "right" }}>Monto</th>
+                      <th>Detalle</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoice.paymentLines!.map((p, i) => (
+                      <tr key={i}>
+                        <td>{p.modeOfPayment}</td>
+                        <td style={{ textAlign: "right" }}>{formatDOP(p.amount)}</td>
+                        <td style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                          {[
+                            p.cardNumber && `Tarjeta: ${p.cardNumber}`,
+                            p.authorizationCode && `Autorización: ${p.authorizationCode}`,
+                            p.bank && `Banco: ${p.bank}`,
+                            p.checkNumber && `Cheque: ${p.checkNumber}`,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {invoice.status === "submitted" && (invoice.vueltoDetalle?.length ?? 0) > 0 && (
+            <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-secondary)",
+                  marginBottom: 8,
+                }}
+              >
+                Vuelto entregado
+              </p>
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Denominación</th>
+                      <th style={{ textAlign: "right" }}>Cantidad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoice.vueltoDetalle!.map((v, i) => (
+                      <tr key={i}>
+                        <td>{v.denominacion}</td>
+                        <td style={{ textAlign: "right" }}>{v.cantidad}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
@@ -1281,6 +1530,86 @@ export default function InvoiceDetail() {
           </div>
         )}
 
+      {invoice.status === "draft" &&
+        invoice.pendingTracking &&
+        invoice.pendingTracking.length > 0 && (
+          <div className="card">
+            <div className="card-header">
+              <h2
+                className="modal-title"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 15,
+                  fontWeight: 600,
+                }}
+              >
+                <AlertTriangle
+                  size={16}
+                  style={{ color: "var(--color-warning)" }}
+                />{" "}
+                Pendiente de asignar serial/lote
+              </h2>
+              <button
+                className="btn btn-primary btn-size-sm"
+                onClick={() => setPendingTrackingModalOpen(true)}
+              >
+                Asignar seriales/lotes
+              </button>
+            </div>
+            <div
+              className="card-body"
+              style={{ display: "flex", flexDirection: "column", gap: 6 }}
+            >
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "var(--text-secondary)",
+                  margin: 0,
+                }}
+              >
+                Estos artículos requieren tracking de serial/lote. ERPNext lo
+                asigna automáticamente al someter si hay stock disponible —
+                usa este selector solo si quieres elegir uno específico, o si
+                el submit falla por falta de stock.
+              </p>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Artículo</th>
+                    <th>Almacén</th>
+                    <th style={{ textAlign: "right" }}>Cant.</th>
+                    <th>Tipo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoice.pendingTracking.map((p, i) => (
+                    <tr key={i}>
+                      <td>
+                        {p.itemCode}
+                        {p.parentItem && (
+                          <span
+                            className="td-muted"
+                            style={{ display: "block", fontSize: 12 }}
+                          >
+                            Componente del combo {p.parentItem}
+                          </span>
+                        )}
+                      </td>
+                      <td className="td-muted">{p.warehouse}</td>
+                      <td style={{ textAlign: "right" }}>{p.qty}</td>
+                      <td className="td-muted">
+                        {p.trackingType === "serial" ? "Serial" : "Lote"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Artículos</h2>
@@ -1423,6 +1752,59 @@ export default function InvoiceDetail() {
         currentDocId={invoice.id}
       />
 
+      {/* Modal: buscando a qué línea/almacén pertenece el artículo del error de tracking */}
+      {trackingRecoveryLoading && (
+        <div className="modal-overlay">
+          <div
+            className="modal-box modal-box-sm"
+            style={{ textAlign: "center", padding: 32 }}
+          >
+            <Loader2 size={20} className="spin" />
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 12 }}>
+              Buscando información del artículo…
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: asignar serial/lote para recuperar el submit fallido */}
+      {trackingRecovery && (
+        <ComponentTrackingModal
+          bundleName={trackingRecovery.itemName ?? trackingRecovery.itemCode}
+          components={[trackingRecovery]}
+          title={`Serial / Lote requerido — ${trackingRecovery.itemName ?? trackingRecovery.itemCode}`}
+          description="ERPNext no pudo asignar automáticamente el serial/lote de este artículo (sin stock disponible en el almacén de la línea, o requiere selección manual). Elige uno para continuar."
+          confirmLabel={assignTrackingRecoveryMutation.isPending ? "Asignando…" : "Asignar y reintentar"}
+          onConfirm={(tracking) => assignTrackingRecoveryMutation.mutate(tracking)}
+          onClose={() => setTrackingRecovery(null)}
+        />
+      )}
+
+      {/* Modal: asignación proactiva desde la sección "Pendiente de asignar serial/lote" */}
+      {pendingTrackingModalOpen && invoice.pendingTracking && (
+        <ComponentTrackingModal
+          bundleName="Factura"
+          components={invoice.pendingTracking.map((p) => ({
+            itemCode: p.itemCode,
+            itemName: p.parentItem
+              ? `${p.itemCode} — Componente del combo ${p.parentItem}`
+              : p.itemCode,
+            trackingType: p.trackingType,
+            qtyNeeded: p.qty,
+            warehouse: p.warehouse,
+          }))}
+          title="Asignar seriales/lotes pendientes"
+          description="Selecciona los seriales/lotes de cada artículo pendiente. No es obligatorio para someter la factura — ERPNext los asigna automáticamente si hay stock disponible."
+          confirmLabel={
+            assignPendingTrackingMutation.isPending
+              ? "Guardando…"
+              : "Guardar asignación"
+          }
+          onConfirm={(tracking) => assignPendingTrackingMutation.mutate(tracking)}
+          onClose={() => setPendingTrackingModalOpen(false)}
+        />
+      )}
+
       {/* Modal: crédito excedido al someter */}
       {creditErrorOpen && (
         <div
@@ -1430,7 +1812,7 @@ export default function InvoiceDetail() {
           onClick={() => setCreditErrorOpen(false)}
         >
           <div
-            className="modal-box modal-box-sm"
+            className={flujoCobro === "caja" ? "modal-box" : "modal-box modal-box-sm"}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-head">
@@ -1458,23 +1840,31 @@ export default function InvoiceDetail() {
               <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
                 {creditErrorMsg}
               </p>
-              <div className="ff-wrap">
-                <label className="ff-label" htmlFor="modeOfPaymentRetry">
-                  Método de pago <span className="ff-required">*</span>
-                </label>
-                <SearchSelect
-                  id="modeOfPaymentRetry"
-                  value={modeOfPayment}
-                  selectedLabel={
-                    metodos?.find((m) => m.name === modeOfPayment)?.name ?? ""
-                  }
-                  onChange={(val) => setModeOfPayment(val)}
-                  options={metodosRetryOptions}
-                  onSearch={setModeOfPaymentRetrySearch}
-                  placeholder="Seleccionar…"
-                  className="ff-select"
+              {flujoCobro === "caja" ? (
+                <PaymentLinesEditor
+                  amountDue={pendingAmount}
+                  value={cashPayments}
+                  onChange={setCashPayments}
                 />
-              </div>
+              ) : (
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="modeOfPaymentRetry">
+                    Método de pago <span className="ff-required">*</span>
+                  </label>
+                  <SearchSelect
+                    id="modeOfPaymentRetry"
+                    value={modeOfPayment}
+                    selectedLabel={
+                      metodos?.find((m) => m.name === modeOfPayment)?.name ?? ""
+                    }
+                    onChange={(val) => setModeOfPayment(val)}
+                    options={metodosRetryOptions}
+                    onSearch={setModeOfPaymentRetrySearch}
+                    placeholder="Seleccionar…"
+                    className="ff-select"
+                  />
+                </div>
+              )}
             </div>
             <div className="modal-foot">
               <button
@@ -1486,7 +1876,7 @@ export default function InvoiceDetail() {
               <button
                 className="btn btn-primary"
                 onClick={handleCashRetry}
-                disabled={submitMutation.isPending}
+                disabled={submitMutation.isPending || !isCashReadyToSubmit()}
               >
                 <Send size={14} /> Cobrar al contado y someter
               </button>

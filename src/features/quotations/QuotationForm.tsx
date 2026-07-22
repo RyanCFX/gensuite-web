@@ -5,7 +5,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { createQuotation, updateQuotation, getQuotation, getQuotationDuplicateSource } from '@/shared/api/quotations'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getDefaultPriceTier } from '@/shared/api/catalog'
-import { listImpuestosVentas } from '@/shared/api/config'
+import { listImpuestosVentas, listAlmacenes } from '@/shared/api/config'
 import type { CreateQuotationDto, ItemPrices, Bundle } from '@/shared/api/types'
 import type { Item } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
@@ -46,6 +46,19 @@ interface LineItem {
   uom: string
   _prices?: ItemPrices
   maxDiscountPct?: number
+  warehouse: string
+  /** Stock por almacén del artículo seleccionado, para validar contra el almacén elegido en la línea */
+  _stockByWarehouse?: Record<string, number>
+  stockError?: string
+}
+
+function validateLineStock(row: LineItem): string | undefined {
+  if (!row.warehouse || !row._stockByWarehouse) return undefined
+  const available = row._stockByWarehouse[row.warehouse] ?? 0
+  if (row.qty > available) {
+    return `Stock insuficiente en ${row.warehouse}. Disponible: ${available}`
+  }
+  return undefined
 }
 
 
@@ -102,6 +115,7 @@ export default function QuotationForm() {
   const [branchSearch, setBranchSearch] = useState('')
   const [taxesTemplate, setTaxesTemplate] = useState('')
   const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
+  const [warehouseSearch, setWarehouseSearch] = useState('')
 
   // ── Load existing quotation when editing ─────────────────────────────────
   const { data: existingQuotation, isLoading: loadingQuotation } = useQuery({
@@ -126,6 +140,7 @@ export default function QuotationForm() {
       salesTaxPct: 0,
       salesTaxTemplate: '',
       uom: i.uom,
+      warehouse: '',
     })))
     setNotes(existingQuotation.notes ?? '')
     setBranch(existingQuotation.branch ?? '')
@@ -158,6 +173,7 @@ export default function QuotationForm() {
       salesTaxPct: 0,
       salesTaxTemplate: '',
       uom: i.uom ?? 'Unidad',
+      warehouse: '',
     })))
     setNotes(duplicateSource.notes ?? '')
     setInitialized(true)
@@ -172,7 +188,11 @@ export default function QuotationForm() {
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
     onBarcode: async (code) => {
-      const res = await listItems({ barcode: code, limit: 1, validateStock: true })
+      if (!branch) {
+        toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
+        return
+      }
+      const res = await listItems({ barcode: code, limit: 1, validateStock: true, branch })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
       addRow()
@@ -231,6 +251,44 @@ export default function QuotationForm() {
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch && !isEdit) setBranch(myBranches.defaultBranch)
   }, [myBranches])
+
+  // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
+  const { data: branchWarehouses } = useQuery({
+    queryKey: ['almacenes', { branch }],
+    queryFn: () => listAlmacenes({ branch }),
+    enabled: !!branch,
+    staleTime: 60_000,
+  })
+
+  // Al cambiar de sucursal, el almacén elegido en cada línea deja de ser válido
+  useEffect(() => {
+    setItems((prev) => prev.map((row) => (row.warehouse ? { ...row, warehouse: '', stockError: undefined } : row)))
+  }, [branch])
+
+  const warehouseSelectOptions: SearchSelectOption[] = useMemo(() => {
+    const q = warehouseSearch.toLowerCase()
+    return (branchWarehouses ?? [])
+      .filter((w) => !q || w.name.toLowerCase().includes(q))
+      .map((w) => ({ value: w.id, label: w.name }))
+  }, [branchWarehouses, warehouseSearch])
+
+  function defaultWarehouse(): string {
+    return branchWarehouses?.length === 1 ? branchWarehouses[0].id : ''
+  }
+
+  // Si la sucursal solo tiene un almacén, se autoselecciona en las líneas que no tengan uno.
+  useEffect(() => {
+    if (branchWarehouses?.length !== 1) return
+    const onlyId = branchWarehouses[0].id
+    setItems((prev) =>
+      prev.map((row) => {
+        if (!row.itemCode || row.warehouse) return row
+        const updated = { ...row, warehouse: onlyId }
+        updated.stockError = validateLineStock(updated)
+        return updated
+      }),
+    )
+  }, [branchWarehouses])
 
   // ── Impuesto del documento (Sales Taxes and Charges Template) ────────────
   const { data: taxesTemplates } = useQuery({
@@ -298,6 +356,7 @@ export default function QuotationForm() {
         rate: i.rate,
         discountPct: i.discountPct || undefined,
         uom: i.uom || undefined,
+        warehouse: i.warehouse || undefined,
       })),
       notes: notes || undefined,
       taxesTemplate: taxesTemplate || undefined,
@@ -330,6 +389,22 @@ export default function QuotationForm() {
         if ('qty' in patch || 'rate' in patch || 'discountPct' in patch) {
           updated.amount = calcAmount(updated.qty, updated.rate, updated.discountPct)
         }
+        if ('qty' in patch || 'warehouse' in patch) {
+          updated.stockError = validateLineStock(updated)
+        }
+        return updated
+      }),
+    )
+  }
+
+  function updateWarehouse(index: number, warehouse: string) {
+    setItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== index) return item
+        const available = item._stockByWarehouse?.[warehouse]
+        const qty = available != null ? Math.min(item.qty, available) : item.qty
+        const updated = { ...item, warehouse, qty, amount: calcAmount(qty, item.rate, item.discountPct) }
+        updated.stockError = validateLineStock(updated)
         return updated
       }),
     )
@@ -355,6 +430,8 @@ export default function QuotationForm() {
           uom: s.item.stockUom ?? 'Unidad',
           maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
           _prices: s.item.prices,
+          warehouse: defaultWarehouse(),
+          _stockByWarehouse: s.item.stockByWarehouse,
         }
       }),
     ])
@@ -380,6 +457,9 @@ export default function QuotationForm() {
           _prices: catalogItem.prices,
           salesTaxPct: catalogItem.salesTaxPct ?? 0,
           salesTaxTemplate: catalogItem.salesTaxTemplate ?? '',
+          warehouse: defaultWarehouse(),
+          _stockByWarehouse: catalogItem.stockByWarehouse,
+          stockError: undefined,
         }
       }),
     )
@@ -404,6 +484,9 @@ export default function QuotationForm() {
           _prices: bundle.prices,
           salesTaxPct: 0,
           salesTaxTemplate: '',
+          warehouse: defaultWarehouse(),
+          _stockByWarehouse: undefined,
+          stockError: undefined,
         }
       }),
     )
@@ -426,7 +509,11 @@ export default function QuotationForm() {
   }, [customerPriceTier, defaultPriceTier])
 
   function addRow() {
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad' }])
+    if (!branch) {
+      toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
+      return
+    }
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', warehouse: '' }])
   }
   function removeRow(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index))
@@ -474,6 +561,10 @@ export default function QuotationForm() {
       const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
       if (row.discountPct > effectiveLimit) {
         toast.error(`Artículo #${num}: el descuento supera el límite de ${effectiveLimit}%`)
+        return
+      }
+      if (row.stockError) {
+        toast.error(`Artículo #${num}: ${row.stockError}`)
         return
       }
     }
@@ -557,11 +648,12 @@ export default function QuotationForm() {
               </div>
 
               <div className="ff-wrap">
-                <label className="ff-label" htmlFor="branch">Sucursal</label>
+                <label className="ff-label ff-required" htmlFor="branch">Sucursal</label>
                 <SearchSelect
                   id="branch"
                   value={branch}
                   selectedLabel={branch}
+                  error={!branch}
                   onChange={(val) => setBranch(val)}
                   options={branchSelectOptions}
                   onSearch={setBranchSearch}
@@ -604,13 +696,14 @@ export default function QuotationForm() {
                   <th style={{ textAlign: 'right', width: 80 }}>Impuesto</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 72 }}>UDM</th>
+                  <th style={{ width: 140 }}>Almacén</th>
                   <th style={{ width: 40 }} />
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+                    <td colSpan={9} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
                       No hay artículos. Agrega uno con el botón de abajo.
                     </td>
                   </tr>
@@ -628,6 +721,7 @@ export default function QuotationForm() {
                           onClear={() => clearCatalogItem(index)}
                           onVariantSelect={(t) => setVariantTemplate(t)}
                           validateStock
+                          branch={branch || undefined}
                         />
                       </td>
 
@@ -643,7 +737,7 @@ export default function QuotationForm() {
 
                       <td>
                         <input
-                          className={`items-input${submitted && (!item.qty || item.qty <= 0) ? ' items-input-error' : ''}`}
+                          className={`items-input${(submitted && (!item.qty || item.qty <= 0)) || item.stockError ? ' items-input-error' : ''}`}
                           type="number"
                           min="0"
                           step="1"
@@ -651,6 +745,11 @@ export default function QuotationForm() {
                           onChange={(e) => updateItem(index, { qty: parseFloat(e.target.value) || 0 })}
                           style={{ textAlign: 'right' }}
                         />
+                        {item.stockError && (
+                          <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                            {item.stockError}
+                          </span>
+                        )}
                       </td>
 
                       <td>
@@ -721,6 +820,18 @@ export default function QuotationForm() {
                             error={submitted && !item.uom}
                           />
                         )}
+                      </td>
+
+                      <td>
+                        <SearchSelect
+                          value={item.warehouse}
+                          onChange={(val) => updateWarehouse(index, val)}
+                          options={warehouseSelectOptions}
+                          onSearch={setWarehouseSearch}
+                          selectedLabel={branchWarehouses?.find((w) => w.id === item.warehouse)?.name ?? ''}
+                          placeholder="Almacén por defecto"
+                          disabled={!item.itemCode}
+                        />
                       </td>
 
                       <td onClick={(e) => e.stopPropagation()} className="actions-cell">

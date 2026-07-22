@@ -30,6 +30,8 @@ export interface ItemSelectProps {
   /** Incluye combos (Product Bundle) en los resultados de búsqueda — para líneas de venta */
   includeBundles?: boolean
   onSelectBundle?: (bundle: Bundle) => void
+  /** Filtra artículos con stock en almacenes de esta sucursal — el item devuelto trae stockByWarehouse */
+  branch?: string
 }
 
 export function ItemSelect({
@@ -44,12 +46,13 @@ export function ItemSelect({
   validateStock,
   includeBundles,
   onSelectBundle,
+  branch,
 }: ItemSelectProps) {
   const [query, setQuery] = useState('')
 
   const { data, isLoading } = useQuery({
-    queryKey: ['itemSearch', query, typeFilter],
-    queryFn: () => listItems({ search: query || undefined, disabled: 'false', limit: 15, ...(typeFilter && { type: typeFilter }), ...(validateStock && { validateStock: true }) }),
+    queryKey: ['itemSearch', query, typeFilter, branch],
+    queryFn: () => listItems({ search: query || undefined, disabled: 'false', limit: 15, ...(typeFilter && { type: typeFilter }), ...(validateStock && { validateStock: true }), ...(branch && { branch }) }),
     enabled: true,
     staleTime: 30_000,
   })

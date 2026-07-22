@@ -766,6 +766,53 @@
         ]
       }
     },
+    "/api/v1/invoices/{id}/asignar-tracking": {
+      "post": {
+        "operationId": "InvoicesController_assignTracking",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignInvoiceTrackingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Asigna seriales/lotes a artículos (o componentes de Combo) de una factura EN BORRADOR. Útil para facturas creadas desde un Pedido, cuya conversión aún no soporta seriales/lotes directamente. Requiere que el serial/lote ya exista y esté disponible en el almacén de la línea.",
+        "tags": [
+          "Invoices"
+        ]
+      }
+    },
     "/api/v1/invoices/{id}/submit": {
       "post": {
         "operationId": "InvoicesController_submit",
@@ -1735,6 +1782,53 @@
           }
         ],
         "summary": "Deactivate item (sets disabled=1)",
+        "tags": [
+          "Catalog - Items"
+        ]
+      }
+    },
+    "/api/v1/catalog/items/{id}/precios": {
+      "put": {
+        "operationId": "ItemsController_updatePrices",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateItemPricesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar solo los precios del artículo (compra y/o venta), sin mandar el resto del payload del artículo",
         "tags": [
           "Catalog - Items"
         ]
@@ -5511,6 +5605,148 @@
           }
         ],
         "summary": "Actualizar método de pago",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/bancos": {
+      "get": {
+        "operationId": "ConfigController_getBancos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar bancos (doctype nativo Bank de ERPNext, solo lectura)",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/denominaciones": {
+      "get": {
+        "operationId": "ConfigController_getDenominaciones",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar catálogo de denominaciones (billetes/monedas) para el vuelto",
+        "tags": [
+          "Configuración"
+        ]
+      },
+      "post": {
+        "operationId": "ConfigController_createDenominacion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDenominacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear denominación",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/denominaciones/{id}": {
+      "put": {
+        "operationId": "ConfigController_updateDenominacion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDenominacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar denominación",
         "tags": [
           "Configuración"
         ]
@@ -11983,6 +12219,49 @@
           "name"
         ]
       },
+      "BatchAllocationDto": {
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string",
+            "example": "BATCH-0001"
+          },
+          "qty": {
+            "type": "number",
+            "example": 1
+          }
+        },
+        "required": [
+          "batchId",
+          "qty"
+        ]
+      },
+      "ComponentTrackingDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "example": "PROD-0005",
+            "description": "Código del componente del combo (no el del combo en sí)."
+          },
+          "serials": {
+            "description": "Seriales específicos a vender de este componente (debe coincidir en cantidad con lo que aporta el combo).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "batches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchAllocationDto"
+            }
+          }
+        },
+        "required": [
+          "itemCode"
+        ]
+      },
       "InvoiceItemDto": {
         "type": "object",
         "properties": {
@@ -12016,6 +12295,13 @@
             "type": "number",
             "example": 10,
             "description": "% de descuento en la línea (0-100)"
+          },
+          "componentTracking": {
+            "description": "Solo cuando itemCode es un Combo y alguno de sus componentes tiene tracking de serial/lote — indica qué serial(es)/lote(s) específicos de ese componente se están vendiendo. ERPNext no los asigna automáticamente al explotar el bundle.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComponentTrackingDto"
+            }
           }
         },
         "required": [
@@ -12097,6 +12383,97 @@
           "amount"
         ]
       },
+      "AssignTrackingItemDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "example": "PROD-0005",
+            "description": "Código del artículo — puede ser una línea directa de la factura o un componente de un Combo (Packed Item)."
+          },
+          "serials": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "batches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchAllocationDto"
+            }
+          }
+        },
+        "required": [
+          "itemCode"
+        ]
+      },
+      "AssignInvoiceTrackingDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssignTrackingItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "PaymentLineDto": {
+        "type": "object",
+        "properties": {
+          "modeOfPayment": {
+            "type": "string",
+            "example": "Efectivo",
+            "description": "Mode of Payment de esta línea."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Monto cobrado con este método."
+          },
+          "cardNumber": {
+            "type": "string",
+            "description": "Informativo. Número de tarjeta (pago con tarjeta)."
+          },
+          "authorizationCode": {
+            "type": "string",
+            "description": "Informativo. Código de autorización (pago con tarjeta)."
+          },
+          "bank": {
+            "type": "string",
+            "description": "Nombre del Bank (ERPNext) emisor del cheque."
+          },
+          "checkNumber": {
+            "type": "string",
+            "description": "Número de cheque/documento (pago con cheque)."
+          }
+        },
+        "required": [
+          "modeOfPayment",
+          "amount"
+        ]
+      },
+      "VueltoLineDto": {
+        "type": "object",
+        "properties": {
+          "denominacion": {
+            "type": "string",
+            "example": "RD$100",
+            "description": "Nombre del registro Denominacion Billete."
+          },
+          "cantidad": {
+            "type": "number",
+            "description": "Cantidad de billetes/monedas de esta denominación entregados como vuelto."
+          }
+        },
+        "required": [
+          "denominacion",
+          "cantidad"
+        ]
+      },
       "SubmitInvoiceDto": {
         "type": "object",
         "properties": {
@@ -12107,7 +12484,25 @@
           "modeOfPayment": {
             "type": "string",
             "example": "Efectivo",
-            "description": "Mode of Payment a usar. Requerido cuando la factura se cobra al contado (ya sea porque el cliente no tiene crédito, o porque se envió payCash=true)."
+            "description": "DEPRECADO — atajo de un solo método de pago. Use `payments` para uno o más métodos. No enviar junto con `payments`."
+          },
+          "payments": {
+            "description": "Líneas de pago para cobrar al contado (uno o más métodos: efectivo, tarjetas, cheques). La suma de los montos debe coincidir con el monto a cobrar.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentLineDto"
+            }
+          },
+          "vuelto": {
+            "description": "Desglose de denominaciones del vuelto entregado en efectivo. Puramente informativo — requiere `tenderedCash`, no afecta los montos aplicados a la factura.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VueltoLineDto"
+            }
+          },
+          "tenderedCash": {
+            "type": "number",
+            "description": "Efectivo entregado por el cliente, usado para validar el desglose de `vuelto`."
           }
         }
       },
@@ -12565,6 +12960,57 @@
               "serial"
             ],
             "default": "none"
+          }
+        }
+      },
+      "UpdateItemPricesDto": {
+        "type": "object",
+        "properties": {
+          "purchasePrice": {
+            "type": "number",
+            "description": "Precio de compra (valuation_rate) — el costo unitario del artículo.",
+            "example": 3000
+          },
+          "standardRate": {
+            "type": "number",
+            "description": "Precio de venta general/base (standard_rate).",
+            "example": 4500
+          },
+          "priceA": {
+            "type": "number",
+            "description": "Precio de venta — Precio A (Máximo). Si priceMode=cost_plus, se ignora: A/B/C se recalculan desde purchasePrice + los márgenes.",
+            "example": 5000
+          },
+          "priceB": {
+            "type": "number",
+            "description": "Precio de venta — Precio B (Promedio). Ver nota de priceA.",
+            "example": 4500
+          },
+          "priceC": {
+            "type": "number",
+            "description": "Precio de venta — Precio C (Mínimo). Ver nota de priceA.",
+            "example": 4000
+          },
+          "priceMode": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "cost_plus"
+            ],
+            "description": "Modo de precio del artículo. En \"cost_plus\", A/B/C se calculan automáticamente a partir de purchasePrice (o el valuation_rate actual, si no se manda) + marginA/B/C — priceA/B/C mandados directo se ignoran en ese caso."
+          },
+          "marginA": {
+            "type": "number",
+            "example": 40,
+            "description": "% de margen para Precio A (solo si priceMode=cost_plus)"
+          },
+          "marginB": {
+            "type": "number",
+            "example": 25
+          },
+          "marginC": {
+            "type": "number",
+            "example": 10
           }
         }
       },
@@ -13633,6 +14079,15 @@
             "items": {
               "type": "string"
             }
+          },
+          "flujoCobro": {
+            "type": "string",
+            "enum": [
+              "directo",
+              "caja"
+            ],
+            "default": "directo",
+            "description": "\"directo\": se cobra con un solo método de pago al someter (comportamiento histórico). \"caja\": habilita múltiples métodos de pago por cobro y el registro de vuelto."
           }
         }
       },
@@ -13695,6 +14150,41 @@
             "type": "string",
             "example": "Cash - JB",
             "description": "Cuenta GL asociada a este método de pago (Banco, Caja, etc.)"
+          }
+        }
+      },
+      "CreateDenominacionDto": {
+        "type": "object",
+        "properties": {
+          "denominacion": {
+            "type": "string",
+            "example": "RD$2000",
+            "description": "Nombre/etiqueta de la denominación (también su identificador)."
+          },
+          "valor": {
+            "type": "number",
+            "example": 2000,
+            "description": "Valor facial en pesos dominicanos."
+          },
+          "activo": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "denominacion",
+          "valor"
+        ]
+      },
+      "UpdateDenominacionDto": {
+        "type": "object",
+        "properties": {
+          "valor": {
+            "type": "number",
+            "example": 2000
+          },
+          "activo": {
+            "type": "boolean"
           }
         }
       },

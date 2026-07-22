@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { createPedido, updatePedido, getPedido, getPedidoDuplicateSource } from '@/shared/api/pedidos'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getQuotation } from '@/shared/api/quotations'
-import { getLayawayConfig } from '@/shared/api/config'
+import { getLayawayConfig, listAlmacenes } from '@/shared/api/config'
 import type { Item, ItemPrices, CreatePedidoDto, Bundle } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
@@ -40,6 +40,19 @@ interface LineItem {
   uom: string
   maxDiscountPct?: number
   _prices?: ItemPrices
+  warehouse: string
+  /** Stock por almacén del artículo seleccionado, para validar contra el almacén elegido en la línea */
+  _stockByWarehouse?: Record<string, number>
+  stockError?: string
+}
+
+function validateLineStock(row: LineItem): string | undefined {
+  if (!row.warehouse || !row._stockByWarehouse) return undefined
+  const available = row._stockByWarehouse[row.warehouse] ?? 0
+  if (row.qty > available) {
+    return `Stock insuficiente en ${row.warehouse}. Disponible: ${available}`
+  }
+  return undefined
 }
 
 function todayIso() { return format(new Date(), 'yyyy-MM-dd') }
@@ -83,6 +96,7 @@ export default function PedidoForm() {
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [isLayaway, setIsLayaway] = useState(false)
   const [branch, setBranch] = useState('')
+  const [warehouseSearch, setWarehouseSearch] = useState('')
 
   const { data: layawayConfig } = useQuery({
     queryKey: ['layaway-config'],
@@ -94,7 +108,11 @@ export default function PedidoForm() {
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
     onBarcode: async (code) => {
-      const res = await listItems({ barcode: code, limit: 1, validateStock: true })
+      if (!branch) {
+        toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
+        return
+      }
+      const res = await listItems({ barcode: code, limit: 1, validateStock: true, branch })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
       addRow()
@@ -117,6 +135,7 @@ export default function PedidoForm() {
         amount: i.amount,
         discountPct: (i as any).discountPct ?? 0,
         uom: i.uom,
+        warehouse: '',
       })))
       setNotes(q.notes ?? '')
     }).catch(() => toast.error('Error al cargar la cotización'))
@@ -137,6 +156,7 @@ export default function PedidoForm() {
         amount: calcAmount(i.qty, i.rate, i.discountPct ?? 0),
         discountPct: i.discountPct ?? 0,
         uom: 'Unidad',
+        warehouse: '',
       })))
       getCustomer(src.customer).then((c) => {
         setCustomerName(c.customerName)
@@ -164,6 +184,7 @@ export default function PedidoForm() {
       amount: i.amount,
       discountPct: (i as any).discountPct ?? 0,
       uom: i.uom ?? 'Unidad',
+      warehouse: '',
     })))
     setNotes(existing.notes ?? '')
     setBranch(existing.branch ?? '')
@@ -212,6 +233,44 @@ export default function PedidoForm() {
     if (myBranches?.defaultBranch && !branch && !isEdit) setBranch(myBranches.defaultBranch)
   }, [myBranches])
 
+  // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
+  const { data: branchWarehouses } = useQuery({
+    queryKey: ['almacenes', { branch }],
+    queryFn: () => listAlmacenes({ branch }),
+    enabled: !!branch,
+    staleTime: 60_000,
+  })
+
+  // Al cambiar de sucursal, el almacén elegido en cada línea deja de ser válido
+  useEffect(() => {
+    setItems((prev) => prev.map((row) => (row.warehouse ? { ...row, warehouse: '', stockError: undefined } : row)))
+  }, [branch])
+
+  const warehouseSelectOptions: SearchSelectOption[] = useMemo(() => {
+    const q = warehouseSearch.toLowerCase()
+    return (branchWarehouses ?? [])
+      .filter((w) => !q || w.name.toLowerCase().includes(q))
+      .map((w) => ({ value: w.id, label: w.name }))
+  }, [branchWarehouses, warehouseSearch])
+
+  function defaultWarehouse(): string {
+    return branchWarehouses?.length === 1 ? branchWarehouses[0].id : ''
+  }
+
+  // Si la sucursal solo tiene un almacén, se autoselecciona en las líneas que no tengan uno.
+  useEffect(() => {
+    if (branchWarehouses?.length !== 1) return
+    const onlyId = branchWarehouses[0].id
+    setItems((prev) =>
+      prev.map((row) => {
+        if (!row.itemCode || row.warehouse) return row
+        const updated = { ...row, warehouse: onlyId }
+        updated.stockError = validateLineStock(updated)
+        return updated
+      }),
+    )
+  }, [branchWarehouses])
+
   function handleError(err: unknown) {
     const msg = (err as any)?.message ?? ''
     setSubmitError(msg)
@@ -244,6 +303,17 @@ export default function PedidoForm() {
       if (i !== index) return item
       const updated = { ...item, ...patch }
       if ('qty' in patch || 'rate' in patch || 'discountPct' in patch) updated.amount = calcAmount(updated.qty, updated.rate, updated.discountPct)
+      if ('qty' in patch || 'warehouse' in patch) updated.stockError = validateLineStock(updated)
+      return updated
+    }))
+  }
+  function updateWarehouse(index: number, warehouse: string) {
+    setItems((prev) => prev.map((item, i) => {
+      if (i !== index) return item
+      const available = item._stockByWarehouse?.[warehouse]
+      const qty = available != null ? Math.min(item.qty, available) : item.qty
+      const updated = { ...item, warehouse, qty, amount: calcAmount(qty, item.rate, item.discountPct) }
+      updated.stockError = validateLineStock(updated)
       return updated
     }))
   }
@@ -263,6 +333,9 @@ export default function PedidoForm() {
         uom: catalogItem.stockUom ?? row.uom,
         maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
         _prices: catalogItem.prices,
+        warehouse: defaultWarehouse(),
+        _stockByWarehouse: catalogItem.stockByWarehouse,
+        stockError: undefined,
       }
     }))
   }
@@ -282,6 +355,9 @@ export default function PedidoForm() {
         uom: bundle.itemUom ?? '',
         maxDiscountPct: undefined,
         _prices: bundle.prices,
+        warehouse: defaultWarehouse(),
+        _stockByWarehouse: undefined,
+        stockError: undefined,
       }
     }))
   }
@@ -303,6 +379,8 @@ export default function PedidoForm() {
           uom: s.item.stockUom ?? 'Unidad',
           maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
           _prices: s.item.prices,
+          warehouse: defaultWarehouse(),
+          _stockByWarehouse: s.item.stockByWarehouse,
         }
       }),
     ])
@@ -321,7 +399,13 @@ export default function PedidoForm() {
     )
   }, [customerPriceTier, defaultPriceTier])
 
-  function addRow() { setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, uom: 'Unidad' }]) }
+  function addRow() {
+    if (!branch) {
+      toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
+      return
+    }
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, uom: 'Unidad', warehouse: '' }])
+  }
   function removeRow(index: number) { setItems((prev) => prev.filter((_, i) => i !== index)) }
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0)
@@ -335,6 +419,7 @@ export default function PedidoForm() {
       qty: i.qty,
       rate: i.rate,
       discountPct: i.discountPct || undefined,
+      warehouse: i.warehouse || undefined,
     }))
     if (isEdit) updateMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, branch: branch || undefined, items: itemsDto, quotation: quotationId || undefined })
     else createMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, branch: branch || undefined, items: itemsDto, quotation: quotationId || undefined, isLayaway: isLayaway || undefined })
@@ -358,6 +443,10 @@ export default function PedidoForm() {
         const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
         if (item.discountPct > effectiveLimit) {
           toast.error(`Línea ${num}: el descuento supera el límite de ${effectiveLimit}%`)
+          return
+        }
+        if (item.stockError) {
+          toast.error(`Línea ${num}: ${item.stockError}`)
           return
         }
       }
@@ -415,8 +504,8 @@ export default function PedidoForm() {
                 <input type="date" className="ff-input" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
               </div>
               <div className="ff-wrap">
-                <label className="ff-label">Sucursal</label>
-                <select className="ff-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
+                <label className="ff-label ff-required">Sucursal</label>
+                <select className={`ff-select${!branch ? ' ff-input-error' : ''}`} value={branch} onChange={(e) => setBranch(e.target.value)}>
                   <option value="">Sin especificar</option>
                   {branchOptions.map((b) => (
                     <option key={b} value={b}>{b}</option>
@@ -458,23 +547,29 @@ export default function PedidoForm() {
                   <th style={{ textAlign: 'right', width: 72 }}>Dto. %</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 72 }}>UDM</th>
+                  <th style={{ width: 140 }}>Almacén</th>
                   <th style={{ width: 40 }} />
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
-                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>No hay artículos.</td></tr>
+                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>No hay artículos.</td></tr>
                 ) : (
                   items.map((item, index) => (
                     <tr key={index}>
                       <td>
-                        <ItemSelect value={item.itemCode} selectedLabel={item.itemLabel} onSelect={(ci) => selectCatalogItem(index, ci)} onSelectBundle={(b) => selectBundle(index, b)} includeBundles onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0 })} onVariantSelect={(t) => setVariantTemplate(t)} validateStock />
+                        <ItemSelect value={item.itemCode} selectedLabel={item.itemLabel} onSelect={(ci) => selectCatalogItem(index, ci)} onSelectBundle={(b) => selectBundle(index, b)} includeBundles onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0 })} onVariantSelect={(t) => setVariantTemplate(t)} validateStock branch={branch || undefined} />
                       </td>
                       <td>
                         <input className="items-input" value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="Descripción" />
                       </td>
                       <td>
-                        <input className={`items-input${submitted && (!item.qty || item.qty <= 0) ? ' items-input-error' : ''}`} type="number" min="0" step="1" value={item.qty} onChange={(e) => updateItem(index, { qty: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right' }} />
+                        <input className={`items-input${(submitted && (!item.qty || item.qty <= 0)) || item.stockError ? ' items-input-error' : ''}`} type="number" min="0" step="1" value={item.qty} onChange={(e) => updateItem(index, { qty: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right' }} />
+                        {item.stockError && (
+                          <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                            {item.stockError}
+                          </span>
+                        )}
                       </td>
                       <td>
                         <input className={`items-input${submitted && (!item.rate || item.rate <= 0) ? ' items-input-error' : ''}`} type="number" min="0" step="0.01" value={item.rate} disabled style={{ textAlign: 'right' }} />
@@ -509,6 +604,17 @@ export default function PedidoForm() {
                         ) : (
                           <UomSelect value={item.uom} onChange={(v) => updateItem(index, { uom: v })} itemCode={item.itemCode || undefined} />
                         )}
+                      </td>
+                      <td>
+                        <SearchSelect
+                          value={item.warehouse}
+                          onChange={(val) => updateWarehouse(index, val)}
+                          options={warehouseSelectOptions}
+                          onSearch={setWarehouseSearch}
+                          selectedLabel={branchWarehouses?.find((w) => w.id === item.warehouse)?.name ?? ''}
+                          placeholder="Almacén por defecto"
+                          disabled={!item.itemCode}
+                        />
                       </td>
                       <td onClick={(e) => e.stopPropagation()} className="actions-cell">
                         <ActionsMenu>

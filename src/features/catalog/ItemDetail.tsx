@@ -2,13 +2,222 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { getItem, toggleItem, listItemVariants, generateVariants, createVariant, getAttribute } from '@/shared/api/catalog'
+import { getItem, toggleItem, listItemVariants, generateVariants, createVariant, getAttribute, updateItemPrices } from '@/shared/api/catalog'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listZonas } from '@/shared/api/zonas'
 import { listUbicaciones, getItemUbicaciones, assignItemUbicacion, unassignItemUbicacion } from '@/shared/api/ubicaciones'
 import { formatDOP } from '@/lib/formatters'
-import { ToggleLeft, ToggleRight, Package, ArrowLeft, X, MapPin, Trash2, Info } from 'lucide-react'
-import type { Item, GenerateVariantsResult, ItemAttribute, ApiError } from '@/shared/api/types'
+import { ToggleLeft, ToggleRight, Package, ArrowLeft, X, MapPin, Trash2, Info, DollarSign } from 'lucide-react'
+import type { Item, GenerateVariantsResult, ItemAttribute, ApiError, UpdateItemPricesDto, ItemPricesResult } from '@/shared/api/types'
+
+// ─── Update Prices Modal ──────────────────────────────────────────────────────
+
+function costPlusPreview(purchasePrice: string, margin: string): number | undefined {
+  const cost = parseFloat(purchasePrice)
+  const marginPct = parseFloat(margin)
+  if (!Number.isFinite(cost) || !Number.isFinite(marginPct) || marginPct >= 100) return undefined
+  return Math.round((cost / (1 - marginPct / 100)) * 100) / 100
+}
+
+function UpdatePricesModal({
+  item,
+  onClose,
+  onSuccess,
+}: {
+  item: Item
+  onClose: () => void
+  onSuccess: (updated: ItemPricesResult) => void
+}) {
+  const [purchasePrice, setPurchasePrice] = useState(item.valuationRate?.toString() ?? '')
+  const [standardRate, setStandardRate] = useState(item.standardRate?.toString() ?? '')
+  const [priceMode, setPriceMode] = useState<'manual' | 'cost_plus'>(item.priceMode ?? 'manual')
+  const [priceA, setPriceA] = useState(item.prices?.A?.toString() ?? '')
+  const [priceB, setPriceB] = useState(item.prices?.B?.toString() ?? '')
+  const [priceC, setPriceC] = useState(item.prices?.C?.toString() ?? '')
+  const [marginA, setMarginA] = useState(item.marginA?.toString() ?? '')
+  const [marginB, setMarginB] = useState(item.marginB?.toString() ?? '')
+  const [marginC, setMarginC] = useState(item.marginC?.toString() ?? '')
+
+  const isCostPlus = priceMode === 'cost_plus'
+
+  const mutation = useMutation({
+    mutationFn: (data: UpdateItemPricesDto) => updateItemPrices(item.id, data),
+    onSuccess: (result) => {
+      toast.success('Precios actualizados')
+      onSuccess(result)
+      onClose()
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? 'Error al actualizar los precios')
+    },
+  })
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const num = (v: string) => (v.trim() === '' ? undefined : parseFloat(v))
+
+    // Solo se manda lo que realmente cambió respecto al valor original.
+    const data: UpdateItemPricesDto = {}
+    const pp = num(purchasePrice)
+    if (pp !== undefined && pp !== item.valuationRate) data.purchasePrice = pp
+    const sr = num(standardRate)
+    if (sr !== undefined && sr !== item.standardRate) data.standardRate = sr
+    if (priceMode !== (item.priceMode ?? 'manual')) data.priceMode = priceMode
+
+    if (isCostPlus) {
+      const ma = num(marginA)
+      if (ma !== undefined && ma !== item.marginA) data.marginA = ma
+      const mb = num(marginB)
+      if (mb !== undefined && mb !== item.marginB) data.marginB = mb
+      const mc = num(marginC)
+      if (mc !== undefined && mc !== item.marginC) data.marginC = mc
+    } else {
+      const pa = num(priceA)
+      if (pa !== undefined && pa !== item.prices?.A) data.priceA = pa
+      const pb = num(priceB)
+      if (pb !== undefined && pb !== item.prices?.B) data.priceB = pb
+      const pc = num(priceC)
+      if (pc !== undefined && pc !== item.prices?.C) data.priceC = pc
+    }
+
+    if (Object.keys(data).length === 0) {
+      onClose()
+      return
+    }
+    mutation.mutate(data)
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2 className="modal-title">Actualizar Precios</h2>
+          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {isCostPlus && (
+              <div className="inline-alert inline-alert-warn">
+                En modo "Sobre Costo" los precios A/B/C se calculan automáticamente a partir del
+                precio de compra y los márgenes de abajo — no se pueden fijar directamente. La
+                vista previa es solo referencial; los valores finales son los que devuelva el
+                servidor al guardar.
+              </div>
+            )}
+            <div className="ff-wrap">
+              <label className="ff-label">Precio de Compra</label>
+              <input
+                className="ff-input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={purchasePrice}
+                onChange={(e) => setPurchasePrice(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+            <div className="ff-wrap">
+              <label className="ff-label">Precio de Venta (base)</label>
+              <input
+                className="ff-input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={standardRate}
+                onChange={(e) => setStandardRate(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+            <div className="ff-wrap">
+              <label className="ff-label">Modo de Precio</label>
+              <select
+                className="ff-select"
+                value={priceMode}
+                onChange={(e) => setPriceMode(e.target.value as 'manual' | 'cost_plus')}
+              >
+                <option value="manual">Manual</option>
+                <option value="cost_plus">Sobre Costo</option>
+              </select>
+            </div>
+
+            {isCostPlus ? (
+              <div className="form-row form-row-3">
+                {([
+                  { label: 'Margen A — Máximo', value: marginA, setValue: setMarginA },
+                  { label: 'Margen B — Promedio', value: marginB, setValue: setMarginB },
+                  { label: 'Margen C — Mínimo', value: marginC, setValue: setMarginC },
+                ] as const).map(({ label, value, setValue }) => {
+                  const preview = costPlusPreview(purchasePrice, value)
+                  return (
+                    <div className="ff-wrap" key={label}>
+                      <label className="ff-label">{label}</label>
+                      <input
+                        className="ff-input"
+                        type="number"
+                        min="0"
+                        max="99"
+                        step="0.1"
+                        value={value}
+                        onChange={(e) => setValue(e.target.value)}
+                        placeholder="0"
+                      />
+                      <p className="ff-hint">{preview != null ? `≈ ${formatDOP(preview)}` : '—'}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="form-row form-row-3">
+                <div className="ff-wrap">
+                  <label className="ff-label">Precio A — Máximo</label>
+                  <input
+                    className="ff-input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={priceA}
+                    onChange={(e) => setPriceA(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label">Precio B — Promedio</label>
+                  <input
+                    className="ff-input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={priceB}
+                    onChange={(e) => setPriceB(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label">Precio C — Mínimo</label>
+                  <input
+                    className="ff-input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={priceC}
+                    onChange={(e) => setPriceC(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="modal-foot">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-primary" disabled={mutation.isPending}>
+              {mutation.isPending ? 'Guardando…' : 'Guardar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
 
 // ─── Generate Confirm Modal ───────────────────────────────────────────────────
 
@@ -561,6 +770,8 @@ export default function ItemDetail() {
     enabled: Boolean(id),
   })
 
+  const [showPricesModal, setShowPricesModal] = useState(false)
+
   const toggleMutation = useMutation({
     mutationFn: () => toggleItem(id!),
     onSuccess: (updated) => {
@@ -630,15 +841,22 @@ export default function ItemDetail() {
           </h1>
           <p className="page-sub" style={{ fontFamily: 'monospace' }}>{item.id}</p>
         </div>
-        <button
-          className="btn btn-secondary"
-          onClick={() => toggleMutation.mutate()}
-          disabled={toggleMutation.isPending}
-        >
-          {item.disabled
-            ? <><ToggleRight size={15} /> Activar</>
-            : <><ToggleLeft size={15} /> Desactivar</>}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {!item.hasVariants && (
+            <button className="btn btn-secondary" onClick={() => setShowPricesModal(true)}>
+              <DollarSign size={15} /> Actualizar Precios
+            </button>
+          )}
+          <button
+            className="btn btn-secondary"
+            onClick={() => toggleMutation.mutate()}
+            disabled={toggleMutation.isPending}
+          >
+            {item.disabled
+              ? <><ToggleRight size={15} /> Activar</>
+              : <><ToggleLeft size={15} /> Desactivar</>}
+          </button>
+        </div>
       </div>
 
       {/* Variant-of banner */}
@@ -760,7 +978,7 @@ export default function ItemDetail() {
 
             {(item.priceMode === 'cost_plus'
               ? (item.marginA != null || item.marginB != null || item.marginC != null) && item.valuationRate != null && item.valuationRate > 0
-              : (item.priceA != null || item.priceB != null || item.priceC != null)
+              : (item.prices?.A != null || item.prices?.B != null || item.prices?.C != null)
             ) && (
               <div className="stats-row">
                 {item.priceMode === 'cost_plus' ? (
@@ -828,18 +1046,18 @@ export default function ItemDetail() {
                   </>
                 ) : (
                   <>
-                    {item.priceA != null && (
+                    {item.prices?.A != null && (
                       <div className="stat-card">
                         <div className="stat-card-top">
                           <span className="stat-label">Precio A</span>
                         </div>
                         <div className="stat-value" style={{ fontSize: 22, color: 'var(--text-secondary)' }}>
-                          {formatDOP(item.priceA)}
+                          {formatDOP(item.prices?.A)}
                           <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>sin impuesto</span>
                         </div>
                         {item.salesTaxPct != null && item.salesTaxPct > 0 && (
                           <div className="stat-value" style={{ fontSize: 22, color: 'var(--color-brand)' }}>
-                            {formatDOP(Math.round(item.priceA * (1 + item.salesTaxPct / 100) * 100) / 100)}
+                            {formatDOP(Math.round(item.prices?.A * (1 + item.salesTaxPct / 100) * 100) / 100)}
                             <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>con impuesto</span>
                           </div>
                         )}
@@ -848,18 +1066,18 @@ export default function ItemDetail() {
                         </div>
                       </div>
                     )}
-                    {item.priceB != null && (
+                    {item.prices?.B != null && (
                       <div className="stat-card">
                         <div className="stat-card-top">
                           <span className="stat-label">Precio B</span>
                         </div>
                         <div className="stat-value" style={{ fontSize: 22 }}>
-                          {formatDOP(item.priceB)}
+                          {formatDOP(item.prices?.B)}
                           <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>sin impuesto</span>
                         </div>
                         {item.salesTaxPct != null && item.salesTaxPct > 0 && (
                           <div className="stat-value" style={{ fontSize: 22, color: 'var(--color-brand)' }}>
-                            {formatDOP(Math.round(item.priceB * (1 + item.salesTaxPct / 100) * 100) / 100)}
+                            {formatDOP(Math.round(item.prices?.B * (1 + item.salesTaxPct / 100) * 100) / 100)}
                             <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>con impuesto</span>
                           </div>
                         )}
@@ -868,18 +1086,18 @@ export default function ItemDetail() {
                         </div>
                       </div>
                     )}
-                    {item.priceC != null && (
+                    {item.prices?.C != null && (
                       <div className="stat-card">
                         <div className="stat-card-top">
                           <span className="stat-label">Precio C</span>
                         </div>
                         <div className="stat-value" style={{ fontSize: 22, color: 'var(--text-secondary)' }}>
-                          {formatDOP(item.priceC)}
+                          {formatDOP(item.prices?.C)}
                           <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>sin impuesto</span>
                         </div>
                         {item.salesTaxPct != null && item.salesTaxPct > 0 && (
                           <div className="stat-value" style={{ fontSize: 22, color: 'var(--color-brand)' }}>
-                            {formatDOP(Math.round(item.priceC * (1 + item.salesTaxPct / 100) * 100) / 100)}
+                            {formatDOP(Math.round(item.prices?.C * (1 + item.salesTaxPct / 100) * 100) / 100)}
                             <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>con impuesto</span>
                           </div>
                         )}
@@ -970,6 +1188,27 @@ export default function ItemDetail() {
         <div style={{ marginTop: 20 }}>
           <VariantsPanel itemId={id!} item={item} />
         </div>
+      )}
+
+      {showPricesModal && (
+        <UpdatePricesModal
+          item={item}
+          onClose={() => setShowPricesModal(false)}
+          onSuccess={(result) => {
+            queryClient.setQueryData(['item', id], (old: Item | undefined) =>
+              old
+                ? {
+                    ...old,
+                    valuationRate: result.purchasePrice,
+                    standardRate: result.standardRate,
+                    priceMode: result.priceMode,
+                    prices: result.prices,
+                  }
+                : old,
+            )
+            queryClient.invalidateQueries({ queryKey: ['items'] })
+          }}
+        />
       )}
     </div>
   )

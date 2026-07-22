@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -114,13 +114,15 @@ function removeBatch(idx: number, batchIdx: number, setItems: React.Dispatch<Rea
 // ─── SerialBatchRow Sub-component ────────────────────────────────────────
 
 function SerialBatchRow({
-  item, idx, items, setItems, warehouses, updateItem, selectCatalogItem, clearCatalogItem, setVariantTemplate,
+  item, idx, items, setItems, warehouses, warehouseOptions, onWarehouseSearch, updateItem, selectCatalogItem, clearCatalogItem, setVariantTemplate,
 }: {
   item: ItemRow
   idx: number
   items: ItemRow[]
   setItems: React.Dispatch<React.SetStateAction<ItemRow[]>>
-  warehouses?: { name: string }[]
+  warehouses?: { id: string; name: string }[]
+  warehouseOptions: SearchSelectOption[]
+  onWarehouseSearch: (q: string) => void
   updateItem: (idx: number, field: keyof ItemRow, value: string | number) => void
   selectCatalogItem: (idx: number, catalogItem: Item) => void
   clearCatalogItem: (idx: number) => void
@@ -221,16 +223,14 @@ function SerialBatchRow({
           )}
         </td>
         <td>
-          <select
-            className="items-input"
+          <SearchSelect
             value={item.warehouse}
-            onChange={(e) => updateItem(idx, 'warehouse', e.target.value)}
-          >
-            <option value="">Almacén</option>
-            {warehouses?.map((w) => (
-              <option key={w.name} value={w.name}>{w.name}</option>
-            ))}
-          </select>
+            onChange={(val) => updateItem(idx, 'warehouse', val)}
+            options={warehouseOptions}
+            onSearch={onWarehouseSearch}
+            selectedLabel={warehouses?.find((w) => w.id === item.warehouse)?.name ?? ''}
+            placeholder="Almacén"
+          />
         </td>
         <td>
           <UomSelect
@@ -437,6 +437,7 @@ export default function CompraForm() {
   const [branch, setBranch] = useState('')
   const [taxesTemplate, setTaxesTemplate] = useState('')
   const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
+  const [warehouseSearch, setWarehouseSearch] = useState('')
 
   const [ncfProveedor, setNcfProveedor] = useState('')
   const [tipoBienes606, setTipoBienes606] = useState('')
@@ -481,6 +482,20 @@ export default function CompraForm() {
     enabled: !!branch,
   })
   const warehouses = branch ? warehousesForBranch : warehousesAll
+
+  const warehouseSelectOptions: SearchSelectOption[] = useMemo(() => {
+    const q = warehouseSearch.toLowerCase()
+    return (warehouses ?? [])
+      .filter((w) => !q || w.name.toLowerCase().includes(q))
+      .map((w) => ({ value: w.id, label: w.name }))
+  }, [warehouses, warehouseSearch])
+
+  // Si solo hay un almacén disponible, se autoselecciona en las líneas que no tengan uno.
+  useEffect(() => {
+    if (warehouses?.length !== 1) return
+    const onlyId = warehouses[0].id
+    setItems((prev) => prev.map((row) => (row.warehouse ? row : { ...row, warehouse: onlyId })))
+  }, [warehouses])
 
   // ── Sucursal (branch) selector ────────────────────────────────────────────
   const { data: currentUserDetail } = useQuery({
@@ -794,6 +809,8 @@ export default function CompraForm() {
                         items={items}
                         setItems={setItems}
                         warehouses={warehouses}
+                        warehouseOptions={warehouseSelectOptions}
+                        onWarehouseSearch={setWarehouseSearch}
                         updateItem={updateItem}
                         selectCatalogItem={selectCatalogItem}
                         clearCatalogItem={clearCatalogItem}

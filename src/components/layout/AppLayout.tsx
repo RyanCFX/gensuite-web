@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Package, FileText, Receipt, Warehouse,
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
   ChevronRight, LogOut, Menu, Building2, UserCog, Sun, Moon,
-  Shield, X, BookOpen, ClipboardList, Percent, Calendar, Lock, BookText, Tag, MapPin,
+  Shield, X, BookOpen, ClipboardList, Percent, Calendar, Lock, BookText, Tag, MapPin, Coins,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth.store'
 import { CommandPalette } from './CommandPalette'
@@ -118,6 +118,7 @@ const NAV_CONFIG: NavEntry = {
     { label: 'Facturación',        icon: <FileText size={14} />,    path: '/config/facturacion'       },
     { label: 'Almacenes',          icon: <Warehouse size={14} />,   path: '/config/almacenes'         },
     { label: 'Métodos de Pago',    icon: <CreditCard size={14} />,  path: '/config/metodos-pago'      },
+    { label: 'Denominaciones',     icon: <Coins size={14} />,       path: '/config/denominaciones'    },
     { label: 'Unidades de Medida', icon: <Settings size={14} />,    path: '/config/uom'               },
     { label: 'Listas de Precio',   icon: <FileText size={14} />,    path: '/config/listas-precio'     },
     { label: 'Secuencias NCF',     icon: <Shield size={14} />,      path: '/config/ncf'               },

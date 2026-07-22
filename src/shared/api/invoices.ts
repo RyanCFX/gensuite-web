@@ -9,6 +9,7 @@ import type {
   DraftVersion,
   PaginatedResponse,
   PaginationParams,
+  ComponentTracking,
 } from './types'
 
 export interface ListInvoicesParams extends PaginationParams {
@@ -71,6 +72,16 @@ export async function aplicarSaldoFavor(id: string, data: AplicarSaldoFavorDto) 
 // DELETE /invoices/:id/aplicar-saldo-favor/:paymentEntryId — deshace la aplicación de un saldo a favor
 export async function removerSaldoFavor(id: string, paymentEntryId: string) {
   await client.delete(ENDPOINTS.invoices.removerSaldoFavor(id, paymentEntryId))
+}
+
+/**
+ * Asigna seriales/lotes específicos a un artículo (o componente de un Combo) de una factura en
+ * Draft — pensado para recuperar el submit cuando ERPNext no pudo auto-asignar el tracking
+ * (sin stock disponible en el almacén de la línea, o el usuario necesita elegir uno puntual).
+ */
+export async function asignarTrackingFactura(id: string, items: ComponentTracking[]) {
+  const res = await client.post<{ success: true; data: Invoice }>(ENDPOINTS.invoices.asignarTracking(id), { items })
+  return unwrap(res)
 }
 
 export async function downloadInvoicePdf(id: string, filename?: string): Promise<void> {

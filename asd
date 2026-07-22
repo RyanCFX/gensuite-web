@@ -1,0 +1,7 @@
+Implementé el soporte completo para flujoCobro ("directo"/"caja") en el cobro de facturas al someter:
+
+Tipos/API (types.ts, endpoints.ts, config.ts): FacturacionConfig.flujoCobro, PaymentLine, VueltoLine, Banco, Denominacion (+ CRUD dto's), SubmitInvoiceDto.payments/vuelto/tenderedCash, Invoice.paymentLines/vueltoDetalle, y los nuevos wrappers listBancos/listDenominaciones/createDenominacion/updateDenominacion.
+PaymentLinesEditor (nuevo, con la lógica pura en paymentLines.ts): editor multi-línea de pago con detalles colapsables, calculadora de vuelto en vivo, y validación de que la suma cuadre (tolerancia RD$0.01).
+InvoiceDetail.tsx: lee flujoCobro (default seguro "directo" si falla/falta), usa el editor multi-línea en el flujo "caja" (barra principal y modal de crédito excedido) sin tocar el flujo "directo" existente, y agrega las secciones "Pagos"/"Vuelto entregado" al detalle de facturas sometidas.
+ConfigPage.tsx / AppLayout.tsx: selector Directo/Caja en Configuración de Facturación, nueva sección CRUD "Denominaciones" con su entrada de navegación.
+Todo el proyecto pasa tsc --noEmit y eslint sin errores nuevos (verificado contra el estado previo con git stash). No pude completar la verificación visual en el navegador esta vez — el preview del dev server corre sin errores, pero la herramienta de navegación del Browser pane está rechazando la navegación a nivel de política. Si quieres, puedo reintentarlo, o puedes probarlo tú mismo en /config/facturacion, /config/denominaciones, y en una factura en borrador con crédito deshabilitado.

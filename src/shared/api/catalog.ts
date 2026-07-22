@@ -14,6 +14,8 @@ import type {
   UpdateAttributeDto,
   GenerateVariantsResult,
   ItemStock,
+  UpdateItemPricesDto,
+  ItemPricesResult,
 } from './types'
 
 // ---- Items ----
@@ -28,6 +30,8 @@ export interface ListItemsParams extends PaginationParams {
   variantOf?: string
   barcode?: string
   validateStock?: boolean
+  /** Filtra artículos con stock en almacenes de esta sucursal, y agrega stockByWarehouse a cada item */
+  branch?: string
 }
 
 export async function listItems(params?: ListItemsParams) {
@@ -52,6 +56,12 @@ export async function createItem(data: CreateItemDto) {
 
 export async function updateItem(id: string, data: Partial<CreateItemDto>) {
   const res = await client.put<{ success: true; data: Item }>(ENDPOINTS.catalog.items.byId(id), data)
+  return unwrap(res)
+}
+
+/** Atajo para actualizar solo precios de un artículo, sin mandar el payload completo de edición. */
+export async function updateItemPrices(id: string, data: UpdateItemPricesDto) {
+  const res = await client.put<{ success: true; data: ItemPricesResult }>(ENDPOINTS.catalog.items.precios(id), data)
   return unwrap(res)
 }
 

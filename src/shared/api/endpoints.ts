@@ -22,6 +22,7 @@ export const ENDPOINTS = {
     version: (id: string, seq: number) => `/invoices/${id}/versions/${seq}`,
     aplicarSaldoFavor: (id: string) => `/invoices/${id}/aplicar-saldo-favor`,
     removerSaldoFavor: (id: string, paymentEntryId: string) => `/invoices/${id}/aplicar-saldo-favor/${paymentEntryId}`,
+    asignarTracking: (id: string) => `/invoices/${id}/asignar-tracking`,
   },
   quotations: {
     list: '/quotations',
@@ -69,6 +70,7 @@ export const ENDPOINTS = {
       toggle: (id: string) => `/catalog/items/${id}/toggle`,
       variants: (id: string) => `/catalog/items/${id}/variants`,
       generateVariants: (id: string) => `/catalog/items/${id}/variants/generate`,
+      precios: (id: string) => `/catalog/items/${id}/precios`,
     },
     bundles: {
       list: '/catalog/bundles',
@@ -192,6 +194,9 @@ export const ENDPOINTS = {
     gruposClientesById: (id: string) => `/config/grupos-clientes/${encodeURIComponent(id)}`,
     facturacion: '/config/facturacion',
     apartados: '/config/apartados',
+    bancos: '/config/bancos',
+    denominaciones: '/config/denominaciones',
+    denominacionesById: (id: string) => `/config/denominaciones/${encodeURIComponent(id)}`,
   },
   ejercicioFiscal: {
     list: '/config/ejercicio-fiscal',

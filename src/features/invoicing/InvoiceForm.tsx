@@ -1,12 +1,14 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Fragment } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { createInvoice } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
-import { listItems, getDefaultPriceTier } from '@/shared/api/catalog'
-import { listImpuestosVentas } from '@/shared/api/config'
-import type { CreateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle } from '@/shared/api/types'
+import { listItems, getDefaultPriceTier, getItem } from '@/shared/api/catalog'
+import { listImpuestosVentas, listAlmacenes } from '@/shared/api/config'
+import type { CreateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking } from '@/shared/api/types'
+import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingModal'
+import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2 } from 'lucide-react'
@@ -51,6 +53,44 @@ interface LineItem {
   conversionFactor: number
   maxDiscountPct?: number
   _prices?: ItemPrices
+  warehouse: string
+  /** Stock por almacén del artículo seleccionado, para validar contra el almacén elegido en la línea */
+  _stockByWarehouse?: Record<string, number>
+  stockError?: string
+  /** Componentes del combo con tracking de serial/lote activo (solo si itemType === 'combo') */
+  _comboComponents?: { itemCode: string; itemName?: string; trackingType: 'serial' | 'batch'; qtyPerCombo: number }[]
+  componentTracking?: ComponentTracking[]
+}
+
+function validateLineStock(row: LineItem): string | undefined {
+  if (!row.warehouse || !row._stockByWarehouse) return undefined
+  const available = row._stockByWarehouse[row.warehouse] ?? 0
+  if (row.qty > available) {
+    return `Stock insuficiente en ${row.warehouse}. Disponible: ${available}`
+  }
+  return undefined
+}
+
+/** Requerimiento de seriales/lotes por componente, recalculado según la cantidad actual de la línea */
+function getTrackingRequirement(row: LineItem): TrackedComponent[] {
+  return (row._comboComponents ?? []).map((c) => ({
+    itemCode: c.itemCode,
+    itemName: c.itemName,
+    trackingType: c.trackingType,
+    qtyNeeded: c.qtyPerCombo * row.qty,
+    warehouse: row.warehouse || undefined,
+  }))
+}
+
+function isTrackingComplete(row: LineItem): boolean {
+  const requirement = getTrackingRequirement(row)
+  if (requirement.length === 0) return true
+  return requirement.every((req) => {
+    const entry = row.componentTracking?.find((t) => t.itemCode === req.itemCode)
+    if (req.trackingType === 'serial') return (entry?.serials?.length ?? 0) === req.qtyNeeded
+    const sum = (entry?.batches ?? []).reduce((s, b) => s + Number(b.qty || 0), 0)
+    return sum === req.qtyNeeded && (entry?.batches?.length ?? 0) > 0
+  })
 }
 
 function todayIso() {
@@ -93,17 +133,23 @@ export default function InvoiceForm() {
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
   const [viewItemCode, setViewItemCode] = useState<string | null>(null)
+  const [trackingModalIndex, setTrackingModalIndex] = useState<number | null>(null)
   const [submitted, setSubmitted] = useState(false)
   const [branch, setBranch] = useState('')
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
   const [branchSearch, setBranchSearch] = useState('')
   const [taxesTemplate, setTaxesTemplate] = useState('')
   const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
+  const [warehouseSearch, setWarehouseSearch] = useState('')
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
     onBarcode: async (code) => {
-      const res = await listItems({ barcode: code, limit: 1, validateStock: true })
+      if (!branch) {
+        toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
+        return
+      }
+      const res = await listItems({ barcode: code, limit: 1, validateStock: true, branch })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
       addRow()
@@ -180,6 +226,44 @@ export default function InvoiceForm() {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
   }, [myBranches])
 
+  // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
+  const { data: branchWarehouses } = useQuery({
+    queryKey: ['almacenes', { branch }],
+    queryFn: () => listAlmacenes({ branch }),
+    enabled: !!branch,
+    staleTime: 60_000,
+  })
+
+  // Al cambiar de sucursal, el almacén elegido en cada línea deja de ser válido
+  useEffect(() => {
+    setItems((prev) => prev.map((row) => (row.warehouse ? { ...row, warehouse: '', stockError: undefined } : row)))
+  }, [branch])
+
+  const warehouseSelectOptions: SearchSelectOption[] = useMemo(() => {
+    const q = warehouseSearch.toLowerCase()
+    return (branchWarehouses ?? [])
+      .filter((w) => !q || w.name.toLowerCase().includes(q))
+      .map((w) => ({ value: w.id, label: w.name }))
+  }, [branchWarehouses, warehouseSearch])
+
+  function defaultWarehouse(): string {
+    return branchWarehouses?.length === 1 ? branchWarehouses[0].id : ''
+  }
+
+  // Si la sucursal solo tiene un almacén, se autoselecciona en las líneas que no tengan uno.
+  useEffect(() => {
+    if (branchWarehouses?.length !== 1) return
+    const onlyId = branchWarehouses[0].id
+    setItems((prev) =>
+      prev.map((row) => {
+        if (!row.itemCode || row.warehouse) return row
+        const updated = { ...row, warehouse: onlyId }
+        updated.stockError = validateLineStock(updated)
+        return updated
+      }),
+    )
+  }, [branchWarehouses])
+
   // Si solo hay una sucursal disponible, se selecciona sola y el select se bloquea.
   useEffect(() => {
     if (branchOptions.length === 1 && branch !== branchOptions[0]) setBranch(branchOptions[0])
@@ -253,6 +337,22 @@ export default function InvoiceForm() {
         if ('qty' in patch || 'rate' in patch || 'discountPct' in patch) {
           updated.amount = calcAmount(updated.qty, updated.rate, updated.discountPct)
         }
+        if ('qty' in patch || 'warehouse' in patch) {
+          updated.stockError = validateLineStock(updated)
+        }
+        return updated
+      }),
+    )
+  }
+
+  function updateWarehouse(index: number, warehouse: string) {
+    setItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== index) return item
+        const available = item._stockByWarehouse?.[warehouse]
+        const qty = available != null ? Math.min(item.qty, available) : item.qty
+        const updated = { ...item, warehouse, qty, amount: calcAmount(qty, item.rate, item.discountPct) }
+        updated.stockError = validateLineStock(updated)
         return updated
       }),
     )
@@ -279,13 +379,18 @@ export default function InvoiceForm() {
           _prices: catalogItem.prices,
           salesTaxPct: catalogItem.salesTaxPct ?? 0,
           salesTaxTemplate: catalogItem.salesTaxTemplate ?? '',
+          warehouse: defaultWarehouse(),
+          _stockByWarehouse: catalogItem.stockByWarehouse,
+          stockError: undefined,
+          _comboComponents: undefined,
+          componentTracking: undefined,
         }
       }),
     )
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '' })
+    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', _comboComponents: undefined, componentTracking: undefined })
   }
 
   function selectBundle(index: number, bundle: Bundle) {
@@ -309,9 +414,34 @@ export default function InvoiceForm() {
           _prices: bundle.prices,
           salesTaxPct: 0,
           salesTaxTemplate: '',
+          warehouse: defaultWarehouse(),
+          _stockByWarehouse: undefined,
+          stockError: undefined,
+          _comboComponents: undefined,
+          componentTracking: undefined,
         }
       }),
     )
+
+    // Detecta componentes del combo con tracking de serial/lote — solo aplica a facturación directa.
+    Promise.all(
+      (bundle.components ?? []).map(async (c) => {
+        try {
+          const item = await getItem(c.itemCode)
+          if (item.trackingType === 'serial' || item.trackingType === 'batch') {
+            return { itemCode: c.itemCode, itemName: item.itemName, trackingType: item.trackingType, qtyPerCombo: c.qty }
+          }
+        } catch {
+          // ignora — si falla la consulta del componente, no se bloquea la selección del combo
+        }
+        return null
+      }),
+    ).then((results) => {
+      const tracked = results.filter((r): r is NonNullable<typeof r> => r != null)
+      if (tracked.length === 0) return
+      setItems((prev) => prev.map((row, i) => (i === index ? { ...row, _comboComponents: tracked } : row)))
+      setTrackingModalIndex(index)
+    })
   }
 
   function onVariantConfirm(selections: VariantSelection[]) {
@@ -336,6 +466,8 @@ export default function InvoiceForm() {
           conversionFactor: 1,
           maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
           _prices: s.item.prices,
+          warehouse: defaultWarehouse(),
+          _stockByWarehouse: s.item.stockByWarehouse,
         }
       }),
     ])
@@ -355,7 +487,11 @@ export default function InvoiceForm() {
   }, [selectedCustomer?.priceTier, defaultPriceTier])
 
   function addRow() {
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', conversionFactor: 1 }])
+    if (!branch) {
+      toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
+      return
+    }
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', conversionFactor: 1, warehouse: '' }])
   }
 
   function removeRow(index: number) {
@@ -397,6 +533,14 @@ export default function InvoiceForm() {
         toast.error(`Línea ${i + 1}: el descuento supera el límite de ${effectiveLimit}%`)
         return
       }
+      if (item.stockError) {
+        toast.error(`Línea ${i + 1}: ${item.stockError}`)
+        return
+      }
+      if (!isTrackingComplete(item)) {
+        toast.error(`Línea ${i + 1}: selecciona las series/lotes de los componentes del combo antes de continuar`)
+        return
+      }
     }
 
     const itemsDto = items.map((i) => ({
@@ -406,6 +550,8 @@ export default function InvoiceForm() {
       rate: i.rate,
       discountPct: i.discountPct || undefined,
       uom: i.uom || undefined,
+      warehouse: i.warehouse || undefined,
+      componentTracking: i.componentTracking,
     }))
 
     createMutation.mutate({
@@ -527,11 +673,12 @@ export default function InvoiceForm() {
               </div>
 
               <div className="ff-wrap">
-                <label className="ff-label" htmlFor="branch">Sucursal</label>
+                <label className="ff-label ff-required" htmlFor="branch">Sucursal</label>
                 <SearchSelect
                   id="branch"
                   value={branch}
                   selectedLabel={branch}
+                  error={!branch}
                   onChange={(val) => setBranch(val)}
                   options={branchSelectOptions}
                   onSearch={setBranchSearch}
@@ -582,19 +729,21 @@ export default function InvoiceForm() {
                   <th style={{ textAlign: 'right', width: 80 }}>Impuesto</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 56 }}>UDM</th>
+                  <th style={{ width: 140 }}>Almacén</th>
                   <th style={{ width: 40 }} />
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+                    <td colSpan={10} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
                       No hay artículos. Agrega uno con el botón de abajo.
                     </td>
                   </tr>
                 ) : (
                   items.map((item, index) => (
-                    <tr key={index}>
+                    <Fragment key={index}>
+                    <tr>
                       <td style={{ minWidth: 200 }}>
                         <ItemSelect
                           value={item.itemCode}
@@ -605,13 +754,19 @@ export default function InvoiceForm() {
                           onClear={() => clearCatalogItem(index)}
                           onVariantSelect={(t) => setVariantTemplate(t)}
                           validateStock
+                          branch={branch || undefined}
                         />
                       </td>
                       <td>
                         <input className="items-input" value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="Descripción" />
                       </td>
                       <td>
-                        <input className="items-input" type="number" min="0" step="1" value={item.qty} onChange={(e) => updateItem(index, { qty: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right' }} />
+                        <input className={`items-input${item.stockError ? ' items-input-error' : ''}`} type="number" min="0" step="1" value={item.qty} onChange={(e) => updateItem(index, { qty: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right' }} />
+                        {item.stockError && (
+                          <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                            {item.stockError}
+                          </span>
+                        )}
                       </td>
                       <td>
                         <input className="items-input" type="number" min="0" step="0.01" value={item.rate} disabled style={{ textAlign: 'right' }} />
@@ -663,6 +818,17 @@ export default function InvoiceForm() {
                           />
                         )}
                       </td>
+                      <td>
+                        <SearchSelect
+                          value={item.warehouse}
+                          onChange={(val) => updateWarehouse(index, val)}
+                          options={warehouseSelectOptions}
+                          onSearch={setWarehouseSearch}
+                          selectedLabel={branchWarehouses?.find((w) => w.id === item.warehouse)?.name ?? ''}
+                          placeholder="Almacén por defecto"
+                          disabled={!item.itemCode}
+                        />
+                      </td>
                       <td onClick={(e) => e.stopPropagation()} className="actions-cell">
                         <ActionsMenu>
                           <ActionsMenuItem
@@ -677,6 +843,28 @@ export default function InvoiceForm() {
                         </ActionsMenu>
                       </td>
                     </tr>
+                    {item.itemType === 'combo' && item._comboComponents && item._comboComponents.length > 0 && (
+                      <tr>
+                        <td colSpan={10} style={{ padding: '4px 12px 10px' }}>
+                          {isTrackingComplete(item) ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-success)' }}>
+                              ✓ Series/lotes de componentes asignados
+                              <button type="button" className="btn btn-ghost btn-size-xs" onClick={() => setTrackingModalIndex(index)}>
+                                Editar
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-warning)' }}>
+                              ⚠ Este combo requiere seleccionar series/lotes de sus componentes
+                              <button type="button" className="btn btn-secondary btn-size-xs" onClick={() => setTrackingModalIndex(index)}>
+                                Seleccionar series/lotes
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))
                 )}
               </tbody>
@@ -755,7 +943,8 @@ export default function InvoiceForm() {
           setPinModalOpen(false)
           const itemsDto = items.map((i) => ({
             itemCode: i.itemCode, description: i.description, qty: i.qty, rate: i.rate,
-            discountPct: i.discountPct || undefined, uom: i.uom || undefined,
+            discountPct: i.discountPct || undefined, uom: i.uom || undefined, warehouse: i.warehouse || undefined,
+            componentTracking: i.componentTracking,
           }))
           createMutation.mutate({ customer: customerId, postingDate, dueDate, branch: branch || undefined, ncfType, items: itemsDto, notes: notes || undefined, taxesTemplate: taxesTemplate || undefined })
         }}
@@ -773,6 +962,19 @@ export default function InvoiceForm() {
 
       {viewItemCode && (
         <ItemDetailModal itemCode={viewItemCode} onClose={() => setViewItemCode(null)} />
+      )}
+
+      {trackingModalIndex != null && items[trackingModalIndex] && (
+        <ComponentTrackingModal
+          bundleName={items[trackingModalIndex].itemLabel ?? items[trackingModalIndex].itemCode}
+          components={getTrackingRequirement(items[trackingModalIndex])}
+          initial={items[trackingModalIndex].componentTracking}
+          onConfirm={(tracking) => {
+            updateItem(trackingModalIndex, { componentTracking: tracking })
+            setTrackingModalIndex(null)
+          }}
+          onClose={() => setTrackingModalIndex(null)}
+        />
       )}
     </div>
   )

@@ -25,6 +25,10 @@ import type {
   AlmacenListItem,
   CreateAlmacenDto,
   UpdateAlmacenDto,
+  Banco,
+  Denominacion,
+  CreateDenominacionDto,
+  UpdateDenominacionDto,
 } from './types'
 
 export async function getEmpresa() {
@@ -79,6 +83,26 @@ export async function createMetodoPago(data: Omit<MetodoPago, 'disabled'>) {
 
 export async function updateMetodoPago(id: string, data: Partial<MetodoPago>) {
   const res = await client.put<{ success: true; data: MetodoPago }>(`${ENDPOINTS.config.metodosPago}/${id}`, data)
+  return unwrap(res)
+}
+
+export async function listBancos() {
+  const res = await client.get<{ success: true; data: Banco[] }>(ENDPOINTS.config.bancos)
+  return unwrap(res)
+}
+
+export async function listDenominaciones() {
+  const res = await client.get<{ success: true; data: Denominacion[] }>(ENDPOINTS.config.denominaciones)
+  return unwrap(res)
+}
+
+export async function createDenominacion(data: CreateDenominacionDto) {
+  const res = await client.post<{ success: true; data: Denominacion }>(ENDPOINTS.config.denominaciones, data)
+  return unwrap(res)
+}
+
+export async function updateDenominacion(id: string, data: UpdateDenominacionDto) {
+  const res = await client.put<{ success: true; data: Denominacion }>(ENDPOINTS.config.denominacionesById(id), data)
   return unwrap(res)
 }
 
