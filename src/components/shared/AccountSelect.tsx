@@ -28,7 +28,7 @@ export function AccountSelect({ value, onChange, placeholder = 'Buscar cuenta…
       accountType: accountType || undefined,
       rootType: rootType || undefined,
       isGroup: ledgerOnly ? false : undefined,  // exclude groups when ledgerOnly
-      limit: 20,
+      // limit: 300
     }),
     staleTime: 30_000,
   })

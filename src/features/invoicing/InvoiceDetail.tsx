@@ -346,6 +346,15 @@ export default function InvoiceDetail() {
         resolveTrackingError(msg);
         return;
       }
+      if (/ubicac/i.test(msg)) {
+        toast.error(msg || "Error al someter la factura", {
+          action: {
+            label: "Ver pendientes",
+            onClick: () => navigate("/inventario/zonas?tab=pendientes"),
+          },
+        });
+        return;
+      }
       toast.error(msg || "Error al someter la factura");
     },
   });

@@ -5,9 +5,9 @@ import { toast } from 'sonner'
 import { getItem, toggleItem, listItemVariants, generateVariants, createVariant, getAttribute, updateItemPrices } from '@/shared/api/catalog'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listZonas } from '@/shared/api/zonas'
-import { listUbicaciones, getItemUbicaciones, assignItemUbicacion, unassignItemUbicacion } from '@/shared/api/ubicaciones'
+import { listUbicaciones, getItemUbicaciones, assignItemUbicacion, unassignItemUbicacion, moverStockUbicacion } from '@/shared/api/ubicaciones'
 import { formatDOP } from '@/lib/formatters'
-import { ToggleLeft, ToggleRight, Package, ArrowLeft, X, MapPin, Trash2, Info, DollarSign } from 'lucide-react'
+import { ToggleLeft, ToggleRight, Package, ArrowLeft, X, MapPin, Trash2, Info, DollarSign, ArrowRightLeft } from 'lucide-react'
 import type { Item, GenerateVariantsResult, ItemAttribute, ApiError, UpdateItemPricesDto, ItemPricesResult } from '@/shared/api/types'
 
 // ─── Update Prices Modal ──────────────────────────────────────────────────────
@@ -575,7 +575,7 @@ function AssignUbicacionModal({
 
   const { data: ubicacionesData } = useQuery({
     queryKey: ['ubicaciones', zonaId],
-    queryFn: () => listUbicaciones({ zona: zonaId, limit: 100 }),
+    queryFn: () => listUbicaciones({ zona: zonaId }),
     enabled: !!zonaId,
   })
   const ubicaciones = ubicacionesData?.items ?? []
@@ -642,12 +642,116 @@ function AssignUbicacionModal({
   )
 }
 
+// ─── Mover Stock Modal ─────────────────────────────────────────────────────────
+
+function MoverUbicacionModal({
+  itemCode,
+  warehouse,
+  origen,
+  onClose,
+  onSuccess,
+}: {
+  itemCode: string
+  warehouse: string
+  origen: { id: string; label: string }
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [zonaId, setZonaId] = useState('')
+  const [ubicacionDestino, setUbicacionDestino] = useState('')
+  const [cantidad, setCantidad] = useState(1)
+  const [notas, setNotas] = useState('')
+
+  const { data: zonasData } = useQuery({
+    queryKey: ['zonas', warehouse],
+    queryFn: () => listZonas({ warehouse, limit: 100 }),
+  })
+  const zonas = zonasData?.items ?? []
+
+  const { data: ubicacionesData } = useQuery({
+    queryKey: ['ubicaciones', zonaId],
+    queryFn: () => listUbicaciones({ zona: zonaId }),
+    enabled: !!zonaId,
+  })
+  const ubicaciones = (ubicacionesData?.items ?? []).filter((u) => u.id !== origen.id)
+
+  const moverMutation = useMutation({
+    mutationFn: () => moverStockUbicacion({ itemCode, cantidad, ubicacionOrigen: origen.id, ubicacionDestino, notas: notas || undefined }),
+    onSuccess: () => {
+      toast.success('Stock movido correctamente')
+      onSuccess()
+    },
+    onError: (err: ApiError) => toast.error(err?.message ?? 'Error al mover el stock'),
+  })
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2 className="modal-title">Mover stock</h2>
+          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="ff-wrap">
+            <label className="ff-label">Ubicación origen</label>
+            <input className="ff-input" value={origen.label} disabled />
+          </div>
+          <div className="ff-wrap">
+            <label className="ff-label ff-required">Zona destino</label>
+            <select className="ff-select" value={zonaId} onChange={(e) => { setZonaId(e.target.value); setUbicacionDestino('') }}>
+              <option value="">Seleccionar zona…</option>
+              {zonas.map((z) => (
+                <option key={z.id} value={z.id}>{z.zonaName}</option>
+              ))}
+            </select>
+          </div>
+          <div className="ff-wrap">
+            <label className="ff-label ff-required">Ubicación destino</label>
+            <select className="ff-select" value={ubicacionDestino} onChange={(e) => setUbicacionDestino(e.target.value)} disabled={!zonaId}>
+              <option value="">Seleccionar ubicación…</option>
+              {ubicaciones.map((u) => (
+                <option key={u.id} value={u.id}>{u.ubicacionName}</option>
+              ))}
+            </select>
+          </div>
+          <div className="ff-wrap">
+            <label className="ff-label ff-required">Cantidad</label>
+            <input
+              className="ff-input"
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={cantidad}
+              onChange={(e) => setCantidad(parseFloat(e.target.value) || 0)}
+            />
+          </div>
+          <div className="ff-wrap">
+            <label className="ff-label">Notas</label>
+            <textarea className="ff-textarea" rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Opcional" />
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button
+            className="btn btn-primary"
+            onClick={() => moverMutation.mutate()}
+            disabled={!ubicacionDestino || cantidad <= 0 || moverMutation.isPending}
+          >
+            {moverMutation.isPending ? 'Moviendo…' : 'Mover'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Panel de Ubicaciones ─────────────────────────────────────────────────────
 
 function UbicacionesPanel({ itemCode }: { itemCode: string }) {
   const queryClient = useQueryClient()
   const [warehouse, setWarehouse] = useState('')
   const [showAssign, setShowAssign] = useState(false)
+  const [moverTarget, setMoverTarget] = useState<{ id: string; label: string } | null>(null)
 
   const { data: warehouses } = useQuery({
     queryKey: ['warehouses'],
@@ -730,6 +834,13 @@ function UbicacionesPanel({ itemCode }: { itemCode: string }) {
                 {a.esPrincipal && <span className="badge badge-success">Principal</span>}
                 <button
                   className="btn btn-ghost btn-size-icon-sm"
+                  onClick={() => setMoverTarget({ id: a.ubicacionId, label: `${a.zonaName ?? '—'} / ${a.ubicacionName ?? a.ubicacionId}` })}
+                  title="Mover stock"
+                >
+                  <ArrowRightLeft size={13} />
+                </button>
+                <button
+                  className="btn btn-ghost btn-size-icon-sm"
                   style={{ color: 'var(--icon-muted)' }}
                   onClick={() => unassignMutation.mutate(a.id)}
                   disabled={unassignMutation.isPending}
@@ -749,6 +860,19 @@ function UbicacionesPanel({ itemCode }: { itemCode: string }) {
           onClose={() => setShowAssign(false)}
           onSuccess={() => {
             setShowAssign(false)
+            queryClient.invalidateQueries({ queryKey: ['item-ubicaciones', itemCode, activeWarehouse] })
+          }}
+        />
+      )}
+
+      {moverTarget && activeWarehouse && (
+        <MoverUbicacionModal
+          itemCode={itemCode}
+          warehouse={activeWarehouse}
+          origen={moverTarget}
+          onClose={() => setMoverTarget(null)}
+          onSuccess={() => {
+            setMoverTarget(null)
             queryClient.invalidateQueries({ queryKey: ['item-ubicaciones', itemCode, activeWarehouse] })
           }}
         />

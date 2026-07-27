@@ -1,4 +1,4 @@
-import { client, unwrap } from './client'
+import { client, unwrap, unwrapPaginated } from './client'
 import { ENDPOINTS } from './endpoints'
 import type {
   UbicacionResponseDto,
@@ -8,6 +8,13 @@ import type {
   AssignItemUbicacionDto,
   UpdateItemUbicacionDto,
   PaginationParams,
+  ItemPendienteUbicar,
+  DistribuirUbicacionDto,
+  DistribuirUbicacionResult,
+  MoverUbicacionDto,
+  MoverUbicacionResult,
+  MovimientoUbicacion,
+  PaginatedResponse,
 } from './types'
 
 export interface ListUbicacionesParams extends PaginationParams {
@@ -69,4 +76,50 @@ export async function updateItemUbicacionAssignment(id: string, data: UpdateItem
 
 export async function unassignItemUbicacion(id: string) {
   await client.delete(ENDPOINTS.inventory.ubicaciones.asignarById(id))
+}
+
+// ─── Distribución de artículos sin ubicación asignada ─────────────────────────
+
+export async function listUbicacionesPendientes(warehouse: string) {
+  const res = await client.get<{ success: true; data: ItemPendienteUbicar[]; note?: string }>(
+    ENDPOINTS.inventory.ubicaciones.pendientes,
+    { params: { warehouse } },
+  )
+  return { items: res.data.data ?? [], note: res.data.note }
+}
+
+export async function distribuirUbicaciones(data: DistribuirUbicacionDto) {
+  const res = await client.post<{ success: true; data: DistribuirUbicacionResult[] }>(
+    ENDPOINTS.inventory.ubicaciones.distribuir,
+    data,
+  )
+  return unwrap(res)
+}
+
+// ─── Mover stock entre ubicaciones del mismo almacén ──────────────────────────
+
+export async function moverStockUbicacion(data: MoverUbicacionDto) {
+  const res = await client.post<{ success: true; data: MoverUbicacionResult }>(
+    ENDPOINTS.inventory.ubicaciones.mover,
+    data,
+  )
+  return unwrap(res)
+}
+
+// ─── Historial de movimientos (distribuciones + movimientos internos) ─────────
+
+export interface ListMovimientosUbicacionParams extends PaginationParams {
+  itemCode?: string
+  ubicacion?: string
+  warehouse?: string
+  fromDate?: string
+  toDate?: string
+}
+
+export async function listMovimientosUbicaciones(params?: ListMovimientosUbicacionParams) {
+  const res = await client.get<PaginatedResponse<MovimientoUbicacion>>(
+    ENDPOINTS.inventory.ubicaciones.movimientos,
+    { params },
+  )
+  return unwrapPaginated(res)
 }

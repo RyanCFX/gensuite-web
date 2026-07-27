@@ -1989,11 +1989,13 @@ function FacturacionConfigSection() {
   const { data: roles } = useQuery({ queryKey: ['roles'], queryFn: listRoles, staleTime: 5 * 60_000 })
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [flujoCobro, setFlujoCobro] = useState<'directo' | 'caja'>('directo')
+  const [requiereUbicacionVenta, setRequiereUbicacionVenta] = useState(false)
 
   useEffect(() => {
     if (data) {
       setSelectedRoles(data.rolesCancelacionFactura ?? [])
       setFlujoCobro(data.flujoCobro ?? 'directo')
+      setRequiereUbicacionVenta(data.requiereUbicacionVenta ?? false)
     }
   }, [data])
 
@@ -2068,10 +2070,25 @@ function FacturacionConfigSection() {
             )}
           </div>
         </div>
+        <div className="ff-wrap">
+          <label className="ff-check-wrap">
+            <input
+              type="checkbox"
+              className="ff-check"
+              checked={requiereUbicacionVenta}
+              onChange={(e) => setRequiereUbicacionVenta(e.target.checked)}
+            />
+            <span style={{ fontSize: 13 }}>Requiere Ubicación para Vender</span>
+          </label>
+          <p className="ff-hint" style={{ marginTop: 4 }}>
+            Si está activo, no se podrá vender un artículo de inventario si no tiene una Ubicación asignada dentro
+            del almacén desde el cual se factura.
+          </p>
+        </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button
             className="btn btn-primary btn-size-sm"
-            onClick={() => saveMutation.mutate({ rolesCancelacionFactura: selectedRoles, flujoCobro })}
+            onClick={() => saveMutation.mutate({ rolesCancelacionFactura: selectedRoles, flujoCobro, requiereUbicacionVenta })}
             disabled={saveMutation.isPending}
           >
             <Save size={14} /> Guardar

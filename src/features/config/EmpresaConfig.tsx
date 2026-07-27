@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getEmpresa, updateEmpresa, getCuentasEmpresa, updateCuentasEmpresa, listAlmacenes } from '@/shared/api/config'
-import type { Empresa, CuentasEmpresa, AlmacenListItem } from '@/shared/api/types'
+import type { Empresa, CuentasEmpresa, AlmacenListItem, ItemProps } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { CostCenterSelect } from '@/components/shared/CostCenterSelect'
@@ -89,9 +89,9 @@ export default function EmpresaConfig() {
   // 🆕 Descuentos
   const [defaultDiscountAccount, setDefaultDiscountAccount] = useState('')
   // 🆕 Centros de Costo
-  const [costCenter, setCostCenter] = useState('')
-  const [roundOffCostCenter, setRoundOffCostCenter] = useState('')
-  const [depreciationCostCenter, setDepreciationCostCenter] = useState('')
+  const [costCenter, setCostCenter] = useState<ItemProps | null>(null)
+  const [roundOffCostCenter, setRoundOffCostCenter] = useState<ItemProps | null>(null)
+  const [depreciationCostCenter, setDepreciationCostCenter] = useState<ItemProps | null>(null)
   // 🆕 Inventario perpetuo
   const [enablePerpetualInventory, setEnablePerpetualInventory] = useState(false)
 
@@ -116,9 +116,9 @@ export default function EmpresaConfig() {
       setDepreciationExpenseAccount(cuentasData.depreciationExpenseAccount ?? '')
       setDisposalAccount(cuentasData.disposalAccount ?? '')
       setDefaultDiscountAccount(cuentasData.defaultDiscountAccount ?? '')
-      setCostCenter(cuentasData.costCenter ?? '')
-      setRoundOffCostCenter(cuentasData.roundOffCostCenter ?? '')
-      setDepreciationCostCenter(cuentasData.depreciationCostCenter ?? '')
+      setCostCenter(cuentasData.costCenter ?? null)
+      setRoundOffCostCenter(cuentasData.roundOffCostCenter ?? null)
+      setDepreciationCostCenter(cuentasData.depreciationCostCenter ?? null)
       setEnablePerpetualInventory(cuentasData.enablePerpetualInventory ?? false)
     }
   }, [cuentasData])
@@ -169,9 +169,9 @@ export default function EmpresaConfig() {
       depreciationExpenseAccount: depreciationExpenseAccount || null,
       disposalAccount: disposalAccount || null,
       defaultDiscountAccount: defaultDiscountAccount || null,
-      costCenter: costCenter || undefined,
-      roundOffCostCenter: roundOffCostCenter || undefined,
-      depreciationCostCenter: depreciationCostCenter || null,
+      costCenter: costCenter?.id || undefined,
+      roundOffCostCenter: roundOffCostCenter?.id || undefined,
+      depreciationCostCenter: depreciationCostCenter?.id || null,
       enablePerpetualInventory,
     })
   }

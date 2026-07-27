@@ -106,6 +106,10 @@ export const ENDPOINTS = {
       byItem: (itemCode: string) => `/inventory/ubicaciones/item/${itemCode}`,
       asignar: '/inventory/ubicaciones/asignar',
       asignarById: (id: string) => `/inventory/ubicaciones/asignar/${id}`,
+      pendientes: '/inventory/ubicaciones/pendientes',
+      distribuir: '/inventory/ubicaciones/distribuir',
+      mover: '/inventory/ubicaciones/mover',
+      movimientos: '/inventory/ubicaciones/movimientos',
     },
   },
   compras: {

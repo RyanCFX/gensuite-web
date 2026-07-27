@@ -6,6 +6,7 @@ import { listCustomers } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
 import { listItems, getDefaultPriceTier, getItem } from '@/shared/api/catalog'
 import { listImpuestosVentas, listAlmacenes } from '@/shared/api/config'
+import { getItemUbicaciones } from '@/shared/api/ubicaciones'
 import type { CreateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking } from '@/shared/api/types'
 import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingModal'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
@@ -59,6 +60,10 @@ interface LineItem {
   /** Stock por almacén del artículo seleccionado, para validar contra el almacén elegido en la línea */
   _stockByWarehouse?: Record<string, number>
   stockError?: string
+  /** Ubicación/rack específico dentro del almacén elegido, si el artículo tiene alguna asignada ahí */
+  ubicacion?: string
+  /** Mensaje cuando el backend rechazó la venta por ambigüedad de ubicación (varias con stock) — obliga a elegir una */
+  ubicacionError?: string
   /** Componentes del combo con tracking de serial/lote activo (solo si itemType === 'combo') */
   _comboComponents?: { itemCode: string; itemName?: string; trackingType: 'serial' | 'batch'; qtyPerCombo: number }[]
   componentTracking?: ComponentTracking[]
@@ -116,6 +121,55 @@ function maxDiscFromPrices(rate: number, prices: ItemPrices | undefined): number
   const minPrice = Math.min(...vals)
   if (minPrice <= 0) return 100
   return Math.max(0, (1 - minPrice / rate) * 100)
+}
+
+/** Selector de ubicación/rack de la línea — solo se muestra si el artículo tiene alguna ubicación
+ *  asignada en el almacén elegido. Si no tiene ninguna, no hay nada que elegir. */
+function LineUbicacionCell({
+  itemCode,
+  warehouse,
+  value,
+  error,
+  onChange,
+}: {
+  itemCode: string
+  warehouse: string
+  value?: string
+  error?: string
+  onChange: (ubicacion: string) => void
+}) {
+  const { data } = useQuery({
+    queryKey: ['item-ubicaciones', itemCode, warehouse],
+    queryFn: () => getItemUbicaciones(itemCode, warehouse),
+    enabled: !!itemCode && !!warehouse,
+  })
+  const ubicaciones = data?.items ?? []
+
+  if (data?.note || ubicaciones.length === 0) {
+    return <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+  }
+
+  return (
+    <>
+      <select
+        className={`ff-select${error ? ' items-input-error' : ''}`}
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">Sin especificar</option>
+        {ubicaciones.map((u) => (
+          <option key={u.id} value={u.ubicacionId}>
+            {u.zonaName ? `${u.zonaName} / ${u.ubicacionName ?? u.ubicacionId}` : u.ubicacionName ?? u.ubicacionId}
+          </option>
+        ))}
+      </select>
+      {error && (
+        <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'normal', maxWidth: 160 }}>
+          {error}
+        </span>
+      )}
+    </>
+  )
 }
 
 export default function InvoiceForm() {
@@ -311,6 +365,27 @@ export default function InvoiceForm() {
   }, [selectedCustomer])
 
   // ── Mutations ─────────────────────────────────────────────────────────────
+  /** Cuando el backend rechaza la venta por tener stock repartido en varias ubicaciones del mismo
+   *  almacén, marca la línea afectada para que el cajero elija una ahí mismo en vez de un toast genérico. */
+  function tryResolveUbicacionAmbiguity(msg: string): boolean {
+    const match = msg.match(/art[ií]culo\s+([A-Za-z0-9_.-]+)\s+tiene stock en varias ubicaciones/i)
+    const itemCode = match?.[1]
+    if (!itemCode) return false
+
+    let found = false
+    setItems((prev) =>
+      prev.map((row) => {
+        if (row.itemCode !== itemCode) return row
+        found = true
+        return { ...row, ubicacionError: 'Selecciona la ubicación específica desde la que se venderá este artículo.' }
+      }),
+    )
+    if (!found) return false
+
+    toast.error(`El artículo ${itemCode} tiene stock en varias ubicaciones. Selecciona una en la línea correspondiente.`)
+    return true
+  }
+
   const createMutation = useMutation({
     mutationFn: (dto: CreateInvoiceDto) => createInvoice(dto),
     onSuccess: (invoice) => {
@@ -329,6 +404,16 @@ export default function InvoiceForm() {
       if (msg.toLowerCase().includes('no tienes acceso a la sucursal')) {
         refetchMyBranches()
         toast.error(`${msg} Tus sucursales asignadas se actualizaron, vuelve a intentar.`)
+        return
+      }
+      if (tryResolveUbicacionAmbiguity(msg)) return
+      if (msg.toLowerCase().includes('ubicac')) {
+        toast.error(msg || 'Error al crear la factura', {
+          action: {
+            label: 'Ver pendientes',
+            onClick: () => navigate('/inventario/zonas?tab=pendientes'),
+          },
+        })
         return
       }
       toast.error(msg || 'Error al crear la factura')
@@ -360,7 +445,7 @@ export default function InvoiceForm() {
         if (i !== index) return item
         const available = item._stockByWarehouse?.[warehouse]
         const qty = available != null ? Math.min(item.qty, available) : item.qty
-        const updated = { ...item, warehouse, qty, amount: calcAmount(qty, item.rate, item.discountPct) }
+        const updated = { ...item, warehouse, qty, amount: calcAmount(qty, item.rate, item.discountPct), ubicacion: undefined, ubicacionError: undefined }
         updated.stockError = validateLineStock(updated)
         return updated
       }),
@@ -393,13 +478,15 @@ export default function InvoiceForm() {
           stockError: undefined,
           _comboComponents: undefined,
           componentTracking: undefined,
+          ubicacion: undefined,
+          ubicacionError: undefined,
         }
       }),
     )
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', _comboComponents: undefined, componentTracking: undefined })
+    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', _comboComponents: undefined, componentTracking: undefined, ubicacion: undefined, ubicacionError: undefined })
   }
 
   function selectBundle(index: number, bundle: Bundle) {
@@ -428,6 +515,8 @@ export default function InvoiceForm() {
           stockError: undefined,
           _comboComponents: undefined,
           componentTracking: undefined,
+          ubicacion: undefined,
+          ubicacionError: undefined,
         }
       }),
     )
@@ -560,6 +649,7 @@ export default function InvoiceForm() {
       discountPct: i.discountPct || undefined,
       uom: i.uom || undefined,
       warehouse: i.warehouse || undefined,
+      ubicacion: i.ubicacion || undefined,
       componentTracking: i.componentTracking,
     }))
 
@@ -746,13 +836,14 @@ export default function InvoiceForm() {
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 56 }}>UDM</th>
                   <th style={{ width: 140 }}>Almacén</th>
+                  <th style={{ width: 140 }}>Ubicación</th>
                   <th style={{ width: 40 }} />
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={10} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+                    <td colSpan={11} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
                       No hay artículos. Agrega uno con el botón de abajo.
                     </td>
                   </tr>
@@ -845,6 +936,19 @@ export default function InvoiceForm() {
                           disabled={!item.itemCode}
                         />
                       </td>
+                      <td>
+                        {item.itemCode && item.warehouse ? (
+                          <LineUbicacionCell
+                            itemCode={item.itemCode}
+                            warehouse={item.warehouse}
+                            value={item.ubicacion}
+                            error={item.ubicacionError}
+                            onChange={(val) => updateItem(index, { ubicacion: val || undefined, ubicacionError: undefined })}
+                          />
+                        ) : (
+                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                        )}
+                      </td>
                       <td onClick={(e) => e.stopPropagation()} className="actions-cell">
                         <ActionsMenu>
                           <ActionsMenuItem
@@ -861,7 +965,7 @@ export default function InvoiceForm() {
                     </tr>
                     {item.itemType === 'combo' && item._comboComponents && item._comboComponents.length > 0 && (
                       <tr>
-                        <td colSpan={10} style={{ padding: '4px 12px 10px' }}>
+                        <td colSpan={11} style={{ padding: '4px 12px 10px' }}>
                           {isTrackingComplete(item) ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-success)' }}>
                               ✓ Series/lotes de componentes asignados
@@ -960,6 +1064,7 @@ export default function InvoiceForm() {
           const itemsDto = items.map((i) => ({
             itemCode: i.itemCode, description: i.description, qty: i.qty, rate: i.rate,
             discountPct: i.discountPct || undefined, uom: i.uom || undefined, warehouse: i.warehouse || undefined,
+            ubicacion: i.ubicacion || undefined,
             componentTracking: i.componentTracking,
           }))
           createMutation.mutate({ customer: customerId, postingDate, dueDate, branch: branch || undefined, department: department || undefined, ncfType, items: itemsDto, notes: notes || undefined, taxesTemplate: taxesTemplate || undefined })
