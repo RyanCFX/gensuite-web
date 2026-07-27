@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -12,6 +12,13 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import type { Item } from '@/shared/api/types'
+import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
+import { listSucursales } from '@/shared/api/sucursales'
+import { getUser } from '@/shared/api/storage'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
+import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+
+const SYSTEM_MANAGER_ROLE = 'System Manager'
 
 interface ItemRow {
   itemCode: string
@@ -50,6 +57,52 @@ export default function GastoForm() {
   const [esDeducible, setEsDeducible] = useState(true)
   const [retencionIsr, setRetencionIsr] = useState(0)
   const [retencionItbis, setRetencionItbis] = useState(0)
+  const [branch, setBranch] = useState('')
+  const [branchSearch, setBranchSearch] = useState('')
+  const [branchError, setBranchError] = useState(false)
+  const [department, setDepartment] = useState('')
+
+  const currentUserEmail = getUser()?.email
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser', currentUserEmail],
+    queryFn: () => getUsuario(currentUserEmail!),
+    enabled: !!currentUserEmail,
+    staleTime: 5 * 60_000,
+  })
+
+  // ── Sucursal (branch) selector ────────────────────────────────────────────
+  const isSystemManager = currentUser?.roles?.includes(SYSTEM_MANAGER_ROLE) ?? false
+  const { data: myBranches } = useQuery({
+    queryKey: ['usuarioSucursales', currentUserEmail],
+    queryFn: () => getUsuarioSucursales(currentUserEmail!),
+    enabled: !!currentUserEmail,
+    staleTime: 60_000,
+  })
+  const { data: allSucursales } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+    enabled: isSystemManager,
+    staleTime: 60_000,
+  })
+  const branchOptions = useMemo(
+    () => (isSystemManager ? (allSucursales?.items.map((s) => s.name) ?? []) : (myBranches?.branches ?? [])),
+    [isSystemManager, allSucursales, myBranches],
+  )
+  const branchSelectOptions: SearchSelectOption[] = useMemo(() => {
+    const q = branchSearch.toLowerCase()
+    return branchOptions
+      .filter((b) => !q || b.toLowerCase().includes(q))
+      .map((b) => ({ value: b, label: b }))
+  }, [branchOptions, branchSearch])
+
+  useEffect(() => {
+    if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
+  }, [myBranches])
+
+  // Si solo hay una sucursal disponible, se selecciona sola y el select se bloquea.
+  useEffect(() => {
+    if (branchOptions.length === 1 && branch !== branchOptions[0]) setBranch(branchOptions[0])
+  }, [branchOptions, branch])
 
   const { data: gastoData, isLoading: loadingEdit } = useQuery({
     queryKey: ['gasto', id],
@@ -91,6 +144,8 @@ export default function GastoForm() {
     setEsDeducible(gastoData.esDeducible ?? true)
     setRetencionIsr(gastoData.retencionIsr ?? 0)
     setRetencionItbis(gastoData.retencionItbis ?? 0)
+    setBranch(gastoData.branch ?? '')
+    setDepartment(gastoData.department ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gastoData])
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -116,6 +171,11 @@ export default function GastoForm() {
       navigate(`/gastos/${data.id}`)
     },
     onError: (error) => {
+      if (isApiErrorCode(error, ERROR_CODES.BRANCH_REQUIRED)) {
+        setBranchError(true)
+        toast.error((error as { message?: string })?.message ?? 'Selecciona una sucursal')
+        return
+      }
       const apiErr = error as { message?: string }
       toast.error(apiErr?.message ?? 'Error al guardar el gasto')
     },
@@ -176,6 +236,8 @@ export default function GastoForm() {
       esDeducible,
       retencionIsr: retencionIsr || undefined,
       retencionItbis: retencionItbis || undefined,
+      branch: branch || undefined,
+      department: department || undefined,
     }
     saveMutation.mutate(dto)
   }
@@ -224,6 +286,25 @@ export default function GastoForm() {
                 <div className="ff-wrap">
                   <label className="ff-label">Fecha Vencimiento</label>
                   <input type="date" className="ff-input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label">Sucursal <span className="ff-required">*</span></label>
+                  <SearchSelect
+                    id="branch"
+                    value={branch}
+                    selectedLabel={branch}
+                    error={!branch || branchError}
+                    onChange={(val) => { setBranch(val); setBranchError(false) }}
+                    options={branchSelectOptions}
+                    onSearch={setBranchSearch}
+                    placeholder="Sin especificar"
+                    disabled={branchOptions.length === 1}
+                  />
+                  {branchError && <span className="ff-error">Debes seleccionar una sucursal para continuar</span>}
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label">Departamento</label>
+                  <DepartmentSelect id="department" value={department} onChange={setDepartment} />
                 </div>
               </div>
             </div>

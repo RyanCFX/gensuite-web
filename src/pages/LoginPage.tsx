@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Eye, EyeOff } from 'lucide-react'
 import { AuthLayout } from '@/shared/layout/AuthLayout'
 import LogoMark from '@/components/LogoMark'
 import { isApiError } from '@/shared/api/auth'
@@ -39,6 +40,7 @@ export default function LoginPage() {
 
   const [serverError, setServerError] = useState<string | null>(null)
   const [isRateLimited, setIsRateLimited] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const authLogin = useAuthStore((s) => s.login)
 
   const {
@@ -99,14 +101,25 @@ export default function LoginPage() {
 
         <div className="form-field">
           <Label htmlFor="password">Contraseña</Label>
-          <Input
-            id="password"
-            type="password"
-            placeholder="••••••••"
-            autoComplete="current-password"
-            {...register('password')}
-            data-error={!!errors.password}
-          />
+          <div className="form-input-wrap">
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="••••••••"
+              autoComplete="current-password"
+              {...register('password')}
+              data-error={!!errors.password}
+            />
+            <button
+              type="button"
+              className="form-input-toggle"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
           {errors.password?.message && (
             <span className="form-error">{errors.password.message}</span>
           )}

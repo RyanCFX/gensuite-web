@@ -5,6 +5,7 @@ import { listTransferencias, confirmarTransferencia, cancelarTransferencia } fro
 import type { ListTransferenciasParams } from '@/shared/api/transferencias'
 import type { Transferencia } from '@/shared/api/types'
 import { listAlmacenes } from '@/shared/api/config'
+import { listSucursales } from '@/shared/api/sucursales'
 import { getUsuarioAlmacenesPermitidos } from '@/shared/api/usuarios'
 import { getUser } from '@/shared/api/storage'
 import { formatDate } from '@/lib/formatters'
@@ -30,6 +31,7 @@ export default function TransferenciasPage() {
   const queryClient = useQueryClient()
   const [status, setStatus] = useState<string>('all')
   const [warehouse, setWarehouse] = useState('')
+  const [branch, setBranch] = useState('')
   const [toConfirm, setToConfirm] = useState<Transferencia | null>(null)
   const [toCancel, setToCancel] = useState<Transferencia | null>(null)
 
@@ -40,6 +42,12 @@ export default function TransferenciasPage() {
     queryFn: () => listAlmacenes(),
   })
   const warehouses = warehousesData ?? []
+
+  const { data: sucursalesData } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+  })
+  const sucursales = sucursalesData?.items ?? []
 
   const { data: myWarehouses } = useQuery({
     queryKey: ['usuarioAlmacenesPermitidos', currentUserEmail],
@@ -58,6 +66,7 @@ export default function TransferenciasPage() {
   const params: ListTransferenciasParams = {
     status: status === 'all' ? undefined : (status as ListTransferenciasParams['status']),
     warehouse: warehouse || undefined,
+    branch: branch || undefined,
     limit: 50,
   }
 
@@ -123,6 +132,12 @@ export default function TransferenciasPage() {
             <option value="">Todos los almacenes</option>
             {warehouses.map((w) => (
               <option key={w.name} value={w.name}>{w.name}</option>
+            ))}
+          </select>
+          <select className="filter-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
+            <option value="">Todas las sucursales</option>
+            {sucursales.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
         </div>

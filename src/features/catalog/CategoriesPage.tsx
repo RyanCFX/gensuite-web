@@ -4,10 +4,11 @@ import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { listCategories, createCategory, updateCategory, deleteCategory } from '@/shared/api/catalog'
+import { listCategories, getCategory, createCategory, updateCategory, deleteCategory } from '@/shared/api/catalog'
 import type { Category, UpdateCategoryDto } from '@/shared/api/types'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightSmall, FolderOpen, Tag, Folder } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -21,6 +22,9 @@ const categorySchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   parentCategory: z.string().optional(),
   itemCodePrefix: z.string().max(5).optional(),
+  incomeAccount: z.string().optional(),
+  expenseAccount: z.string().optional(),
+  defaultCogsAccount: z.string().optional(),
 })
 
 type CategoryFormValues = z.infer<typeof categorySchema>
@@ -168,7 +172,7 @@ export default function CategoriesPage() {
     formState: { errors, isSubmitting },
   } = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
-    defaultValues: { name: '', parentCategory: '', itemCodePrefix: '' },
+    defaultValues: { name: '', parentCategory: '', itemCodePrefix: '', incomeAccount: '', expenseAccount: '', defaultCogsAccount: '' },
   })
 
   const createMutation = useMutation({
@@ -205,20 +209,45 @@ export default function CategoriesPage() {
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al eliminar'),
   })
 
+  const [detailLoading, setDetailLoading] = useState(false)
+
   function openCreate() {
     setEditTarget(null)
-    reset({ name: '', parentCategory: '', itemCodePrefix: '' })
+    reset({ name: '', parentCategory: '', itemCodePrefix: '', incomeAccount: '', expenseAccount: '', defaultCogsAccount: '' })
     setDialogOpen(true)
   }
 
-  function openEdit(cat: Category) {
+  async function openEdit(cat: Category) {
     setEditTarget(cat)
     reset({
       name: cat.name,
       parentCategory: cat.parentCategory ?? '',
       itemCodePrefix: (cat as any).itemCodePrefix ?? '',
+      incomeAccount: (cat as any).incomeAccount ?? '',
+      expenseAccount: (cat as any).expenseAccount ?? '',
+      defaultCogsAccount: (cat as any).defaultCogsAccount ?? '',
     })
     setDialogOpen(true)
+
+    // La lista/árbol no traen incomeAccount/expenseAccount/defaultCogsAccount:
+    // se cargan solo en el detalle. Hacemos fetch completo para precargarlos.
+    setDetailLoading(true)
+    try {
+      const full = await getCategory(cat.id)
+      setEditTarget(full)
+      reset({
+        name: full.name,
+        parentCategory: full.parentCategory ?? '',
+        itemCodePrefix: (full as any).itemCodePrefix ?? '',
+        incomeAccount: (full as any).incomeAccount ?? '',
+        expenseAccount: (full as any).expenseAccount ?? '',
+        defaultCogsAccount: (full as any).defaultCogsAccount ?? '',
+      })
+    } catch {
+      toast.error('No se pudo cargar el detalle completo de la categoría')
+    } finally {
+      setDetailLoading(false)
+    }
   }
 
   function closeDialog() {
@@ -236,6 +265,9 @@ export default function CategoriesPage() {
     if (values.itemCodePrefix) {
       basePayload.itemCodePrefix = values.itemCodePrefix
     }
+    basePayload.incomeAccount = values.incomeAccount || undefined
+    basePayload.expenseAccount = values.expenseAccount || undefined
+    basePayload.defaultCogsAccount = values.defaultCogsAccount || undefined
     if (editTarget) {
       updateMutation.mutate({ id: editTarget.id, data: basePayload as UpdateCategoryDto })
     } else {
@@ -481,6 +513,61 @@ export default function CategoriesPage() {
                   <label className="ff-label" htmlFor="itemCodePrefix">Prefijo de código</label>
                   <input id="itemCodePrefix" className="ff-input" maxLength={5} placeholder="Ej: VEN" {...register('itemCodePrefix')} />
                   <p className="ff-hint">Máx 5 caracteres. Se usará como prefijo en códigos de artículo (ej: VEN-0001)</p>
+                </div>
+
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="incomeAccount">Cuenta de Ingreso</label>
+                  <Controller
+                    name="incomeAccount"
+                    control={control}
+                    render={({ field }) => (
+                      <AccountSelect
+                        id="incomeAccount"
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        rootType="Income"
+                        placeholder="Buscar cuenta de ingreso…"
+                        disabled={detailLoading}
+                      />
+                    )}
+                  />
+                </div>
+
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="expenseAccount">Cuenta de Gasto</label>
+                  <Controller
+                    name="expenseAccount"
+                    control={control}
+                    render={({ field }) => (
+                      <AccountSelect
+                        id="expenseAccount"
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        rootType="Expense"
+                        placeholder="Buscar cuenta de gasto…"
+                        disabled={detailLoading}
+                      />
+                    )}
+                  />
+                </div>
+
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="defaultCogsAccount">Cuenta de Costo de Mercancía Vendida (COGS)</label>
+                  <Controller
+                    name="defaultCogsAccount"
+                    control={control}
+                    render={({ field }) => (
+                      <AccountSelect
+                        id="defaultCogsAccount"
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        accountType="Cost of Goods Sold"
+                        placeholder="Buscar cuenta de COGS…"
+                        disabled={detailLoading}
+                      />
+                    )}
+                  />
+                  <p className="ff-hint">Cuenta que controla el costo real en ventas — es el campo más importante de los tres.</p>
                 </div>
               </div>
               <div className="modal-foot">

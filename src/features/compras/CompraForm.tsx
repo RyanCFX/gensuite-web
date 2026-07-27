@@ -22,6 +22,8 @@ import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { listItems } from '@/shared/api/catalog'
 import { useAuthStore } from '@/stores/auth.store'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
+import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 
 interface ItemRow {
   itemCode: string
@@ -435,6 +437,8 @@ export default function CompraForm() {
   const [dueDate, setDueDate] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem(defaultWh)])
   const [branch, setBranch] = useState('')
+  const [branchError, setBranchError] = useState(false)
+  const [department, setDepartment] = useState('')
   const [taxesTemplate, setTaxesTemplate] = useState('')
   const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
@@ -557,6 +561,11 @@ export default function CompraForm() {
     },
     onError: (error) => {
       const apiErr = error as { code?: string; message?: string; statusCode?: number }
+      if (isApiErrorCode(error, ERROR_CODES.BRANCH_REQUIRED)) {
+        setBranchError(true)
+        toast.error(apiErr?.message || 'Selecciona una sucursal')
+        return
+      }
       if (apiErr?.message?.toLowerCase().includes('no tienes acceso a la sucursal')) {
         refetchMyBranches()
         toast.error(`${apiErr.message} Tus sucursales asignadas se actualizaron, vuelve a intentar.`)
@@ -628,6 +637,7 @@ export default function CompraForm() {
       postingDate,
       dueDate: dueDate || undefined,
       branch: branch || undefined,
+      department: department || undefined,
       items: items.map((i) => ({
         itemCode: i.itemCode,
         description: i.description,
@@ -747,12 +757,17 @@ export default function CompraForm() {
 
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal</label>
-                  <select className="ff-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
+                  <select className={`ff-select${branchError ? ' ff-input-error' : ''}`} value={branch} onChange={(e) => { setBranch(e.target.value); setBranchError(false) }}>
                     <option value="">Sin especificar</option>
                     {branchOptions.map((b) => (
                       <option key={b} value={b}>{b}</option>
                     ))}
                   </select>
+                </div>
+
+                <div className="ff-wrap">
+                  <label className="ff-label">Departamento</label>
+                  <DepartmentSelect value={department} onChange={setDepartment} placeholder="Buscar departamento…" />
                 </div>
 
                 <div className="ff-wrap">

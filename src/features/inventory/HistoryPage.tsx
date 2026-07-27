@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getInventoryHistory, listWarehouses } from '@/shared/api/inventory'
+import { listSucursales } from '@/shared/api/sucursales'
 import { formatDate, formatNumber } from '@/lib/formatters'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -18,6 +19,7 @@ const VOUCHER_TYPES = [
 
 export default function HistoryPage() {
   const [warehouse, setWarehouse] = useState<string>('all')
+  const [branch, setBranch] = useState('')
   const [voucherType, setVoucherType] = useState<string>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -31,11 +33,17 @@ export default function HistoryPage() {
     queryFn: listWarehouses,
   })
 
+  const { data: sucursales } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+  })
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['inventory-history', { warehouse, voucherType, fromDate, toDate, offset, orderBy }],
+    queryKey: ['inventory-history', { warehouse, branch, voucherType, fromDate, toDate, offset, orderBy }],
     queryFn: () =>
       getInventoryHistory({
         warehouse: warehouse !== 'all' ? warehouse : undefined,
+        branch: warehouse === 'all' ? (branch || undefined) : undefined,
         voucherType: voucherType !== 'all' ? voucherType : undefined,
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
@@ -59,13 +67,26 @@ export default function HistoryPage() {
           <select
             className="filter-select"
             value={warehouse}
-            onChange={(e) => { setWarehouse(e.target.value); setPage(1) }}
+            onChange={(e) => { setWarehouse(e.target.value); setPage(1); if (e.target.value !== 'all') setBranch('') }}
           >
             <option value="all">Todos los almacenes</option>
             {warehouses?.map((w) => (
               <option key={w.name} value={w.name}>{w.name}</option>
             ))}
           </select>
+
+          {warehouse === 'all' && (
+            <select
+              className="filter-select"
+              value={branch}
+              onChange={(e) => { setBranch(e.target.value); setPage(1) }}
+            >
+              <option value="">Todas las sucursales</option>
+              {sucursales?.items.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          )}
 
           <select
             className="filter-select"

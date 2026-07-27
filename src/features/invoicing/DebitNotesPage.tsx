@@ -6,6 +6,9 @@ import {
   submitDebitNote,
 } from '@/shared/api/notes'
 import { listInvoices } from '@/shared/api/invoices'
+import { listSucursales } from '@/shared/api/sucursales'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
+import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import type { Invoice, CreateDebitNoteDto } from '@/shared/api/types'
 import { Plus, Loader2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -29,6 +32,8 @@ interface DebitNote {
   grandTotal?: number
   status: 'Draft' | 'Submitted' | 'Cancelled'
   reason?: string
+  branch?: string
+  department?: string
   items: NoteItem[]
 }
 
@@ -59,10 +64,27 @@ export default function DebitNotesPage() {
   const [invoiceQuery, setInvoiceQuery] = useState('')
   const [reason, setReason] = useState('')
   const [noteItems, setNoteItems] = useState<NoteLineItem[]>([{ itemCode: '', qty: 1, rate: 0 }])
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
+  const [branchError, setBranchError] = useState(false)
+
+  const [filterBranch, setFilterBranch] = useState('')
+  const [filterDepartment, setFilterDepartment] = useState('')
+
+  const { data: sucursalesData } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+  })
+  const sucursales = sucursalesData?.items ?? []
 
   const { data: notesData, isLoading } = useQuery({
-    queryKey: ['debit-notes', orderBy],
-    queryFn: () => listDebitNotes({ orderBy: orderBy || undefined }),
+    queryKey: ['debit-notes', orderBy, filterBranch, filterDepartment],
+    queryFn: () =>
+      listDebitNotes({
+        orderBy: orderBy || undefined,
+        branch: filterBranch || undefined,
+        department: filterDepartment || undefined,
+      } as Parameters<typeof listDebitNotes>[0]),
   })
 
   const { data: invoicesData, isLoading: invoicesLoading } = useQuery({
@@ -89,6 +111,11 @@ export default function DebitNotesPage() {
       handleCloseModal()
     },
     onError: (err: { message?: string }) => {
+      if (isApiErrorCode(err, ERROR_CODES.BRANCH_REQUIRED)) {
+        setBranchError(true)
+        toast.error(err?.message ?? 'Selecciona una sucursal')
+        return
+      }
       toast.error(err?.message ?? 'Error al crear la nota de débito')
     },
   })
@@ -100,6 +127,9 @@ export default function DebitNotesPage() {
     setInvoiceQuery('')
     setReason('')
     setNoteItems([{ itemCode: '', qty: 1, rate: 0 }])
+    setBranch('')
+    setDepartment('')
+    setBranchError(false)
   }
 
   function updateNoteItem(index: number, patch: Partial<NoteLineItem>) {
@@ -127,6 +157,8 @@ export default function DebitNotesPage() {
       customer: selectedInvoice.customer,
       postingDate: new Date().toISOString().slice(0, 10),
       notes: reason || undefined,
+      branch: branch || undefined,
+      department: department || undefined,
       items: noteItems
         .filter((i) => i.itemCode.trim())
         .map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate })),
@@ -144,6 +176,20 @@ export default function DebitNotesPage() {
         <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
           <Plus size={16} /> Nueva Nota de Débito
         </button>
+      </div>
+
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <select className="filter-select" value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)}>
+            <option value="">Todas las sucursales</option>
+            {sucursales.map((s) => (
+              <option key={s.id} value={s.name}>{s.name}</option>
+            ))}
+          </select>
+          <div style={{ minWidth: 220 }}>
+            <DepartmentSelect value={filterDepartment} onChange={setFilterDepartment} placeholder="Todos los departamentos" />
+          </div>
+        </div>
       </div>
 
       <div className="table-scroll">
@@ -248,6 +294,34 @@ export default function DebitNotesPage() {
                     placeholder="Ej: Cargo adicional por flete no incluido"
                     required
                   />
+                </div>
+
+                <div style={{ display: 'flex', gap: 16 }}>
+                  <div className="ff-wrap" style={{ flex: 1 }}>
+                    <label className="ff-label" htmlFor="branch-debit">Sucursal</label>
+                    <select
+                      id="branch-debit"
+                      className={`filter-select${branchError ? ' ff-error' : ''}`}
+                      style={{ width: '100%' }}
+                      value={branch}
+                      onChange={(e) => {
+                        setBranch(e.target.value)
+                        setBranchError(false)
+                      }}
+                    >
+                      <option value="">Sin sucursal</option>
+                      {sucursales.map((s) => (
+                        <option key={s.id} value={s.name}>{s.name}</option>
+                      ))}
+                    </select>
+                    {branchError && (
+                      <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal</p>
+                    )}
+                  </div>
+                  <div className="ff-wrap" style={{ flex: 1 }}>
+                    <label className="ff-label" htmlFor="department-debit">Departamento</label>
+                    <DepartmentSelect id="department-debit" value={department} onChange={setDepartment} />
+                  </div>
                 </div>
 
                 <div>

@@ -28,6 +28,8 @@ import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
+import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -136,6 +138,8 @@ export default function InvoiceForm() {
   const [trackingModalIndex, setTrackingModalIndex] = useState<number | null>(null)
   const [submitted, setSubmitted] = useState(false)
   const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
+  const [branchError, setBranchError] = useState(false)
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
   const [branchSearch, setBranchSearch] = useState('')
   const [taxesTemplate, setTaxesTemplate] = useState('')
@@ -314,8 +318,13 @@ export default function InvoiceForm() {
       toast.success('Factura creada como borrador')
       navigate(`/facturas/${invoice.id}`)
     },
-    onError: (err: { message?: string }) => {
+    onError: (err: { message?: string; code?: string }) => {
       const msg = err?.message ?? ''
+      if (isApiErrorCode(err, ERROR_CODES.BRANCH_REQUIRED)) {
+        setBranchError(true)
+        toast.error(msg || 'Selecciona una sucursal')
+        return
+      }
       if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) { setPinModalOpen(true); return }
       if (msg.toLowerCase().includes('no tienes acceso a la sucursal')) {
         refetchMyBranches()
@@ -559,6 +568,7 @@ export default function InvoiceForm() {
       postingDate,
       dueDate,
       branch: branch || undefined,
+      department: department || undefined,
       ncfType,
       items: itemsDto,
       notes: notes || undefined,
@@ -678,14 +688,20 @@ export default function InvoiceForm() {
                   id="branch"
                   value={branch}
                   selectedLabel={branch}
-                  error={!branch}
-                  onChange={(val) => setBranch(val)}
+                  error={!branch || branchError}
+                  onChange={(val) => { setBranch(val); setBranchError(false) }}
                   options={branchSelectOptions}
                   onSearch={setBranchSearch}
                   placeholder="Sin especificar"
                   className="ff-select"
                   disabled={branchOptions.length === 1}
                 />
+                {branchError && <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal para continuar</p>}
+              </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="department">Departamento</label>
+                <DepartmentSelect id="department" value={department} onChange={setDepartment} />
               </div>
 
               <div className="ff-wrap">
@@ -946,7 +962,7 @@ export default function InvoiceForm() {
             discountPct: i.discountPct || undefined, uom: i.uom || undefined, warehouse: i.warehouse || undefined,
             componentTracking: i.componentTracking,
           }))
-          createMutation.mutate({ customer: customerId, postingDate, dueDate, branch: branch || undefined, ncfType, items: itemsDto, notes: notes || undefined, taxesTemplate: taxesTemplate || undefined })
+          createMutation.mutate({ customer: customerId, postingDate, dueDate, branch: branch || undefined, department: department || undefined, ncfType, items: itemsDto, notes: notes || undefined, taxesTemplate: taxesTemplate || undefined })
         }}
         title="Autorización requerida"
         description="El descuento supera tu límite. Ingresa el PIN de un administrador."

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { listInventory, listWarehouses } from '@/shared/api/inventory'
+import { listSucursales } from '@/shared/api/sucursales'
 import { formatDOP, formatNumber } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { DollarSign, TrendingUp, Package } from 'lucide-react'
@@ -11,6 +12,7 @@ import { useAuthStore } from '@/stores/auth.store'
 export default function StockPage() {
   const authUser = useAuthStore((s) => s.user)
   const [warehouse, setWarehouse] = useState<string>('all')
+  const [branch, setBranch] = useState('')
   const [category, setCategory] = useState('')
   const [brand, setBrand] = useState('')
   const [stockFilter, setStockFilter] = useState<string>('all')
@@ -21,11 +23,17 @@ export default function StockPage() {
     queryFn: listWarehouses,
   })
 
+  const { data: sucursales } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+  })
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['inventory', { warehouse, stockFilter, orderBy }],
+    queryKey: ['inventory', { warehouse, branch, stockFilter, orderBy }],
     queryFn: () =>
       listInventory({
         warehouse: warehouse !== 'all' ? warehouse : undefined,
+        branch: warehouse === 'all' ? (branch || undefined) : undefined,
         limit: 100,
         orderBy: orderBy || undefined,
       }),
@@ -110,12 +118,20 @@ export default function StockPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <select className="filter-select" value={warehouse} onChange={(e) => setWarehouse(e.target.value)}>
+          <select className="filter-select" value={warehouse} onChange={(e) => { setWarehouse(e.target.value); if (e.target.value !== 'all') setBranch('') }}>
             <option value="all">Todos los almacenes</option>
             {warehouses?.map((w) => (
               <option key={w.name} value={w.name}>{w.name}</option>
             ))}
           </select>
+          {warehouse === 'all' && (
+            <select className="filter-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
+              <option value="">Todas las sucursales</option>
+              {sucursales?.items.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          )}
           <input
             className="ff-input ff-input-sm"
             placeholder="Categoría / nombre"

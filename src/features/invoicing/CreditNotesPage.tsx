@@ -12,6 +12,8 @@ import {
 import { listInvoices, getInvoice } from '@/shared/api/invoices'
 import { listMetodosPago } from '@/shared/api/config'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
+import { listSucursales } from '@/shared/api/sucursales'
+import { listDepartamentos } from '@/shared/api/departamentos'
 import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo } from '@/shared/api/types'
 import { Plus, Loader2, Wallet, ArrowRightLeft, ChevronDown, ChevronRight } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -86,6 +88,18 @@ export default function CreditNotesPage() {
   const [customerId, setCustomerId] = useState(searchParams.get('customer') ?? '')
   const [customerLabel, setCustomerLabel] = useState('')
   const [customerQuery, setCustomerQuery] = useState('')
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
+
+  const { data: sucursales } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+  })
+
+  const { data: departamentos } = useQuery({
+    queryKey: ['departamentos-all'],
+    queryFn: () => listDepartamentos({ limit: 100 }),
+  })
 
   const { data: preselectedCustomer } = useQuery({
     queryKey: ['customer', customerId],
@@ -126,8 +140,13 @@ export default function CreditNotesPage() {
   const [applyAmount, setApplyAmount] = useState(0)
 
   const { data: notesData, isLoading } = useQuery({
-    queryKey: ['credit-notes', orderBy, customerId],
-    queryFn: () => listCreditNotes({ orderBy: orderBy || undefined, customer: customerId || undefined }),
+    queryKey: ['credit-notes', orderBy, customerId, branch, department],
+    queryFn: () => listCreditNotes({
+      orderBy: orderBy || undefined,
+      customer: customerId || undefined,
+      branch: branch || undefined,
+      department: department || undefined,
+    }),
   })
 
   const { data: metodos } = useQuery({
@@ -377,6 +396,18 @@ export default function CreditNotesPage() {
               placeholder="Filtrar por cliente…"
             />
           </div>
+          <select className="filter-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
+            <option value="">Todas las sucursales</option>
+            {sucursales?.items.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+          <select className="filter-select" value={department} onChange={(e) => setDepartment(e.target.value)}>
+            <option value="">Todos los departamentos</option>
+            {departamentos?.items.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
         </div>
       </div>
 

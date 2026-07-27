@@ -29,6 +29,14 @@ import type {
   Denominacion,
   CreateDenominacionDto,
   UpdateDenominacionDto,
+  AccountsSettings,
+  UpdateAccountsSettingsDto,
+  StockSettings,
+  UpdateStockSettingsDto,
+  SellingSettings,
+  UpdateSellingSettingsDto,
+  BuyingSettings,
+  UpdateBuyingSettingsDto,
 } from './types'
 
 export async function getEmpresa() {
@@ -311,4 +319,46 @@ export async function updateItemTaxTemplate(id: string, data: Partial<CreateItem
 
 export async function deleteItemTaxTemplate(id: string): Promise<void> {
   await client.delete(ENDPOINTS.config.itemTaxTemplatesById(id))
+}
+
+// ─── Ajustes avanzados (Settings singletons) ──────────────────────────────────
+
+export async function getAccountsSettings() {
+  const res = await client.get<{ success: true; data: AccountsSettings }>(ENDPOINTS.settings.accounts)
+  return unwrap(res)
+}
+
+export async function updateAccountsSettings(data: UpdateAccountsSettingsDto) {
+  const res = await client.put<{ success: true; data: AccountsSettings }>(ENDPOINTS.settings.accounts, data)
+  return unwrap(res)
+}
+
+export async function getStockSettings() {
+  const res = await client.get<{ success: true; data: StockSettings }>(ENDPOINTS.settings.stock)
+  return unwrap(res)
+}
+
+export async function updateStockSettings(data: UpdateStockSettingsDto) {
+  const res = await client.put<{ success: true; data: StockSettings }>(ENDPOINTS.settings.stock, data)
+  return unwrap(res)
+}
+
+export async function getSellingSettings() {
+  const res = await client.get<{ success: true; data: SellingSettings }>(ENDPOINTS.settings.selling)
+  return unwrap(res)
+}
+
+export async function updateSellingSettings(data: UpdateSellingSettingsDto) {
+  const res = await client.put<{ success: true; data: SellingSettings }>(ENDPOINTS.settings.selling, data)
+  return unwrap(res)
+}
+
+export async function getBuyingSettings() {
+  const res = await client.get<{ success: true; data: BuyingSettings }>(ENDPOINTS.settings.buying)
+  return unwrap(res)
+}
+
+export async function updateBuyingSettings(data: UpdateBuyingSettingsDto) {
+  const res = await client.put<{ success: true; data: BuyingSettings }>(ENDPOINTS.settings.buying, data)
+  return unwrap(res)
 }

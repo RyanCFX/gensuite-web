@@ -67,6 +67,12 @@ const PedidoForm        = lazy(() => import('@/features/pedidos/PedidoForm'))
 const TransferenciasPage = lazy(() => import('@/features/transferencias/TransferenciasPage'))
 const TransferenciaForm  = lazy(() => import('@/features/transferencias/TransferenciaForm'))
 const TransferenciaDetail = lazy(() => import('@/features/transferencias/TransferenciaDetail'))
+const CentrosCostoPage    = lazy(() => import('@/features/config/CentrosCostoPage'))
+const DepartamentosPage   = lazy(() => import('@/features/config/DepartamentosPage'))
+const RetencionesPage     = lazy(() => import('@/features/config/RetencionesPage'))
+const AjustesAvanzadosPage = lazy(() => import('@/features/config/AjustesAvanzadosPage'))
+const CostosImportacionPage = lazy(() => import('@/features/compras/CostosImportacionPage'))
+const CostoImportacionDetail = lazy(() => import('@/features/compras/CostoImportacionDetail'))
 
 function PageLoader() {
   return (
@@ -147,6 +153,10 @@ export default function App() {
             <Route path="/compras/:id/editar" element={<Suspense fallback={<PageLoader />}><CompraForm /></Suspense>} />
             <Route path="/compras/:id" element={<Suspense fallback={<PageLoader />}><CompraDetail /></Suspense>} />
 
+            {/* Costos de Importación (Landed Cost) */}
+            <Route path="/compras/costos-importacion" element={<Suspense fallback={<PageLoader />}><CostosImportacionPage /></Suspense>} />
+            <Route path="/compras/costos-importacion/:id" element={<Suspense fallback={<PageLoader />}><CostoImportacionDetail /></Suspense>} />
+
             {/* Gastos */}
             <Route path="/gastos" element={<Suspense fallback={<PageLoader />}><GastosPage /></Suspense>} />
             <Route path="/gastos/nuevo" element={<Suspense fallback={<PageLoader />}><GastoForm /></Suspense>} />
@@ -198,6 +208,10 @@ export default function App() {
             {/* /config/ncf and /config/sucursales must be before /config/:seccion to avoid being caught as seccion */}
             <Route path="/config/ncf" element={<Suspense fallback={<PageLoader />}><NcfPage /></Suspense>} />
             <Route path="/config/sucursales" element={<Suspense fallback={<PageLoader />}><SucursalesPage /></Suspense>} />
+            <Route path="/config/centros-costo" element={<Suspense fallback={<PageLoader />}><CentrosCostoPage /></Suspense>} />
+            <Route path="/config/departamentos" element={<Suspense fallback={<PageLoader />}><DepartamentosPage /></Suspense>} />
+            <Route path="/config/retenciones" element={<Suspense fallback={<PageLoader />}><RetencionesPage /></Suspense>} />
+            <Route path="/config/ajustes-avanzados" element={<Suspense fallback={<PageLoader />}><AjustesAvanzadosPage /></Suspense>} />
             <Route path="/config/:seccion" element={<Suspense fallback={<PageLoader />}><ConfigPage /></Suspense>} />
             <Route path="/config" element={<Navigate to="/config/empresa" replace />} />
 

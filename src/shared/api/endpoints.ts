@@ -239,4 +239,30 @@ export const ENDPOINTS = {
   cuentasMovimientos: {
     byId: (id: string) => `/cuentas/${encodeURIComponent(id)}/movimientos`,
   },
+  centrosCosto: {
+    list: '/centros-costo',
+    tree: '/centros-costo/tree',
+    byId: (id: string) => `/centros-costo/${encodeURIComponent(id)}`,
+  },
+  departamentos: {
+    list: '/departamentos',
+    tree: '/departamentos/tree',
+    byId: (id: string) => `/departamentos/${encodeURIComponent(id)}`,
+  },
+  retenciones: {
+    list: '/config/retenciones',
+    byId: (id: string) => `/config/retenciones/${encodeURIComponent(id)}`,
+  },
+  costosImportacion: {
+    list: '/compras/costos-importacion',
+    byId: (id: string) => `/compras/costos-importacion/${encodeURIComponent(id)}`,
+    submit: (id: string) => `/compras/costos-importacion/${encodeURIComponent(id)}/submit`,
+    cancel: (id: string) => `/compras/costos-importacion/${encodeURIComponent(id)}/cancel`,
+  },
+  settings: {
+    accounts: '/config/accounts-settings',
+    stock: '/config/stock-settings',
+    selling: '/config/selling-settings',
+    buying: '/config/buying-settings',
+  },
 } as const

@@ -351,6 +351,11 @@ button {
   pointer-events: all;
 }
 
+.dd-logo {
+    width: 110px;
+    object-fit: contain;
+}
+
 .dd-header {
   padding: 12px 14px 10px;
   border-bottom: 1px solid var(--border-default);
@@ -1872,6 +1877,16 @@ button {
 .form-input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(255,69,56,0.12); }
 .form-input::placeholder { color: var(--text-tertiary); }
 .form-input--error { border-color: var(--error-border); }
+
+.form-input-wrap { position: relative; }
+.form-input-wrap .form-input { padding-right: 38px; }
+.form-input-toggle {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0; border: none; background: transparent;
+  color: var(--text-tertiary); cursor: pointer; border-radius: var(--radius-sm);
+}
+.form-input-toggle:hover { color: var(--text-secondary); background: var(--surface-sunken); }
 
 /* ─── RESPONSIVE ─── */
 @media (max-width: 1024px) {

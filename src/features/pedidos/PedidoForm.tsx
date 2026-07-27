@@ -21,10 +21,11 @@ import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { listItems, getDefaultPriceTier } from '@/shared/api/catalog'
-import { client } from '@/shared/api/client'
+import { client, isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
+import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -96,6 +97,8 @@ export default function PedidoForm() {
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [isLayaway, setIsLayaway] = useState(false)
   const [branch, setBranch] = useState('')
+  const [branchError, setBranchError] = useState(false)
+  const [department, setDepartment] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
 
   const { data: layawayConfig } = useQuery({
@@ -188,6 +191,7 @@ export default function PedidoForm() {
     })))
     setNotes(existing.notes ?? '')
     setBranch(existing.branch ?? '')
+    setDepartment((existing as any).department ?? '')
     setLoaded(true)
   }, [existing])
 
@@ -274,6 +278,11 @@ export default function PedidoForm() {
   function handleError(err: unknown) {
     const msg = (err as any)?.message ?? ''
     setSubmitError(msg)
+    if (isApiErrorCode(err, ERROR_CODES.BRANCH_REQUIRED)) {
+      setBranchError(true)
+      toast.error(msg || 'Selecciona una sucursal')
+      return
+    }
     if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) {
       setPinModalOpen(true)
       return
@@ -421,8 +430,8 @@ export default function PedidoForm() {
       discountPct: i.discountPct || undefined,
       warehouse: i.warehouse || undefined,
     }))
-    if (isEdit) updateMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, branch: branch || undefined, items: itemsDto, quotation: quotationId || undefined })
-    else createMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, branch: branch || undefined, items: itemsDto, quotation: quotationId || undefined, isLayaway: isLayaway || undefined })
+    if (isEdit) updateMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, branch: branch || undefined, department: department || undefined, items: itemsDto, quotation: quotationId || undefined })
+    else createMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, branch: branch || undefined, department: department || undefined, items: itemsDto, quotation: quotationId || undefined, isLayaway: isLayaway || undefined })
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -505,12 +514,16 @@ export default function PedidoForm() {
               </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Sucursal</label>
-                <select className={`ff-select${!branch ? ' ff-input-error' : ''}`} value={branch} onChange={(e) => setBranch(e.target.value)}>
+                <select className={`ff-select${!branch || branchError ? ' ff-input-error' : ''}`} value={branch} onChange={(e) => { setBranch(e.target.value); setBranchError(false) }}>
                   <option value="">Sin especificar</option>
                   {branchOptions.map((b) => (
                     <option key={b} value={b}>{b}</option>
                   ))}
                 </select>
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Departamento</label>
+                <DepartmentSelect value={department} onChange={setDepartment} placeholder="Buscar departamento…" />
               </div>
             </div>
 

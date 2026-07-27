@@ -27,6 +27,16 @@ const ACCOUNT_TYPES = [
 
 const CURRENCIES = ['DOP', 'USD', 'EUR'] as const
 
+const ROOT_TYPES = ['Asset', 'Liability', 'Equity', 'Income', 'Expense'] as const
+
+const ROOT_TYPE_LABELS: Record<(typeof ROOT_TYPES)[number], string> = {
+  Asset: 'Activo',
+  Liability: 'Pasivo',
+  Equity: 'Patrimonio',
+  Income: 'Ingreso',
+  Expense: 'Gasto',
+}
+
 interface FormState {
   accountName: string
   accountNumber: string
@@ -35,6 +45,8 @@ interface FormState {
   currency: string
   isGroup: boolean
   disabled: boolean
+  isRootAccount: boolean
+  rootType: string
 }
 
 const EMPTY_FORM: FormState = {
@@ -45,6 +57,8 @@ const EMPTY_FORM: FormState = {
   currency: 'DOP',
   isGroup: false,
   disabled: false,
+  isRootAccount: false,
+  rootType: '',
 }
 
 export default function CuentaForm() {
@@ -109,7 +123,13 @@ export default function CuentaForm() {
   function validate(): boolean {
     const newErrors: Partial<Record<keyof FormState, string>> = {}
     if (!form.accountName.trim()) newErrors.accountName = 'El nombre es requerido'
-    if (!isEdit && !form.parentAccount) newErrors.parentAccount = 'La cuenta padre es requerida'
+    if (!isEdit) {
+      if (form.isRootAccount) {
+        if (!form.rootType) newErrors.rootType = 'El tipo raíz es requerido'
+      } else if (!form.parentAccount) {
+        newErrors.parentAccount = 'La cuenta padre es requerida'
+      }
+    }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -131,14 +151,23 @@ export default function CuentaForm() {
       }
       updateMutation.mutate(payload)
     } else {
-      const payload: CreateCuentaDto = {
-        accountName: form.accountName,
-        parentAccount: form.parentAccount,
-        accountNumber: form.accountNumber || undefined,
-        accountType: form.accountType || undefined,
-        currency: form.currency,
-        isGroup: form.isGroup,
-      }
+      const payload: CreateCuentaDto = form.isRootAccount
+        ? {
+            accountName: form.accountName,
+            rootType: form.rootType as CreateCuentaDto['rootType'],
+            accountNumber: form.accountNumber || undefined,
+            accountType: form.accountType || undefined,
+            currency: form.currency,
+            isGroup: true,
+          }
+        : {
+            accountName: form.accountName,
+            parentAccount: form.parentAccount,
+            accountNumber: form.accountNumber || undefined,
+            accountType: form.accountType || undefined,
+            currency: form.currency,
+            isGroup: form.isGroup,
+          }
       createMutation.mutate(payload)
     }
   }
@@ -216,22 +245,57 @@ export default function CuentaForm() {
               />
             </div>
 
-            {/* Cuenta Padre */}
-            <div className="ff-wrap">
-              <label className="ff-label" htmlFor="parentAccount">
-                Cuenta Padre {!isEdit && <span className="ff-required">*</span>}
+            {/* Crear cuenta raíz — solo al crear */}
+            {!isEdit && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={form.isRootAccount}
+                  onChange={(e) => setField('isRootAccount', e.target.checked)}
+                />
+                Crear cuenta raíz (sin cuenta padre)
               </label>
-              <AccountSelect
-                id="parentAccount"
-                value={form.parentAccount}
-                onChange={(val) => setField('parentAccount', val)}
-                ledgerOnly={false}
-                placeholder="Seleccionar cuenta padre…"
-                error={Boolean(errors.parentAccount)}
-                disabled={hasMovements}
-              />
-              {errors.parentAccount && <p className="ff-error">{errors.parentAccount}</p>}
-            </div>
+            )}
+
+            {/* Cuenta Padre */}
+            {!form.isRootAccount && (
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="parentAccount">
+                  Cuenta Padre {!isEdit && <span className="ff-required">*</span>}
+                </label>
+                <AccountSelect
+                  id="parentAccount"
+                  value={form.parentAccount}
+                  onChange={(val) => setField('parentAccount', val)}
+                  ledgerOnly={false}
+                  placeholder="Seleccionar cuenta padre…"
+                  error={Boolean(errors.parentAccount)}
+                  disabled={hasMovements}
+                />
+                {errors.parentAccount && <p className="ff-error">{errors.parentAccount}</p>}
+              </div>
+            )}
+
+            {/* Tipo Raíz — solo al crear cuenta raíz */}
+            {!isEdit && form.isRootAccount && (
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="rootType">
+                  Tipo Raíz <span className="ff-required">*</span>
+                </label>
+                <select
+                  id="rootType"
+                  className={`ff-select${errors.rootType ? ' ff-input-error' : ''}`}
+                  value={form.rootType}
+                  onChange={(e) => setField('rootType', e.target.value)}
+                >
+                  <option value="">— Seleccionar —</option>
+                  {ROOT_TYPES.map((rt) => (
+                    <option key={rt} value={rt}>{ROOT_TYPE_LABELS[rt]}</option>
+                  ))}
+                </select>
+                {errors.rootType && <p className="ff-error">{errors.rootType}</p>}
+              </div>
+            )}
 
             {/* Tipo de Cuenta */}
             <div className="ff-wrap">
@@ -270,8 +334,8 @@ export default function CuentaForm() {
               </select>
             </div>
 
-            {/* Es cuenta grupo — only on create */}
-            {!isEdit && (
+            {/* Es cuenta grupo — only on create, no aplica si es cuenta raíz (siempre es grupo) */}
+            {!isEdit && !form.isRootAccount && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
                 <input
                   type="checkbox"

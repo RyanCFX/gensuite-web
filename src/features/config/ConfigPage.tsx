@@ -126,6 +126,7 @@ function AlmacenesSection() {
   const [newName, setNewName] = useState('')
   const [newBranch, setNewBranch] = useState('')
   const [newWarehouseType, setNewWarehouseType] = useState('')
+  const [newAccount, setNewAccount] = useState('')
   const [toDelete, setToDelete] = useState<string | null>(null)
   const [editTarget, setEditTarget] = useState<{ name: string; branch?: string | null; warehouseType?: string } | null>(null)
   const [editWarehouseAccount, setEditWarehouseAccount] = useState('')
@@ -145,8 +146,8 @@ function AlmacenesSection() {
   const sucursales = sucursalesData?.items ?? []
 
   const createMutation = useMutation({
-    mutationFn: () => createAlmacen({ warehouseName: newName, branch: newBranch || undefined, warehouseType: newWarehouseType || undefined }),
-    onSuccess: () => { toast.success('Almacén creado'); queryClient.invalidateQueries({ queryKey: ['almacenes'] }); setShowNew(false); setNewName(''); setNewBranch(''); setNewWarehouseType('') },
+    mutationFn: () => createAlmacen({ warehouseName: newName, branch: newBranch || undefined, warehouseType: newWarehouseType || undefined, account: newAccount || undefined }),
+    onSuccess: () => { toast.success('Almacén creado'); queryClient.invalidateQueries({ queryKey: ['almacenes'] }); setShowNew(false); setNewName(''); setNewBranch(''); setNewWarehouseType(''); setNewAccount('') },
     onError: () => toast.error('Error al crear el almacén'),
   })
 
@@ -198,6 +199,7 @@ function AlmacenesSection() {
                       <th>Nombre</th>
                       <th>Sucursal</th>
                       <th>Tipo</th>
+                      <th>Cuenta</th>
                       <th>Estado</th>
                       <th style={{ width: 80 }} />
                     </tr>
@@ -208,6 +210,7 @@ function AlmacenesSection() {
                         <td style={{ fontWeight: 500 }}>{a.name}</td>
                         <td className="td-muted">{a.branch ?? '—'}</td>
                         <td className="td-muted">{a.warehouseType === 'Transit' ? <span className="badge badge-neutral">Tránsito</span> : (a.warehouseType ?? '—')}</td>
+                        <td className="td-muted">{a.account ?? '—'}</td>
                         <td>
                           {a.disabled
                             ? <span className="badge badge-error">Inactivo</span>
@@ -266,6 +269,15 @@ function AlmacenesSection() {
                   <option value="Transit">Tránsito</option>
                 </select>
                 <p className="ff-hint">"Tránsito" se usa como punto intermedio en transferencias entre almacenes.</p>
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Cuenta de Inventario</label>
+                <AccountSelect
+                  value={newAccount}
+                  onChange={setNewAccount}
+                  placeholder="Buscar cuenta de inventario…"
+                  rootType="Asset"
+                />
               </div>
             </div>
             <div className="modal-foot">

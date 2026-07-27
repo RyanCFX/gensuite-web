@@ -6,10 +6,67 @@ import {
   getBalanceGeneral, getIngresosEgresos, getReporteVentas,
   getInventarioValoracion, getInventarioMovimientos,
   getCxcAging, getCajaCuadre,
+  getLibroDiario, getLibroMayor,
 } from '@/shared/api/reportes'
+import type { LibroDiarioByDimension } from '@/shared/api/types'
+import { listSucursales } from '@/shared/api/sucursales'
+import { listDepartamentos } from '@/shared/api/departamentos'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { BarChart3, AlertCircle, Download, FileText } from 'lucide-react'
+
+// ─── Branch / Department filter ──────────────────────────────────────────────
+
+function useBranchOptions() {
+  const { data } = useQuery({
+    queryKey: ['reportes-sucursales-options'],
+    queryFn: () => listSucursales({ limit: 100 }),
+    staleTime: 60_000,
+  })
+  return data?.items ?? []
+}
+
+function useDepartmentOptions() {
+  const { data } = useQuery({
+    queryKey: ['reportes-departamentos-options'],
+    queryFn: () => listDepartamentos({ limit: 100 }),
+    staleTime: 60_000,
+  })
+  return data?.items ?? []
+}
+
+/** Selectores opcionales de Sucursal / Departamento para reportes con rango de fechas. */
+function BranchDepartmentFilters({
+  branch,
+  onBranchChange,
+  department,
+  onDepartmentChange,
+}: {
+  branch: string
+  onBranchChange: (v: string) => void
+  department: string
+  onDepartmentChange: (v: string) => void
+}) {
+  const branches = useBranchOptions()
+  const departments = useDepartmentOptions()
+
+  return (
+    <>
+      <select className="filter-select" value={branch} onChange={(e) => onBranchChange(e.target.value)}>
+        <option value="">Todas las sucursales</option>
+        {branches.map((b) => (
+          <option key={b.id} value={b.name}>{b.name}</option>
+        ))}
+      </select>
+      <select className="filter-select" value={department} onChange={(e) => onDepartmentChange(e.target.value)}>
+        <option value="">Todos los departamentos</option>
+        {departments.map((d) => (
+          <option key={d.id} value={d.name}>{d.name}</option>
+        ))}
+      </select>
+    </>
+  )
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -24,6 +81,8 @@ const REPORT_META: Record<string, { label: string; description: string }> = {
   movimientos:  { label: 'Movimientos de Stock', description: 'Historial de entradas y salidas' },
   cxcaging:    { label: 'Aging CxC',            description: 'Antigüedad de cuentas por cobrar' },
   caja:         { label: 'Cuadre de Caja',       description: 'Resumen de movimientos de caja' },
+  libroDiario:  { label: 'Libro Diario',         description: 'Movimientos contables (GL) del período' },
+  libroMayor:   { label: 'Libro Mayor',          description: 'Movimientos por cuenta con saldo inicial y final' },
 }
 
 function thisYear() { return new Date().getFullYear() }
@@ -158,11 +217,13 @@ function extractRows(data: unknown): { rows: Record<string, unknown>[]; columns?
 function DgiiReport({ tipo }: { tipo: '606' | '607' | '608' }) {
   const [year, setYear] = useState(thisYear())
   const [month, setMonth] = useState(thisMonth())
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
   const fn = tipo === '606' ? getReporte606 : tipo === '607' ? getReporte607 : getReporte608
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['reporte-dgii', tipo, year, month],
-    queryFn: () => fn({ year, month }),
+    queryKey: ['reporte-dgii', tipo, year, month, branch, department],
+    queryFn: () => fn({ year, month, branch: branch || undefined, department: department || undefined }),
     retry: false,
   })
 
@@ -186,6 +247,10 @@ function DgiiReport({ tipo }: { tipo: '606' | '607' | '608' }) {
               ))}
             </select>
           </label>
+          <BranchDepartmentFilters
+            branch={branch} onBranchChange={setBranch}
+            department={department} onDepartmentChange={setDepartment}
+          />
         </div>
         <div className="filter-bar-right">
           <button className="btn btn-secondary btn-size-sm">
@@ -212,11 +277,13 @@ function FinancialReport({ tipo }: { tipo: 'balance' | 'pl' }) {
   const [fromDate, setFromDate] = useState(monthStart())
   const [toDate, setToDate] = useState(today())
   const [periodicity, setPeriodicity] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly')
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
   const fn = tipo === 'balance' ? getBalanceGeneral : getIngresosEgresos
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['reporte-financial', tipo, fromDate, toDate, periodicity],
-    queryFn: () => fn({ fromDate, toDate, periodicity }),
+    queryKey: ['reporte-financial', tipo, fromDate, toDate, periodicity, branch, department],
+    queryFn: () => fn({ fromDate, toDate, periodicity, branch: branch || undefined, department: department || undefined }),
     retry: false,
   })
 
@@ -233,6 +300,10 @@ function FinancialReport({ tipo }: { tipo: 'balance' | 'pl' }) {
             <option value="quarterly">Trimestral</option>
             <option value="yearly">Anual</option>
           </select>
+          <BranchDepartmentFilters
+            branch={branch} onBranchChange={setBranch}
+            department={department} onDepartmentChange={setDepartment}
+          />
         </div>
       </div>
       <div className="card">
@@ -257,10 +328,12 @@ function VentasReport() {
   const [fromDate, setFromDate] = useState(monthStart())
   const [toDate, setToDate] = useState(today())
   const [groupBy, setGroupBy] = useState<'day' | 'week' | 'month'>('month')
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['reporte-ventas', fromDate, toDate, groupBy],
-    queryFn: () => getReporteVentas({ fromDate, toDate, groupBy }),
+    queryKey: ['reporte-ventas', fromDate, toDate, groupBy, branch, department],
+    queryFn: () => getReporteVentas({ fromDate, toDate, groupBy, branch: branch || undefined, department: department || undefined }),
     retry: false,
   })
 
@@ -275,6 +348,10 @@ function VentasReport() {
             <option value="week">Por semana</option>
             <option value="month">Por mes</option>
           </select>
+          <BranchDepartmentFilters
+            branch={branch} onBranchChange={setBranch}
+            department={department} onDepartmentChange={setDepartment}
+          />
         </div>
       </div>
       <div className="card">
@@ -289,11 +366,13 @@ function VentasReport() {
 function InventarioReport({ tipo }: { tipo: 'stock' | 'movimientos' }) {
   const [fromDate, setFromDate] = useState(monthStart())
   const [toDate, setToDate] = useState(today())
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
   const fn = tipo === 'stock' ? getInventarioValoracion : getInventarioMovimientos
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['reporte-inventario', tipo, fromDate, toDate],
-    queryFn: () => fn({ fromDate, toDate }),
+    queryKey: ['reporte-inventario', tipo, fromDate, toDate, branch, department],
+    queryFn: () => fn({ fromDate, toDate, branch: branch || undefined, department: department || undefined }),
     retry: false,
   })
 
@@ -305,6 +384,10 @@ function InventarioReport({ tipo }: { tipo: 'stock' | 'movimientos' }) {
         <div className="filter-bar-left">
           <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
           <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          <BranchDepartmentFilters
+            branch={branch} onBranchChange={setBranch}
+            department={department} onDepartmentChange={setDepartment}
+          />
         </div>
       </div>
       <div className="card">
@@ -351,9 +434,11 @@ type CajaCuadreData = {
 
 function CajaCuadreReport() {
   const [date, setDate] = useState(today())
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
   const { data, isLoading, error } = useQuery({
-    queryKey: ['reporte-caja', date],
-    queryFn: () => getCajaCuadre({ date }),
+    queryKey: ['reporte-caja', date, branch, department],
+    queryFn: () => getCajaCuadre({ date, branch: branch || undefined, department: department || undefined }),
     retry: false,
   })
 
@@ -367,6 +452,10 @@ function CajaCuadreReport() {
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
             Fecha: <input type="date" className="filter-select" value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
+          <BranchDepartmentFilters
+            branch={branch} onBranchChange={setBranch}
+            department={department} onDepartmentChange={setDepartment}
+          />
         </div>
       </div>
 
@@ -439,6 +528,123 @@ function CajaCuadreReport() {
   )
 }
 
+function ByDimensionTable({ rows }: { rows: LibroDiarioByDimension[] }) {
+  return (
+    <div className="table-scroll">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Dimensión</th>
+            <th style={{ textAlign: 'right' }}>Total Débito</th>
+            <th style={{ textAlign: 'right' }}>Total Crédito</th>
+            <th style={{ textAlign: 'right' }}>Cantidad</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <td>{r.key}</td>
+              <td style={{ textAlign: 'right' }}>{formatDOP(r.totalDebit)}</td>
+              <td style={{ textAlign: 'right' }}>{formatDOP(r.totalCredit)}</td>
+              <td style={{ textAlign: 'right' }}>{r.count}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function LibroDiarioReport() {
+  const [fromDate, setFromDate] = useState(monthStart())
+  const [toDate, setToDate] = useState(today())
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
+  const [groupBy, setGroupBy] = useState<
+    'Group by Voucher' | 'Group by Voucher (Consolidated)' | 'Group by Account' | 'Group by Sucursal' | 'Group by Departamento'
+  >('Group by Voucher (Consolidated)')
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reporte-libro-diario', fromDate, toDate, branch, department, groupBy],
+    queryFn: () => getLibroDiario({ fromDate, toDate, branch: branch || undefined, department: department || undefined, groupBy }),
+    retry: false,
+  })
+
+  const { rows, columns } = extractRows(data)
+  const byDimension = (data as { data?: { byDimension?: LibroDiarioByDimension[] } } | undefined)?.data?.byDimension
+    ?? (data as { byDimension?: LibroDiarioByDimension[] } | undefined)?.byDimension
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          <select className="filter-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value as typeof groupBy)}>
+            <option value="Group by Voucher">Agrupar por Voucher</option>
+            <option value="Group by Voucher (Consolidated)">Agrupar por Voucher (Consolidado)</option>
+            <option value="Group by Account">Agrupar por Cuenta</option>
+            <option value="Group by Sucursal">Agrupar por Sucursal</option>
+            <option value="Group by Departamento">Agrupar por Departamento</option>
+          </select>
+          <BranchDepartmentFilters
+            branch={branch} onBranchChange={setBranch}
+            department={department} onDepartmentChange={setDepartment}
+          />
+        </div>
+      </div>
+
+      {byDimension && byDimension.length > 0 && (
+        <div className="card">
+          <div style={{ padding: '14px 16px 10px', fontWeight: 600, fontSize: 13, borderBottom: '1px solid var(--border-default)' }}>
+            Resumen por {groupBy === 'Group by Sucursal' ? 'Sucursal' : 'Departamento'}
+          </div>
+          <ByDimensionTable rows={byDimension} />
+        </div>
+      )}
+
+      <div className="card">
+        {isLoading && <LoadingRows />}
+        {error && <ErrorBanner err={error} />}
+        {!isLoading && !error && <ReportTable data={rows} columns={columns} />}
+      </div>
+    </div>
+  )
+}
+
+function LibroMayorReport() {
+  const [fromDate, setFromDate] = useState(monthStart())
+  const [toDate, setToDate] = useState(today())
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reporte-libro-mayor', fromDate, toDate, branch, department],
+    queryFn: () => getLibroMayor({ fromDate, toDate, branch: branch || undefined, department: department || undefined }),
+    retry: false,
+  })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          <BranchDepartmentFilters
+            branch={branch} onBranchChange={setBranch}
+            department={department} onDepartmentChange={setDepartment}
+          />
+        </div>
+      </div>
+      <div className="card">
+        {isLoading && <LoadingRows />}
+        {error && <ErrorBanner err={error} />}
+        {!isLoading && !error && <AutoTable data={data} />}
+      </div>
+    </div>
+  )
+}
+
 // ─── Nav items ────────────────────────────────────────────────────────────────
 
 const REPORT_NAV = [
@@ -452,6 +658,8 @@ const REPORT_NAV = [
   { key: 'movimientos', group: 'Inventario', label: 'Movimientos de Stock' },
   { key: 'cxcaging',   group: 'CxC',        label: 'Aging CxC' },
   { key: 'caja',        group: 'Caja',       label: 'Cuadre de Caja' },
+  { key: 'libroDiario', group: 'Contabilidad', label: 'Libro Diario' },
+  { key: 'libroMayor',  group: 'Contabilidad', label: 'Libro Mayor' },
 ]
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -475,6 +683,8 @@ export default function ReportesPage() {
       case 'movimientos':return <InventarioReport tipo="movimientos" />
       case 'cxcaging':  return <CxcAgingReport />
       case 'caja':       return <CajaCuadreReport />
+      case 'libroDiario': return <LibroDiarioReport />
+      case 'libroMayor':  return <LibroMayorReport />
       default:           return <ServiceUnavailable message="Reporte no encontrado." />
     }
   }

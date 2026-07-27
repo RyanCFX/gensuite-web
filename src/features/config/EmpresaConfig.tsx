@@ -5,6 +5,7 @@ import { getEmpresa, updateEmpresa, getCuentasEmpresa, updateCuentasEmpresa, lis
 import type { Empresa, CuentasEmpresa, AlmacenListItem } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { CostCenterSelect } from '@/components/shared/CostCenterSelect'
 import { REGIMENES_FISCALES } from '@/lib/constants'
 import { Building2, Save } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -71,6 +72,29 @@ export default function EmpresaConfig() {
   const [writeOffAccount, setWriteOffAccount] = useState('')
   const [roundOffAccount, setRoundOffAccount] = useState('')
 
+  // 🆕 Inventario
+  const [defaultCashAccount, setDefaultCashAccount] = useState('')
+  const [defaultInventoryAccount, setDefaultInventoryAccount] = useState('')
+  const [stockReceivedButNotBilled, setStockReceivedButNotBilled] = useState('')
+  const [stockAdjustmentAccount, setStockAdjustmentAccount] = useState('')
+  // 🆕 Diferidos/Cambiario
+  const [defaultDeferredRevenueAccount, setDefaultDeferredRevenueAccount] = useState('')
+  const [defaultDeferredExpenseAccount, setDefaultDeferredExpenseAccount] = useState('')
+  const [exchangeGainLossAccount, setExchangeGainLossAccount] = useState('')
+  const [unrealizedExchangeGainLossAccount, setUnrealizedExchangeGainLossAccount] = useState('')
+  // 🆕 Depreciación
+  const [accumulatedDepreciationAccount, setAccumulatedDepreciationAccount] = useState('')
+  const [depreciationExpenseAccount, setDepreciationExpenseAccount] = useState('')
+  const [disposalAccount, setDisposalAccount] = useState('')
+  // 🆕 Descuentos
+  const [defaultDiscountAccount, setDefaultDiscountAccount] = useState('')
+  // 🆕 Centros de Costo
+  const [costCenter, setCostCenter] = useState('')
+  const [roundOffCostCenter, setRoundOffCostCenter] = useState('')
+  const [depreciationCostCenter, setDepreciationCostCenter] = useState('')
+  // 🆕 Inventario perpetuo
+  const [enablePerpetualInventory, setEnablePerpetualInventory] = useState(false)
+
   useEffect(() => {
     if (cuentasData) {
       setDefaultReceivableAccount(cuentasData.defaultReceivableAccount ?? '')
@@ -80,6 +104,22 @@ export default function EmpresaConfig() {
       setDefaultBankAccount(cuentasData.defaultBankAccount ?? '')
       setWriteOffAccount(cuentasData.writeOffAccount ?? '')
       setRoundOffAccount(cuentasData.roundOffAccount ?? '')
+      setDefaultCashAccount(cuentasData.defaultCashAccount ?? '')
+      setDefaultInventoryAccount(cuentasData.defaultInventoryAccount ?? '')
+      setStockReceivedButNotBilled(cuentasData.stockReceivedButNotBilled ?? '')
+      setStockAdjustmentAccount(cuentasData.stockAdjustmentAccount ?? '')
+      setDefaultDeferredRevenueAccount(cuentasData.defaultDeferredRevenueAccount ?? '')
+      setDefaultDeferredExpenseAccount(cuentasData.defaultDeferredExpenseAccount ?? '')
+      setExchangeGainLossAccount(cuentasData.exchangeGainLossAccount ?? '')
+      setUnrealizedExchangeGainLossAccount(cuentasData.unrealizedExchangeGainLossAccount ?? '')
+      setAccumulatedDepreciationAccount(cuentasData.accumulatedDepreciationAccount ?? '')
+      setDepreciationExpenseAccount(cuentasData.depreciationExpenseAccount ?? '')
+      setDisposalAccount(cuentasData.disposalAccount ?? '')
+      setDefaultDiscountAccount(cuentasData.defaultDiscountAccount ?? '')
+      setCostCenter(cuentasData.costCenter ?? '')
+      setRoundOffCostCenter(cuentasData.roundOffCostCenter ?? '')
+      setDepreciationCostCenter(cuentasData.depreciationCostCenter ?? '')
+      setEnablePerpetualInventory(cuentasData.enablePerpetualInventory ?? false)
     }
   }, [cuentasData])
 
@@ -89,8 +129,24 @@ export default function EmpresaConfig() {
       toast.success('Cuentas por defecto actualizadas')
       queryClient.invalidateQueries({ queryKey: ['cuentas-empresa'] })
     },
-    onError: () => toast.error('Error al guardar las cuentas'),
+    onError: (err: { response?: { status?: number; data?: { message?: string } }; message?: string }) => {
+      if (err?.response?.status === 400 && err.response.data?.message) {
+        toast.error(err.response.data.message)
+      } else {
+        toast.error(err?.message ?? 'Error al guardar las cuentas')
+      }
+    },
   })
+
+  function handleTogglePerpetualInventory(checked: boolean) {
+    if (!checked && enablePerpetualInventory) {
+      const confirmed = window.confirm(
+        'Una vez que existan movimientos de inventario, no será posible desactivar el Inventario Perpetuo. ¿Deseas continuar?'
+      )
+      if (!confirmed) return
+    }
+    setEnablePerpetualInventory(checked)
+  }
 
   function handleSaveCuentas() {
     saveCuentasMutation.mutate({
@@ -101,6 +157,22 @@ export default function EmpresaConfig() {
       defaultBankAccount: defaultBankAccount || undefined,
       writeOffAccount: writeOffAccount || undefined,
       roundOffAccount: roundOffAccount || undefined,
+      defaultCashAccount: defaultCashAccount || undefined,
+      defaultInventoryAccount: defaultInventoryAccount || undefined,
+      stockReceivedButNotBilled: stockReceivedButNotBilled || undefined,
+      stockAdjustmentAccount: stockAdjustmentAccount || undefined,
+      defaultDeferredRevenueAccount: defaultDeferredRevenueAccount || null,
+      defaultDeferredExpenseAccount: defaultDeferredExpenseAccount || null,
+      exchangeGainLossAccount: exchangeGainLossAccount || null,
+      unrealizedExchangeGainLossAccount: unrealizedExchangeGainLossAccount || null,
+      accumulatedDepreciationAccount: accumulatedDepreciationAccount || null,
+      depreciationExpenseAccount: depreciationExpenseAccount || null,
+      disposalAccount: disposalAccount || null,
+      defaultDiscountAccount: defaultDiscountAccount || null,
+      costCenter: costCenter || undefined,
+      roundOffCostCenter: roundOffCostCenter || undefined,
+      depreciationCostCenter: depreciationCostCenter || null,
+      enablePerpetualInventory,
     })
   }
 
@@ -469,6 +541,212 @@ export default function EmpresaConfig() {
                 </div>
               </div>
             </div>
+          )}
+
+          {!cuentasLoading && (
+            <>
+              <div className="card">
+                <div className="card-header">
+                  <span className="card-title">Inventario</span>
+                </div>
+                <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="defaultCashAccount">Caja por Defecto</label>
+                    <AccountSelect
+                      id="defaultCashAccount"
+                      value={defaultCashAccount}
+                      onChange={setDefaultCashAccount}
+                      placeholder="Buscar cuenta…"
+                      ledgerOnly={true}
+                    />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="defaultInventoryAccount">Inventario por Defecto</label>
+                    <AccountSelect
+                      id="defaultInventoryAccount"
+                      value={defaultInventoryAccount}
+                      onChange={setDefaultInventoryAccount}
+                      placeholder="Buscar cuenta…"
+                      ledgerOnly={true}
+                    />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="stockReceivedButNotBilled">Existencias Recibidas No Facturadas</label>
+                    <AccountSelect
+                      id="stockReceivedButNotBilled"
+                      value={stockReceivedButNotBilled}
+                      onChange={setStockReceivedButNotBilled}
+                      placeholder="Buscar cuenta…"
+                      ledgerOnly={true}
+                    />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="stockAdjustmentAccount">Cuenta de Ajuste de Inventario</label>
+                    <AccountSelect
+                      id="stockAdjustmentAccount"
+                      value={stockAdjustmentAccount}
+                      onChange={setStockAdjustmentAccount}
+                      placeholder="Buscar cuenta…"
+                      ledgerOnly={true}
+                    />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="enablePerpetualInventory">
+                      <input
+                        id="enablePerpetualInventory"
+                        type="checkbox"
+                        checked={enablePerpetualInventory}
+                        onChange={(e) => handleTogglePerpetualInventory(e.target.checked)}
+                        style={{ marginRight: 8 }}
+                      />
+                      Habilitar Inventario Perpetuo
+                    </label>
+                    <p className="ff-hint">
+                      Advertencia: una vez que existan movimientos de inventario, no será posible desactivar esta opción.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-header">
+                  <span className="card-title">Diferidos / Cambiario</span>
+                </div>
+                <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="defaultDeferredRevenueAccount">Ingresos Diferidos por Defecto</label>
+                    <AccountSelect
+                      id="defaultDeferredRevenueAccount"
+                      value={defaultDeferredRevenueAccount}
+                      onChange={setDefaultDeferredRevenueAccount}
+                      placeholder="Buscar cuenta…"
+                      ledgerOnly={true}
+                    />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="defaultDeferredExpenseAccount">Gastos Diferidos por Defecto</label>
+                    <AccountSelect
+                      id="defaultDeferredExpenseAccount"
+                      value={defaultDeferredExpenseAccount}
+                      onChange={setDefaultDeferredExpenseAccount}
+                      placeholder="Buscar cuenta…"
+                      ledgerOnly={true}
+                    />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="exchangeGainLossAccount">Ganancia/Pérdida Cambiaria</label>
+                    <AccountSelect
+                      id="exchangeGainLossAccount"
+                      value={exchangeGainLossAccount}
+                      onChange={setExchangeGainLossAccount}
+                      placeholder="Buscar cuenta…"
+                      ledgerOnly={true}
+                    />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="unrealizedExchangeGainLossAccount">Ganancia/Pérdida Cambiaria No Realizada</label>
+                    <AccountSelect
+                      id="unrealizedExchangeGainLossAccount"
+                      value={unrealizedExchangeGainLossAccount}
+                      onChange={setUnrealizedExchangeGainLossAccount}
+                      placeholder="Buscar cuenta…"
+                      ledgerOnly={true}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-header">
+                  <span className="card-title">Depreciación</span>
+                </div>
+                <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="accumulatedDepreciationAccount">Depreciación Acumulada</label>
+                    <AccountSelect
+                      id="accumulatedDepreciationAccount"
+                      value={accumulatedDepreciationAccount}
+                      onChange={setAccumulatedDepreciationAccount}
+                      placeholder="Buscar cuenta…"
+                      ledgerOnly={true}
+                    />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="depreciationExpenseAccount">Gasto de Depreciación</label>
+                    <AccountSelect
+                      id="depreciationExpenseAccount"
+                      value={depreciationExpenseAccount}
+                      onChange={setDepreciationExpenseAccount}
+                      placeholder="Buscar cuenta…"
+                      ledgerOnly={true}
+                    />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="disposalAccount">Cuenta de Baja de Activos</label>
+                    <AccountSelect
+                      id="disposalAccount"
+                      value={disposalAccount}
+                      onChange={setDisposalAccount}
+                      placeholder="Buscar cuenta…"
+                      ledgerOnly={true}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-header">
+                  <span className="card-title">Descuentos</span>
+                </div>
+                <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="defaultDiscountAccount">Cuenta de Descuento por Defecto</label>
+                    <AccountSelect
+                      id="defaultDiscountAccount"
+                      value={defaultDiscountAccount}
+                      onChange={setDefaultDiscountAccount}
+                      placeholder="Buscar cuenta…"
+                      ledgerOnly={true}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-header">
+                  <span className="card-title">Centros de Costo</span>
+                </div>
+                <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="costCenter">Centro de Costo por Defecto</label>
+                    <CostCenterSelect
+                      id="costCenter"
+                      value={costCenter}
+                      onChange={setCostCenter}
+                      placeholder="Buscar centro de costo…"
+                    />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="roundOffCostCenter">Centro de Costo de Redondeos</label>
+                    <CostCenterSelect
+                      id="roundOffCostCenter"
+                      value={roundOffCostCenter}
+                      onChange={setRoundOffCostCenter}
+                      placeholder="Buscar centro de costo…"
+                    />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="depreciationCostCenter">Centro de Costo de Depreciación</label>
+                    <CostCenterSelect
+                      id="depreciationCostCenter"
+                      value={depreciationCostCenter}
+                      onChange={setDepreciationCostCenter}
+                      placeholder="Buscar centro de costo…"
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
           )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

@@ -14,6 +14,7 @@ import type {
 
 export interface InventoryFilterParams extends PaginationParams {
   warehouse?: string
+  branch?: string
   category?: string
   brand?: string
   stockStatus?: 'all' | 'in_stock' | 'low_stock' | 'out_of_stock'
@@ -22,6 +23,7 @@ export interface InventoryFilterParams extends PaginationParams {
 
 export interface HistoryFilterParams extends PaginationParams {
   warehouse?: string
+  branch?: string
   voucherType?: string
   fromDate?: string
   toDate?: string

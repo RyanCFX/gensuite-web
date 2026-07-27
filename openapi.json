@@ -530,6 +530,15 @@
             }
           },
           {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
             "name": "includeItems",
             "required": false,
             "in": "query",
@@ -2734,6 +2743,16 @@
             }
           },
           {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal — se traduce a los almacenes de esa sucursal",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
             "name": "category",
             "required": false,
             "in": "query",
@@ -2907,6 +2926,16 @@
             }
           },
           {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal — se traduce a los almacenes de esa sucursal",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
             "name": "voucherType",
             "required": false,
             "in": "query",
@@ -3007,6 +3036,16 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal — se traduce a los almacenes de esa sucursal",
+            "schema": {
+              "example": "Santo Domingo",
               "type": "string"
             }
           },
@@ -3177,6 +3216,24 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Almacén - JBC",
               "type": "string"
             }
           }
@@ -4093,6 +4150,15 @@
               "example": "Sucursal Norte",
               "type": "string"
             }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4563,6 +4629,24 @@
             "in": "query",
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Sucursal Norte",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
             }
           }
         ],
@@ -7621,6 +7705,453 @@
         ]
       }
     },
+    "/api/v1/config/accounts-settings": {
+      "get": {
+        "operationId": "ConfigController_getAccountsSettings",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accounts Settings (dimensiones contables, ledger inmutable, ageing, etc.)",
+        "tags": [
+          "Configuración"
+        ]
+      },
+      "put": {
+        "operationId": "ConfigController_updateAccountsSettings",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAccountsSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar Accounts Settings",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/stock-settings": {
+      "get": {
+        "operationId": "ConfigController_getStockSettings",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Stock Settings (valuación, almacén por defecto, reservas, etc.)",
+        "tags": [
+          "Configuración"
+        ]
+      },
+      "put": {
+        "operationId": "ConfigController_updateStockSettings",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStockSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar Stock Settings",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/selling-settings": {
+      "get": {
+        "operationId": "ConfigController_getSellingSettings",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Selling Settings",
+        "tags": [
+          "Configuración"
+        ]
+      },
+      "put": {
+        "operationId": "ConfigController_updateSellingSettings",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSellingSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar Selling Settings",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/buying-settings": {
+      "get": {
+        "operationId": "ConfigController_getBuyingSettings",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Buying Settings",
+        "tags": [
+          "Configuración"
+        ]
+      },
+      "put": {
+        "operationId": "ConfigController_updateBuyingSettings",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBuyingSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar Buying Settings",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/retenciones": {
+      "get": {
+        "operationId": "ConfigController_getRetenciones",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar categorías de retención",
+        "tags": [
+          "Configuración"
+        ]
+      },
+      "post": {
+        "operationId": "ConfigController_createRetencion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRetencionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear categoría de retención",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/retenciones/{id}": {
+      "get": {
+        "operationId": "ConfigController_getRetencion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una categoría de retención (tasas y cuentas)",
+        "tags": [
+          "Configuración"
+        ]
+      },
+      "put": {
+        "operationId": "ConfigController_updateRetencion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRetencionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar categoría de retención",
+        "tags": [
+          "Configuración"
+        ]
+      },
+      "delete": {
+        "operationId": "ConfigController_deleteRetencion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar categoría de retención",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
     "/api/v1/quotations": {
       "get": {
         "operationId": "QuotationsController_findAll",
@@ -8171,6 +8702,24 @@
             "in": "query",
             "description": "Filtra por id de cliente",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Ventas - JBC",
               "type": "string"
             }
           }
@@ -8893,6 +9442,24 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Sucursal Norte",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -9038,6 +9605,24 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Sucursal Norte",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Ventas - JBC",
               "type": "string"
             }
           }
@@ -9239,6 +9824,26 @@
             }
           },
           {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
             "name": "groupBy",
             "required": false,
             "in": "query",
@@ -9318,6 +9923,26 @@
             }
           },
           {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
             "name": "periodicity",
             "required": false,
             "in": "query",
@@ -9381,6 +10006,26 @@
             }
           },
           {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
             "name": "periodicity",
             "required": false,
             "in": "query",
@@ -9440,6 +10085,26 @@
             "description": "Default: hoy",
             "schema": {
               "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
               "type": "string"
             }
           },
@@ -9514,6 +10179,26 @@
             "description": "Default: hoy",
             "schema": {
               "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
               "type": "string"
             }
           },
@@ -9603,6 +10288,16 @@
                 "txt"
               ]
             }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "📌 Comodidad — la DGII reporta por RNC de la compañía, no por sucursal. No filtra el 606/607/608 en sí.",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -9664,6 +10359,16 @@
                 "json",
                 "txt"
               ]
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "📌 Comodidad — la DGII reporta por RNC de la compañía, no por sucursal. No filtra el 606/607/608 en sí.",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
             }
           }
         ],
@@ -9727,6 +10432,16 @@
                 "txt"
               ]
             }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "📌 Comodidad — la DGII reporta por RNC de la compañía, no por sucursal. No filtra el 606/607/608 en sí.",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -9763,6 +10478,15 @@
             "in": "query",
             "description": "Fecha del cuadre. Default: hoy",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Santo Domingo",
               "type": "string"
             }
           }
@@ -9846,6 +10570,26 @@
             }
           },
           {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
             "name": "account",
             "required": false,
             "in": "query",
@@ -9906,6 +10650,26 @@
             }
           },
           {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
             "name": "account",
             "required": false,
             "in": "query",
@@ -9961,7 +10725,9 @@
               "enum": [
                 "Group by Voucher",
                 "Group by Voucher (Consolidated)",
-                "Group by Account"
+                "Group by Account",
+                "Group by Sucursal",
+                "Group by Departamento"
               ]
             }
           }
@@ -10243,9 +11009,42 @@
             "name": "accountType",
             "required": false,
             "in": "query",
-            "description": "Tipo de cuenta: Receivable, Payable, Bank, Cash, Income, Expense, Tax, etc.",
+            "description": "Tipo de cuenta — enum real de ERPNext v16 (Account.account_type)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "Accumulated Depreciation",
+                "Asset Received But Not Billed",
+                "Bank",
+                "Cash",
+                "Chargeable",
+                "Capital Work in Progress",
+                "Cost of Goods Sold",
+                "Current Asset",
+                "Current Liability",
+                "Depreciation",
+                "Direct Expense",
+                "Direct Income",
+                "Equity",
+                "Expense Account",
+                "Expenses Included In Asset Valuation",
+                "Expenses Included In Valuation",
+                "Fixed Asset",
+                "Income Account",
+                "Indirect Expense",
+                "Indirect Income",
+                "Liability",
+                "Payable",
+                "Receivable",
+                "Round Off",
+                "Round Off for Opening",
+                "Service Received But Not Billed",
+                "Stock",
+                "Stock Adjustment",
+                "Stock Received But Not Billed",
+                "Tax",
+                "Temporary"
+              ]
             }
           },
           {
@@ -10388,6 +11187,26 @@
             "description": "Default: hoy",
             "schema": {
               "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
               "type": "string"
             }
           },
@@ -10544,6 +11363,26 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar asientos que tengan al menos una línea con esta Sucursal",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar asientos que tengan al menos una línea con este Departamento",
+            "schema": {
+              "example": "Ventas - JBC",
               "type": "string"
             }
           }
@@ -10962,6 +11801,15 @@
             "in": "query",
             "schema": {
               "example": "Sucursal Norte",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Ventas - JBC",
               "type": "string"
             }
           }
@@ -11460,6 +12308,24 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11821,6 +12687,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal del almacén origen",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11984,6 +12860,851 @@
         "summary": "Cancelar la solicitud si aún no fue confirmada (el stock regresa al origen)",
         "tags": [
           "Transferencias"
+        ]
+      }
+    },
+    "/api/v1/caja/pendientes": {
+      "get": {
+        "operationId": "CajaController_listPendientes",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lista facturas sometidas con saldo pendiente de cobro (la cola de caja).",
+        "tags": [
+          "Caja"
+        ]
+      }
+    },
+    "/api/v1/caja/facturas/{id}/cobrar": {
+      "post": {
+        "operationId": "CajaController_cobrar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CobrarFacturaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cobra una factura ya sometida: crea y somete uno o más Payment Entry (uno por método de pago) y registra el vuelto si aplica. Admite cobro parcial.",
+        "tags": [
+          "Caja"
+        ]
+      }
+    },
+    "/api/v1/centros-costo": {
+      "get": {
+        "operationId": "CentrosCostoController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isGroup",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar solo grupos (true) o solo hojas (false)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "includeDisabled",
+            "required": false,
+            "in": "query",
+            "description": "Incluir centros de costo deshabilitados",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar centros de costo con paginación",
+        "tags": [
+          "Centros de Costo"
+        ]
+      },
+      "post": {
+        "operationId": "CentrosCostoController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCentroCostoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear centro de costo (hijo de la raíz de la compañía por defecto)",
+        "tags": [
+          "Centros de Costo"
+        ]
+      }
+    },
+    "/api/v1/centros-costo/tree": {
+      "get": {
+        "operationId": "CentrosCostoController_getTree",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Árbol completo de centros de costo",
+        "tags": [
+          "Centros de Costo"
+        ]
+      }
+    },
+    "/api/v1/centros-costo/{id}": {
+      "get": {
+        "operationId": "CentrosCostoController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obtener centro de costo por ID",
+        "tags": [
+          "Centros de Costo"
+        ]
+      },
+      "put": {
+        "operationId": "CentrosCostoController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCentroCostoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renombrar centro de costo",
+        "tags": [
+          "Centros de Costo"
+        ]
+      },
+      "delete": {
+        "operationId": "CentrosCostoController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deshabilitar centro de costo (falla si es default de Company o tiene movimientos)",
+        "tags": [
+          "Centros de Costo"
+        ]
+      }
+    },
+    "/api/v1/departamentos": {
+      "get": {
+        "operationId": "DepartamentosController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeDisabled",
+            "required": false,
+            "in": "query",
+            "description": "Incluir departamentos deshabilitados (incluye los 13 nativos de ERPNext que Fase 3 desactivó)",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar departamentos con paginación",
+        "tags": [
+          "Departamentos"
+        ]
+      },
+      "post": {
+        "operationId": "DepartamentosController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDepartamentoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear departamento",
+        "tags": [
+          "Departamentos"
+        ]
+      }
+    },
+    "/api/v1/departamentos/tree": {
+      "get": {
+        "operationId": "DepartamentosController_getTree",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Árbol completo de departamentos",
+        "tags": [
+          "Departamentos"
+        ]
+      }
+    },
+    "/api/v1/departamentos/{id}": {
+      "get": {
+        "operationId": "DepartamentosController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obtener departamento por ID",
+        "tags": [
+          "Departamentos"
+        ]
+      },
+      "put": {
+        "operationId": "DepartamentosController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDepartamentoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renombrar departamento",
+        "tags": [
+          "Departamentos"
+        ]
+      },
+      "delete": {
+        "operationId": "DepartamentosController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deshabilitar departamento",
+        "tags": [
+          "Departamentos"
+        ]
+      }
+    },
+    "/api/v1/compras/costos-importacion": {
+      "get": {
+        "operationId": "CostosImportacionController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar costos de importación (draft + confirmados)",
+        "tags": [
+          "Costos de Importación (Landed Cost Voucher)"
+        ]
+      },
+      "post": {
+        "description": "Los items se generan automáticamente por ERPNext a partir de los documentos de recepción — no se envían a mano.",
+        "operationId": "CostosImportacionController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCostoImportacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear costo de importación (borrador)",
+        "tags": [
+          "Costos de Importación (Landed Cost Voucher)"
+        ]
+      }
+    },
+    "/api/v1/compras/costos-importacion/{id}": {
+      "get": {
+        "operationId": "CostosImportacionController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un costo de importación, con los items ya distribuidos por ERPNext",
+        "tags": [
+          "Costos de Importación (Landed Cost Voucher)"
+        ]
+      }
+    },
+    "/api/v1/compras/costos-importacion/{id}/submit": {
+      "post": {
+        "operationId": "CostosImportacionController_submit",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Someter — aplica los cargos a la valuación de los items recibidos",
+        "tags": [
+          "Costos de Importación (Landed Cost Voucher)"
+        ]
+      }
+    },
+    "/api/v1/compras/costos-importacion/{id}/cancel": {
+      "post": {
+        "operationId": "CostosImportacionController_cancel",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar",
+        "tags": [
+          "Costos de Importación (Landed Cost Voucher)"
         ]
       }
     }
@@ -12350,7 +14071,12 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se emite el documento. Si se omite, se usa la sucursal por defecto del usuario. Se valida contra las sucursales asignadas al usuario."
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+          },
+          "department": {
+            "type": "string",
+            "example": "Ventas - JBC",
+            "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
           },
           "taxesTemplate": {
             "type": "string",
@@ -12422,87 +14148,12 @@
           "items"
         ]
       },
-      "PaymentLineDto": {
-        "type": "object",
-        "properties": {
-          "modeOfPayment": {
-            "type": "string",
-            "example": "Efectivo",
-            "description": "Mode of Payment de esta línea."
-          },
-          "amount": {
-            "type": "number",
-            "description": "Monto cobrado con este método."
-          },
-          "cardNumber": {
-            "type": "string",
-            "description": "Informativo. Número de tarjeta (pago con tarjeta)."
-          },
-          "authorizationCode": {
-            "type": "string",
-            "description": "Informativo. Código de autorización (pago con tarjeta)."
-          },
-          "bank": {
-            "type": "string",
-            "description": "Nombre del Bank (ERPNext) emisor del cheque."
-          },
-          "checkNumber": {
-            "type": "string",
-            "description": "Número de cheque/documento (pago con cheque)."
-          }
-        },
-        "required": [
-          "modeOfPayment",
-          "amount"
-        ]
-      },
-      "VueltoLineDto": {
-        "type": "object",
-        "properties": {
-          "denominacion": {
-            "type": "string",
-            "example": "RD$100",
-            "description": "Nombre del registro Denominacion Billete."
-          },
-          "cantidad": {
-            "type": "number",
-            "description": "Cantidad de billetes/monedas de esta denominación entregados como vuelto."
-          }
-        },
-        "required": [
-          "denominacion",
-          "cantidad"
-        ]
-      },
       "SubmitInvoiceDto": {
         "type": "object",
         "properties": {
           "payCash": {
             "type": "boolean",
-            "description": "Fuerza el cobro al contado aunque el cliente tenga crédito establecido."
-          },
-          "modeOfPayment": {
-            "type": "string",
-            "example": "Efectivo",
-            "description": "DEPRECADO — atajo de un solo método de pago. Use `payments` para uno o más métodos. No enviar junto con `payments`."
-          },
-          "payments": {
-            "description": "Líneas de pago para cobrar al contado (uno o más métodos: efectivo, tarjetas, cheques). La suma de los montos debe coincidir con el monto a cobrar.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PaymentLineDto"
-            }
-          },
-          "vuelto": {
-            "description": "Desglose de denominaciones del vuelto entregado en efectivo. Puramente informativo — requiere `tenderedCash`, no afecta los montos aplicados a la factura.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VueltoLineDto"
-            }
-          },
-          "tenderedCash": {
-            "type": "number",
-            "description": "Efectivo entregado por el cliente, usado para validar el desglose de `vuelto`."
+            "description": "Fuerza el cobro al contado aunque el cliente tenga crédito establecido (solo afecta si se valida el crédito disponible al someter — el cobro real se hace después en caja, ver POST /caja/facturas/:id/cobrar)."
           }
         }
       },
@@ -12579,7 +14230,12 @@
           "expenseAccount": {
             "type": "string",
             "example": "Costo sobre ventas - JB",
-            "description": "Cuenta GL de gasto (COGS) por defecto para artículos de esta categoría"
+            "description": "Cuenta GL de gasto por defecto para artículos de esta categoría"
+          },
+          "defaultCogsAccount": {
+            "type": "string",
+            "example": "COSTO DE MERCANCIA VENDIDA - JBC",
+            "description": "Cuenta de Costo de Mercancía Vendida (COGS) — es la que realmente controla el costo en Sales Invoice / Delivery Note en ERPNext v16"
           }
         }
       },
@@ -13404,6 +15060,16 @@
             "items": {
               "$ref": "#/components/schemas/CountItemDto"
             }
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal del conteo. Si se omite, se deriva de la sucursal de los almacenes de las líneas (deben ser todos de la misma sucursal)."
+          },
+          "department": {
+            "type": "string",
+            "example": "Almacén - JBC",
+            "description": "Departamento del conteo (dimensión contable informativa, nunca obligatoria)."
           }
         },
         "required": [
@@ -13660,7 +15326,12 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se registra la compra. Si se omite, se usa la sucursal por defecto del usuario. Se valida contra las sucursales asignadas al usuario."
+            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+          },
+          "department": {
+            "type": "string",
+            "example": "Ventas - JBC",
+            "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
           },
           "taxesTemplate": {
             "type": "string",
@@ -13728,7 +15399,12 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se registra la compra. Si se omite, se usa la sucursal por defecto del usuario. Se valida contra las sucursales asignadas al usuario."
+            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+          },
+          "department": {
+            "type": "string",
+            "example": "Ventas - JBC",
+            "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
           },
           "taxesTemplate": {
             "type": "string",
@@ -13826,6 +15502,16 @@
           },
           "esDeducible": {
             "type": "boolean"
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+          },
+          "department": {
+            "type": "string",
+            "example": "Ventas - JBC",
+            "description": "Departamento del gasto (dimensión contable informativa, nunca obligatoria)."
           }
         },
         "required": [
@@ -14215,6 +15901,11 @@
             "type": "string",
             "example": "Sucursal Norte",
             "description": "Sucursal a la que pertenece este almacén"
+          },
+          "account": {
+            "type": "string",
+            "example": "Stock en mano - JBC",
+            "description": "Cuenta GL de inventario asociada a este almacén (Warehouse.account). Si se omite, ERPNext usa la cuenta de inventario por defecto de la compañía."
           }
         },
         "required": [
@@ -14405,7 +16096,7 @@
           },
           "defaultExpenseAccount": {
             "type": "string",
-            "description": "Cuenta de Gastos por defecto"
+            "description": "Cuenta de Costo de Mercancía Vendida por defecto (etiqueta nativa de ERPNext: \"Default Cost of Goods Sold Account\")"
           },
           "defaultBankAccount": {
             "type": "string",
@@ -14418,6 +16109,70 @@
           "roundOffAccount": {
             "type": "string",
             "description": "Cuenta para diferencias de redondeo"
+          },
+          "defaultCashAccount": {
+            "type": "string",
+            "description": "Cuenta de Caja/Efectivo por defecto"
+          },
+          "defaultInventoryAccount": {
+            "type": "string",
+            "description": "Cuenta de Inventario por defecto — solo relevante con inventario perpetuo"
+          },
+          "stockReceivedButNotBilled": {
+            "type": "string",
+            "description": "Mercancía Recibida No Facturada — puente entre Purchase Receipt y Purchase Invoice"
+          },
+          "stockAdjustmentAccount": {
+            "type": "string",
+            "description": "Contrapartida de Stock Reconciliation (ajustes de inventario)"
+          },
+          "defaultDeferredRevenueAccount": {
+            "type": "string",
+            "description": "Cuenta de ingreso diferido por defecto"
+          },
+          "defaultDeferredExpenseAccount": {
+            "type": "string",
+            "description": "Cuenta de gasto diferido por defecto"
+          },
+          "exchangeGainLossAccount": {
+            "type": "string",
+            "description": "Ganancia/pérdida cambiaria"
+          },
+          "unrealizedExchangeGainLossAccount": {
+            "type": "string",
+            "description": "Ganancia/pérdida cambiaria no realizada"
+          },
+          "accumulatedDepreciationAccount": {
+            "type": "string",
+            "description": "Depreciación acumulada por defecto"
+          },
+          "depreciationExpenseAccount": {
+            "type": "string",
+            "description": "Gasto de depreciación por defecto"
+          },
+          "disposalAccount": {
+            "type": "string",
+            "description": "Cuenta de disposición de activos fijos"
+          },
+          "defaultDiscountAccount": {
+            "type": "string",
+            "description": "Cuenta de descuentos — solo si se usa la Opción B de presentación bruta (§6.3)"
+          },
+          "costCenter": {
+            "type": "string",
+            "description": "Centro de costo por defecto de la compañía (fieldname real de ERPNext: cost_center, NO default_cost_center)"
+          },
+          "roundOffCostCenter": {
+            "type": "string",
+            "description": "Centro de costo para el asiento de redondeo. Sin este campo, el asiento de redondeo lanza excepción (ver ANEXO_CORRECCIONES.md C17)"
+          },
+          "depreciationCostCenter": {
+            "type": "string",
+            "description": "Centro de costo para asientos de depreciación"
+          },
+          "enablePerpetualInventory": {
+            "type": "boolean",
+            "description": "Inventario perpetuo activado/desactivado. ⚠️ No se puede desactivar una vez que existen movimientos de inventario (puerta de un solo sentido)"
           }
         }
       },
@@ -14636,6 +16391,273 @@
           }
         }
       },
+      "UpdateAccountsSettingsDto": {
+        "type": "object",
+        "properties": {
+          "enableAccountingDimensions": {
+            "type": "boolean",
+            "description": "Habilita las dimensiones contables (Sucursal/Departamento) en toda la app. Ligado a la Fase 3 — no lo cambie sin coordinar con el provisioning de dimensiones."
+          },
+          "deleteLinkedLedgerEntries": {
+            "type": "boolean",
+            "description": "⚠️ NUNCA activar: borra permanentemente el histórico de asientos contables y de inventario al eliminar documentos. El BFF rechaza este cambio con 400."
+          },
+          "unlinkPaymentOnCancellationOfInvoice": {
+            "type": "boolean"
+          },
+          "addTaxesFromItemTaxTemplate": {
+            "type": "boolean"
+          },
+          "checkSupplierInvoiceUniqueness": {
+            "type": "boolean"
+          },
+          "overBillingAllowance": {
+            "type": "number",
+            "description": "% de tolerancia de sobre-facturación"
+          },
+          "allowStale": {
+            "type": "boolean"
+          },
+          "staleDays": {
+            "type": "number"
+          },
+          "bookDeferredEntriesViaJournalEntry": {
+            "type": "boolean"
+          },
+          "submitJournalEntries": {
+            "type": "boolean"
+          },
+          "enableImmutableLedger": {
+            "type": "boolean",
+            "description": "Ledger inmutable — impide editar/eliminar asientos ya contabilizados"
+          },
+          "showBalanceInCoa": {
+            "type": "boolean"
+          },
+          "defaultAgeingRange": {
+            "type": "string",
+            "enum": [
+              "30, 60, 90, 120",
+              "30, 60, 90"
+            ]
+          },
+          "creditController": {
+            "type": "string",
+            "description": "Rol con permiso para controlar límite de crédito"
+          },
+          "roleAllowedToOverBill": {
+            "type": "string",
+            "description": "Rol con permiso para sobre-facturar más allá del límite"
+          }
+        }
+      },
+      "UpdateStockSettingsDto": {
+        "type": "object",
+        "properties": {
+          "valuationMethod": {
+            "type": "string",
+            "enum": [
+              "FIFO",
+              "Moving Average",
+              "LIFO"
+            ]
+          },
+          "defaultWarehouse": {
+            "type": "string"
+          },
+          "allowNegativeStock": {
+            "type": "boolean"
+          },
+          "stockUom": {
+            "type": "string"
+          },
+          "itemNamingBy": {
+            "type": "string",
+            "enum": [
+              "Item Code",
+              "Naming Series"
+            ]
+          },
+          "stockFrozenUpto": {
+            "type": "string",
+            "description": "Fecha límite — no se pueden crear/editar movimientos de stock anteriores a esta fecha"
+          },
+          "stockFrozenUptoDays": {
+            "type": "number"
+          },
+          "stockAuthRole": {
+            "type": "string",
+            "description": "Rol autorizado a editar movimientos de stock congelados"
+          },
+          "enableStockReservation": {
+            "type": "boolean"
+          },
+          "allowPartialReservation": {
+            "type": "boolean"
+          },
+          "useSerialBatchFields": {
+            "type": "boolean"
+          },
+          "overDeliveryReceiptAllowance": {
+            "type": "number",
+            "description": "% de tolerancia de sobre-recepción de compra"
+          },
+          "roleAllowedToCreateEditBackDatedTransactions": {
+            "type": "string"
+          },
+          "validateMaterialTransferWarehouses": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UpdateSellingSettingsDto": {
+        "type": "object",
+        "properties": {
+          "customerGroup": {
+            "type": "string"
+          },
+          "territory": {
+            "type": "string"
+          },
+          "maintainSameSellingRate": {
+            "type": "boolean"
+          },
+          "editableItemRate": {
+            "type": "boolean"
+          },
+          "allowMultiplePricingRules": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UpdateBuyingSettingsDto": {
+        "type": "object",
+        "properties": {
+          "supplierGroup": {
+            "type": "string"
+          },
+          "maintainSameRateThroughPurchaseCycle": {
+            "type": "boolean"
+          },
+          "disableLastPurchaseRate": {
+            "type": "boolean",
+            "description": "⚠️ En 1, rompe silenciosamente el recálculo automático de precio por último costo usado en el modo \"sobre costo\" de artículos (compras.service.ts)."
+          },
+          "allowMultiplePricingRules": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RetencionRateDto": {
+        "type": "object",
+        "properties": {
+          "taxWithholdingRate": {
+            "type": "number",
+            "example": 5.4,
+            "description": "% de retención (Float, no 0-100 normalizado más allá del propio %)"
+          },
+          "fromDate": {
+            "type": "string",
+            "example": "2026-01-01"
+          },
+          "toDate": {
+            "type": "string",
+            "example": "2026-12-31"
+          },
+          "singleThreshold": {
+            "type": "number",
+            "description": "Umbral por transacción individual"
+          },
+          "cumulativeThreshold": {
+            "type": "number",
+            "description": "Umbral acumulado en el período"
+          },
+          "taxWithholdingGroup": {
+            "type": "string",
+            "description": "Omitir la clave por completo si no aplica — NUNCA enviar string vacío"
+          }
+        },
+        "required": [
+          "taxWithholdingRate",
+          "fromDate",
+          "toDate"
+        ]
+      },
+      "CreateRetencionDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Retención ITBIS Servicios 30%",
+            "description": "Nombre exacto del documento (autoname: Prompt — se envía tal cual como `name`)"
+          },
+          "categoryName": {
+            "type": "string",
+            "description": "Título visible, si difiere del `name`"
+          },
+          "taxDeductionBasis": {
+            "type": "string",
+            "enum": [
+              "Gross Total",
+              "Net Total"
+            ]
+          },
+          "taxOnExcessAmount": {
+            "type": "boolean"
+          },
+          "roundOffTaxAmount": {
+            "type": "boolean"
+          },
+          "disableCumulativeThreshold": {
+            "type": "boolean"
+          },
+          "disableTransactionThreshold": {
+            "type": "boolean"
+          },
+          "rates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RetencionRateDto"
+            }
+          },
+          "account": {
+            "type": "string",
+            "example": "22-15 - RETENCION ITBIS - JBC",
+            "description": "Cuenta contable de la retención para esta compañía"
+          }
+        },
+        "required": [
+          "name",
+          "taxDeductionBasis",
+          "rates",
+          "account"
+        ]
+      },
+      "UpdateRetencionDto": {
+        "type": "object",
+        "properties": {
+          "categoryName": {
+            "type": "string"
+          },
+          "taxDeductionBasis": {
+            "type": "string",
+            "enum": [
+              "Gross Total",
+              "Net Total"
+            ]
+          },
+          "rates": {
+            "description": "Reemplaza por completo la tabla de tasas si se envía",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RetencionRateDto"
+            }
+          },
+          "account": {
+            "type": "string"
+          }
+        }
+      },
       "QuotationItemDto": {
         "type": "object",
         "properties": {
@@ -14821,6 +16843,16 @@
           },
           "notes": {
             "type": "string"
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal de la nota de débito. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+          },
+          "department": {
+            "type": "string",
+            "example": "Ventas - JBC",
+            "description": "Departamento de la nota de débito (dimensión contable informativa, nunca obligatoria)."
           }
         },
         "required": [
@@ -14891,6 +16923,16 @@
             "items": {
               "$ref": "#/components/schemas/CobroReferenciaDto"
             }
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal del cobro. Si se omite, se toma de las facturas/pedidos referenciados (si todos coinciden en una sola) o se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente)."
+          },
+          "department": {
+            "type": "string",
+            "example": "Ventas - JBC",
+            "description": "Departamento del cobro (dimensión contable informativa, nunca obligatoria)."
           }
         },
         "required": [
@@ -14910,12 +16952,55 @@
           "parentAccount": {
             "type": "string",
             "example": "Bank Accounts - JB",
-            "description": "Cuenta padre — define la posición en el árbol"
+            "description": "Cuenta padre — define la posición en el árbol. Omitir SOLO para crear una cuenta raíz (junto con rootType e isGroup=true)."
+          },
+          "rootType": {
+            "type": "string",
+            "enum": [
+              "Asset",
+              "Liability",
+              "Equity",
+              "Income",
+              "Expense"
+            ],
+            "description": "Root type de una cuenta RAÍZ nueva (Asset/Liability/Equity/Income/Expense). Solo tiene sentido junto con isGroup=true y sin parentAccount."
           },
           "accountType": {
             "type": "string",
-            "example": "Bank",
-            "description": "Tipo: Receivable | Payable | Bank | Cash | Income | Expense | Tax | Fixed Asset | ..."
+            "enum": [
+              "Accumulated Depreciation",
+              "Asset Received But Not Billed",
+              "Bank",
+              "Cash",
+              "Chargeable",
+              "Capital Work in Progress",
+              "Cost of Goods Sold",
+              "Current Asset",
+              "Current Liability",
+              "Depreciation",
+              "Direct Expense",
+              "Direct Income",
+              "Equity",
+              "Expense Account",
+              "Expenses Included In Asset Valuation",
+              "Expenses Included In Valuation",
+              "Fixed Asset",
+              "Income Account",
+              "Indirect Expense",
+              "Indirect Income",
+              "Liability",
+              "Payable",
+              "Receivable",
+              "Round Off",
+              "Round Off for Opening",
+              "Service Received But Not Billed",
+              "Stock",
+              "Stock Adjustment",
+              "Stock Received But Not Billed",
+              "Tax",
+              "Temporary"
+            ],
+            "description": "Tipo de cuenta — enum real de ERPNext v16 (Account.account_type)"
           },
           "accountNumber": {
             "type": "string",
@@ -14934,8 +17019,7 @@
           }
         },
         "required": [
-          "accountName",
-          "parentAccount"
+          "accountName"
         ]
       },
       "UpdateCuentaDto": {
@@ -14957,7 +17041,40 @@
           },
           "accountType": {
             "type": "string",
-            "description": "[Sin movimientos] Tipo: Bank | Cash | Receivable | Payable | ..."
+            "enum": [
+              "Accumulated Depreciation",
+              "Asset Received But Not Billed",
+              "Bank",
+              "Cash",
+              "Chargeable",
+              "Capital Work in Progress",
+              "Cost of Goods Sold",
+              "Current Asset",
+              "Current Liability",
+              "Depreciation",
+              "Direct Expense",
+              "Direct Income",
+              "Equity",
+              "Expense Account",
+              "Expenses Included In Asset Valuation",
+              "Expenses Included In Valuation",
+              "Fixed Asset",
+              "Income Account",
+              "Indirect Expense",
+              "Indirect Income",
+              "Liability",
+              "Payable",
+              "Receivable",
+              "Round Off",
+              "Round Off for Opening",
+              "Service Received But Not Billed",
+              "Stock",
+              "Stock Adjustment",
+              "Stock Received But Not Billed",
+              "Tax",
+              "Temporary"
+            ],
+            "description": "[Sin movimientos] Tipo de cuenta — enum real de ERPNext v16"
           },
           "parentAccount": {
             "type": "string",
@@ -14990,6 +17107,21 @@
           "description": {
             "type": "string",
             "description": "Descripción de esta línea"
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal de esta línea. Si se omite, se usa la del asiento (branch a nivel de cabecera). Obligatoria si la cuenta es de resultado (Income/Expense) y la dimensión \"Sucursal\" está marcada como requerida."
+          },
+          "department": {
+            "type": "string",
+            "example": "Ventas - JBC",
+            "description": "Departamento de esta línea (dimensión contable informativa, nunca obligatoria)."
+          },
+          "costCenter": {
+            "type": "string",
+            "example": "Main - JBC",
+            "description": "Centro de costo de esta línea. ERPNext exige centro de costo en toda cuenta de resultado (Income/Expense) — si se omite, se usa Company.cost_center."
           }
         },
         "required": [
@@ -15020,6 +17152,19 @@
             "type": "string",
             "default": "Journal Entry",
             "description": "Tipo de asiento en ERPNext"
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal por defecto para las líneas que no especifiquen la suya. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente)."
+          },
+          "department": {
+            "type": "string",
+            "description": "Departamento por defecto para las líneas que no especifiquen el suyo."
+          },
+          "costCenter": {
+            "type": "string",
+            "description": "Centro de costo por defecto para las líneas que no especifiquen el suyo."
           }
         },
         "required": [
@@ -15130,7 +17275,12 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se emite el documento. Si se omite, se usa la sucursal por defecto del usuario. Se valida contra las sucursales asignadas al usuario."
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+          },
+          "department": {
+            "type": "string",
+            "example": "Ventas - JBC",
+            "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
           }
         },
         "required": [
@@ -15286,6 +17436,229 @@
           "fromWarehouse",
           "toWarehouse",
           "items"
+        ]
+      },
+      "PaymentLineDto": {
+        "type": "object",
+        "properties": {
+          "modeOfPayment": {
+            "type": "string",
+            "example": "Efectivo",
+            "description": "Mode of Payment de esta línea."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Monto cobrado con este método."
+          },
+          "cardNumber": {
+            "type": "string",
+            "description": "Informativo. Número de tarjeta (pago con tarjeta)."
+          },
+          "authorizationCode": {
+            "type": "string",
+            "description": "Informativo. Código de autorización (pago con tarjeta)."
+          },
+          "bank": {
+            "type": "string",
+            "description": "Nombre del Bank (ERPNext) emisor del cheque."
+          },
+          "checkNumber": {
+            "type": "string",
+            "description": "Número de cheque/documento (pago con cheque)."
+          }
+        },
+        "required": [
+          "modeOfPayment",
+          "amount"
+        ]
+      },
+      "VueltoLineDto": {
+        "type": "object",
+        "properties": {
+          "denominacion": {
+            "type": "string",
+            "example": "RD$100",
+            "description": "Nombre del registro Denominacion Billete."
+          },
+          "cantidad": {
+            "type": "number",
+            "description": "Cantidad de billetes/monedas de esta denominación entregados como vuelto."
+          }
+        },
+        "required": [
+          "denominacion",
+          "cantidad"
+        ]
+      },
+      "CobrarFacturaDto": {
+        "type": "object",
+        "properties": {
+          "payments": {
+            "description": "Líneas de pago (uno o más métodos: efectivo, tarjetas, cheques). La suma no puede exceder el saldo pendiente de la factura — puede ser menor (cobro parcial).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentLineDto"
+            }
+          },
+          "vuelto": {
+            "description": "Desglose de denominaciones del vuelto entregado en efectivo. Puramente informativo — requiere `tenderedCash`, no afecta los montos aplicados a la factura. Solo admitido si el tenant está en flujo de cobro \"caja\" (ver Facturacion Config).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VueltoLineDto"
+            }
+          },
+          "tenderedCash": {
+            "type": "number",
+            "description": "Efectivo entregado por el cliente, usado para validar el desglose de `vuelto`."
+          }
+        },
+        "required": [
+          "payments"
+        ]
+      },
+      "CreateCentroCostoDto": {
+        "type": "object",
+        "properties": {
+          "costCenterName": {
+            "type": "string",
+            "example": "Sucursal Norte"
+          },
+          "costCenterNumber": {
+            "type": "string",
+            "example": "01",
+            "description": "Número identificador, opcional"
+          },
+          "parentCostCenter": {
+            "type": "string",
+            "description": "Centro de costo padre. Si se omite, se usa la raíz de la compañía."
+          },
+          "isGroup": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "costCenterName"
+        ]
+      },
+      "UpdateCentroCostoDto": {
+        "type": "object",
+        "properties": {
+          "costCenterName": {
+            "type": "string",
+            "example": "Sucursal Norte"
+          },
+          "costCenterNumber": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateDepartamentoDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Ventas",
+            "description": "Nombre del departamento (sin la abreviatura de la compañía)"
+          },
+          "parentDepartment": {
+            "type": "string",
+            "description": "Departamento padre. Si se omite, se usa la raíz de Department del site (NUNCA asumir \"All Departments\" — puede estar traducida)."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateDepartamentoDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Ventas"
+          }
+        }
+      },
+      "LandedCostReceiptDto": {
+        "type": "object",
+        "properties": {
+          "receiptDocumentType": {
+            "type": "string",
+            "enum": [
+              "Purchase Invoice",
+              "Purchase Receipt",
+              "Stock Entry",
+              "Subcontracting Receipt"
+            ]
+          },
+          "receiptDocument": {
+            "type": "string",
+            "example": "PUR-ORD-2026-00012",
+            "description": "Nombre del documento de recepción (Purchase Receipt, Purchase Invoice con update_stock=1, o Stock Entry)"
+          }
+        },
+        "required": [
+          "receiptDocumentType",
+          "receiptDocument"
+        ]
+      },
+      "LandedCostChargeDto": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "example": "Flete internacional"
+          },
+          "amount": {
+            "type": "number",
+            "example": 15000
+          },
+          "expenseAccount": {
+            "type": "string",
+            "example": "Gastos de Importación - JBC",
+            "description": "Cuenta de gasto contrapartida de este cargo"
+          }
+        },
+        "required": [
+          "description",
+          "amount"
+        ]
+      },
+      "CreateCostoImportacionDto": {
+        "type": "object",
+        "properties": {
+          "postingDate": {
+            "type": "string",
+            "example": "2026-06-10"
+          },
+          "purchaseReceipts": {
+            "description": "Documentos de recepción cuyo costo se va a incrementar con los cargos de importación",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LandedCostReceiptDto"
+            }
+          },
+          "taxes": {
+            "description": "Cargos a distribuir (flete, seguro, aranceles, etc.)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LandedCostChargeDto"
+            }
+          },
+          "distributeChargesBasedOn": {
+            "type": "string",
+            "enum": [
+              "Qty",
+              "Amount",
+              "Distribute Manually"
+            ],
+            "default": "Amount"
+          }
+        },
+        "required": [
+          "postingDate",
+          "purchaseReceipts",
+          "taxes"
         ]
       }
     }

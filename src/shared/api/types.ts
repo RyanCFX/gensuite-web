@@ -212,6 +212,7 @@ export interface Invoice {
   postingDate: string
   dueDate: string
   branch?: string | null
+  department?: string | null
   ncf?: string
   ncfType?: string
   subtotal: number
@@ -268,6 +269,7 @@ export interface CreateInvoiceDto {
   postingDate: string
   dueDate?: string
   branch?: string
+  department?: string
   ncfType: 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
   items: {
     itemCode: string
@@ -544,12 +546,16 @@ export interface DebitNote {
   grandTotal: number
   ncf?: string
   postingDate: string
+  branch?: string | null
+  department?: string | null
   createdAt: string
 }
 
 export interface CreateDebitNoteDto {
   customer: string           // debit notes use customer, not invoiceId
   postingDate: string        // required
+  branch?: string
+  department?: string
   items: {
     itemCode: string
     qty: number
@@ -775,6 +781,7 @@ export interface Pedido {
   transactionDate: string
   deliveryDate?: string
   branch?: string | null
+  department?: string | null
   status: 'draft' | 'submitted' | 'cancelled' | 'completed'
   items: PedidoItem[]
   notes?: string
@@ -798,6 +805,7 @@ export interface CreatePedidoDto {
   transactionDate?: string
   deliveryDate?: string
   branch?: string
+  department?: string
   items: {
     itemCode: string
     qty: number
@@ -903,6 +911,8 @@ export interface Category {
   image?: string
   incomeAccount?: string
   expenseAccount?: string
+  /** El que realmente controla el Costo de Mercancía Vendida en facturas/notas de entrega */
+  defaultCogsAccount?: string
   itemCodePrefix?: string
   children?: Category[]
 }
@@ -921,6 +931,7 @@ export interface UpdateCategoryDto {
   image?: string
   incomeAccount?: string
   expenseAccount?: string
+  defaultCogsAccount?: string
   itemCodePrefix?: string
 }
 
@@ -1130,6 +1141,8 @@ export interface AlmacenListItem {
   disabled: boolean
   branch?: string | null
   warehouseType?: string
+  /** Cuenta de inventario asociada — antes solo se veía consultando uno por uno */
+  account?: string | null
 }
 
 export interface CreateAlmacenDto {
@@ -1164,6 +1177,8 @@ export interface InventoryCount {
   status: 'Draft' | 'Submitted'
   postingDate: string
   remarks?: string
+  branch?: string | null
+  department?: string | null
   items: {
     itemCode: string
     warehouse: string
@@ -1184,6 +1199,8 @@ export interface InventoryCountTemplate {
 export interface CreateCountDto {
   postingDate: string        // required
   remarks?: string
+  branch?: string
+  department?: string
   items: {
     itemCode: string
     warehouse: string
@@ -1214,6 +1231,7 @@ export interface Compra {
   postingDate: string
   dueDate: string
   branch?: string | null
+  department?: string | null
   status: 'draft' | 'submitted' | 'cancelled'
   currency: string
   items: CompraItem[]
@@ -1233,6 +1251,7 @@ export interface CreateCompraDto {
   postingDate: string
   dueDate?: string
   branch?: string
+  department?: string
   currency?: string
   conversionRate?: number
   items: {
@@ -1275,6 +1294,8 @@ export interface Gasto {
   supplierName: string
   postingDate: string
   dueDate: string
+  branch?: string | null
+  department?: string | null
   status: 'draft' | 'submitted' | 'cancelled'
   currency: string
   items: GastoItem[]
@@ -1298,6 +1319,8 @@ export interface CreateGastoDto {
   supplier: string
   postingDate: string
   dueDate?: string
+  branch?: string
+  department?: string
   currency?: string
   conversionRate?: number
   items: {
@@ -1659,6 +1682,8 @@ export interface PaymentEntry {
   referenceNo?: string
   referenceDate?: string
   remarks?: string
+  branch?: string | null
+  department?: string | null
   referencias?: PaymentEntryReferencia[]
   createdAt: string
   modifiedAt?: string
@@ -1673,6 +1698,8 @@ export interface CreateCobroDto {
   referenceNo?: string
   referenceDate?: string
   remarks?: string
+  branch?: string
+  department?: string
   referencias?: {
     invoiceId: string
     allocatedAmount: number
@@ -1756,6 +1783,8 @@ export interface Cuenta {
   accountNumber?: string
   accountType?: string
   rootType: 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense'
+  /** Derivado: Income/Expense → 'Profit and Loss', el resto → 'Balance Sheet'. Solo lectura. */
+  reportType?: 'Profit and Loss' | 'Balance Sheet'
   parentAccount?: string
   isGroup: boolean
   disabled: boolean
@@ -1768,7 +1797,10 @@ export interface Cuenta {
 
 export interface CreateCuentaDto {
   accountName: string           // required
-  parentAccount: string         // required
+  /** Requerido salvo que se envíe rootType (cuenta raíz nueva, junto con isGroup: true) */
+  parentAccount?: string
+  /** Solo para crear una cuenta raíz (sin parentAccount), junto con isGroup: true */
+  rootType?: 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense'
   accountType?: string
   accountNumber?: string
   currency?: string             // default 'DOP'
@@ -1795,6 +1827,23 @@ export interface CuentasEmpresa {
   defaultBankAccount?: string
   writeOffAccount?: string
   roundOffAccount?: string
+  // 🆕 16 campos nuevos (ver plan/IMPLEMENTACION.md sección 6)
+  defaultCashAccount?: string
+  defaultInventoryAccount?: string
+  stockReceivedButNotBilled?: string
+  stockAdjustmentAccount?: string
+  defaultDeferredRevenueAccount?: string | null
+  defaultDeferredExpenseAccount?: string | null
+  exchangeGainLossAccount?: string | null
+  unrealizedExchangeGainLossAccount?: string | null
+  accumulatedDepreciationAccount?: string | null
+  depreciationExpenseAccount?: string | null
+  disposalAccount?: string | null
+  defaultDiscountAccount?: string | null
+  costCenter?: string
+  roundOffCostCenter?: string
+  depreciationCostCenter?: string | null
+  enablePerpetualInventory?: boolean
 }
 
 export type UpdateCuentasEmpresaDto = CuentasEmpresa
@@ -1806,6 +1855,10 @@ export interface JournalEntryLine {
   debit: number
   credit: number
   description?: string
+  /** Dimensión por línea — obligatoria si la cuenta es de tipo Ingreso/Gasto (reportType "Profit and Loss") */
+  branch?: string
+  department?: string
+  costCenter?: string
 }
 
 export interface JournalEntry {
@@ -1825,6 +1878,10 @@ export interface CreateJournalEntryDto {
   entries: JournalEntryLine[]  // required - must balance (sum debit = sum credit)
   remarks?: string
   voucherType?: string
+  /** Defaults aplicados a las líneas que no traigan su propio valor */
+  branch?: string
+  department?: string
+  costCenter?: string
 }
 
 // ─── Ejercicio Fiscal ──────────────────────────────────────────────────────────
@@ -1917,4 +1974,201 @@ export interface GenerateVariantsResult {
   created: number
   skipped: number
   variants: Item[]
+}
+
+// ─── Centros de Costo (Cost Center) ────────────────────────────────────────────
+
+export interface CostCenter {
+  id: string
+  name: string
+  number?: string
+  parentCostCenter?: string
+  isGroup: boolean
+  disabled: boolean
+  children?: CostCenter[]        // only in tree response
+}
+
+export interface CreateCostCenterDto {
+  costCenterName: string
+  costCenterNumber?: string
+  parentCostCenter?: string
+  isGroup?: boolean
+}
+
+export interface UpdateCostCenterDto {
+  costCenterName?: string
+  costCenterNumber?: string
+}
+
+// ─── Departamentos (Department) ────────────────────────────────────────────────
+
+export interface Departamento {
+  id: string
+  name: string
+  parentDepartment?: string | null
+  isGroup: boolean
+  disabled: boolean
+  children?: Departamento[]      // only in tree response
+}
+
+export interface CreateDepartamentoDto {
+  name: string
+  parentDepartment?: string
+}
+
+export type UpdateDepartamentoDto = Partial<CreateDepartamentoDto>
+
+// ─── Settings singletons (Accounts / Stock / Selling / Buying) ────────────────
+
+export interface AccountsSettings {
+  enableAccountingDimensions?: boolean
+  enableImmutableLedger?: boolean
+  defaultAgeingRange?: string
+  creditController?: string
+  roleAllowedToOverBill?: string
+  /** El backend siempre rechaza este campo en `true` — no editable */
+  deleteLinkedLedgerEntries?: boolean
+  [key: string]: unknown
+}
+export type UpdateAccountsSettingsDto = Partial<AccountsSettings>
+
+export interface StockSettings {
+  valuationMethod?: 'FIFO' | 'Moving Average' | 'LIFO'
+  defaultWarehouse?: string
+  allowNegativeStock?: boolean
+  enableStockReservation?: boolean
+  [key: string]: unknown
+}
+export type UpdateStockSettingsDto = Partial<StockSettings>
+
+export interface SellingSettings {
+  customerGroup?: string
+  territory?: string
+  maintainSameSellingRate?: boolean
+  editableItemRate?: boolean
+  allowMultiplePricingRules?: boolean
+  [key: string]: unknown
+}
+export type UpdateSellingSettingsDto = Partial<SellingSettings>
+
+export interface BuyingSettings {
+  supplierGroup?: string
+  maintainSameRateThroughPurchaseCycle?: boolean
+  disableLastPurchaseRate?: boolean
+  allowMultiplePricingRules?: boolean
+  [key: string]: unknown
+}
+export type UpdateBuyingSettingsDto = Partial<BuyingSettings>
+
+// ─── Retenciones (Tax Withholding Category) ───────────────────────────────────
+
+export interface RetencionRate {
+  taxWithholdingRate: number
+  fromDate: string
+  toDate: string
+  singleThreshold?: number | null
+  cumulativeThreshold?: number | null
+  taxWithholdingGroup?: string | null
+}
+
+export interface RetencionListItem {
+  id: string
+  categoryName: string
+  taxDeductionBasis?: string
+}
+
+export interface Retencion {
+  id: string
+  categoryName: string
+  taxDeductionBasis?: string
+  rates: RetencionRate[]
+  accounts: { company: string; account: string }[]
+}
+
+export interface CreateRetencionDto {
+  name: string
+  taxDeductionBasis?: string
+  rates: RetencionRate[]
+  account?: string
+}
+
+export type UpdateRetencionDto = Partial<CreateRetencionDto>
+
+// ─── Costos de Importación (Landed Cost Voucher) ──────────────────────────────
+
+export interface LandedCostReceiptRef {
+  receiptDocumentType: 'Purchase Receipt' | 'Purchase Invoice' | 'Stock Entry'
+  receiptDocument: string
+}
+
+export interface LandedCostTax {
+  description: string
+  amount: number
+  expenseAccount?: string
+}
+
+export interface LandedCostItem {
+  itemCode: string
+  description?: string
+  qty: number
+  rate: number
+  amount: number
+  applicableCharges: number
+  receiptDocumentType: string
+  receiptDocument: string
+}
+
+export interface LandedCostVoucherListItem {
+  id: string
+  status: 'draft' | 'submitted' | 'cancelled'
+  postingDate: string
+  totalTaxesAndCharges?: number
+}
+
+export interface LandedCostVoucher {
+  id: string
+  status: 'draft' | 'submitted' | 'cancelled'
+  postingDate: string
+  purchaseReceipts: LandedCostReceiptRef[]
+  taxes: LandedCostTax[]
+  distributeChargesBasedOn?: 'Qty' | 'Amount' | 'Distribute Manually'
+  items?: LandedCostItem[]
+}
+
+export interface CreateLandedCostVoucherDto {
+  postingDate: string
+  purchaseReceipts: LandedCostReceiptRef[]
+  taxes: LandedCostTax[]
+  distributeChargesBasedOn?: 'Qty' | 'Amount' | 'Distribute Manually'
+}
+
+// ─── Libro Diario (GL) / Libro Mayor ────────────────────────────────────────
+
+/** Fila de movimiento contable (GL Entry) usada en Libro Diario y Libro Mayor. */
+export interface GlEntryRow {
+  account?: string
+  postingDate?: string
+  voucherType?: string
+  voucherNo?: string
+  party?: string
+  debit?: number
+  credit?: number
+  balance?: number
+  branch?: string
+  department?: string
+  [key: string]: unknown
+}
+
+/** Resumen por dimensión (Sucursal/Departamento) cuando groupBy = 'Group by Sucursal' | 'Group by Departamento'. */
+export interface LibroDiarioByDimension {
+  key: string
+  totalDebit: number
+  totalCredit: number
+  count: number
+}
+
+export interface LibroDiarioResult {
+  rows?: GlEntryRow[]
+  byDimension?: LibroDiarioByDimension[]
+  [key: string]: unknown
 }

@@ -7,6 +7,8 @@ export interface DgiiParams {
   year?: number
   month?: number
   format?: 'json' | 'txt'
+  branch?: string
+  department?: string
 }
 
 export async function getReporte606(params?: DgiiParams) {
@@ -30,6 +32,8 @@ export interface FinancialParams {
   fromDate?: string
   toDate?: string
   periodicity?: 'monthly' | 'quarterly' | 'yearly'
+  branch?: string
+  department?: string
 }
 
 export async function getBalanceGeneral(params?: FinancialParams) {
@@ -50,6 +54,8 @@ export interface VentasParams {
   groupBy?: 'day' | 'week' | 'month'
   customer?: string
   itemCode?: string
+  branch?: string
+  department?: string
 }
 
 export async function getReporteVentas(params?: VentasParams) {
@@ -65,6 +71,8 @@ export interface InventarioParams {
   warehouse?: string
   itemCode?: string
   date?: string
+  branch?: string
+  department?: string
 }
 
 export async function getInventarioValoracion(params?: InventarioParams) {
@@ -84,7 +92,44 @@ export async function getCxcAging() {
   return res.data
 }
 
-export async function getCajaCuadre(params?: { date?: string }) {
+export async function getCajaCuadre(params?: { date?: string; branch?: string; department?: string }) {
   const res = await client.get(ENDPOINTS.reportes.cajaCuadre, { params })
+  return res.data
+}
+
+// ─── LIBRO DIARIO / LIBRO MAYOR ──────────────────────────────────────────────
+
+export interface LibroDiarioParams {
+  fromDate?: string
+  toDate?: string
+  branch?: string
+  department?: string
+  account?: string
+  voucherNo?: string
+  voucherType?: 'Sales Invoice' | 'Purchase Invoice' | 'Payment Entry' | 'Journal Entry' | 'Stock Entry'
+  party?: string
+  groupBy?:
+    | 'Group by Voucher'
+    | 'Group by Voucher (Consolidated)'
+    | 'Group by Account'
+    | 'Group by Sucursal'
+    | 'Group by Departamento'
+}
+
+export async function getLibroDiario(params?: LibroDiarioParams) {
+  const res = await client.get(ENDPOINTS.reportes.libroDiario, { params })
+  return res.data
+}
+
+export interface LibroMayorParams {
+  fromDate?: string
+  toDate?: string
+  branch?: string
+  department?: string
+  account?: string
+}
+
+export async function getLibroMayor(params?: LibroMayorParams) {
+  const res = await client.get(ENDPOINTS.reportes.libroMayor, { params })
   return res.data
 }

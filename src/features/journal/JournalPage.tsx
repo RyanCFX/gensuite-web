@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listJournalEntries } from '@/shared/api/journal-entry'
+import { listSucursales } from '@/shared/api/sucursales'
+import { listDepartamentos } from '@/shared/api/departamentos'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Plus, Search, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react'
@@ -15,18 +17,32 @@ export default function JournalPage() {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
   const { orderBy, sort } = useSortState()
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
 
+  const { data: sucursales } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+  })
+
+  const { data: departamentos } = useQuery({
+    queryKey: ['departamentos-all'],
+    queryFn: () => listDepartamentos({ limit: 100 }),
+  })
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['journal-entries', { search: debouncedSearch, offset, orderBy }],
+    queryKey: ['journal-entries', { search: debouncedSearch, offset, orderBy, branch, department }],
     queryFn: () => listJournalEntries({
       search: debouncedSearch || undefined,
       limit: PAGE_SIZE,
       offset,
       orderBy: orderBy || undefined,
+      branch: branch || undefined,
+      department: department || undefined,
     }),
   })
 
@@ -61,6 +77,18 @@ export default function JournalPage() {
               onChange={handleSearchChange}
             />
           </div>
+          <select className="filter-select" value={branch} onChange={(e) => { setBranch(e.target.value); setPage(1) }}>
+            <option value="">Todas las sucursales</option>
+            {sucursales?.items.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+          <select className="filter-select" value={department} onChange={(e) => { setDepartment(e.target.value); setPage(1) }}>
+            <option value="">Todos los departamentos</option>
+            {departamentos?.items.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
         </div>
       </div>
 

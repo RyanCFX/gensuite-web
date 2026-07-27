@@ -21,6 +21,10 @@ function rootTypeBadgeStyle(rootType: string): React.CSSProperties {
   }
 }
 
+function reportTypeLabel(reportType: string): string {
+  return reportType === 'Profit and Loss' ? 'Estado de Resultados' : 'Balance General'
+}
+
 function rootTypeLabel(rootType: string): string {
   const map: Record<string, string> = {
     Asset: 'Activo',
@@ -164,6 +168,16 @@ export default function CuentaDetail() {
                 </span>
               </span>
             </div>
+            {cuenta.reportType && (
+              <div className="detail-field">
+                <span className="detail-label">Tipo de Reporte</span>
+                <span className="detail-value">
+                  <span className="badge badge-neutral" style={{ fontSize: 11 }}>
+                    {reportTypeLabel(cuenta.reportType)}
+                  </span>
+                </span>
+              </div>
+            )}
             <div className="detail-field">
               <span className="detail-label">Moneda</span>
               <span className="detail-value">{cuenta.currency}</span>
