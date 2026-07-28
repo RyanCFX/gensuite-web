@@ -37,6 +37,12 @@ export default function DevolucionDetail() {
     enabled: !!id,
   })
 
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+
   if (isLoading) {
     return (
       <div className="page-container">
@@ -60,11 +66,6 @@ export default function DevolucionDetail() {
     )
   }
 
-  const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: getCatalogosFiscales,
-    staleTime: 60 * 60_000,
-  })
   const ncfLabel = catalogos?.ncfTypes.find((t) => t.value === devolucion.ncfType)?.label
   const usageStatus = devolucion.usageStatus
 

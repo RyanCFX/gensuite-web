@@ -150,6 +150,12 @@ export default function InvoiceDetail() {
   // Si la llamada falla o el campo no viene, se trata como "directo" (comportamiento histórico/seguro).
   const flujoCobro = facturacionConfig?.flujoCobro ?? "directo";
 
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  });
+
   const metodosOptions: SearchSelectOption[] = useMemo(() => {
     const q = modeOfPaymentSearch.toLowerCase();
     return (metodos ?? [])
@@ -677,11 +683,6 @@ export default function InvoiceDetail() {
     );
   }
 
-  const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: getCatalogosFiscales,
-    staleTime: 60 * 60_000,
-  })
   const ncfLabel = catalogos?.ncfTypes.find((t) => t.value === invoice.ncfType)?.label;
   const ps = invoice.paymentStatus;
 
