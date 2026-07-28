@@ -977,7 +977,7 @@ function AppLayoutInner() {
           className="main"
           style={{ display: "flex", flexDirection: "column" }}
         >
-          {!user?.defaultWarehouse && (
+          {/*{!user?.defaultWarehouse && (
             <div
               style={{
                 background: "var(--color-warning-bg, #fff3cd)",
@@ -1002,7 +1002,7 @@ function AppLayoutInner() {
               </a>
               .
             </div>
-          )}
+          )}*/}
           {multiTab && <TabBar keepAliveRef={keepAliveRef} />}
           <div style={{ flex: 1, overflowY: "auto" }}>
             {multiTab ? (

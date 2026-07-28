@@ -197,7 +197,7 @@ function SerialBatchRow({
           <input
             className="items-input"
             type="number"
-            min="0.001"
+            // min="0.001"
             step="0.001"
             style={{ textAlign: 'right' }}
             value={item.qty}
