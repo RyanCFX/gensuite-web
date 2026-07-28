@@ -1,5 +1,6 @@
-import { client } from './client'
+import { client, BASE_URL } from './client'
 import { ENDPOINTS } from './endpoints'
+import { getToken, getTenant } from './storage'
 
 // ─── DGII (606 / 607 / 608) ──────────────────────────────────────────────────
 
@@ -24,6 +25,41 @@ export async function getReporte607(params?: DgiiParams) {
 export async function getReporte608(params?: DgiiParams) {
   const res = await client.get(ENDPOINTS.reportes.r608, { params })
   return res.data
+}
+
+const ENDPOINT_MAP: Record<string, string> = {
+  '606': ENDPOINTS.reportes.r606,
+  '607': ENDPOINTS.reportes.r607,
+  '608': ENDPOINTS.reportes.r608,
+}
+
+export async function downloadReporteExcel(tipo: string, year: number, month: number, branch?: string) {
+  const params = new URLSearchParams({ year: String(year), month: String(month), format: 'excel' })
+  if (branch) params.set('branch', branch)
+
+  const token = getToken()
+  const tenant = getTenant()
+
+  const res = await fetch(`${BASE_URL}${ENDPOINT_MAP[tipo]}?${params}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(tenant ? { 'X-Tenant': tenant.slug } : {}),
+    },
+  })
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    const err = (body as { error?: { message?: string } })?.error
+    throw new Error(err?.message ?? `Error al descargar el reporte (${res.status})`)
+  }
+
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${tipo}_${year}-${String(month).padStart(2, '0')}.xlsx`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // ─── FINANCIEROS ─────────────────────────────────────────────────────────────

@@ -8,7 +8,7 @@ import {
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { TIPO_BIENES_606, FORMA_PAGO_606 } from '@/lib/constants'
+import { getCatalogosFiscales } from '@/shared/api/config'
 import { Send, X, RotateCcw, Undo2, Info, FileText, Trash2 } from 'lucide-react'
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | 'delete' | null
@@ -26,6 +26,12 @@ export default function CompraDetail() {
     queryKey: ['compra', id],
     queryFn: () => getCompra(id!),
     enabled: !!id,
+  })
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
   })
 
   const submitMutation = useMutation({
@@ -89,10 +95,10 @@ export default function CompraDetail() {
   const isPending = submitMutation.isPending || cancelMutation.isPending || amendMutation.isPending || deleteMutation.isPending
 
   function getTipoBienesLabel(value?: string) {
-    return TIPO_BIENES_606.find((t) => t.value === value)?.label ?? value ?? '—'
+    return (catalogos?.tipoBienes606 ?? []).find((t) => t.value === value)?.label ?? value ?? '—'
   }
   function getFormaPagoLabel(value?: string) {
-    return FORMA_PAGO_606.find((f) => f.value === value)?.label ?? value ?? '—'
+    return (catalogos?.formaPago606 ?? []).find((f) => f.value === value)?.label ?? value ?? '—'
   }
 
   if (isLoading) {

@@ -18,11 +18,12 @@ import {
   aplicarCreditNoteAFactura,
   removerCreditNoteAplicada,
 } from "@/shared/api/notes";
-import { listMetodosPago, getFacturacionConfig, listDenominaciones } from "@/shared/api/config";
+import { listMetodosPago, getFacturacionConfig, listDenominaciones, getCatalogosFiscales } from "@/shared/api/config";
 import { createDevolucion } from "@/shared/api/devoluciones";
 import { getItem } from "@/shared/api/catalog";
 import { getBundle } from "@/shared/api/bundles";
 import type { ApiError, SubmitInvoiceDto, ComponentTracking } from "@/shared/api/types";
+import { MOTIVOS_ANULACION_DGII } from "@/lib/constants";
 import { PaymentLinesEditor } from "@/components/shared/PaymentLinesEditor";
 import {
   EMPTY_PAYMENT_LINES_VALUE,
@@ -49,7 +50,7 @@ import {
   formatDOP,
   displayId,
 } from "@/lib/formatters";
-import { NCF_TYPES } from "@/lib/constants";
+
 import { DocumentHistoryCard } from "@/components/shared/DocumentHistoryCard";
 import { SearchSelect } from "@/shared/ui/SearchSelect";
 import type { SearchSelectOption } from "@/shared/ui/SearchSelect";
@@ -89,6 +90,7 @@ export default function InvoiceDetail() {
   const [trackingRecoveryLoading, setTrackingRecoveryLoading] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelMotivo, setCancelMotivo] = useState("");
   const [cancelForbiddenMsg, setCancelForbiddenMsg] = useState("");
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [returnFullInvoice, setReturnFullInvoice] = useState(true);
@@ -495,13 +497,15 @@ export default function InvoiceDetail() {
   }
 
   const cancelMutation = useMutation({
-    mutationFn: (reason: string) => cancelInvoice(id!, { reason }),
+    mutationFn: (vars: { reason: string; motivoAnulacion?: string }) =>
+      cancelInvoice(id!, vars),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["invoice", id] });
       toast.success("Factura cancelada");
       setCancelModalOpen(false);
       setCancelReason("");
+      setCancelMotivo("");
       setCancelForbiddenMsg("");
     },
     onError: (err: ApiError) => {
@@ -523,12 +527,16 @@ export default function InvoiceDetail() {
 
   function openCancelModal() {
     setCancelReason("");
+    setCancelMotivo("");
     setCancelForbiddenMsg("");
     setCancelModalOpen(true);
   }
 
+  const cancelMotivoRequired = Boolean(invoice?.ncf);
   const cancelReasonValid =
-    cancelReason.trim().length >= 10 && cancelReason.trim().length <= 500;
+    cancelReason.trim().length >= 10 &&
+    cancelReason.trim().length <= 500 &&
+    (!cancelMotivoRequired || Boolean(cancelMotivo));
 
   function openReturnModal() {
     setReturnFullInvoice(true);
@@ -669,7 +677,12 @@ export default function InvoiceDetail() {
     );
   }
 
-  const ncfLabel = NCF_TYPES.find((t) => t.value === invoice.ncfType)?.label;
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+  const ncfLabel = catalogos?.ncfTypes.find((t) => t.value === invoice.ncfType)?.label;
   const ps = invoice.paymentStatus;
 
   const outstandingColor =
@@ -1950,6 +1963,32 @@ export default function InvoiceDetail() {
                   {cancelReason.trim().length}/500 caracteres (mínimo 10)
                 </p>
               </div>
+              <div className="ff-wrap">
+                <label
+                  className={`ff-label${cancelMotivoRequired ? " ff-required" : ""}`}
+                  htmlFor="cancelMotivo"
+                >
+                  Motivo de anulación (DGII)
+                </label>
+                <select
+                  id="cancelMotivo"
+                  className="ff-select"
+                  value={cancelMotivo}
+                  onChange={(e) => setCancelMotivo(e.target.value)}
+                >
+                  <option value="">Seleccionar motivo</option>
+                  {MOTIVOS_ANULACION_DGII.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="ff-hint">
+                  {cancelMotivoRequired
+                    ? "Obligatorio: esta factura tiene NCF asignado (Formato 608 DGII)."
+                    : "Opcional: esta factura aún no tiene NCF asignado."}
+                </p>
+              </div>
             </div>
             <div className="modal-foot">
               <button
@@ -1960,7 +1999,12 @@ export default function InvoiceDetail() {
               </button>
               <button
                 className="btn btn-danger"
-                onClick={() => cancelMutation.mutate(cancelReason.trim())}
+                onClick={() =>
+                  cancelMutation.mutate({
+                    reason: cancelReason.trim(),
+                    motivoAnulacion: cancelMotivo || undefined,
+                  })
+                }
                 disabled={!cancelReasonValid || cancelMutation.isPending}
               >
                 <Ban size={14} /> Confirmar cancelación

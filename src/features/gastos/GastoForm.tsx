@@ -6,7 +6,8 @@ import { createGasto, updateGasto, getGasto } from '@/shared/api/compras-gastos'
 import { listSuppliers } from '@/shared/api/suppliers'
 import type { CreateGastoDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { TIPO_BIENES_606, FORMA_PAGO_606, NCF_TYPES_COMPRA, CATEGORIA_GASTO } from '@/lib/constants'
+import { getCatalogosFiscales } from '@/shared/api/config'
+import { CATEGORIA_GASTO } from '@/lib/constants'
 import { Plus, Trash2, Info, AlertCircle } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -149,6 +150,12 @@ export default function GastoForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gastoData])
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
 
   const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
     queryKey: ['supplierSearch', supplierQuery],
@@ -411,7 +418,7 @@ export default function GastoForm() {
                   onChange={(e) => setTipoComprobante(e.target.value)}
                 >
                   <option value="">Seleccionar</option>
-                  {NCF_TYPES_COMPRA.map((t) => (
+                  {(catalogos?.ncfTypesCompra ?? []).map((t) => (
                     <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
                 </select>
@@ -421,7 +428,7 @@ export default function GastoForm() {
                 <label className="ff-label">Tipo de Bienes 606</label>
                 <select className="ff-select" value={tipoBienes606} onChange={(e) => setTipoBienes606(e.target.value)}>
                   <option value="">Seleccionar tipo</option>
-                  {TIPO_BIENES_606.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  {(catalogos?.tipoBienes606 ?? []).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
 
@@ -429,7 +436,7 @@ export default function GastoForm() {
                 <label className="ff-label">Forma de Pago 606</label>
                 <select className="ff-select" value={formaPago606} onChange={(e) => setFormaPago606(e.target.value)}>
                   <option value="">Seleccionar forma</option>
-                  {FORMA_PAGO_606.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                  {(catalogos?.formaPago606 ?? []).map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
               </div>
 

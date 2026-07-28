@@ -201,6 +201,7 @@ export const ENDPOINTS = {
     bancos: '/config/bancos',
     denominaciones: '/config/denominaciones',
     denominacionesById: (id: string) => `/config/denominaciones/${encodeURIComponent(id)}`,
+    catalogosFiscales: '/config/catalogos-fiscales',
   },
   ejercicioFiscal: {
     list: '/config/ejercicio-fiscal',

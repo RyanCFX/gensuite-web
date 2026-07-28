@@ -1,48 +1,3 @@
-export const NCF_TYPES = [
-  { value: 'B01', label: 'B01 — Crédito Fiscal' },
-  { value: 'B02', label: 'B02 — Consumidor Final' },
-  { value: 'B14', label: 'B14 — Regímenes Especiales' },
-  { value: 'B15', label: 'B15 — Gubernamental' },
-  { value: 'B16', label: 'B16 — Proveedores Informales' },
-] as const
-
-export const NCF_TYPES_COMPRA = [
-  { value: 'B01', label: 'B01 — Crédito Fiscal' },
-  { value: 'B13', label: 'B13 — Pago al Exterior' },
-  { value: 'B14', label: 'B14 — Regímenes Especiales' },
-  { value: 'B15', label: 'B15 — Gubernamental' },
-  { value: 'B16', label: 'B16 — Proveedores Informales' },
-  { value: 'B17', label: 'B17 — Gastos Menores (≤ RD$50)' },
-  { value: 'E31', label: 'E31 — Exportación' },
-] as const
-
-export const TIPO_BIENES_606 = [
-  { value: '01', label: '01 — Gastos de Personal' },
-  { value: '02', label: '02 — Gastos por Trabajo, Suministros y Servicios' },
-  { value: '03', label: '03 — Arrendamientos' },
-  { value: '04', label: '04 — Gastos de Activos Fijos' },
-  { value: '05', label: '05 — Adquisición de Activos' },
-  { value: '06', label: '06 — Gastos de Representación' },
-  { value: '07', label: '07 — Otras Deducciones Admitidas' },
-  { value: '08', label: '08 — Gastos con Efectos Patrimoniales' },
-  { value: '09', label: '09 — Pagos Computables por Terceros' },
-  { value: '10', label: '10 — Gastos en Regímenes Especiales' },
-  { value: '11', label: '11 — Compras y Gastos que Serán Parte del Costo de Venta' },
-  { value: '12', label: '12 — Beneficios Laborales' },
-  { value: '13', label: '13 — Compras de Bienes' },
-] as const
-
-export const FORMA_PAGO_606 = [
-  { value: '01', label: '01 — Efectivo' },
-  { value: '02', label: '02 — Cheques/Transferencias/Depósitos' },
-  { value: '03', label: '03 — Tarjeta de Crédito/Débito' },
-  { value: '04', label: '04 — Compra a Crédito' },
-  { value: '05', label: '05 — Permuta' },
-  { value: '06', label: '06 — Nota de Crédito' },
-  { value: '07', label: '07 — Mixto' },
-  { value: '08', label: '08 — Otras Formas de Pago' },
-] as const
-
 export const DOC_STATUS_LABELS: Record<string, string> = {
   Draft: 'Borrador',
   Submitted: 'Sometido',
@@ -85,6 +40,21 @@ export const CATEGORIA_GASTO = [
   { value: 'Administrativo', label: 'Administrativo' },
   { value: 'Ventas', label: 'Ventas' },
   { value: 'Financiero', label: 'Financiero' },
+] as const
+
+// Motivos de anulación de comprobantes fiscales — Formato 608 DGII.
+// Lista fija por norma legal, no viene de un endpoint de catálogo.
+export const MOTIVOS_ANULACION_DGII = [
+  { value: '1', label: 'Deterioro de factura preimpresa' },
+  { value: '2', label: 'Errores de impresión' },
+  { value: '3', label: 'Impresión defectuosa' },
+  { value: '4', label: 'Corrección de la información' },
+  { value: '5', label: 'Cambio de productos' },
+  { value: '6', label: 'Devolución de productos' },
+  { value: '7', label: 'Omisión de productos' },
+  { value: '8', label: 'Errores en secuencia de NCF' },
+  { value: '9', label: 'Por cese de operaciones' },
+  { value: '10', label: 'Pérdida o hurto de talonarios' },
 ] as const
 
 export const PAYMENT_STATUS_LABELS: Record<string, string> = {

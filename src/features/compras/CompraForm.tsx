@@ -5,12 +5,11 @@ import { toast } from 'sonner'
 import { createCompra, updateCompra, getCompra } from '@/shared/api/compras-gastos'
 import { listSuppliers } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
-import { listAlmacenes, listImpuestosCompras } from '@/shared/api/config'
+import { listAlmacenes, listImpuestosCompras, getCatalogosFiscales } from '@/shared/api/config'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateCompraDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { TIPO_BIENES_606, FORMA_PAGO_606 } from '@/lib/constants'
 import { Plus, Trash2, Info } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -447,6 +446,9 @@ export default function CompraForm() {
   const [tipoBienes606, setTipoBienes606] = useState('')
   const [formaPago606, setFormaPago606] = useState('')
   const [tipoPago, setTipoPago] = useState<'Contado' | 'Crédito'>('Contado')
+  const [tipoBienes606Touched, setTipoBienes606Touched] = useState(false)
+  const [formaPago606Touched, setFormaPago606Touched] = useState(false)
+  const [tipoPagoTouched, setTipoPagoTouched] = useState(false)
   const [retencionIsr, setRetencionIsr] = useState<number>(0)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
 
@@ -459,6 +461,12 @@ export default function CompraForm() {
       setItems((prev) => [...prev, emptyItem(defaultWh)])
       setTimeout(() => selectCatalogItem(items.length, item), 0)
     },
+  })
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
   })
 
   const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
@@ -725,7 +733,17 @@ export default function CompraForm() {
                     id="supplier"
                     value={supplierId}
                     selectedLabel={supplierName}
-                    onChange={(id, opt) => { setSupplierId(id === '' ? '' : (opt?.value ?? id)); setSupplierName(opt?.label ?? '') }}
+                    onChange={(id, opt) => {
+                      const resolvedId = id === '' ? '' : (opt?.value ?? id)
+                      setSupplierId(resolvedId)
+                      setSupplierName(opt?.label ?? '')
+                      const selected = suppliersData?.items.find((s) => s.id === resolvedId)
+                      if (selected) {
+                        if (!tipoBienes606Touched && selected.defaultTipoBienes606) setTipoBienes606(selected.defaultTipoBienes606)
+                        if (!formaPago606Touched && selected.defaultFormaPago606) setFormaPago606(selected.defaultFormaPago606)
+                        if (!tipoPagoTouched && selected.defaultTipoPagoProveedor) setTipoPago(selected.defaultTipoPagoProveedor)
+                      }
+                    }}
                     options={supplierOptions}
                     onSearch={setSupplierQuery}
                     loading={suppliersLoading}
@@ -879,10 +897,10 @@ export default function CompraForm() {
                 <select
                   className="ff-select"
                   value={tipoBienes606}
-                  onChange={(e) => setTipoBienes606(e.target.value)}
+                  onChange={(e) => { setTipoBienes606(e.target.value); setTipoBienes606Touched(true) }}
                 >
                   <option value="">Seleccionar tipo</option>
-                  {TIPO_BIENES_606.map((t) => (
+                  {(catalogos?.tipoBienes606 ?? []).map((t) => (
                     <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
                 </select>
@@ -893,10 +911,10 @@ export default function CompraForm() {
                 <select
                   className="ff-select"
                   value={formaPago606}
-                  onChange={(e) => setFormaPago606(e.target.value)}
+                  onChange={(e) => { setFormaPago606(e.target.value); setFormaPago606Touched(true) }}
                 >
                   <option value="">Seleccionar forma</option>
-                  {FORMA_PAGO_606.map((f) => (
+                  {(catalogos?.formaPago606 ?? []).map((f) => (
                     <option key={f.value} value={f.value}>{f.label}</option>
                   ))}
                 </select>
@@ -907,7 +925,7 @@ export default function CompraForm() {
                 <select
                   className="ff-select"
                   value={tipoPago}
-                  onChange={(e) => setTipoPago(e.target.value as 'Contado' | 'Crédito')}
+                  onChange={(e) => { setTipoPago(e.target.value as 'Contado' | 'Crédito'); setTipoPagoTouched(true) }}
                 >
                   <option value="Contado">Contado</option>
                   <option value="Crédito">Crédito</option>

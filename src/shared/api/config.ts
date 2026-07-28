@@ -362,3 +362,20 @@ export async function updateBuyingSettings(data: UpdateBuyingSettingsDto) {
   const res = await client.put<{ success: true; data: BuyingSettings }>(ENDPOINTS.settings.buying, data)
   return unwrap(res)
 }
+
+export interface CatalogoFiscalItem {
+  value: string
+  label: string
+}
+
+export interface CatalogosFiscales {
+  ncfTypes: CatalogoFiscalItem[]
+  ncfTypesCompra: CatalogoFiscalItem[]
+  tipoBienes606: CatalogoFiscalItem[]
+  formaPago606: CatalogoFiscalItem[]
+}
+
+export async function getCatalogosFiscales() {
+  const res = await client.get<{ success: true; data: CatalogosFiscales }>(ENDPOINTS.config.catalogosFiscales)
+  return unwrap(res)
+}

@@ -162,6 +162,10 @@ export interface Supplier {
   address?: string;
   disabled: boolean;
   balance: number;
+  defaultTipoBienes606?: string | null;
+  defaultFormaPago606?: string | null;
+  defaultTipoPagoProveedor?: "Contado" | "Crédito" | null;
+  cuentaCxpDefault?: string | null;
   createdAt: string;
   modifiedAt: string;
 }
@@ -186,6 +190,10 @@ export interface CreateProveedorDto {
   emailPagos?: string;
   mobileNo?: string;
   address?: string;
+  defaultTipoBienes606?: string | null;
+  defaultFormaPago606?: string | null;
+  defaultTipoPagoProveedor?: "Contado" | "Crédito" | null;
+  cuentaCxpDefault?: string | null;
 }
 
 export type UpdateProveedorDto = Partial<CreateProveedorDto>;
@@ -219,6 +227,8 @@ export interface Invoice {
   department?: string | null;
   ncf?: string;
   ncfType?: string;
+  /** Para facturas normales, siempre igual a `ncf` (una factura no afecta a otro comprobante). */
+  ncfAfectado?: string | null;
   subtotal: number;
   grandTotal: number;
   /** Monto total de impuestos del documento (Sales Taxes and Charges), si se aplicó un template */
@@ -299,9 +309,11 @@ export interface CreateInvoiceDto {
   taxesTemplate?: string;
 }
 
-// POST /invoices/:id/cancel — reason is mandatory, 10-500 chars
+// POST /invoices/:id/cancel — reason is mandatory, 10-500 chars.
+// motivoAnulacion (código DGII, Formato 608) es obligatorio solo si la factura ya tiene NCF asignado.
 export interface CancelInvoiceDto {
   reason: string;
+  motivoAnulacion?: string;
 }
 
 // POST /invoices/:id/submit — optional body to control cash vs. credit at submit time
@@ -410,6 +422,8 @@ export interface CreditNote {
   reason?: string;
   grandTotal: number;
   ncf?: string;
+  /** NCF de la factura original que esta nota corrige (resuelto de `returnAgainst`) — distinto de `ncf`, que es el propio de la nota. */
+  ncfAfectado?: string | null;
   postingDate: string;
   createdAt: string;
   /** true si ya fue reembolsada en efectivo/transferencia; false = sigue como saldo a favor pendiente */
@@ -494,6 +508,8 @@ export interface DevolucionDto {
 export interface DevolucionResult {
   creditNoteId: string;
   ncf?: string;
+  /** NCF de la factura original devuelta — distinto de `ncf`, que es el propio de la nota de crédito. */
+  ncfAfectado?: string | null;
   resolution: "refund" | "credit_note_only";
   grandTotal: number;
   /** true si la nota de crédito se concilió automáticamente contra el saldo pendiente de la factura original */
@@ -536,6 +552,8 @@ export interface DevolucionDetail {
   creditNoteId: string;
   ncf?: string;
   ncfType?: string;
+  /** NCF de la factura original devuelta — distinto de `ncf`, que es el propio de la nota de crédito. */
+  ncfAfectado?: string | null;
   postingDate: string;
   reason: string;
   documentStatus: "draft" | "submitted" | "cancelled";
@@ -562,6 +580,8 @@ export interface DebitNote {
   customer: string;
   grandTotal: number;
   ncf?: string;
+  /** NCF de la factura original que esta nota afecta — distinto de `ncf`, que es el propio de la nota. */
+  ncfAfectado?: string | null;
   postingDate: string;
   branch?: string | null;
   department?: string | null;

@@ -6,7 +6,7 @@ import type { ListInvoicesParams } from '@/shared/api/invoices'
 import { listSucursales } from '@/shared/api/sucursales'
 import { Plus, Eye, Search, GitBranch } from 'lucide-react'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
-import { NCF_TYPES } from '@/lib/constants'
+import { getCatalogosFiscales } from '@/shared/api/config'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 
@@ -71,6 +71,12 @@ export default function InvoicesPage() {
     queryFn: () => listInvoices(params),
   })
 
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+
   const invoices = data?.items ?? []
 
   function statusBadge(inv: { status: string; paymentStatus?: string | null; isPos?: boolean | null }) {
@@ -133,7 +139,7 @@ export default function InvoicesPage() {
           </select>
           <select className="filter-select" value={ncfType} onChange={(e) => setNcfType(e.target.value)}>
             <option value="">Todos los tipos NCF</option>
-            {NCF_TYPES.map((t) => (
+            {(catalogos?.ncfTypes ?? []).map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>

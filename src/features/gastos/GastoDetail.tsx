@@ -6,7 +6,7 @@ import { getGasto, submitGasto, cancelGasto, amendGasto } from '@/shared/api/com
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { TIPO_BIENES_606, FORMA_PAGO_606 } from '@/lib/constants'
+import { getCatalogosFiscales } from '@/shared/api/config'
 import { Send, X, RotateCcw, Info, FileText, AlertCircle } from 'lucide-react'
 
 function apiErrorMessage(error: unknown, fallback: string) {
@@ -26,6 +26,12 @@ export default function GastoDetail() {
     queryKey: ['gasto', id],
     queryFn: () => getGasto(id!),
     enabled: !!id,
+  })
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
   })
 
   const invalidate = () => {
@@ -60,8 +66,8 @@ export default function GastoDetail() {
 
   const isPending = submitMutation.isPending || cancelMutation.isPending || amendMutation.isPending
 
-  function getTipoBienesLabel(v?: string) { return TIPO_BIENES_606.find((t) => t.value === v)?.label ?? v ?? '—' }
-  function getFormaPagoLabel(v?: string) { return FORMA_PAGO_606.find((f) => f.value === v)?.label ?? v ?? '—' }
+  function getTipoBienesLabel(v?: string) { return (catalogos?.tipoBienes606 ?? []).find((t) => t.value === v)?.label ?? v ?? '—' }
+  function getFormaPagoLabel(v?: string) { return (catalogos?.formaPago606 ?? []).find((f) => f.value === v)?.label ?? v ?? '—' }
 
   const missing606 = !!gasto && (!gasto.tipoBienes606 || !gasto.formaPago606)
   const b17Violation = !!gasto && gasto.tipoComprobante === 'B17' && gasto.grandTotal > 50

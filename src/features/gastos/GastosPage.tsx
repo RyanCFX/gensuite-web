@@ -5,7 +5,7 @@ import { listGastos, getGastoResumen } from '@/shared/api/compras-gastos'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { NCF_TYPES_COMPRA } from '@/lib/constants'
+import { getCatalogosFiscales } from '@/shared/api/config'
 import { Plus, ChevronLeft, ChevronRight, Search, Receipt } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -46,6 +46,12 @@ export default function GastosPage() {
   const { orderBy, sort } = useSortState()
 
   const offset = (page - 1) * PAGE_SIZE
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
 
   const { data: resumen, isLoading: resumenLoading } = useQuery({
     queryKey: ['gastos-resumen', month],
@@ -140,7 +146,7 @@ export default function GastosPage() {
             </select>
             <select className="filter-select" value={tipoComprobante} onChange={(e) => { setTipoComprobante(e.target.value); setPage(1) }}>
               <option value="all">Todos los NCF</option>
-              {NCF_TYPES_COMPRA.map((t) => (
+              {(catalogos?.ncfTypesCompra ?? []).map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </select>

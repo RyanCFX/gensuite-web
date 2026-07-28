@@ -5,7 +5,7 @@ import { createInvoice } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
 import { listItems, getDefaultPriceTier, getItem } from '@/shared/api/catalog'
-import { listImpuestosVentas, listAlmacenes } from '@/shared/api/config'
+import { listImpuestosVentas, listAlmacenes, getCatalogosFiscales } from '@/shared/api/config'
 import { getItemUbicaciones } from '@/shared/api/ubicaciones'
 import type { CreateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking } from '@/shared/api/types'
 import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingModal'
@@ -17,7 +17,7 @@ import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
-import { NCF_TYPES } from '@/lib/constants'
+
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
@@ -35,7 +35,7 @@ import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
 
-type NcfType = 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
+type NcfType = string
 
 interface LineItem {
   itemCode: string
@@ -262,10 +262,16 @@ export default function InvoiceForm() {
       .map((b) => ({ value: b, label: b }))
   }, [branchOptions, branchSearch])
 
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+
   const ncfTypeOptions: SearchSelectOption[] = useMemo(() => {
     const q = ncfTypeSearch.toLowerCase()
-    return NCF_TYPES.filter((t) => !q || t.label.toLowerCase().includes(q))
-  }, [ncfTypeSearch])
+    return (catalogos?.ncfTypes ?? []).filter((t) => !q || t.label.toLowerCase().includes(q))
+  }, [catalogos, ncfTypeSearch])
 
   // ── Impuesto del documento (Sales Taxes and Charges Template) ────────────
   const { data: taxesTemplates } = useQuery({
@@ -759,7 +765,7 @@ export default function InvoiceForm() {
                 <SearchSelect
                   id="ncfType"
                   value={ncfType}
-                  selectedLabel={NCF_TYPES.find((t) => t.value === ncfType)?.label ?? ''}
+                  selectedLabel={(catalogos?.ncfTypes ?? []).find((t) => t.value === ncfType)?.label ?? ''}
                   onChange={(val) => setNcfType((val || 'B02') as NcfType)}
                   options={ncfTypeOptions}
                   onSearch={setNcfTypeSearch}

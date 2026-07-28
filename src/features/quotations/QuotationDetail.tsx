@@ -6,7 +6,7 @@ import type { Quotation } from '@/shared/api/types'
 import { ArrowLeft, Download, FileText, Loader2, Send, Trash2, ClipboardList, XCircle, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
-import { NCF_TYPES } from '@/lib/constants'
+import { getCatalogosFiscales } from '@/shared/api/config'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
 
 const STATUS_BADGE: Record<string, string> = {
@@ -35,6 +35,12 @@ export default function QuotationDetail() {
     queryKey: ['quotation', id],
     queryFn: () => getQuotation(id!),
     enabled: !!id,
+  })
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
   })
 
   const submitMutation = useMutation({
@@ -361,7 +367,7 @@ export default function QuotationDetail() {
                   value={selectedNcfType}
                   onChange={(e) => setSelectedNcfType(e.target.value)}
                 >
-                  {NCF_TYPES.map((t) => (
+                  {(catalogos?.ncfTypes ?? []).map((t) => (
                     <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
                 </select>

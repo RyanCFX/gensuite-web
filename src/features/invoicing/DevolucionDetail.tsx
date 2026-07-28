@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getDevolucion } from '@/shared/api/devoluciones'
 import { ArrowLeft, Receipt, Wallet } from 'lucide-react'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { NCF_TYPES } from '@/lib/constants'
+import { getCatalogosFiscales } from '@/shared/api/config'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -60,7 +60,12 @@ export default function DevolucionDetail() {
     )
   }
 
-  const ncfLabel = NCF_TYPES.find((t) => t.value === devolucion.ncfType)?.label
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+  const ncfLabel = catalogos?.ncfTypes.find((t) => t.value === devolucion.ncfType)?.label
   const usageStatus = devolucion.usageStatus
 
   return (
@@ -96,6 +101,12 @@ export default function DevolucionDetail() {
               <span className="detail-label">Tipo NCF</span>
               <span className="detail-value">
                 {ncfLabel ? <span className="badge badge-neutral">{ncfLabel}</span> : '—'}
+              </span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">NCF Afectado</span>
+              <span className="detail-value" style={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                {devolucion.ncfAfectado ?? <em style={{ fontStyle: 'italic', fontWeight: 400, color: 'var(--text-secondary)' }}>Pendiente</em>}
               </span>
             </div>
             <div className="detail-field">

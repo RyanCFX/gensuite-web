@@ -7,13 +7,14 @@ import {
   getInventarioValoracion, getInventarioMovimientos,
   getCxcAging, getCajaCuadre,
   getLibroDiario, getLibroMayor,
+  downloadReporteExcel,
 } from '@/shared/api/reportes'
 import type { LibroDiarioByDimension } from '@/shared/api/types'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listDepartamentos } from '@/shared/api/departamentos'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { BarChart3, AlertCircle, Download, FileText } from 'lucide-react'
+import { BarChart3, AlertCircle, Download, FileText, Loader2 } from 'lucide-react'
 
 // ─── Branch / Department filter ──────────────────────────────────────────────
 
@@ -219,6 +220,7 @@ function DgiiReport({ tipo }: { tipo: '606' | '607' | '608' }) {
   const [month, setMonth] = useState(thisMonth())
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
+  const [downloadingExcel, setDownloadingExcel] = useState(false)
   const fn = tipo === '606' ? getReporte606 : tipo === '607' ? getReporte607 : getReporte608
 
   const { data, isLoading, error } = useQuery({
@@ -226,6 +228,19 @@ function DgiiReport({ tipo }: { tipo: '606' | '607' | '608' }) {
     queryFn: () => fn({ year, month, branch: branch || undefined, department: department || undefined }),
     retry: false,
   })
+
+  async function handleDownloadExcel() {
+    setDownloadingExcel(true)
+    try {
+      await downloadReporteExcel(tipo, year, month, branch || undefined)
+    } catch (err) {
+      const msg = (err as { message?: string })?.message ?? 'Error al descargar el Excel'
+      const { toast } = await import('sonner')
+      toast.error(msg)
+    } finally {
+      setDownloadingExcel(false)
+    }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -253,8 +268,9 @@ function DgiiReport({ tipo }: { tipo: '606' | '607' | '608' }) {
           />
         </div>
         <div className="filter-bar-right">
-          <button className="btn btn-secondary btn-size-sm">
-            <Download size={13} aria-hidden="true" /> Exportar TXT
+          <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadExcel} disabled={downloadingExcel}>
+            {downloadingExcel ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
+            {' '}Descargar Excel
           </button>
         </div>
       </div>
