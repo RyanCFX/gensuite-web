@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { Search, BookOpen } from 'lucide-react'
-import { getLibroDiario, type LibroDiarioParams } from '@/shared/api/libroDiario'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { Search, BookOpen, Download, Loader2 } from 'lucide-react'
+import { getLibroDiario, downloadLibroDiarioPdf, type LibroDiarioParams } from '@/shared/api/libroDiario'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 
@@ -54,16 +55,25 @@ export default function LibroDiarioPage() {
     enabled: queryParams !== null,
   })
 
-  const handleSearch = () => {
-    setQueryParams({
+  function buildParams(): LibroDiarioParams {
+    return {
       fromDate,
       toDate,
       account: account || undefined,
       voucherType: voucherType || undefined,
       voucherNo: voucherNo || undefined,
       groupBy: groupBy || undefined,
-    })
+    }
   }
+
+  const handleSearch = () => {
+    setQueryParams(buildParams())
+  }
+
+  const downloadPdfMutation = useMutation({
+    mutationFn: () => downloadLibroDiarioPdf(buildParams()),
+    onError: () => toast.error('No se pudo descargar el PDF'),
+  })
 
   const rows = data?.rows ?? []
   const totalDebit = data?.totalDebit ?? 0
@@ -146,6 +156,14 @@ export default function LibroDiarioPage() {
               <Search size={14} />
               Buscar
             </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => downloadPdfMutation.mutate()}
+              disabled={downloadPdfMutation.isPending}
+            >
+              {downloadPdfMutation.isPending ? <Loader2 size={14} className="spin" /> : <Download size={14} />}
+              Descargar PDF
+            </button>
           </div>
         </div>
       </div>
@@ -156,6 +174,7 @@ export default function LibroDiarioPage() {
           <table className="data-table">
             <thead>
               <tr>
+                <th>Identificador</th>
                 <th>Fecha</th>
                 <th>Cuenta</th>
                 <th>Tipo</th>
@@ -170,7 +189,7 @@ export default function LibroDiarioPage() {
               {isLoading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 8 }).map((__, j) => (
+                      {Array.from({ length: 9 }).map((__, j) => (
                         <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                       ))}
                     </tr>
@@ -178,7 +197,7 @@ export default function LibroDiarioPage() {
                 : queryParams === null
                   ? (
                       <tr>
-                        <td colSpan={8}>
+                        <td colSpan={9}>
                           <div className="empty-state">
                             <div className="empty-icon"><BookOpen size={28} /></div>
                             <p className="empty-title">Selecciona un rango de fechas</p>
@@ -190,7 +209,7 @@ export default function LibroDiarioPage() {
                   : rows.length === 0
                     ? (
                         <tr>
-                          <td colSpan={8}>
+                          <td colSpan={9}>
                             <div className="empty-state">
                               <div className="empty-icon"><BookOpen size={28} /></div>
                               <p className="empty-title">Sin movimientos</p>
@@ -203,6 +222,7 @@ export default function LibroDiarioPage() {
                         const link = voucherLink(row.voucherType, row.voucherNo)
                         return (
                           <tr key={i}>
+                            <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{row.glEntryId}</td>
                             <td className="td-muted">{formatDate(row.postingDate)}</td>
                             <td style={{ fontSize: 12 }}>{row.account}</td>
                             <td className="td-muted" style={{ fontSize: 12 }}>{row.voucherType}</td>
@@ -238,7 +258,7 @@ export default function LibroDiarioPage() {
             {rows.length > 0 && (
               <tfoot>
                 <tr style={{ fontWeight: 600, borderTop: '2px solid var(--border-default)' }}>
-                  <td colSpan={4} style={{ fontSize: 13 }}>Totales</td>
+                  <td colSpan={5} style={{ fontSize: 13 }}>Totales</td>
                   <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 13 }}>{formatDOP(totalDebit)}</td>
                   <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 13 }}>{formatDOP(totalCredit)}</td>
                   <td colSpan={2} />

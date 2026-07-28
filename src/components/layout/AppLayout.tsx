@@ -37,6 +37,7 @@ import { CommandPalette } from "./CommandPalette";
 import { Toaster } from "sonner";
 import { TabsProvider, useTabs } from "@/contexts/TabsContext";
 import { KeepAlive, useKeepAliveRef } from "keepalive-for-react";
+import { TurnoCajaIndicator } from "@/components/shared/TurnoCajaIndicator";
 
 import logo from "@/assets/logo.png";
 
@@ -681,11 +682,24 @@ function AppLayoutInner() {
   const outlet = useOutlet();
   const activeTabPath = location.pathname + (location.search || "");
 
-  // Auto-collapse sidebar when on any reportes page
+  // Auto-collapse sidebar al ENTRAR a reportes (transición desde fuera de /reportes) y
+  // auto-expand al SALIR, siempre que el colapso actual siga siendo el automático (el
+  // usuario no lo tocó a mano). Si el usuario expande manualmente mientras está en
+  // Reportes, `autoCollapsedRef` se limpia (ver toggle más abajo) y ya no se fuerza nada
+  // al salir. Si navega entre sub-opciones de Reportes, no se toca el estado.
+  const prevPathRef = useRef(location.pathname);
+  const autoCollapsedRef = useRef(false);
   useEffect(() => {
-    if (location.pathname.startsWith("/reportes")) {
+    const prevWasReportes = prevPathRef.current.startsWith("/reportes");
+    const nowIsReportes = location.pathname.startsWith("/reportes");
+    if (nowIsReportes && !prevWasReportes) {
       setCollapsed(true);
+      autoCollapsedRef.current = true;
+    } else if (!nowIsReportes && prevWasReportes && autoCollapsedRef.current) {
+      setCollapsed(false);
+      autoCollapsedRef.current = false;
     }
+    prevPathRef.current = location.pathname;
   }, [location.pathname]);
 
   const displayName = user?.full_name ?? user?.email ?? "Usuario";
@@ -828,7 +842,10 @@ function AppLayoutInner() {
             aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
             onClick={() => {
               if (window.innerWidth < 768) setMobileOpen((o) => !o);
-              else setCollapsed((c) => !c);
+              else {
+                autoCollapsedRef.current = false;
+                setCollapsed((c) => !c);
+              }
             }}
           >
             <Menu size={16} aria-hidden="true" />
@@ -886,6 +903,8 @@ function AppLayoutInner() {
 
           {/* Right actions */}
           <div className="topbar-right">
+            <TurnoCajaIndicator />
+
             {/* Theme toggle */}
             <button
               className="icon-btn"

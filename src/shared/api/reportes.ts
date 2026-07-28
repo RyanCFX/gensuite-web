@@ -1,6 +1,7 @@
 import { client, BASE_URL } from './client'
 import { ENDPOINTS } from './endpoints'
 import { getToken, getTenant } from './storage'
+import type { CuadreTurnoResult } from './types'
 
 // ─── DGII (606 / 607 / 608) ──────────────────────────────────────────────────
 
@@ -168,4 +169,51 @@ export interface LibroMayorParams {
 export async function getLibroMayor(params?: LibroMayorParams) {
   const res = await client.get(ENDPOINTS.reportes.libroMayor, { params })
   return res.data
+}
+
+// ─── POS — Cuadre por Turno ──────────────────────────────────────────────────
+
+export interface CuadreTurnoParams {
+  fromDate?: string
+  toDate?: string
+  cajero?: string
+}
+
+export async function getCuadreTurno(params?: CuadreTurnoParams) {
+  const res = await client.get<{ success: true; data: CuadreTurnoResult; meta?: { fromDate: string; toDate: string } }>(
+    ENDPOINTS.reportes.cuadreTurno,
+    { params },
+  )
+  return res.data
+}
+
+export async function downloadCuadreTurnoExcel(params?: CuadreTurnoParams) {
+  const search = new URLSearchParams({ format: 'excel' })
+  if (params?.fromDate) search.set('fromDate', params.fromDate)
+  if (params?.toDate) search.set('toDate', params.toDate)
+  if (params?.cajero) search.set('cajero', params.cajero)
+
+  const token = getToken()
+  const tenant = getTenant()
+
+  const res = await fetch(`${BASE_URL}${ENDPOINTS.reportes.cuadreTurno}?${search}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(tenant ? { 'X-Tenant': tenant.slug } : {}),
+    },
+  })
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    const err = (body as { error?: { message?: string } })?.error
+    throw new Error(err?.message ?? `Error al descargar el reporte (${res.status})`)
+  }
+
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `cuadre-turno_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.xlsx`
+  a.click()
+  URL.revokeObjectURL(url)
 }

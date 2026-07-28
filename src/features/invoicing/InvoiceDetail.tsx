@@ -1040,7 +1040,9 @@ export default function InvoiceDetail() {
                 <div className="detail-field">
                   <span className="detail-label">Estado de Pago</span>
                   <span className="detail-value">
-                    {invoice.isPos ? (
+                    {/* isPos ya no implica pago completo (módulo POS permite turno + pago
+                        parcial) — "Contado" solo cuando ps confirma que no queda saldo pendiente. */}
+                    {invoice.isPos && ps === "paid" ? (
                       <span className="badge badge-pos">Contado</span>
                     ) : (
                       <span

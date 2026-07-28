@@ -8,6 +8,7 @@ import {
   aplicarCreditNoteAFactura,
   removerCreditNoteAplicada,
   getCreditNoteSaldoFavor,
+  downloadCreditNotePdf,
 } from '@/shared/api/notes'
 import { listInvoices, getInvoice } from '@/shared/api/invoices'
 import { listMetodosPago } from '@/shared/api/config'
@@ -15,7 +16,7 @@ import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listDepartamentos } from '@/shared/api/departamentos'
 import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo } from '@/shared/api/types'
-import { Plus, Loader2, Wallet, ArrowRightLeft, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Loader2, Wallet, ArrowRightLeft, ChevronDown, ChevronRight, Download } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { formatDate, formatDOP } from '@/lib/formatters'
@@ -37,6 +38,10 @@ interface CreditNoteRow {
   invoiceName?: string
   customerName?: string
   postingDate?: string
+  /** Solo viene presente tras someter la nota — en Draft llega vacío/undefined */
+  ncf?: string
+  /** NCF de la factura original corregida — distinto de `ncf`, que es el propio de la nota */
+  ncfAfectado?: string | null
   /** Viene negativo desde la API (es una factura de signo invertido) — usar Math.abs() para mostrarlo/aplicarlo como monto */
   grandTotal?: number
   status: string
@@ -190,6 +195,11 @@ export default function CreditNotesPage() {
   const availableToAdd = (selectedInvoiceDetail?.items ?? []).filter(
     (i) => !noteItems.some((n) => n.itemCode === i.itemCode),
   )
+
+  const downloadPdfMutation = useMutation({
+    mutationFn: (id: string) => downloadCreditNotePdf(id, `nota-credito-${id}.pdf`),
+    onError: () => toast.error('No se pudo descargar el PDF'),
+  })
 
   const createMutation = useMutation({
     mutationFn: (dto: CreateCreditNoteDto) => createCreditNote(dto) as unknown as Promise<CreditNoteRow>,
@@ -417,26 +427,29 @@ export default function CreditNotesPage() {
             <tr>
               <th style={{ width: 28 }} />
               <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} />
+              <th>NCF</th>
+              <th>NCF Afectado</th>
               <th>Factura Original</th>
               <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} />
               <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} />
               <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={sort} align="right" />
               <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
               <th>Reembolso</th>
+              <th />
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 8 }).map((__, j) => (
+                  {Array.from({ length: 11 }).map((__, j) => (
                     <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                   ))}
                 </tr>
               ))
             ) : notes.length === 0 ? (
               <tr>
-                <td colSpan={8}>
+                <td colSpan={11}>
                   <div className="empty-state">
                     <div className="empty-title">Sin notas de crédito</div>
                     <p className="empty-sub">Crea una nota de crédito para procesar una devolución.</p>
@@ -469,6 +482,12 @@ export default function CreditNotesPage() {
                     )}
                   </td>
                   <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.id}</td>
+                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    {note.ncf ?? <span className="td-dim">Pendiente</span>}
+                  </td>
+                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    {note.ncfAfectado ?? <span className="td-dim">—</span>}
+                  </td>
                   <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.returnAgainst}</td>
                   <td>{note.customerName ?? '—'}</td>
                   <td>{formatDate(note.postingDate)}</td>
@@ -503,6 +522,18 @@ export default function CreditNotesPage() {
                           </>
                         )}
                       </div>
+                    )}
+                  </td>
+                  <td>
+                    {statusLower !== 'draft' && statusLower !== 'cancelled' && (
+                      <button
+                        className="btn btn-ghost btn-size-icon-sm"
+                        title="Descargar PDF"
+                        onClick={() => downloadPdfMutation.mutate(note.id)}
+                        disabled={downloadPdfMutation.isPending && downloadPdfMutation.variables === note.id}
+                      >
+                        <Download size={14} />
+                      </button>
                     )}
                   </td>
                 </tr>

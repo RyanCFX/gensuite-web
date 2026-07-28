@@ -4,13 +4,14 @@ import {
   listDebitNotes,
   createDebitNote,
   submitDebitNote,
+  downloadDebitNotePdf,
 } from '@/shared/api/notes'
 import { listInvoices } from '@/shared/api/invoices'
 import { listSucursales } from '@/shared/api/sucursales'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import type { Invoice, CreateDebitNoteDto } from '@/shared/api/types'
-import { Plus, Loader2, Trash2 } from 'lucide-react'
+import { Plus, Loader2, Trash2, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -35,6 +36,10 @@ interface DebitNote {
   branch?: string
   department?: string
   items: NoteItem[]
+  /** Solo viene presente tras someter la nota — en Draft llega vacío/undefined */
+  ncf?: string
+  /** NCF de la factura original afectada — distinto de `ncf`, que es el propio de la nota */
+  ncfAfectado?: string | null
 }
 
 interface NoteLineItem {
@@ -101,6 +106,11 @@ export default function DebitNotesPage() {
     sublabel: (inv.ncf ?? inv.id) + ' — ' + formatDate(inv.postingDate),
   }))
   const notes = (Array.isArray(notesData) ? notesData : []) as DebitNote[]
+
+  const downloadPdfMutation = useMutation({
+    mutationFn: (id: string) => downloadDebitNotePdf(id, `nota-debito-${id}.pdf`),
+    onError: () => toast.error('No se pudo descargar el PDF'),
+  })
 
   const createMutation = useMutation({
     mutationFn: (dto: CreateDebitNoteDto) => createDebitNote(dto) as Promise<DebitNote>,
@@ -197,25 +207,28 @@ export default function DebitNotesPage() {
           <thead>
             <tr>
               <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} />
+              <th>NCF</th>
+              <th>NCF Afectado</th>
               <th>Factura Original</th>
               <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} />
               <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} />
               <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={sort} align="right" />
               <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
+              <th />
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 6 }).map((__, j) => (
+                  {Array.from({ length: 9 }).map((__, j) => (
                     <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                   ))}
                 </tr>
               ))
             ) : notes.length === 0 ? (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={9}>
                   <div className="empty-state">
                     <div className="empty-title">Sin notas de débito</div>
                     <p className="empty-sub">Crea una nota de débito para agregar cargos adicionales a una factura.</p>
@@ -229,6 +242,12 @@ export default function DebitNotesPage() {
               notes.map((note) => (
                 <tr key={note.id}>
                   <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.id}</td>
+                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    {note.ncf ?? <span className="td-dim">Pendiente</span>}
+                  </td>
+                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    {note.ncfAfectado ?? <span className="td-dim">—</span>}
+                  </td>
                   <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.customer}</td>
                   <td>{note.customerName ?? '—'}</td>
                   <td>{formatDate(note.date)}</td>
@@ -237,6 +256,18 @@ export default function DebitNotesPage() {
                     <span className={`badge ${STATUS_BADGE[note.status] ?? 'badge-neutral'}`}>
                       {STATUS_LABEL[note.status] ?? note.status}
                     </span>
+                  </td>
+                  <td>
+                    {note.status === 'Submitted' && (
+                      <button
+                        className="btn btn-ghost btn-size-icon-sm"
+                        title="Descargar PDF"
+                        onClick={() => downloadPdfMutation.mutate(note.id)}
+                        disabled={downloadPdfMutation.isPending && downloadPdfMutation.variables === note.id}
+                      >
+                        <Download size={14} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

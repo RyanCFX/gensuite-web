@@ -21,6 +21,10 @@ interface DevolucionRow {
   postingDate?: string
   grandTotal?: number
   status: string
+  /** Solo viene presente tras someter la nota — en Draft llega vacío/undefined */
+  ncf?: string
+  /** NCF de la factura original devuelta — distinto de `ncf`, que es el propio de la nota */
+  ncfAfectado?: string | null
 }
 
 // El backend devuelve el status en minúscula. Una vez Sometida, `status` deja de ser "submitted"
@@ -124,6 +128,8 @@ export default function DevolucionesPage() {
           <thead>
             <tr>
               <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
+              <th>NCF</th>
+              <th>NCF Afectado</th>
               <th>Factura Original</th>
               <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
               <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
@@ -135,20 +141,20 @@ export default function DevolucionesPage() {
             {isLoading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 6 }).map((__, j) => (
+                  {Array.from({ length: 8 }).map((__, j) => (
                     <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                   ))}
                 </tr>
               ))
             ) : isError ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
+                <td colSpan={8} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
                   Error al cargar las devoluciones
                 </td>
               </tr>
             ) : data?.items.length === 0 ? (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={8}>
                   <div className="empty-state">
                     <div className="empty-title">Sin devoluciones</div>
                     <p className="empty-sub">Las devoluciones se crean desde el detalle de una factura sometida.</p>
@@ -166,6 +172,12 @@ export default function DevolucionesPage() {
                   >
                     <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>
                       {devolucion.id}
+                    </td>
+                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                      {devolucion.ncf ?? <span className="td-dim">Pendiente</span>}
+                    </td>
+                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                      {devolucion.ncfAfectado ?? <span className="td-dim">—</span>}
                     </td>
                     <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{devolucion.returnAgainst}</td>
                     <td>{devolucion.customerName ?? '—'}</td>

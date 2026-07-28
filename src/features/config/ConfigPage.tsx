@@ -18,11 +18,12 @@ import {
   listGruposProveedores, createGrupoProveedor,
   getFacturacionConfig, updateFacturacionConfig,
   listDenominaciones, createDenominacion, updateDenominacion,
+  habilitarPos,
 } from '@/shared/api/config'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listCustomerGroups, createCustomerGroup, deleteCustomerGroup } from '@/shared/api/customers'
 import { listRoles } from '@/shared/api/usuarios'
-import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, TaxLineCategory, TaxLineAddDeduct, CreateTaxTemplateDto, ItemTaxTemplate, ItemTaxLine, CreateItemTaxTemplateDto, GrupoCliente, FacturacionConfig, Denominacion } from '@/shared/api/types'
+import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, TaxLineCategory, TaxLineAddDeduct, CreateTaxTemplateDto, ItemTaxTemplate, ItemTaxLine, CreateItemTaxTemplateDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
@@ -1987,9 +1988,12 @@ function FacturacionConfigSection() {
   const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({ queryKey: ['facturacion-config'], queryFn: getFacturacionConfig })
   const { data: roles } = useQuery({ queryKey: ['roles'], queryFn: listRoles, staleTime: 5 * 60_000 })
+  const { data: almacenes } = useQuery({ queryKey: ['almacenes-all'], queryFn: () => listAlmacenes(), staleTime: 5 * 60_000 })
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [flujoCobro, setFlujoCobro] = useState<'directo' | 'caja'>('directo')
   const [requiereUbicacionVenta, setRequiereUbicacionVenta] = useState(false)
+  const [showPosActivar, setShowPosActivar] = useState(false)
+  const [posWarehouse, setPosWarehouse] = useState('')
 
   useEffect(() => {
     if (data) {
@@ -2006,6 +2010,19 @@ function FacturacionConfigSection() {
       queryClient.invalidateQueries({ queryKey: ['facturacion-config'] })
     },
     onError: () => toast.error('Error al guardar'),
+  })
+
+  const habilitarPosMutation = useMutation({
+    mutationFn: () => habilitarPos({ warehouse: posWarehouse }),
+    onSuccess: () => {
+      toast.success('Módulo POS activado correctamente')
+      setShowPosActivar(false)
+      setPosWarehouse('')
+      queryClient.invalidateQueries({ queryKey: ['facturacion-config'] })
+    },
+    onError: (err: ApiError) => {
+      toast.error(err?.message ?? 'Error al activar el módulo POS')
+    },
   })
 
   if (isLoading) return <span className="skeleton-box" style={{ height: 200, display: 'block' }} />
@@ -2085,6 +2102,64 @@ function FacturacionConfigSection() {
             del almacén desde el cual se factura.
           </p>
         </div>
+
+        <div className="ff-wrap" style={{ borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
+          <label className="ff-label">Módulo POS</label>
+          <p className="ff-hint" style={{ marginBottom: 8 }}>
+            Permite abrir turnos de caja y cobrar ventas al contado con pago parcial sin crear un Payment Entry
+            aparte. Es opcional — si no se activa, todo sigue funcionando igual que hoy.
+          </p>
+
+          {data?.usaModuloPos ? (
+            <div className="inline-alert inline-alert-success" style={{ alignItems: 'flex-start' }}>
+              <span>
+                Módulo POS activo.
+                {data.posProfileDefault && (
+                  <>
+                    {' '}Perfil: <strong>{data.posProfileDefault}</strong>
+                  </>
+                )}
+              </span>
+            </div>
+          ) : !showPosActivar ? (
+            <button className="btn btn-secondary btn-size-sm" onClick={() => setShowPosActivar(true)}>
+              Activar módulo POS
+            </button>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 320 }}>
+              <div className="ff-wrap">
+                <label className="ff-label">Almacén por defecto para el POS</label>
+                <select
+                  className="ff-select"
+                  value={posWarehouse}
+                  onChange={(e) => setPosWarehouse(e.target.value)}
+                >
+                  <option value="">Seleccionar almacén</option>
+                  {(almacenes ?? []).filter((a) => !a.disabled).map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="btn btn-secondary btn-size-sm"
+                  onClick={() => { setShowPosActivar(false); setPosWarehouse('') }}
+                  disabled={habilitarPosMutation.isPending}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="btn btn-primary btn-size-sm"
+                  onClick={() => habilitarPosMutation.mutate()}
+                  disabled={!posWarehouse || habilitarPosMutation.isPending}
+                >
+                  {habilitarPosMutation.isPending ? 'Activando…' : 'Confirmar activación'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button
             className="btn btn-primary btn-size-sm"

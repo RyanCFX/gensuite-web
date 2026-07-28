@@ -1,7 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { getDevolucion } from '@/shared/api/devoluciones'
-import { ArrowLeft, Receipt, Wallet } from 'lucide-react'
+import { downloadCreditNotePdf } from '@/shared/api/notes'
+import { ArrowLeft, Receipt, Wallet, Download } from 'lucide-react'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { getCatalogosFiscales } from '@/shared/api/config'
 
@@ -41,6 +43,11 @@ export default function DevolucionDetail() {
     queryKey: ['catalogos-fiscales'],
     queryFn: getCatalogosFiscales,
     staleTime: 60 * 60_000,
+  })
+
+  const downloadMutation = useMutation({
+    mutationFn: () => downloadCreditNotePdf(id!, `nota-credito-${id}.pdf`),
+    onError: () => toast.error('No se pudo descargar el PDF'),
   })
 
   if (isLoading) {
@@ -84,6 +91,23 @@ export default function DevolucionDetail() {
           </h1>
           <p className="page-sub">Cliente: {devolucion.customerName}</p>
         </div>
+        {devolucion.documentStatus === 'submitted' && (
+          <button
+            className="btn btn-secondary btn-size-sm"
+            onClick={() => downloadMutation.mutate()}
+            disabled={downloadMutation.isPending}
+          >
+            {downloadMutation.isPending ? (
+              <>
+                <span className="spinner" /> Descargando…
+              </>
+            ) : (
+              <>
+                <Download size={14} /> Descargar PDF
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>

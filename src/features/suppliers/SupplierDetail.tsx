@@ -145,6 +145,30 @@ export default function SupplierDetail() {
       <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 800 }}>
         <div className="card">
           <div className="card-header">
+            <span className="card-title">Valores por Defecto de Compra</span>
+          </div>
+          <div className="fields-grid">
+            <div className="detail-field">
+              <span className="detail-label">Tipo de Bienes/Servicios (606)</span>
+              <span className="detail-value">{supplier.defaultTipoBienes606 ?? 'Sin configurar'}</span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">Forma de Pago (606)</span>
+              <span className="detail-value">{supplier.defaultFormaPago606 ?? 'Sin configurar'}</span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">Tipo de Pago</span>
+              <span className="detail-value">{supplier.defaultTipoPagoProveedor ?? 'Sin configurar'}</span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">Cuenta CxP Alterna</span>
+              <span className="detail-value">{supplier.cuentaCxpDefault ?? 'Sin configurar'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
             <span className="card-title">Información General</span>
           </div>
           <div className="fields-grid fields-grid-3">

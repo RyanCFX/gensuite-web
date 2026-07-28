@@ -81,7 +81,9 @@ export default function InvoicesPage() {
 
   function statusBadge(inv: { status: string; paymentStatus?: string | null; isPos?: boolean | null }) {
     if (inv.status === 'submitted') {
-      if (inv.isPos) {
+      // isPos ya no implica pago completo (módulo POS permite turno + pago parcial) —
+      // solo se etiqueta "Contado" cuando paymentStatus confirma que no queda saldo pendiente.
+      if (inv.isPos && inv.paymentStatus === 'paid') {
         return <span className="badge badge-pos">Contado</span>
       }
       if (inv.paymentStatus) {

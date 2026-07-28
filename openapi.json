@@ -2274,6 +2274,36 @@
         ]
       }
     },
+    "/api/v1/config/catalogos-fiscales": {
+      "get": {
+        "description": "Fuente única de verdad — lee las opciones reales de los Select de Sales Invoice/Purchase Invoice en ERPNext (respeta Property Setters). Reemplaza cualquier constante hardcodeada equivalente en el frontend.",
+        "operationId": "ConfigController_getCatalogosFiscales",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tipos de NCF (venta y compra), tipos de bienes/servicios 606 y forma de pago 606",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
     "/api/v1/config/ncf": {
       "get": {
         "operationId": "ConfigController_getNcfSeries",
@@ -5185,6 +5215,113 @@
         ]
       }
     },
+    "/api/v1/inventory/ubicaciones/movimientos": {
+      "get": {
+        "operationId": "UbicacionesController_findMovimientos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por artículo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ubicacion",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por ubicación (origen o destino)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por almacén",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Historial de movimientos entre almacén/ubicaciones (distribuir y mover)",
+        "tags": [
+          "Inventario — Ubicaciones"
+        ]
+      }
+    },
     "/api/v1/inventory/ubicaciones/{id}": {
       "get": {
         "operationId": "UbicacionesController_findOne",
@@ -5299,6 +5436,117 @@
         "summary": "Eliminar ubicación/rack (falla si tiene artículos asignados)",
         "tags": [
           "Inventario — Ubicaciones"
+        ]
+      }
+    },
+    "/api/v1/caja/pendientes": {
+      "get": {
+        "operationId": "CajaController_listPendientes",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lista facturas sometidas con saldo pendiente de cobro (la cola de caja).",
+        "tags": [
+          "Caja"
+        ]
+      }
+    },
+    "/api/v1/caja/facturas/{id}/cobrar": {
+      "post": {
+        "operationId": "CajaController_cobrar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CobrarFacturaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cobra una factura ya sometida: crea y somete uno o más Payment Entry (uno por método de pago) y registra el vuelto si aplica. Admite cobro parcial.",
+        "tags": [
+          "Caja"
         ]
       }
     },
@@ -8966,6 +9214,43 @@
         ]
       }
     },
+    "/api/v1/credit-notes/{id}/pdf": {
+      "get": {
+        "operationId": "CreditNotesController_getPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de nota de crédito (Print Format \"Nota Credito RD\")",
+        "tags": [
+          "Notas de Crédito y Débito"
+        ]
+      }
+    },
     "/api/v1/credit-notes/{id}/submit": {
       "post": {
         "operationId": "CreditNotesController_submit",
@@ -9275,6 +9560,43 @@
           }
         ],
         "summary": "Confirmar nota de débito",
+        "tags": [
+          "Notas de Crédito y Débito"
+        ]
+      }
+    },
+    "/api/v1/debit-notes/{id}/pdf": {
+      "get": {
+        "operationId": "DebitNotesController_getPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de nota de débito (Print Format \"Nota Debito RD\")",
         "tags": [
           "Notas de Crédito y Débito"
         ]
@@ -10858,6 +11180,216 @@
           }
         ],
         "summary": "Libro Diario (General Ledger) — todos los movimientos contables",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/libro-diario/pdf": {
+      "get": {
+        "operationId": "ReportesController_getLibroDiarioPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "account",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por cuenta contable específica",
+            "schema": {
+              "example": "Cuentas por Cobrar - EMP",
+              "type": "string"
+            }
+          },
+          {
+            "name": "voucherNo",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por nombre de voucher (factura, cobro, etc.)",
+            "schema": {
+              "example": "ACC-SINV-2026-00001",
+              "type": "string"
+            }
+          },
+          {
+            "name": "voucherType",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por tipo de documento origen",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Sales Invoice",
+                "Purchase Invoice",
+                "Payment Entry",
+                "Journal Entry",
+                "Stock Entry"
+              ]
+            }
+          },
+          {
+            "name": "party",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por parte (cliente/proveedor)",
+            "schema": {
+              "example": "Juan Perez",
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "Group by Voucher (Consolidated)",
+              "type": "string",
+              "enum": [
+                "Group by Voucher",
+                "Group by Voucher (Consolidated)",
+                "Group by Account",
+                "Group by Sucursal",
+                "Group by Departamento"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF del Libro Diario — mismas filas/columnas que la versión JSON",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/libro-mayor/pdf": {
+      "get": {
+        "operationId": "ReportesController_getLibroMayorPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "account",
+            "required": false,
+            "in": "query",
+            "description": "Limitar a una sola cuenta contable",
+            "schema": {
+              "example": "Ventas - JB",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF del Libro Mayor — mismas filas/columnas que la versión JSON",
         "tags": [
           "Reportes"
         ]
@@ -12978,117 +13510,6 @@
         ]
       }
     },
-    "/api/v1/caja/pendientes": {
-      "get": {
-        "operationId": "CajaController_listPendientes",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "default": 20,
-              "type": "number"
-            }
-          },
-          {
-            "name": "offset",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": 0,
-              "type": "number"
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "orderBy",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Lista facturas sometidas con saldo pendiente de cobro (la cola de caja).",
-        "tags": [
-          "Caja"
-        ]
-      }
-    },
-    "/api/v1/caja/facturas/{id}/cobrar": {
-      "post": {
-        "operationId": "CajaController_cobrar",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CobrarFacturaDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Cobra una factura ya sometida: crea y somete uno o más Payment Entry (uno por método de pago) y registra el vuelto si aplica. Admite cobro parcial.",
-        "tags": [
-          "Caja"
-        ]
-      }
-    },
     "/api/v1/centros-costo": {
       "get": {
         "operationId": "CentrosCostoController_findAll",
@@ -14268,12 +14689,82 @@
           "items"
         ]
       },
+      "PaymentLineDto": {
+        "type": "object",
+        "properties": {
+          "modeOfPayment": {
+            "type": "string",
+            "example": "Efectivo",
+            "description": "Mode of Payment de esta línea."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Monto cobrado con este método."
+          },
+          "cardNumber": {
+            "type": "string",
+            "description": "Informativo. Número de tarjeta (pago con tarjeta)."
+          },
+          "authorizationCode": {
+            "type": "string",
+            "description": "Informativo. Código de autorización (pago con tarjeta)."
+          },
+          "bank": {
+            "type": "string",
+            "description": "Nombre del Bank (ERPNext) emisor del cheque."
+          },
+          "checkNumber": {
+            "type": "string",
+            "description": "Número de cheque/documento (pago con cheque)."
+          }
+        },
+        "required": [
+          "modeOfPayment",
+          "amount"
+        ]
+      },
+      "VueltoLineDto": {
+        "type": "object",
+        "properties": {
+          "denominacion": {
+            "type": "string",
+            "example": "RD$100",
+            "description": "Nombre del registro Denominacion Billete."
+          },
+          "cantidad": {
+            "type": "number",
+            "description": "Cantidad de billetes/monedas de esta denominación entregados como vuelto."
+          }
+        },
+        "required": [
+          "denominacion",
+          "cantidad"
+        ]
+      },
       "SubmitInvoiceDto": {
         "type": "object",
         "properties": {
           "payCash": {
             "type": "boolean",
-            "description": "Fuerza el cobro al contado aunque el cliente tenga crédito establecido (solo afecta si se valida el crédito disponible al someter — el cobro real se hace después en caja, ver POST /caja/facturas/:id/cobrar)."
+            "description": "Fuerza el cobro al contado aunque el cliente tenga crédito establecido (solo afecta si se valida el crédito disponible al someter). Se marca automáticamente en true si se envía `payments`."
+          },
+          "payments": {
+            "description": "Opcional — si se envía, la factura se cobra en la misma llamada (equivalente a someter y después llamar POST /caja/facturas/:id/cobrar con este mismo cuerpo). Si se omite, la factura queda sometida sin cobrar, para cobrarse después por separado.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentLineDto"
+            }
+          },
+          "vuelto": {
+            "description": "Ver POST /caja/facturas/:id/cobrar — solo tiene efecto si se envía `payments`.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VueltoLineDto"
+            }
+          },
+          "tenderedCash": {
+            "type": "number",
+            "description": "Ver POST /caja/facturas/:id/cobrar — solo tiene efecto si se envía `payments`."
           }
         }
       },
@@ -14285,6 +14776,22 @@
             "minLength": 10,
             "maxLength": 500,
             "description": "Motivo obligatorio de la cancelación. Queda registrado como Comment en el documento (auditoría)."
+          },
+          "motivoAnulacion": {
+            "type": "string",
+            "enum": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10"
+            ],
+            "description": "Código de motivo de anulación DGII. Obligatorio si la factura ya tiene NCF asignado (requerido por el Formato 608)."
           }
         },
         "required": [
@@ -14715,8 +15222,15 @@
             "enum": [
               "B01",
               "B02",
+              "B03",
+              "B04",
+              "B11",
+              "B12",
+              "B13",
               "B14",
-              "B15"
+              "B15",
+              "B16",
+              "B17"
             ],
             "description": "Solo editable si no se ha emitido ningún NCF aún."
           },
@@ -15567,6 +16081,32 @@
           }
         }
       },
+      "CobrarFacturaDto": {
+        "type": "object",
+        "properties": {
+          "payments": {
+            "description": "Líneas de pago (uno o más métodos: efectivo, tarjetas, cheques). La suma no puede exceder el saldo pendiente de la factura — puede ser menor (cobro parcial).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentLineDto"
+            }
+          },
+          "vuelto": {
+            "description": "Desglose de denominaciones del vuelto entregado en efectivo. Puramente informativo — requiere `tenderedCash`, no afecta los montos aplicados a la factura. Solo admitido si el tenant está en flujo de cobro \"caja\" (ver Facturacion Config).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VueltoLineDto"
+            }
+          },
+          "tenderedCash": {
+            "type": "number",
+            "description": "Efectivo entregado por el cliente, usado para validar el desglose de `vuelto`."
+          }
+        },
+        "required": [
+          "payments"
+        ]
+      },
       "CreateCategoryDto": {
         "type": "object",
         "properties": {
@@ -16315,6 +16855,28 @@
           "address": {
             "type": "string",
             "example": "Av. Principal 123"
+          },
+          "defaultTipoBienes606": {
+            "type": "string",
+            "example": "01 - Gastos de personal",
+            "description": "Default para prellenar el formulario de nueva compra (ver GET /config/catalogos-fiscales → tipoBienes606). Editable por línea de compra."
+          },
+          "defaultFormaPago606": {
+            "type": "string",
+            "example": "01 - Efectivo",
+            "description": "Default para prellenar el formulario de nueva compra (ver GET /config/catalogos-fiscales → formaPago606)."
+          },
+          "defaultTipoPagoProveedor": {
+            "type": "string",
+            "enum": [
+              "Contado",
+              "Crédito"
+            ]
+          },
+          "cuentaCxpDefault": {
+            "type": "string",
+            "example": "21-01-002 - CXP - PROVEEDORES EXTERIOR",
+            "description": "Cuenta CxP alterna — si se configura, las compras a este proveedor afectan esta cuenta en vez del default de la empresa."
           }
         },
         "required": [
@@ -16417,6 +16979,28 @@
           "address": {
             "type": "string",
             "example": "Av. Principal 123"
+          },
+          "defaultTipoBienes606": {
+            "type": "string",
+            "example": "01 - Gastos de personal",
+            "description": "Default para prellenar el formulario de nueva compra (ver GET /config/catalogos-fiscales → tipoBienes606). Editable por línea de compra."
+          },
+          "defaultFormaPago606": {
+            "type": "string",
+            "example": "01 - Efectivo",
+            "description": "Default para prellenar el formulario de nueva compra (ver GET /config/catalogos-fiscales → formaPago606)."
+          },
+          "defaultTipoPagoProveedor": {
+            "type": "string",
+            "enum": [
+              "Contado",
+              "Crédito"
+            ]
+          },
+          "cuentaCxpDefault": {
+            "type": "string",
+            "example": "21-01-002 - CXP - PROVEEDORES EXTERIOR",
+            "description": "Cuenta CxP alterna — si se configura, las compras a este proveedor afectan esta cuenta en vez del default de la empresa."
           }
         }
       },
@@ -16452,7 +17036,8 @@
             "description": "Descripción/nombre del artículo en la factura"
           },
           "qty": {
-            "type": "number"
+            "type": "number",
+            "description": "Positiva para una compra normal. Negativa SOLO al editar el borrador de una devolución (Purchase Invoice con is_return=1, creada vía POST /compras/:id/return) — el servicio valida el signo contra el estado real del documento."
           },
           "rate": {
             "type": "number"
@@ -17637,84 +18222,6 @@
           "fromWarehouse",
           "toWarehouse",
           "items"
-        ]
-      },
-      "PaymentLineDto": {
-        "type": "object",
-        "properties": {
-          "modeOfPayment": {
-            "type": "string",
-            "example": "Efectivo",
-            "description": "Mode of Payment de esta línea."
-          },
-          "amount": {
-            "type": "number",
-            "description": "Monto cobrado con este método."
-          },
-          "cardNumber": {
-            "type": "string",
-            "description": "Informativo. Número de tarjeta (pago con tarjeta)."
-          },
-          "authorizationCode": {
-            "type": "string",
-            "description": "Informativo. Código de autorización (pago con tarjeta)."
-          },
-          "bank": {
-            "type": "string",
-            "description": "Nombre del Bank (ERPNext) emisor del cheque."
-          },
-          "checkNumber": {
-            "type": "string",
-            "description": "Número de cheque/documento (pago con cheque)."
-          }
-        },
-        "required": [
-          "modeOfPayment",
-          "amount"
-        ]
-      },
-      "VueltoLineDto": {
-        "type": "object",
-        "properties": {
-          "denominacion": {
-            "type": "string",
-            "example": "RD$100",
-            "description": "Nombre del registro Denominacion Billete."
-          },
-          "cantidad": {
-            "type": "number",
-            "description": "Cantidad de billetes/monedas de esta denominación entregados como vuelto."
-          }
-        },
-        "required": [
-          "denominacion",
-          "cantidad"
-        ]
-      },
-      "CobrarFacturaDto": {
-        "type": "object",
-        "properties": {
-          "payments": {
-            "description": "Líneas de pago (uno o más métodos: efectivo, tarjetas, cheques). La suma no puede exceder el saldo pendiente de la factura — puede ser menor (cobro parcial).",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PaymentLineDto"
-            }
-          },
-          "vuelto": {
-            "description": "Desglose de denominaciones del vuelto entregado en efectivo. Puramente informativo — requiere `tenderedCash`, no afecta los montos aplicados a la factura. Solo admitido si el tenant está en flujo de cobro \"caja\" (ver Facturacion Config).",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VueltoLineDto"
-            }
-          },
-          "tenderedCash": {
-            "type": "number",
-            "description": "Efectivo entregado por el cliente, usado para validar el desglose de `vuelto`."
-          }
-        },
-        "required": [
-          "payments"
         ]
       },
       "CreateCentroCostoDto": {

@@ -7,12 +7,13 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { getSupplier, createSupplier, updateSupplier } from '@/shared/api/suppliers'
 import type { ApiError } from '@/shared/api/types'
-import { listGruposProveedores } from '@/shared/api/config'
+import { listGruposProveedores, getCatalogosFiscales } from '@/shared/api/config'
 import { validateRNC, validateCedula, formatRNC, formatCedula } from '@/lib/validators/dgii'
 import { TIPO_IDENTIFICACION } from '@/lib/constants'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { AccountSelect } from '@/components/shared/AccountSelect'
 import { CheckCircle2, XCircle } from 'lucide-react'
 
 const schema = z
@@ -34,6 +35,10 @@ const schema = z
     tipoCuenta: z.string().optional(),
     numeroCuenta: z.string().optional(),
     abaSwift: z.string().optional(),
+    defaultTipoBienes606: z.string().optional(),
+    defaultFormaPago606: z.string().optional(),
+    defaultTipoPagoProveedor: z.string().optional(),
+    cuentaCxpDefault: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.tipoIdentificacion === 'RNC' && data.rnc) {
@@ -66,6 +71,12 @@ export default function SupplierForm() {
     queryKey: ['grupos-proveedores'],
     queryFn: listGruposProveedores,
     staleTime: 60_000,
+  })
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
   })
 
   const grupoOptions: SearchSelectOption[] = (gruposData ?? []).map((g) => ({
@@ -103,6 +114,10 @@ export default function SupplierForm() {
       tipoCuenta: '',
       numeroCuenta: '',
       abaSwift: '',
+      defaultTipoBienes606: '',
+      defaultFormaPago606: '',
+      defaultTipoPagoProveedor: '',
+      cuentaCxpDefault: '',
     },
   })
 
@@ -126,6 +141,10 @@ export default function SupplierForm() {
         tipoCuenta: supplier.tipoCuenta ?? '',
         numeroCuenta: supplier.numeroCuenta ?? '',
         abaSwift: supplier.abaSwift ?? '',
+        defaultTipoBienes606: supplier.defaultTipoBienes606 ?? '',
+        defaultFormaPago606: supplier.defaultFormaPago606 ?? '',
+        defaultTipoPagoProveedor: supplier.defaultTipoPagoProveedor ?? '',
+        cuentaCxpDefault: supplier.cuentaCxpDefault ?? '',
       })
     }
   }, [supplier, reset])
@@ -150,6 +169,10 @@ export default function SupplierForm() {
         tipoCuenta: data.tipoCuenta || undefined,
         numeroCuenta: data.numeroCuenta || undefined,
         abaSwift: data.abaSwift || undefined,
+        defaultTipoBienes606: data.defaultTipoBienes606 || undefined,
+        defaultFormaPago606: data.defaultFormaPago606 || undefined,
+        defaultTipoPagoProveedor: (data.defaultTipoPagoProveedor || undefined) as 'Contado' | 'Crédito' | undefined,
+        cuentaCxpDefault: data.cuentaCxpDefault || undefined,
       }),
     onSuccess: () => {
       toast.success('Proveedor creado correctamente')
@@ -434,6 +457,80 @@ export default function SupplierForm() {
                 <div className="ff-wrap">
                   <label className="ff-label">ABA / SWIFT</label>
                   <input className="ff-input" {...register('abaSwift')} placeholder="Código ABA o SWIFT" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Defaults de compra */}
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Valores por Defecto de Compra</span>
+            </div>
+            <div className="card-body">
+              <div className="form-section">
+                <div className="ff-wrap">
+                  <label className="ff-label">Tipo de Bienes/Servicios (606) por Defecto</label>
+                  <Controller
+                    name="defaultTipoBienes606"
+                    control={control}
+                    render={({ field }) => (
+                      <select className="ff-select" value={field.value ?? ''} onChange={field.onChange}>
+                        <option value="">Sin configurar</option>
+                        {(catalogos?.tipoBienes606 ?? []).map((t) => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                      </select>
+                    )}
+                  />
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label">Forma de Pago (606) por Defecto</label>
+                  <Controller
+                    name="defaultFormaPago606"
+                    control={control}
+                    render={({ field }) => (
+                      <select className="ff-select" value={field.value ?? ''} onChange={field.onChange}>
+                        <option value="">Sin configurar</option>
+                        {(catalogos?.formaPago606 ?? []).map((t) => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                      </select>
+                    )}
+                  />
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label">Tipo de Pago por Defecto</label>
+                  <Controller
+                    name="defaultTipoPagoProveedor"
+                    control={control}
+                    render={({ field }) => (
+                      <select className="ff-select" value={field.value ?? ''} onChange={field.onChange}>
+                        <option value="">Sin configurar</option>
+                        <option value="Contado">Contado</option>
+                        <option value="Crédito">Crédito</option>
+                      </select>
+                    )}
+                  />
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label">Cuenta CxP Alterna</label>
+                  <Controller
+                    name="cuentaCxpDefault"
+                    control={control}
+                    render={({ field }) => (
+                      <AccountSelect
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        rootType="Liability"
+                        placeholder="Buscar cuenta…"
+                      />
+                    )}
+                  />
+                  <p className="ff-hint">
+                    Si se configura, las compras a este proveedor afectan esta cuenta en vez de la cuenta CxP
+                    default de la empresa. Dejar vacío para usar el default.
+                  </p>
                 </div>
               </div>
             </div>

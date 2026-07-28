@@ -7,13 +7,15 @@ import {
   getInventarioValoracion, getInventarioMovimientos,
   getCxcAging, getCajaCuadre,
   getLibroDiario, getLibroMayor,
+  getCuadreTurno, downloadCuadreTurnoExcel,
   downloadReporteExcel,
 } from '@/shared/api/reportes'
-import type { LibroDiarioByDimension } from '@/shared/api/types'
+import type { LibroDiarioByDimension, CuadreTurnoRow } from '@/shared/api/types'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listDepartamentos } from '@/shared/api/departamentos'
+import { listUsuarios } from '@/shared/api/usuarios'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { formatDate, formatDateTime, formatDOP } from '@/lib/formatters'
 import { BarChart3, AlertCircle, Download, FileText, Loader2 } from 'lucide-react'
 
 // ─── Branch / Department filter ──────────────────────────────────────────────
@@ -84,6 +86,7 @@ const REPORT_META: Record<string, { label: string; description: string }> = {
   caja:         { label: 'Cuadre de Caja',       description: 'Resumen de movimientos de caja' },
   libroDiario:  { label: 'Libro Diario',         description: 'Movimientos contables (GL) del período' },
   libroMayor:   { label: 'Libro Mayor',          description: 'Movimientos por cuenta con saldo inicial y final' },
+  cuadreTurno:  { label: 'Cuadre por Turno',     description: 'Historial de turnos de caja cerrados y su cuadre' },
 }
 
 function thisYear() { return new Date().getFullYear() }
@@ -544,6 +547,160 @@ function CajaCuadreReport() {
   )
 }
 
+function useCajeroOptions() {
+  const { data } = useQuery({
+    queryKey: ['reportes-cajeros-options'],
+    queryFn: () => listUsuarios({ limit: 100 }),
+    staleTime: 60_000,
+  })
+  return data?.items ?? []
+}
+
+function diferenciaColor(diff: number): string | undefined {
+  if (diff < 0) return 'var(--error-text)'
+  if (diff > 0) return 'var(--warning-text)'
+  return undefined
+}
+
+function CuadreTurnoReport() {
+  const [fromDate, setFromDate] = useState(monthStart())
+  const [toDate, setToDate] = useState(today())
+  const [cajero, setCajero] = useState('')
+  const [downloadingExcel, setDownloadingExcel] = useState(false)
+  const cajeros = useCajeroOptions()
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reporte-cuadre-turno', fromDate, toDate, cajero],
+    queryFn: () => getCuadreTurno({ fromDate, toDate, cajero: cajero || undefined }),
+    retry: false,
+  })
+
+  const rows: CuadreTurnoRow[] = data?.data?.rows ?? []
+
+  const resumen = rows.reduce(
+    (acc, r) => {
+      acc.totalDiferencia += r.difference
+      if (r.difference !== 0) acc.turnosConDiferencia.add(r.closingEntryId)
+      return acc
+    },
+    { totalDiferencia: 0, turnosConDiferencia: new Set<string>() },
+  )
+
+  async function handleDownloadExcel() {
+    setDownloadingExcel(true)
+    try {
+      await downloadCuadreTurnoExcel({ fromDate, toDate, cajero: cajero || undefined })
+    } catch (err) {
+      const msg = (err as { message?: string })?.message ?? 'Error al descargar el Excel'
+      const { toast } = await import('sonner')
+      toast.error(msg)
+    } finally {
+      setDownloadingExcel(false)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          <select className="filter-select" value={cajero} onChange={(e) => setCajero(e.target.value)}>
+            <option value="">Todos los cajeros</option>
+            {cajeros.map((u) => (
+              <option key={u.email} value={u.email}>{u.fullName}</option>
+            ))}
+          </select>
+        </div>
+        <div className="filter-bar-right">
+          <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadExcel} disabled={downloadingExcel}>
+            {downloadingExcel ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
+            {' '}Descargar Excel
+          </button>
+        </div>
+      </div>
+
+      {!isLoading && !error && rows.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+          {[
+            { label: 'Turnos en el período', value: String(new Set(rows.map((r) => r.closingEntryId)).size) },
+            { label: 'Turnos con diferencia', value: String(resumen.turnosConDiferencia.size) },
+            {
+              label: 'Diferencia total',
+              value: formatDOP(resumen.totalDiferencia),
+              color: diferenciaColor(resumen.totalDiferencia),
+            },
+          ].map((card) => (
+            <div key={card.label} className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                {card.label}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: card.color ?? 'var(--text-primary)' }}>
+                {card.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="card">
+        {isLoading && <LoadingRows />}
+        {error && <ErrorBanner err={error} />}
+        {!isLoading && !error && rows.length === 0 && (
+          <div className="empty-state">
+            <span className="empty-icon"><FileText size={20} /></span>
+            <p className="empty-title">Sin turnos cerrados</p>
+            <p className="empty-sub">No hay turnos de caja cerrados para los filtros seleccionados.</p>
+          </div>
+        )}
+        {!isLoading && !error && rows.length > 0 && (
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Turno</th>
+                  <th>Cajero</th>
+                  <th>Modo de Pago</th>
+                  <th style={{ textAlign: 'right' }}>Apertura</th>
+                  <th style={{ textAlign: 'right' }}>Esperado</th>
+                  <th style={{ textAlign: 'right' }}>Contado</th>
+                  <th style={{ textAlign: 'right' }}>Diferencia</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={`${r.closingEntryId}-${r.modeOfPayment}-${i}`}>
+                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                      {r.closingEntryId}
+                      <div className="td-muted" style={{ fontSize: 11 }}>{formatDateTime(r.periodStartDate)}</div>
+                    </td>
+                    <td>{r.cajero}</td>
+                    <td>{r.modeOfPayment}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatDOP(r.openingAmount)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatDOP(r.expectedAmount)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatDOP(r.closingAmount)}</td>
+                    <td
+                      style={{
+                        textAlign: 'right',
+                        fontFamily: 'monospace',
+                        fontWeight: 600,
+                        color: diferenciaColor(r.difference),
+                      }}
+                    >
+                      {r.difference > 0 ? '+' : ''}
+                      {formatDOP(r.difference)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ByDimensionTable({ rows }: { rows: LibroDiarioByDimension[] }) {
   return (
     <div className="table-scroll">
@@ -674,6 +831,7 @@ const REPORT_NAV = [
   { key: 'movimientos', group: 'Inventario', label: 'Movimientos de Stock' },
   { key: 'cxcaging',   group: 'CxC',        label: 'Aging CxC' },
   { key: 'caja',        group: 'Caja',       label: 'Cuadre de Caja' },
+  { key: 'cuadreTurno', group: 'Caja',       label: 'Cuadre por Turno' },
   { key: 'libroDiario', group: 'Contabilidad', label: 'Libro Diario' },
   { key: 'libroMayor',  group: 'Contabilidad', label: 'Libro Mayor' },
 ]
@@ -699,6 +857,7 @@ export default function ReportesPage() {
       case 'movimientos':return <InventarioReport tipo="movimientos" />
       case 'cxcaging':  return <CxcAgingReport />
       case 'caja':       return <CajaCuadreReport />
+      case 'cuadreTurno': return <CuadreTurnoReport />
       case 'libroDiario': return <LibroDiarioReport />
       case 'libroMayor':  return <LibroMayorReport />
       default:           return <ServiceUnavailable message="Reporte no encontrado." />

@@ -43,6 +43,7 @@ export const ENDPOINTS = {
     aplicarAFactura: (id: string) => `/credit-notes/${id}/aplicar-a-factura`,
     removerAplicacion: (id: string, invoiceId: string) => `/credit-notes/${id}/aplicar-a-factura/${invoiceId}`,
     saldoFavor: (customerId: string) => `/credit-notes/saldo-favor/${customerId}`,
+    pdf: (id: string) => `/credit-notes/${id}/pdf`,
   },
   devoluciones: {
     create: '/devoluciones',
@@ -53,6 +54,7 @@ export const ENDPOINTS = {
     list: '/debit-notes',
     byId: (id: string) => `/debit-notes/${id}`,
     submit: (id: string) => `/debit-notes/${id}/submit`,
+    pdf: (id: string) => `/debit-notes/${id}/pdf`,
   },
   catalog: {
     categories: {
@@ -202,6 +204,13 @@ export const ENDPOINTS = {
     denominaciones: '/config/denominaciones',
     denominacionesById: (id: string) => `/config/denominaciones/${encodeURIComponent(id)}`,
     catalogosFiscales: '/config/catalogos-fiscales',
+    posHabilitar: '/config/pos/habilitar',
+  },
+  pos: {
+    turnoActual: '/pos/turnos/actual',
+    turnoAbrir: '/pos/turnos/abrir',
+    turnoPreviewCierre: (openingEntryId: string) => `/pos/turnos/${encodeURIComponent(openingEntryId)}/preview-cierre`,
+    turnoCerrar: (openingEntryId: string) => `/pos/turnos/${encodeURIComponent(openingEntryId)}/cerrar`,
   },
   ejercicioFiscal: {
     list: '/config/ejercicio-fiscal',
@@ -239,7 +248,10 @@ export const ENDPOINTS = {
     cxcAging: '/reportes/cxc/aging',
     cajaCuadre: '/reportes/caja/cuadre',
     libroDiario: '/reportes/libro-diario',
+    libroDiarioPdf: '/reportes/libro-diario/pdf',
     libroMayor: '/reportes/libro-mayor',
+    libroMayorPdf: '/reportes/libro-mayor/pdf',
+    cuadreTurno: '/reportes/pos/cuadre-turno',
   },
   cuentasMovimientos: {
     byId: (id: string) => `/cuentas/${encodeURIComponent(id)}/movimientos`,

@@ -1620,6 +1620,99 @@ export interface FacturacionConfig {
   flujoCobro: "directo" | "caja";
   /** Si está activo, no se puede vender un artículo de inventario sin una Ubicación asignada dentro del almacén de facturación. */
   requiereUbicacionVenta?: boolean;
+  /** true si el módulo POS (turnos de caja) está activo para este tenant. */
+  usaModuloPos?: boolean;
+  /** Nombre del POS Profile provisionado — solo informativo, no editable desde aquí. */
+  posProfileDefault?: string | null;
+}
+
+// POST /config/pos/habilitar
+export interface HabilitarPosDto {
+  warehouse: string;
+}
+
+export interface HabilitarPosResult {
+  posProfile: string;
+  cajeroRole: string;
+}
+
+// ─── Turnos de caja (POS) ──────────────────────────────────────────────────
+
+export interface BalanceDetailLine {
+  modeOfPayment: string;
+  openingAmount: number;
+}
+
+// GET /pos/turnos/actual — null si el cajero no tiene turno abierto
+export interface TurnoCaja {
+  openingEntryId: string;
+  posProfile: string;
+  company: string;
+  periodStartDate: string;
+}
+
+// POST /pos/turnos/abrir
+export interface AbrirTurnoDto {
+  /** Si se omite, usa el POS Profile default del tenant. */
+  posProfile?: string;
+  balanceDetails: BalanceDetailLine[];
+}
+
+export interface PaymentReconciliationLine {
+  modeOfPayment: string;
+  openingAmount: number;
+  expectedAmount: number;
+  /** En la vista previa siempre es 0 — el cajero todavía no ha contado nada. */
+  closingAmount: number;
+  /** closingAmount - expectedAmount. Negativo = faltante, positivo = sobrante. */
+  difference: number;
+}
+
+// GET /pos/turnos/:openingEntryId/preview-cierre
+export interface PreviewCierreTurno {
+  posOpeningEntry: string;
+  periodStartDate: string;
+  periodEndDate: string;
+  grandTotal: number;
+  netTotal: number;
+  totalQuantity: number;
+  paymentReconciliation: PaymentReconciliationLine[];
+}
+
+export interface ClosingAmountLine {
+  modeOfPayment: string;
+  amount: number;
+}
+
+// POST /pos/turnos/:openingEntryId/cerrar
+export interface CerrarTurnoDto {
+  closingAmounts: ClosingAmountLine[];
+}
+
+export interface CierreTurnoResult {
+  id: string;
+  status: string;
+  paymentReconciliation: PaymentReconciliationLine[];
+}
+
+// GET /reportes/pos/cuadre-turno — una fila por combinación turno + modo de pago
+export interface CuadreTurnoRow {
+  closingEntryId: string;
+  cajero: string;
+  posProfile: string;
+  periodStartDate: string;
+  periodEndDate: string;
+  grandTotal: number;
+  modeOfPayment: string;
+  openingAmount: number;
+  expectedAmount: number;
+  closingAmount: number;
+  difference: number;
+}
+
+export interface CuadreTurnoResult {
+  rows: CuadreTurnoRow[];
+  totalRows: number;
 }
 
 export interface MetodoPago {
