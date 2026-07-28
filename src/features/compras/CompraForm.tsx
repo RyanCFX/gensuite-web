@@ -115,7 +115,7 @@ function removeBatch(idx: number, batchIdx: number, setItems: React.Dispatch<Rea
 // ─── SerialBatchRow Sub-component ────────────────────────────────────────
 
 function SerialBatchRow({
-  item, idx, items, setItems, warehouses, warehouseOptions, onWarehouseSearch, updateItem, selectCatalogItem, clearCatalogItem, setVariantTemplate,
+  item, idx, items, setItems, warehouses, warehouseOptions, onWarehouseSearch, updateItem, selectCatalogItem, clearCatalogItem, setVariantTemplate, isReturn,
 }: {
   item: ItemRow
   idx: number
@@ -128,6 +128,7 @@ function SerialBatchRow({
   selectCatalogItem: (idx: number, catalogItem: Item) => void
   clearCatalogItem: (idx: number) => void
   setVariantTemplate: (t: Item | null) => void
+  isReturn: boolean
 }) {
   const serialInputRef = useRef<HTMLInputElement>(null)
   const [serialInput, setSerialInput] = useState('')
@@ -893,6 +894,7 @@ export default function CompraForm() {
                         selectCatalogItem={selectCatalogItem}
                         clearCatalogItem={clearCatalogItem}
                         setVariantTemplate={setVariantTemplate}
+                        isReturn={isReturn}
                       />
                     ))}
                   </tbody>
