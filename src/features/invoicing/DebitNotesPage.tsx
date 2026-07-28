@@ -258,7 +258,7 @@ export default function DebitNotesPage() {
                     </span>
                   </td>
                   <td>
-                    {note.status === 'Submitted' && (
+                    {note.status?.toLowerCase() === 'submitted' && (
                       <button
                         className="btn btn-ghost btn-size-icon-sm"
                         title="Descargar PDF"
