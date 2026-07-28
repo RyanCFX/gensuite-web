@@ -73,9 +73,11 @@ export default function InvoicesPage() {
 
   const invoices = data?.items ?? []
 
-  function statusBadge(inv: { status: string; paymentStatus?: string | null }) {
-    // Submitted → show paymentStatus (or neutral "Sometido" if null)
+  function statusBadge(inv: { status: string; paymentStatus?: string | null; isPos?: boolean | null }) {
     if (inv.status === 'submitted') {
+      if (inv.isPos) {
+        return <span className="badge badge-pos">Contado</span>
+      }
       if (inv.paymentStatus) {
         return (
           <span className={`badge ${PAYMENT_BADGE[inv.paymentStatus] ?? 'badge-neutral'}`}>

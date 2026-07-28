@@ -956,6 +956,7 @@ button {
 .badge-draft { background: var(--surface-sunken); color: var(--text-secondary); border-color: var(--border-default); }
 .badge-submitted { background: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
 .badge-cancelled { background: var(--error-bg); color: var(--error-text); border-color: var(--error-border); }
+.badge-pos { background: var(--brand-primary-subtle); color: var(--brand-primary); border-color: var(--brand-primary); }
 .badge-ordered { background: var(--info-bg); color: var(--info-text); border-color: var(--info-border); }
 .badge-lost { background: var(--surface-sunken); color: var(--text-tertiary); border-color: var(--border-default); }
 

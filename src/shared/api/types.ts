@@ -244,6 +244,11 @@ export interface Invoice {
   paymentLines?: PaymentLine[];
   /** Desglose de vuelto entregado (vacío si no aplica o el flujo es "directo"). */
   vueltoDetalle?: VueltoLine[];
+  /** Indica si la factura fue sometida como venta al contado nativa (is_pos=1 en ERPNext).
+   *  Cuando es true, no existe un Payment Entry asociado — el pago vive en paymentLines/cobro. */
+  isPos?: boolean;
+  /** Resumen del cobro registrado al someter (presente cuando se enviaron payments). */
+  cobro?: CobroResumen;
 }
 
 export interface PendingTrackingEntry {
@@ -1641,6 +1646,15 @@ export interface PaymentLine {
 export interface VueltoLine {
   denominacion: string;
   cantidad: number;
+}
+
+/** Resumen del cobro registrado al someter una factura (presente cuando se enviaron payments). */
+export interface CobroResumen {
+  invoiceId: string;
+  paymentEntryIds: string[];
+  outstandingAmount: number;
+  fullyPaid: boolean;
+  vuelto: VueltoLine[];
 }
 
 export interface ListaPrecio {

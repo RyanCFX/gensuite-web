@@ -1022,15 +1022,19 @@ export default function InvoiceDetail() {
                   {formatDOP(invoice.outstandingAmount)}
                 </span>
               </div>
-              {ps && (
+              {(ps || invoice.isPos) && (
                 <div className="detail-field">
                   <span className="detail-label">Estado de Pago</span>
                   <span className="detail-value">
-                    <span
-                      className={`badge ${PAYMENT_BADGE[ps] ?? "badge-neutral"}`}
-                    >
-                      {PAYMENT_LABEL[ps] ?? ps}
-                    </span>
+                    {invoice.isPos ? (
+                      <span className="badge badge-pos">Contado</span>
+                    ) : (
+                      <span
+                        className={`badge ${PAYMENT_BADGE[ps!] ?? "badge-neutral"}`}
+                      >
+                        {PAYMENT_LABEL[ps!] ?? ps}
+                      </span>
+                    )}
                   </span>
                 </div>
               )}
