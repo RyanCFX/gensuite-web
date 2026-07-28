@@ -8,7 +8,7 @@ import { listWarehouses } from '@/shared/api/inventory'
 import { listAlmacenes, listImpuestosCompras, getCatalogosFiscales } from '@/shared/api/config'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
-import type { CreateCompraDto } from '@/shared/api/types'
+import type { CreateCompraDto, Compra } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Plus, Trash2, Info } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -212,6 +212,7 @@ function SerialBatchRow({
             style={{ textAlign: 'right' }}
             value={item.rate}
             onChange={(e) => updateItem(idx, 'rate', parseFloat(e.target.value) || 0)}
+            disabled={isReturn}
           />
         </td>
         <td style={{ textAlign: 'right' }}>
@@ -231,11 +232,13 @@ function SerialBatchRow({
             onSearch={onWarehouseSearch}
             selectedLabel={warehouses?.find((w) => w.id === item.warehouse)?.name ?? ''}
             placeholder="Almacén"
+            disabled={isReturn}
           />
         </td>
         <td>
           <UomSelect
             value={item.uom}
+            disabled={isReturn}
             onChange={(v, factor) => {
               const newRate = Math.round(item.baseRate * factor * 10000) / 10000
               setItems(prev => prev.map((row, i) =>
@@ -547,13 +550,43 @@ export default function CompraForm() {
     .filter((t) => !taxesTemplateSearch || t.title.toLowerCase().includes(taxesTemplateSearch.toLowerCase()))
     .map((t) => ({ value: String(t.id), label: t.title }))
 
-  const { isLoading: loadingEdit } = useQuery({
+  const { data: compraData, isLoading: loadingEdit } = useQuery({
     queryKey: ['compra', id],
     queryFn: () => getCompra(id!),
     enabled: isEdit,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    select: (data: any) => data,
   })
+
+  useEffect(() => {
+    if (!compraData) return
+    setSupplierId(compraData.supplier)
+    setSupplierName(compraData.supplierName ?? '')
+    setPostingDate(compraData.postingDate.split('T')[0])
+    setDueDate(compraData.dueDate?.split('T')[0] ?? '')
+    setItems(
+      compraData.items.map((ci) => ({
+        itemCode: ci.itemCode,
+        description: '',
+        qty: ci.qty,
+        rate: ci.rate,
+        warehouse: ci.warehouse ?? '',
+        uom: ci.uom ?? 'Nos',
+        baseRate: ci.rate,
+        trackingType: ((ci.serials?.length ?? 0) > 0 ? 'serial' : (ci.batches?.length ?? 0) > 0 ? 'batch' : 'none') as 'none' | 'serial' | 'batch',
+        serials: ci.serials ?? [],
+        batches: ci.batches ?? [],
+        purchaseTaxPct: 0,
+        purchaseTaxTemplate: '',
+      })),
+    )
+    setBranch(compraData.branch ?? '')
+    setDepartment(compraData.department ?? '')
+    setNcfProveedor(compraData.ncfProveedor ?? '')
+    setTipoBienes606(compraData.tipoBienes606 ?? '')
+    setFormaPago606(compraData.formaPago606 ?? '')
+    setTipoPago(compraData.tipoPago ?? 'Contado')
+    setRetencionIsr(compraData.retencionIsr ?? 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compraData])
 
   const saveMutation = useMutation({
     mutationFn: (dto: CreateCompraDto) =>
@@ -601,6 +634,7 @@ export default function CompraForm() {
   const subtotal = items.reduce((sum, i) => sum + i.qty * i.rate, 0)
   const taxTotal = items.reduce((sum, i) => sum + (i.qty * i.rate * i.purchaseTaxPct / 100), 0)
   const grandTotal = subtotal + taxTotal
+  const isReturn = (compraData?.grandTotal ?? grandTotal) < 0
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -718,6 +752,13 @@ export default function CompraForm() {
         description="Registra una compra de inventario"
       />
 
+      {isReturn && (
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
+          <Info size={16} />
+          <span>Devolución a proveedor — los campos de información general, precio, almacén y UOM no pueden modificarse.</span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Header fields */}
@@ -733,6 +774,7 @@ export default function CompraForm() {
                     id="supplier"
                     value={supplierId}
                     selectedLabel={supplierName}
+                    disabled={isReturn}
                     onChange={(id, opt) => {
                       const resolvedId = id === '' ? '' : (opt?.value ?? id)
                       setSupplierId(resolvedId)
@@ -760,6 +802,7 @@ export default function CompraForm() {
                     value={postingDate}
                     onChange={(e) => setPostingDate(e.target.value)}
                     required
+                    disabled={isReturn}
                   />
                 </div>
 
@@ -770,12 +813,13 @@ export default function CompraForm() {
                     className="ff-input"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
+                    disabled={isReturn}
                   />
                 </div>
 
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal</label>
-                  <select className={`ff-select${branchError ? ' ff-input-error' : ''}`} value={branch} onChange={(e) => { setBranch(e.target.value); setBranchError(false) }}>
+                  <select className={`ff-select${branchError ? ' ff-input-error' : ''}`} value={branch} onChange={(e) => { setBranch(e.target.value); setBranchError(false) }} disabled={isReturn}>
                     <option value="">Sin especificar</option>
                     {branchOptions.map((b) => (
                       <option key={b} value={b}>{b}</option>
@@ -785,7 +829,7 @@ export default function CompraForm() {
 
                 <div className="ff-wrap">
                   <label className="ff-label">Departamento</label>
-                  <DepartmentSelect value={department} onChange={setDepartment} placeholder="Buscar departamento…" />
+                  <DepartmentSelect value={department} onChange={setDepartment} placeholder="Buscar departamento…" disabled={isReturn} />
                 </div>
 
                 <div className="ff-wrap">
@@ -793,6 +837,7 @@ export default function CompraForm() {
                   <SearchSelect
                     id="taxesTemplate"
                     value={taxesTemplate}
+                    disabled={isReturn}
                     onChange={(val) => setTaxesTemplate(val)}
                     options={taxesTemplateOptions}
                     onSearch={setTaxesTemplateSearch}
