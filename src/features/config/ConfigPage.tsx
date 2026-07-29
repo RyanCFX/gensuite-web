@@ -1994,12 +1994,14 @@ function FacturacionConfigSection() {
   const [requiereUbicacionVenta, setRequiereUbicacionVenta] = useState(false)
   const [showPosActivar, setShowPosActivar] = useState(false)
   const [posWarehouse, setPosWarehouse] = useState('')
+  const [arqueoEfectivoRequerido, setArqueoEfectivoRequerido] = useState(false)
 
   useEffect(() => {
     if (data) {
       setSelectedRoles(data.rolesCancelacionFactura ?? [])
       setFlujoCobro(data.flujoCobro ?? 'directo')
       setRequiereUbicacionVenta(data.requiereUbicacionVenta ?? false)
+      setArqueoEfectivoRequerido(data.arqueoEfectivoRequerido ?? false)
     }
   }, [data])
 
@@ -2160,10 +2162,33 @@ function FacturacionConfigSection() {
           )}
         </div>
 
+        {data?.usaModuloPos && (
+          <div className="ff-wrap">
+            <label className="ff-check-wrap">
+              <input
+                type="checkbox"
+                className="ff-check"
+                checked={arqueoEfectivoRequerido}
+                onChange={(e) => setArqueoEfectivoRequerido(e.target.checked)}
+              />
+              <span style={{ fontSize: 13 }}>Arqueo de efectivo obligatorio al cerrar turno</span>
+            </label>
+            <p className="ff-hint" style={{ marginTop: 4 }}>
+              Si está activo, el cajero debe contar y desglosar las denominaciones de efectivo (billetes/monedas) al cerrar su turno;
+              si falta, el sistema rechaza el cierre.
+            </p>
+          </div>
+        )}
+
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button
             className="btn btn-primary btn-size-sm"
-            onClick={() => saveMutation.mutate({ rolesCancelacionFactura: selectedRoles, flujoCobro, requiereUbicacionVenta })}
+            onClick={() => saveMutation.mutate({
+              rolesCancelacionFactura: selectedRoles,
+              flujoCobro,
+              requiereUbicacionVenta,
+              arqueoEfectivoRequerido,
+            })}
             disabled={saveMutation.isPending}
           >
             <Save size={14} /> Guardar

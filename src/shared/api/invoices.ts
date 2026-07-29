@@ -5,6 +5,7 @@ import type {
   CreateInvoiceDto,
   CancelInvoiceDto,
   SubmitInvoiceDto,
+  SubmitInvoiceResult,
   AplicarSaldoFavorDto,
   DraftVersion,
   PaginatedResponse,
@@ -38,7 +39,7 @@ export async function createInvoice(data: CreateInvoiceDto) {
 }
 
 export async function submitInvoice(id: string, data?: SubmitInvoiceDto) {
-  const res = await client.post<{ success: true; data: Invoice }>(ENDPOINTS.invoices.submit(id), data)
+  const res = await client.post<{ success: true; data: SubmitInvoiceResult }>(ENDPOINTS.invoices.submit(id), data)
   return unwrap(res)
 }
 

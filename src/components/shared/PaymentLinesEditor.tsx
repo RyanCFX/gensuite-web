@@ -52,7 +52,7 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
 
   const cash = cashAmount(value.payments, metodos ?? [])
   const tenderedCash = Number(value.tenderedCash) || 0
-  const vueltoEsperado = Math.max(0, tenderedCash - cash)
+  const vueltoEsperado = tenderedCash - cash
   const vueltoDeclarado = sumVuelto(value.vuelto, denominacionesActivas)
   const vueltoOk = Math.abs(vueltoEsperado - vueltoDeclarado) <= PAYMENT_LINES_TOLERANCE
 
@@ -206,7 +206,14 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
 
           {tenderedCash > 0 && (
             <>
-              <p style={{ fontSize: 13, margin: 0 }}>Vuelto a entregar: {formatDOP(vueltoEsperado)}</p>
+              <p style={{ fontSize: 13, margin: 0, color: vueltoEsperado < 0 ? 'var(--color-error)' : undefined }}>
+                Vuelto a entregar: {formatDOP(vueltoEsperado)}
+                {vueltoEsperado < 0 && (
+                  <span style={{ display: 'block', fontSize: 12, color: 'var(--color-error)', marginTop: 2 }}>
+                    El efectivo entregado es menor al total de pagos en efectivo
+                  </span>
+                )}
+              </p>
 
               {value.vuelto.map((v, idx) => (
                 <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -256,8 +263,13 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
                 <Plus size={13} /> Agregar denominación
               </button>
 
-              <p style={{ fontSize: 13, margin: 0, color: vueltoOk ? 'var(--color-success)' : 'var(--error-text)' }}>
+              <p style={{ fontSize: 13, margin: 0, color: vueltoEsperado >= 0 && vueltoOk ? 'var(--color-success)' : 'var(--error-text)' }}>
                 Total desglosado: {formatDOP(vueltoDeclarado)} / Vuelto esperado: {formatDOP(vueltoEsperado)}
+                {vueltoEsperado >= 0 && !vueltoOk && (
+                  <span style={{ display: 'block', fontSize: 12, color: 'var(--color-error)', marginTop: 2 }}>
+                    El desglose no coincide con el vuelto esperado
+                  </span>
+                )}
               </p>
             </>
           )}

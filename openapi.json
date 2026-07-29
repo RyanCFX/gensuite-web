@@ -65,6 +65,418 @@
         ]
       }
     },
+    "/api/v1/auth/change-password": {
+      "post": {
+        "operationId": "AuthController_changePassword",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambiar mi propia contraseña",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/notificaciones/tipos": {
+      "get": {
+        "operationId": "NotificacionesController_listTipos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lista los 28 tipos de notificación del catálogo con su estado actual",
+        "tags": [
+          "Notificaciones"
+        ]
+      }
+    },
+    "/api/v1/notificaciones/tipos/{codigo}": {
+      "get": {
+        "operationId": "NotificacionesController_getTipo",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un tipo de notificación, incluye destinatarios",
+        "tags": [
+          "Notificaciones"
+        ]
+      },
+      "put": {
+        "operationId": "NotificacionesController_updateTipo",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificacionTipoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualiza activo/canalEmail/destinatarios de un tipo (upsert parcial; destinatarios reemplaza la lista completa)",
+        "tags": [
+          "Notificaciones"
+        ]
+      }
+    },
+    "/api/v1/notificaciones/tipos/{codigo}/probar": {
+      "post": {
+        "operationId": "NotificacionesController_probarTipo",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestNotificacionTipoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Envía un correo de prueba de este tipo (datos de ejemplo) a un email arbitrario, sin tocar activo/destinatarios ni el historial",
+        "tags": [
+          "Notificaciones"
+        ]
+      }
+    },
+    "/api/v1/notificaciones/canales/email": {
+      "get": {
+        "operationId": "NotificacionesController_getEmailChannelConfig",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configuración actual del canal de email saliente (sin exponer la contraseña)",
+        "tags": [
+          "Notificaciones"
+        ]
+      },
+      "put": {
+        "operationId": "NotificacionesController_updateEmailChannelConfig",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEmailChannelDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crea/actualiza la cuenta de email saliente (Email Account default_outgoing)",
+        "tags": [
+          "Notificaciones"
+        ]
+      }
+    },
+    "/api/v1/notificaciones/logs": {
+      "get": {
+        "operationId": "NotificacionesController_listLogs",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por código de tipo, ej. \"cxc_factura_vence_hoy\"",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Enviado",
+                "Fallido"
+              ]
+            }
+          },
+          {
+            "name": "referencia",
+            "required": false,
+            "in": "query",
+            "description": "Referencia del documento/entidad origen, ej. el name de una factura",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "Fecha desde (YYYY-MM-DD), inclusive",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "Fecha hasta (YYYY-MM-DD), inclusive",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Historial de intentos de envío (Enviado/Fallido), paginado y filtrable",
+        "tags": [
+          "Notificaciones"
+        ]
+      }
+    },
+    "/api/v1/notificaciones/logs/resumen": {
+      "get": {
+        "operationId": "NotificacionesController_getLogsResumen",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dias",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Conteos agregados (total/enviados/fallidos) en una ventana de días + último intento",
+        "tags": [
+          "Notificaciones"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "HealthController_check",
@@ -1183,6 +1595,36 @@
           }
         ],
         "summary": "Actualizar configuración de facturación",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/pos/habilitar": {
+      "post": {
+        "description": "Opt-in por tenant — provisiona el POS Profile default y el rol \"Cajero POS\", y marca Facturacion Config.usa_modulo_pos=1. Ver docs/modulo_pos/FASE_A_HABILITACION_POR_TENANT.md.",
+        "operationId": "ConfigController_enablePosModule",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activar el módulo POS (turnos de caja) para este tenant",
         "tags": [
           "Configuración"
         ]
@@ -5547,6 +5989,447 @@
         "summary": "Cobra una factura ya sometida: crea y somete uno o más Payment Entry (uno por método de pago) y registra el vuelto si aplica. Admite cobro parcial.",
         "tags": [
           "Caja"
+        ]
+      }
+    },
+    "/api/v1/caja/por-cobrar": {
+      "get": {
+        "operationId": "CajaController_listPorCobrar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lista facturas Draft enviadas a Caja (módulo POS habilitado + pago al contado al someter) que aún no tienen NCF asignado — pendientes de completar el cobro.",
+        "tags": [
+          "Caja"
+        ]
+      }
+    },
+    "/api/v1/caja/facturas/{id}/completar-cobro": {
+      "post": {
+        "operationId": "CajaController_completarCobro",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CobrarFacturaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Completa el cobro de una factura enviada a Caja: somete la factura de verdad y asigna el NCF en este momento (nunca antes). Mismo body que /cobrar.",
+        "tags": [
+          "Caja"
+        ]
+      }
+    },
+    "/api/v1/caja/facturas/{id}": {
+      "delete": {
+        "operationId": "CajaController_descartar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Descarta una factura Draft abandonada en la cola de Caja (nunca se cobró).",
+        "tags": [
+          "Caja"
+        ]
+      }
+    },
+    "/api/v1/pos/turnos/actual": {
+      "get": {
+        "operationId": "PosController_getCurrentSession",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Turno de caja abierto del usuario actual (o null si no tiene ninguno).",
+        "tags": [
+          "POS"
+        ]
+      }
+    },
+    "/api/v1/pos/turnos": {
+      "get": {
+        "operationId": "PosController_listTurnos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cajero",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por cajero (email de usuario)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por estado del turno",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Open",
+                "Closed"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Fecha/hora mínima de apertura (period_start_date \u003E=)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Fecha/hora máxima de apertura (period_start_date \u003C=)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Historial paginado de turnos de caja (abiertos y cerrados), filtrable por cajero/estado/fechas.",
+        "tags": [
+          "POS"
+        ]
+      }
+    },
+    "/api/v1/pos/turnos/{id}": {
+      "get": {
+        "operationId": "PosController_getTurnoDetalle",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle completo de un turno específico: apertura y, si ya cerró, el detalle del cierre (incluye arqueo de efectivo).",
+        "tags": [
+          "POS"
+        ]
+      }
+    },
+    "/api/v1/pos/turnos/abrir": {
+      "post": {
+        "operationId": "PosController_openSession",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenPosSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Abrir turno de caja (POS Opening Entry) — precondición para vender con pago parcial vía POS.",
+        "tags": [
+          "POS"
+        ]
+      }
+    },
+    "/api/v1/pos/turnos/{openingEntryId}/preview-cierre": {
+      "get": {
+        "operationId": "PosController_previewClosingEntry",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "openingEntryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa del cierre de turno — monto esperado por modo de pago (calculado por ERPNext).",
+        "tags": [
+          "POS"
+        ]
+      }
+    },
+    "/api/v1/pos/turnos/{openingEntryId}/cerrar": {
+      "post": {
+        "operationId": "PosController_closeSession",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "openingEntryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClosePosSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cerrar turno de caja (POS Closing Entry) con el efectivo contado por el cajero.",
+        "tags": [
+          "POS"
         ]
       }
     },
@@ -10722,7 +11605,8 @@
               "type": "string",
               "enum": [
                 "json",
-                "txt"
+                "txt",
+                "excel"
               ]
             }
           },
@@ -10747,7 +11631,7 @@
             "bearer": []
           }
         ],
-        "summary": "Formato 606 DGII — compras del período (requiere dgii-compliance)",
+        "summary": "Formato 606 DGII — compras del período (requiere dgii-compliance). ?format=json|txt|excel",
         "tags": [
           "Reportes"
         ]
@@ -10794,7 +11678,8 @@
               "type": "string",
               "enum": [
                 "json",
-                "txt"
+                "txt",
+                "excel"
               ]
             }
           },
@@ -10819,7 +11704,7 @@
             "bearer": []
           }
         ],
-        "summary": "Formato 607 DGII — ventas del período (requiere dgii-compliance)",
+        "summary": "Formato 607 DGII — ventas del período (requiere dgii-compliance). ?format=json|txt|excel",
         "tags": [
           "Reportes"
         ]
@@ -10866,7 +11751,8 @@
               "type": "string",
               "enum": [
                 "json",
-                "txt"
+                "txt",
+                "excel"
               ]
             }
           },
@@ -10891,7 +11777,7 @@
             "bearer": []
           }
         ],
-        "summary": "Formato 608 DGII — comprobantes anulados (requiere dgii-compliance)",
+        "summary": "Formato 608 DGII — comprobantes anulados (requiere dgii-compliance). ?format=json|txt|excel",
         "tags": [
           "Reportes"
         ]
@@ -10939,6 +11825,76 @@
           }
         ],
         "summary": "Cuadre de caja del día — cobros por método de pago vs facturas emitidas",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/pos/cuadre-turno": {
+      "get": {
+        "operationId": "ReportesController_getCuadreTurno",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cajero",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por cajero (User).",
+            "schema": {
+              "example": "rcastrofelix06@gmail.com",
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "json",
+              "type": "string",
+              "enum": [
+                "json",
+                "excel"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cuadre de caja por turno (POS Closing Entry) — reusa el cuadre ya calculado por ERPNext al cerrar cada turno.",
         "tags": [
           "Reportes"
         ]
@@ -14309,6 +15265,107 @@
           "pin"
         ]
       },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "newPassword": {
+            "type": "string",
+            "example": "NuevaClave2026!"
+          }
+        },
+        "required": [
+          "newPassword"
+        ]
+      },
+      "NotificacionDestinatarioDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Correo del destinatario"
+          },
+          "nombre": {
+            "type": "string",
+            "description": "Nombre opcional, solo para mostrar en la UI (ej. \"Contador\")"
+          }
+        }
+      },
+      "UpdateNotificacionTipoDto": {
+        "type": "object",
+        "properties": {
+          "activo": {
+            "type": "boolean",
+            "description": "¿El tipo está activo? Opt-in — arranca en false."
+          },
+          "canalEmail": {
+            "type": "boolean",
+            "description": "¿Notifica por email? Independiente de \"activo\"."
+          },
+          "destinatarios": {
+            "description": "Reemplaza la lista completa de destinatarios (no es un merge).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificacionDestinatarioDto"
+            }
+          }
+        }
+      },
+      "TestNotificacionTipoDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "ryan@empresa.com",
+            "description": "Correo al que se envía el correo de prueba"
+          },
+          "nombre": {
+            "type": "string",
+            "example": "Ryan",
+            "description": "Nombre opcional, solo para el saludo del correo de prueba"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "UpdateEmailChannelDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Correo desde el que se envían las notificaciones"
+          },
+          "host": {
+            "type": "string",
+            "description": "Host SMTP (ej. smtp.gmail.com)"
+          },
+          "puerto": {
+            "type": "number",
+            "description": "Puerto SMTP (ej. 587)"
+          },
+          "tls": {
+            "type": "boolean",
+            "default": true
+          },
+          "ssl": {
+            "type": "boolean",
+            "default": false
+          },
+          "habilitado": {
+            "type": "boolean",
+            "default": true,
+            "description": "Habilitar el envío saliente"
+          },
+          "usuario": {
+            "type": "string",
+            "description": "Usuario de autenticación SMTP"
+          },
+          "password": {
+            "type": "string",
+            "description": "Contraseña SMTP. Opcional en el PUT — si se omite, no se toca la ya guardada."
+          }
+        }
+      },
       "CreateCustomerDto": {
         "type": "object",
         "properties": {
@@ -14749,7 +15806,7 @@
             "description": "Fuerza el cobro al contado aunque el cliente tenga crédito establecido (solo afecta si se valida el crédito disponible al someter). Se marca automáticamente en true si se envía `payments`."
           },
           "payments": {
-            "description": "Opcional — si se envía, la factura se cobra en la misma llamada (equivalente a someter y después llamar POST /caja/facturas/:id/cobrar con este mismo cuerpo). Si se omite, la factura queda sometida sin cobrar, para cobrarse después por separado.",
+            "description": "Opcional — indica que esta es una venta al contado. Si el tenant NO tiene usaModuloPos habilitado, la factura se somete y se cobra en la misma llamada (is_pos nativo). Si el tenant SÍ tiene usaModuloPos habilitado, la factura NO se somete en esta llamada — queda en Draft, enviada a la cola de Caja (custom_enviada_a_caja=1); el submit real y el NCF ocurren recién en POST /caja/facturas/:id/completar-cobro (mismo body: payments/vuelto/tenderedCash). Si se omite `payments`, la factura queda sometida a crédito, sin cobrar, para cobrarse después por separado (GET /caja/pendientes → POST /caja/facturas/:id/cobrar).",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PaymentLineDto"
@@ -14934,6 +15991,11 @@
             "type": "boolean",
             "default": false,
             "description": "Si está activo, no se podrá vender un artículo de inventario si no tiene una Ubicación asignada dentro del almacén desde el cual se factura."
+          },
+          "arqueoEfectivoRequerido": {
+            "type": "boolean",
+            "default": false,
+            "description": "Si está activo, cerrar un turno de caja (POS) exige el desglose de denominaciones contadas para el/los modos de pago en efectivo — el cierre se rechaza si falta. Solo aplica cuando usaModuloPos está activo."
           }
         }
       },
@@ -16107,6 +17169,99 @@
           "payments"
         ]
       },
+      "BalanceDetailDto": {
+        "type": "object",
+        "properties": {
+          "modeOfPayment": {
+            "type": "string",
+            "example": "Cash"
+          },
+          "openingAmount": {
+            "type": "number",
+            "example": 2000,
+            "description": "Monto de apertura para este modo de pago."
+          }
+        },
+        "required": [
+          "modeOfPayment",
+          "openingAmount"
+        ]
+      },
+      "OpenPosSessionDto": {
+        "type": "object",
+        "properties": {
+          "posProfile": {
+            "type": "string",
+            "description": "POS Profile a usar — si se omite, se usa Facturacion Config.pos_profile_default."
+          },
+          "balanceDetails": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BalanceDetailDto"
+            }
+          }
+        },
+        "required": [
+          "balanceDetails"
+        ]
+      },
+      "DenominacionCierreDto": {
+        "type": "object",
+        "properties": {
+          "denominacion": {
+            "type": "string",
+            "example": "RD$1000",
+            "description": "Nombre del registro Denominacion Billete."
+          },
+          "cantidad": {
+            "type": "number",
+            "description": "Cantidad de billetes/monedas de esta denominación contados en caja."
+          }
+        },
+        "required": [
+          "denominacion",
+          "cantidad"
+        ]
+      },
+      "ClosingAmountDto": {
+        "type": "object",
+        "properties": {
+          "modeOfPayment": {
+            "type": "string",
+            "example": "Efectivo RD"
+          },
+          "amount": {
+            "type": "number",
+            "example": 4700,
+            "description": "Monto real contado físicamente por el cajero para este modo de pago."
+          },
+          "denominaciones": {
+            "description": "Desglose de billetes/monedas contados para este modo de pago (arqueo). Solo tiene sentido para el modo de pago en efectivo — para los demás modos, omitir. Si se envía, la suma `valor × cantidad` debe coincidir exactamente con `amount` (mismo principio que el vuelto al cobrar en Caja: el desglose es la fuente de verdad, no un adorno informativo suelto).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DenominacionCierreDto"
+            }
+          }
+        },
+        "required": [
+          "modeOfPayment",
+          "amount"
+        ]
+      },
+      "ClosePosSessionDto": {
+        "type": "object",
+        "properties": {
+          "closingAmounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClosingAmountDto"
+            }
+          }
+        },
+        "required": [
+          "closingAmounts"
+        ]
+      },
       "CreateCategoryDto": {
         "type": "object",
         "properties": {
@@ -16812,7 +17967,7 @@
             "type": "string",
             "enum": [
               "Corriente",
-              "Ahorro"
+              "Ahorros"
             ]
           },
           "numeroCuenta": {
@@ -16936,7 +18091,7 @@
             "type": "string",
             "enum": [
               "Corriente",
-              "Ahorro"
+              "Ahorros"
             ]
           },
           "numeroCuenta": {

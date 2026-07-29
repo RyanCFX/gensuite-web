@@ -1624,6 +1624,8 @@ export interface FacturacionConfig {
   usaModuloPos?: boolean;
   /** Nombre del POS Profile provisionado — solo informativo, no editable desde aquí. */
   posProfileDefault?: string | null;
+  /** Si está activo, cerrar un turno de caja exige el desglose de denominaciones contadas para el/los modos de pago en efectivo. */
+  arqueoEfectivoRequerido?: boolean;
 }
 
 // POST /config/pos/habilitar
@@ -1679,9 +1681,16 @@ export interface PreviewCierreTurno {
   paymentReconciliation: PaymentReconciliationLine[];
 }
 
+export interface DenominacionCierreDto {
+  denominacion: string;
+  cantidad: number;
+}
+
 export interface ClosingAmountLine {
   modeOfPayment: string;
   amount: number;
+  /** Desglose de billetes/monedas contados para este modo de pago (arqueo). Solo para efectivo. */
+  denominaciones?: DenominacionCierreDto[];
 }
 
 // POST /pos/turnos/:openingEntryId/cerrar
@@ -1693,6 +1702,47 @@ export interface CierreTurnoResult {
   id: string;
   status: string;
   paymentReconciliation: PaymentReconciliationLine[];
+}
+
+// GET /pos/turnos — fila del historial de turnos
+export interface TurnoListItem {
+  id: string;
+  cajero: string;
+  posProfile: string;
+  company: string;
+  periodStartDate: string;
+  status: "Open" | "Closed";
+  closingEntryId?: string;
+  periodEndDate?: string;
+  grandTotal?: number;
+  totalDifference?: number;
+}
+
+// GET /pos/turnos/:id — detalle completo
+export interface TurnoDetail {
+  id: string;
+  status: "Open" | "Closed";
+  posProfile: string;
+  company: string;
+  user: string;
+  periodStartDate: string;
+  balanceDetails: BalanceDetailLine[];
+  closing?: TurnoClosing | null;
+}
+
+export interface TurnoClosing {
+  id: string;
+  status: string;
+  posOpeningEntry: string;
+  posProfile: string;
+  user: string;
+  periodStartDate: string;
+  periodEndDate: string;
+  grandTotal: number;
+  netTotal: number;
+  totalQuantity: number;
+  paymentReconciliation: PaymentReconciliationLine[];
+  denominacionesEfectivo: DenominacionCierreDto[];
 }
 
 // GET /reportes/pos/cuadre-turno — una fila por combinación turno + modo de pago
@@ -1761,6 +1811,13 @@ export interface VueltoLine {
   cantidad: number;
 }
 
+// POST /caja/facturas/:id/cobrar
+export interface CobrarFacturaDto {
+  payments: PaymentLine[]
+  vuelto?: VueltoLine[]
+  tenderedCash?: number
+}
+
 /** Resumen del cobro registrado al someter una factura (presente cuando se enviaron payments). */
 export interface CobroResumen {
   invoiceId: string;
@@ -1769,6 +1826,36 @@ export interface CobroResumen {
   fullyPaid: boolean;
   vuelto: VueltoLine[];
 }
+
+/** Respuesta de POST /invoices/:id/submit cuando usaModuloPos=true y se envían payments.
+ *  La factura no recibe NCF todavía — pasa a la cola de "por cobrar" en Caja. */
+export interface PendienteCobroSubmitResult {
+  invoiceId: string;
+  status: "pendiente_cobro";
+  message: string;
+}
+
+/** Fila de GET /caja/por-cobrar — factura en borrador que espera completar cobro (sin NCF aún). */
+export interface PendienteCobroItem {
+  id: string;
+  customer: string;
+  customerName: string;
+  grandTotal: number;
+  postingDate: string;
+}
+
+/** Respuesta de POST /caja/facturas/:id/completar-cobro. */
+export interface CompletarCobroResult {
+  invoiceId: string;
+  ncf: string;
+  isPos: boolean;
+  paymentEntryIds: string[];
+  outstandingAmount: number;
+  fullyPaid: boolean;
+  vuelto: VueltoLine[];
+}
+
+export type SubmitInvoiceResult = Invoice | PendienteCobroSubmitResult;
 
 export interface ListaPrecio {
   name: string;

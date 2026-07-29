@@ -74,6 +74,10 @@ const AjustesAvanzadosPage = lazy(() => import('@/features/config/AjustesAvanzad
 const NotificacionesPage   = lazy(() => import('@/features/config/NotificacionesPage'))
 const CostosImportacionPage = lazy(() => import('@/features/compras/CostosImportacionPage'))
 const CostoImportacionDetail = lazy(() => import('@/features/compras/CostoImportacionDetail'))
+const CajaPage = lazy(() => import('@/features/caja/CajaPage'))
+const PorCobrarPage = lazy(() => import('@/features/caja/PorCobrarPage'))
+const TurnosPage = lazy(() => import('@/features/pos/TurnosPage'))
+const TurnoDetailPage = lazy(() => import('@/features/pos/TurnoDetailPage'))
 
 function PageLoader() {
   return (
@@ -170,7 +174,11 @@ export default function App() {
             <Route path="/proveedores/:id" element={<Suspense fallback={<PageLoader />}><SupplierDetail /></Suspense>} />
             <Route path="/proveedores/:id/editar" element={<Suspense fallback={<PageLoader />}><SupplierForm /></Suspense>} />
 
-            {/* Cobros */}
+            {/* Caja / Cobros */}
+            <Route path="/caja" element={<Suspense fallback={<PageLoader />}><CajaPage /></Suspense>} />
+            <Route path="/caja/por-cobrar" element={<Suspense fallback={<PageLoader />}><PorCobrarPage /></Suspense>} />
+            <Route path="/turnos" element={<Suspense fallback={<PageLoader />}><TurnosPage /></Suspense>} />
+            <Route path="/turnos/:id" element={<Suspense fallback={<PageLoader />}><TurnoDetailPage /></Suspense>} />
             <Route path="/cobros/lista" element={<Suspense fallback={<PageLoader />}><CobrosPage /></Suspense>} />
             <Route path="/cobros/pago" element={<Suspense fallback={<PageLoader />}><PagoPage /></Suspense>} />
             <Route path="/cobros/aging" element={<Suspense fallback={<PageLoader />}><AgingPage /></Suspense>} />

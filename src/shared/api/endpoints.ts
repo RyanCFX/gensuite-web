@@ -211,6 +211,15 @@ export const ENDPOINTS = {
     turnoAbrir: '/pos/turnos/abrir',
     turnoPreviewCierre: (openingEntryId: string) => `/pos/turnos/${encodeURIComponent(openingEntryId)}/preview-cierre`,
     turnoCerrar: (openingEntryId: string) => `/pos/turnos/${encodeURIComponent(openingEntryId)}/cerrar`,
+    turnos: '/pos/turnos',
+    turnoById: (id: string) => `/pos/turnos/${encodeURIComponent(id)}`,
+  },
+  caja: {
+    pendientes: '/caja/pendientes',
+    cobrar: (id: string) => `/caja/facturas/${encodeURIComponent(id)}/cobrar`,
+    porCobrar: '/caja/por-cobrar',
+    completarCobro: (id: string) => `/caja/facturas/${encodeURIComponent(id)}/completar-cobro`,
+    descartar: (id: string) => `/caja/facturas/${encodeURIComponent(id)}`,
   },
   ejercicioFiscal: {
     list: '/config/ejercicio-fiscal',

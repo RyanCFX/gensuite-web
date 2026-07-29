@@ -171,13 +171,13 @@ export default function RetencionesPage() {
   }
 
   const retenciones = data?.items ?? []
-  const totalPages = data ? Math.ceil((data.meta.total ?? 0) / PAGE_SIZE) : 1
+  const totalPages = data?.meta ? Math.ceil((data.meta.total ?? 0) / PAGE_SIZE) : 1
 
   return (
     <div className="page-container">
       <PageHeader
         title="Retenciones"
-        description={data ? `${data.meta.total ?? 0} categorías de retención` : undefined}
+        description={data?.meta ? `${data.meta.total ?? 0} categorías de retención` : undefined}
         action={
           <button className="btn btn-primary" onClick={openCreate}>
             <Plus size={16} />
@@ -258,7 +258,7 @@ export default function RetencionesPage() {
           </table>
         </div>
 
-        {data && data.meta.total > PAGE_SIZE && (
+        {data?.meta && data.meta.total > PAGE_SIZE && (
           <div className="pagination">
             <span className="pagination-info">
               Mostrando {offset + 1}–{Math.min(offset + PAGE_SIZE, data.meta.total)} de {data.meta.total}

@@ -22,7 +22,8 @@ import { listMetodosPago, getFacturacionConfig, listDenominaciones, getCatalogos
 import { createDevolucion } from "@/shared/api/devoluciones";
 import { getItem } from "@/shared/api/catalog";
 import { getBundle } from "@/shared/api/bundles";
-import type { ApiError, SubmitInvoiceDto, ComponentTracking } from "@/shared/api/types";
+import { getTurnoActual, abrirTurno } from "@/shared/api/pos";
+import type { ApiError, SubmitInvoiceDto, ComponentTracking, TurnoCaja, BalanceDetailLine } from "@/shared/api/types";
 import { MOTIVOS_ANULACION_DGII } from "@/lib/constants";
 import { PaymentLinesEditor } from "@/components/shared/PaymentLinesEditor";
 import {
@@ -42,6 +43,9 @@ import {
   RotateCcw,
   Receipt,
   Loader2,
+  Clock,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -86,6 +90,7 @@ export default function InvoiceDetail() {
   const [creditErrorOpen, setCreditErrorOpen] = useState(false);
   const [creditErrorMsg, setCreditErrorMsg] = useState("");
   const [lastSubmitBody, setLastSubmitBody] = useState<SubmitInvoiceDto | undefined>(undefined);
+  const [submitResult, setSubmitResult] = useState<{ outstandingAmount: number; invoiceId: string } | null>(null);
   const [trackingRecovery, setTrackingRecovery] = useState<TrackedComponent | null>(null);
   const [trackingRecoveryLoading, setTrackingRecoveryLoading] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
@@ -108,6 +113,11 @@ export default function InvoiceDetail() {
   >("credit_note_only");
   const [returnModeOfPayment, setReturnModeOfPayment] = useState("");
   const [returnReason, setReturnReason] = useState("");
+
+  const [turnoModalOpen, setTurnoModalOpen] = useState(false);
+  const [turnoBalanceDetails, setTurnoBalanceDetails] = useState<BalanceDetailLine[]>([
+    { modeOfPayment: '', openingAmount: 0 },
+  ]);
 
   const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState("");
   const [modeOfPaymentRetrySearch, setModeOfPaymentRetrySearch] = useState("");
@@ -147,8 +157,33 @@ export default function InvoiceDetail() {
     enabled: invoice?.status === "draft",
     staleTime: 5 * 60_000,
   });
+  const usaModuloPos = facturacionConfig?.usaModuloPos ?? false;
+
+  const { data: turno } = useQuery({
+    queryKey: ['turno-actual'],
+    queryFn: getTurnoActual,
+    enabled: !!invoice && invoice.status === "draft" && usaModuloPos,
+    staleTime: 30_000,
+  });
+
   // Si la llamada falla o el campo no viene, se trata como "directo" (comportamiento histórico/seguro).
   const flujoCobro = facturacionConfig?.flujoCobro ?? "directo";
+
+  const abrirTurnoMutation = useMutation({
+    mutationFn: () =>
+      abrirTurno({
+        balanceDetails: turnoBalanceDetails.filter((b) => b.modeOfPayment),
+      }),
+    onSuccess: (turnoCaja) => {
+      queryClient.setQueryData(['turno-actual'], turnoCaja);
+      setTurnoModalOpen(false);
+      setTurnoBalanceDetails([{ modeOfPayment: '', openingAmount: 0 }]);
+      toast.success(`Turno abierto — ${turnoCaja.posProfile}`);
+    },
+    onError: (err: ApiError) => {
+      toast.error(err?.message ?? 'Error al abrir el turno');
+    },
+  });
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
@@ -333,15 +368,37 @@ export default function InvoiceDetail() {
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      queryClient.invalidateQueries({ queryKey: ["turno-actual"] });
       setCreditErrorOpen(false);
       setPayCash(false);
       setModeOfPayment("");
       setCashPayments(EMPTY_PAYMENT_LINES_VALUE);
-      toast.success(
-        updated.paymentStatus === "paid"
-          ? "Factura sometida y cobrada al contado"
-          : "Factura sometida — NCF asignado",
-      );
+      setSubmitResult(null);
+
+      // Nuevo flujo POS: la factura va a "por cobrar" sin NCF — redirigir a Caja
+      if ("status" in updated && updated.status === "pendiente_cobro") {
+        toast.success(updated.message);
+        navigate(`/caja/por-cobrar?invoiceId=${updated.invoiceId}`);
+        return;
+      }
+
+      if (updated.cobro?.fullyPaid) {
+        toast.success("Factura sometida y cobrada");
+      } else if (updated.isPos && updated.outstandingAmount > 0) {
+        toast.success(
+          `Factura sometida con pago parcial — saldo pendiente: ${formatDOP(updated.outstandingAmount)}`,
+        );
+        setSubmitResult({ outstandingAmount: updated.outstandingAmount, invoiceId: updated.id });
+      } else if (updated.cobro && !updated.cobro.fullyPaid) {
+        toast.success(
+          `Factura sometida con pago parcial — saldo pendiente: ${formatDOP(updated.outstandingAmount)}`,
+        );
+        setSubmitResult({ outstandingAmount: updated.outstandingAmount, invoiceId: updated.id });
+      } else if (updated.paymentStatus === "paid") {
+        toast.success("Factura sometida y cobrada al contado");
+      } else {
+        toast.success("Factura sometida — NCF asignado");
+      }
     },
     onError: (err: { message?: string }) => {
       const msg = err?.message ?? "";
@@ -455,6 +512,18 @@ export default function InvoiceDetail() {
     },
   });
 
+  function updateTurnoBalanceLine(i: number, patch: Partial<BalanceDetailLine>) {
+    setTurnoBalanceDetails((prev) => prev.map((b, idx) => (idx === i ? { ...b, ...patch } : b)));
+  }
+
+  function addTurnoBalanceLine() {
+    setTurnoBalanceDetails((prev) => [...prev, { modeOfPayment: '', openingAmount: 0 }]);
+  }
+
+  function removeTurnoBalanceLine(i: number) {
+    setTurnoBalanceDetails((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
   function buildCashSubmitBody(): SubmitInvoiceDto {
     if (flujoCobro === "caja") {
       return { payCash: true, ...buildSubmitPayload(cashPayments) };
@@ -470,7 +539,7 @@ export default function InvoiceDetail() {
   }
 
   function handleSubmitClick() {
-    if (showCashSelector) {
+    if (!usaModuloPos && showCashSelector) {
       if (!isCashReadyToSubmit()) {
         toast.error(
           flujoCobro === "caja"
@@ -784,7 +853,26 @@ export default function InvoiceDetail() {
                 <Ban size={14} /> Cancelar
               </button>
 
-              {!noCredit && !paidByCreditNote && (
+              {turno && (
+                <span
+                  style={{
+                    fontSize: 12,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "2px 8px",
+                    borderRadius: "var(--radius-sm)",
+                    background: "var(--color-success-bg, #e6f7e6)",
+                    color: "var(--color-success, #2e7d32)",
+                    fontWeight: 500,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <Clock size={13} /> Turno abierto — {turno.posProfile}
+                </span>
+              )}
+
+              {!usaModuloPos && !noCredit && !paidByCreditNote && (
                 <label
                   style={{
                     display: "flex",
@@ -804,7 +892,7 @@ export default function InvoiceDetail() {
                 </label>
               )}
 
-              {(paidByCreditNote || flujoCobro !== "caja" || !showCashSelector) && (
+              {!usaModuloPos && (paidByCreditNote || flujoCobro !== "caja" || !showCashSelector) && (
                 <div>
                   {paidByCreditNote ? (
                     <SearchSelect
@@ -835,7 +923,7 @@ export default function InvoiceDetail() {
                 </div>
               )}
 
-              {!(flujoCobro === "caja" && showCashSelector && !paidByCreditNote) && (
+              {usaModuloPos || !(flujoCobro === "caja" && showCashSelector && !paidByCreditNote) ? (
                 <button
                   className="btn btn-primary btn-size-sm"
                   onClick={handleSubmitClick}
@@ -843,10 +931,10 @@ export default function InvoiceDetail() {
                 >
                   <Send size={14} /> Someter
                 </button>
-              )}
+              ) : null}
             </div>
 
-            {flujoCobro === "caja" && showCashSelector && !paidByCreditNote && (
+            {!usaModuloPos && flujoCobro === "caja" && showCashSelector && !paidByCreditNote && (
               <>
                 <PaymentLinesEditor
                   amountDue={pendingAmount}
@@ -863,7 +951,7 @@ export default function InvoiceDetail() {
                 </button>
               </>
             )}
-            {noCredit && !paidByCreditNote && (
+            {!usaModuloPos && noCredit && !paidByCreditNote && (
               <p
                 style={{
                   fontSize: 12,
@@ -938,6 +1026,31 @@ export default function InvoiceDetail() {
           </button>
         )}
       </div>
+
+      {submitResult && (
+        <div
+          className="inline-alert"
+          style={{
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          <AlertTriangle size={16} />
+          <span style={{ fontSize: 13, flex: 1 }}>
+            Esta factura tiene un saldo pendiente de {formatDOP(submitResult.outstandingAmount)} — puedes
+            completar el cobro desde la cola de Caja.
+          </span>
+          <button
+            className="btn btn-primary btn-size-sm"
+            onClick={() => navigate("/caja/pendientes")}
+          >
+            Ir a Caja
+          </button>
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
@@ -2227,6 +2340,75 @@ export default function InvoiceDetail() {
               >
                 {devolucionMutation.isPending && <span className="spinner" />}
                 <RotateCcw size={14} /> Confirmar devolución
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: abrir turno */}
+      {turnoModalOpen && (
+        <div className="modal-overlay" onClick={() => setTurnoModalOpen(false)}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Clock size={16} /> Abrir turno de caja
+              </h2>
+              <button className="modal-close" onClick={() => setTurnoModalOpen(false)}>×</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <p className="ff-hint">Fondo inicial de caja por método de pago.</p>
+              {turnoBalanceDetails.map((line, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                  <div className="ff-wrap" style={{ flex: 1 }}>
+                    <label className="ff-label">Método de pago</label>
+                    <select
+                      className="ff-select"
+                      value={line.modeOfPayment}
+                      onChange={(e) => updateTurnoBalanceLine(i, { modeOfPayment: e.target.value })}
+                    >
+                      <option value="">Seleccionar</option>
+                      {(metodos ?? []).filter((m) => !m.disabled).map((m) => (
+                        <option key={m.name} value={m.name}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="ff-wrap" style={{ width: 130 }}>
+                    <label className="ff-label">Monto</label>
+                    <input
+                      type="number"
+                      min={0}
+                      className="ff-input"
+                      value={line.openingAmount}
+                      onChange={(e) => updateTurnoBalanceLine(i, { openingAmount: Number(e.target.value) })}
+                    />
+                  </div>
+                  {turnoBalanceDetails.length > 1 && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-size-icon-sm"
+                      onClick={() => removeTurnoBalanceLine(i)}
+                      aria-label="Quitar línea"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button type="button" className="btn btn-ghost btn-size-sm" onClick={addTurnoBalanceLine} style={{ alignSelf: 'flex-start' }}>
+                <Plus size={14} /> Agregar método de pago
+              </button>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={() => setTurnoModalOpen(false)}>
+                Cancelar
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => abrirTurnoMutation.mutate()}
+                disabled={!turnoBalanceDetails.some((b) => b.modeOfPayment) || abrirTurnoMutation.isPending}
+              >
+                {abrirTurnoMutation.isPending ? 'Abriendo…' : 'Abrir turno'}
               </button>
             </div>
           </div>

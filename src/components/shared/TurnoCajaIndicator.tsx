@@ -1,10 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Clock, Plus, Trash2, Lock } from 'lucide-react'
-import { getFacturacionConfig, listMetodosPago } from '@/shared/api/config'
+import { getFacturacionConfig, listMetodosPago, listDenominaciones } from '@/shared/api/config'
 import { getTurnoActual, abrirTurno, getPreviewCierreTurno, cerrarTurno } from '@/shared/api/pos'
-import type { ApiError, BalanceDetailLine, ClosingAmountLine, CierreTurnoResult } from '@/shared/api/types'
+import type {
+  ApiError,
+  BalanceDetailLine,
+  ClosingAmountLine,
+  CierreTurnoResult,
+  DenominacionCierreDto,
+  MetodoPago,
+} from '@/shared/api/types'
 import { formatDateTime, formatDOP } from '@/lib/formatters'
 
 export function TurnoCajaIndicator() {
@@ -29,6 +36,7 @@ export function TurnoCajaIndicator() {
   })
 
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false
+  const arqueoEfectivoRequerido = facturacionConfig?.arqueoEfectivoRequerido ?? false
 
   const { data: turno } = useQuery({
     queryKey: ['turno-actual'],
@@ -40,9 +48,19 @@ export function TurnoCajaIndicator() {
   const { data: metodos } = useQuery({
     queryKey: ['metodos-pago'],
     queryFn: listMetodosPago,
-    enabled: modalOpen,
+    enabled: modalOpen || cierreModalOpen,
     staleTime: 5 * 60_000,
   })
+
+  const { data: denominaciones } = useQuery({
+    queryKey: ['denominaciones'],
+    queryFn: listDenominaciones,
+    enabled: cierreModalOpen,
+    staleTime: 5 * 60_000,
+  })
+
+  const metodosActivos = (metodos ?? []).filter((m) => !m.disabled)
+  const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo)
 
   const abrirMutation = useMutation({
     mutationFn: () =>
@@ -107,6 +125,44 @@ export function TurnoCajaIndicator() {
 
   const canSubmit = balanceDetails.some((b) => b.modeOfPayment)
 
+  function isCashMethod(mopName: string): boolean {
+    return metodosActivos.some((m) => m.name === mopName && m.type === 'Cash')
+  }
+
+  function getDenominacionesForMode(modeOfPayment: string): DenominacionCierreDto[] {
+    const ca = closingAmounts.find((c) => c.modeOfPayment === modeOfPayment)
+    return ca?.denominaciones ?? []
+  }
+
+  function updateDenominacion(
+    modeOfPayment: string,
+    denom: string,
+    cantidad: number,
+  ) {
+    setClosingAmounts((prev) =>
+      prev.map((c) => {
+        if (c.modeOfPayment !== modeOfPayment) return c
+        const current = c.denominaciones ?? []
+        const existing = current.findIndex((d) => d.denominacion === denom)
+        const updated =
+          existing >= 0
+            ? current.map((d, i) => (i === existing ? { ...d, cantidad } : d))
+            : [...current, { denominacion: denom, cantidad }]
+        return { ...c, denominaciones: updated.filter((d) => d.cantidad > 0) }
+      }),
+    )
+  }
+
+  const cierreValido =
+    preview &&
+    closingAmounts.every((c) => {
+      if (isCashMethod(c.modeOfPayment) && arqueoEfectivoRequerido) {
+        const dens = c.denominaciones ?? []
+        return dens.length > 0 && dens.some((d) => d.cantidad > 0)
+      }
+      return true
+    })
+
   function openCierreModal() {
     setCierreStep('preview')
     setCierreResult(null)
@@ -122,7 +178,9 @@ export function TurnoCajaIndicator() {
   }
 
   function updateClosingAmount(modeOfPayment: string, amount: number) {
-    setClosingAmounts((prev) => prev.map((c) => (c.modeOfPayment === modeOfPayment ? { ...c, amount } : c)))
+    setClosingAmounts((prev) =>
+      prev.map((c) => (c.modeOfPayment === modeOfPayment ? { ...c, amount } : c)),
+    )
   }
 
   return (
@@ -168,7 +226,7 @@ export function TurnoCajaIndicator() {
                       onChange={(e) => updateLine(i, { modeOfPayment: e.target.value })}
                     >
                       <option value="">Seleccionar</option>
-                      {(metodos ?? []).filter((m) => !m.disabled).map((m) => (
+                      {metodosActivos.map((m) => (
                         <option key={m.name} value={m.name}>{m.name}</option>
                       ))}
                     </select>
@@ -218,7 +276,7 @@ export function TurnoCajaIndicator() {
       {/* Modal: cerrar turno */}
       {cierreModalOpen && (
         <div className="modal-overlay" onClick={closeCierreModal}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-box" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Lock size={16} /> {cierreStep === 'preview' ? 'Cerrar turno de caja' : 'Turno cerrado'}
@@ -238,6 +296,9 @@ export function TurnoCajaIndicator() {
                     <p className="ff-hint">
                       Ingresa el monto contado físicamente por cada método de pago. El sistema ya calculó lo
                       que debería haber según las ventas del turno.
+                      {arqueoEfectivoRequerido && (
+                        <> Los métodos de pago en <strong>efectivo</strong> requieren el desglose de denominaciones.</>
+                      )}
                     </p>
                     <div className="table-scroll">
                       <table className="data-table">
@@ -246,30 +307,145 @@ export function TurnoCajaIndicator() {
                             <th>Método</th>
                             <th style={{ textAlign: 'right' }}>Esperado</th>
                             <th style={{ textAlign: 'right' }}>Contado</th>
+                            <th style={{ width: 40 }} />
                           </tr>
                         </thead>
                         <tbody>
-                          {preview.paymentReconciliation.map((p) => (
-                            <tr key={p.modeOfPayment}>
-                              <td>{p.modeOfPayment}</td>
-                              <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>
-                                {formatDOP(p.expectedAmount)}
-                              </td>
-                              <td style={{ textAlign: 'right' }}>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  className="ff-input"
-                                  style={{ textAlign: 'right', maxWidth: 130 }}
-                                  value={closingAmounts.find((c) => c.modeOfPayment === p.modeOfPayment)?.amount ?? 0}
-                                  onChange={(e) => updateClosingAmount(p.modeOfPayment, Number(e.target.value))}
-                                />
-                              </td>
-                            </tr>
-                          ))}
+                          {preview.paymentReconciliation.map((p) => {
+                            const isCash = isCashMethod(p.modeOfPayment)
+                            return (
+                              <tr key={p.modeOfPayment}>
+                                <td>{p.modeOfPayment}</td>
+                                <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>
+                                  {formatDOP(p.expectedAmount)}
+                                </td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    className="ff-input"
+                                    style={{ textAlign: 'right', maxWidth: 130 }}
+                                    value={closingAmounts.find((c) => c.modeOfPayment === p.modeOfPayment)?.amount ?? 0}
+                                    onChange={(e) => updateClosingAmount(p.modeOfPayment, Number(e.target.value))}
+                                  />
+                                </td>
+                                <td>
+                                  {isCash && (
+                                    <span
+                                      className="badge badge-info"
+                                      style={{ cursor: 'pointer', fontSize: 10 }}
+                                      title="Abrir desglose de efectivo"
+                                    >
+                                      Desglose
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>
+
+                    {preview.paymentReconciliation.some((p) => isCashMethod(p.modeOfPayment)) && (
+                      <div
+                        style={{
+                          border: '1px solid var(--border-default)',
+                          borderRadius: 'var(--radius-md)',
+                          padding: 12,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 10,
+                        }}
+                      >
+                        <label className="ff-label" style={{ margin: 0 }}>
+                          Arqueo de efectivo
+                          {arqueoEfectivoRequerido && (
+                            <span style={{ color: 'var(--color-error)', fontWeight: 400, fontSize: 11, marginLeft: 6 }}>
+                              (obligatorio)
+                            </span>
+                          )}
+                        </label>
+                        <p className="ff-hint" style={{ margin: 0 }}>
+                          Desglose de billetes/monedas contados físicamente en caja para cada método de pago en efectivo.
+                        </p>
+                        {preview.paymentReconciliation
+                          .filter((p) => isCashMethod(p.modeOfPayment))
+                          .map((p) => (
+                            <div key={p.modeOfPayment}>
+                              <label className="ff-label" style={{ fontSize: 12, margin: '8px 0 4px' }}>
+                                {p.modeOfPayment}
+                              </label>
+                              <div
+                                style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: '1fr 80px',
+                                  gap: 6,
+                                  alignItems: 'center',
+                                }}
+                              >
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 500 }}>
+                                  Denominación
+                                </span>
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 500, textAlign: 'right' }}>
+                                  Cantidad
+                                </span>
+                                {denominacionesActivas.map((d) => {
+                                  const current = getDenominacionesForMode(p.modeOfPayment)
+                                  const line = current.find((l) => l.denominacion === d.denominacion)
+                                  return (
+                                    <div key={d.denominacion} style={{ display: 'contents' }}>
+                                      <span style={{ fontSize: 13 }}>{d.denominacion}</span>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step={1}
+                                        className="ff-input"
+                                        style={{ width: '100%', textAlign: 'right' }}
+                                        value={line?.cantidad ?? ''}
+                                        onChange={(e) =>
+                                          updateDenominacion(
+                                            p.modeOfPayment,
+                                            d.denominacion,
+                                            Number(e.target.value) || 0,
+                                          )
+                                        }
+                                      />
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        {(() => {
+                          const totalArqueo = preview.paymentReconciliation
+                            .filter((p) => isCashMethod(p.modeOfPayment))
+                            .reduce((sum, p) => {
+                              const ca = closingAmounts.find((c) => c.modeOfPayment === p.modeOfPayment)
+                              return sum + (ca?.denominaciones ?? []).reduce((s, d) => {
+                                const denom = denominacionesActivas.find((da) => da.denominacion === d.denominacion)
+                                return s + (denom ? denom.valor * d.cantidad : 0)
+                              }, 0)
+                            }, 0)
+                          return totalArqueo > 0 ? (
+                            <div
+                              style={{
+                                borderTop: '1px solid var(--border-default)',
+                                paddingTop: 10,
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                              }}
+                            >
+                              <span style={{ fontSize: 13, fontWeight: 600 }}>Total arqueado</span>
+                              <span style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
+                                {formatDOP(totalArqueo)}
+                              </span>
+                            </div>
+                          ) : null
+                        })()}
+                      </div>
+                    )}
                   </>
                 )
               ) : (
@@ -337,7 +513,7 @@ export function TurnoCajaIndicator() {
                   <button
                     className="btn btn-primary"
                     onClick={() => cerrarMutation.mutate()}
-                    disabled={!preview || cerrarMutation.isPending}
+                    disabled={!preview || cerrarMutation.isPending || (arqueoEfectivoRequerido && !cierreValido)}
                   >
                     {cerrarMutation.isPending ? 'Cerrando…' : 'Confirmar cierre'}
                   </button>

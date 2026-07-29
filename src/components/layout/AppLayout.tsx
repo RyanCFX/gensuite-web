@@ -32,6 +32,8 @@ import {
   MapPin,
   Coins,
   Bell,
+  DollarSign,
+  Clock,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { CommandPalette } from "./CommandPalette";
@@ -193,6 +195,21 @@ const NAV_OPS: NavEntry[] = [
 ];
 
 const NAV_FINANZAS: NavItem[] = [
+  {
+    label: "Caja",
+    icon: <DollarSign size={16} aria-hidden="true" />,
+    path: "/caja",
+  },
+  {
+    label: "Por Cobrar",
+    icon: <Clock size={16} aria-hidden="true" />,
+    path: "/caja/por-cobrar",
+  },
+  {
+    label: "Turnos",
+    icon: <Clock size={16} aria-hidden="true" />,
+    path: "/turnos",
+  },
   {
     label: "Cobros",
     icon: <ClipboardList size={16} aria-hidden="true" />,
