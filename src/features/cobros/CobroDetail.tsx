@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -48,6 +48,14 @@ export default function CobroDetail() {
       setConfirmSubmit(false)
     },
   })
+
+  // ── Redirect POS sales to invoice detail ───────────────────────────────
+
+  useEffect(() => {
+    if (cobro?.isPosSale) {
+      navigate(`/facturas/${id}`, { replace: true })
+    }
+  }, [cobro, id, navigate])
 
   // ── Loading / error states ──────────────────────────────────────────────
 

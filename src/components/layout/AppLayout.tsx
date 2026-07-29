@@ -31,6 +31,7 @@ import {
   Tag,
   MapPin,
   Coins,
+  Bell,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { CommandPalette } from "./CommandPalette";
@@ -354,6 +355,11 @@ const NAV_CONFIG: NavEntry = {
       label: "Ajustes Avanzados",
       icon: <Settings size={14} />,
       path: "/config/ajustes-avanzados",
+    },
+    {
+      label: "Notificaciones",
+      icon: <Bell size={14} />,
+      path: "/config/notificaciones",
     },
     {
       label: "Grupos de Clientes",

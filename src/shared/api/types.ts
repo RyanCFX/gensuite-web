@@ -1906,6 +1906,8 @@ export interface PaymentEntry {
   referencias?: PaymentEntryReferencia[];
   createdAt: string;
   modifiedAt?: string;
+  /** true when this row comes from a POS sale (is_pos=1) — id is a Sales Invoice, not a Payment Entry */
+  isPosSale?: boolean;
 }
 
 // CreateCobroDto — matches BFF's CreateCobroDto exactly
@@ -2395,4 +2397,102 @@ export interface LibroDiarioResult {
   rows?: GlEntryRow[];
   byDimension?: LibroDiarioByDimension[];
   [key: string]: unknown;
+}
+
+// ─── Notificaciones ─────────────────────────────────────────────────────────
+
+export type NotificacionCategoria =
+  | "Contabilidad"
+  | "Cuentas por Cobrar"
+  | "Cuentas por Pagar"
+  | "Inventario"
+  | "Compras"
+  | "Ventas"
+  | "Logística"
+  | "Seguridad";
+
+export interface NotificacionDestinatario {
+  email: string;
+  nombre?: string;
+}
+
+export interface NotificacionTipoListItem {
+  codigo: string;
+  categoria: NotificacionCategoria;
+  nombre: string;
+  descripcion: string;
+  activo: boolean;
+  canalEmail: boolean;
+  destinatarios: NotificacionDestinatario[];
+}
+
+export interface NotificacionTipo extends NotificacionTipoListItem {
+  destinatarios: NotificacionDestinatario[];
+}
+
+export interface UpdateNotificacionTipoDto {
+  activo?: boolean;
+  canalEmail?: boolean;
+  destinatarios?: NotificacionDestinatario[];
+}
+
+export interface NotificacionCanalEmail {
+  configurado: boolean;
+  email?: string;
+  host?: string;
+  puerto?: number;
+  tls?: boolean;
+  ssl?: boolean;
+  habilitado?: boolean;
+}
+
+export interface UpdateNotificacionCanalEmailDto {
+  email: string;
+  host: string;
+  puerto: number;
+  tls?: boolean;
+  ssl?: boolean;
+  habilitado?: boolean;
+  usuario: string;
+  password?: string;
+}
+
+// ─── Notificaciones — Historial de envíos (observabilidad) ──────────────────
+
+export interface NotificacionLogEntry {
+  id: string;
+  tipo: string;
+  referencia: string | null;
+  destinatarios: string[];
+  estado: "Enviado" | "Fallido";
+  fecha: string;
+  error: string | null;
+}
+
+export interface NotificacionLogResumen {
+  dias: number;
+  total: number;
+  enviados: number;
+  fallidos: number;
+  ultimoIntento: {
+    tipo: string;
+    estado: "Enviado" | "Fallido";
+    fecha: string;
+  } | null;
+}
+
+export interface ListNotificacionLogsParams {
+  limit?: number;
+  offset?: number;
+  tipo?: string;
+  estado?: "Enviado" | "Fallido";
+  referencia?: string;
+  desde?: string;
+  hasta?: string;
+  orderBy?: string;
+}
+
+export interface ProbarNotificacionDto {
+  email: string;
+  nombre?: string;
 }

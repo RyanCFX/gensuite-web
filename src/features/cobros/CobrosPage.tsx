@@ -116,6 +116,7 @@ export default function CobrosPage() {
                 <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} />
                 <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} />
                 <th>Método de Pago</th>
+                <th>Tipo</th>
                 <SortableTh label="Monto" sortKey="paidAmount" orderBy={orderBy} onSort={sort} align="right" />
                 <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
               </tr>
@@ -124,7 +125,7 @@ export default function CobrosPage() {
               {isLoading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 6 }).map((__, j) => (
+                      {Array.from({ length: 7 }).map((__, j) => (
                         <td key={j}>
                           <span className="skeleton-box" style={{ height: 16, width: '100%', display: 'block' }} />
                         </td>
@@ -134,7 +135,7 @@ export default function CobrosPage() {
                 : cobros.length === 0
                 ? (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>
                         No se encontraron cobros
                       </td>
                     </tr>
@@ -143,7 +144,7 @@ export default function CobrosPage() {
                     <tr
                       key={cobro.id}
                       className="data-table-row-link"
-                      onClick={() => navigate(`/cobros/${cobro.id}`)}
+                      onClick={() => navigate(cobro.isPosSale ? `/facturas/${cobro.id}` : `/cobros/${cobro.id}`)}
                     >
                       <td>
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500 }}>
@@ -153,6 +154,17 @@ export default function CobrosPage() {
                       <td>{cobro.customerName}</td>
                       <td>{formatDate(cobro.postingDate)}</td>
                       <td>{cobro.modeOfPayment}</td>
+                      <td>
+                        {cobro.isPosSale ? (
+                          <span className="badge badge-submitted" style={{ background: 'var(--color-info-bg, #e0f2fe)', color: 'var(--color-info-text, #0369a1)', border: '1px solid var(--color-info-border, #bae6fd)' }}>
+                            Venta al contado
+                          </span>
+                        ) : (
+                          <span className="badge badge-draft" style={{ background: 'var(--color-neutral-bg, #f5f5f5)', color: 'var(--text-secondary)', border: '1px solid var(--border-default)' }}>
+                            Cobro factura
+                          </span>
+                        )}
+                      </td>
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(cobro.paidAmount)}</td>
                       <td>
                         <span className={`badge ${STATUS_BADGE[cobro.status] ?? 'badge-draft'}`}>

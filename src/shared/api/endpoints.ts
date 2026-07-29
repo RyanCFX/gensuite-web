@@ -282,4 +282,12 @@ export const ENDPOINTS = {
     selling: '/config/selling-settings',
     buying: '/config/buying-settings',
   },
+  notificaciones: {
+    tipos: '/notificaciones/tipos',
+    tipoByCodigo: (codigo: string) => `/notificaciones/tipos/${encodeURIComponent(codigo)}`,
+    canalEmail: '/notificaciones/canales/email',
+    logs: '/notificaciones/logs',
+    logsResumen: '/notificaciones/logs/resumen',
+    probar: (codigo: string) => `/notificaciones/tipos/${encodeURIComponent(codigo)}/probar`,
+  },
 } as const

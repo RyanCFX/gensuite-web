@@ -71,6 +71,7 @@ const CentrosCostoPage    = lazy(() => import('@/features/config/CentrosCostoPag
 const DepartamentosPage   = lazy(() => import('@/features/config/DepartamentosPage'))
 const RetencionesPage     = lazy(() => import('@/features/config/RetencionesPage'))
 const AjustesAvanzadosPage = lazy(() => import('@/features/config/AjustesAvanzadosPage'))
+const NotificacionesPage   = lazy(() => import('@/features/config/NotificacionesPage'))
 const CostosImportacionPage = lazy(() => import('@/features/compras/CostosImportacionPage'))
 const CostoImportacionDetail = lazy(() => import('@/features/compras/CostoImportacionDetail'))
 
@@ -212,6 +213,7 @@ export default function App() {
             <Route path="/config/departamentos" element={<Suspense fallback={<PageLoader />}><DepartamentosPage /></Suspense>} />
             <Route path="/config/retenciones" element={<Suspense fallback={<PageLoader />}><RetencionesPage /></Suspense>} />
             <Route path="/config/ajustes-avanzados" element={<Suspense fallback={<PageLoader />}><AjustesAvanzadosPage /></Suspense>} />
+            <Route path="/config/notificaciones" element={<Suspense fallback={<PageLoader />}><NotificacionesPage /></Suspense>} />
             <Route path="/config/:seccion" element={<Suspense fallback={<PageLoader />}><ConfigPage /></Suspense>} />
             <Route path="/config" element={<Navigate to="/config/empresa" replace />} />
 
