@@ -209,7 +209,7 @@ export default function CajaPage() {
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div className="page-header">
         <div>
-          <h1 className="page-title">Caja</h1>
+          <h1 className="page-title">Cobros Pendientes</h1>
           <p className="page-sub">
             {data?.meta ? `${data.meta.total} factura(s) pendiente(s) de cobro` : 'Cola de cobros pendientes'}
           </p>

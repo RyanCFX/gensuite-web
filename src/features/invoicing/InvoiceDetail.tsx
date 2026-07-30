@@ -46,6 +46,7 @@ import {
   Clock,
   Plus,
   Trash2,
+  BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -1006,6 +1007,12 @@ export default function InvoiceDetail() {
               disabled={isActionsLoading}
             >
               <RotateCcw size={14} /> Devolver producto(s)
+            </button>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => navigate(`/contabilidad/libro-diario?voucherNo=${encodeURIComponent(invoice.id)}&voucherType=Sales+Invoice`)}
+            >
+              <BookOpen size={14} /> Ver asientos
             </button>
             <button
               className="btn btn-danger btn-size-sm"

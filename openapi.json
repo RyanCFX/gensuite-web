@@ -477,6 +477,64 @@
         ]
       }
     },
+    "/api/v1/notificaciones/cron/ejecutar": {
+      "post": {
+        "operationId": "NotificacionesController_ejecutarCronDisparadores",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ejecuta manualmente los disparadores programados (vencimientos, límites, stock sin movimiento)",
+        "tags": [
+          "Notificaciones"
+        ]
+      }
+    },
+    "/api/v1/notificaciones/cron/cierre-diario": {
+      "post": {
+        "operationId": "NotificacionesController_ejecutarCierreDiario",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ejecuta manualmente el cierre diario (resumen contable)",
+        "tags": [
+          "Notificaciones"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "HealthController_check",
@@ -6050,7 +6108,7 @@
             "bearer": []
           }
         ],
-        "summary": "Lista facturas Draft enviadas a Caja (módulo POS habilitado + pago al contado al someter) que aún no tienen NCF asignado — pendientes de completar el cobro.",
+        "summary": "Lista facturas Draft enviadas a Caja (módulo POS habilitado + cliente de consumo) que aún no tienen NCF asignado — pendientes de completar el cobro.",
         "tags": [
           "Caja"
         ]
@@ -6097,7 +6155,7 @@
             "bearer": []
           }
         ],
-        "summary": "Completa el cobro de una factura enviada a Caja: somete la factura de verdad y asigna el NCF en este momento (nunca antes). Mismo body que /cobrar.",
+        "summary": "Completa el cobro de una factura enviada a Caja: somete la factura de verdad, fija la condición fiscal (Crédito Fiscal/Consumo, ver `condicionFiscal` en el body) y asigna el NCF en este momento (nunca antes). Mismo body que /cobrar.",
         "tags": [
           "Caja"
         ]
@@ -15806,7 +15864,7 @@
             "description": "Fuerza el cobro al contado aunque el cliente tenga crédito establecido (solo afecta si se valida el crédito disponible al someter). Se marca automáticamente en true si se envía `payments`."
           },
           "payments": {
-            "description": "Opcional — indica que esta es una venta al contado. Si el tenant NO tiene usaModuloPos habilitado, la factura se somete y se cobra en la misma llamada (is_pos nativo). Si el tenant SÍ tiene usaModuloPos habilitado, la factura NO se somete en esta llamada — queda en Draft, enviada a la cola de Caja (custom_enviada_a_caja=1); el submit real y el NCF ocurren recién en POST /caja/facturas/:id/completar-cobro (mismo body: payments/vuelto/tenderedCash). Si se omite `payments`, la factura queda sometida a crédito, sin cobrar, para cobrarse después por separado (GET /caja/pendientes → POST /caja/facturas/:id/cobrar).",
+            "description": "Opcional — indica que esta es una venta al contado. Si el tenant NO tiene usaModuloPos habilitado, la factura se somete y se cobra en la misma llamada (is_pos nativo). Si el tenant SÍ tiene usaModuloPos habilitado y el cliente NO tiene crédito fiscal establecido (\"de consumo\"), la factura NO se somete en esta llamada — queda en Draft, enviada a la cola de Caja (custom_enviada_a_caja=1), se hayan enviado `payments` o no; el submit real, el NCF y la condición fiscal final (Crédito Fiscal/Consumo) ocurren recién en POST /caja/facturas/:id/completar-cobro. Si el cliente SÍ tiene crédito fiscal establecido (empresa), la factura sigue el flujo histórico: se somete de inmediato, al contado (con `payments`) o a crédito para cobrarse después por separado (GET /caja/pendientes → POST /caja/facturas/:id/cobrar).",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PaymentLineDto"
@@ -17163,6 +17221,14 @@
           "tenderedCash": {
             "type": "number",
             "description": "Efectivo entregado por el cliente, usado para validar el desglose de `vuelto`."
+          },
+          "condicionFiscal": {
+            "type": "string",
+            "enum": [
+              "CREDITO_FISCAL",
+              "CONSUMO"
+            ],
+            "description": "Solo tiene efecto en POST /caja/facturas/:id/completar-cobro (factura aún en Draft, sin NCF asignado) — el cajero confirma en el momento del cobro si el comprobante debe ser de Crédito Fiscal (B01, cliente empresa con RNC) o de Consumo (B02, persona física). Si se omite, se infiere automáticamente: Crédito Fiscal si el cliente tiene RNC registrado, Consumo en caso contrario. Sin efecto en POST /caja/facturas/:id/cobrar (factura ya sometida, el NCF ya está fijo y no puede cambiar)."
           }
         },
         "required": [

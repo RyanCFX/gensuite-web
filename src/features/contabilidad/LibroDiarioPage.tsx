@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Search, BookOpen, Download, Loader2 } from 'lucide-react'
@@ -39,15 +39,35 @@ function voucherLink(voucherType: string, voucherNo: string): string | null {
 
 export default function LibroDiarioPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const [fromDate, setFromDate] = useState(firstOfMonth())
   const [toDate, setToDate] = useState(today())
   const [account, setAccount] = useState('')
-  const [voucherType, setVoucherType] = useState('')
-  const [voucherNo, setVoucherNo] = useState('')
+  const [voucherType, setVoucherType] = useState(searchParams.get('voucherType') ?? '')
+  const [voucherNo, setVoucherNo] = useState(searchParams.get('voucherNo') ?? '')
   const [groupBy, setGroupBy] = useState('Group by Voucher (Consolidated)')
 
   const [queryParams, setQueryParams] = useState<LibroDiarioParams | null>(null)
+
+  // ─── Read deep-link params from URL ─────────────────────────────────
+  useEffect(() => {
+    const initialVoucherNo = searchParams.get('voucherNo')
+    const initialVoucherType = searchParams.get('voucherType')
+    if (initialVoucherNo || initialVoucherType) {
+      const params: LibroDiarioParams = {
+        fromDate,
+        toDate,
+        account: account || undefined,
+        voucherType: initialVoucherType || undefined,
+        voucherNo: initialVoucherNo || undefined,
+        groupBy: groupBy || undefined,
+      }
+      setQueryParams(params)
+    }
+    // Only run once on mount with initial URL params
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const { data, isLoading } = useQuery({
     queryKey: ['libro-diario', queryParams],

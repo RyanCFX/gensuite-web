@@ -175,7 +175,7 @@ export default function App() {
             <Route path="/proveedores/:id/editar" element={<Suspense fallback={<PageLoader />}><SupplierForm /></Suspense>} />
 
             {/* Caja / Cobros */}
-            <Route path="/caja" element={<Suspense fallback={<PageLoader />}><CajaPage /></Suspense>} />
+            <Route path="/caja/pendientes" element={<Suspense fallback={<PageLoader />}><CajaPage /></Suspense>} />
             <Route path="/caja/por-cobrar" element={<Suspense fallback={<PageLoader />}><PorCobrarPage /></Suspense>} />
             <Route path="/turnos" element={<Suspense fallback={<PageLoader />}><TurnosPage /></Suspense>} />
             <Route path="/turnos/:id" element={<Suspense fallback={<PageLoader />}><TurnoDetailPage /></Suspense>} />

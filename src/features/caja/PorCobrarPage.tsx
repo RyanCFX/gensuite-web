@@ -237,7 +237,7 @@ export default function PorCobrarPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Pendientes por cobrar</h1>
+          <h1 className="page-title">Caja</h1>
           <p className="page-sub">
             {data?.meta
               ? `${data.meta.total} factura(s) pendiente(s) de completar cobro`

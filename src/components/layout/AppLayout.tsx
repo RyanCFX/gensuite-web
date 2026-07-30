@@ -194,17 +194,16 @@ const NAV_OPS: NavEntry[] = [
   },
 ];
 
-const NAV_FINANZAS: NavItem[] = [
+const NAV_FINANZAS: NavEntry[] = [
   {
     label: "Caja",
     icon: <DollarSign size={16} aria-hidden="true" />,
-    path: "/caja",
+    prefix: "/caja",
+    children: [
+      { label: "Caja", icon: <Clock size={14} />, path: "/caja/por-cobrar" },
+      { label: "Cobros Pendientes", icon: <DollarSign size={14} />, path: "/caja/pendientes" },
+    ],
   },
-  // {
-  //   label: "Por Cobrar",
-  //   icon: <Clock size={16} aria-hidden="true" />,
-  //   path: "/caja/por-cobrar",
-  // },
   {
     label: "Turnos",
     icon: <Clock size={16} aria-hidden="true" />,
@@ -821,14 +820,7 @@ function AppLayoutInner() {
       {/* Finanzas */}
       <div className="sb-section">
         {!collapsed && <div className="sb-label">Finanzas</div>}
-        {NAV_FINANZAS.map((item) => (
-          <NavItemBtn
-            key={item.path}
-            item={item}
-            onNav={handleNav}
-            collapsed={collapsed}
-          />
-        ))}
+        {NAV_FINANZAS.map((entry) => renderEntry(entry, handleNav, collapsed))}
       </div>
 
       {/* Contabilidad */}
