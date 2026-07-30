@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { Search, DollarSign, Trash2, ChevronLeft, ChevronRight, X, Clock, Plus } from 'lucide-react'
 import { listPorCobrar, completarCobro, descartarFactura } from '@/shared/api/caja'
 import { getFacturacionConfig, listMetodosPago } from '@/shared/api/config'
+import { getCustomer } from '@/shared/api/customers'
 import { getTurnoActual, abrirTurno } from '@/shared/api/pos'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useDebounce } from '@/lib/useDebounce'
@@ -17,7 +18,7 @@ import {
   PAYMENT_LINES_TOLERANCE,
   type PaymentLinesValue,
 } from '@/lib/paymentLines'
-import type { CobrarFacturaDto, PendienteCobroItem, BalanceDetailLine } from '@/shared/api/types'
+import type { CobrarFacturaDto, PendienteCobroItem, BalanceDetailLine, Customer } from '@/shared/api/types'
 
 const PAGE_SIZE = 20
 
@@ -119,10 +120,23 @@ export default function PorCobrarPage() {
   // ─── Form state ────────────────────────────────────────────────────
   const [directoMop, setDirectoMop] = useState('')
   const [paymentsValue, setPaymentsValue] = useState<PaymentLinesValue>(EMPTY_PAYMENT_LINES_VALUE)
+  const [condicionFiscal, setCondicionFiscal] = useState<'CREDITO_FISCAL' | 'CONSUMO'>('CONSUMO')
+
+  // ─── Customer fetch (to pre-suggest condicionFiscal) ────────────────
+  const { data: customerData } = useQuery({
+    queryKey: ['customer', selectedInvoice?.customer],
+    queryFn: () => getCustomer(selectedInvoice!.customer),
+    enabled: !!selectedInvoice,
+  })
+  useEffect(() => {
+    if (customerData) {
+      setCondicionFiscal(customerData.rnc ? 'CREDITO_FISCAL' : 'CONSUMO')
+    }
+  }, [customerData])
 
   // ─── Completar cobro mutation ───────────────────────────────────────
   const completarMutation = useMutation({
-    mutationFn: (dto: CobrarFacturaDto) => completarCobro(selectedInvoice!.id, dto),
+    mutationFn: (dto: CobrarFacturaDto) => completarCobro(selectedInvoice!.id, { ...dto, condicionFiscal }),
     onSuccess: (res) => {
       const msg = `Factura cobrada — NCF: ${res.ncf}`
       if (res.fullyPaid) {
@@ -358,6 +372,46 @@ export default function PorCobrarPage() {
                 <span style={{ color: 'var(--text-secondary)' }}>Monto a cobrar:</span>
                 <span style={{ fontWeight: 700, color: 'var(--color-error)' }}>{formatDOP(selectedInvoice.grandTotal)}</span>
               </div>
+
+              {(selectedInvoice.grandTotal > 0 || (customerData?.rnc ?? customerData?.cedula)) && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    Condición fiscal del comprobante
+                  </label>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+                      <input
+                        type="radio"
+                        name="condicionFiscal"
+                        value="CREDITO_FISCAL"
+                        checked={condicionFiscal === 'CREDITO_FISCAL'}
+                        onChange={() => setCondicionFiscal('CREDITO_FISCAL')}
+                      />
+                      Crédito Fiscal
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+                      <input
+                        type="radio"
+                        name="condicionFiscal"
+                        value="CONSUMO"
+                        checked={condicionFiscal === 'CONSUMO'}
+                        onChange={() => setCondicionFiscal('CONSUMO')}
+                      />
+                      Consumo
+                    </label>
+                  </div>
+                  {customerData?.rnc && (
+                    <p style={{ margin: 0, fontSize: 11, color: 'var(--text-tertiary)' }}>
+                      Se sugiere Crédito Fiscal (RNC: {customerData.rnc})
+                    </p>
+                  )}
+                  {!customerData?.rnc && customerData?.cedula && (
+                    <p style={{ margin: 0, fontSize: 11, color: 'var(--text-tertiary)' }}>
+                      Se sugiere Consumo (sin RNC registrado)
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="divider" />
 

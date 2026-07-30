@@ -1812,10 +1812,14 @@ export interface VueltoLine {
 }
 
 // POST /caja/facturas/:id/cobrar
+export type CondicionFiscal = "CREDITO_FISCAL" | "CONSUMO"
+
 export interface CobrarFacturaDto {
   payments: PaymentLine[]
   vuelto?: VueltoLine[]
   tenderedCash?: number
+  /** Opcional — si se omite, el backend infiere según el RNC/Cédula del cliente. */
+  condicionFiscal?: CondicionFiscal
 }
 
 /** Resumen del cobro registrado al someter una factura (presente cuando se enviaron payments). */
@@ -1827,7 +1831,7 @@ export interface CobroResumen {
   vuelto: VueltoLine[];
 }
 
-/** Respuesta de POST /invoices/:id/submit cuando usaModuloPos=true y se envían payments.
+/** Respuesta de POST /invoices/:id/submit cuando usaModuloPos=true y el cliente no tiene crédito fiscal (hasCredit=false).
  *  La factura no recibe NCF todavía — pasa a la cola de "por cobrar" en Caja. */
 export interface PendienteCobroSubmitResult {
   invoiceId: string;
@@ -1848,6 +1852,8 @@ export interface PendienteCobroItem {
 export interface CompletarCobroResult {
   invoiceId: string;
   ncf: string;
+  ncfType?: string;
+  condicionFiscal?: CondicionFiscal;
   isPos: boolean;
   paymentEntryIds: string[];
   outstandingAmount: number;
