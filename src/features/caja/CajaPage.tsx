@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Search, DollarSign, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Search, DollarSign, ChevronLeft, ChevronRight, X, Clock, Plus, Trash2 } from 'lucide-react'
 import { listPendientes, cobrarFactura } from '@/shared/api/caja'
 import { getFacturacionConfig, listMetodosPago } from '@/shared/api/config'
+import { getTurnoActual, abrirTurno } from '@/shared/api/pos'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useDebounce } from '@/lib/useDebounce'
 import { PaymentLinesEditor } from '@/components/shared/PaymentLinesEditor'
@@ -15,7 +16,7 @@ import {
   PAYMENT_LINES_TOLERANCE,
   type PaymentLinesValue,
 } from '@/lib/paymentLines'
-import type { Invoice, CobrarFacturaDto } from '@/shared/api/types'
+import type { Invoice, CobrarFacturaDto, TurnoCaja, BalanceDetailLine } from '@/shared/api/types'
 
 const PAGE_SIZE = 20
 
@@ -46,10 +47,55 @@ export default function CajaPage() {
   })
 
 
+  const usaModuloPos = facturacion?.usaModuloPos ?? false
   const flujoCobro = facturacion?.flujoCobro ?? 'directo'
   const metodosActivos = (metodos ?? []).filter((m) => !m.disabled)
   const pendientes = data?.items ?? []
   const totalPages = data?.meta ? Math.ceil((data.meta.total ?? 0) / PAGE_SIZE) : 1
+
+  // ─── Turno check ────────────────────────────────────────────────────
+  const [turnoModalOpen, setTurnoModalOpen] = useState(false)
+  const [turnoBalanceDetails, setTurnoBalanceDetails] = useState<BalanceDetailLine[]>([
+    { modeOfPayment: '', openingAmount: 0 },
+  ])
+
+  const { data: turno } = useQuery({
+    queryKey: ['turno-actual'],
+    queryFn: getTurnoActual,
+    enabled: usaModuloPos,
+    staleTime: 30_000,
+  })
+
+  const abrirTurnoMutation = useMutation({
+    mutationFn: () =>
+      abrirTurno({
+        balanceDetails: turnoBalanceDetails.filter((b) => b.modeOfPayment),
+      }),
+    onSuccess: (turnoCaja) => {
+      queryClient.setQueryData(['turno-actual'], turnoCaja)
+      setTurnoModalOpen(false)
+      setTurnoBalanceDetails([{ modeOfPayment: '', openingAmount: 0 }])
+      toast.success(`Turno abierto — ${turnoCaja.posProfile}`)
+      queryClient.invalidateQueries({ queryKey: ['caja-pendientes'] })
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? 'Error al abrir el turno')
+    },
+  })
+
+  function updateTurnoBalanceLine(i: number, patch: Partial<BalanceDetailLine>) {
+    setTurnoBalanceDetails((prev) => prev.map((b, idx) => (idx === i ? { ...b, ...patch } : b)))
+  }
+
+  function addTurnoBalanceLine() {
+    setTurnoBalanceDetails((prev) => [...prev, { modeOfPayment: '', openingAmount: 0 }])
+  }
+
+  function removeTurnoBalanceLine(i: number) {
+    setTurnoBalanceDetails((prev) => prev.filter((_, idx) => idx !== i))
+  }
+
+  const turnoBlocked = usaModuloPos && !turno
 
   // ─── Form state ────────────────────────────────────────────────────
 
@@ -170,6 +216,23 @@ export default function CajaPage() {
         </div>
       </div>
 
+      {/* ── Turno gate (POS habilitado sin turno abierto) ──────────── */}
+      {turnoBlocked ? (
+        <div className="empty-state" style={{ padding: '48px 24px' }}>
+          <Clock size={32} style={{ color: 'var(--text-tertiary)', marginBottom: 8 }} />
+          <div className="empty-title">Caja bloqueada</div>
+          <p className="empty-sub" style={{ maxWidth: 400, textAlign: 'center' }}>
+            El módulo POS/Caja está habilitado pero no tienes un turno de caja abierto.
+            Abre un turno para acceder a los cobros pendientes.
+          </p>
+          <div style={{ marginTop: 16 }}>
+            <button className="btn btn-primary" onClick={() => setTurnoModalOpen(true)}>
+              <Clock size={14} /> Abrir turno
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* ── Filtros ──────────────────────────────────────────────────── */}
       <div className="filter-bar">
         <div className="filter-bar-left">
@@ -354,6 +417,77 @@ export default function CajaPage() {
                     ? Number(directoAmount) || 0
                     : sumPayments(paymentsValue.payments)
                 )}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </>
+      )}
+
+      {/* ── Modal: abrir turno ──────────────────────────────────────── */}
+      {turnoModalOpen && (
+        <div className="modal-overlay" onClick={() => setTurnoModalOpen(false)}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Clock size={16} /> Abrir turno de caja
+              </h2>
+              <button className="modal-close" onClick={() => setTurnoModalOpen(false)}>×</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <p className="ff-hint">Fondo inicial de caja por método de pago.</p>
+              {turnoBalanceDetails.map((line, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                  <div className="ff-wrap" style={{ flex: 1 }}>
+                    <label className="ff-label">Método de pago</label>
+                    <select
+                      className="ff-select"
+                      value={line.modeOfPayment}
+                      onChange={(e) => updateTurnoBalanceLine(i, { modeOfPayment: e.target.value })}
+                    >
+                      <option value="">Seleccionar</option>
+                      {metodosActivos.map((m) => (
+                        <option key={m.name} value={m.name}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="ff-wrap" style={{ width: 130 }}>
+                    <label className="ff-label">Monto</label>
+                    <input
+                      type="number"
+                      min={0}
+                      className="ff-input"
+                      value={line.openingAmount}
+                      onChange={(e) => updateTurnoBalanceLine(i, { openingAmount: Number(e.target.value) })}
+                    />
+                  </div>
+                  {turnoBalanceDetails.length > 1 && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-size-icon-sm"
+                      onClick={() => removeTurnoBalanceLine(i)}
+                      aria-label="Quitar línea"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button type="button" className="btn btn-ghost btn-size-sm" onClick={addTurnoBalanceLine} style={{ alignSelf: 'flex-start' }}>
+                <Plus size={14} /> Agregar método de pago
+              </button>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={() => setTurnoModalOpen(false)}>
+                Cancelar
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => abrirTurnoMutation.mutate()}
+                disabled={!turnoBalanceDetails.some((b) => b.modeOfPayment) || abrirTurnoMutation.isPending}
+              >
+                {abrirTurnoMutation.isPending ? 'Abriendo…' : 'Abrir turno'}
               </button>
             </div>
           </div>

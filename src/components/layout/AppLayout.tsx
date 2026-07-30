@@ -200,11 +200,11 @@ const NAV_FINANZAS: NavItem[] = [
     icon: <DollarSign size={16} aria-hidden="true" />,
     path: "/caja",
   },
-  {
-    label: "Por Cobrar",
-    icon: <Clock size={16} aria-hidden="true" />,
-    path: "/caja/por-cobrar",
-  },
+  // {
+  //   label: "Por Cobrar",
+  //   icon: <Clock size={16} aria-hidden="true" />,
+  //   path: "/caja/por-cobrar",
+  // },
   {
     label: "Turnos",
     icon: <Clock size={16} aria-hidden="true" />,
