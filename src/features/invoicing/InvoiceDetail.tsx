@@ -155,10 +155,10 @@ export default function InvoiceDetail() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ["facturacion-config"],
     queryFn: getFacturacionConfig,
-    enabled: invoice?.status === "draft",
     staleTime: 5 * 60_000,
   });
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false;
+  const formatoImpresionDefault = facturacionConfig?.formatoImpresionDefault ?? "pdf";
 
   const { data: turno } = useQuery({
     queryKey: ['turno-actual'],
@@ -400,6 +400,7 @@ export default function InvoiceDetail() {
       } else {
         toast.success("Factura sometida — NCF asignado");
       }
+      downloadInvoicePdf(id!, `factura-${id}.pdf`, formatoImpresionDefault);
     },
     onError: (err: { message?: string }) => {
       const msg = err?.message ?? "";
@@ -705,7 +706,7 @@ export default function InvoiceDetail() {
     amendMutation.isPending;
 
   const downloadMutation = useMutation({
-    mutationFn: () => downloadInvoicePdf(id!, `factura-${id}.pdf`),
+    mutationFn: () => downloadInvoicePdf(id!, `factura-${id}.pdf`, formatoImpresionDefault),
     onError: () => toast.error("No se pudo descargar el PDF"),
   });
 
@@ -1070,8 +1071,25 @@ export default function InvoiceDetail() {
           <div className="fields-grid">
             <div className="detail-field">
               <span className="detail-label">Cliente</span>
-              <span className="detail-value">{invoice.customerName}</span>
+              <span className="detail-value">
+                {invoice.esClienteOcasional ? (
+                  <span>
+                    {invoice.clienteOcasionalNombre ?? invoice.customerName}
+                    {invoice.esClienteOcasional && (
+                      <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 6 }}>(ocasional)</span>
+                    )}
+                  </span>
+                ) : (
+                  invoice.customerName
+                )}
+              </span>
             </div>
+            {invoice.esClienteOcasional && invoice.clienteOcasionalRnc && (
+              <div className="detail-field">
+                <span className="detail-label">RNC</span>
+                <span className="detail-value" style={{ fontFamily: 'monospace' }}>{invoice.clienteOcasionalRnc}</span>
+              </div>
+            )}
             <div className="detail-field">
               <span className="detail-label">Fecha</span>
               <span className="detail-value">

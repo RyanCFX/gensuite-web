@@ -102,6 +102,8 @@ export default function QuotationForm() {
   const [customerName, setCustomerName] = useState('')
   const [customerPriceTier, setCustomerPriceTier] = useState<keyof ItemPrices | undefined>(undefined)
   const [customerQuery, setCustomerQuery] = useState('')
+  const [esClienteOcasional, setEsClienteOcasional] = useState(false)
+  const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
   const [date, setDate] = useState(todayIso())
   const [validTill, setValidTill] = useState(defaultValidTill())
   const [items, setItems] = useState<LineItem[]>([])
@@ -124,28 +126,32 @@ export default function QuotationForm() {
     enabled: isEdit,
   })
 
-  useEffect(() => {
-    if (!existingQuotation || initialized) return
-    setCustomerId(existingQuotation.customer)
-    setCustomerName(existingQuotation.customerName)
-    setDate(existingQuotation.date)
-    setValidTill(existingQuotation.validTill ?? defaultValidTill())
-    setItems(existingQuotation.items.map((i) => ({
-      itemCode: i.itemCode,
-      description: i.description,
-      qty: i.qty,
-      rate: i.rate,
-      amount: i.amount,
-      discountPct: i.discountPct ?? 0,
-      salesTaxPct: 0,
-      salesTaxTemplate: '',
-      uom: i.uom,
-      warehouse: '',
-    })))
-    setNotes(existingQuotation.notes ?? '')
-    setBranch(existingQuotation.branch ?? '')
-    setInitialized(true)
-  }, [existingQuotation, initialized])
+useEffect(() => {
+     if (!existingQuotation || initialized) return
+     setCustomerId(existingQuotation.customer)
+     setCustomerName(existingQuotation.customerName)
+     setDate(existingQuotation.date)
+     setValidTill(existingQuotation.validTill ?? defaultValidTill())
+     setItems(existingQuotation.items.map((i) => ({
+       itemCode: i.itemCode,
+       description: i.description,
+       qty: i.qty,
+       rate: i.rate,
+       amount: i.amount,
+       discountPct: i.discountPct ?? 0,
+       salesTaxPct: 0,
+       salesTaxTemplate: '',
+       uom: i.uom,
+       warehouse: '',
+     })))
+     setNotes(existingQuotation.notes ?? '')
+     setBranch(existingQuotation.branch ?? '')
+     if (existingQuotation.esClienteOcasional) {
+       setEsClienteOcasional(true)
+       setClienteOcasionalNombre(existingQuotation.clienteOcasionalNombre ?? '')
+     }
+     setInitialized(true)
+   }, [existingQuotation, initialized])
 
   // ── Duplicar: precargar desde una cotización existente (no crea nada) ────
   const { data: duplicateSource } = useQuery({
@@ -343,27 +349,27 @@ export default function QuotationForm() {
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
-  function submitDto() {
-    const dto: CreateQuotationDto = {
-      customer: customerId,
-      date,
-      validTill,
-      branch: branch || undefined,
-      items: items.map((i) => ({
-        itemCode: i.itemCode,
-        description: i.description,
-        qty: i.qty,
-        rate: i.rate,
-        discountPct: i.discountPct || undefined,
-        uom: i.uom || undefined,
-        warehouse: i.warehouse || undefined,
-      })),
-      notes: notes || undefined,
-      taxesTemplate: taxesTemplate || undefined,
-    }
-    if (id) updateMutation.mutate(dto)
-    else createMutation.mutate(dto)
-  }
+function submitDto() {
+     const dto: CreateQuotationDto = {
+       ...(esClienteOcasional ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined } : { customer: customerId }),
+       date,
+       validTill,
+       branch: branch || undefined,
+       items: items.map((i) => ({
+         itemCode: i.itemCode,
+         description: i.description,
+         qty: i.qty,
+         rate: i.rate,
+         discountPct: i.discountPct || undefined,
+         uom: i.uom || undefined,
+         warehouse: i.warehouse || undefined,
+       })),
+       notes: notes || undefined,
+       taxesTemplate: taxesTemplate || undefined,
+     }
+     if (id) updateMutation.mutate(dto)
+     else createMutation.mutate(dto)
+   }
 
   function handleError(err: { message?: string }) {
     const msg = err?.message ?? ''
@@ -531,10 +537,17 @@ export default function QuotationForm() {
     e.preventDefault()
     setSubmitted(true)
 
-    if (!customerId) {
-      toast.error('Selecciona un cliente')
-      return
-    }
+if (esClienteOcasional) {
+       if (!clienteOcasionalNombre.trim()) {
+         toast.error('Ingresa el nombre del cliente ocasional')
+         return
+       }
+     } else {
+       if (!customerId) {
+         toast.error('Selecciona un cliente')
+         return
+       }
+     }
     if (items.length === 0) {
       toast.error('Agrega al menos un artículo')
       return
@@ -603,26 +616,48 @@ export default function QuotationForm() {
           </div>
           <div className="card-body">
             <div className="form-row form-row-3">
-              <div className="ff-wrap">
-                <label className="ff-label ff-required" htmlFor="customer">Cliente</label>
-                <SearchSelect
-                  id="customer"
-                  value={customerId}
-                  onChange={(id, opt) => {
-                    const cid = id === '' ? '' : (opt?.value ?? id)
-                    setCustomerId(cid)
-                    setCustomerName(opt?.label ?? '')
-                    const c = cid && customersData?.items?.find((c) => c.id === cid)
-                    setCustomerPriceTier(c?.priceTier)
-                  }}
-                  options={customerOptions}
-                  selectedLabel={customerName}
-                  onSearch={setCustomerQuery}
-                  loading={loadingCustomers}
-                  placeholder="Buscar cliente…"
-                  error={!customerId}
-                />
-              </div>
+<div className="ff-wrap">
+                 <label className="ff-label ff-required" htmlFor="customer">Cliente</label>
+                 {esClienteOcasional ? (
+                   <input
+                     id="customer"
+                     className="ff-input"
+                     value={clienteOcasionalNombre}
+                     onChange={(e) => setClienteOcasionalNombre(e.target.value)}
+                     placeholder="Nombre del cliente ocasional"
+                     required={esClienteOcasional}
+                   />
+                 ) : (
+                   <SearchSelect
+                     id="customer"
+                     value={customerId}
+                     onChange={(id, opt) => {
+                       const cid = id === '' ? '' : (opt?.value ?? id)
+                       setCustomerId(cid)
+                       setCustomerName(opt?.label ?? '')
+                       const c = cid && customersData?.items?.find((c) => c.id === cid)
+                       setCustomerPriceTier(c?.priceTier)
+                     }}
+                     options={customerOptions}
+                     selectedLabel={customerName}
+                     onSearch={setCustomerQuery}
+                     loading={loadingCustomers}
+                     placeholder="Buscar cliente…"
+                     error={!customerId}
+                   />
+                 )}
+               </div>
+               <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
+                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                   <input type="checkbox" checked={esClienteOcasional} onChange={(e) => { setEsClienteOcasional(e.target.checked); if (e.target.checked) setCustomerId('') }} />
+                   Venta ocasional (cliente no registrado)
+                 </label>
+                 {esClienteOcasional && (
+                   <p className="ff-hint" style={{ marginTop: 4 }}>
+                     Ingresa el nombre del cliente. No se requiere RUC/Cédula para cotizaciones.
+                   </p>
+                 )}
+               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="date">Fecha</label>

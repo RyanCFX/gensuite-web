@@ -85,14 +85,18 @@ export async function asignarTrackingFactura(id: string, items: ComponentTrackin
   return unwrap(res)
 }
 
-export async function downloadInvoicePdf(id: string, filename?: string): Promise<void> {
-  const res = await client.get<Blob>(ENDPOINTS.invoices.pdf(id), {
-    responseType: 'blob',
+export async function downloadInvoicePdf(id: string, filename?: string, formato?: "pdf" | "pos"): Promise<void> {
+  const params = new URLSearchParams()
+  if (formato) params.set("formato", formato)
+  const qs = params.toString()
+  const url = qs ? `${ENDPOINTS.invoices.pdf(id)}?${qs}` : ENDPOINTS.invoices.pdf(id)
+  const res = await client.get<Blob>(url, {
+    responseType: "blob",
   })
-  const url = URL.createObjectURL(res.data)
-  const a = document.createElement('a')
-  a.href = url
+  const blobUrl = URL.createObjectURL(res.data)
+  const a = document.createElement("a")
+  a.href = blobUrl
   a.download = filename ?? `factura-${id}.pdf`
   a.click()
-  URL.revokeObjectURL(url)
+  URL.revokeObjectURL(blobUrl)
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { listMetodosPago, listBancos, listDenominaciones } from '@/shared/api/config'
 import {
@@ -15,6 +15,22 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { formatDOP } from '@/lib/formatters'
 import { Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 
+function calcularVuelto(monto: number, denominaciones: { denominacion: string; valor: number }[]): VueltoLineDraft[] {
+  const sorted = [...denominaciones].sort((a, b) => b.valor - a.valor)
+  const resultado: VueltoLineDraft[] = []
+  let restante = monto
+  for (const d of sorted) {
+    if (restante <= 0) break
+    const cantidad = Math.floor(restante / d.valor)
+    if (cantidad > 0) {
+      resultado.push({ denominacion: d.denominacion, cantidad: String(cantidad) })
+      restante = restante - d.valor * cantidad
+      restante = Math.round(restante * 100) / 100
+    }
+  }
+  return resultado
+}
+
 interface PaymentLinesEditorProps {
   amountDue: number
   value: PaymentLinesValue
@@ -29,12 +45,28 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
   const [metodoSearch, setMetodoSearch] = useState<Record<number, string>>({})
   const [bancoSearch, setBancoSearch] = useState<Record<number, string>>({})
   const [vueltoDenomSearch, setVueltoDenomSearch] = useState<Record<number, string>>({})
+  const prevTenderedCashRef = useRef<string>('')
 
   const metodosActivos = (metodos ?? []).filter((m) => !m.disabled)
   const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo)
 
   const total = sumPayments(value.payments)
   const totalOk = Math.abs(amountDue - total) <= PAYMENT_LINES_TOLERANCE
+
+  useEffect(() => {
+    if (!value.vueltoEnabled) return
+    const tendered = Number(value.tenderedCash) || 0
+    if (tendered <= 0) return
+    const cash = cashAmount(value.payments, metodos ?? [])
+    const vueltoEsperado = tendered - cash
+    if (vueltoEsperado <= 0) return
+    if (prevTenderedCashRef.current === value.tenderedCash) return
+    prevTenderedCashRef.current = value.tenderedCash
+    const autoVuelto = calcularVuelto(vueltoEsperado, denominacionesActivas)
+    if (autoVuelto.length > 0) {
+      onChange({ ...value, vuelto: autoVuelto })
+    }
+  }, [value, denominacionesActivas, metodos, onChange])
 
   function updateLine(idx: number, patch: Partial<PaymentLineDraft>) {
     const payments = value.payments.map((p, i) => (i === idx ? { ...p, ...patch } : p))
@@ -214,6 +246,12 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
                   </span>
                 )}
               </p>
+
+              {value.vuelto.length > 0 && (
+                <p style={{ fontSize: 11, color: 'var(--text-tertiary)', margin: 0 }}>
+                  Desglose calculado automáticamente. Puedes ajustar las cantidades manualmente si es necesario.
+                </p>
+              )}
 
               {value.vuelto.map((v, idx) => (
                 <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

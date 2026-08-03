@@ -259,6 +259,12 @@ export interface Invoice {
   isPos?: boolean;
   /** Resumen del cobro registrado al someter (presente cuando se enviaron payments). */
   cobro?: CobroResumen;
+  /** Indica si la factura fue creada para un cliente ocasional (no registrado). */
+  esClienteOcasional?: boolean;
+  /** Nombre del cliente ocasional (solo presente cuando esClienteOcasional=true). */
+  clienteOcasionalNombre?: string;
+  /** RNC del cliente ocasional (solo presente cuando esClienteOcasional=true y ncfType=B01). */
+  clienteOcasionalRnc?: string;
 }
 
 export interface PendingTrackingEntry {
@@ -284,7 +290,9 @@ export interface ComponentTracking {
 }
 
 export interface CreateInvoiceDto {
-  customer: string;
+  customer?: string;
+  clienteOcasionalNombre?: string;
+  clienteOcasionalRnc?: string;
   postingDate: string;
   dueDate?: string;
   branch?: string;
@@ -350,6 +358,8 @@ export interface Quotation {
   id: string;
   customer: string;
   customerName: string;
+  esClienteOcasional: boolean;
+  clienteOcasionalNombre?: string;
   date: string;
   validTill: string;
   branch?: string | null;
@@ -365,7 +375,8 @@ export interface Quotation {
 }
 
 export interface CreateQuotationDto {
-  customer: string;
+  customer?: string;
+  clienteOcasionalNombre?: string;
   date: string; // required per API
   validTill?: string;
   branch?: string;
@@ -388,8 +399,9 @@ export type UpdateQuotationDto = Partial<CreateQuotationDto>;
 
 // GET /quotations/:id/duplicate-source
 export interface DuplicateQuotationSource {
-  customer: string;
-  items: {
+   customer: string;
+   clienteOcasionalNombre?: string;
+   items: {
     itemCode: string;
     description?: string;
     qty: number;
@@ -835,6 +847,8 @@ export interface Pedido {
   id: string;
   customer: string;
   customerName: string;
+  esClienteOcasional: boolean;
+  clienteOcasionalNombre?: string;
   transactionDate: string;
   deliveryDate?: string;
   branch?: string | null;
@@ -858,7 +872,8 @@ export interface Pedido {
 }
 
 export interface CreatePedidoDto {
-  customer: string;
+  customer?: string;
+  clienteOcasionalNombre?: string;
   transactionDate?: string;
   deliveryDate?: string;
   branch?: string;
@@ -1626,6 +1641,10 @@ export interface FacturacionConfig {
   posProfileDefault?: string | null;
   /** Si está activo, cerrar un turno de caja exige el desglose de denominaciones contadas para el/los modos de pago en efectivo. */
   arqueoEfectivoRequerido?: boolean;
+/** Formato de impresión default al generar el PDF de una factura. "pdf": hoja carta/A4 (histórico). "pos": ticket angosto 80mm para impresora térmica. */
+  formatoImpresionDefault?: "pdf" | "pos"
+  /** Máximo de horas que un turno de caja puede estar abierto antes de obligar al cajero a cerrarlo. 0.1 = 6 minutos. Default 24 si no se configura. */
+  turnoMaxHoras?: number
 }
 
 // POST /config/pos/habilitar
@@ -1647,11 +1666,12 @@ export interface BalanceDetailLine {
 
 // GET /pos/turnos/actual — null si el cajero no tiene turno abierto
 export interface TurnoCaja {
-  openingEntryId: string;
-  posProfile: string;
-  company: string;
-  periodStartDate: string;
-}
+   openingEntryId: string;
+   posProfile: string;
+   company: string;
+   periodStartDate: string;
+   turnoMaxHoras: number;
+ }
 
 // POST /pos/turnos/abrir
 export interface AbrirTurnoDto {
@@ -1815,12 +1835,14 @@ export interface VueltoLine {
 export type CondicionFiscal = "CREDITO_FISCAL" | "CONSUMO"
 
 export interface CobrarFacturaDto {
-  payments: PaymentLine[]
-  vuelto?: VueltoLine[]
-  tenderedCash?: number
-  /** Opcional — si se omite, el backend infiere según el RNC/Cédula del cliente. */
-  condicionFiscal?: CondicionFiscal
-}
+   payments: PaymentLine[]
+   vuelto?: VueltoLine[]
+   tenderedCash?: number
+   /** Opcional — si se omite, el backend infiere según el RNC/Cédula del cliente. */
+   condicionFiscal?: CondicionFiscal
+   /** RNC del cliente ocasional — requerido cuando esClienteOcasional=true y condicionFiscal=CREDITO_FISCAL. */
+   rnc?: string
+ }
 
 /** Resumen del cobro registrado al someter una factura (presente cuando se enviaron payments). */
 export interface CobroResumen {
@@ -1841,25 +1863,30 @@ export interface PendienteCobroSubmitResult {
 
 /** Fila de GET /caja/por-cobrar — factura en borrador que espera completar cobro (sin NCF aún). */
 export interface PendienteCobroItem {
-  id: string;
-  customer: string;
-  customerName: string;
-  grandTotal: number;
-  postingDate: string;
-}
+   id: string;
+   customer: string;
+   customerName: string;
+   grandTotal: number;
+   postingDate: string;
+   esClienteOcasional: boolean;
+   clienteOcasionalNombre?: string;
+ }
 
 /** Respuesta de POST /caja/facturas/:id/completar-cobro. */
 export interface CompletarCobroResult {
-  invoiceId: string;
-  ncf: string;
-  ncfType?: string;
-  condicionFiscal?: CondicionFiscal;
-  isPos: boolean;
-  paymentEntryIds: string[];
-  outstandingAmount: number;
-  fullyPaid: boolean;
-  vuelto: VueltoLine[];
-}
+   invoiceId: string;
+   ncf: string;
+   ncfType?: string;
+   condicionFiscal?: CondicionFiscal;
+   isPos: boolean;
+   paymentEntryIds: string[];
+   outstandingAmount: number;
+   fullyPaid: boolean;
+   vuelto: VueltoLine[];
+   esClienteOcasional: boolean;
+   clienteOcasionalNombre?: string;
+   clienteOcasionalRnc?: string;
+ }
 
 export type SubmitInvoiceResult = Invoice | PendienteCobroSubmitResult;
 

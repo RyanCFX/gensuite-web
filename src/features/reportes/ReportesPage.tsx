@@ -125,7 +125,7 @@ function ReportTable({
   data: Record<string, unknown>[]
   columns?: ColumnDef[]
 }) {
-  
+
   if (!data || data.length === 0) {
     return (
       <div className="empty-state">
@@ -822,8 +822,8 @@ function LibroMayorReport() {
 
 const REPORT_NAV = [
   { key: '606',         group: 'DGII',       label: '606 – Compras' },
-  { key: '607',         group: 'DGII',       label: '607 – Retenciones' },
-  { key: '608',         group: 'DGII',       label: '608 – Ventas' },
+  { key: '607',         group: 'DGII',       label: '607 – Ventas' },
+  { key: '608',         group: 'DGII',       label: '608 – Anulaciones' },
   { key: 'ventas',      group: 'Ventas',     label: 'Ventas' },
   { key: 'balance',     group: 'Financiero', label: 'Balance General' },
   { key: 'pl',          group: 'Financiero', label: 'Estado de Resultados' },

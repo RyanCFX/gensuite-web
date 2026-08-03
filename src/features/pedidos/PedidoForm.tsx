@@ -81,11 +81,13 @@ export default function PedidoForm() {
   const queryClient = useQueryClient()
   const isEdit = !!id
 
-  const [customerId, setCustomerId] = useState('')
-  const [customerName, setCustomerName] = useState('')
-  const [customerPriceTier, setCustomerPriceTier] = useState<keyof ItemPrices | undefined>(undefined)
-  const [customerQuery, setCustomerQuery] = useState('')
-  const [transactionDate, setTransactionDate] = useState(todayIso())
+const [customerId, setCustomerId] = useState('')
+   const [customerName, setCustomerName] = useState('')
+   const [customerPriceTier, setCustomerPriceTier] = useState<keyof ItemPrices | undefined>(undefined)
+   const [customerQuery, setCustomerQuery] = useState('')
+   const [esClienteOcasional, setEsClienteOcasional] = useState(false)
+   const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
+   const [transactionDate, setTransactionDate] = useState(todayIso())
   const [deliveryDate, setDeliveryDate] = useState(defaultDelivery())
   const [items, setItems] = useState<LineItem[]>([])
   const [notes, setNotes] = useState('')
@@ -174,26 +176,30 @@ export default function PedidoForm() {
     queryFn: () => getPedido(id!),
     enabled: isEdit,
   })
-  useEffect(() => {
-    if (!existing || loaded) return
-    setCustomerId(existing.customer)
-    setTransactionDate(existing.transactionDate)
-    setDeliveryDate(existing.deliveryDate ?? defaultDelivery())
-    setItems(existing.items.map((i) => ({
-      itemCode: i.itemCode,
-      description: i.description,
-      qty: i.qty,
-      rate: i.rate,
-      amount: i.amount,
-      discountPct: (i as any).discountPct ?? 0,
-      uom: i.uom ?? 'Unidad',
-      warehouse: '',
-    })))
-    setNotes(existing.notes ?? '')
-    setBranch(existing.branch ?? '')
-    setDepartment((existing as any).department ?? '')
-    setLoaded(true)
-  }, [existing])
+useEffect(() => {
+     if (!existing || loaded) return
+     setCustomerId(existing.customer)
+     setTransactionDate(existing.transactionDate)
+     setDeliveryDate(existing.deliveryDate ?? defaultDelivery())
+     setItems(existing.items.map((i) => ({
+       itemCode: i.itemCode,
+       description: i.description,
+       qty: i.qty,
+       rate: i.rate,
+       amount: i.amount,
+       discountPct: (i as any).discountPct ?? 0,
+       uom: i.uom ?? 'Unidad',
+       warehouse: '',
+     })))
+     setNotes(existing.notes ?? '')
+     setBranch(existing.branch ?? '')
+     setDepartment((existing as any).department ?? '')
+     if (existing.esClienteOcasional) {
+       setEsClienteOcasional(true)
+       setClienteOcasionalNombre(existing.clienteOcasionalNombre ?? '')
+     }
+     setLoaded(true)
+   }, [existing])
 
   const { data: customersData } = useQuery({
     queryKey: ['customerSearch', customerQuery],
@@ -422,26 +428,40 @@ export default function PedidoForm() {
   const totalDiscount = grossTotal - subtotal
   const total = subtotal
 
-  function submitDto() {
-    const itemsDto = items.map((i) => ({
-      itemCode: i.itemCode,
-      qty: i.qty,
-      rate: i.rate,
-      discountPct: i.discountPct || undefined,
-      warehouse: i.warehouse || undefined,
-    }))
-    if (isEdit) updateMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, branch: branch || undefined, department: department || undefined, items: itemsDto, quotation: quotationId || undefined })
-    else createMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, branch: branch || undefined, department: department || undefined, items: itemsDto, quotation: quotationId || undefined, isLayaway: isLayaway || undefined })
-  }
+function submitDto() {
+     const itemsDto = items.map((i) => ({
+       itemCode: i.itemCode,
+       qty: i.qty,
+       rate: i.rate,
+       discountPct: i.discountPct || undefined,
+       warehouse: i.warehouse || undefined,
+     }))
+     const baseDto = {
+       ...(esClienteOcasional ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined } : { customer: customerId }),
+       transactionDate,
+       deliveryDate: deliveryDate || undefined,
+       branch: branch || undefined,
+       department: department || undefined,
+       items: itemsDto,
+       quotation: quotationId || undefined,
+       isLayaway: isLayaway || undefined,
+     }
+     if (isEdit) updateMutation.mutate(baseDto)
+     else createMutation.mutate(baseDto)
+   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitted(true)
     setSubmitError(null)
 
-    try {
-      if (!customerId) { toast.error('Selecciona un cliente'); return }
-      if (items.length === 0) { toast.error('Agrega al menos un artículo'); return }
+try {
+       if (esClienteOcasional) {
+         if (!clienteOcasionalNombre.trim()) { toast.error('Ingresa el nombre del cliente ocasional'); return }
+       } else {
+         if (!customerId) { toast.error('Selecciona un cliente'); return }
+       }
+       if (items.length === 0) { toast.error('Agrega al menos un artículo'); return }
       for (let i = 0; i < items.length; i++) {
         const item = items[i]; const num = i + 1
         if (!item.qty || item.qty <= 0) { toast.error(`Artículo #${num}: la cantidad es requerida`); return }
@@ -485,25 +505,46 @@ export default function PedidoForm() {
           <div className="card-header"><h2 className="card-title">Información General</h2></div>
           <div className="card-body">
             <div className="form-row form-row-3">
-              <div className="ff-wrap">
-                <label className="ff-label ff-required">Cliente</label>
-                <SearchSelect
-                  value={customerId}
-                  onChange={(id, opt) => {
-                    const cid = id === '' ? '' : (opt?.value ?? id)
-                    setCustomerId(cid)
-                    setCustomerName(opt?.label ?? '')
-                    const c = cid && customersData?.items?.find((c) => c.id === cid)
-                    setCustomerPriceTier(c?.priceTier)
-                  }}
-                  options={customerOptions}
-                  selectedLabel={customerName}
-                  onSearch={setCustomerQuery}
-                  loading={false}
-                  placeholder="Buscar cliente…"
-                  error={submitted && !customerId}
-                />
-              </div>
+<div className="ff-wrap">
+                 <label className="ff-label ff-required">Cliente</label>
+                 {esClienteOcasional ? (
+                   <input
+                     className="ff-input"
+                     value={clienteOcasionalNombre}
+                     onChange={(e) => setClienteOcasionalNombre(e.target.value)}
+                     placeholder="Nombre del cliente ocasional"
+                     required={esClienteOcasional}
+                   />
+                 ) : (
+                   <SearchSelect
+                     value={customerId}
+                     onChange={(id, opt) => {
+                       const cid = id === '' ? '' : (opt?.value ?? id)
+                       setCustomerId(cid)
+                       setCustomerName(opt?.label ?? '')
+                       const c = cid && customersData?.items?.find((c) => c.id === cid)
+                       setCustomerPriceTier(c?.priceTier)
+                     }}
+                     options={customerOptions}
+                     selectedLabel={customerName}
+                     onSearch={setCustomerQuery}
+                     loading={false}
+                     placeholder="Buscar cliente…"
+                     error={submitted && !customerId}
+                   />
+                 )}
+               </div>
+               <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
+                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                   <input type="checkbox" checked={esClienteOcasional} onChange={(e) => { setEsClienteOcasional(e.target.checked); if (e.target.checked) setCustomerId('') }} />
+                   Venta ocasional (cliente no registrado)
+                 </label>
+                 {esClienteOcasional && (
+                   <p className="ff-hint" style={{ marginTop: 4 }}>
+                     Ingresa el nombre del cliente. No se requiere RUC/Cédula para pedidos.
+                   </p>
+                 )}
+               </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Fecha</label>
                 <input type="date" className="ff-input" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />

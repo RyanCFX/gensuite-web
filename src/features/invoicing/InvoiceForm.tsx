@@ -179,6 +179,9 @@ export default function InvoiceForm() {
   const [customerId, setCustomerId] = useState('')
   const [customerQuery, setCustomerQuery] = useState('')
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [esClienteOcasional, setEsClienteOcasional] = useState(false)
+  const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
+  const [clienteOcasionalRnc, setClienteOcasionalRnc] = useState('')
   const [postingDate, setPostingDate] = useState(todayIso())
   const [dueDate, setDueDate] = useState(defaultDueDate())
   const [ncfType, setNcfType] = useState<NcfType>('B02')
@@ -369,6 +372,16 @@ export default function InvoiceForm() {
       setNcfType('B02')
     }
   }, [selectedCustomer])
+
+  // ── Auto-select NCF type for ocasional customers ────────────────────────
+  useEffect(() => {
+    if (!esClienteOcasional) return
+    if (clienteOcasionalRnc.trim()) {
+      setNcfType('B01')
+    } else {
+      setNcfType('B02')
+    }
+  }, [esClienteOcasional, clienteOcasionalRnc])
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   /** Cuando el backend rechaza la venta por tener stock repartido en varias ubicaciones del mismo
@@ -613,18 +626,25 @@ export default function InvoiceForm() {
     e.preventDefault()
     setSubmitted(true)
 
-    if (!customerId) {
-      toast.error('Selecciona un cliente')
-      return
-    }
-    if (items.length === 0) {
-      toast.error('Agrega al menos un artículo')
-      return
-    }
-    if (ncfType === 'B01' && !selectedCustomer?.rnc) {
-      toast.error('El cliente necesita RNC para comprobante B01 (Crédito Fiscal)')
-      return
-    }
+if (esClienteOcasional) {
+       if (!clienteOcasionalNombre.trim()) {
+         toast.error('Ingresa el nombre del cliente ocasional')
+         return
+       }
+       if (ncfType === 'B01' && !clienteOcasionalRnc.trim()) {
+         toast.error('El RNC es requerido para comprobante B01 (Crédito Fiscal)')
+         return
+       }
+     } else {
+       if (!customerId) {
+         toast.error('Selecciona un cliente')
+         return
+       }
+       if (ncfType === 'B01' && !selectedCustomer?.rnc) {
+         toast.error('El cliente necesita RNC para comprobante B01 (Crédito Fiscal)')
+         return
+       }
+     }
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
@@ -647,29 +667,33 @@ export default function InvoiceForm() {
       }
     }
 
-    const itemsDto = items.map((i) => ({
-      itemCode: i.itemCode,
-      description: i.description,
-      qty: i.qty,
-      rate: i.rate,
-      discountPct: i.discountPct || undefined,
-      uom: i.uom || undefined,
-      warehouse: i.warehouse || undefined,
-      ubicacion: i.ubicacion || undefined,
-      componentTracking: i.componentTracking,
-    }))
+const itemsDto = items.map((i) => ({
+       itemCode: i.itemCode,
+       description: i.description,
+       qty: i.qty,
+       rate: i.rate,
+       discountPct: i.discountPct || undefined,
+       uom: i.uom || undefined,
+       warehouse: i.warehouse || undefined,
+       ubicacion: i.ubicacion || undefined,
+       componentTracking: i.componentTracking,
+     }))
 
-    createMutation.mutate({
-      customer: customerId,
-      postingDate,
-      dueDate,
-      branch: branch || undefined,
-      department: department || undefined,
-      ncfType,
-      items: itemsDto,
-      notes: notes || undefined,
-      taxesTemplate: taxesTemplate || undefined,
-    })
+     const baseDto = {
+       ...(esClienteOcasional
+         ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalRnc: clienteOcasionalRnc || undefined }
+         : { customer: customerId }),
+       postingDate,
+       dueDate,
+       branch: branch || undefined,
+       department: department || undefined,
+       ncfType,
+       items: itemsDto,
+       notes: notes || undefined,
+       taxesTemplate: taxesTemplate || undefined,
+     }
+
+     createMutation.mutate(baseDto)
   }
 
   const semaforoStatusClass: Record<string, string> = {
@@ -701,41 +725,63 @@ export default function InvoiceForm() {
           </div>
           <div className="card-body">
             <div className="form-row">
-              <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
-                <label className="ff-label ff-required" htmlFor="customer">Cliente</label>
-                <SearchSelect
-                  id="customer"
-                  value={customerId}
-                  onChange={(val, _opt) => {
-                    setCustomerId(val)
-                    if (!val) {
-                      setSelectedCustomer(null)
-                      setSemaforo(null)
-                    } else {
-                      const match = customersData?.items.find((c) => c.id === val) ?? null
-                      setSelectedCustomer(match)
-                    }
-                  }}
-                  options={customerOptions}
-                  onSearch={setCustomerQuery}
-                  loading={loadingCustomers}
-                  placeholder="Buscar cliente…"
-                  error={!customerId}
-                />
-                {selectedCustomer && (
-                  <div style={{ marginTop: 6 }}>
-                    {loadingSemaforo ? (
-                      <div className="skeleton-box" style={{ width: 120, height: 20 }} />
-                    ) : semaforo ? (
-                      <div className={`semaforo ${semaforoStatusClass[semaforo.semaforo] ?? ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                        <span className="semaforo-dot" />
-                        {semaforoLabel[semaforo.semaforo] ?? semaforo.semaforo}
-                        {` — ${(semaforo.pctUsado ?? 0).toFixed(0)}% del límite`}
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-              </div>
+<div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
+                 <label className="ff-label ff-required" htmlFor="customer">Cliente</label>
+                 {esClienteOcasional ? (
+                   <input
+                     id="customer"
+                     className="ff-input"
+                     value={clienteOcasionalNombre}
+                     onChange={(e) => setClienteOcasionalNombre(e.target.value)}
+                     placeholder="Nombre del cliente ocasional"
+                     required={esClienteOcasional}
+                   />
+                 ) : (
+                   <SearchSelect
+                     id="customer"
+                     value={customerId}
+                     onChange={(val, _opt) => {
+                       setCustomerId(val)
+                       if (!val) {
+                         setSelectedCustomer(null)
+                         setSemaforo(null)
+                       } else {
+                         const match = customersData?.items.find((c) => c.id === val) ?? null
+                         setSelectedCustomer(match)
+                       }
+                     }}
+                     options={customerOptions}
+                     onSearch={setCustomerQuery}
+                     loading={loadingCustomers}
+                     placeholder="Buscar cliente…"
+                     error={!customerId}
+                   />
+                 )}
+                 {selectedCustomer && !esClienteOcasional && (
+                   <div style={{ marginTop: 6 }}>
+                     {loadingSemaforo ? (
+                       <div className="skeleton-box" style={{ width: 120, height: 20 }} />
+                     ) : semaforo ? (
+                       <div className={`semaforo ${semaforoStatusClass[semaforo.semaforo] ?? ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                         <span className="semaforo-dot" />
+                         {semaforoLabel[semaforo.semaforo] ?? semaforo.semaforo}
+                         {` — ${(semaforo.pctUsado ?? 0).toFixed(0)}% del límite`}
+                       </div>
+                     ) : null}
+                   </div>
+                 )}
+               </div>
+               <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
+                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                   <input type="checkbox" checked={esClienteOcasional} onChange={(e) => { setEsClienteOcasional(e.target.checked); if (e.target.checked) { setCustomerId(''); setSelectedCustomer(null); setSemaforo(null) } }} />
+                   Venta ocasional (cliente no registrado)
+                 </label>
+                 {esClienteOcasional && (
+                   <p className="ff-hint" style={{ marginTop: 4 }}>
+                     Ingresa el nombre del cliente. Para Crédito Fiscal (B01), también se requiere el RNC.
+                   </p>
+                 )}
+               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="postingDate">Fecha</label>
@@ -760,23 +806,43 @@ export default function InvoiceForm() {
                 />
               </div>
 
-              <div className="ff-wrap">
-                <label className="ff-label" htmlFor="ncfType">Tipo NCF</label>
-                <SearchSelect
-                  id="ncfType"
-                  value={ncfType}
-                  selectedLabel={(catalogos?.ncfTypes ?? []).find((t) => t.value === ncfType)?.label ?? ''}
-                  onChange={(val) => setNcfType((val || 'B02') as NcfType)}
-                  options={ncfTypeOptions}
-                  onSearch={setNcfTypeSearch}
-                  className="ff-select"
-                />
-                {ncfType === 'B01' && !selectedCustomer?.rnc && (
-                  <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
-                    B01 requiere RNC del cliente
-                  </p>
-                )}
-              </div>
+<div className="ff-wrap">
+                 <label className="ff-label" htmlFor="ncfType">Tipo NCF</label>
+                 <SearchSelect
+                   id="ncfType"
+                   value={ncfType}
+                   selectedLabel={(catalogos?.ncfTypes ?? []).find((t) => t.value === ncfType)?.label ?? ''}
+                   onChange={(val) => setNcfType((val || 'B02') as NcfType)}
+                   options={ncfTypeOptions}
+                   onSearch={setNcfTypeSearch}
+                   className="ff-select"
+                 />
+                 {ncfType === 'B01' && !selectedCustomer?.rnc && !esClienteOcasional && (
+                   <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
+                     B01 requiere RNC del cliente
+                   </p>
+                 )}
+                 {ncfType === 'B01' && esClienteOcasional && (
+                   <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
+                     B01 requiere RNC del cliente ocasional
+                   </p>
+                 )}
+               </div>
+
+               {esClienteOcasional && ncfType === 'B01' && (
+                 <div className="ff-wrap">
+                   <label className="ff-label ff-required" htmlFor="clienteOcasionalRnc">RNC del cliente</label>
+                   <input
+                     id="clienteOcasionalRnc"
+                     type="text"
+                     className="ff-input"
+                     value={clienteOcasionalRnc}
+                     onChange={(e) => setClienteOcasionalRnc(e.target.value)}
+                     placeholder="RNC del cliente ocasional"
+                     required
+                   />
+                 </div>
+               )}
 
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="branch">Sucursal</label>
@@ -1064,17 +1130,26 @@ export default function InvoiceForm() {
       <PinModal
         open={pinModalOpen}
         onClose={() => setPinModalOpen(false)}
-        onAuthorized={(userId) => {
-          client.defaults.headers.common['X-Admin-Pin'] = userId
-          setPinModalOpen(false)
-          const itemsDto = items.map((i) => ({
-            itemCode: i.itemCode, description: i.description, qty: i.qty, rate: i.rate,
-            discountPct: i.discountPct || undefined, uom: i.uom || undefined, warehouse: i.warehouse || undefined,
-            ubicacion: i.ubicacion || undefined,
-            componentTracking: i.componentTracking,
-          }))
-          createMutation.mutate({ customer: customerId, postingDate, dueDate, branch: branch || undefined, department: department || undefined, ncfType, items: itemsDto, notes: notes || undefined, taxesTemplate: taxesTemplate || undefined })
-        }}
+onAuthorized={(userId) => {
+           client.defaults.headers.common['X-Admin-Pin'] = userId
+           setPinModalOpen(false)
+           const itemsDto = items.map((i) => ({
+             itemCode: i.itemCode, description: i.description, qty: i.qty, rate: i.rate,
+             discountPct: i.discountPct || undefined, uom: i.uom || undefined, warehouse: i.warehouse || undefined,
+             ubicacion: i.ubicacion || undefined,
+             componentTracking: i.componentTracking,
+           }))
+           const baseDto = {
+             ...(esClienteOcasional
+               ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalRnc: clienteOcasionalRnc || undefined }
+               : { customer: customerId }),
+             postingDate, dueDate, branch: branch || undefined, department: department || undefined, ncfType,
+             items: itemsDto,
+             notes: notes || undefined,
+             taxesTemplate: taxesTemplate || undefined,
+           }
+           createMutation.mutate(baseDto)
+         }}
         title="Autorización requerida"
         description="El descuento supera tu límite. Ingresa el PIN de un administrador."
       />

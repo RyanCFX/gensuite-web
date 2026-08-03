@@ -1995,15 +1995,19 @@ function FacturacionConfigSection() {
   const [showPosActivar, setShowPosActivar] = useState(false)
   const [posWarehouse, setPosWarehouse] = useState('')
   const [arqueoEfectivoRequerido, setArqueoEfectivoRequerido] = useState(false)
+const [formatoImpresionDefault, setFormatoImpresionDefault] = useState<"pdf" | "pos">("pdf")
+   const [turnoMaxHoras, setTurnoMaxHoras] = useState(24)
 
-  useEffect(() => {
-    if (data) {
-      setSelectedRoles(data.rolesCancelacionFactura ?? [])
-      setFlujoCobro(data.flujoCobro ?? 'directo')
-      setRequiereUbicacionVenta(data.requiereUbicacionVenta ?? false)
-      setArqueoEfectivoRequerido(data.arqueoEfectivoRequerido ?? false)
-    }
-  }, [data])
+   useEffect(() => {
+     if (data) {
+       setSelectedRoles(data.rolesCancelacionFactura ?? [])
+       setFlujoCobro(data.flujoCobro ?? "directo")
+       setRequiereUbicacionVenta(data.requiereUbicacionVenta ?? false)
+       setArqueoEfectivoRequerido(data.arqueoEfectivoRequerido ?? false)
+       setFormatoImpresionDefault(data.formatoImpresionDefault ?? "pdf")
+       setTurnoMaxHoras(data.turnoMaxHoras ?? 24)
+     }
+   }, [data])
 
   const saveMutation = useMutation({
     mutationFn: (dto: Partial<FacturacionConfig>) => updateFacturacionConfig(dto),
@@ -2180,15 +2184,55 @@ function FacturacionConfigSection() {
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+{data?.usaModuloPos && (
+           <div className="ff-wrap">
+             <label className="ff-label">Máximo de horas por turno de caja</label>
+             <p className="ff-hint" style={{ marginTop: 4 }}>
+               El turno se bloqueará automáticamente al superar este límite. El cajero deberá cerrar y abrir uno nuevo.
+               Valor 0.1 equivale a 6 minutos. Default: 24 horas.
+             </p>
+             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+               <input
+                 type="number"
+                 min={0.1}
+                 step={0.1}
+                 className="ff-input"
+                 style={{ width: 120 }}
+                 value={turnoMaxHoras}
+                 onChange={(e) => setTurnoMaxHoras(parseFloat(e.target.value) || 0.1)}
+               />
+               <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>horas</span>
+             </div>
+           </div>
+         )}
+
+         <div className="ff-wrap">
+           <label className="ff-label">Formato de impresión default</label>
+          <p className="ff-hint" style={{ marginBottom: 8 }}>
+            Formato de impresión predeterminado al generar el PDF de una factura. "pdf": hoja carta/A4 (histórico). "pos": ticket angosto 80mm para impresora térmica.
+          </p>
+          <select
+            className="ff-select"
+            style={{ maxWidth: 240 }}
+            value={formatoImpresionDefault}
+            onChange={(e) => setFormatoImpresionDefault(e.target.value as "pdf" | "pos")}
+          >
+            <option value="pdf">PDF (A4)</option>
+            <option value="pos">POS Ticket (80mm)</option>
+          </select>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <button
             className="btn btn-primary btn-size-sm"
-            onClick={() => saveMutation.mutate({
-              rolesCancelacionFactura: selectedRoles,
-              flujoCobro,
-              requiereUbicacionVenta,
-              arqueoEfectivoRequerido,
-            })}
+onClick={() => saveMutation.mutate({
+               rolesCancelacionFactura: selectedRoles,
+               flujoCobro,
+               requiereUbicacionVenta,
+               arqueoEfectivoRequerido,
+               formatoImpresionDefault,
+               turnoMaxHoras,
+             })}
             disabled={saveMutation.isPending}
           >
             <Save size={14} /> Guardar
