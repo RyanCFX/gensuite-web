@@ -1987,36 +1987,43 @@ function GruposClientesSection() {
 function FacturacionConfigSection() {
   const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({ queryKey: ['facturacion-config'], queryFn: getFacturacionConfig })
-  const { data: roles } = useQuery({ queryKey: ['roles'], queryFn: listRoles, staleTime: 5 * 60_000 })
-  const { data: almacenes } = useQuery({ queryKey: ['almacenes-all'], queryFn: () => listAlmacenes(), staleTime: 5 * 60_000 })
+   const { data: roles } = useQuery({ queryKey: ['roles'], queryFn: listRoles, staleTime: 5 * 60_000 })
+   const { data: almacenes } = useQuery({ queryKey: ['almacenes-all'], queryFn: () => listAlmacenes(), staleTime: 5 * 60_000 })
+   const { data: metodosPago } = useQuery({ queryKey: ['metodos-pago-config'], queryFn: listMetodosPago, staleTime: 5 * 60_000 })
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [flujoCobro, setFlujoCobro] = useState<'directo' | 'caja'>('directo')
   const [requiereUbicacionVenta, setRequiereUbicacionVenta] = useState(false)
   const [showPosActivar, setShowPosActivar] = useState(false)
   const [posWarehouse, setPosWarehouse] = useState('')
-  const [arqueoEfectivoRequerido, setArqueoEfectivoRequerido] = useState(false)
-const [formatoImpresionDefault, setFormatoImpresionDefault] = useState<"pdf" | "pos">("pdf")
-   const [turnoMaxHoras, setTurnoMaxHoras] = useState(24)
+   const [arqueoEfectivoRequerido, setArqueoEfectivoRequerido] = useState(false)
+   const [formatoImpresionDefault, setFormatoImpresionDefault] = useState<"pdf" | "pos">("pdf")
+    const [turnoMaxHoras, setTurnoMaxHoras] = useState(24)
+   const [modoPagoCaja, setModoPagoCaja] = useState<string | null>(null)
+   const [modosPagoConciliar, setModosPagoConciliar] = useState<string[]>([])
 
    useEffect(() => {
      if (data) {
        setSelectedRoles(data.rolesCancelacionFactura ?? [])
        setFlujoCobro(data.flujoCobro ?? "directo")
        setRequiereUbicacionVenta(data.requiereUbicacionVenta ?? false)
-       setArqueoEfectivoRequerido(data.arqueoEfectivoRequerido ?? false)
-       setFormatoImpresionDefault(data.formatoImpresionDefault ?? "pdf")
-       setTurnoMaxHoras(data.turnoMaxHoras ?? 24)
-     }
-   }, [data])
+        setArqueoEfectivoRequerido(data.arqueoEfectivoRequerido ?? false)
+        setFormatoImpresionDefault(data.formatoImpresionDefault ?? "pdf")
+        setTurnoMaxHoras(data.turnoMaxHoras ?? 24)
+        setModoPagoCaja(data.modoPagoCaja ?? null)
+        setModosPagoConciliar(data.modosPagoConciliar ?? [])
+      }
+    }, [data])
 
-  const saveMutation = useMutation({
-    mutationFn: (dto: Partial<FacturacionConfig>) => updateFacturacionConfig(dto),
-    onSuccess: () => {
-      toast.success('Configuración de facturación actualizada')
-      queryClient.invalidateQueries({ queryKey: ['facturacion-config'] })
-    },
-    onError: () => toast.error('Error al guardar'),
-  })
+   const saveMutation = useMutation({
+     mutationFn: (dto: Partial<FacturacionConfig>) => updateFacturacionConfig(dto),
+     onSuccess: () => {
+       toast.success('Configuración de facturación actualizada')
+       queryClient.invalidateQueries({ queryKey: ['facturacion-config'] })
+     },
+     onError: (err: ApiError) => {
+       toast.error(err?.message ?? 'Error al guardar')
+     },
+   })
 
   const habilitarPosMutation = useMutation({
     mutationFn: () => habilitarPos({ warehouse: posWarehouse }),
@@ -2181,10 +2188,75 @@ const [formatoImpresionDefault, setFormatoImpresionDefault] = useState<"pdf" | "
               Si está activo, el cajero debe contar y desglosar las denominaciones de efectivo (billetes/monedas) al cerrar su turno;
               si falta, el sistema rechaza el cierre.
             </p>
-          </div>
-        )}
+           </div>
+         )}
 
-{data?.usaModuloPos && (
+         {data?.usaModuloPos && (
+           <div className="ff-wrap">
+             <label className="ff-label">Método de pago de Caja</label>
+             <p className="ff-hint" style={{ marginTop: 4 }}>
+               El método de pago cuyo cobrado se compara contra el efectivo físico al cuadrar el turno.
+               Solo tiene sentido cuando el módulo POS está activo.
+             </p>
+             <select
+               className="ff-select"
+               style={{ maxWidth: 320 }}
+               value={modoPagoCaja ?? ''}
+               onChange={(e) => setModoPagoCaja(e.target.value || null)}
+             >
+               <option value="">No configurado</option>
+               {(metodosPago ?? []).map((m) => (
+                 <option key={m.name} value={m.name}>{m.name}</option>
+               ))}
+              </select>
+            </div>
+          )}
+
+          {data?.usaModuloPos && (
+            <div className="ff-wrap">
+              <label className="ff-label">Métodos de pago a conciliar</label>
+              <p className="ff-hint" style={{ marginTop: 4 }}>
+                Métodos de pago que requieren que el cajero ingrese el monto contado al cerrar el turno.
+                Si no se selecciona ninguno, el backend usa por defecto los métodos de tipo efectivo.
+              </p>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 8,
+                maxHeight: 200,
+                overflowY: 'auto',
+                border: '1px solid var(--border-default)',
+                borderRadius: 'var(--radius-md)',
+                padding: 12,
+              }}>
+                {(metodosPago ?? []).length === 0 ? (
+                  <p style={{ fontSize: 13, color: 'var(--text-tertiary)', gridColumn: '1 / -1' }}>
+                    No hay métodos de pago disponibles.
+                  </p>
+                ) : (
+                  (metodosPago ?? []).map((m) => (
+                    <label key={m.name} className="ff-check-wrap">
+                      <input
+                        type="checkbox"
+                        className="ff-check"
+                        checked={modosPagoConciliar.includes(m.name)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setModosPagoConciliar((prev) => [...prev, m.name])
+                          } else {
+                            setModosPagoConciliar((prev) => prev.filter((n) => n !== m.name))
+                          }
+                        }}
+                      />
+                      <span style={{ fontSize: 13 }}>{m.name}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+ {data?.usaModuloPos && (
            <div className="ff-wrap">
              <label className="ff-label">Máximo de horas por turno de caja</label>
              <p className="ff-hint" style={{ marginTop: 4 }}>
@@ -2225,14 +2297,16 @@ const [formatoImpresionDefault, setFormatoImpresionDefault] = useState<"pdf" | "
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <button
             className="btn btn-primary btn-size-sm"
-onClick={() => saveMutation.mutate({
-               rolesCancelacionFactura: selectedRoles,
-               flujoCobro,
-               requiereUbicacionVenta,
-               arqueoEfectivoRequerido,
-               formatoImpresionDefault,
-               turnoMaxHoras,
-             })}
+ onClick={() => saveMutation.mutate({
+                rolesCancelacionFactura: selectedRoles,
+                flujoCobro,
+                requiereUbicacionVenta,
+                arqueoEfectivoRequerido,
+                formatoImpresionDefault,
+                turnoMaxHoras,
+                modoPagoCaja,
+                modosPagoConciliar,
+              })}
             disabled={saveMutation.isPending}
           >
             <Save size={14} /> Guardar

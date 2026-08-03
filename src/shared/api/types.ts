@@ -1639,6 +1639,10 @@ export interface FacturacionConfig {
   usaModuloPos?: boolean;
   /** Nombre del POS Profile provisionado — solo informativo, no editable desde aquí. */
   posProfileDefault?: string | null;
+  /** Nombre exacto del método de pago que representa "la caja" — se compara contra el efectivo físico al cuadrar. Solo tiene sentido cuando usaModuloPos está activo. */
+  modoPagoCaja?: string | null;
+  /** Nombres exactos de Mode of Payment que requieren conteo manual al cerrar turno. Si no se configura, el backend usa por defecto los métodos type="Cash". */
+  modosPagoConciliar?: string[];
   /** Si está activo, cerrar un turno de caja exige el desglose de denominaciones contadas para el/los modos de pago en efectivo. */
   arqueoEfectivoRequerido?: boolean;
 /** Formato de impresión default al generar el PDF de una factura. "pdf": hoja carta/A4 (histórico). "pos": ticket angosto 80mm para impresora térmica. */
@@ -1657,13 +1661,6 @@ export interface HabilitarPosResult {
   cajeroRole: string;
 }
 
-// ─── Turnos de caja (POS) ──────────────────────────────────────────────────
-
-export interface BalanceDetailLine {
-  modeOfPayment: string;
-  openingAmount: number;
-}
-
 // GET /pos/turnos/actual — null si el cajero no tiene turno abierto
 export interface TurnoCaja {
    openingEntryId: string;
@@ -1671,13 +1668,19 @@ export interface TurnoCaja {
    company: string;
    periodStartDate: string;
    turnoMaxHoras: number;
+   modoPagoCaja?: string | null;
+   montoCaja?: number | null;
+   /** Planos del response de POST /pos/turnos/abrir (reemplazan balanceDetails). */
+   modeOfPayment?: string;
+   openingAmount?: number;
  }
 
 // POST /pos/turnos/abrir
 export interface AbrirTurnoDto {
   /** Si se omite, usa el POS Profile default del tenant. */
   posProfile?: string;
-  balanceDetails: BalanceDetailLine[];
+  /** Efectivo físico con el que se abre el turno. Se asocia automáticamente a FacturacionConfig.modoPagoCaja. */
+  openingAmount: number;
 }
 
 export interface PaymentReconciliationLine {
@@ -1688,6 +1691,8 @@ export interface PaymentReconciliationLine {
   closingAmount: number;
   /** closingAmount - expectedAmount. Negativo = faltante, positivo = sobrante. */
   difference: number;
+  /** true si este método requiere que el cajero ingrese manualmente el monto contado. */
+  requiereConciliacion: boolean;
 }
 
 // GET /pos/turnos/:openingEntryId/preview-cierre
@@ -1740,15 +1745,16 @@ export interface TurnoListItem {
 
 // GET /pos/turnos/:id — detalle completo
 export interface TurnoDetail {
-  id: string;
-  status: "Open" | "Closed";
-  posProfile: string;
-  company: string;
-  user: string;
-  periodStartDate: string;
-  balanceDetails: BalanceDetailLine[];
-  closing?: TurnoClosing | null;
-}
+   id: string;
+   status: "Open" | "Closed";
+   posProfile: string;
+   company: string;
+   user: string;
+   periodStartDate: string;
+   modeOfPayment?: string;
+   openingAmount?: number;
+   closing?: TurnoClosing | null;
+ }
 
 export interface TurnoClosing {
   id: string;

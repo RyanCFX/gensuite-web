@@ -1425,6 +1425,7 @@
     },
     "/api/v1/invoices/{id}/pdf": {
       "get": {
+        "description": "`formato`: \"pdf\" (carta/A4) o \"pos\" (ticket angosto 80mm). Si se omite, usa el default configurable del tenant (Facturacion Config.formato_impresion_default).",
         "operationId": "InvoicesController_getPdf",
         "parameters": [
           {
@@ -1439,6 +1440,14 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "formato",
+            "required": true,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -6221,7 +6230,7 @@
             "bearer": []
           }
         ],
-        "summary": "Turno de caja abierto del usuario actual (o null si no tiene ninguno).",
+        "summary": "Turno de caja abierto del usuario actual (o null si no tiene ninguno). Incluye montoCaja: lo cobrado con el método de pago de caja (Facturacion Config.modoPagoCaja) desde que se abrió el turno, para comparar contra el efectivo físico antes de cerrar.",
         "tags": [
           "POS"
         ]
@@ -6438,7 +6447,7 @@
             "bearer": []
           }
         ],
-        "summary": "Vista previa del cierre de turno — monto esperado por modo de pago (calculado por ERPNext).",
+        "summary": "Vista previa del cierre de turno — monto esperado por modo de pago (calculado por ERPNext) y requiereConciliacion por fila (Facturacion Config.modosPagoConciliar): solo esos modos necesitan un monto contado al cerrar, los demás se concilian automáticamente.",
         "tags": [
           "POS"
         ]
@@ -15692,7 +15701,18 @@
         "properties": {
           "customer": {
             "type": "string",
-            "example": "CUST-0001"
+            "example": "CUST-0001",
+            "description": "Cliente registrado. Exactamente uno de `customer`/`clienteOcasionalNombre` es requerido."
+          },
+          "clienteOcasionalNombre": {
+            "type": "string",
+            "example": "Juan Pérez",
+            "description": "Nombre de la persona cuando la factura es para alguien sin registrar como cliente. No enviar junto con `customer`."
+          },
+          "clienteOcasionalRnc": {
+            "type": "string",
+            "example": "132456789",
+            "description": "RNC del comprador ocasional (sin registrar como cliente). Obligatorio cuando `clienteOcasionalNombre` viene junto con `ncfType: \"B01\"` (Crédito Fiscal) — la DGII exige el RNC del comprador en ese caso. Sin efecto para clientes registrados (customer)."
           },
           "postingDate": {
             "type": "string"
@@ -15741,7 +15761,6 @@
           }
         },
         "required": [
-          "customer",
           "postingDate",
           "ncfType",
           "items"
@@ -16050,10 +16069,35 @@
             "default": false,
             "description": "Si está activo, no se podrá vender un artículo de inventario si no tiene una Ubicación asignada dentro del almacén desde el cual se factura."
           },
+          "modoPagoCaja": {
+            "type": "string",
+            "description": "Método de pago (Mode of Payment) que se compara contra el efectivo físico en caja al cuadrar el turno. GET /pos/turnos/actual expone el monto cobrado con este método desde que se abrió el turno, para comparar en el frontend antes de cerrar. Solo aplica cuando usaModuloPos está activo."
+          },
+          "modosPagoConciliar": {
+            "description": "Métodos de pago (Mode of Payment) que requieren conciliación manual (monto contado por el cajero) al cerrar turno — los demás se dan por conciliados automáticamente contra el monto esperado, sin exigirle nada al cajero (ej. tarjeta, que ya se verifica contra el lote del datáfono, no contra un conteo físico). Si se envía vacío o se omite, se usan por defecto los métodos con type=\"Cash\" en ERPNext. Solo aplica cuando usaModuloPos está activo.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "arqueoEfectivoRequerido": {
             "type": "boolean",
             "default": false,
             "description": "Si está activo, cerrar un turno de caja (POS) exige el desglose de denominaciones contadas para el/los modos de pago en efectivo — el cierre se rechaza si falta. Solo aplica cuando usaModuloPos está activo."
+          },
+          "formatoImpresionDefault": {
+            "type": "string",
+            "enum": [
+              "pdf",
+              "pos"
+            ],
+            "default": "pdf",
+            "description": "Qué formato se imprime por defecto al cobrar una factura: \"pdf\" (hoja carta/A4, formato actual) o \"pos\" (ticket angosto 80mm para impresora térmica). El frontend puede pedir explícitamente el otro formato vía GET /invoices/:id/pdf?formato=pos|pdf sin importar este default."
+          },
+          "turnoMaxHoras": {
+            "type": "number",
+            "default": 24,
+            "description": "Cantidad máxima de horas que un turno de caja (POS) puede permanecer abierto antes de que el frontend deba obligar a cerrarlo. Puramente informativo — el backend no cierra turnos automáticamente ni rechaza ventas por esto; GET /pos/turnos/actual devuelve este valor junto con periodStartDate para que el frontend calcule si ya se venció."
           }
         }
       },
@@ -17229,28 +17273,15 @@
               "CONSUMO"
             ],
             "description": "Solo tiene efecto en POST /caja/facturas/:id/completar-cobro (factura aún en Draft, sin NCF asignado) — el cajero confirma en el momento del cobro si el comprobante debe ser de Crédito Fiscal (B01, cliente empresa con RNC) o de Consumo (B02, persona física). Si se omite, se infiere automáticamente: Crédito Fiscal si el cliente tiene RNC registrado, Consumo en caso contrario. Sin efecto en POST /caja/facturas/:id/cobrar (factura ya sometida, el NCF ya está fijo y no puede cambiar)."
+          },
+          "rnc": {
+            "type": "string",
+            "example": "132456789",
+            "description": "RNC del comprador. Obligatorio en POST /caja/facturas/:id/completar-cobro cuando la factura es de un comprador sin registrar como cliente (cliente ocasional) y la condición fiscal resuelta es Crédito Fiscal (B01) — la DGII exige el RNC del comprador en ese caso. Sin efecto para clientes registrados (se usa el RNC ya guardado en el Customer)."
           }
         },
         "required": [
           "payments"
-        ]
-      },
-      "BalanceDetailDto": {
-        "type": "object",
-        "properties": {
-          "modeOfPayment": {
-            "type": "string",
-            "example": "Cash"
-          },
-          "openingAmount": {
-            "type": "number",
-            "example": 2000,
-            "description": "Monto de apertura para este modo de pago."
-          }
-        },
-        "required": [
-          "modeOfPayment",
-          "openingAmount"
         ]
       },
       "OpenPosSessionDto": {
@@ -17260,15 +17291,14 @@
             "type": "string",
             "description": "POS Profile a usar — si se omite, se usa Facturacion Config.pos_profile_default."
           },
-          "balanceDetails": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/BalanceDetailDto"
-            }
+          "openingAmount": {
+            "type": "number",
+            "example": 2000,
+            "description": "Efectivo físico con el que se abre el turno. Se asocia automáticamente al método de pago configurado en Facturacion Config.modoPagoCaja — no hace falta (ni se puede) indicar el modo de pago acá, solo tiene sentido contar efectivo al abrir turno."
           }
         },
         "required": [
-          "balanceDetails"
+          "openingAmount"
         ]
       },
       "DenominacionCierreDto": {
@@ -17318,6 +17348,7 @@
         "type": "object",
         "properties": {
           "closingAmounts": {
+            "description": "Monto real contado por el cajero, uno por modo de pago. Solo es obligatorio para los modos con requiereConciliacion=true en la vista previa (GET .../preview-cierre) — los demás (ej. tarjeta) se concilian automáticamente contra el monto esperado si se omiten. Enviar uno de todas formas para un modo que no lo requiere es válido (se respeta el monto enviado en vez de asumirlo igual al esperado).",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ClosingAmountDto"
@@ -18708,7 +18739,13 @@
         "properties": {
           "customer": {
             "type": "string",
-            "example": "CUST-0001"
+            "example": "CUST-0001",
+            "description": "Cliente registrado. Exactamente uno de `customer`/`clienteOcasionalNombre` es requerido."
+          },
+          "clienteOcasionalNombre": {
+            "type": "string",
+            "example": "Juan Pérez",
+            "description": "Nombre de la persona cuando la cotización es para alguien sin registrar como cliente. No enviar junto con `customer`."
           },
           "date": {
             "type": "string",
@@ -18740,7 +18777,6 @@
           }
         },
         "required": [
-          "customer",
           "date",
           "items"
         ]
@@ -19253,7 +19289,13 @@
         "properties": {
           "customer": {
             "type": "string",
-            "example": "CUST-0001"
+            "example": "CUST-0001",
+            "description": "Cliente registrado. Exactamente uno de `customer`/`clienteOcasionalNombre` es requerido."
+          },
+          "clienteOcasionalNombre": {
+            "type": "string",
+            "example": "Juan Pérez",
+            "description": "Nombre de la persona cuando el pedido es para alguien sin registrar como cliente. No enviar junto con `customer`."
           },
           "transactionDate": {
             "type": "string",
@@ -19291,7 +19333,6 @@
           }
         },
         "required": [
-          "customer",
           "items"
         ]
       },

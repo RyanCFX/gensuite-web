@@ -52,16 +52,16 @@ export default function PorCobrarPage() {
     staleTime: 5 * 60_000,
   })
 
+  const usaModuloPos = facturacion?.usaModuloPos ?? false
+  const flujoCobro = facturacion?.flujoCobro ?? 'directo'
+  const metodosActivos = (metodos ?? []).filter((m) => !m.disabled)
+
   const { data: turno } = useQuery({
     queryKey: ['turno-actual'],
     queryFn: getTurnoActual,
     enabled: usaModuloPos,
     staleTime: 30_000,
   })
-
-  const usaModuloPos = facturacion?.usaModuloPos ?? false
-   const flujoCobro = facturacion?.flujoCobro ?? 'directo'
-   const metodosActivos = (metodos ?? []).filter((m) => !m.disabled)
    const pendientes = data?.items ?? []
    const totalPages = data?.meta ? Math.ceil((data.meta.total ?? 0) / PAGE_SIZE) : 1
 
@@ -258,8 +258,9 @@ function validateAndSubmit() {
                : 'Facturas enviadas a Caja que aún no tienen NCF'}
            </p>
          </div>
-         <TurnoCajaIndicator />
        </div>
+
+       <TurnoCajaIndicator />
 
        {turnoBlockedOrExpired ? (
          <div className="empty-state" style={{ padding: '48px 24px' }}>

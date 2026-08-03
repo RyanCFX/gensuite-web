@@ -225,8 +225,8 @@ function validateAndSubmit() {
              {data?.meta ? `${data.meta.total} factura(s) pendiente(s) de cobro` : 'Cola de cobros pendientes'}
            </p>
          </div>
-         <TurnoCajaIndicator />
        </div>
+         <TurnoCajaIndicator />
 
        {/* ── Turno gate (POS habilitado sin turno abierto o turno vencido) ──── */}
        {turnoBlockedOrExpired ? (
@@ -337,7 +337,7 @@ function validateAndSubmit() {
        {/* ── Modal de cobro ────────────────────────────────────────────── */}
        {selectedInvoice && (
          <div className="modal-overlay" onClick={closeModal}>
-           <div className="modal-box" style={{ maxWidth: flujoCobro === 'caja' ? 640 : 480 }} onClick={(e) => e.stopPropagation()}>
+           <div className="modal-box" style={{ maxWidth: flujoCobro === 'caja' ? 640 : 480, maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
              <div className="modal-head">
                <h2 className="modal-title">Cobrar {selectedInvoice.id}</h2>
                <button className="modal-close" type="button" onClick={closeModal}><X size={16} /></button>

@@ -71,30 +71,15 @@ export default function TurnoDetailPage() {
           <span style={{ fontWeight: 500 }}>{turno.user}</span>
           <span style={{ color: 'var(--text-secondary)' }}>Fecha de apertura</span>
           <span style={{ fontWeight: 500 }}>{formatDateTime(turno.periodStartDate)}</span>
+          {turno.modeOfPayment && (
+            <>
+              <span style={{ color: 'var(--text-secondary)' }}>Método de pago</span>
+              <span style={{ fontWeight: 500 }}>{turno.modeOfPayment}</span>
+              <span style={{ color: 'var(--text-secondary)' }}>Fondo inicial</span>
+              <span style={{ fontWeight: 500, fontFamily: 'var(--font-mono)' }}>{formatDOP(turno.openingAmount)}</span>
+            </>
+          )}
         </div>
-
-        {turno.balanceDetails.length > 0 && (
-          <div className="table-scroll" style={{ marginTop: 8 }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Método de pago</th>
-                  <th style={{ textAlign: 'right' }}>Fondo inicial</th>
-                </tr>
-              </thead>
-              <tbody>
-                {turno.balanceDetails.map((b) => (
-                  <tr key={b.modeOfPayment}>
-                    <td>{b.modeOfPayment}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-                      {formatDOP(b.openingAmount)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
       {/* Información de cierre (si existe) */}
@@ -157,13 +142,14 @@ function ClosingSection({ closing }: { closing: TurnoClosing }) {
         <div className="table-scroll">
           <table className="data-table">
             <thead>
-              <tr>
-                <th>Método</th>
-                <th style={{ textAlign: 'right' }}>Apertura</th>
-                <th style={{ textAlign: 'right' }}>Esperado</th>
-                <th style={{ textAlign: 'right' }}>Contado</th>
-                <th style={{ textAlign: 'right' }}>Diferencia</th>
-              </tr>
+                <tr>
+                  <th>Método</th>
+                  <th style={{ textAlign: 'right' }}>Apertura</th>
+                  <th style={{ textAlign: 'right' }}>Esperado</th>
+                  <th style={{ textAlign: 'right' }}>Contado</th>
+                  <th style={{ textAlign: 'right' }}>Diferencia</th>
+                  <th>Conciliación</th>
+                </tr>
             </thead>
             <tbody>
               {closing.paymentReconciliation.length === 0 ? (
@@ -197,6 +183,13 @@ function ClosingSection({ closing }: { closing: TurnoClosing }) {
                         <span style={{ display: 'block', fontSize: 11, fontWeight: 400 }}>
                           {p.difference < 0 ? 'Faltante' : 'Sobrante'}
                         </span>
+                      )}
+                    </td>
+                    <td>
+                      {p.requiereConciliacion ? (
+                        <span className="badge badge-info">Manual</span>
+                      ) : (
+                        <span className="badge badge-submitted">Auto</span>
                       )}
                     </td>
                   </tr>

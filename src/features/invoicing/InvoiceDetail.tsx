@@ -23,7 +23,7 @@ import { createDevolucion } from "@/shared/api/devoluciones";
 import { getItem } from "@/shared/api/catalog";
 import { getBundle } from "@/shared/api/bundles";
 import { getTurnoActual, abrirTurno } from "@/shared/api/pos";
-import type { ApiError, SubmitInvoiceDto, ComponentTracking, TurnoCaja, BalanceDetailLine } from "@/shared/api/types";
+import type { ApiError, SubmitInvoiceDto, ComponentTracking } from "@/shared/api/types";
 import { MOTIVOS_ANULACION_DGII } from "@/lib/constants";
 import { PaymentLinesEditor } from "@/components/shared/PaymentLinesEditor";
 import {
@@ -44,8 +44,6 @@ import {
   Receipt,
   Loader2,
   Clock,
-  Plus,
-  Trash2,
   BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -116,9 +114,7 @@ export default function InvoiceDetail() {
   const [returnReason, setReturnReason] = useState("");
 
   const [turnoModalOpen, setTurnoModalOpen] = useState(false);
-  const [turnoBalanceDetails, setTurnoBalanceDetails] = useState<BalanceDetailLine[]>([
-    { modeOfPayment: '', openingAmount: 0 },
-  ]);
+  const [turnoOpeningAmount, setTurnoOpeningAmount] = useState(0);
 
   const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState("");
   const [modeOfPaymentRetrySearch, setModeOfPaymentRetrySearch] = useState("");
@@ -173,12 +169,12 @@ export default function InvoiceDetail() {
   const abrirTurnoMutation = useMutation({
     mutationFn: () =>
       abrirTurno({
-        balanceDetails: turnoBalanceDetails.filter((b) => b.modeOfPayment),
+        openingAmount: turnoOpeningAmount,
       }),
     onSuccess: (turnoCaja) => {
       queryClient.setQueryData(['turno-actual'], turnoCaja);
       setTurnoModalOpen(false);
-      setTurnoBalanceDetails([{ modeOfPayment: '', openingAmount: 0 }]);
+      setTurnoOpeningAmount(0);
       toast.success(`Turno abierto — ${turnoCaja.posProfile}`);
     },
     onError: (err: ApiError) => {
@@ -513,18 +509,6 @@ export default function InvoiceDetail() {
       toast.error(err?.message ?? "No se pudo asignar el serial/lote");
     },
   });
-
-  function updateTurnoBalanceLine(i: number, patch: Partial<BalanceDetailLine>) {
-    setTurnoBalanceDetails((prev) => prev.map((b, idx) => (idx === i ? { ...b, ...patch } : b)));
-  }
-
-  function addTurnoBalanceLine() {
-    setTurnoBalanceDetails((prev) => [...prev, { modeOfPayment: '', openingAmount: 0 }]);
-  }
-
-  function removeTurnoBalanceLine(i: number) {
-    setTurnoBalanceDetails((prev) => prev.filter((_, idx) => idx !== i));
-  }
 
   function buildCashSubmitBody(): SubmitInvoiceDto {
     if (flujoCobro === "caja") {
@@ -2382,47 +2366,20 @@ export default function InvoiceDetail() {
               <button className="modal-close" onClick={() => setTurnoModalOpen(false)}>×</button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <p className="ff-hint">Fondo inicial de caja por método de pago.</p>
-              {turnoBalanceDetails.map((line, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-                  <div className="ff-wrap" style={{ flex: 1 }}>
-                    <label className="ff-label">Método de pago</label>
-                    <select
-                      className="ff-select"
-                      value={line.modeOfPayment}
-                      onChange={(e) => updateTurnoBalanceLine(i, { modeOfPayment: e.target.value })}
-                    >
-                      <option value="">Seleccionar</option>
-                      {(metodos ?? []).filter((m) => !m.disabled).map((m) => (
-                        <option key={m.name} value={m.name}>{m.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="ff-wrap" style={{ width: 130 }}>
-                    <label className="ff-label">Monto</label>
-                    <input
-                      type="number"
-                      min={0}
-                      className="ff-input"
-                      value={line.openingAmount}
-                      onChange={(e) => updateTurnoBalanceLine(i, { openingAmount: Number(e.target.value) })}
-                    />
-                  </div>
-                  {turnoBalanceDetails.length > 1 && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-size-icon-sm"
-                      onClick={() => removeTurnoBalanceLine(i)}
-                      aria-label="Quitar línea"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button type="button" className="btn btn-ghost btn-size-sm" onClick={addTurnoBalanceLine} style={{ alignSelf: 'flex-start' }}>
-                <Plus size={14} /> Agregar método de pago
-              </button>
+              <div className="ff-wrap">
+                <label className="ff-label">Monto de efectivo de apertura</label>
+                <p className="ff-hint" style={{ marginTop: 4 }}>
+                  Efectivo físico con el que se abre el turno. Se asociará automáticamente al método de pago de Caja configurado.
+                </p>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  className="ff-input"
+                  value={turnoOpeningAmount}
+                  onChange={(e) => setTurnoOpeningAmount(Number(e.target.value) || 0)}
+                />
+              </div>
             </div>
             <div className="modal-foot">
               <button className="btn btn-secondary" onClick={() => setTurnoModalOpen(false)}>
@@ -2431,7 +2388,7 @@ export default function InvoiceDetail() {
               <button
                 className="btn btn-primary"
                 onClick={() => abrirTurnoMutation.mutate()}
-                disabled={!turnoBalanceDetails.some((b) => b.modeOfPayment) || abrirTurnoMutation.isPending}
+                disabled={turnoOpeningAmount <= 0 || abrirTurnoMutation.isPending}
               >
                 {abrirTurnoMutation.isPending ? 'Abriendo…' : 'Abrir turno'}
               </button>

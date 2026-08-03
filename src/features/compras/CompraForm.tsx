@@ -947,6 +947,12 @@ export default function CompraForm() {
                   onChange={(e) => { setTipoBienes606(e.target.value); setTipoBienes606Touched(true) }}
                 >
                   <option value="">Seleccionar tipo</option>
+                  {/* El default del proveedor puede no estar en el catálogo vigente
+                      (formato distinto o valor legado) — se inyecta como opción para
+                      que el select nunca se muestre en blanco con un valor ya seteado. */}
+                  {tipoBienes606 && !(catalogos?.tipoBienes606 ?? []).some((t) => t.value === tipoBienes606) && (
+                    <option value={tipoBienes606}>{tipoBienes606}</option>
+                  )}
                   {(catalogos?.tipoBienes606 ?? []).map((t) => (
                     <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
@@ -961,6 +967,9 @@ export default function CompraForm() {
                   onChange={(e) => { setFormaPago606(e.target.value); setFormaPago606Touched(true) }}
                 >
                   <option value="">Seleccionar forma</option>
+                  {formaPago606 && !(catalogos?.formaPago606 ?? []).some((f) => f.value === formaPago606) && (
+                    <option value={formaPago606}>{formaPago606}</option>
+                  )}
                   {(catalogos?.formaPago606 ?? []).map((f) => (
                     <option key={f.value} value={f.value}>{f.label}</option>
                   ))}

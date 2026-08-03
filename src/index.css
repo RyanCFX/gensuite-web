@@ -868,7 +868,13 @@ button {
 .card-action:hover { background: var(--info-bg); }
 
 /* ─── TABLE ─── */
-.table-scroll { overflow-x: auto; }
+/* flex-shrink: 0 — `overflow-x: auto` makes the UA also compute `overflow-y` as
+   `auto` (CSS Overflow spec), which gives flex items an automatic minimum size of
+   0 instead of their content size. Inside a height-constrained flex column
+   (e.g. .modal-body) that lets .table-scroll collapse to 0px while its table
+   content keeps painting past the collapsed box, visually landing behind
+   whatever sibling comes next in the DOM. */
+.table-scroll { overflow-x: auto; flex-shrink: 0; }
 
 .data-table {
   width: 100%;
@@ -919,6 +925,68 @@ button {
 
 .td-muted { color: var(--text-tertiary); font-size: 12px; }
 .td-dim { color: var(--text-secondary); }
+
+/* Hallmark · component: turno-strip · genre: modern-minimal · branding: preserved (brand-red, JetBrains Mono)
+ * states: default · hover · focus · active · disabled · loading · error · success
+ * contrast: pass
+ * Deliberately NOT a right-aligned button cluster (that pattern belongs to .topbar-right) —
+ * this reads as a status instrument, not a repeated header action row.
+ */
+.turno-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 16px;
+  margin-bottom: 20px;
+  background: var(--surface-page);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--success-text);
+  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+}
+
+.turno-strip[data-state='closed'] { border-left-color: var(--border-strong); }
+.turno-strip[data-state='warning'] { border-left-color: var(--warning-text); }
+.turno-strip[data-state='expired'] { border-left-color: var(--error-text); }
+
+.turno-strip-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.turno-strip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--success-text);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--success-text) 18%, transparent);
+}
+
+.turno-strip[data-state='closed'] .turno-strip-dot { background: var(--text-tertiary); box-shadow: none; }
+.turno-strip[data-state='warning'] .turno-strip-dot { background: var(--warning-text); box-shadow: 0 0 0 3px color-mix(in oklch, var(--warning-text) 18%, transparent); }
+.turno-strip[data-state='expired'] .turno-strip-dot { background: var(--error-text); box-shadow: 0 0 0 3px color-mix(in oklch, var(--error-text) 18%, transparent); }
+
+.turno-strip-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.turno-strip-time {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.turno-strip-action {
+  flex-shrink: 0;
+}
 
 /* ─── BADGE ─── */
 .badge {
@@ -2415,6 +2483,16 @@ tbody .badge {
 }
 @starting-style {
   .modal-box { opacity: 0; scale: 0.94; translate: 0 14px; }
+}
+
+/* Content inside a modal already enters via .modal-box's own animation above —
+   nested entrance animations (table-scroll, card, badges, rows) create their own
+   compositing layers and can paint out of DOM order relative to plain siblings. */
+.modal-box .table-scroll,
+.modal-box .card,
+.modal-box tbody tr,
+.modal-box tbody .badge {
+  animation: none;
 }
 
 /* Pagination */
