@@ -9,6 +9,7 @@ import type {
   SaldoFavorResult,
   PaginatedResponse,
   PaginationParams,
+  EstadoCuentaResponse,
 } from './types'
 
 // ─── List Cobros ──────────────────────────────────────────────────────────────
@@ -96,4 +97,30 @@ export async function getSaldoFavor(customerId: string) {
     ENDPOINTS.cobros.saldoFavor(customerId),
   )
   return unwrap(res)
+}
+
+// ─── Estado de Cuenta ──────────────────────────────────────────
+// GET /cobros/estado-cuenta/:customerId — JSON preview
+// GET /cobros/estado-cuenta/:customerId/pdf — PDF download
+
+export async function getEstadoCuenta(customerId: string) {
+  const res = await client.get<{ success: true; data: EstadoCuentaResponse }>(
+    ENDPOINTS.cobros.estadoCuenta(customerId),
+  )
+  return unwrap(res)
+}
+
+export async function downloadEstadoCuentaPdf(
+  customerId: string,
+  filename?: string,
+): Promise<void> {
+  const res = await client.get<Blob>(ENDPOINTS.cobros.estadoCuentaPdf(customerId), {
+    responseType: 'blob',
+  })
+  const blobUrl = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = filename ?? `estado-cuenta-${customerId}.pdf`
+  a.click()
+  URL.revokeObjectURL(blobUrl)
 }

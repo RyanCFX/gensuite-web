@@ -5,7 +5,7 @@ import {
   getReporte606, getReporte607, getReporte608,
   getBalanceGeneral, getIngresosEgresos, getReporteVentas,
   getInventarioValoracion, getInventarioMovimientos,
-  getCxcAging, getCajaCuadre,
+  getCxcAging, getCxpAging, getCajaCuadre,
   getLibroDiario, getLibroMayor,
   getCuadreTurno, downloadCuadreTurnoExcel,
   downloadReporteExcel,
@@ -440,6 +440,22 @@ function CxcAgingReport() {
   )
 }
 
+function CxpAgingReport() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reporte-cxp-aging'],
+    queryFn: getCxpAging,
+    retry: false,
+  })
+
+  return (
+    <div className="card">
+      {isLoading && <LoadingRows />}
+      {error && <ErrorBanner err={error} />}
+      {!isLoading && !error && <AutoTable data={data} />}
+    </div>
+  )
+}
+
 type CajaCuadreData = {
   date: string
   cashier: string
@@ -830,6 +846,7 @@ const REPORT_NAV = [
   { key: 'stock',       group: 'Inventario', label: 'Valoración de Stock' },
   { key: 'movimientos', group: 'Inventario', label: 'Movimientos de Stock' },
   { key: 'cxcaging',   group: 'CxC',        label: 'Aging CxC' },
+  { key: 'cxpaging',   group: 'CXP',        label: 'Aging CXP' },
   { key: 'caja',        group: 'Caja',       label: 'Cuadre de Caja' },
   { key: 'cuadreTurno', group: 'Caja',       label: 'Cuadre por Turno' },
   { key: 'libroDiario', group: 'Contabilidad', label: 'Libro Diario' },
@@ -856,6 +873,7 @@ export default function ReportesPage() {
       case 'stock':      return <InventarioReport tipo="stock" />
       case 'movimientos':return <InventarioReport tipo="movimientos" />
       case 'cxcaging':  return <CxcAgingReport />
+      case 'cxpaging':  return <CxpAgingReport />
       case 'caja':       return <CajaCuadreReport />
       case 'cuadreTurno': return <CuadreTurnoReport />
       case 'libroDiario': return <LibroDiarioReport />
