@@ -24,6 +24,7 @@ const SYSTEM_MANAGER_ROLE = 'System Manager'
 interface ItemRow {
   itemCode: string
   itemLabel?: string
+  itemType?: 'product' | 'service'
   description: string
   qty: number
   rate: number
@@ -205,15 +206,18 @@ export default function GastoForm() {
         ...row,
         itemCode: catalogItem.id,
         itemLabel: catalogItem.itemName,
+        itemType: catalogItem.type,
         description: catalogItem.internalDescription ?? catalogItem.itemName,
         rate: catalogItem.standardRate ?? 0,
+        // Los servicios no se venden por cantidad — se fija en 1.
+        qty: catalogItem.type === 'service' ? 1 : row.qty,
       }
     }))
   }, [])
 
   const clearCatalogItem = useCallback((idx: number) => {
     setItems((prev) => prev.map((row, i) =>
-      i === idx ? { ...row, itemCode: '', itemLabel: undefined, description: '', rate: 0 } : row,
+      i === idx ? { ...row, itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, qty: 1 } : row,
     ))
   }, [])
 
@@ -347,14 +351,17 @@ export default function GastoForm() {
                             onSelect={(catalogItem) => selectCatalogItem(idx, catalogItem)}
                             onClear={() => clearCatalogItem(idx)}
                             placeholder="Buscar concepto…"
-                            typeFilter="product"
                           />
                         </td>
                         <td>
                           <input className="items-input" placeholder="Descripción" value={item.description} onChange={(e) => updateItem(idx, 'description', e.target.value)} />
                         </td>
                         <td>
-                          <input className="items-input" type="number" min="0.001" step="0.001" style={{ textAlign: 'right' }} value={item.qty} onChange={(e) => updateItem(idx, 'qty', parseFloat(e.target.value) || 0)} />
+                          {item.itemType === 'service' ? (
+                            <span className="td-muted" style={{ display: 'block', textAlign: 'right' }}>—</span>
+                          ) : (
+                            <input className="items-input" type="number" min="0.001" step="0.001" style={{ textAlign: 'right' }} value={item.qty} onChange={(e) => updateItem(idx, 'qty', parseFloat(e.target.value) || 0)} />
+                          )}
                         </td>
                         <td>
                           <input className="items-input" type="number" min="0" step="0.01" style={{ textAlign: 'right' }} value={item.rate} onChange={(e) => updateItem(idx, 'rate', parseFloat(e.target.value) || 0)} />

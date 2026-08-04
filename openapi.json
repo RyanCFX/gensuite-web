@@ -11178,6 +11178,566 @@
         ]
       }
     },
+    "/api/v1/pagos/pendientes": {
+      "get": {
+        "operationId": "PagosController_getPendientes",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplier",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por proveedor específico",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "overdueOnly",
+            "required": false,
+            "in": "query",
+            "description": "Solo facturas vencidas (due_date \u003C hoy)",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Facturas de compra con saldo pendiente de pago",
+        "tags": [
+          "Cuentas por Pagar"
+        ]
+      }
+    },
+    "/api/v1/pagos/aging": {
+      "get": {
+        "operationId": "PagosController_getAging",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reporte de antigüedad de saldos a proveedores (Accounts Payable)",
+        "tags": [
+          "Cuentas por Pagar"
+        ]
+      }
+    },
+    "/api/v1/pagos/historial/{supplierId}": {
+      "get": {
+        "operationId": "PagosController_getHistorial",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplier",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "submitted",
+                "cancelled",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "modeOfPayment",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Sucursal Norte",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Compras - JBC",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Historial de pagos (Payment Entries) a un proveedor",
+        "tags": [
+          "Cuentas por Pagar"
+        ]
+      }
+    },
+    "/api/v1/pagos/saldo-favor/{supplierId}": {
+      "get": {
+        "operationId": "PagosController_getSaldoFavor",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Saldo a favor disponible con el proveedor (Payment Entries con unallocated_amount \u003E 0, ej. anticipos pagados sin aplicar a ninguna factura). Sin expiración.",
+        "tags": [
+          "Cuentas por Pagar"
+        ]
+      }
+    },
+    "/api/v1/pagos": {
+      "get": {
+        "operationId": "PagosController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplier",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "submitted",
+                "cancelled",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "modeOfPayment",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Sucursal Norte",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Compras - JBC",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar pagos registrados",
+        "tags": [
+          "Cuentas por Pagar"
+        ]
+      },
+      "post": {
+        "operationId": "PagosController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePagoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar pago a proveedor (Payment Entry Draft)",
+        "tags": [
+          "Cuentas por Pagar"
+        ]
+      }
+    },
+    "/api/v1/pagos/{id}": {
+      "get": {
+        "operationId": "PagosController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un pago",
+        "tags": [
+          "Cuentas por Pagar"
+        ]
+      }
+    },
+    "/api/v1/pagos/{id}/submit": {
+      "post": {
+        "operationId": "PagosController_submit",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Someter pago — aplica el pago a las facturas de compra referenciadas",
+        "tags": [
+          "Cuentas por Pagar"
+        ]
+      }
+    },
+    "/api/v1/pagos/{id}/cancel": {
+      "post": {
+        "operationId": "PagosController_cancel",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar pago sometido",
+        "tags": [
+          "Cuentas por Pagar"
+        ]
+      }
+    },
     "/api/v1/reportes/ventas": {
       "get": {
         "operationId": "ReportesController_getVentas",
@@ -18980,6 +19540,78 @@
         },
         "required": [
           "customer",
+          "postingDate",
+          "paidAmount",
+          "modeOfPayment"
+        ]
+      },
+      "PagoReferenciaDto": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string",
+            "example": "PINV-0042",
+            "description": "ID de la Purchase Invoice a saldar"
+          },
+          "allocatedAmount": {
+            "type": "number",
+            "description": "Monto a aplicar de este pago a esta factura"
+          }
+        },
+        "required": [
+          "invoiceId",
+          "allocatedAmount"
+        ]
+      },
+      "CreatePagoDto": {
+        "type": "object",
+        "properties": {
+          "supplier": {
+            "type": "string",
+            "example": "SUPP-0001"
+          },
+          "postingDate": {
+            "type": "string",
+            "example": "2026-06-07"
+          },
+          "paidAmount": {
+            "type": "number",
+            "description": "Monto total pagado"
+          },
+          "modeOfPayment": {
+            "type": "string",
+            "example": "Cheque / Transferencia"
+          },
+          "referenceNo": {
+            "type": "string",
+            "description": "Número de cheque, transferencia, etc."
+          },
+          "referenceDate": {
+            "type": "string"
+          },
+          "remarks": {
+            "type": "string"
+          },
+          "referencias": {
+            "description": "Facturas de compra a las que aplica el pago. Si se omite (o se envía vacío), el pago queda sin aplicar y, al someterlo, ERPNext registra el monto completo como saldo a favor del proveedor (Payment Entry.unallocated_amount) — anticipo pagado sin factura. Ver GET /pagos/saldo-favor/:supplierId para consultarlo.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PagoReferenciaDto"
+            }
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal del pago. Si se omite, se toma de las facturas referenciadas (si todas coinciden en una sola) o se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente)."
+          },
+          "department": {
+            "type": "string",
+            "example": "Compras - JBC",
+            "description": "Departamento del pago (dimensión contable informativa, nunca obligatoria)."
+          }
+        },
+        "required": [
+          "supplier",
           "postingDate",
           "paidAmount",
           "modeOfPayment"
