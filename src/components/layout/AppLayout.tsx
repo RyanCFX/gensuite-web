@@ -210,24 +210,26 @@ const NAV_FINANZAS: NavEntry[] = [
     path: "/turnos",
   },
   {
-    label: "Cobros",
-    icon: <ClipboardList size={16} aria-hidden="true" />,
-    path: "/cobros/lista",
+    label: "Cuentas por Cobrar",
+    icon: <CreditCard size={16} aria-hidden="true" />,
+    prefix: "/cobros",
+    children: [
+      { label: "Cobros", icon: <ClipboardList size={14} />, path: "/cobros/lista" },
+      { label: "Registrar Cobro", icon: <Wallet size={14} />, path: "/cobros/pago" },
+      { label: "Aging CxC", icon: <BarChart3 size={14} />, path: "/cobros/aging" },
+      { label: "Semáforo", icon: <Shield size={14} />, path: "/cobros/semaforo" },
+    ],
   },
   {
-    label: "Registrar Cobro",
-    icon: <Wallet size={16} aria-hidden="true" />,
-    path: "/cobros/pago",
-  },
-  {
-    label: "Aging CxC",
-    icon: <BarChart3 size={16} aria-hidden="true" />,
-    path: "/cobros/aging",
-  },
-  {
-    label: "Semáforo",
-    icon: <Shield size={16} aria-hidden="true" />,
-    path: "/cobros/semaforo",
+    label: "Cuentas por Pagar",
+    icon: <CreditCard size={16} aria-hidden="true" />,
+    prefix: "/pagos",
+    children: [
+      { label: "Pagos", icon: <ClipboardList size={14} />, path: "/pagos/lista" },
+      { label: "Pendientes de Pago", icon: <Receipt size={14} />, path: "/pagos/pendientes" },
+      { label: "Registrar Pago", icon: <Wallet size={14} />, path: "/pagos/nuevo" },
+      { label: "Aging CxP", icon: <BarChart3 size={14} />, path: "/pagos/aging" },
+    ],
   },
 ];
 

@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { listCustomers, deleteCustomer } from '@/shared/api/customers'
+import { downloadEstadoCuentaPdf } from '@/shared/api/cobros'
 import type { Customer, ApiError } from '@/shared/api/types'
 import { useDebounce } from '@/lib/useDebounce'
-import { Plus, Pencil, Ban, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { Plus, Pencil, Ban, ChevronLeft, ChevronRight, Search, Download } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -165,6 +166,9 @@ export default function CustomersPage() {
                           <ActionsMenu>
                             <ActionsMenuItem onClick={() => navigate(`/clientes/${customer.id}/editar`)}>
                               <Pencil size={14} /> Editar
+                            </ActionsMenuItem>
+                            <ActionsMenuItem onClick={() => downloadEstadoCuentaPdf(customer.id, `estado-cuenta-${customer.customerName}.pdf`)}>
+                              <Download size={14} /> Estado de Cuenta PDF
                             </ActionsMenuItem>
                             {!customer.disabled && (
                               <ActionsMenuItem danger onClick={() => setToDisable(customer)}>

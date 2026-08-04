@@ -1,3 +1,10 @@
+/* Hallmark · genre: modern-minimal · macrostructure: Bento Grid (dashboard, app-scope)
+ * Login reverted to its original asymmetric photo-split at user request (2026-08-04) — see .hallmark/log.json.
+ * theme: existing-brand, extended · accent: brand-red oklch(66.3% 0.224 28.7) · secondary: brand-blue oklch(50.9% 0.128 249.1)
+ * new: ink-deep navy oklch(16% 0.030 228) (from logo navy, dashboard hero tile only) · teal-accent oklch(60% 0.090 203)
+ * fonts: DM Sans (display 800 / body 400-500, now actually loaded — see index.html) + JetBrains Mono (numeric-data outlier)
+ * scope: Dashboard screen only · Login is back to its pre-existing design · rest of app design system untouched
+ */
 /* ─── FLUX DESIGN SYSTEM — ERP RD ─── */
 :root {
   --brand-primary: #ff4538;
@@ -125,6 +132,24 @@
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.55), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
   --shadow-brand: 0 0 0 3px rgba(255, 69, 56, 0.28);
   --shadow-brand-strong: 0 8px 24px -4px rgba(255, 69, 56, 0.4);
+}
+
+/* ─── BRAND DARK SURFACE — theme-invariant, anchored on the logo's navy ───
+   Used for the login field and the dashboard hero tile. Stays constant
+   whether the app is in light or dark mode — it's a brand surface, not
+   a UI surface. */
+:root {
+  --ink-deep:      oklch(16% 0.030 228);
+  --ink-deep-2:    oklch(21% 0.033 228);
+  --ink-deep-3:    oklch(27% 0.034 228);
+  --on-dark-ink:   oklch(96% 0.006 228);
+  --on-dark-sub:   oklch(74% 0.020 228);
+  --teal-accent:   oklch(60% 0.090 203);
+}
+
+[data-theme='dark'] {
+  --ink-deep-2:    oklch(24% 0.034 228);
+  --ink-deep-3:    oklch(31% 0.036 228);
 }
 
 /* ─── RESET ─── */

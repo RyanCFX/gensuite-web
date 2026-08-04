@@ -45,6 +45,11 @@ const SemaforoPage    = lazy(() => import('@/features/cobros/SemaforoPage'))
 const PagoPage        = lazy(() => import('@/features/cobros/PagoPage'))
 const CobrosPage      = lazy(() => import('@/features/cobros/CobrosPage'))
 const CobroDetail     = lazy(() => import('@/features/cobros/CobroDetail'))
+const AgingProveedoresPage = lazy(() => import('@/features/pagos/AgingProveedoresPage'))
+const RegistrarPagoPage   = lazy(() => import('@/features/pagos/RegistrarPagoPage'))
+const PendientesPagoPage  = lazy(() => import('@/features/pagos/PendientesPagoPage'))
+const PagosPage           = lazy(() => import('@/features/pagos/PagosPage'))
+const PagoDetail          = lazy(() => import('@/features/pagos/PagoDetail'))
 const UsuariosPage    = lazy(() => import('@/features/usuarios/UsuariosPage'))
 const ReportesPage    = lazy(() => import('@/features/reportes/ReportesPage'))
 const EmpresaConfig   = lazy(() => import('@/features/config/EmpresaConfig'))
@@ -184,6 +189,13 @@ export default function App() {
             <Route path="/cobros/aging" element={<Suspense fallback={<PageLoader />}><AgingPage /></Suspense>} />
             <Route path="/cobros/semaforo" element={<Suspense fallback={<PageLoader />}><SemaforoPage /></Suspense>} />
             <Route path="/cobros/:id" element={<Suspense fallback={<PageLoader />}><CobroDetail /></Suspense>} />
+
+            {/* Cuentas por Pagar */}
+            <Route path="/pagos/lista" element={<Suspense fallback={<PageLoader />}><PagosPage /></Suspense>} />
+            <Route path="/pagos/pendientes" element={<Suspense fallback={<PageLoader />}><PendientesPagoPage /></Suspense>} />
+            <Route path="/pagos/nuevo" element={<Suspense fallback={<PageLoader />}><RegistrarPagoPage /></Suspense>} />
+            <Route path="/pagos/aging" element={<Suspense fallback={<PageLoader />}><AgingProveedoresPage /></Suspense>} />
+            <Route path="/pagos/:id" element={<Suspense fallback={<PageLoader />}><PagoDetail /></Suspense>} />
 
             {/* Usuarios */}
             <Route path="/usuarios" element={<Suspense fallback={<PageLoader />}><UsuariosPage /></Suspense>} />

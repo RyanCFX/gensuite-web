@@ -2092,6 +2092,110 @@ export interface AplicarSaldoFavorDto {
   amount: number;
 }
 
+// ─── Cuentas por Pagar (CxP) ────────────────────────────────────────────────
+// Equivalente de Cobros/CxC pero para proveedores. Sin semáforo — Supplier no
+// tiene límite de crédito en ERPNext, así que ese concepto no aplica acá.
+
+export interface PendientePago {
+  id: string;
+  supplier: string;
+  supplierName: string;
+  postingDate: string;
+  dueDate: string;
+  grandTotal: number;
+  outstandingAmount: number;
+  isOverdue: boolean;
+  daysOverdue: number;
+}
+
+export interface AgingProveedorEntry {
+  supplier: string;
+  supplierName?: string;
+  totalOutstanding: number;
+  current: number;
+  range1: number;
+  range2: number;
+  range3: number;
+  range4: number;
+}
+
+export interface AgingProveedorConfig {
+  rangos: string[];
+}
+
+// GET /pagos/aging responde { success, data: AgingProveedorEntry[], config, note? }
+// — config y note NO están anidados dentro de `data`, van al mismo nivel.
+export interface AgingProveedorResult {
+  rows: AgingProveedorEntry[];
+  config: AgingProveedorConfig;
+  note?: string;
+}
+
+export interface PagoReferenciaResumen {
+  invoiceId: string;
+  invoiceName?: string;
+  totalAmount?: number;
+  outstandingAmount?: number;
+  allocatedAmount: number;
+}
+
+export interface Pago {
+  id: string;
+  status: "draft" | "submitted" | "cancelled";
+  supplier: string;
+  supplierName: string;
+  postingDate: string;
+  paidAmount: number;
+  modeOfPayment: string;
+  referenceNo?: string;
+  referenceDate?: string;
+  remarks?: string;
+  branch?: string | null;
+  department?: string | null;
+  referencias?: PagoReferenciaResumen[];
+  createdAt: string;
+  modifiedAt?: string;
+}
+
+export interface PagoReferenciaDto {
+  invoiceId: string;
+  allocatedAmount: number;
+}
+
+export interface CreatePagoDto {
+  supplier: string;
+  postingDate: string;
+  paidAmount: number;
+  modeOfPayment: string;
+  referenceNo?: string;
+  referenceDate?: string;
+  remarks?: string;
+  referencias?: PagoReferenciaDto[];
+  branch?: string;
+  department?: string;
+}
+
+export interface SaldoFavorProveedorAppliedTo {
+  invoiceId: string;
+  allocatedAmount: number;
+}
+
+export interface SaldoFavorProveedorEntry {
+  paymentEntryId: string;
+  unallocatedAmount: number;
+  postingDate: string;
+  modeOfPayment: string;
+  committedAmount: number;
+  availableAmount: number;
+  appliedTo: SaldoFavorProveedorAppliedTo[];
+}
+
+export interface SaldoFavorProveedorResult {
+  supplier: string;
+  balance: number;
+  entries: SaldoFavorProveedorEntry[];
+}
+
 // ─── Reportes ─────────────────────────────────────────────────────────────────
 
 export interface Reporte606Entry {
@@ -2622,4 +2726,38 @@ export interface ListNotificacionLogsParams {
 export interface ProbarNotificacionDto {
   email: string;
   nombre?: string;
+}
+
+// ─── Estado de Cuenta ──────────────────────────────────────────────────
+
+export interface EstadoCuentaCliente {
+  id: string
+  nombre: string
+  telefono: string | null
+}
+
+export interface EstadoCuentaDocumento {
+  fecha: string
+  numero: string
+  comprobante: string
+  vence: string
+  monto: number
+  aplicado: number
+  saldo: number
+  dias: number
+}
+
+export interface EstadoCuentaAgingBucket {
+  label: string
+  total: number
+}
+
+export interface EstadoCuentaResponse {
+  empresa: string
+  cliente: EstadoCuentaCliente
+  telefono: string | null
+  fecha: string
+  documentos: EstadoCuentaDocumento[]
+  aging: EstadoCuentaAgingBucket[]
+  totalPendiente: number
 }

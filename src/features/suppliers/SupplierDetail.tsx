@@ -3,10 +3,99 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getSupplier, deleteSupplier, getSupplierPurchases } from '@/shared/api/suppliers'
+import { getHistorialPagos, getSaldoFavorProveedor } from '@/shared/api/pagos'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
-import { Pencil, Ban, Building2, Globe } from 'lucide-react'
+import { Pencil, Ban, Building2, Globe, Wallet } from 'lucide-react'
+
+const PAGO_STATUS_BADGE: Record<string, string> = {
+  draft: 'badge-draft',
+  submitted: 'badge-submitted',
+  cancelled: 'badge-cancelled',
+}
+const PAGO_STATUS_LABEL: Record<string, string> = {
+  draft: 'Borrador',
+  submitted: 'Sometido',
+  cancelled: 'Cancelado',
+}
+
+function SaldoFavorProveedorIndicator({ supplierId }: { supplierId: string }) {
+  const { data: saldo } = useQuery({
+    queryKey: ['saldo-favor-proveedor', supplierId],
+    queryFn: () => getSaldoFavorProveedor(supplierId),
+    retry: false,
+  })
+
+  if (!saldo || saldo.balance <= 0) return null
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card-body">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Wallet size={16} style={{ color: 'var(--success-text)' }} />
+          <span style={{ fontWeight: 500 }}>Saldo a favor: {formatDOP(saldo.balance)}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function HistorialPagos({ supplierId }: { supplierId: string }) {
+  const navigate = useNavigate()
+  const { data, isLoading } = useQuery({
+    queryKey: ['historial-pagos', supplierId],
+    queryFn: () => getHistorialPagos(supplierId, { limit: 10 }),
+    retry: false,
+  })
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <span key={i} className="skeleton-box" style={{ height: 40, display: 'block' }} />
+        ))}
+      </div>
+    )
+  }
+
+  if (!data || data.items.length === 0) {
+    return <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Sin pagos registrados</p>
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {data.items.map((pago) => (
+        <div
+          key={pago.id}
+          className="data-table-row-link"
+          onClick={() => navigate(`/pagos/${pago.id}`)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            border: '1px solid var(--border-default)',
+            borderRadius: 'var(--radius-md)',
+            padding: '8px 12px',
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className={`badge ${PAGO_STATUS_BADGE[pago.status] ?? 'badge-draft'}`}>
+              {PAGO_STATUS_LABEL[pago.status] ?? pago.status}
+            </span>
+            <span style={{ fontWeight: 500, fontFamily: 'var(--font-mono)' }}>{pago.id}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <span style={{ color: 'var(--text-tertiary)' }}>{formatDate(pago.postingDate)}</span>
+            <span style={{ fontWeight: 500 }}>{formatDOP(pago.paidAmount)}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 function RecentPurchases({ supplierId }: { supplierId: string }) {
   const { data, isLoading } = useQuery({
@@ -142,6 +231,8 @@ export default function SupplierDetail() {
         }
       />
 
+      {id && <SaldoFavorProveedorIndicator supplierId={id} />}
+
       <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 800 }}>
         <div className="card">
           <div className="card-header">
@@ -251,6 +342,20 @@ export default function SupplierDetail() {
           </div>
           <div className="card-body">
             {id && <RecentPurchases supplierId={id} />}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Historial de Pagos</span>
+            {id && (
+              <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/pagos/lista?supplier=${id}`)}>
+                Ver todos
+              </button>
+            )}
+          </div>
+          <div className="card-body">
+            {id && <HistorialPagos supplierId={id} />}
           </div>
         </div>
       </div>

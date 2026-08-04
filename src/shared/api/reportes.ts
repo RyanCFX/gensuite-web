@@ -129,6 +129,11 @@ export async function getCxcAging() {
   return res.data
 }
 
+export async function getCxpAging() {
+  const res = await client.get(ENDPOINTS.reportes.cxpAging)
+  return res.data
+}
+
 export async function getCajaCuadre(params?: { date?: string; branch?: string; department?: string }) {
   const res = await client.get(ENDPOINTS.reportes.cajaCuadre, { params })
   return res.data
