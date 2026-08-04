@@ -1443,6 +1443,7 @@ export interface Gasto {
   amendedFrom?: string;
   createdAt?: string;
   modifiedAt?: string;
+  message?: string;
 }
 
 export interface CreateGastoDto {

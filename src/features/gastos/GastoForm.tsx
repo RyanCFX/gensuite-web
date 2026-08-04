@@ -8,7 +8,7 @@ import type { CreateGastoDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { getCatalogosFiscales } from '@/shared/api/config'
 import { CATEGORIA_GASTO } from '@/lib/constants'
-import { Plus, Trash2, Info, AlertCircle } from 'lucide-react'
+import { Plus, Trash2, Info, AlertCircle, AlertTriangle } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
@@ -62,6 +62,7 @@ export default function GastoForm() {
   const [branchSearch, setBranchSearch] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
+  const [serverMessage, setServerMessage] = useState<string | null>(null)
 
   const currentUserEmail = getUser()?.email
   const { data: currentUser } = useQuery({
@@ -121,6 +122,11 @@ export default function GastoForm() {
       navigate(`/gastos/${gastoData.id}`, { replace: true })
       return
     }
+
+    // Extraer y mostrar el mensaje del servidor (ej. cambio automático de cuenta contable)
+    const rawMsg = (gastoData as { message?: string }).message
+    setServerMessage(rawMsg ?? null)
+
     setSupplierId(gastoData.supplier)
     setSupplierLabel(gastoData.supplierName)
     setPostingDate(gastoData.postingDate.split('T')[0])
@@ -259,6 +265,13 @@ export default function GastoForm() {
         title={isEdit ? 'Editar Gasto' : 'Nuevo Gasto'}
         description="Registra un gasto sin movimiento de inventario"
       />
+
+      {isEdit && serverMessage && (
+        <div className="inline-alert inline-alert-info">
+          <AlertTriangle size={16} />
+          <span dangerouslySetInnerHTML={{ __html: serverMessage }} />
+        </div>
+      )}
 
       {isEdit && loadingEdit ? (
         <span className="skeleton-box" style={{ height: 256, width: '100%', display: 'block' }} />
@@ -405,7 +418,15 @@ export default function GastoForm() {
                   className={`ff-input${!ncfValid ? ' ff-input-error' : ''}`}
                   placeholder="B13XXXXXXXXXX"
                   value={ncfProveedor}
-                  onChange={(e) => setNcfProveedor(e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase()
+                    setNcfProveedor(val)
+                    if (val.length >= 3) {
+                      setTipoComprobante(val.slice(0, 3))
+                    } else {
+                      setTipoComprobante('')
+                    }
+                  }}
                 />
                 {!ncfValid && <span className="ff-error">Formato inválido.</span>}
               </div>
@@ -428,6 +449,9 @@ export default function GastoForm() {
                 <label className="ff-label">Tipo de Bienes 606</label>
                 <select className="ff-select" value={tipoBienes606} onChange={(e) => setTipoBienes606(e.target.value)}>
                   <option value="">Seleccionar tipo</option>
+                  {tipoBienes606 && !(catalogos?.tipoBienes606 ?? []).some((t) => t.value === tipoBienes606) && (
+                    <option value={tipoBienes606}>{tipoBienes606}</option>
+                  )}
                   {(catalogos?.tipoBienes606 ?? []).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
@@ -436,6 +460,9 @@ export default function GastoForm() {
                 <label className="ff-label">Forma de Pago 606</label>
                 <select className="ff-select" value={formaPago606} onChange={(e) => setFormaPago606(e.target.value)}>
                   <option value="">Seleccionar forma</option>
+                  {formaPago606 && !(catalogos?.formaPago606 ?? []).some((f) => f.value === formaPago606) && (
+                    <option value={formaPago606}>{formaPago606}</option>
+                  )}
                   {(catalogos?.formaPago606 ?? []).map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
               </div>
