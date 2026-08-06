@@ -34,6 +34,7 @@ import {
   Bell,
   DollarSign,
   Clock,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { CommandPalette } from "./CommandPalette";
@@ -94,6 +95,11 @@ const NAV_CATALOG: NavEntry = {
       label: "Atributos",
       icon: <Tag size={14} />,
       path: "/catalogo/atributos",
+    },
+    {
+      label: "Descuentos",
+      icon: <Percent size={14} />,
+      path: "/catalogo/descuentos",
     },
   ],
 };
@@ -385,9 +391,14 @@ const NAV_CONFIG: NavEntry = {
       path: "/config/grupos-clientes",
     },
     { label: "Usuarios", icon: <UserCog size={14} />, path: "/usuarios" },
+    // Administrativos — requieren System Manager en ERPNext, filtrados en el render (ver AppLayoutInner)
+    { label: "Permisos", icon: <Lock size={14} />, path: "/config/permisos" },
+    { label: "Roles", icon: <ShieldCheck size={14} />, path: "/config/roles" },
     { label: "Mi Perfil", icon: <UserCog size={14} />, path: "/config/perfil" },
   ],
 };
+
+const ADMIN_ONLY_PATHS = new Set(["/config/permisos", "/config/roles"]);
 
 // ─── NavItem component ────────────────────────────────────────────────────────
 
@@ -700,6 +711,15 @@ function AppLayoutInner() {
   const userRef = useRef<HTMLDivElement>(null);
   const keepAliveRef = useKeepAliveRef();
   const { user, logout } = useAuthStore();
+  const isSystemManager = user?.roles?.includes("System Manager") ?? false;
+  const configNav: NavEntry = isSystemManager
+    ? NAV_CONFIG
+    : {
+        ...(NAV_CONFIG as NavGroup),
+        children: (NAV_CONFIG as NavGroup).children.filter(
+          (item) => !ADMIN_ONLY_PATHS.has(item.path),
+        ),
+      };
   const { tabs, activeId, closeTab, multiTab } = useTabs();
   const navigate = useNavigate();
   const location = useLocation();
@@ -843,7 +863,7 @@ function AppLayoutInner() {
         {renderEntry(NAV_REPORTES, handleNav, collapsed, {
           floatWhenCollapsed: true,
         })}
-        {renderEntry(NAV_CONFIG, handleNav, collapsed)}
+        {renderEntry(configNav, handleNav, collapsed)}
       </div>
     </>
   );

@@ -66,6 +66,7 @@ const CierrePeriodoPage = lazy(() => import('@/features/contabilidad/CierrePerio
 const LibroDiarioPage   = lazy(() => import('@/features/contabilidad/LibroDiarioPage'))
 const LibroMayorPage    = lazy(() => import('@/features/contabilidad/LibroMayorPage'))
 const BundlesPage       = lazy(() => import('@/features/bundles/BundlesPage'))
+const PricingRulesPage  = lazy(() => import('@/features/catalog/PricingRulesPage'))
 const PedidosPage       = lazy(() => import('@/features/pedidos/PedidosPage'))
 const PedidoDetail      = lazy(() => import('@/features/pedidos/PedidoDetail'))
 const PedidoForm        = lazy(() => import('@/features/pedidos/PedidoForm'))
@@ -77,6 +78,9 @@ const DepartamentosPage   = lazy(() => import('@/features/config/DepartamentosPa
 const RetencionesPage     = lazy(() => import('@/features/config/RetencionesPage'))
 const AjustesAvanzadosPage = lazy(() => import('@/features/config/AjustesAvanzadosPage'))
 const NotificacionesPage   = lazy(() => import('@/features/config/NotificacionesPage'))
+const PermisosPage         = lazy(() => import('@/features/config/PermisosPage'))
+const RolesPage            = lazy(() => import('@/features/config/RolesPage'))
+const RoleDetailPage       = lazy(() => import('@/features/config/RoleDetailPage'))
 const CostosImportacionPage = lazy(() => import('@/features/compras/CostosImportacionPage'))
 const CostoImportacionDetail = lazy(() => import('@/features/compras/CostoImportacionDetail'))
 const CajaPage = lazy(() => import('@/features/caja/CajaPage'))
@@ -120,6 +124,7 @@ export default function App() {
             <Route path="/catalogo/categorias" element={<Suspense fallback={<PageLoader />}><CategoriesPage /></Suspense>} />
             <Route path="/catalogo/marcas" element={<Suspense fallback={<PageLoader />}><BrandsPage /></Suspense>} />
             <Route path="/catalogo/combos" element={<Suspense fallback={<PageLoader />}><BundlesPage /></Suspense>} />
+            <Route path="/catalogo/descuentos" element={<Suspense fallback={<PageLoader />}><PricingRulesPage /></Suspense>} />
 
             {/* Cotizaciones */}
             <Route path="/cotizaciones" element={<Suspense fallback={<PageLoader />}><QuotationsPage /></Suspense>} />
@@ -234,6 +239,9 @@ export default function App() {
             <Route path="/config/retenciones" element={<Suspense fallback={<PageLoader />}><RetencionesPage /></Suspense>} />
             <Route path="/config/ajustes-avanzados" element={<Suspense fallback={<PageLoader />}><AjustesAvanzadosPage /></Suspense>} />
             <Route path="/config/notificaciones" element={<Suspense fallback={<PageLoader />}><NotificacionesPage /></Suspense>} />
+            <Route path="/config/permisos" element={<Suspense fallback={<PageLoader />}><PermisosPage /></Suspense>} />
+            <Route path="/config/roles" element={<Suspense fallback={<PageLoader />}><RolesPage /></Suspense>} />
+            <Route path="/config/roles/:name" element={<Suspense fallback={<PageLoader />}><RoleDetailPage /></Suspense>} />
             <Route path="/config/:seccion" element={<Suspense fallback={<PageLoader />}><ConfigPage /></Suspense>} />
             <Route path="/config" element={<Navigate to="/config/empresa" replace />} />
 

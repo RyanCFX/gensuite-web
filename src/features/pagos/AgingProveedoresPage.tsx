@@ -1,8 +1,10 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { getAgingProveedores } from '@/shared/api/pagos'
+import { downloadCxpAgingPdf } from '@/shared/api/reportes'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { formatDOP } from '@/lib/formatters'
-import { Info } from 'lucide-react'
+import { Info, Download, Loader2 } from 'lucide-react'
 
 const DEFAULT_LABELS = ['Corriente', '0–30 días', '31–60 días', '61–90 días', '+90 días']
 
@@ -10,6 +12,11 @@ export default function AgingProveedoresPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['aging-proveedores'],
     queryFn: getAgingProveedores,
+  })
+
+  const downloadPdfMutation = useMutation({
+    mutationFn: downloadCxpAgingPdf,
+    onError: () => toast.error('No se pudo descargar el PDF'),
   })
 
   const AGING_THRESHOLD = 10_000
@@ -25,6 +32,16 @@ export default function AgingProveedoresPage() {
       <PageHeader
         title="Aging de Cuentas por Pagar"
         description="Análisis de saldos vencidos a proveedores"
+        action={
+          <button
+            className="btn btn-secondary btn-size-sm"
+            onClick={() => downloadPdfMutation.mutate()}
+            disabled={downloadPdfMutation.isPending}
+          >
+            {downloadPdfMutation.isPending ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
+            {' '}Descargar PDF
+          </button>
+        }
       />
 
       {data?.note && (

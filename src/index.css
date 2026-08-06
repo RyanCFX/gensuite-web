@@ -1057,6 +1057,7 @@ button {
 .badge-in-stock { background: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
 .badge-low-stock { background: var(--warning-bg); color: var(--warning-text); border-color: var(--warning-border); }
 .badge-out-stock { background: var(--error-bg); color: var(--error-text); border-color: var(--error-border); }
+.badge-discount { background: var(--warning-bg); color: var(--warning-text); border-color: var(--warning-border); }
 
 /* ─── ACTIONS DROPDOWN ─── */
 .actions-cell { width: 48px; }

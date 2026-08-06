@@ -1,14 +1,18 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import {
   getReporte606, getReporte607, getReporte608,
   getBalanceGeneral, getIngresosEgresos, getReporteVentas,
   getInventarioValoracion, getInventarioMovimientos,
   getCxcAging, getCxpAging, getCajaCuadre,
   getLibroDiario, getLibroMayor,
-  getCuadreTurno, downloadCuadreTurnoExcel,
+  getCuadreTurno, downloadCuadreTurnoExcel, downloadCuadreTurnoPdf,
   downloadReporteExcel,
+  downloadBalanceGeneralPdf, downloadIngresosEgresosPdf, downloadVentasPdf,
+  downloadInventarioValoracionPdf, downloadInventarioMovimientosPdf,
+  downloadCxcAgingPdf, downloadCxpAgingPdf, downloadCajaCuadrePdf,
 } from '@/shared/api/reportes'
 import type { LibroDiarioByDimension, CuadreTurnoRow } from '@/shared/api/types'
 import { listSucursales } from '@/shared/api/sucursales'
@@ -68,6 +72,24 @@ function BranchDepartmentFilters({
         ))}
       </select>
     </>
+  )
+}
+
+/** Botón "Descargar PDF" reutilizable — mismo patrón que Libro Diario/Mayor. */
+function DownloadPdfButton({ onDownload }: { onDownload: () => Promise<void> }) {
+  const mutation = useMutation({
+    mutationFn: onDownload,
+    onError: () => toast.error('No se pudo descargar el PDF'),
+  })
+  return (
+    <button
+      className="btn btn-secondary btn-size-sm"
+      onClick={() => mutation.mutate()}
+      disabled={mutation.isPending}
+    >
+      {mutation.isPending ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
+      {' '}Descargar PDF
+    </button>
   )
 }
 
@@ -299,6 +321,7 @@ function FinancialReport({ tipo }: { tipo: 'balance' | 'pl' }) {
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
   const fn = tipo === 'balance' ? getBalanceGeneral : getIngresosEgresos
+  const downloadPdf = tipo === 'balance' ? downloadBalanceGeneralPdf : downloadIngresosEgresosPdf
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-financial', tipo, fromDate, toDate, periodicity, branch, department],
@@ -322,6 +345,11 @@ function FinancialReport({ tipo }: { tipo: 'balance' | 'pl' }) {
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
             department={department} onDepartmentChange={setDepartment}
+          />
+        </div>
+        <div className="filter-bar-right">
+          <DownloadPdfButton
+            onDownload={() => downloadPdf({ fromDate, toDate, periodicity, branch: branch || undefined, department: department || undefined })}
           />
         </div>
       </div>
@@ -372,6 +400,11 @@ function VentasReport() {
             department={department} onDepartmentChange={setDepartment}
           />
         </div>
+        <div className="filter-bar-right">
+          <DownloadPdfButton
+            onDownload={() => downloadVentasPdf({ fromDate, toDate, groupBy, branch: branch || undefined, department: department || undefined })}
+          />
+        </div>
       </div>
       <div className="card">
         {isLoading && <LoadingRows />}
@@ -388,6 +421,7 @@ function InventarioReport({ tipo }: { tipo: 'stock' | 'movimientos' }) {
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
   const fn = tipo === 'stock' ? getInventarioValoracion : getInventarioMovimientos
+  const downloadPdf = tipo === 'stock' ? downloadInventarioValoracionPdf : downloadInventarioMovimientosPdf
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-inventario', tipo, fromDate, toDate, branch, department],
@@ -406,6 +440,11 @@ function InventarioReport({ tipo }: { tipo: 'stock' | 'movimientos' }) {
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
             department={department} onDepartmentChange={setDepartment}
+          />
+        </div>
+        <div className="filter-bar-right">
+          <DownloadPdfButton
+            onDownload={() => downloadPdf({ fromDate, toDate, branch: branch || undefined, department: department || undefined })}
           />
         </div>
       </div>
@@ -432,10 +471,18 @@ function CxcAgingReport() {
   })
 
   return (
-    <div className="card">
-      {isLoading && <LoadingRows />}
-      {error && <ErrorBanner err={error} />}
-      {!isLoading && !error && <AutoTable data={data} />}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="filter-bar">
+        <div className="filter-bar-left" />
+        <div className="filter-bar-right">
+          <DownloadPdfButton onDownload={downloadCxcAgingPdf} />
+        </div>
+      </div>
+      <div className="card">
+        {isLoading && <LoadingRows />}
+        {error && <ErrorBanner err={error} />}
+        {!isLoading && !error && <AutoTable data={data} />}
+      </div>
     </div>
   )
 }
@@ -448,10 +495,18 @@ function CxpAgingReport() {
   })
 
   return (
-    <div className="card">
-      {isLoading && <LoadingRows />}
-      {error && <ErrorBanner err={error} />}
-      {!isLoading && !error && <AutoTable data={data} />}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="filter-bar">
+        <div className="filter-bar-left" />
+        <div className="filter-bar-right">
+          <DownloadPdfButton onDownload={downloadCxpAgingPdf} />
+        </div>
+      </div>
+      <div className="card">
+        {isLoading && <LoadingRows />}
+        {error && <ErrorBanner err={error} />}
+        {!isLoading && !error && <AutoTable data={data} />}
+      </div>
     </div>
   )
 }
@@ -490,6 +545,11 @@ function CajaCuadreReport() {
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
             department={department} onDepartmentChange={setDepartment}
+          />
+        </div>
+        <div className="filter-bar-right">
+          <DownloadPdfButton
+            onDownload={() => downloadCajaCuadrePdf({ date, branch: branch || undefined, department: department || undefined })}
           />
         </div>
       </div>
@@ -633,6 +693,10 @@ function CuadreTurnoReport() {
             {downloadingExcel ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
             {' '}Descargar Excel
           </button>
+          {/* Acción separada — /pdf ignora cualquier `format`, no es un tercer valor del selector de Excel */}
+          <DownloadPdfButton
+            onDownload={() => downloadCuadreTurnoPdf({ fromDate, toDate, cajero: cajero || undefined })}
+          />
         </div>
       </div>
 

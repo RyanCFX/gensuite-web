@@ -331,7 +331,21 @@ export default function UsuariosPage() {
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label">Roles</label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label className="ff-label">Roles</label>
+                    <button
+                      type="button"
+                      className="btn btn-link"
+                      style={{ fontSize: 12 }}
+                      onClick={() =>
+                        setSelectedRoles((prev) =>
+                          roles && prev.length === roles.length ? [] : (roles ?? []),
+                        )
+                      }
+                    >
+                      {roles && selectedRoles.length === roles.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                    </button>
+                  </div>
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: '1fr 1fr',

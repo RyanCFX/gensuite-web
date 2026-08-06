@@ -12,7 +12,7 @@ import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingMod
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP } from '@/lib/formatters'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2 } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info } from 'lucide-react'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { toast } from 'sonner'
@@ -51,13 +51,14 @@ interface LineItem {
   /** Precio base al stockUom — se usa para recalcular al cambiar UOM */
   baseRate: number
   uom: string
-
   /** Factor de conversión activo (UOM seleccionada / stockUom) */
   conversionFactor: number
   maxDiscountPct?: number
-  _prices?: ItemPrices
-  warehouse: string
-  /** Stock por almacén del artículo seleccionado, para validar contra el almacén elegido en la línea */
+  /** Porcentaje de descuento automático del Pricing Rule (solo lectura, se suma al manual) */
+  autoDiscountPct?: number
+  /** Descuento manual que escribe el vendedor (encima del automático) */
+  manualDiscountPct: number
+  allowsDiscount?: boolean
   _stockByWarehouse?: Record<string, number>
   stockError?: string
   /** Ubicación/rack específico dentro del almacén elegido, si el artículo tiene alguna asignada ahí */
@@ -442,21 +443,24 @@ export default function InvoiceForm() {
   const isSaving = createMutation.isPending
 
   // ── Line item helpers ─────────────────────────────────────────────────────
-  function updateItem(index: number, patch: Partial<LineItem>) {
-    setItems((prev) =>
-      prev.map((item, i) => {
-        if (i !== index) return item
-        const updated = { ...item, ...patch }
-        if ('qty' in patch || 'rate' in patch || 'discountPct' in patch) {
-          updated.amount = calcAmount(updated.qty, updated.rate, updated.discountPct)
-        }
-        if ('qty' in patch || 'warehouse' in patch) {
-          updated.stockError = validateLineStock(updated)
-        }
-        return updated
-      }),
-    )
-  }
+   function updateItem(index: number, patch: Partial<LineItem>) {
+     setItems((prev) =>
+       prev.map((item, i) => {
+         if (i !== index) return item
+         const updated = { ...item, ...patch }
+         if ('manualDiscountPct' in patch) {
+           updated.discountPct = (updated.autoDiscountPct ?? 0) + (updated.manualDiscountPct ?? 0)
+         }
+         if ('qty' in patch || 'rate' in patch || 'discountPct' in patch) {
+           updated.amount = calcAmount(updated.qty, updated.rate, updated.discountPct)
+         }
+         if ('qty' in patch || 'warehouse' in patch) {
+           updated.stockError = validateLineStock(updated)
+         }
+         return updated
+       }),
+     )
+   }
 
   function updateWarehouse(index: number, warehouse: string) {
     setItems((prev) =>
@@ -485,10 +489,13 @@ export default function InvoiceForm() {
           description: catalogItem.internalDescription ?? catalogItem.itemName,
           rate: baseRate,
           baseRate,
-          amount: calcAmount(row.qty, baseRate, row.discountPct),
+           amount: calcAmount(row.qty, baseRate, row.discountPct),
           uom: catalogItem.stockUom ?? row.uom,
           conversionFactor: 1,
           maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
+          autoDiscountPct: catalogItem.autoDiscount?.discountType === 'Discount Percentage' ? catalogItem.autoDiscount.discountPercentage : undefined,
+          manualDiscountPct: 0,
+          allowsDiscount: catalogItem.allowsDiscount,
           _prices: catalogItem.prices,
           salesTaxPct: catalogItem.salesTaxPct ?? 0,
           salesTaxTemplate: catalogItem.salesTaxTemplate ?? '',
@@ -505,7 +512,7 @@ export default function InvoiceForm() {
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', _comboComponents: undefined, componentTracking: undefined, ubicacion: undefined, ubicacionError: undefined })
+    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', _comboComponents: undefined, componentTracking: undefined, ubicacion: undefined, ubicacionError: undefined })
   }
 
   function selectBundle(index: number, bundle: Bundle) {
@@ -582,6 +589,9 @@ export default function InvoiceForm() {
           uom: s.item.stockUom ?? 'Unidad',
           conversionFactor: 1,
           maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
+          autoDiscountPct: s.item.autoDiscount?.discountType === 'Discount Percentage' ? s.item.autoDiscount.discountPercentage : undefined,
+          manualDiscountPct: 0,
+          allowsDiscount: s.item.allowsDiscount,
           _prices: s.item.prices,
           warehouse: defaultWarehouse(),
           _stockByWarehouse: s.item.stockByWarehouse,
@@ -608,7 +618,7 @@ export default function InvoiceForm() {
       toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
       return
     }
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', conversionFactor: 1, warehouse: '' }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, discountPct: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', conversionFactor: 1, warehouse: '' }])
   }
 
   function removeRow(index: number) {
@@ -903,7 +913,10 @@ const itemsDto = items.map((i) => ({
                   <th>Descripción</th>
                   <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
-                  <th style={{ textAlign: 'right', width: 72 }}>Dto. %</th>
+                  <th style={{ textAlign: 'right', width: 72 }}>
+                  Dto. %
+                  <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} title="El descuento puede incluir una parte automática (Pricing Rule) y una parte manual del vendedor. Ambas se suman contra el tope máximo." />
+                </th>
                   <th style={{ textAlign: 'right', width: 80 }}>Impuesto</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 56 }}>UDM</th>
@@ -950,29 +963,57 @@ const itemsDto = items.map((i) => ({
                       <td>
                         <input className="items-input" type="number" min="0" step="0.01" value={item.rate} disabled style={{ textAlign: 'right' }} />
                       </td>
-                      <td>
-                        {(() => {
-                          const itemMax = item.maxDiscountPct && item.maxDiscountPct > 0 ? item.maxDiscountPct : 100
-                          const userMax = currentUser?.maxDiscountPct && currentUser.maxDiscountPct > 0 ? currentUser.maxDiscountPct : 100
-                          const priceLimit = maxDiscFromPrices(item.rate, item._prices)
-                          const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
-                          return (
-                            <>
-                              <input className={`items-input${item.discountPct > effectiveLimit ? ' items-input-error' : ''}`} type="number" min="0" max="100" step="0.1" value={item.discountPct} onChange={(e) => updateItem(index, { discountPct: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right', width: 56 }} />
-                              {effectiveLimit < 100 && (
-                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                  máx {effectiveLimit.toFixed(2)}%
-                                </span>
-                              )}
-                              {item.discountPct > effectiveLimit && (
-                                <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                  Supera el límite de {effectiveLimit.toFixed(2)}%
-                                </span>
-                              )}
-                            </>
-                          )
-                        })()}
-                      </td>
+                       <td>
+                         {(() => {
+                           const autoPct = item.autoDiscountPct ?? 0
+                           const itemMax = item.maxDiscountPct && item.maxDiscountPct > 0 ? item.maxDiscountPct : 100
+                           const userMax = currentUser?.maxDiscountPct && currentUser.maxDiscountPct > 0 ? currentUser.maxDiscountPct : 100
+                           const priceLimit = maxDiscFromPrices(item.rate, item._prices)
+                           const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
+                           const allowsManual = item.allowsDiscount !== false
+                           return (
+                             <>
+                               {autoPct > 0 && (
+                                 <div style={{ marginBottom: 4 }}>
+                                   <span className="badge badge-discount" style={{ fontSize: 10, padding: '2px 6px' }}>
+                                     {autoPct}% auto
+                                   </span>
+                                 </div>
+                               )}
+                               <input
+                                 className={`items-input${submitted && item.discountPct > effectiveLimit ? ' items-input-error' : ''}`}
+                                 type="number"
+                                 min="0"
+                                 max="100"
+                                 step="0.1"
+                                 value={item.manualDiscountPct}
+                                 onChange={(e) => updateItem(index, { manualDiscountPct: parseFloat(e.target.value) || 0 })}
+                                 style={{ textAlign: 'right', width: 56 }}
+                                 disabled={!allowsManual}
+                                 title={allowsManual ? undefined : 'Este artículo no acepta descuentos'}
+                               />
+                               {item.discountPct > 0 && (
+                                 <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                   Total: {item.discountPct.toFixed(1)}%
+                                 </span>
+                               )}
+                               {effectiveLimit < 100 && (
+                                 <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                   máx {effectiveLimit.toFixed(2)}%
+                                 </span>
+                               )}
+                               {item.discountPct > effectiveLimit && (
+                                 <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                   Supera el límite de {effectiveLimit.toFixed(2)}%
+                                 </span>
+                               )}
+                               <span style={{ fontSize: 10, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, cursor: 'help' }} title="El descuento puede incluir una parte automática (Pricing Rule) y una parte manual del vendedor. Ambas se suman contra el tope máximo.">
+                                 ⓘ automático + manual
+                               </span>
+                             </>
+                           )
+                         })()}
+                       </td>
                       <td style={{ textAlign: 'right' }}>
                         {item.salesTaxPct > 0 ? (
                           <span className="td-muted" style={{ fontSize: 12 }}>

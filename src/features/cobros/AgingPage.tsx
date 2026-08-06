@@ -1,5 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { Download, Loader2 } from 'lucide-react'
 import { getAging } from '@/shared/api/cobros'
+import { downloadCxcAgingPdf } from '@/shared/api/reportes'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { formatDOP } from '@/lib/formatters'
 
@@ -7,6 +10,11 @@ export default function AgingPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['aging'],
     queryFn: getAging,
+  })
+
+  const downloadPdfMutation = useMutation({
+    mutationFn: downloadCxcAgingPdf,
+    onError: () => toast.error('No se pudo descargar el PDF'),
   })
 
   const AGING_THRESHOLD = 10_000
@@ -22,6 +30,16 @@ export default function AgingPage() {
       <PageHeader
         title="Aging de Cuentas por Cobrar"
         description="Análisis de saldos vencidos por cliente"
+        action={
+          <button
+            className="btn btn-secondary btn-size-sm"
+            onClick={() => downloadPdfMutation.mutate()}
+            disabled={downloadPdfMutation.isPending}
+          >
+            {downloadPdfMutation.isPending ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
+            {' '}Descargar PDF
+          </button>
+        }
       />
 
       <div>

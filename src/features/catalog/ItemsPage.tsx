@@ -36,6 +36,15 @@ function StockBadge({ item }: { item: Item }) {
   )
 }
 
+function AutoDiscountBadge({ item }: { item: Item }) {
+  const ad = item.autoDiscount
+  if (!ad) return null
+  if (ad.discountType === 'Discount Percentage') {
+    return <span className="badge badge-discount">{ad.discountPercentage ?? 0}% OFF</span>
+  }
+  return <span className="badge badge-discount">{ad.discountAmount ?? 0} OFF</span>
+}
+
 function ItemTypeBadge({ item }: { item: Item }) {
   if (item.hasVariants) return <span className="badge badge-info">Template</span>
   if (item.variantOf) return <span className="badge badge-neutral">Variante</span>
@@ -198,9 +207,10 @@ export default function ItemsPage() {
               <th>Categoría</th>
               <th>Marca</th>
               <SortableTh label="Precio" sortKey="standardRate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} align="right" />
-              <SortableTh label="Stock" sortKey="currentStock" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-              <th>Estado</th>
-              <th style={{ width: 48 }} />
+               <SortableTh label="Stock" sortKey="currentStock" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
+                <th>Estado</th>
+                <th>Descuento</th>
+                <th style={{ width: 48 }} />
             </tr>
           </thead>
           <tbody>
@@ -251,12 +261,18 @@ export default function ItemsPage() {
                             : item.categoryName ?? item.category ?? '—'}
                         </td>
                         <td className="td-muted">{item.brandName ?? '—'}</td>
-                        <td style={{ textAlign: 'right' }}>
-                          {item.hasVariants
-                            ? <span className="td-muted">—</span>
-                            : formatDOP(item.standardRate)}
-                        </td>
-                        <td><StockBadge item={item} /></td>
+          <td style={{ textAlign: 'right' }}>
+            {item.hasVariants
+              ? <span className="td-muted">—</span>
+              : formatDOP(item.standardRate)}
+          </td>
+          <td><StockBadge item={item} /></td>
+          <td>
+            <AutoDiscountBadge item={item} />
+            {item.allowsDiscount === false
+              ? <span className="badge badge-neutral" style={{ marginLeft: 4 }}>Sin dto.</span>
+              : null}
+          </td>
                         <td>
                           {item.disabled
                             ? <span className="badge badge-neutral">Inactivo</span>

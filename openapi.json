@@ -7901,6 +7901,279 @@
         ]
       }
     },
+    "/api/v1/catalog/pricing-rules": {
+      "get": {
+        "operationId": "PricingRulesController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "applyOn",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Item Code",
+                "Item Group",
+                "Brand"
+              ]
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por código de artículo (solo aplica cuando applyOn = \"Item Code\")",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemGroup",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por categoría (solo aplica cuando applyOn = \"Item Group\")",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "brand",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por marca (solo aplica cuando applyOn = \"Brand\")",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "disabled",
+            "required": false,
+            "in": "query",
+            "description": "Incluir reglas deshabilitadas. Default: solo activas.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar reglas de descuento global por artículo, categoría o marca",
+        "tags": [
+          "Catalog - Pricing Rules"
+        ]
+      },
+      "post": {
+        "operationId": "PricingRulesController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePricingRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear una regla de descuento global (aplica automáticamente en facturas/cotizaciones)",
+        "tags": [
+          "Catalog - Pricing Rules"
+        ]
+      }
+    },
+    "/api/v1/catalog/pricing-rules/{id}": {
+      "get": {
+        "operationId": "PricingRulesController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obtener una regla de descuento por ID",
+        "tags": [
+          "Catalog - Pricing Rules"
+        ]
+      },
+      "put": {
+        "operationId": "PricingRulesController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePricingRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar una regla de descuento",
+        "tags": [
+          "Catalog - Pricing Rules"
+        ]
+      }
+    },
+    "/api/v1/catalog/pricing-rules/{id}/toggle": {
+      "post": {
+        "operationId": "PricingRulesController_toggle",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activar/desactivar una regla de descuento",
+        "tags": [
+          "Catalog - Pricing Rules"
+        ]
+      }
+    },
     "/api/v1/suppliers": {
       "get": {
         "operationId": "ProveedoresController_findAll",
@@ -9463,6 +9736,160 @@
         "tags": [
           "Usuarios"
         ]
+      },
+      "post": {
+        "operationId": "RolesController_createRole",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear un rol nuevo",
+        "tags": [
+          "Usuarios"
+        ]
+      }
+    },
+    "/api/v1/roles/{name}": {
+      "get": {
+        "operationId": "RolesController_getRoleDetail",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un rol: metadata + usuarios que lo tienen asignado",
+        "tags": [
+          "Usuarios"
+        ]
+      },
+      "put": {
+        "operationId": "RolesController_updateRole",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Habilitar/deshabilitar un rol o cambiar su acceso al Desk",
+        "tags": [
+          "Usuarios"
+        ]
+      },
+      "delete": {
+        "operationId": "RolesController_deleteRole",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar un rol custom (ERPNext rechaza roles estándar o en uso)",
+        "tags": [
+          "Usuarios"
+        ]
       }
     },
     "/api/v1/quotations": {
@@ -10865,6 +11292,80 @@
         ]
       }
     },
+    "/api/v1/cobros/estado-cuenta/{customerId}": {
+      "get": {
+        "operationId": "CobrosController_getEstadoCuenta",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Estado de cuenta de un cliente — documentos pendientes + antigüedad de saldos",
+        "tags": [
+          "Cuentas por Cobrar"
+        ]
+      }
+    },
+    "/api/v1/cobros/estado-cuenta/{customerId}/pdf": {
+      "get": {
+        "operationId": "CobrosController_getEstadoCuentaPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Estado de cuenta de un cliente — PDF exportable (mismos datos que la versión JSON)",
+        "tags": [
+          "Cuentas por Cobrar"
+        ]
+      }
+    },
     "/api/v1/cobros/saldo-favor/{customerId}": {
       "get": {
         "operationId": "CobrosController_getSaldoFavor",
@@ -11837,6 +12338,105 @@
         ]
       }
     },
+    "/api/v1/reportes/ventas/pdf": {
+      "get": {
+        "operationId": "ReportesController_getVentasPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "month",
+              "type": "string",
+              "enum": [
+                "day",
+                "week",
+                "month"
+              ]
+            }
+          },
+          {
+            "name": "customer",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de Ventas — mismos filtros que la versión JSON",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
     "/api/v1/reportes/ingresos-egresos": {
       "get": {
         "operationId": "ReportesController_getIngresosEgresos",
@@ -11920,6 +12520,89 @@
         ]
       }
     },
+    "/api/v1/reportes/ingresos-egresos/pdf": {
+      "get": {
+        "operationId": "ReportesController_getIngresosEgresosPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodicity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "Monthly",
+              "type": "string",
+              "enum": [
+                "Monthly",
+                "Quarterly",
+                "Yearly"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de Ingresos y Egresos — mismos filtros que la versión JSON",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
     "/api/v1/reportes/balance-general": {
       "get": {
         "operationId": "ReportesController_getBalanceGeneral",
@@ -11998,6 +12681,89 @@
           }
         ],
         "summary": "Balance Sheet — estado de situación financiera",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/balance-general/pdf": {
+      "get": {
+        "operationId": "ReportesController_getBalanceGeneralPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodicity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "Monthly",
+              "type": "string",
+              "enum": [
+                "Monthly",
+                "Quarterly",
+                "Yearly"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de Balance General — mismos filtros que la versión JSON",
         "tags": [
           "Reportes"
         ]
@@ -12097,6 +12863,100 @@
         ]
       }
     },
+    "/api/v1/reportes/inventario/valoracion/pdf": {
+      "get": {
+        "operationId": "ReportesController_getValoracionStockPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de corte para valoración (default: hoy)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de Valoración de Inventario — mismos filtros que la versión JSON",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
     "/api/v1/reportes/inventario/movimientos": {
       "get": {
         "operationId": "ReportesController_getMovimientosStock",
@@ -12186,6 +13046,100 @@
           }
         ],
         "summary": "Stock Ledger — movimientos de inventario del período",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/inventario/movimientos/pdf": {
+      "get": {
+        "operationId": "ReportesController_getMovimientosStockPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de corte para valoración (default: hoy)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de Movimientos de Inventario — mismos filtros que la versión JSON",
         "tags": [
           "Reportes"
         ]
@@ -12457,6 +13411,53 @@
         ]
       }
     },
+    "/api/v1/reportes/caja/cuadre/pdf": {
+      "get": {
+        "operationId": "ReportesController_getCuadrePdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Fecha del cuadre. Default: hoy",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF del Cuadre de Caja — mismos filtros que la versión JSON",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
     "/api/v1/reportes/pos/cuadre-turno": {
       "get": {
         "operationId": "ReportesController_getCuadreTurno",
@@ -12527,6 +13528,76 @@
         ]
       }
     },
+    "/api/v1/reportes/pos/cuadre-turno/pdf": {
+      "get": {
+        "operationId": "ReportesController_getCuadreTurnoPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cajero",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por cajero (User).",
+            "schema": {
+              "example": "rcastrofelix06@gmail.com",
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "json",
+              "type": "string",
+              "enum": [
+                "json",
+                "excel"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF del Cuadre por Turno — mismos filtros que la versión JSON (ignora ?format)",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
     "/api/v1/reportes/cxc/aging": {
       "get": {
         "operationId": "ReportesController_getCxcAging",
@@ -12551,6 +13622,93 @@
           }
         ],
         "summary": "Accounts Receivable — antigüedad de cuentas por cobrar",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/cxc/aging/pdf": {
+      "get": {
+        "operationId": "ReportesController_getCxcAgingPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de Cuentas por Cobrar (Aging)",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/cxp/aging": {
+      "get": {
+        "operationId": "ReportesController_getCxpAging",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accounts Payable — antigüedad de cuentas por pagar",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/cxp/aging/pdf": {
+      "get": {
+        "operationId": "ReportesController_getCxpAgingPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de Cuentas por Pagar (Aging)",
         "tags": [
           "Reportes"
         ]
@@ -15826,6 +16984,271 @@
           "Costos de Importación (Landed Cost Voucher)"
         ]
       }
+    },
+    "/api/v1/permisos/catalogo": {
+      "get": {
+        "operationId": "PermisosController_getCatalogo",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "DocTypes y Roles disponibles para armar reglas de permiso",
+        "tags": [
+          "Permisos"
+        ]
+      }
+    },
+    "/api/v1/permisos": {
+      "get": {
+        "operationId": "PermisosController_getPermisos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "doctype",
+            "required": false,
+            "in": "query",
+            "description": "Nombre del DocType de ERPNext (ej. \"Sales Invoice\")",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "required": false,
+            "in": "query",
+            "description": "Nombre del Role de ERPNext (ej. \"Sales User\")",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reglas de permiso actuales (filtrable por doctype y/o role)",
+        "tags": [
+          "Permisos"
+        ]
+      },
+      "post": {
+        "operationId": "PermisosController_createPermiso",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePermisoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear una fila de permiso nueva (doctype + role + permlevel)",
+        "tags": [
+          "Permisos"
+        ]
+      },
+      "put": {
+        "operationId": "PermisosController_updatePermiso",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePermisoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambiar un flag puntual (read/write/create/...) de una regla existente",
+        "tags": [
+          "Permisos"
+        ]
+      },
+      "delete": {
+        "operationId": "PermisosController_removePermiso",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemovePermisoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar una regla de permiso",
+        "tags": [
+          "Permisos"
+        ]
+      }
+    },
+    "/api/v1/permisos/reset": {
+      "post": {
+        "operationId": "PermisosController_resetPermisos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPermisoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revertir un DocType a sus permisos estándar (borra las reglas custom)",
+        "tags": [
+          "Permisos"
+        ]
+      }
+    },
+    "/api/v1/permisos/asignar": {
+      "post": {
+        "operationId": "PermisosController_assignPermiso",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignPermisoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Asignar de una vez un set de permisos a un rol sobre un doctype",
+        "tags": [
+          "Permisos"
+        ]
+      }
     }
   },
   "info": {
@@ -18573,6 +19996,201 @@
           }
         }
       },
+      "CreatePricingRuleDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Descuento 10% Laptops HP",
+            "description": "Nombre único de la regla"
+          },
+          "applyOn": {
+            "type": "string",
+            "enum": [
+              "Item Code",
+              "Item Group",
+              "Brand"
+            ],
+            "description": "A qué se aplica el descuento"
+          },
+          "itemCodes": {
+            "example": [
+              "PROD-001",
+              "PROD-002"
+            ],
+            "description": "Códigos de artículo. Requerido cuando applyOn = \"Item Code\".",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "itemGroups": {
+            "example": [
+              "Laptops"
+            ],
+            "description": "Categorías/grupos de artículo. Requerido cuando applyOn = \"Item Group\".",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "brands": {
+            "example": [
+              "HP"
+            ],
+            "description": "Marcas. Requerido cuando applyOn = \"Brand\".",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "discountType": {
+            "type": "string",
+            "enum": [
+              "Discount Percentage",
+              "Discount Amount"
+            ],
+            "description": "Tipo de descuento a aplicar"
+          },
+          "discountPercentage": {
+            "type": "number",
+            "example": 10,
+            "description": "% de descuento (0-100). Requerido cuando discountType = \"Discount Percentage\"."
+          },
+          "discountAmount": {
+            "type": "number",
+            "example": 500,
+            "description": "Monto fijo de descuento en la moneda de la empresa. Requerido cuando discountType = \"Discount Amount\"."
+          },
+          "minQty": {
+            "type": "number",
+            "example": 1,
+            "description": "Cantidad mínima de la línea para que aplique el descuento"
+          },
+          "maxQty": {
+            "type": "number",
+            "example": 100,
+            "description": "Cantidad máxima de la línea para que aplique el descuento"
+          },
+          "validFrom": {
+            "type": "string",
+            "example": "2026-01-01",
+            "description": "Fecha desde la que la regla está vigente"
+          },
+          "validUpto": {
+            "type": "string",
+            "example": "2026-12-31",
+            "description": "Fecha hasta la que la regla está vigente"
+          },
+          "priority": {
+            "type": "number",
+            "example": 0,
+            "minimum": 0,
+            "maximum": 20,
+            "description": "Prioridad cuando varias reglas aplican al mismo artículo (mayor gana)"
+          }
+        },
+        "required": [
+          "title",
+          "applyOn",
+          "discountType"
+        ]
+      },
+      "UpdatePricingRuleDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Descuento 10% Laptops HP",
+            "description": "Nombre único de la regla"
+          },
+          "applyOn": {
+            "type": "string",
+            "enum": [
+              "Item Code",
+              "Item Group",
+              "Brand"
+            ],
+            "description": "A qué se aplica el descuento"
+          },
+          "itemCodes": {
+            "example": [
+              "PROD-001",
+              "PROD-002"
+            ],
+            "description": "Códigos de artículo. Requerido cuando applyOn = \"Item Code\".",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "itemGroups": {
+            "example": [
+              "Laptops"
+            ],
+            "description": "Categorías/grupos de artículo. Requerido cuando applyOn = \"Item Group\".",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "brands": {
+            "example": [
+              "HP"
+            ],
+            "description": "Marcas. Requerido cuando applyOn = \"Brand\".",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "discountType": {
+            "type": "string",
+            "enum": [
+              "Discount Percentage",
+              "Discount Amount"
+            ],
+            "description": "Tipo de descuento a aplicar"
+          },
+          "discountPercentage": {
+            "type": "number",
+            "example": 10,
+            "description": "% de descuento (0-100). Requerido cuando discountType = \"Discount Percentage\"."
+          },
+          "discountAmount": {
+            "type": "number",
+            "example": 500,
+            "description": "Monto fijo de descuento en la moneda de la empresa. Requerido cuando discountType = \"Discount Amount\"."
+          },
+          "minQty": {
+            "type": "number",
+            "example": 1,
+            "description": "Cantidad mínima de la línea para que aplique el descuento"
+          },
+          "maxQty": {
+            "type": "number",
+            "example": 100,
+            "description": "Cantidad máxima de la línea para que aplique el descuento"
+          },
+          "validFrom": {
+            "type": "string",
+            "example": "2026-01-01",
+            "description": "Fecha desde la que la regla está vigente"
+          },
+          "validUpto": {
+            "type": "string",
+            "example": "2026-12-31",
+            "description": "Fecha hasta la que la regla está vigente"
+          },
+          "priority": {
+            "type": "number",
+            "example": 0,
+            "minimum": 0,
+            "maximum": 20,
+            "description": "Prioridad cuando varias reglas aplican al mismo artículo (mayor gana)"
+          }
+        }
+      },
       "CreateProveedorDto": {
         "type": "object",
         "properties": {
@@ -19255,6 +20873,36 @@
         "required": [
           "branches"
         ]
+      },
+      "CreateRoleDto": {
+        "type": "object",
+        "properties": {
+          "roleName": {
+            "type": "string",
+            "description": "Nombre del rol nuevo"
+          },
+          "deskAccess": {
+            "type": "boolean",
+            "default": true,
+            "description": "Si el rol tiene acceso al Desk de ERPNext"
+          }
+        },
+        "required": [
+          "roleName"
+        ]
+      },
+      "UpdateRoleDto": {
+        "type": "object",
+        "properties": {
+          "disabled": {
+            "type": "boolean",
+            "description": "Deshabilitar (true) o habilitar (false) el rol"
+          },
+          "deskAccess": {
+            "type": "boolean",
+            "description": "Si el rol tiene acceso al Desk de ERPNext"
+          }
+        }
       },
       "QuotationItemDto": {
         "type": "object",
@@ -20261,6 +21909,184 @@
           "postingDate",
           "purchaseReceipts",
           "taxes"
+        ]
+      },
+      "CreatePermisoDto": {
+        "type": "object",
+        "properties": {
+          "doctype": {
+            "type": "string",
+            "description": "Nombre del DocType de ERPNext (ej. \"Sales Invoice\")"
+          },
+          "role": {
+            "type": "string",
+            "description": "Nombre del Role de ERPNext (ej. \"Sales User\")"
+          },
+          "permlevel": {
+            "type": "number",
+            "default": 0,
+            "description": "Nivel de permiso (0 = nivel base)"
+          }
+        },
+        "required": [
+          "doctype",
+          "role"
+        ]
+      },
+      "UpdatePermisoDto": {
+        "type": "object",
+        "properties": {
+          "doctype": {
+            "type": "string",
+            "description": "Nombre del DocType de ERPNext"
+          },
+          "role": {
+            "type": "string",
+            "description": "Nombre del Role de ERPNext"
+          },
+          "permlevel": {
+            "type": "number",
+            "description": "Nivel de permiso de la regla a modificar"
+          },
+          "ptype": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write",
+              "create",
+              "delete",
+              "submit",
+              "cancel",
+              "amend",
+              "report",
+              "export",
+              "import",
+              "share",
+              "print",
+              "email",
+              "select"
+            ],
+            "description": "Flag de permiso a cambiar"
+          },
+          "value": {
+            "type": "boolean",
+            "description": "Nuevo valor del flag (default: true)"
+          },
+          "ifOwner": {
+            "type": "boolean",
+            "description": "Si la regla aplica solo cuando el usuario es el dueño del documento"
+          }
+        },
+        "required": [
+          "doctype",
+          "role",
+          "permlevel",
+          "ptype"
+        ]
+      },
+      "RemovePermisoDto": {
+        "type": "object",
+        "properties": {
+          "doctype": {
+            "type": "string",
+            "description": "Nombre del DocType de ERPNext"
+          },
+          "role": {
+            "type": "string",
+            "description": "Nombre del Role de ERPNext"
+          },
+          "permlevel": {
+            "type": "number",
+            "description": "Nivel de permiso de la regla a eliminar"
+          },
+          "ifOwner": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "doctype",
+          "role",
+          "permlevel"
+        ]
+      },
+      "ResetPermisoDto": {
+        "type": "object",
+        "properties": {
+          "doctype": {
+            "type": "string",
+            "description": "Nombre del DocType a revertir a sus permisos estándar"
+          }
+        },
+        "required": [
+          "doctype"
+        ]
+      },
+      "AssignPermisoDto": {
+        "type": "object",
+        "properties": {
+          "doctype": {
+            "type": "string",
+            "description": "Nombre del DocType de ERPNext (ej. \"Sales Invoice\")"
+          },
+          "role": {
+            "type": "string",
+            "description": "Nombre del Role de ERPNext (ej. \"Sales User\")"
+          },
+          "permlevel": {
+            "type": "number",
+            "default": 0,
+            "description": "Nivel de permiso (0 = nivel base)"
+          },
+          "ifOwner": {
+            "type": "boolean",
+            "description": "Si la regla aplica solo cuando el usuario es el dueño del documento"
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "write": {
+            "type": "boolean"
+          },
+          "create": {
+            "type": "boolean"
+          },
+          "delete": {
+            "type": "boolean"
+          },
+          "submit": {
+            "type": "boolean"
+          },
+          "cancel": {
+            "type": "boolean"
+          },
+          "amend": {
+            "type": "boolean"
+          },
+          "report": {
+            "type": "boolean"
+          },
+          "export": {
+            "type": "boolean"
+          },
+          "import": {
+            "type": "boolean"
+          },
+          "share": {
+            "type": "boolean"
+          },
+          "print": {
+            "type": "boolean"
+          },
+          "email": {
+            "type": "boolean"
+          },
+          "select": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "doctype",
+          "role"
         ]
       }
     }

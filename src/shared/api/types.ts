@@ -709,6 +709,14 @@ export interface Item {
   salesTaxPct?: number;
   purchasePriceDate?: string;
   salesPriceDate?: string;
+  autoDiscount?: AutoDiscount;
+}
+
+export interface AutoDiscount {
+  ruleId: string;
+  discountType: "Discount Percentage" | "Discount Amount";
+  discountPercentage?: number;
+  discountAmount?: number;
 }
 
 export interface CreateItemDto {
@@ -1520,6 +1528,101 @@ export interface UpdateUsuarioDto {
 
 export interface Role {
   name: string;
+}
+
+// ─── Permisos y Roles (admin — requiere System Manager) ───────────────────────
+// Nota: openapi.json documenta los DTOs de request para /permisos y /roles pero
+// no las respuestas (200/201 sin schema) — los shapes de abajo para PermisoRow
+// y RoleDetail siguen los ejemplos del prompt de implementación, no un schema
+// generado. Verificar contra el endpoint real si algo no calza.
+
+export interface PermisoFlagValues {
+  read: boolean;
+  write: boolean;
+  create: boolean;
+  delete: boolean;
+  submit: boolean;
+  cancel: boolean;
+  amend: boolean;
+  report: boolean;
+  export: boolean;
+  import: boolean;
+  share: boolean;
+  print: boolean;
+  email: boolean;
+  select: boolean;
+}
+
+export type PermisoPtype = keyof PermisoFlagValues;
+
+export interface PermisoRow extends PermisoFlagValues {
+  role: string;
+  permlevel: number;
+  ifOwner?: boolean;
+}
+
+export interface CreatePermisoDto {
+  doctype: string;
+  role: string;
+  permlevel?: number;
+}
+
+export interface UpdatePermisoDto {
+  doctype: string;
+  role: string;
+  permlevel: number;
+  ptype: PermisoPtype;
+  value?: boolean;
+  ifOwner?: boolean;
+}
+
+export interface RemovePermisoDto {
+  doctype: string;
+  role: string;
+  permlevel: number;
+  ifOwner?: boolean;
+}
+
+export interface ResetPermisoDto {
+  doctype: string;
+}
+
+export interface AssignPermisoDto extends Partial<PermisoFlagValues> {
+  doctype: string;
+  role: string;
+  permlevel?: number;
+  ifOwner?: boolean;
+}
+
+/** La forma exacta la define ERPNext (get_roles_and_doctypes) — normalizada
+ * defensivamente en el cliente, ver normalizeCatalogo() en shared/api/permisos.ts */
+export interface PermisosCatalogo {
+  doctypes: string[];
+  roles: string[];
+}
+
+export interface RoleUserSummary {
+  email: string;
+  fullName: string;
+  enabled: boolean;
+}
+
+export interface RoleDetail {
+  roleName: string;
+  disabled: boolean;
+  deskAccess: boolean;
+  isCustom: boolean;
+  users: RoleUserSummary[];
+}
+
+export interface CreateRoleDto {
+  roleName: string;
+  deskAccess?: boolean;
+}
+
+export interface UpdateRoleDto {
+  disabled?: boolean;
+  deskAccess?: boolean;
 }
 
 // ─── Tax Templates ────────────────────────────────────────────────────────────
@@ -2761,3 +2864,41 @@ export interface EstadoCuentaResponse {
   aging: EstadoCuentaAgingBucket[]
   totalPendiente: number
 }
+
+// ─── Pricing Rules ───────────────────────────────────────────────────
+
+export interface PricingRule {
+  id: string
+  title: string
+  applyOn: 'Item Code' | 'Item Group' | 'Brand'
+  itemCodes?: string[]
+  itemGroups?: string[]
+  brands?: string[]
+  discountType: 'Discount Percentage' | 'Discount Amount'
+  discountPercentage?: number
+  discountAmount?: number
+  minQty?: number
+  maxQty?: number
+  validFrom?: string
+  validUpto?: string
+  priority?: number
+  disabled: boolean
+}
+
+export interface CreatePricingRuleDto {
+  title: string
+  applyOn: 'Item Code' | 'Item Group' | 'Brand'
+  itemCodes?: string[]
+  itemGroups?: string[]
+  brands?: string[]
+  discountType: 'Discount Percentage' | 'Discount Amount'
+  discountPercentage?: number
+  discountAmount?: number
+  minQty?: number
+  maxQty?: number
+  validFrom?: string
+  validUpto?: string
+  priority?: number
+}
+
+export type UpdatePricingRuleDto = Partial<CreatePricingRuleDto>

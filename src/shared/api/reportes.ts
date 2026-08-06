@@ -78,9 +78,29 @@ export async function getBalanceGeneral(params?: FinancialParams) {
   return res.data
 }
 
+export async function downloadBalanceGeneralPdf(params?: FinancialParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.balanceGeneralPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `balance-general_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export async function getIngresosEgresos(params?: FinancialParams) {
   const res = await client.get(ENDPOINTS.reportes.ingresosEgresos, { params })
   return res.data
+}
+
+export async function downloadIngresosEgresosPdf(params?: FinancialParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.ingresosEgresosPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `ingresos-egresos_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // ─── VENTAS ──────────────────────────────────────────────────────────────────
@@ -100,6 +120,16 @@ export async function getReporteVentas(params?: VentasParams) {
   return res.data
 }
 
+export async function downloadVentasPdf(params?: VentasParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.ventasPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `ventas_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ─── INVENTARIO ──────────────────────────────────────────────────────────────
 
 export interface InventarioParams {
@@ -117,9 +147,29 @@ export async function getInventarioValoracion(params?: InventarioParams) {
   return res.data
 }
 
+export async function downloadInventarioValoracionPdf(params?: InventarioParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.inventarioValoracionPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `valoracion-inventario_${params?.fromDate ?? params?.date ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export async function getInventarioMovimientos(params?: InventarioParams) {
   const res = await client.get(ENDPOINTS.reportes.inventarioMovimientos, { params })
   return res.data
+}
+
+export async function downloadInventarioMovimientosPdf(params?: InventarioParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.inventarioMovimientosPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `movimientos-inventario_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // ─── CXC / CAJA ──────────────────────────────────────────────────────────────
@@ -129,14 +179,44 @@ export async function getCxcAging() {
   return res.data
 }
 
+export async function downloadCxcAgingPdf() {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.cxcAgingPdf, { responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'aging-cxc.pdf'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export async function getCxpAging() {
   const res = await client.get(ENDPOINTS.reportes.cxpAging)
   return res.data
 }
 
+export async function downloadCxpAgingPdf() {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.cxpAgingPdf, { responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'aging-cxp.pdf'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export async function getCajaCuadre(params?: { date?: string; branch?: string; department?: string }) {
   const res = await client.get(ENDPOINTS.reportes.cajaCuadre, { params })
   return res.data
+}
+
+export async function downloadCajaCuadrePdf(params?: { date?: string; branch?: string; department?: string }) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.cajaCuadrePdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `cuadre-caja_${params?.date ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // ─── LIBRO DIARIO / LIBRO MAYOR ──────────────────────────────────────────────
@@ -190,6 +270,19 @@ export async function getCuadreTurno(params?: CuadreTurnoParams) {
     { params },
   )
   return res.data
+}
+
+// Separate route from the Excel export above — /pdf always returns the PDF
+// regardless of any `format` query param, so it goes through the same
+// axios-blob pattern as the other report PDFs, not the raw-fetch Excel one.
+export async function downloadCuadreTurnoPdf(params?: CuadreTurnoParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.cuadreTurnoPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `cuadre-turno_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 export async function downloadCuadreTurnoExcel(params?: CuadreTurnoParams) {

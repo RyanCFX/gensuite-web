@@ -1008,12 +1008,21 @@ export default function ItemDetail() {
             </div>
           </div>
 
-          {!!item.standardRate && (
+           {!!item.standardRate && (
             <div className="stat-card">
               <div className="stat-card-top">
                 <span className="stat-label">Precio de Venta</span>
               </div>
               <div className="stat-value" style={{ fontSize: 28 }}>{formatDOP(item.standardRate)}</div>
+              {item.autoDiscount && (
+                <div className="stat-footer">
+                  <span className="badge badge-discount" style={{ fontSize: 11 }}>
+                    {item.autoDiscount.discountType === 'Discount Percentage'
+                      ? `${item.autoDiscount.discountPercentage ?? 0}% OFF (auto)`
+                      : `${formatDOP(item.autoDiscount.discountAmount ?? 0)} OFF (auto)`}
+                  </span>
+                </div>
+              )}
               {item.salesPriceDate && (
                 <div className="stat-footer">
                   <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>

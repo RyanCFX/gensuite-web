@@ -11,7 +11,7 @@ import type { Item } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDOP, displayId } from '@/lib/formatters'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, ShieldAlert } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, ShieldAlert, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -46,6 +46,9 @@ interface LineItem {
   uom: string
   _prices?: ItemPrices
   maxDiscountPct?: number
+  autoDiscountPct?: number
+  manualDiscountPct: number
+  allowsDiscount?: boolean
   warehouse: string
   /** Stock por almacén del artículo seleccionado, para validar contra el almacén elegido en la línea */
   _stockByWarehouse?: Record<string, number>
@@ -132,18 +135,19 @@ useEffect(() => {
      setCustomerName(existingQuotation.customerName)
      setDate(existingQuotation.date)
      setValidTill(existingQuotation.validTill ?? defaultValidTill())
-     setItems(existingQuotation.items.map((i) => ({
-       itemCode: i.itemCode,
-       description: i.description,
-       qty: i.qty,
-       rate: i.rate,
-       amount: i.amount,
-       discountPct: i.discountPct ?? 0,
-       salesTaxPct: 0,
-       salesTaxTemplate: '',
-       uom: i.uom,
-       warehouse: '',
-     })))
+      setItems(existingQuotation.items.map((i) => ({
+        itemCode: i.itemCode,
+        description: i.description,
+        qty: i.qty,
+        rate: i.rate,
+        amount: i.amount,
+        discountPct: i.discountPct ?? 0,
+        manualDiscountPct: 0,
+        salesTaxPct: 0,
+        salesTaxTemplate: '',
+        uom: i.uom,
+        warehouse: '',
+      })))
      setNotes(existingQuotation.notes ?? '')
      setBranch(existingQuotation.branch ?? '')
      if (existingQuotation.esClienteOcasional) {
@@ -176,6 +180,7 @@ useEffect(() => {
       rate: i.rate,
       amount: calcAmount(i.qty, i.rate, i.discountPct ?? 0),
       discountPct: i.discountPct ?? 0,
+      manualDiscountPct: 0,
       salesTaxPct: 0,
       salesTaxTemplate: '',
       uom: i.uom ?? 'Unidad',
@@ -392,6 +397,9 @@ function submitDto() {
       prev.map((item, i) => {
         if (i !== index) return item
         const updated = { ...item, ...patch }
+        if ('manualDiscountPct' in patch) {
+          updated.discountPct = (updated.autoDiscountPct ?? 0) + (updated.manualDiscountPct ?? 0)
+        }
         if ('qty' in patch || 'rate' in patch || 'discountPct' in patch) {
           updated.amount = calcAmount(updated.qty, updated.rate, updated.discountPct)
         }
@@ -435,6 +443,9 @@ function submitDto() {
           salesTaxTemplate: s.item.salesTaxTemplate ?? '',
           uom: s.item.stockUom ?? 'Unidad',
           maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
+          autoDiscountPct: s.item.autoDiscount?.discountType === 'Discount Percentage' ? s.item.autoDiscount.discountPercentage : undefined,
+          manualDiscountPct: 0,
+          allowsDiscount: s.item.allowsDiscount,
           _prices: s.item.prices,
           warehouse: defaultWarehouse(),
           _stockByWarehouse: s.item.stockByWarehouse,
@@ -459,6 +470,9 @@ function submitDto() {
           rate,
           amount: calcAmount(row.qty, rate, row.discountPct),
           maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
+          autoDiscountPct: catalogItem.autoDiscount?.discountType === 'Discount Percentage' ? catalogItem.autoDiscount.discountPercentage : undefined,
+          manualDiscountPct: 0,
+          allowsDiscount: catalogItem.allowsDiscount,
           uom: catalogItem.stockUom ?? row.uom,
           _prices: catalogItem.prices,
           salesTaxPct: catalogItem.salesTaxPct ?? 0,
@@ -499,7 +513,7 @@ function submitDto() {
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '' })
+    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '' })
   }
 
   // ── Reprice on customer change ───────────────────────────────────────────
@@ -519,7 +533,7 @@ function submitDto() {
       toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
       return
     }
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', warehouse: '' }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', warehouse: '' }])
   }
   function removeRow(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index))
@@ -727,7 +741,10 @@ if (esClienteOcasional) {
                   <th>Descripción</th>
                   <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
-                  <th style={{ textAlign: 'right', width: 80 }}>Dto. %</th>
+                  <th style={{ textAlign: 'right', width: 80 }}>
+                  Dto. %
+                  <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} title="El descuento puede incluir una parte automática (Pricing Rule) y una parte manual del vendedor. Ambas se suman contra el tope máximo." />
+                </th>
                   <th style={{ textAlign: 'right', width: 80 }}>Impuesto</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 72 }}>UDM</th>
@@ -802,22 +819,38 @@ if (esClienteOcasional) {
                       {/* Descuento */}
                       <td>
                         {(() => {
+                          const autoPct = item.autoDiscountPct ?? 0
                           const itemMax = item.maxDiscountPct && item.maxDiscountPct > 0 ? item.maxDiscountPct : 100
                           const userMax = currentUser?.maxDiscountPct && currentUser.maxDiscountPct > 0 ? currentUser.maxDiscountPct : 100
                           const priceLimit = maxDiscFromPrices(item.rate, item._prices)
                           const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
+                          const allowsManual = item.allowsDiscount !== false
                           return (
                             <>
+                              {autoPct > 0 && (
+                                <div style={{ marginBottom: 4 }}>
+                                  <span className="badge badge-discount" style={{ fontSize: 10, padding: '2px 6px' }}>
+                                    {autoPct}% auto
+                                  </span>
+                                </div>
+                              )}
                               <input
                                 className={`items-input${submitted && item.discountPct > effectiveLimit ? ' items-input-error' : ''}`}
                                 type="number"
                                 min="0"
                                 max="100"
                                 step="0.1"
-                                value={item.discountPct}
-                                onChange={(e) => updateItem(index, { discountPct: parseFloat(e.target.value) || 0 })}
+                                value={item.manualDiscountPct}
+                                onChange={(e) => updateItem(index, { manualDiscountPct: parseFloat(e.target.value) || 0 })}
                                 style={{ textAlign: 'right', width: 64 }}
+                                disabled={!allowsManual}
+                                title={allowsManual ? undefined : 'Este artículo no acepta descuentos'}
                               />
+                              {item.discountPct > 0 && (
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                  Total: {item.discountPct.toFixed(1)}%
+                                </span>
+                              )}
                               {effectiveLimit < 100 && (
                                 <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
                                   máx {effectiveLimit.toFixed(2)}%
@@ -828,6 +861,9 @@ if (esClienteOcasional) {
                                   Supera el límite de {effectiveLimit.toFixed(2)}%
                                 </span>
                               )}
+                              <span style={{ fontSize: 10, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, cursor: 'help' }} title="El descuento puede incluir una parte automática (Pricing Rule) y una parte manual del vendedor. Ambas se suman contra el tope máximo.">
+                                ⓘ automático + manual
+                              </span>
                             </>
                           )
                         })()}

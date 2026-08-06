@@ -67,12 +67,22 @@ export function ItemSelect({
   const activeBundles = (bundlesData?.items ?? []).filter((b) => !b.disabled)
 
   const options: SearchSelectOption[] = [
-    ...(data?.items ?? []).map((item) => ({
-      value: item.id,
-      label: item.itemName,
-      // Muestra el código como sublabel solo cuando es distinto del nombre
-      sublabel: item.id !== item.itemName ? item.id : undefined,
-    })),
+    ...(data?.items ?? []).map((item) => {
+      const parts: string[] = []
+      if (item.id !== item.itemName) parts.push(item.id)
+      if (item.autoDiscount) {
+        if (item.autoDiscount.discountType === 'Discount Percentage') {
+          parts.push(`🔖 ${item.autoDiscount.discountPercentage ?? 0}% OFF`)
+        } else {
+          parts.push(`🔖 ${item.autoDiscount.discountAmount ?? 0} OFF`)
+        }
+      }
+      return {
+        value: item.id,
+        label: item.itemName,
+        sublabel: parts.join(' · '),
+      }
+    }),
     ...(includeBundles ? activeBundles.map((bundle) => ({
       value: bundle.id,
       label: bundle.itemName,

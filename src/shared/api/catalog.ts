@@ -16,6 +16,9 @@ import type {
   ItemStock,
   UpdateItemPricesDto,
   ItemPricesResult,
+  PricingRule,
+  CreatePricingRuleDto,
+  UpdatePricingRuleDto,
 } from './types'
 
 // ---- Items ----
@@ -187,5 +190,40 @@ export async function createVariant(itemId: string, data: {
     `/catalog/items/${encodeURIComponent(itemId)}/variants`,
     data,
   )
+  return unwrap(res)
+}
+
+// ─── Pricing Rules ──────────────────────────────────────────────────
+
+export interface ListPricingRulesParams extends PaginationParams {
+  applyOn?: string
+  itemCode?: string
+  itemGroup?: string
+  brand?: string
+  disabled?: string
+}
+
+export async function listPricingRules(params?: ListPricingRulesParams) {
+  const res = await client.get<PaginatedResponse<PricingRule>>(ENDPOINTS.catalog.pricingRules.list, { params })
+  return unwrapPaginated(res)
+}
+
+export async function getPricingRule(id: string) {
+  const res = await client.get<{ success: true; data: PricingRule }>(ENDPOINTS.catalog.pricingRules.byId(id))
+  return unwrap(res)
+}
+
+export async function createPricingRule(data: CreatePricingRuleDto) {
+  const res = await client.post<{ success: true; data: PricingRule }>(ENDPOINTS.catalog.pricingRules.list, data)
+  return unwrap(res)
+}
+
+export async function updatePricingRule(id: string, data: UpdatePricingRuleDto) {
+  const res = await client.put<{ success: true; data: PricingRule }>(ENDPOINTS.catalog.pricingRules.byId(id), data)
+  return unwrap(res)
+}
+
+export async function togglePricingRule(id: string) {
+  const res = await client.post<{ success: true; data: PricingRule }>(ENDPOINTS.catalog.pricingRules.toggle(id))
   return unwrap(res)
 }
