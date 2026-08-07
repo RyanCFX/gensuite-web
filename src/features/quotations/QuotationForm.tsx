@@ -11,7 +11,7 @@ import type { Item } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDOP, displayId } from '@/lib/formatters'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, ShieldAlert, Info } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -137,7 +137,7 @@ useEffect(() => {
      setValidTill(existingQuotation.validTill ?? defaultValidTill())
       setItems(existingQuotation.items.map((i) => ({
         itemCode: i.itemCode,
-        description: i.description,
+        description: i.description ?? '',
         qty: i.qty,
         rate: i.rate,
         amount: i.amount,
@@ -649,7 +649,7 @@ if (esClienteOcasional) {
                        const cid = id === '' ? '' : (opt?.value ?? id)
                        setCustomerId(cid)
                        setCustomerName(opt?.label ?? '')
-                       const c = cid && customersData?.items?.find((c) => c.id === cid)
+                       const c = cid ? customersData?.items?.find((c) => c.id === cid) : undefined
                        setCustomerPriceTier(c?.priceTier)
                      }}
                      options={customerOptions}
@@ -743,7 +743,7 @@ if (esClienteOcasional) {
                   <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
                   <th style={{ textAlign: 'right', width: 80 }}>
                   Dto. %
-                  <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} title="El descuento puede incluir una parte automática (Pricing Rule) y una parte manual del vendedor. Ambas se suman contra el tope máximo." />
+                  <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} />
                 </th>
                   <th style={{ textAlign: 'right', width: 80 }}>Impuesto</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>

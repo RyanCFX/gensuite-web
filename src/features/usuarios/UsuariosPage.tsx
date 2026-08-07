@@ -22,7 +22,6 @@ type ConfirmType = { type: 'disable'; user: Usuario } | { type: 'enable'; user: 
 export default function UsuariosPage() {
   const queryClient = useQueryClient()
   const authUser = useAuthStore((s) => s.user)
-  const logout = useAuthStore((s) => s.logout)
 
   const [showForm, setShowForm] = useState(false)
   const [editingUser, setEditingUser] = useState<Usuario | null>(null)

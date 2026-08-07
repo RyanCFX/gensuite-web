@@ -1065,7 +1065,7 @@ function AppLayoutInner() {
               <KeepAlive
                 activeCacheKey={activeTabPath}
                 max={15}
-                cacheNodeRef={keepAliveRef}
+                aliveRef={keepAliveRef}
               >
                 {outlet}
               </KeepAlive>

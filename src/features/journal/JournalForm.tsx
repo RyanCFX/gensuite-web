@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { createJournalEntry, submitJournalEntry } from '@/shared/api/journal-entry'
-import type { CreateJournalEntryDto, JournalEntryLine } from '@/shared/api/types'
+import type { CreateJournalEntryDto, JournalEntryLine, ItemProps } from '@/shared/api/types'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { CostCenterSelect } from '@/components/shared/CostCenterSelect'
@@ -53,7 +53,7 @@ export default function JournalForm() {
   // Defaults a nivel de cabecera — el backend los aplica a las líneas que no traigan valor propio
   const [defaultBranch, setDefaultBranch] = useState('')
   const [defaultDepartment, setDefaultDepartment] = useState('')
-  const [defaultCostCenter, setDefaultCostCenter] = useState('')
+  const [defaultCostCenter, setDefaultCostCenter] = useState<ItemProps | null>(null)
 
   const [sucursalQuery, setSucursalQuery] = useState('')
   const { data: sucursalesData, isLoading: sucursalesLoading } = useQuery({
@@ -105,7 +105,7 @@ export default function JournalForm() {
       remarks: remarks || undefined,
       branch: defaultBranch || undefined,
       department: defaultDepartment || undefined,
-      costCenter: defaultCostCenter || undefined,
+      costCenter: defaultCostCenter?.id || undefined,
       entries,
     }
   }
@@ -343,8 +343,8 @@ export default function JournalForm() {
                       </td>
                       <td>
                         <CostCenterSelect
-                          value={row.costCenter}
-                          onChange={(val) => updateRow(row.id, { costCenter: val })}
+                          value={row.costCenter ? { id: row.costCenter, name: '' } : null}
+                          onChange={(val) => updateRow(row.id, { costCenter: val?.id ?? '' })}
                           placeholder="C. Costo…"
                         />
                       </td>

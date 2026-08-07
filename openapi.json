@@ -18839,8 +18839,13 @@
           "allowPartialReservation": {
             "type": "boolean"
           },
+          "enableSerialAndBatchNoForItem": {
+            "type": "boolean",
+            "description": "\"Activate Serial / Batch No for Item\" — interruptor maestro que ERPNext exige en 1 antes de poder crear CUALQUIER Serial and Batch Bundle (compras/ventas/ajustes de artículos con serie o lote). Sin esto en 1, cualquier compra/venta de un artículo con tracking falla con \"Please check the 'Activate Serial and Batch No for Item' checkbox...\", aunque useSerialBatchFields ya esté activo (son dos campos distintos; este es el que ERPNext realmente valida)."
+          },
           "useSerialBatchFields": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Solo tiene efecto si enableSerialAndBatchNoForItem ya está en true — habilita los campos legacy serial_no/batch_no de texto plano en el renglón de la transacción, en vez de requerir un Serial and Batch Bundle explícito."
           },
           "overDeliveryReceiptAllowance": {
             "type": "number",

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, useFieldArray } from 'react-hook-form'
+import type { Resolver } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -25,7 +26,7 @@ const PAGE_SIZE = 20
 const TAX_DEDUCTION_BASIS_OPTIONS = ['Gross Total', 'Net Total'] as const
 
 const rateSchema = z.object({
-  taxWithholdingRate: z.coerce.number({ invalid_type_error: 'La tasa es requerida' }).min(0, 'Debe ser >= 0'),
+  taxWithholdingRate: z.coerce.number().min(0, 'Debe ser >= 0'),
   fromDate: z.string().min(1, 'La fecha desde es requerida'),
   toDate: z.string().min(1, 'La fecha hasta es requerida'),
 })
@@ -81,7 +82,7 @@ export default function RetencionesPage() {
     reset,
     formState: { errors, isSubmitting },
   } = useForm<RetencionFormValues>({
-    resolver: zodResolver(retencionSchema),
+    resolver: zodResolver(retencionSchema) as Resolver<RetencionFormValues>,
     defaultValues: { name: '', taxDeductionBasis: '', account: '', rates: [emptyRate] },
   })
 

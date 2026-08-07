@@ -573,10 +573,10 @@ function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
   }))
 
   function updateRow(itemCode: string, actualQty: number, patch: Partial<{ ubicacion: string; cantidad: number; esPrincipal: boolean }>) {
-    setRows((prev) => ({
-      ...prev,
-      [itemCode]: { ubicacion: '', cantidad: actualQty, esPrincipal: false, ...prev[itemCode], ...patch },
-    }))
+    setRows((prev) => {
+      const current = prev[itemCode] ?? { ubicacion: '', cantidad: actualQty, esPrincipal: false }
+      return { ...prev, [itemCode]: { ...current, ...patch } }
+    })
   }
 
   const distribuirMutation = useMutation({
@@ -590,19 +590,18 @@ function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
   })
 
   function handleDistribuir() {
-    const items: DistribuirUbicacionItemDto[] = pendientes
-      .map((p) => {
-        const draft = rows[p.itemCode]
-        if (!draft?.ubicacion || !draft.cantidad || draft.cantidad <= 0) return null
-        return {
-          itemCode: p.itemCode,
-          warehouse: p.warehouse,
-          ubicacion: draft.ubicacion,
-          cantidad: draft.cantidad,
-          esPrincipal: draft.esPrincipal || undefined,
-        }
+    const items: DistribuirUbicacionItemDto[] = []
+    for (const p of pendientes) {
+      const draft = rows[p.itemCode]
+      if (!draft?.ubicacion || !draft.cantidad || draft.cantidad <= 0) continue
+      items.push({
+        itemCode: p.itemCode,
+        warehouse: p.warehouse,
+        ubicacion: draft.ubicacion,
+        cantidad: draft.cantidad,
+        esPrincipal: draft.esPrincipal || undefined,
       })
-      .filter((x): x is DistribuirUbicacionItemDto => x != null)
+    }
 
     if (items.length === 0) {
       toast.error('Selecciona al menos una ubicación y cantidad para distribuir')

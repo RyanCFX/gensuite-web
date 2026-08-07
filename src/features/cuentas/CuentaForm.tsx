@@ -89,6 +89,8 @@ export default function CuentaForm() {
         currency: cuenta.currency,
         isGroup: cuenta.isGroup,
         disabled: cuenta.disabled,
+        isRootAccount: false,
+        rootType: '',
       })
     }
   }, [cuenta])

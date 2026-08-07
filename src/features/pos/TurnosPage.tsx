@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { listTurnos, type ListTurnosParams } from '@/shared/api/pos'
-import { formatDate, formatDateTime, formatDOP } from '@/lib/formatters'
+import { formatDateTime, formatDOP } from '@/lib/formatters'
 import { useDebounce } from '@/lib/useDebounce'
 
 const PAGE_SIZE = 20

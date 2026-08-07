@@ -134,7 +134,7 @@ const [customerId, setCustomerId] = useState('')
       setTransactionDate(todayIso())
       setItems(q.items.map((i) => ({
         itemCode: i.itemCode,
-        description: i.description,
+        description: i.description ?? '',
         qty: i.qty,
         rate: i.rate,
         amount: i.amount,
@@ -522,7 +522,7 @@ try {
                        const cid = id === '' ? '' : (opt?.value ?? id)
                        setCustomerId(cid)
                        setCustomerName(opt?.label ?? '')
-                       const c = cid && customersData?.items?.find((c) => c.id === cid)
+                       const c = cid ? customersData?.items?.find((c) => c.id === cid) : undefined
                        setCustomerPriceTier(c?.priceTier)
                      }}
                      options={customerOptions}

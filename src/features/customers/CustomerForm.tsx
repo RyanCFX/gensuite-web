@@ -359,7 +359,7 @@ export default function CustomerForm() {
                 <SearchSelect
                   id="customerGroup"
                   value={customerGroup ?? ''}
-                  onChange={(v, opt) => {
+                  onChange={(_, opt) => {
                     setValue('customerGroup', opt?.value ?? '')
                     setGroupLabel(opt?.label ?? '')
                   }}
@@ -376,7 +376,7 @@ export default function CustomerForm() {
                     <span className="badge" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>
                       Nivel {selectedGroup.priceTier}
                     </span>
-                    <HelpCircle size={13} style={{ color: 'var(--text-tertiary)' }} title="El nivel de precio se hereda del grupo de clientes" />
+                    <HelpCircle size={13} style={{ color: 'var(--text-tertiary)' }} />
                   </div>
                 </div>
               )}

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { listBundles, getBundle, createBundle, updateBundle, deleteBundle } from '@/shared/api/bundles'
-import type { Bundle, BundleComponent } from '@/shared/api/types'
+import type { Bundle } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
@@ -256,7 +256,7 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
   }
 
   const duplicateItemCodes = new Set(
-    components.map((c) => c.itemCode).filter((code, i, arr) => code && arr.indexOf(code) !== arr.lastIndexOf(code)),
+    components.filter((c) => components.filter((x) => x.itemCode === c.itemCode).length > 1).map((c) => c.itemCode),
   )
 
   function handleSubmit(e: React.FormEvent) {

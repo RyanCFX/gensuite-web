@@ -206,7 +206,7 @@ export default function SupplierForm() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<FormValues>) => updateSupplier(id!, data),
+    mutationFn: (data: Partial<FormValues>) => updateSupplier(id!, data as Partial<import('@/shared/api/types').Supplier>),
     onSuccess: () => {
       toast.success('Proveedor actualizado correctamente')
       queryClient.invalidateQueries({ queryKey: ['suppliers'] })

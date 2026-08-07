@@ -50,7 +50,6 @@ export default function CostosImportacionPage() {
     queryKey: ['costos-importacion', { status, offset }],
     queryFn: () =>
       listCostosImportacion({
-        status: status !== 'all' ? status : undefined,
         limit: PAGE_SIZE,
         offset,
       }),

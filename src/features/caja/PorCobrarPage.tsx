@@ -164,7 +164,6 @@ const [directoMop, setDirectoMop] = useState('')
   // ─── Modal handlers ────────────────────────────────────────────────
 function openModal(invoice: PendienteCobroItem) {
      setSelectedInvoice(invoice)
-     setClienteOcasionalRnc(invoice.clienteOcasionalRnc ?? '')
      if (invoice.esClienteOcasional) {
        setCondicionFiscal('CREDITO_FISCAL')
      } else if (customerData?.rnc) {

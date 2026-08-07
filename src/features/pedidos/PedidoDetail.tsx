@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
 import { displayId, formatDate, formatDOP } from '@/lib/formatters'
 import type { ApiError } from '@/shared/api/types'
-import { ArrowLeft, Download, Send, Trash2, GitBranch, Loader2, FileText, History, Copy, PackageOpen, AlertTriangle, Ban } from 'lucide-react'
+import { ArrowLeft, Download, Send, Trash2, GitBranch, FileText, History, Copy, PackageOpen, AlertTriangle, Ban } from 'lucide-react'
 import { toast } from 'sonner'
 
 const STATUS_BADGE: Record<string, string> = {
@@ -158,8 +158,9 @@ export default function PedidoDetail() {
           </div>
         }
         description={`Cliente: ${pedido.customerName}`}
-        backTo="/pedidos"
-        backLabel="Pedidos"
+        action={
+          <a className="page-back-link" onClick={() => navigate('/pedidos')}><ArrowLeft size={14} /> Pedidos</a>
+        }
       />
 
       {stockWarning && (

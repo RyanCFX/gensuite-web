@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
+import type { Resolver } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -225,7 +226,7 @@ export default function PricingRulesPage() {
     watch,
     formState: { errors, isSubmitting },
   } = useForm<PricingRuleFormValues>({
-    resolver: zodResolver(pricingRuleSchema),
+    resolver: zodResolver(pricingRuleSchema) as Resolver<PricingRuleFormValues>,
     defaultValues: {
       title: '',
       applyOn: 'Item Code',
@@ -246,7 +247,7 @@ export default function PricingRulesPage() {
   const itemOptions = useMemo(() => {
     return (itemsData?.items ?? []).map((item) => ({
       value: item.id,
-      label: `${item.itemCode ?? item.id} — ${item.itemName}`,
+      label: `${item.id} — ${item.itemName}`,
       sublabel: item.type === 'service' ? 'Servicio' : 'Producto',
     }))
   }, [itemsData])

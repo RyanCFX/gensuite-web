@@ -60,6 +60,10 @@ interface LineItem {
   /** Descuento manual que escribe el vendedor (encima del automático) */
   manualDiscountPct: number
   allowsDiscount?: boolean
+  /** Almacén seleccionado para la línea */
+  warehouse: string
+  /** Precios por tier del catálogo, para recalcular al cambiar el pricing tier */
+  _prices?: ItemPrices
   _stockByWarehouse?: Record<string, number>
   stockError?: string
   /** Ubicación/rack específico dentro del almacén elegido, si el artículo tiene alguna asignada ahí */
@@ -728,12 +732,12 @@ const itemsDto = items.map((i) => ({
        department: department || undefined,
        ncfType,
        items: itemsDto,
-       notes: notes || undefined,
-       taxesTemplate: taxesTemplate || undefined,
-     }
+        notes: notes || undefined,
+        taxesTemplate: taxesTemplate || undefined,
+      }
 
-     createMutation.mutate(baseDto)
-  }
+     createMutation.mutate(baseDto as CreateInvoiceDto)
+   }
 
   const semaforoStatusClass: Record<string, string> = {
     verde: 'semaforo-verde',
@@ -944,7 +948,7 @@ const itemsDto = items.map((i) => ({
                   <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
                   <th style={{ textAlign: 'right', width: 72 }}>
                   Dto. %
-                  <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} title="El descuento puede incluir una parte automática (Pricing Rule) y una parte manual del vendedor. Ambas se suman contra el tope máximo." />
+                  <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} />
                 </th>
                   <th style={{ textAlign: 'right', width: 80 }}>Impuesto</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
@@ -1234,7 +1238,7 @@ onAuthorized={(userId) => {
              notes: notes || undefined,
              taxesTemplate: taxesTemplate || undefined,
            }
-           createMutation.mutate(baseDto)
+createMutation.mutate(baseDto as CreateInvoiceDto)
          }}
         title="Autorización requerida"
         description="El descuento supera tu límite. Ingresa el PIN de un administrador."

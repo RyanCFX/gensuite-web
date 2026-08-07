@@ -2408,9 +2408,9 @@ export interface CuentasEmpresa {
   depreciationExpenseAccount?: string | null;
   disposalAccount?: string | null;
   defaultDiscountAccount?: string | null;
-  costCenter?: ItemProps;
-  roundOffCostCenter?: ItemProps;
-  depreciationCostCenter?: ItemProps;
+  costCenter?: ItemProps | null;
+  roundOffCostCenter?: ItemProps | null;
+  depreciationCostCenter?: ItemProps | null;
   enablePerpetualInventory?: boolean;
 }
 
@@ -2605,7 +2605,9 @@ export interface StockSettings {
   defaultWarehouse?: string;
   allowNegativeStock?: boolean;
   enableStockReservation?: boolean;
-  /** true → capturar Serial No / Batch No directamente en la fila del documento (sin diálogo emergente). */
+  /** Interruptor maestro de ERPNext — debe estar en true para poder comprar/vender artículos con Serial/Batch No. */
+  enableSerialAndBatchNoForItem?: boolean;
+  /** true → capturar Serial No / Batch No directamente en la fila del documento (sin diálogo emergente). Solo tiene efecto si enableSerialAndBatchNoForItem es true. */
   useSerialBatchFields?: boolean;
   [key: string]: unknown;
 }

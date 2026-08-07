@@ -50,7 +50,8 @@ export default function EmpresaConfig() {
     e.preventDefault()
     const payload: Partial<Empresa> = {}
     for (const key of ['rnc', 'regimenFiscal', 'actividadEconomica', 'representanteLegal', 'cedulaRepresentante', 'logoUrl', 'telefono', 'email', 'website', 'direccion', 'itemCodeMode', 'defaultWarehouse', 'defaultPriceTipo', 'transitWarehouse'] as const) {
-      if (form[key] !== undefined) payload[key] = form[key]
+      const value = form[key]
+      if (value !== undefined) (payload as Record<string, unknown>)[key] = value
     }
     saveMutation.mutate(payload)
   }
@@ -173,9 +174,9 @@ export default function EmpresaConfig() {
       depreciationExpenseAccount: depreciationExpenseAccount || null,
       disposalAccount: disposalAccount || null,
       defaultDiscountAccount: defaultDiscountAccount || null,
-      costCenter: costCenter?.id || undefined,
-      roundOffCostCenter: roundOffCostCenter?.id || undefined,
-      depreciationCostCenter: depreciationCostCenter?.id || null,
+      costCenter: costCenter || undefined,
+      roundOffCostCenter: roundOffCostCenter || undefined,
+      depreciationCostCenter: depreciationCostCenter || null,
       enablePerpetualInventory,
     })
   }

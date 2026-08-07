@@ -174,9 +174,11 @@ function InventarioTab() {
     queryFn: getStockSettings,
   })
 
-  const { register, handleSubmit, reset } = useForm<StockSettings>({
+  const { register, handleSubmit, reset, watch } = useForm<StockSettings>({
     defaultValues: {},
   })
+
+  const enableSerialAndBatchNoForItem = watch('enableSerialAndBatchNoForItem')
 
   useEffect(() => {
     if (data) reset(data)
@@ -248,12 +250,33 @@ function InventarioTab() {
 
           <div className="ff-wrap">
             <label className="ff-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" className="ff-check" {...register('useSerialBatchFields')} />
+              <input type="checkbox" className="ff-check" {...register('enableSerialAndBatchNoForItem')} />
+              Activar Serie / Lote para Artículos
+            </label>
+            <p className="ff-hint">
+              Interruptor maestro — actívalo para poder vender/comprar artículos con número de serie o lote. Es un
+              requisito para usar el campo de abajo (Usar Campos de Serie/Lote). Si está apagado, cualquier compra o venta
+              de un artículo con serie/lote será rechazada por el servidor.
+            </p>
+          </div>
+
+          <div className="ff-wrap">
+            <label
+              className="ff-label"
+              style={{ display: 'flex', alignItems: 'center', gap: 8, opacity: enableSerialAndBatchNoForItem ? 1 : 0.5 }}
+            >
+              <input
+                type="checkbox"
+                className="ff-check"
+                disabled={!enableSerialAndBatchNoForItem}
+                {...register('useSerialBatchFields')}
+              />
               Usar campos de Serie/Lote en los documentos
             </label>
             <p className="ff-hint">
               Cuando está activo, los documentos (facturas, pedidos, compras, transferencias) muestran los campos de Número de
-              Serie y Lote directamente en la fila del artículo, en lugar del diálogo emergente de captura.
+              Serie y Lote directamente en la fila del artículo, en lugar del diálogo emergente de captura. Requiere que
+              "Activar Serie / Lote para Artículos" esté encendido — de lo contrario no tiene ningún efecto.
             </p>
           </div>
         </div>

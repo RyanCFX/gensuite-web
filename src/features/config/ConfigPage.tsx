@@ -15,7 +15,6 @@ import {
   listImpuestosVentas, createImpuestoVentas, updateImpuestoVentas, deleteImpuestoVentas,
   listImpuestosCompras, createImpuestoCompras, updateImpuestoCompras, deleteImpuestoCompras,
   listItemTaxTemplates, createItemTaxTemplate, updateItemTaxTemplate, deleteItemTaxTemplate,
-  listGruposProveedores, createGrupoProveedor,
   getFacturacionConfig, updateFacturacionConfig,
   listDenominaciones, createDenominacion, updateDenominacion,
   habilitarPos,
