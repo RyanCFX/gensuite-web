@@ -5,7 +5,7 @@ import { registerPago } from '@/shared/api/cobros'
 import { listInvoices } from '@/shared/api/invoices'
 import { listPedidos } from '@/shared/api/pedidos'
 import { listCustomers } from '@/shared/api/customers'
-import { listMetodosPago, getLayawayConfig } from '@/shared/api/config'
+import { listMetodosPago, getLayawayConfig, getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { CheckCircle2, AlertTriangle, Wallet, PackageOpen } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -55,6 +55,13 @@ export default function PagoPage() {
   const [branchSearch, setBranchSearch] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
 
   const currentUserEmail = getUser()?.email
   const { data: currentUser } = useQuery({
@@ -117,7 +124,12 @@ export default function PagoPage() {
   const { data: invoicesData, isLoading: invoicesLoading } = useQuery({
     queryKey: ['invoices-pending', customerId],
     queryFn: () =>
-      listInvoices({ customer: customerId, status: 'submitted', paymentStatus: 'unpaid', limit: 50 }),
+      listInvoices({
+        customer: customerId,
+        status: 'submitted',
+        paymentStatus: ['unpaid', 'partly_paid'],
+        limit: 50,
+      }),
     enabled: !!customerId && !advancePayment,
     staleTime: 30_000,
   })
@@ -194,6 +206,11 @@ export default function PagoPage() {
     queryKey: ['metodos-pago'],
     queryFn: listMetodosPago,
   })
+  const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState('')
+  const modeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
+    .filter((m) => !m.disabled)
+    .filter((m) => !modeOfPaymentSearch || m.name.toLowerCase().includes(modeOfPaymentSearch.toLowerCase()))
+    .map((m) => ({ value: m.name, label: m.name }))
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -283,7 +300,7 @@ export default function PagoPage() {
       remarks: remarks || undefined,
       referencias: allReferencias.length > 0 ? allReferencias : undefined,
       branch: branch || undefined,
-      department: department || undefined,
+      department: usaDepartamentos ? (department || undefined) : undefined,
     })
   }
 
@@ -544,10 +561,12 @@ export default function PagoPage() {
               </div>
 
               {/* Departamento */}
-              <div className="ff-wrap">
-                <label className="ff-label" htmlFor="department">Departamento</label>
-                <DepartmentSelect id="department" value={department} onChange={setDepartment} />
-              </div>
+              {usaDepartamentos && (
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="department">Departamento</label>
+                  <DepartmentSelect id="department" value={department} onChange={setDepartment} />
+                </div>
+              )}
 
               {/* Cobro anticipado / sin aplicar a factura */}
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
@@ -593,17 +612,14 @@ export default function PagoPage() {
               {/* Método de pago */}
               <div className="ff-wrap">
                 <label className="ff-label">Método de Pago <span className="ff-required">*</span></label>
-                <select
-                  className="ff-select"
+                <SearchSelect
                   value={modeOfPayment}
-                  onChange={(e) => setModeOfPayment(e.target.value)}
-                  required
-                >
-                  <option value="">Seleccionar método…</option>
-                  {metodos?.filter((m) => !m.disabled).map((m) => (
-                    <option key={m.name} value={m.name}>{m.name}</option>
-                  ))}
-                </select>
+                  onChange={setModeOfPayment}
+                  options={modeOfPaymentOptions}
+                  onSearch={setModeOfPaymentSearch}
+                  selectedLabel={modeOfPayment}
+                  placeholder="Seleccionar método…"
+                />
               </div>
 
               {/* Referencia */}

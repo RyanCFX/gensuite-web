@@ -7,6 +7,7 @@ import {
   cancelInvoice,
   amendInvoice,
   downloadInvoicePdf,
+  getInvoicePdfBlobUrl,
   aplicarSaldoFavor,
   removerSaldoFavor,
   asignarTrackingFactura,
@@ -23,7 +24,7 @@ import { createDevolucion } from "@/shared/api/devoluciones";
 import { getItem } from "@/shared/api/catalog";
 import { getBundle } from "@/shared/api/bundles";
 import { getTurnoActual, abrirTurno } from "@/shared/api/pos";
-import type { ApiError, SubmitInvoiceDto, ComponentTracking } from "@/shared/api/types";
+import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion } from "@/shared/api/types";
 import { MOTIVOS_ANULACION_DGII } from "@/lib/constants";
 import { PaymentLinesEditor } from "@/components/shared/PaymentLinesEditor";
 import {
@@ -36,7 +37,6 @@ import {
   Send,
   XCircle,
   FileEdit,
-  Download,
   AlertTriangle,
   Ban,
   Wallet,
@@ -45,6 +45,7 @@ import {
   Loader2,
   Clock,
   BookOpen,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -55,7 +56,10 @@ import {
 } from "@/lib/formatters";
 
 import { DocumentHistoryCard } from "@/components/shared/DocumentHistoryCard";
+import { PdfFormatButton } from "@/components/shared/PdfFormatButton";
+import { PdfPreviewModal } from "@/components/shared/PdfPreviewModal";
 import { SearchSelect } from "@/shared/ui/SearchSelect";
+import { Select, SelectItem } from "@/components/ui/select";
 import type { SearchSelectOption } from "@/shared/ui/SearchSelect";
 import { ComponentTrackingModal } from "@/components/shared/ComponentTrackingModal";
 import type { TrackedComponent } from "@/components/shared/ComponentTrackingModal";
@@ -154,7 +158,8 @@ export default function InvoiceDetail() {
     staleTime: 5 * 60_000,
   });
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false;
-  const formatoImpresionDefault = facturacionConfig?.formatoImpresionDefault ?? "pdf";
+  const formatoImpresionDefault = facturacionConfig?.formatoImpresionDefault ?? "a4";
+  const formatosPermitidos = facturacionConfig?.formatosPermitidos;
 
   const { data: turno } = useQuery({
     queryKey: ['turno-actual'],
@@ -690,8 +695,15 @@ export default function InvoiceDetail() {
     amendMutation.isPending;
 
   const downloadMutation = useMutation({
-    mutationFn: () => downloadInvoicePdf(id!, `factura-${id}.pdf`, formatoImpresionDefault),
-    onError: () => toast.error("No se pudo descargar el PDF"),
+    mutationFn: (formato?: FormatoImpresion) => downloadInvoicePdf(id!, `factura-${id}.pdf`, formato ?? formatoImpresionDefault),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? "No se pudo descargar el PDF"),
+  });
+
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewMutation = useMutation({
+    mutationFn: (formato?: FormatoImpresion) => getInvoicePdfBlobUrl(id!, formato ?? formatoImpresionDefault),
+    onSuccess: (url) => setPreviewUrl(url),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? "No se pudo generar la vista previa del PDF"),
   });
 
   if (isLoading) {
@@ -971,21 +983,19 @@ export default function InvoiceDetail() {
         )}
         {invoice.status === "submitted" && (
           <>
-            <button
-              className="btn btn-secondary btn-size-sm"
-              onClick={() => downloadMutation.mutate()}
-              disabled={downloadMutation.isPending}
-            >
-              {downloadMutation.isPending ? (
-                <>
-                  <span className="spinner" /> Descargando…
-                </>
-              ) : (
-                <>
-                  <Download size={14} /> Descargar PDF
-                </>
-              )}
-            </button>
+            <PdfFormatButton
+              onSelect={(formato) => previewMutation.mutate(formato)}
+              loading={previewMutation.isPending}
+              label="Ver PDF"
+              loadingLabel="Generando…"
+              icon={<Eye size={14} />}
+              formatosPermitidos={formatosPermitidos}
+            />
+            <PdfFormatButton
+              onSelect={(formato) => downloadMutation.mutate(formato)}
+              loading={downloadMutation.isPending}
+              formatosPermitidos={formatosPermitidos}
+            />
             <button
               className="btn btn-secondary btn-size-sm"
               onClick={openReturnModal}
@@ -2095,19 +2105,17 @@ export default function InvoiceDetail() {
                 >
                   Motivo de anulación (DGII)
                 </label>
-                <select
-                  id="cancelMotivo"
-                  className="ff-select"
+                <Select
                   value={cancelMotivo}
-                  onChange={(e) => setCancelMotivo(e.target.value)}
+                  onValueChange={setCancelMotivo}
+                  placeholder="Seleccionar motivo"
                 >
-                  <option value="">Seleccionar motivo</option>
                   {MOTIVOS_ANULACION_DGII.map((m) => (
-                    <option key={m.value} value={m.value}>
+                    <SelectItem key={m.value} value={m.value}>
                       {m.label}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
+                </Select>
                 <p className="ff-hint">
                   {cancelMotivoRequired
                     ? "Obligatorio: esta factura tiene NCF asignado (Formato 608 DGII)."
@@ -2396,6 +2404,7 @@ export default function InvoiceDetail() {
           </div>
         </div>
       )}
+      <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
     </div>
   );
 }

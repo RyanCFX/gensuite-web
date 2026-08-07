@@ -5,6 +5,9 @@ import { Mail, Plus, Trash2, AlertTriangle, Clock, CheckCircle2, XCircle, AlertC
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { Select, SelectItem } from '@/components/ui/select'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import {
   listNotificacionTipos,
   getNotificacionTipo,
@@ -667,6 +670,10 @@ function HistorialTab() {
     queryKey: ['notificaciones', 'tipos'],
     queryFn: listNotificacionTipos,
   })
+  const [filtroTipoSearch, setFiltroTipoSearch] = useState('')
+  const filtroTipoOptions: SearchSelectOption[] = (tiposData ?? [])
+    .filter((t) => !filtroTipoSearch || t.nombre.toLowerCase().includes(filtroTipoSearch.toLowerCase()))
+    .map((t) => ({ value: t.codigo, label: t.nombre }))
 
   // Fetch resumen
   const { data: resumen } = useQuery({
@@ -703,26 +710,22 @@ function HistorialTab() {
       {/* ── Filtros ─────────────────────────────────────────────────────── */}
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <select
-            className="filter-select"
-            value={filtroTipo}
-            onChange={(e) => { setFiltroTipo(e.target.value); resetPage() }}
-          >
-            <option value="">Todos los tipos</option>
-            {(tiposData ?? []).map((t) => (
-              <option key={t.codigo} value={t.codigo}>{t.nombre}</option>
-            ))}
-          </select>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={filtroTipo}
+              onChange={(val) => { setFiltroTipo(val); resetPage() }}
+              options={filtroTipoOptions}
+              onSearch={setFiltroTipoSearch}
+              selectedLabel={tiposData?.find((t) => t.codigo === filtroTipo)?.nombre ?? ''}
+              placeholder="Todos los tipos"
+            />
+          </div>
 
-          <select
-            className="filter-select"
-            value={filtroEstado}
-            onChange={(e) => { setFiltroEstado(e.target.value); resetPage() }}
-          >
+          <Select value={filtroEstado} onValueChange={(val) => { setFiltroEstado(val); resetPage() }}>
             {ESTADOS.map((e) => (
-              <option key={e} value={e}>{e === 'Todos' ? 'Todos los estados' : e}</option>
+              <SelectItem key={e} value={e}>{e === 'Todos' ? 'Todos los estados' : e}</SelectItem>
             ))}
-          </select>
+          </Select>
 
           <input
             type="date"

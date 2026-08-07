@@ -17,6 +17,8 @@ import { ChevronDown, Plus } from 'lucide-react'
 import { listUOMs } from '@/shared/api/config'
 import { getItem } from '@/shared/api/catalog'
 import { useFloatingDropdown, FloatingPortal } from '@/lib/useFloatingPortal'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 interface UomSelectProps {
   value: string
@@ -32,17 +34,18 @@ interface UomSelectProps {
 
 // ─── Modo simple: select nativo (usado en ItemForm) ───────────────────────────
 
-function SimpleUomSelect({ value, onChange, className = 'ff-select', disabled, error }: Omit<UomSelectProps, 'itemCode'>) {
+function SimpleUomSelect({ value, onChange, disabled, error }: Omit<UomSelectProps, 'itemCode' | 'className'>) {
   const { data: uoms, isLoading } = useQuery({
     queryKey: ['uoms'],
     queryFn: listUOMs,
     staleTime: 5 * 60_000,
   })
+  const [search, setSearch] = useState('')
 
   if (isLoading || !uoms?.length) {
     return (
       <input
-        className={className.replace('ff-select', 'ff-input')}
+        className="ff-input"
         value={value}
         onChange={(e) => onChange(e.target.value, 1)}
         placeholder="Unidad"
@@ -51,18 +54,21 @@ function SimpleUomSelect({ value, onChange, className = 'ff-select', disabled, e
     )
   }
 
+  const options: SearchSelectOption[] = uoms
+    .filter((u) => !search || u.name.toLowerCase().includes(search.toLowerCase()))
+    .map((u) => ({ value: u.name, label: u.name }))
+
   return (
-    <select
-      className={`${className}${error ? ' ff-input-error' : ''}`}
+    <SearchSelect
       value={value}
-      onChange={(e) => onChange(e.target.value, 1)}
+      onChange={(val) => onChange(val, 1)}
+      options={options}
+      onSearch={setSearch}
+      selectedLabel={value}
+      placeholder="—"
       disabled={disabled}
-    >
-      <option value="">—</option>
-      {uoms.map((u) => (
-        <option key={u.name} value={u.name}>{u.name}</option>
-      ))}
-    </select>
+      error={error}
+    />
   )
 }
 

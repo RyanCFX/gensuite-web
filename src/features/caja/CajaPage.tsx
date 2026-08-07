@@ -8,6 +8,8 @@ import { getTurnoActual } from '@/shared/api/pos'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useDebounce } from '@/lib/useDebounce'
 import { PaymentLinesEditor } from '@/components/shared/PaymentLinesEditor'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { TurnoCajaIndicator } from '@/components/shared/TurnoCajaIndicator'
 import {
   EMPTY_PAYMENT_LINES_VALUE,
@@ -52,6 +54,10 @@ export default function CajaPage() {
    const flujoCobro = facturacion?.flujoCobro ?? 'directo'
    const metodosActivos = (metodos ?? []).filter((m) => !m.disabled)
    const pendientes = data?.items ?? []
+   const [directoMopSearch, setDirectoMopSearch] = useState('')
+   const directoMopOptions: SearchSelectOption[] = metodosActivos
+     .filter((m) => !directoMopSearch || m.name.toLowerCase().includes(directoMopSearch.toLowerCase()))
+     .map((m) => ({ value: m.name, label: m.name }))
    const totalPages = data?.meta ? Math.ceil((data.meta.total ?? 0) / PAGE_SIZE) : 1
 
    const { data: turno } = useQuery({
@@ -363,16 +369,14 @@ function validateAndSubmit() {
                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                    <div className="ff-wrap">
                      <label className="ff-label ff-required">Método de pago</label>
-                     <select
-                       className="ff-input"
+                     <SearchSelect
                        value={directoMop}
-                       onChange={(e) => setDirectoMop(e.target.value)}
-                     >
-                       <option value="">Seleccionar…</option>
-                       {metodosActivos.map((m) => (
-                         <option key={m.name} value={m.name}>{m.name}</option>
-                       ))}
-                     </select>
+                       onChange={setDirectoMop}
+                       options={directoMopOptions}
+                       onSearch={setDirectoMopSearch}
+                       selectedLabel={directoMop}
+                       placeholder="Seleccionar…"
+                     />
                    </div>
                    <div className="ff-wrap">
                      <label className="ff-label ff-required">Monto a cobrar</label>

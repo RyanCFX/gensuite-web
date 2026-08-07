@@ -9,6 +9,8 @@ import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const PAGE_SIZE = 20
 
@@ -68,6 +70,16 @@ export default function DevolucionesPage() {
     queryFn: () => listDepartamentos({ limit: 100 }),
   })
 
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchOptions: SearchSelectOption[] = (sucursales?.items ?? [])
+    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((s) => ({ value: s.id, label: s.name }))
+
+  const [departmentSearch, setDepartmentSearch] = useState('')
+  const departmentOptions: SearchSelectOption[] = (departamentos?.items ?? [])
+    .filter((d) => !departmentSearch || d.name.toLowerCase().includes(departmentSearch.toLowerCase()))
+    .map((d) => ({ value: d.id, label: d.name }))
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ['devoluciones', { search: debouncedSearch, offset, orderBy, branch, department }],
     queryFn: () =>
@@ -108,18 +120,26 @@ export default function DevolucionesPage() {
               onChange={handleSearchChange}
             />
           </div>
-          <select className="filter-select" value={branch} onChange={(e) => { setBranch(e.target.value); setPage(1) }}>
-            <option value="">Todas las sucursales</option>
-            {sucursales?.items.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-          <select className="filter-select" value={department} onChange={(e) => { setDepartment(e.target.value); setPage(1) }}>
-            <option value="">Todos los departamentos</option>
-            {departamentos?.items.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={branch}
+              onChange={(val) => { setBranch(val); setPage(1) }}
+              options={branchOptions}
+              onSearch={setBranchSearch}
+              selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
+              placeholder="Todas las sucursales"
+            />
+          </div>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={department}
+              onChange={(val) => { setDepartment(val); setPage(1) }}
+              options={departmentOptions}
+              onSearch={setDepartmentSearch}
+              selectedLabel={departamentos?.items.find((d) => d.id === department)?.name ?? ''}
+              placeholder="Todos los departamentos"
+            />
+          </div>
         </div>
       </div>
 

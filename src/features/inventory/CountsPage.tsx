@@ -10,6 +10,8 @@ import { formatDate, formatNumber } from '@/lib/formatters'
 import type { InventoryCount } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Plus, ClipboardList, Send, AlertTriangle } from 'lucide-react'
 
 const STATUS_BADGE: Record<string, string> = {
@@ -65,6 +67,16 @@ export default function CountsPage() {
     })
     return map
   }, [almacenes])
+
+  const [warehouseSearch, setWarehouseSearch] = useState('')
+  const warehouseOptions: SearchSelectOption[] = (warehouses ?? [])
+    .filter((w) => !warehouseSearch || w.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
+    .map((w) => ({ value: w.name, label: w.name }))
+
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchOptions: SearchSelectOption[] = (sucursales?.items ?? [])
+    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((s) => ({ value: s.id, label: s.name }))
 
   const usedBranches = useMemo(() => {
     const set = new Set<string>()
@@ -263,32 +275,30 @@ export default function CountsPage() {
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
                 <div className="ff-wrap">
                   <label className="ff-label">Almacén</label>
-                  <select
-                    className="ff-select"
-                    value={selectedWarehouse}
-                    onChange={(e) => handleWarehouseSelect(e.target.value)}
-                    style={{ maxWidth: 260 }}
-                  >
-                    <option value="">Seleccionar almacén</option>
-                    {warehouses?.map((w) => (
-                      <option key={w.name} value={w.name}>{w.name}</option>
-                    ))}
-                  </select>
+                  <div style={{ maxWidth: 260 }}>
+                    <SearchSelect
+                      value={selectedWarehouse}
+                      onChange={handleWarehouseSelect}
+                      options={warehouseOptions}
+                      onSearch={setWarehouseSearch}
+                      selectedLabel={selectedWarehouse}
+                      placeholder="Seleccionar almacén"
+                    />
+                  </div>
                 </div>
 
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal (opcional)</label>
-                  <select
-                    className="ff-select"
-                    value={branch}
-                    onChange={(e) => setBranch(e.target.value)}
-                    style={{ maxWidth: 260 }}
-                  >
-                    <option value="">Auto (según almacenes)</option>
-                    {sucursales?.items.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
+                  <div style={{ maxWidth: 260 }}>
+                    <SearchSelect
+                      value={branch}
+                      onChange={setBranch}
+                      options={branchOptions}
+                      onSearch={setBranchSearch}
+                      selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
+                      placeholder="Auto (según almacenes)"
+                    />
+                  </div>
                 </div>
 
                 <div className="ff-wrap">

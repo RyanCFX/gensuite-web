@@ -5,7 +5,7 @@ import { createInvoice } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
 import { listItems, getDefaultPriceTier, getItem } from '@/shared/api/catalog'
-import { listImpuestosVentas, listAlmacenes, getCatalogosFiscales, getStockSettings } from '@/shared/api/config'
+import { listImpuestosVentas, listAlmacenes, getCatalogosFiscales, getStockSettings, getFacturacionConfig } from '@/shared/api/config'
 import { getItemUbicaciones } from '@/shared/api/ubicaciones'
 import type { CreateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking } from '@/shared/api/types'
 import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingModal'
@@ -150,25 +150,34 @@ function LineUbicacionCell({
     enabled: !!itemCode && !!warehouse,
   })
   const ubicaciones = data?.items ?? []
+  const [search, setSearch] = useState('')
 
   if (data?.note || ubicaciones.length === 0) {
     return <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
   }
 
+  function ubicacionLabel(u: (typeof ubicaciones)[number]): string {
+    return u.zonaName ? `${u.zonaName} / ${u.ubicacionName ?? u.ubicacionId}` : u.ubicacionName ?? u.ubicacionId
+  }
+
+  const options: SearchSelectOption[] = ubicaciones
+    .filter((u) => !search || ubicacionLabel(u).toLowerCase().includes(search.toLowerCase()))
+    .map((u) => ({ value: u.ubicacionId, label: ubicacionLabel(u) }))
+
   return (
     <>
-      <select
-        className={`ff-select${error ? ' items-input-error' : ''}`}
+      <SearchSelect
         value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="">Sin especificar</option>
-        {ubicaciones.map((u) => (
-          <option key={u.id} value={u.ubicacionId}>
-            {u.zonaName ? `${u.zonaName} / ${u.ubicacionName ?? u.ubicacionId}` : u.ubicacionName ?? u.ubicacionId}
-          </option>
-        ))}
-      </select>
+        onChange={onChange}
+        options={options}
+        onSearch={setSearch}
+        selectedLabel={(() => {
+          const u = ubicaciones.find((u) => u.ubicacionId === value)
+          return u ? ubicacionLabel(u) : ''
+        })()}
+        placeholder="Sin especificar"
+        error={!!error}
+      />
       {error && (
         <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'normal', maxWidth: 160 }}>
           {error}
@@ -208,6 +217,14 @@ export default function InvoiceForm() {
   const [taxesTemplate, setTaxesTemplate] = useState('')
   const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
+  const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
 
   // ── Stock settings: define si los seriales/lotes se capturan inline en la fila (useSerialBatchFields)
   //    o vía diálogo emergente (ComponentTrackingModal). El catálogo es fijo, se cachea 1h.
@@ -729,11 +746,11 @@ const itemsDto = items.map((i) => ({
        postingDate,
        dueDate,
        branch: branch || undefined,
-       department: department || undefined,
+       department: usaDepartamentos ? (department || undefined) : undefined,
        ncfType,
        items: itemsDto,
         notes: notes || undefined,
-        taxesTemplate: taxesTemplate || undefined,
+        taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
       }
 
      createMutation.mutate(baseDto as CreateInvoiceDto)
@@ -904,25 +921,29 @@ const itemsDto = items.map((i) => ({
                 {branchError && <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal para continuar</p>}
               </div>
 
-              <div className="ff-wrap">
-                <label className="ff-label" htmlFor="department">Departamento</label>
-                <DepartmentSelect id="department" value={department} onChange={setDepartment} />
-              </div>
+              {usaDepartamentos && (
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="department">Departamento</label>
+                  <DepartmentSelect id="department" value={department} onChange={setDepartment} />
+                </div>
+              )}
 
-              <div className="ff-wrap">
-                <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
-                <SearchSelect
-                  id="taxesTemplate"
-                  value={taxesTemplate}
-                  onChange={(val) => setTaxesTemplate(val)}
-                  options={taxesTemplateOptions}
-                  onSearch={setTaxesTemplateSearch}
-                  selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
-                  placeholder="Usar el default de la compañía"
-                  className="ff-select"
-                />
-                <p className="ff-hint">Impuesto aplicado al total de la factura (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
-              </div>
+              {usaImpuestoDocumento && (
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
+                  <SearchSelect
+                    id="taxesTemplate"
+                    value={taxesTemplate}
+                    onChange={(val) => setTaxesTemplate(val)}
+                    options={taxesTemplateOptions}
+                    onSearch={setTaxesTemplateSearch}
+                    selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
+                    placeholder="Usar el default de la compañía"
+                    className="ff-select"
+                  />
+                  <p className="ff-hint">Impuesto aplicado al total de la factura (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
+                </div>
+              )}
             </div>
 
             {semaforo?.semaforo === 'rojo' && (
@@ -1233,10 +1254,10 @@ onAuthorized={(userId) => {
              ...(esClienteOcasional
                ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalRnc: clienteOcasionalRnc || undefined }
                : { customer: customerId }),
-             postingDate, dueDate, branch: branch || undefined, department: department || undefined, ncfType,
+             postingDate, dueDate, branch: branch || undefined, department: usaDepartamentos ? (department || undefined) : undefined, ncfType,
              items: itemsDto,
              notes: notes || undefined,
-             taxesTemplate: taxesTemplate || undefined,
+             taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
            }
 createMutation.mutate(baseDto as CreateInvoiceDto)
          }}

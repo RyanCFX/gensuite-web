@@ -17,6 +17,7 @@ import {
 import type { PricingRule, CreatePricingRuleDto, UpdatePricingRuleDto } from '@/shared/api/types'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { Select, SelectItem } from '@/components/ui/select'
 import { Plus, Pencil, Power, ChevronLeft, ChevronRight, Search, Info } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useDebounce } from '@/lib/useDebounce'
@@ -395,17 +396,23 @@ export default function PricingRulesPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <select className="filter-select" value={applyOnFilter} onChange={(e) => { setApplyOnFilter(e.target.value === '_all' ? '' : e.target.value); setPage(1) }}>
-            <option value="_all">Todos los tipos de aplicación</option>
+          <Select
+            value={applyOnFilter || '_all'}
+            onValueChange={(val) => { setApplyOnFilter(val === '_all' ? '' : val); setPage(1) }}
+          >
+            <SelectItem value="_all">Todos los tipos de aplicación</SelectItem>
             {applyOnOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
             ))}
-          </select>
-          <select className="filter-select" value={disabledFilter} onChange={(e) => { setDisabledFilter(e.target.value === '_all' ? '' : e.target.value); setPage(1) }}>
-            <option value="_all">Todos los estados</option>
-            <option value="false">Activas</option>
-            <option value="true">Desactivadas</option>
-          </select>
+          </Select>
+          <Select
+            value={disabledFilter || '_all'}
+            onValueChange={(val) => { setDisabledFilter(val === '_all' ? '' : val); setPage(1) }}
+          >
+            <SelectItem value="_all">Todos los estados</SelectItem>
+            <SelectItem value="false">Activas</SelectItem>
+            <SelectItem value="true">Desactivadas</SelectItem>
+          </Select>
           <div className="search-input-wrap">
             <Search size={14} className="search-input-icon" />
             <input className="search-input" placeholder="Buscar por título…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
@@ -528,11 +535,11 @@ export default function PricingRulesPage() {
                     name="applyOn"
                     control={control}
                     render={({ field }) => (
-                      <select id="pr-applyOn" className="ff-select" value={field.value} onChange={field.onChange}>
+                      <Select value={field.value} onValueChange={field.onChange}>
                         {applyOnOptions.map((opt) => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                         ))}
-                      </select>
+                      </Select>
                     )}
                   />
                   {errors.applyOn && <p className="ff-error">{errors.applyOn.message}</p>}
@@ -604,11 +611,11 @@ export default function PricingRulesPage() {
                     name="discountType"
                     control={control}
                     render={({ field }) => (
-                      <select id="pr-discountType" className="ff-select" value={field.value} onChange={field.onChange}>
+                      <Select value={field.value} onValueChange={field.onChange}>
                         {discountTypeOptions.map((opt) => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                         ))}
-                      </select>
+                      </Select>
                     )}
                   />
                   {errors.discountType && <p className="ff-error">{errors.discountType.message}</p>}

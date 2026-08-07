@@ -972,14 +972,18 @@
             "name": "paymentStatus",
             "required": false,
             "in": "query",
+            "description": "Acepta uno o varios valores separados por coma, ej: paid,partly_paid",
             "schema": {
-              "type": "string",
-              "enum": [
-                "paid",
-                "unpaid",
-                "overdue",
-                "partial"
-              ]
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "paid",
+                  "unpaid",
+                  "overdue",
+                  "partly_paid"
+                ]
+              }
             }
           },
           {
@@ -1425,7 +1429,7 @@
     },
     "/api/v1/invoices/{id}/pdf": {
       "get": {
-        "description": "`formato`: \"pdf\" (carta/A4) o \"pos\" (ticket angosto 80mm). Si se omite, usa el default configurable del tenant (Facturacion Config.formato_impresion_default).",
+        "description": "`formato`: \"a4\", \"carta\" o \"a6\" (página completa, mismo diseño, distinto tamaño de papel) o \"pos\" (ticket angosto 80mm). Si se omite, usa el default configurable del tenant (Facturacion Config.formato_impresion_default).",
         "operationId": "InvoicesController_getPdf",
         "parameters": [
           {
@@ -1446,9 +1450,15 @@
           },
           {
             "name": "formato",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
+              "enum": [
+                "a4",
+                "carta",
+                "a6",
+                "pos"
+              ],
               "type": "string"
             }
           }
@@ -8782,6 +8792,58 @@
         ]
       }
     },
+    "/api/v1/compras/{id}/pdf": {
+      "get": {
+        "description": "`formato`: \"a4\", \"carta\" o \"a6\" (página completa) o \"pos\" (ticket angosto 80mm). Si se omite, usa el default configurable del tenant (Facturacion Config.formato_impresion_default).",
+        "operationId": "ComprasController_getPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "formato",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "a4",
+                "carta",
+                "a6",
+                "pos"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Factura de compra en PDF",
+        "tags": [
+          "Compras"
+        ]
+      }
+    },
     "/api/v1/compras/{id}/submit": {
       "post": {
         "operationId": "ComprasController_submit",
@@ -11630,6 +11692,58 @@
           }
         ],
         "summary": "Detalle de un cobro",
+        "tags": [
+          "Cuentas por Cobrar"
+        ]
+      }
+    },
+    "/api/v1/cobros/{id}/pdf": {
+      "get": {
+        "description": "`formato`: \"a4\", \"carta\" o \"a6\" (página completa) o \"pos\" (ticket angosto 80mm). Si se omite, usa el default configurable del tenant (Facturacion Config.formato_impresion_default).",
+        "operationId": "CobrosController_getPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "formato",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "a4",
+                "carta",
+                "a6",
+                "pos"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Recibo de cobro (Payment Entry) en PDF",
         "tags": [
           "Cuentas por Cobrar"
         ]
@@ -18101,11 +18215,13 @@
           "formatoImpresionDefault": {
             "type": "string",
             "enum": [
-              "pdf",
+              "a4",
+              "carta",
+              "a6",
               "pos"
             ],
-            "default": "pdf",
-            "description": "Qué formato se imprime por defecto al cobrar una factura: \"pdf\" (hoja carta/A4, formato actual) o \"pos\" (ticket angosto 80mm para impresora térmica). El frontend puede pedir explícitamente el otro formato vía GET /invoices/:id/pdf?formato=pos|pdf sin importar este default."
+            "default": "a4",
+            "description": "Qué formato se imprime por defecto al cobrar una factura, registrar un cobro o generar una compra: \"a4\"/\"carta\"/\"a6\" (página completa, mismo diseño, distinto tamaño de papel) o \"pos\" (ticket angosto 80mm para impresora térmica). El frontend puede pedir explícitamente otro formato vía GET /invoices|cobros|compras/:id/pdf?formato=... sin importar este default."
           },
           "turnoMaxHoras": {
             "type": "number",
@@ -19661,11 +19777,6 @@
       "UpdateItemDto": {
         "type": "object",
         "properties": {
-          "itemCode": {
-            "type": "string",
-            "example": "PROD-001",
-            "description": "If omitted, ERPNext auto-generates"
-          },
           "itemName": {
             "type": "string",
             "example": "Laptop HP 15"

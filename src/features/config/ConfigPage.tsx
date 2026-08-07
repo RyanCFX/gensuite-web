@@ -22,9 +22,11 @@ import {
 import { listSucursales } from '@/shared/api/sucursales'
 import { listCustomerGroups, createCustomerGroup, deleteCustomerGroup } from '@/shared/api/customers'
 import { listRoles } from '@/shared/api/usuarios'
-import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, TaxLineCategory, TaxLineAddDeduct, CreateTaxTemplateDto, ItemTaxTemplate, ItemTaxLine, CreateItemTaxTemplateDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError } from '@/shared/api/types'
+import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, TaxLineCategory, TaxLineAddDeduct, CreateTaxTemplateDto, ItemTaxTemplate, ItemTaxLine, CreateItemTaxTemplateDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError, UpdateAlmacenDto, FormatoImpresion } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { formatDate } from '@/lib/formatters'
 import { Plus, Trash2, Save, FileWarning, X, Pencil, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -128,7 +130,7 @@ function AlmacenesSection() {
   const [newWarehouseType, setNewWarehouseType] = useState('')
   const [newAccount, setNewAccount] = useState('')
   const [toDelete, setToDelete] = useState<string | null>(null)
-  const [editTarget, setEditTarget] = useState<{ name: string; branch?: string | null; warehouseType?: string } | null>(null)
+  const [editTarget, setEditTarget] = useState<{ id: string; name: string; branch?: string | null; warehouseType?: string } | null>(null)
   const [editWarehouseAccount, setEditWarehouseAccount] = useState('')
   const [editBranch, setEditBranch] = useState('')
   const [editWarehouseType, setEditWarehouseType] = useState('')
@@ -145,6 +147,16 @@ function AlmacenesSection() {
   })
   const sucursales = sucursalesData?.items ?? []
 
+  const [branchFilterSearch, setBranchFilterSearch] = useState('')
+  const [newBranchSearch, setNewBranchSearch] = useState('')
+  const [editBranchSearch, setEditBranchSearch] = useState('')
+  const branchOptionsFor = (search: string): SearchSelectOption[] => {
+    const q = search.toLowerCase()
+    return sucursales
+      .filter((s) => !q || s.name.toLowerCase().includes(q))
+      .map((s) => ({ value: s.name, label: s.name }))
+  }
+
   const createMutation = useMutation({
     mutationFn: () => createAlmacen({ warehouseName: newName, branch: newBranch || undefined, warehouseType: newWarehouseType || undefined, account: newAccount || undefined }),
     onSuccess: () => { toast.success('Almacén creado'); queryClient.invalidateQueries({ queryKey: ['almacenes'] }); setShowNew(false); setNewName(''); setNewBranch(''); setNewWarehouseType(''); setNewAccount('') },
@@ -152,7 +164,7 @@ function AlmacenesSection() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data: d }: { id: string; data: Partial<{ warehouseName: string; account: string; branch: string; warehouseType: string }> }) =>
+    mutationFn: ({ id, data: d }: { id: string; data: UpdateAlmacenDto }) =>
       updateAlmacen(id, d),
     onSuccess: () => { toast.success('Almacén actualizado'); queryClient.invalidateQueries({ queryKey: ['almacenes'] }); setEditTarget(null) },
     onError: () => toast.error('Error al actualizar el almacén'),
@@ -164,9 +176,9 @@ function AlmacenesSection() {
     onError: () => toast.error('Error al eliminar el almacén'),
   })
 
-  function openEdit(a: { name: string; branch?: string | null; warehouseType?: string }) {
+  function openEdit(a: { id: string; name: string; branch?: string | null; warehouseType?: string; account?: string | null }) {
     setEditTarget(a)
-    setEditWarehouseAccount('')
+    setEditWarehouseAccount(a.account ?? '')
     setEditWarehouseType(a.warehouseType ?? '')
     setEditBranch(a.branch ?? '')
     setToDelete(null)
@@ -178,12 +190,16 @@ function AlmacenesSection() {
         <div className="card-header">
           <span className="card-title">Almacenes</span>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <select className="filter-select" value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
-              <option value="">Todas las sucursales</option>
-              {sucursales.map((s) => (
-                <option key={s.id} value={s.name}>{s.name}</option>
-              ))}
-            </select>
+            <div style={{ width: 200 }}>
+              <SearchSelect
+                value={branchFilter}
+                onChange={setBranchFilter}
+                options={branchOptionsFor(branchFilterSearch)}
+                onSearch={setBranchFilterSearch}
+                selectedLabel={branchFilter}
+                placeholder="Todas las sucursales"
+              />
+            </div>
             <button className="btn btn-primary btn-size-sm" onClick={() => setShowNew(true)}>
               <Plus size={14} />Nuevo
             </button>
@@ -255,19 +271,21 @@ function AlmacenesSection() {
               </div>
               <div className="ff-wrap">
                 <label className="ff-label">Sucursal</label>
-                <select className="ff-select" value={newBranch} onChange={(e) => setNewBranch(e.target.value)}>
-                  <option value="">Sin asignar</option>
-                  {sucursales.map((s) => (
-                    <option key={s.id} value={s.name}>{s.name}</option>
-                  ))}
-                </select>
+                <SearchSelect
+                  value={newBranch}
+                  onChange={setNewBranch}
+                  options={branchOptionsFor(newBranchSearch)}
+                  onSearch={setNewBranchSearch}
+                  selectedLabel={newBranch}
+                  placeholder="Sin asignar"
+                />
               </div>
               <div className="ff-wrap">
                 <label className="ff-label">Tipo de Almacén</label>
-                <select className="ff-select" value={newWarehouseType} onChange={(e) => setNewWarehouseType(e.target.value)}>
-                  <option value="">Estándar</option>
-                  <option value="Transit">Tránsito</option>
-                </select>
+                <Select value={newWarehouseType} onValueChange={setNewWarehouseType} placeholder="Estándar">
+                  <SelectItem value="">Estándar</SelectItem>
+                  <SelectItem value="Transit">Tránsito</SelectItem>
+                </Select>
                 <p className="ff-hint">"Tránsito" se usa como punto intermedio en transferencias entre almacenes.</p>
               </div>
               <div className="ff-wrap">
@@ -300,19 +318,21 @@ function AlmacenesSection() {
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="ff-wrap">
                 <label className="ff-label">Sucursal</label>
-                <select className="ff-select" value={editBranch} onChange={(e) => setEditBranch(e.target.value)}>
-                  <option value="">Sin asignar</option>
-                  {sucursales.map((s) => (
-                    <option key={s.id} value={s.name}>{s.name}</option>
-                  ))}
-                </select>
+                <SearchSelect
+                  value={editBranch}
+                  onChange={setEditBranch}
+                  options={branchOptionsFor(editBranchSearch)}
+                  onSearch={setEditBranchSearch}
+                  selectedLabel={editBranch}
+                  placeholder="Sin asignar"
+                />
               </div>
               <div className="ff-wrap">
                 <label className="ff-label">Tipo de Almacén</label>
-                <select className="ff-select" value={editWarehouseType} onChange={(e) => setEditWarehouseType(e.target.value)}>
-                  <option value="">Estándar</option>
-                  <option value="Transit">Tránsito</option>
-                </select>
+                <Select value={editWarehouseType} onValueChange={setEditWarehouseType} placeholder="Estándar">
+                  <SelectItem value="">Estándar</SelectItem>
+                  <SelectItem value="Transit">Tránsito</SelectItem>
+                </Select>
               </div>
               <div className="ff-wrap">
                 <label className="ff-label">Cuenta de Inventario</label>
@@ -328,7 +348,7 @@ function AlmacenesSection() {
               <button className="btn btn-secondary" onClick={() => setEditTarget(null)}>Cancelar</button>
               <button
                 className="btn btn-primary"
-                onClick={() => updateMutation.mutate({ id: editTarget.name, data: { account: editWarehouseAccount || undefined, branch: editBranch || undefined, warehouseType: editWarehouseType || undefined } })}
+                onClick={() => updateMutation.mutate({ id: editTarget.id, data: { account: editWarehouseAccount, branch: editBranch, warehouseType: editWarehouseType || null } })}
                 disabled={updateMutation.isPending}
               >
                 {updateMutation.isPending ? 'Guardando…' : 'Guardar'}
@@ -454,11 +474,11 @@ function MetodosPagoSection() {
               </div>
               <div className="ff-wrap">
                 <label className="ff-label">Tipo</label>
-                <select className="ff-select" value={newType} onChange={(e) => setNewType(e.target.value as MetodoPago['type'])}>
-                  <option value="Cash">Cash</option>
-                  <option value="Bank">Bank</option>
-                  <option value="General">General</option>
-                </select>
+                <Select value={newType} onValueChange={(val) => setNewType(val as MetodoPago['type'])}>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="Bank">Bank</SelectItem>
+                  <SelectItem value="General">General</SelectItem>
+                </Select>
               </div>
             </div>
             <div className="modal-foot">
@@ -1416,15 +1436,13 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
                     <tbody>
                       {formTaxes.map((line, idx) => (
                         <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}>
-                          <td style={{ padding: '6px 8px' }}>
-                            <select
-                              className="ff-select"
-                              style={{ fontSize: 12, padding: '4px 8px' }}
+                          <td style={{ padding: '6px 8px', minWidth: 150 }}>
+                            <Select
                               value={line.chargeType}
-                              onChange={(e) => updateTaxLine(idx, { chargeType: e.target.value as TaxChargeType })}
+                              onValueChange={(val) => updateTaxLine(idx, { chargeType: val as TaxChargeType })}
                             >
-                              {CHARGE_TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                            </select>
+                              {CHARGE_TYPE_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                            </Select>
                           </td>
                           <td style={{ padding: '6px 8px', minWidth: 220 }}>
                             <AccountSelect
@@ -1456,27 +1474,25 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
                           </td>
                           {kind === 'compras' && (
                             <>
-                              <td style={{ padding: '6px 8px' }}>
-                                <select
-                                  className="ff-select"
-                                  style={{ fontSize: 12, padding: '4px 8px' }}
+                              <td style={{ padding: '6px 8px', minWidth: 130 }}>
+                                <Select
                                   value={line.category ?? ''}
-                                  onChange={(e) => updateTaxLine(idx, { category: (e.target.value || undefined) as TaxLineCategory | undefined })}
+                                  onValueChange={(val) => updateTaxLine(idx, { category: (val || undefined) as TaxLineCategory | undefined })}
+                                  placeholder="—"
                                 >
-                                  <option value="">—</option>
-                                  {TAX_CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                </select>
+                                  <SelectItem value="">—</SelectItem>
+                                  {TAX_CATEGORY_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                                </Select>
                               </td>
-                              <td style={{ padding: '6px 8px' }}>
-                                <select
-                                  className="ff-select"
-                                  style={{ fontSize: 12, padding: '4px 8px' }}
+                              <td style={{ padding: '6px 8px', minWidth: 130 }}>
+                                <Select
                                   value={line.addDeductTax ?? ''}
-                                  onChange={(e) => updateTaxLine(idx, { addDeductTax: (e.target.value || undefined) as TaxLineAddDeduct | undefined })}
+                                  onValueChange={(val) => updateTaxLine(idx, { addDeductTax: (val || undefined) as TaxLineAddDeduct | undefined })}
+                                  placeholder="—"
                                 >
-                                  <option value="">—</option>
-                                  {TAX_ADD_DEDUCT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                </select>
+                                  <SelectItem value="">—</SelectItem>
+                                  {TAX_ADD_DEDUCT_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                                </Select>
                               </td>
                             </>
                           )}
@@ -1923,9 +1939,9 @@ function GruposClientesSection() {
               </div>
               <div className="ff-wrap">
                 <label className="ff-label">Nivel de precio por defecto</label>
-                <select className="ff-select" value={formPriceTier} onChange={(e) => setFormPriceTier(e.target.value)}>
-                  {PRICE_TIER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                <Select value={formPriceTier} onValueChange={setFormPriceTier}>
+                  {PRICE_TIER_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                </Select>
                 <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>
                   Los clientes de este grupo usarán este nivel de precio al crear cotizaciones/facturas.
                 </p>
@@ -1982,6 +1998,14 @@ function GruposClientesSection() {
   )
 }
 
+const ALL_FORMATOS_IMPRESION: FormatoImpresion[] = ['a4', 'carta', 'a6', 'pos']
+const FORMATO_IMPRESION_LABELS: Record<FormatoImpresion, string> = {
+  a4: 'Página completa — A4',
+  carta: 'Página completa — Carta',
+  a6: 'Página completa — A6',
+  pos: 'Ticket POS (80mm)',
+}
+
 // ---- Facturación Config Section ----
 function FacturacionConfigSection() {
   const queryClient = useQueryClient()
@@ -1990,12 +2014,24 @@ function FacturacionConfigSection() {
    const { data: almacenes } = useQuery({ queryKey: ['almacenes-all'], queryFn: () => listAlmacenes(), staleTime: 5 * 60_000 })
    const { data: metodosPago } = useQuery({ queryKey: ['metodos-pago-config'], queryFn: listMetodosPago, staleTime: 5 * 60_000 })
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
+  const [posWarehouseSearch, setPosWarehouseSearch] = useState('')
+  const posWarehouseOptions: SearchSelectOption[] = (almacenes ?? [])
+    .filter((a) => !a.disabled)
+    .filter((a) => !posWarehouseSearch || a.name.toLowerCase().includes(posWarehouseSearch.toLowerCase()))
+    .map((a) => ({ value: a.id, label: a.name }))
+  const [modoPagoCajaSearch, setModoPagoCajaSearch] = useState('')
+  const modoPagoCajaOptions: SearchSelectOption[] = (metodosPago ?? [])
+    .filter((m) => !modoPagoCajaSearch || m.name.toLowerCase().includes(modoPagoCajaSearch.toLowerCase()))
+    .map((m) => ({ value: m.name, label: m.name }))
   const [flujoCobro, setFlujoCobro] = useState<'directo' | 'caja'>('directo')
   const [requiereUbicacionVenta, setRequiereUbicacionVenta] = useState(false)
+  const [usaDepartamentos, setUsaDepartamentos] = useState(true)
+  const [usaImpuestoDocumento, setUsaImpuestoDocumento] = useState(true)
   const [showPosActivar, setShowPosActivar] = useState(false)
   const [posWarehouse, setPosWarehouse] = useState('')
    const [arqueoEfectivoRequerido, setArqueoEfectivoRequerido] = useState(false)
-   const [formatoImpresionDefault, setFormatoImpresionDefault] = useState<"pdf" | "pos">("pdf")
+   const [formatoImpresionDefault, setFormatoImpresionDefault] = useState<FormatoImpresion>("a4")
+   const [formatosPermitidos, setFormatosPermitidos] = useState<FormatoImpresion[]>(ALL_FORMATOS_IMPRESION)
     const [turnoMaxHoras, setTurnoMaxHoras] = useState(24)
    const [modoPagoCaja, setModoPagoCaja] = useState<string | null>(null)
    const [modosPagoConciliar, setModosPagoConciliar] = useState<string[]>([])
@@ -2005,13 +2041,27 @@ function FacturacionConfigSection() {
        setSelectedRoles(data.rolesCancelacionFactura ?? [])
        setFlujoCobro(data.flujoCobro ?? "directo")
        setRequiereUbicacionVenta(data.requiereUbicacionVenta ?? false)
+       setUsaDepartamentos(data.usaDepartamentos ?? true)
+       setUsaImpuestoDocumento(data.usaImpuestoDocumento ?? true)
         setArqueoEfectivoRequerido(data.arqueoEfectivoRequerido ?? false)
-        setFormatoImpresionDefault(data.formatoImpresionDefault ?? "pdf")
+        setFormatoImpresionDefault(data.formatoImpresionDefault ?? "a4")
+        setFormatosPermitidos(data.formatosPermitidos && data.formatosPermitidos.length > 0 ? data.formatosPermitidos : ALL_FORMATOS_IMPRESION)
         setTurnoMaxHoras(data.turnoMaxHoras ?? 24)
         setModoPagoCaja(data.modoPagoCaja ?? null)
         setModosPagoConciliar(data.modosPagoConciliar ?? [])
       }
     }, [data])
+
+   function toggleFormatoPermitido(formato: FormatoImpresion) {
+     setFormatosPermitidos((prev) => {
+       const next = prev.includes(formato) ? prev.filter((f) => f !== formato) : [...prev, formato]
+       if (next.length === 0) return prev
+       if (!next.includes(formatoImpresionDefault)) {
+         setFormatoImpresionDefault(next[0])
+       }
+       return next
+     })
+   }
 
    const saveMutation = useMutation({
      mutationFn: (dto: Partial<FacturacionConfig>) => updateFacturacionConfig(dto),
@@ -2055,15 +2105,12 @@ function FacturacionConfigSection() {
             "Directo": se cobra con un solo método de pago, sin vuelto (comportamiento histórico). "Caja": habilita
             cobrar con múltiples métodos de pago simultáneos y el registro opcional de vuelto.
           </p>
-          <select
-            className="ff-select"
-            style={{ maxWidth: 240 }}
-            value={flujoCobro}
-            onChange={(e) => setFlujoCobro(e.target.value as 'directo' | 'caja')}
-          >
-            <option value="directo">Directo</option>
-            <option value="caja">Caja</option>
-          </select>
+          <div style={{ maxWidth: 240 }}>
+            <Select value={flujoCobro} onValueChange={(val) => setFlujoCobro(val as 'directo' | 'caja')}>
+              <SelectItem value="directo">Directo</SelectItem>
+              <SelectItem value="caja">Caja</SelectItem>
+            </Select>
+          </div>
         </div>
         <div className="ff-wrap">
           <label className="ff-label">Roles autorizados para cancelar facturas sometidas</label>
@@ -2115,6 +2162,38 @@ function FacturacionConfigSection() {
           </p>
         </div>
 
+        <div className="ff-wrap">
+          <label className="ff-check-wrap">
+            <input
+              type="checkbox"
+              className="ff-check"
+              checked={usaDepartamentos}
+              onChange={(e) => setUsaDepartamentos(e.target.checked)}
+            />
+            <span style={{ fontSize: 13 }}>Usar Departamentos</span>
+          </label>
+          <p className="ff-hint" style={{ marginTop: 4 }}>
+            Si está desactivado, se oculta el selector de Departamento (opcional) en los formularios de Factura,
+            Cotización, Pedido, Cobro, Compra y Gasto. No afecta documentos ya guardados con un departamento asignado.
+          </p>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-check-wrap">
+            <input
+              type="checkbox"
+              className="ff-check"
+              checked={usaImpuestoDocumento}
+              onChange={(e) => setUsaImpuestoDocumento(e.target.checked)}
+            />
+            <span style={{ fontSize: 13 }}>Permitir Impuesto de Documento</span>
+          </label>
+          <p className="ff-hint" style={{ marginTop: 4 }}>
+            Si está desactivado, se oculta el selector de plantilla de Impuesto de Documento en Factura, Cotización
+            y Compra. No afecta documentos ya guardados con una plantilla asignada.
+          </p>
+        </div>
+
         <div className="ff-wrap" style={{ borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
           <label className="ff-label">Módulo POS</label>
           <p className="ff-hint" style={{ marginBottom: 8 }}>
@@ -2141,16 +2220,14 @@ function FacturacionConfigSection() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 320 }}>
               <div className="ff-wrap">
                 <label className="ff-label">Almacén por defecto para el POS</label>
-                <select
-                  className="ff-select"
+                <SearchSelect
                   value={posWarehouse}
-                  onChange={(e) => setPosWarehouse(e.target.value)}
-                >
-                  <option value="">Seleccionar almacén</option>
-                  {(almacenes ?? []).filter((a) => !a.disabled).map((a) => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
-                  ))}
-                </select>
+                  onChange={setPosWarehouse}
+                  options={posWarehouseOptions}
+                  onSearch={setPosWarehouseSearch}
+                  selectedLabel={(almacenes ?? []).find((a) => a.id === posWarehouse)?.name ?? ''}
+                  placeholder="Seleccionar almacén"
+                />
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
@@ -2197,17 +2274,16 @@ function FacturacionConfigSection() {
                El método de pago cuyo cobrado se compara contra el efectivo físico al cuadrar el turno.
                Solo tiene sentido cuando el módulo POS está activo.
              </p>
-             <select
-               className="ff-select"
-               style={{ maxWidth: 320 }}
-               value={modoPagoCaja ?? ''}
-               onChange={(e) => setModoPagoCaja(e.target.value || null)}
-             >
-               <option value="">No configurado</option>
-               {(metodosPago ?? []).map((m) => (
-                 <option key={m.name} value={m.name}>{m.name}</option>
-               ))}
-              </select>
+             <div style={{ maxWidth: 320 }}>
+               <SearchSelect
+                 value={modoPagoCaja ?? ''}
+                 onChange={(val) => setModoPagoCaja(val || null)}
+                 options={modoPagoCajaOptions}
+                 onSearch={setModoPagoCajaSearch}
+                 selectedLabel={modoPagoCaja ?? ''}
+                 placeholder="No configurado"
+               />
+             </div>
             </div>
           )}
 
@@ -2278,19 +2354,39 @@ function FacturacionConfigSection() {
          )}
 
          <div className="ff-wrap">
+          <label className="ff-label">Formatos de impresión habilitados</label>
+          <p className="ff-hint" style={{ marginBottom: 8 }}>
+            Formatos que estarán disponibles al generar el PDF de una factura, cobro o compra. Mínimo uno.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {ALL_FORMATOS_IMPRESION.map((formato) => (
+              <label key={formato} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={formatosPermitidos.includes(formato)}
+                  onChange={() => toggleFormatoPermitido(formato)}
+                />
+                {FORMATO_IMPRESION_LABELS[formato]}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="ff-wrap">
            <label className="ff-label">Formato de impresión default</label>
           <p className="ff-hint" style={{ marginBottom: 8 }}>
-            Formato de impresión predeterminado al generar el PDF de una factura. "pdf": hoja carta/A4 (histórico). "pos": ticket angosto 80mm para impresora térmica.
+            Cuál de los formatos habilitados se usa cuando no se pide uno explícito al generar el PDF de una factura, cobro o compra.
           </p>
-          <select
-            className="ff-select"
-            style={{ maxWidth: 240 }}
-            value={formatoImpresionDefault}
-            onChange={(e) => setFormatoImpresionDefault(e.target.value as "pdf" | "pos")}
-          >
-            <option value="pdf">PDF (A4)</option>
-            <option value="pos">POS Ticket (80mm)</option>
-          </select>
+          <div style={{ maxWidth: 240 }}>
+            <Select
+              value={formatoImpresionDefault}
+              onValueChange={(val) => setFormatoImpresionDefault(val as FormatoImpresion)}
+            >
+              {ALL_FORMATOS_IMPRESION.filter((f) => formatosPermitidos.includes(f)).map((formato) => (
+                <SelectItem key={formato} value={formato}>{FORMATO_IMPRESION_LABELS[formato]}</SelectItem>
+              ))}
+            </Select>
+          </div>
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -2300,8 +2396,11 @@ function FacturacionConfigSection() {
                 rolesCancelacionFactura: selectedRoles,
                 flujoCobro,
                 requiereUbicacionVenta,
+                usaDepartamentos,
+                usaImpuestoDocumento,
                 arqueoEfectivoRequerido,
                 formatoImpresionDefault,
+                formatosPermitidos,
                 turnoMaxHoras,
                 modoPagoCaja,
                 modosPagoConciliar,

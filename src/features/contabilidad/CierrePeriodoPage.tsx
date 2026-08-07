@@ -7,6 +7,8 @@ import { listEjerciciosFiscales } from '@/shared/api/ejercicioFiscal'
 import type { CierrePeriodo, CreateCierrePeriodoDto } from '@/shared/api/types'
 import { formatDate } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-warning',
@@ -34,6 +36,15 @@ export default function CierrePeriodoPage() {
   })
 
   const ejercicios = ejerciciosData?.items ?? []
+  const [fyFilterSearch, setFyFilterSearch] = useState('')
+  const fyFilterOptions: SearchSelectOption[] = ejercicios
+    .filter((fy) => !fyFilterSearch || fy.year.includes(fyFilterSearch))
+    .map((fy) => ({ value: fy.id, label: fy.year }))
+
+  const [formFYSearch, setFormFYSearch] = useState('')
+  const formFYOptions: SearchSelectOption[] = ejercicios
+    .filter((fy) => !formFYSearch || fy.year.includes(formFYSearch))
+    .map((fy) => ({ value: fy.id, label: `${fy.year}${fy.isClosed ? ' — Cerrado' : ' — Abierto'}` }))
 
   // ── Wizard state ──────────────────────────────────────────────────────────
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -149,16 +160,16 @@ export default function CierrePeriodoPage() {
       {/* Filter bar */}
       <div className="filter-bar" style={{ marginBottom: 16 }}>
         <div className="filter-bar-left">
-          <select
-            className="filter-select"
-            value={fyFilter}
-            onChange={(e) => setFyFilter(e.target.value)}
-          >
-            <option value="">Todos los ejercicios</option>
-            {ejercicios.map((fy) => (
-              <option key={fy.id} value={fy.id}>{fy.year}</option>
-            ))}
-          </select>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={fyFilter}
+              onChange={setFyFilter}
+              options={fyFilterOptions}
+              onSearch={setFyFilterSearch}
+              selectedLabel={ejercicios.find((fy) => fy.id === fyFilter)?.year ?? ''}
+              placeholder="Todos los ejercicios"
+            />
+          </div>
         </div>
         <button className="btn btn-primary btn-size-sm" onClick={openWizard}>
           <Plus size={14} /> Nuevo cierre
@@ -249,18 +260,14 @@ export default function CierrePeriodoPage() {
                 <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div className="ff-wrap">
                     <label className="ff-label ff-required">Ejercicio Fiscal</label>
-                    <select
-                      className="ff-select"
+                    <SearchSelect
                       value={formFY}
-                      onChange={(e) => handleFYChange(e.target.value)}
-                    >
-                      <option value="">Seleccionar ejercicio…</option>
-                      {ejercicios.map((fy) => (
-                        <option key={fy.id} value={fy.id}>
-                          {fy.year}{fy.isClosed ? ' — Cerrado' : ' — Abierto'}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={handleFYChange}
+                      options={formFYOptions}
+                      onSearch={setFormFYSearch}
+                      selectedLabel={selectedFY ? `${selectedFY.year}${selectedFY.isClosed ? ' — Cerrado' : ' — Abierto'}` : ''}
+                      placeholder="Seleccionar ejercicio…"
+                    />
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

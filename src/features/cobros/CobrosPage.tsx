@@ -7,6 +7,7 @@ import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, Search } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { Select, SelectItem } from '@/components/ui/select'
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
@@ -78,16 +79,12 @@ export default function CobrosPage() {
             />
           </div>
 
-          <select
-            className="filter-select"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as StatusFilter)}
-          >
-            <option value="all">Todos los estados</option>
-            <option value="Draft">Borrador</option>
-            <option value="Submitted">Sometido</option>
-            <option value="Cancelled">Cancelado</option>
-          </select>
+          <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
+            <SelectItem value="all">Todos los estados</SelectItem>
+            <SelectItem value="Draft">Borrador</SelectItem>
+            <SelectItem value="Submitted">Sometido</SelectItem>
+            <SelectItem value="Cancelled">Cancelado</SelectItem>
+          </Select>
 
           <input
             type="date"

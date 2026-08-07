@@ -7,6 +7,8 @@ import { listAlmacenes } from '@/shared/api/config'
 import { getUsuarioAlmacenesPermitidos } from '@/shared/api/usuarios'
 import { getUser } from '@/shared/api/storage'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import type { Item } from '@/shared/api/types'
 import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react'
 
@@ -46,6 +48,17 @@ export default function TransferenciaForm() {
   const originWarehouses = myWarehouses?.warehouses.length
     ? warehouses.filter((w) => myWarehouses.warehouses.includes(w.name))
     : warehouses
+
+  const [fromWarehouseSearch, setFromWarehouseSearch] = useState('')
+  const fromWarehouseOptions: SearchSelectOption[] = originWarehouses
+    .filter((w) => !fromWarehouseSearch || w.name.toLowerCase().includes(fromWarehouseSearch.toLowerCase()))
+    .map((w) => ({ value: w.name, label: w.name }))
+
+  const [toWarehouseSearch, setToWarehouseSearch] = useState('')
+  const toWarehouseOptions: SearchSelectOption[] = warehouses
+    .filter((w) => w.name !== fromWarehouse)
+    .filter((w) => !toWarehouseSearch || w.name.toLowerCase().includes(toWarehouseSearch.toLowerCase()))
+    .map((w) => ({ value: w.name, label: w.name }))
 
   const createMutation = useMutation({
     mutationFn: () => createTransferencia({
@@ -117,29 +130,27 @@ export default function TransferenciaForm() {
             <div className="form-row">
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Almacén Origen</label>
-                <select
-                  className={`ff-select${submitted && !fromWarehouse ? ' ff-input-error' : ''}`}
+                <SearchSelect
                   value={fromWarehouse}
-                  onChange={(e) => setFromWarehouse(e.target.value)}
-                >
-                  <option value="">Selecciona un almacén…</option>
-                  {originWarehouses.map((w) => (
-                    <option key={w.name} value={w.name}>{w.name}</option>
-                  ))}
-                </select>
+                  onChange={setFromWarehouse}
+                  options={fromWarehouseOptions}
+                  onSearch={setFromWarehouseSearch}
+                  selectedLabel={fromWarehouse}
+                  placeholder="Selecciona un almacén…"
+                  error={submitted && !fromWarehouse}
+                />
               </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Almacén Destino</label>
-                <select
-                  className={`ff-select${submitted && (!toWarehouse || toWarehouse === fromWarehouse) ? ' ff-input-error' : ''}`}
+                <SearchSelect
                   value={toWarehouse}
-                  onChange={(e) => setToWarehouse(e.target.value)}
-                >
-                  <option value="">Selecciona un almacén…</option>
-                  {warehouses.map((w) => (
-                    <option key={w.name} value={w.name} disabled={w.name === fromWarehouse}>{w.name}</option>
-                  ))}
-                </select>
+                  onChange={setToWarehouse}
+                  options={toWarehouseOptions}
+                  onSearch={setToWarehouseSearch}
+                  selectedLabel={toWarehouse}
+                  placeholder="Selecciona un almacén…"
+                  error={submitted && (!toWarehouse || toWarehouse === fromWarehouse)}
+                />
                 {submitted && toWarehouse && toWarehouse === fromWarehouse && (
                   <p className="ff-error">El almacén origen y destino no pueden ser el mismo.</p>
                 )}

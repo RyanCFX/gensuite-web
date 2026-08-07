@@ -306,6 +306,10 @@ function AddRoleModal({
   onAssigned: (row: PermisoRow) => void
 }) {
   const [role, setRole] = useState('')
+  const [roleSearch, setRoleSearch] = useState('')
+  const roleOptions = toOptions(
+    roles.filter((r) => !roleSearch || r.toLowerCase().includes(roleSearch.toLowerCase())),
+  )
   const [flags, setFlags] = useState<Record<PermisoPtype, boolean>>(() =>
     Object.fromEntries(PERMISO_PTYPES.map((pt) => [pt, pt === 'read'])) as Record<PermisoPtype, boolean>,
   )
@@ -336,16 +340,14 @@ function AddRoleModal({
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="ff-wrap">
               <label className="ff-label">Rol</label>
-              <select
-                className="filter-select"
-                style={{ width: '100%' }}
+              <SearchSelect
                 value={role}
-                onChange={(e) => setRole(e.target.value)}
-                required
-              >
-                <option value="">Elegir rol…</option>
-                {roles.map((r) => <option key={r} value={r}>{r}</option>)}
-              </select>
+                onChange={setRole}
+                options={roleOptions}
+                onSearch={setRoleSearch}
+                selectedLabel={role}
+                placeholder="Elegir rol…"
+              />
             </div>
             <div>
               <label className="ff-label" style={{ display: 'block', marginBottom: 8 }}>Permisos iniciales</label>

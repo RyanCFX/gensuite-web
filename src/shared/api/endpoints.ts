@@ -127,6 +127,7 @@ export const ENDPOINTS = {
     amend: (id: string) => `/compras/${id}/amend`,
     return: (id: string) => `/compras/${id}/return`,
     delete: (id: string) => `/compras/${id}`,
+    pdf: (id: string) => `/compras/${id}/pdf`,
   },
   pedidos: {
     list: '/pedidos',
@@ -259,6 +260,7 @@ export const ENDPOINTS = {
     saldoFavor: (customerId: string) => `/cobros/saldo-favor/${customerId}`,
     estadoCuenta: (customerId: string) => `/cobros/estado-cuenta/${customerId}`,
     estadoCuentaPdf: (customerId: string) => `/cobros/estado-cuenta/${customerId}/pdf`,
+    pdf: (id: string) => `/cobros/${id}/pdf`,
   },
   pagos: {
     list: '/pagos',

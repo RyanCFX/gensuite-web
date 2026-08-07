@@ -7,6 +7,7 @@ import type {
   PaginationParams,
   Gasto,
   CreateGastoDto,
+  FormatoImpresion,
 } from './types'
 
 // ---- Compras (update_stock=1) ----
@@ -47,6 +48,33 @@ export async function submitCompra(id: string) {
 export async function cancelCompra(id: string) {
   const res = await client.post<{ success: true; data: Compra }>(ENDPOINTS.compras.cancel(id))
   return unwrap(res)
+}
+
+export async function getCompraPdfBlobUrl(id: string, formato?: FormatoImpresion): Promise<string> {
+  const params = new URLSearchParams()
+  if (formato) params.set('formato', formato)
+  const qs = params.toString()
+  const url = qs ? `${ENDPOINTS.compras.pdf(id)}?${qs}` : ENDPOINTS.compras.pdf(id)
+  const res = await client.get<Blob>(url, {
+    responseType: 'blob',
+  })
+  return URL.createObjectURL(res.data)
+}
+
+export async function downloadCompraPdf(id: string, filename?: string, formato?: FormatoImpresion): Promise<void> {
+  const params = new URLSearchParams()
+  if (formato) params.set('formato', formato)
+  const qs = params.toString()
+  const url = qs ? `${ENDPOINTS.compras.pdf(id)}?${qs}` : ENDPOINTS.compras.pdf(id)
+  const res = await client.get<Blob>(url, {
+    responseType: 'blob',
+  })
+  const blobUrl = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = filename ?? `compra-${id}.pdf`
+  a.click()
+  URL.revokeObjectURL(blobUrl)
 }
 
 export async function amendCompra(id: string) {

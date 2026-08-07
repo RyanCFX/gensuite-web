@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm, useFieldArray } from 'react-hook-form'
+import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import type { Resolver } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -20,6 +20,7 @@ import { AccountSelect } from '@/components/shared/AccountSelect'
 import { useDebounce } from '@/lib/useDebounce'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { Select, SelectItem } from '@/components/ui/select'
 
 const PAGE_SIZE = 20
 
@@ -305,12 +306,17 @@ export default function RetencionesPage() {
 
                     <div className="ff-wrap">
                       <label className="ff-label" htmlFor="retBasis">Base de deducción</label>
-                      <select id="retBasis" className="ff-input" {...register('taxDeductionBasis')}>
-                        <option value="">Sin especificar</option>
-                        {TAX_DEDUCTION_BASIS_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
+                      <Controller
+                        name="taxDeductionBasis"
+                        control={control}
+                        render={({ field }) => (
+                          <Select value={field.value ?? ''} onValueChange={field.onChange} placeholder="Sin especificar">
+                            {TAX_DEDUCTION_BASIS_OPTIONS.map((opt) => (
+                              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                            ))}
+                          </Select>
+                        )}
+                      />
                     </div>
 
                     <div className="ff-wrap">

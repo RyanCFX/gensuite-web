@@ -6,6 +6,7 @@ import { Search, BookOpen, Download, Loader2 } from 'lucide-react'
 import { getLibroDiario, downloadLibroDiarioPdf, type LibroDiarioParams } from '@/shared/api/libroDiario'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 
 function firstOfMonth(): string {
   const d = new Date()
@@ -140,16 +141,11 @@ export default function LibroDiarioPage() {
             </div>
             <div className="ff-wrap">
               <label className="ff-label">Tipo de voucher</label>
-              <select
-                className="ff-select"
-                value={voucherType}
-                onChange={(e) => setVoucherType(e.target.value)}
-              >
-                <option value="">Todos</option>
+              <Select value={voucherType} onValueChange={setVoucherType} placeholder="Todos">
                 {VOUCHER_TYPES.map((vt) => (
-                  <option key={vt} value={vt}>{vt}</option>
+                  <SelectItem key={vt} value={vt}>{vt}</SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
             <div className="ff-wrap">
               <label className="ff-label">No. Voucher</label>
@@ -162,15 +158,11 @@ export default function LibroDiarioPage() {
             </div>
             <div className="ff-wrap" style={{ minWidth: 240 }}>
               <label className="ff-label">Agrupar por</label>
-              <select
-                className="ff-select"
-                value={groupBy}
-                onChange={(e) => setGroupBy(e.target.value)}
-              >
-                <option value="Group by Voucher (Consolidated)">Group by Voucher (Consolidated)</option>
-                <option value="Group by Account">Group by Account</option>
-                <option value="">Sin agrupar</option>
-              </select>
+              <Select value={groupBy} onValueChange={setGroupBy}>
+                <SelectItem value="Group by Voucher (Consolidated)">Group by Voucher (Consolidated)</SelectItem>
+                <SelectItem value="Group by Account">Group by Account</SelectItem>
+                <SelectItem value="">Sin agrupar</SelectItem>
+              </Select>
             </div>
             <button className="btn btn-primary" onClick={handleSearch}>
               <Search size={14} />

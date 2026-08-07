@@ -7,6 +7,7 @@ import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, Search } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { Select, SelectItem } from '@/components/ui/select'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -71,16 +72,12 @@ export default function PagosPage() {
             />
           </div>
 
-          <select
-            className="filter-select"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as StatusFilter)}
-          >
-            <option value="all">Todos los estados</option>
-            <option value="draft">Borrador</option>
-            <option value="submitted">Sometido</option>
-            <option value="cancelled">Cancelado</option>
-          </select>
+          <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
+            <SelectItem value="all">Todos los estados</SelectItem>
+            <SelectItem value="draft">Borrador</SelectItem>
+            <SelectItem value="submitted">Sometido</SelectItem>
+            <SelectItem value="cancelled">Cancelado</SelectItem>
+          </Select>
 
           <input
             type="date"

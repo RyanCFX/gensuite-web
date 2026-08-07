@@ -3,13 +3,16 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
-  getCompra, submitCompra, cancelCompra, amendCompra, returnCompra, deleteCompra,
+  getCompra, submitCompra, cancelCompra, amendCompra, returnCompra, deleteCompra, downloadCompraPdf, getCompraPdfBlobUrl,
 } from '@/shared/api/compras-gastos'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { getCatalogosFiscales } from '@/shared/api/config'
-import { Send, X, RotateCcw, Undo2, Info, FileText, Trash2 } from 'lucide-react'
+import { getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
+import { Send, X, RotateCcw, Undo2, Info, FileText, Trash2, Eye } from 'lucide-react'
+import { PdfFormatButton } from '@/components/shared/PdfFormatButton'
+import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
+import type { FormatoImpresion } from '@/shared/api/types'
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | 'delete' | null
 
@@ -32,6 +35,26 @@ export default function CompraDetail() {
     queryKey: ['catalogos-fiscales'],
     queryFn: getCatalogosFiscales,
     staleTime: 60 * 60_000,
+  })
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const formatoImpresionDefault = facturacionConfig?.formatoImpresionDefault ?? 'a4'
+  const formatosPermitidos = facturacionConfig?.formatosPermitidos
+
+  const downloadMutation = useMutation({
+    mutationFn: (formato?: FormatoImpresion) => downloadCompraPdf(id!, `compra-${id}.pdf`, formato ?? formatoImpresionDefault),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo descargar el PDF'),
+  })
+
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const previewMutation = useMutation({
+    mutationFn: (formato?: FormatoImpresion) => getCompraPdfBlobUrl(id!, formato ?? formatoImpresionDefault),
+    onSuccess: (url) => setPreviewUrl(url),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo generar la vista previa del PDF'),
   })
 
   const submitMutation = useMutation({
@@ -153,6 +176,19 @@ export default function CompraDetail() {
             )}
             {compra.status === 'submitted' && (
               <>
+                <PdfFormatButton
+                  onSelect={(formato) => previewMutation.mutate(formato)}
+                  loading={previewMutation.isPending}
+                  label="Ver PDF"
+                  loadingLabel="Generando…"
+                  icon={<Eye size={14} />}
+                  formatosPermitidos={formatosPermitidos}
+                />
+                <PdfFormatButton
+                  onSelect={(formato) => downloadMutation.mutate(formato)}
+                  loading={downloadMutation.isPending}
+                  formatosPermitidos={formatosPermitidos}
+                />
                 <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmAction('cancel')}>
                   <X size={14} />Anular
                 </button>
@@ -335,6 +371,7 @@ export default function CompraDetail() {
           </div>
         </div>
       )}
+      <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
     </div>
   )
 }

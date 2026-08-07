@@ -58,6 +58,15 @@ client.interceptors.response.use(
 
     const data = error.response.data as ApiErrorResponse
 
+    // ERPNEXT_AUTH_ERROR: el BFF no pudo autenticarse contra ERPNext con las
+    // credenciales de la integración (no es la sesión del usuario) — tratamos esto
+    // como sesión inválida: cerramos sesión y redirigimos a login con un aviso.
+    if (!isLoginRequest && data?.error?.code === 'ERPNEXT_AUTH_ERROR') {
+      clearSession()
+      window.location.href = '/login?sessionExpired=1'
+      return Promise.reject(data.error)
+    }
+
     return Promise.reject(
       data?.error ?? {
         code: 'UNKNOWN_ERROR',

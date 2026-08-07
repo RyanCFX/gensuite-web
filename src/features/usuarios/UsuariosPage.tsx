@@ -14,6 +14,8 @@ import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { useAuthStore } from '@/stores/auth.store'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -34,6 +36,7 @@ export default function UsuariosPage() {
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [selectedBranches, setSelectedBranches] = useState<string[]>([])
   const [defaultBranch, setDefaultBranch] = useState('')
+  const [defaultBranchSearch, setDefaultBranchSearch] = useState('')
   const { orderBy, sort } = useSortState()
 
   const { data, isLoading, isError } = useQuery({
@@ -421,12 +424,16 @@ export default function UsuariosPage() {
 
                         <div className="ff-wrap">
                           <label className="ff-label">Sucursal por defecto</label>
-                          <select className="ff-select" value={defaultBranch} onChange={(e) => setDefaultBranch(e.target.value)}>
-                            <option value="">Sin sucursal por defecto</option>
-                            {selectedBranches.map((b) => (
-                              <option key={b} value={b}>{b}</option>
-                            ))}
-                          </select>
+                          <SearchSelect
+                            value={defaultBranch}
+                            onChange={setDefaultBranch}
+                            options={selectedBranches
+                              .filter((b) => !defaultBranchSearch || b.toLowerCase().includes(defaultBranchSearch.toLowerCase()))
+                              .map((b): SearchSelectOption => ({ value: b, label: b }))}
+                            onSearch={setDefaultBranchSearch}
+                            selectedLabel={defaultBranch}
+                            placeholder="Sin sucursal por defecto"
+                          />
                         </div>
                       </>
                     )}

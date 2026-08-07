@@ -12,6 +12,9 @@ import { formatDate } from '@/lib/formatters'
 import { Plus, Eye, Check, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { Select, SelectItem } from '@/components/ui/select'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-neutral',
@@ -48,6 +51,16 @@ export default function TransferenciasPage() {
     queryFn: () => listSucursales({ limit: 100 }),
   })
   const sucursales = sucursalesData?.items ?? []
+
+  const [warehouseSearch, setWarehouseSearch] = useState('')
+  const warehouseOptions: SearchSelectOption[] = warehouses
+    .filter((w) => !warehouseSearch || w.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
+    .map((w) => ({ value: w.name, label: w.name }))
+
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchOptions: SearchSelectOption[] = sucursales
+    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((s) => ({ value: s.id, label: s.name }))
 
   const { data: myWarehouses } = useQuery({
     queryKey: ['usuarioAlmacenesPermitidos', currentUserEmail],
@@ -121,25 +134,33 @@ export default function TransferenciasPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <select className="filter-select" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="all">Todos los estados</option>
-            <option value="draft">Borrador</option>
-            <option value="in_transit">En tránsito</option>
-            <option value="completed">Completada</option>
-            <option value="cancelled">Cancelada</option>
-          </select>
-          <select className="filter-select" value={warehouse} onChange={(e) => setWarehouse(e.target.value)}>
-            <option value="">Todos los almacenes</option>
-            {warehouses.map((w) => (
-              <option key={w.name} value={w.name}>{w.name}</option>
-            ))}
-          </select>
-          <select className="filter-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
-            <option value="">Todas las sucursales</option>
-            {sucursales.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectItem value="all">Todos los estados</SelectItem>
+            <SelectItem value="draft">Borrador</SelectItem>
+            <SelectItem value="in_transit">En tránsito</SelectItem>
+            <SelectItem value="completed">Completada</SelectItem>
+            <SelectItem value="cancelled">Cancelada</SelectItem>
+          </Select>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={warehouse}
+              onChange={setWarehouse}
+              options={warehouseOptions}
+              onSearch={setWarehouseSearch}
+              selectedLabel={warehouse}
+              placeholder="Todos los almacenes"
+            />
+          </div>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={branch}
+              onChange={setBranch}
+              options={branchOptions}
+              onSearch={setBranchSearch}
+              selectedLabel={sucursales.find((s) => s.id === branch)?.name ?? ''}
+              placeholder="Todas las sucursales"
+            />
+          </div>
         </div>
       </div>
 

@@ -5,7 +5,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { createQuotation, updateQuotation, getQuotation, getQuotationDuplicateSource } from '@/shared/api/quotations'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getDefaultPriceTier } from '@/shared/api/catalog'
-import { listImpuestosVentas, listAlmacenes } from '@/shared/api/config'
+import { listImpuestosVentas, listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
 import type { CreateQuotationDto, ItemPrices, Bundle } from '@/shared/api/types'
 import type { Item } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
@@ -121,6 +121,13 @@ export default function QuotationForm() {
   const [taxesTemplate, setTaxesTemplate] = useState('')
   const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
 
   // ── Load existing quotation when editing ─────────────────────────────────
   const { data: existingQuotation, isLoading: loadingQuotation } = useQuery({
@@ -370,7 +377,7 @@ function submitDto() {
          warehouse: i.warehouse || undefined,
        })),
        notes: notes || undefined,
-       taxesTemplate: taxesTemplate || undefined,
+       taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
      }
      if (id) updateMutation.mutate(dto)
      else createMutation.mutate(dto)
@@ -711,19 +718,21 @@ if (esClienteOcasional) {
                 />
               </div>
 
-              <div className="ff-wrap">
-                <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
-                <SearchSelect
-                  id="taxesTemplate"
-                  value={taxesTemplate}
-                  onChange={(val) => setTaxesTemplate(val)}
-                  options={taxesTemplateOptions}
-                  onSearch={setTaxesTemplateSearch}
-                  selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
-                  placeholder="Usar el default de la compañía"
-                />
-                <p className="ff-hint">Impuesto aplicado al total del documento (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
-              </div>
+              {usaImpuestoDocumento && (
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
+                  <SearchSelect
+                    id="taxesTemplate"
+                    value={taxesTemplate}
+                    onChange={(val) => setTaxesTemplate(val)}
+                    options={taxesTemplateOptions}
+                    onSearch={setTaxesTemplateSearch}
+                    selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
+                    placeholder="Usar el default de la compañía"
+                  />
+                  <p className="ff-hint">Impuesto aplicado al total del documento (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

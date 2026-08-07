@@ -9,6 +9,9 @@ import { getCatalogosFiscales } from '@/shared/api/config'
 import { Plus, ChevronLeft, ChevronRight, Search, Receipt } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { Select, SelectItem } from '@/components/ui/select'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const PAGE_SIZE = 20
 
@@ -52,6 +55,10 @@ export default function GastosPage() {
     queryFn: getCatalogosFiscales,
     staleTime: 60 * 60_000,
   })
+  const [tipoComprobanteSearch, setTipoComprobanteSearch] = useState('')
+  const tipoComprobanteOptions: SearchSelectOption[] = (catalogos?.ncfTypesCompra ?? [])
+    .filter((t) => !tipoComprobanteSearch || t.label.toLowerCase().includes(tipoComprobanteSearch.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
 
   const { data: resumen, isLoading: resumenLoading } = useQuery({
     queryKey: ['gastos-resumen', month],
@@ -138,23 +145,27 @@ export default function GastosPage() {
                 onChange={(e) => { setSupplier(e.target.value); setPage(1) }}
               />
             </div>
-            <select className="filter-select" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1) }}>
-              <option value="all">Todos</option>
-              <option value="draft">Borrador</option>
-              <option value="submitted">Sometido</option>
-              <option value="cancelled">Anulado</option>
-            </select>
-            <select className="filter-select" value={tipoComprobante} onChange={(e) => { setTipoComprobante(e.target.value); setPage(1) }}>
-              <option value="all">Todos los NCF</option>
-              {(catalogos?.ncfTypesCompra ?? []).map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
-            <select className="filter-select" value={esDeducible} onChange={(e) => { setEsDeducible(e.target.value); setPage(1) }}>
-              <option value="all">Deducible: Todos</option>
-              <option value="true">Deducibles</option>
-              <option value="false">No deducibles</option>
-            </select>
+            <Select value={status} onValueChange={(val) => { setStatus(val); setPage(1) }}>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="draft">Borrador</SelectItem>
+              <SelectItem value="submitted">Sometido</SelectItem>
+              <SelectItem value="cancelled">Anulado</SelectItem>
+            </Select>
+            <div style={{ width: 200 }}>
+              <SearchSelect
+                value={tipoComprobante === 'all' ? '' : tipoComprobante}
+                onChange={(val) => { setTipoComprobante(val || 'all'); setPage(1) }}
+                options={tipoComprobanteOptions}
+                onSearch={setTipoComprobanteSearch}
+                selectedLabel={catalogos?.ncfTypesCompra?.find((t) => t.value === tipoComprobante)?.label ?? ''}
+                placeholder="Todos los NCF"
+              />
+            </div>
+            <Select value={esDeducible} onValueChange={(val) => { setEsDeducible(val); setPage(1) }}>
+              <SelectItem value="all">Deducible: Todos</SelectItem>
+              <SelectItem value="true">Deducibles</SelectItem>
+              <SelectItem value="false">No deducibles</SelectItem>
+            </Select>
             <input type="date" className="filter-select" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }} />
             <input type="date" className="filter-select" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }} />
           </div>

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { createPago, getPagosPendientes } from '@/shared/api/pagos'
 import { listSuppliers } from '@/shared/api/suppliers'
-import { listMetodosPago } from '@/shared/api/config'
+import { listMetodosPago, getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { CheckCircle2, AlertTriangle, Wallet } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -49,6 +49,13 @@ export default function RegistrarPagoPage() {
   const [branchSearch, setBranchSearch] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
 
   const currentUserEmail = getUser()?.email
   const { data: currentUser } = useQuery({
@@ -147,6 +154,11 @@ export default function RegistrarPagoPage() {
     queryKey: ['metodos-pago'],
     queryFn: listMetodosPago,
   })
+  const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState('')
+  const modeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
+    .filter((m) => !m.disabled)
+    .filter((m) => !modeOfPaymentSearch || m.name.toLowerCase().includes(modeOfPaymentSearch.toLowerCase()))
+    .map((m) => ({ value: m.name, label: m.name }))
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -225,7 +237,7 @@ export default function RegistrarPagoPage() {
         ? undefined
         : checkedRefs.map((r) => ({ invoiceId: r.invoiceId, allocatedAmount: r.allocatedAmount })),
       branch: branch || undefined,
-      department: department || undefined,
+      department: usaDepartamentos ? (department || undefined) : undefined,
     })
   }
 
@@ -405,10 +417,12 @@ export default function RegistrarPagoPage() {
                 {branchError && <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal para continuar</p>}
               </div>
 
-              <div className="ff-wrap">
-                <label className="ff-label" htmlFor="department">Departamento</label>
-                <DepartmentSelect id="department" value={department} onChange={setDepartment} />
-              </div>
+              {usaDepartamentos && (
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="department">Departamento</label>
+                  <DepartmentSelect id="department" value={department} onChange={setDepartment} />
+                </div>
+              )}
 
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
                 <input
@@ -450,17 +464,14 @@ export default function RegistrarPagoPage() {
 
               <div className="ff-wrap">
                 <label className="ff-label">Método de Pago <span className="ff-required">*</span></label>
-                <select
-                  className="ff-select"
+                <SearchSelect
                   value={modeOfPayment}
-                  onChange={(e) => setModeOfPayment(e.target.value)}
-                  required
-                >
-                  <option value="">Seleccionar método…</option>
-                  {metodos?.filter((m) => !m.disabled).map((m) => (
-                    <option key={m.name} value={m.name}>{m.name}</option>
-                  ))}
-                </select>
+                  onChange={setModeOfPayment}
+                  options={modeOfPaymentOptions}
+                  onSearch={setModeOfPaymentSearch}
+                  selectedLabel={modeOfPayment}
+                  placeholder="Seleccionar método…"
+                />
               </div>
 
               <div className="ff-wrap">

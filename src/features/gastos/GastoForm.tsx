@@ -6,7 +6,7 @@ import { createGasto, updateGasto, getGasto } from '@/shared/api/compras-gastos'
 import { listSuppliers } from '@/shared/api/suppliers'
 import type { CreateGastoDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { getCatalogosFiscales } from '@/shared/api/config'
+import { getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
 import { CATEGORIA_GASTO } from '@/lib/constants'
 import { Plus, Trash2, Info, AlertCircle, AlertTriangle } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -18,6 +18,7 @@ import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -64,6 +65,13 @@ export default function GastoForm() {
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
   const [serverMessage, setServerMessage] = useState<string | null>(null)
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
 
   const currentUserEmail = getUser()?.email
   const { data: currentUser } = useQuery({
@@ -163,6 +171,20 @@ export default function GastoForm() {
     queryFn: getCatalogosFiscales,
     staleTime: 60 * 60_000,
   })
+  const [tipoComprobanteSearch, setTipoComprobanteSearch] = useState('')
+  const tipoComprobanteOptions: SearchSelectOption[] = (catalogos?.ncfTypesCompra ?? [])
+    .filter((t) => !tipoComprobanteSearch || t.label.toLowerCase().includes(tipoComprobanteSearch.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
+
+  const [tipoBienes606Search, setTipoBienes606Search] = useState('')
+  const tipoBienes606Options: SearchSelectOption[] = (catalogos?.tipoBienes606 ?? [])
+    .filter((t) => !tipoBienes606Search || t.label.toLowerCase().includes(tipoBienes606Search.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
+
+  const [formaPago606Search, setFormaPago606Search] = useState('')
+  const formaPago606Options: SearchSelectOption[] = (catalogos?.formaPago606 ?? [])
+    .filter((f) => !formaPago606Search || f.label.toLowerCase().includes(formaPago606Search.toLowerCase()))
+    .map((f) => ({ value: f.value, label: f.label }))
 
   const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
     queryKey: ['supplierSearch', supplierQuery],
@@ -254,7 +276,7 @@ export default function GastoForm() {
       retencionIsr: retencionIsr || undefined,
       retencionItbis: retencionItbis || undefined,
       branch: branch || undefined,
-      department: department || undefined,
+      department: usaDepartamentos ? (department || undefined) : undefined,
     }
     saveMutation.mutate(dto)
   }
@@ -326,10 +348,12 @@ export default function GastoForm() {
                   />
                   {branchError && <span className="ff-error">Debes seleccionar una sucursal para continuar</span>}
                 </div>
-                <div className="ff-wrap">
-                  <label className="ff-label">Departamento</label>
-                  <DepartmentSelect id="department" value={department} onChange={setDepartment} />
-                </div>
+                {usaDepartamentos && (
+                  <div className="ff-wrap">
+                    <label className="ff-label">Departamento</label>
+                    <DepartmentSelect id="department" value={department} onChange={setDepartment} />
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -440,46 +464,46 @@ export default function GastoForm() {
 
               <div className="ff-wrap">
                 <label className="ff-label">Tipo Comprobante</label>
-                <select
-                  className={`ff-select${isB17 && b17Error ? ' ff-input-error' : ''}`}
+                <SearchSelect
                   value={tipoComprobante}
-                  onChange={(e) => setTipoComprobante(e.target.value)}
-                >
-                  <option value="">Seleccionar</option>
-                  {(catalogos?.ncfTypesCompra ?? []).map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
+                  onChange={setTipoComprobante}
+                  options={tipoComprobanteOptions}
+                  onSearch={setTipoComprobanteSearch}
+                  selectedLabel={catalogos?.ncfTypesCompra?.find((t) => t.value === tipoComprobante)?.label ?? ''}
+                  placeholder="Seleccionar"
+                  error={isB17 && b17Error}
+                />
               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label">Tipo de Bienes 606</label>
-                <select className="ff-select" value={tipoBienes606} onChange={(e) => setTipoBienes606(e.target.value)}>
-                  <option value="">Seleccionar tipo</option>
-                  {tipoBienes606 && !(catalogos?.tipoBienes606 ?? []).some((t) => t.value === tipoBienes606) && (
-                    <option value={tipoBienes606}>{tipoBienes606}</option>
-                  )}
-                  {(catalogos?.tipoBienes606 ?? []).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
+                <SearchSelect
+                  value={tipoBienes606}
+                  onChange={setTipoBienes606}
+                  options={tipoBienes606Options}
+                  onSearch={setTipoBienes606Search}
+                  selectedLabel={catalogos?.tipoBienes606?.find((t) => t.value === tipoBienes606)?.label ?? tipoBienes606}
+                  placeholder="Seleccionar tipo"
+                />
               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label">Forma de Pago 606</label>
-                <select className="ff-select" value={formaPago606} onChange={(e) => setFormaPago606(e.target.value)}>
-                  <option value="">Seleccionar forma</option>
-                  {formaPago606 && !(catalogos?.formaPago606 ?? []).some((f) => f.value === formaPago606) && (
-                    <option value={formaPago606}>{formaPago606}</option>
-                  )}
-                  {(catalogos?.formaPago606 ?? []).map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-                </select>
+                <SearchSelect
+                  value={formaPago606}
+                  onChange={setFormaPago606}
+                  options={formaPago606Options}
+                  onSearch={setFormaPago606Search}
+                  selectedLabel={catalogos?.formaPago606?.find((f) => f.value === formaPago606)?.label ?? formaPago606}
+                  placeholder="Seleccionar forma"
+                />
               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label">Categoría de Gasto</label>
-                <select className="ff-select" value={categoriaGasto} onChange={(e) => setCategoriaGasto(e.target.value)}>
-                  <option value="">Seleccionar categoría</option>
-                  {CATEGORIA_GASTO.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
+                <Select value={categoriaGasto} onValueChange={setCategoriaGasto} placeholder="Seleccionar categoría">
+                  {CATEGORIA_GASTO.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                </Select>
               </div>
 
               <div className="ff-wrap">

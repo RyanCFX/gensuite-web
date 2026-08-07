@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { createItem, listCategories, listBrands } from '@/shared/api/catalog'
+import { createItem, updateItem, getItem, listCategories, listBrands } from '@/shared/api/catalog'
+import type { CreateItemDto } from '@/shared/api/types'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listUOMs, getEmpresa, listItemTaxTemplates } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -23,6 +24,7 @@ const schema = z.object({
   itemCode: z.string().optional(),
   shortName: z.string().optional(),
   notes: z.string().optional(),
+  image: z.string().optional(),
   hasWarranty: z.boolean().optional(),
   warrantyPeriod: z.number().min(0).optional().catch(undefined),
   description: z.string().optional(),
@@ -70,6 +72,8 @@ const BARCODE_TYPE_OPTIONS_ALL = [
 export default function ItemForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { id } = useParams<{ id: string }>()
+  const isEdit = Boolean(id)
   const [showVariants, setShowVariants] = useState(false)
   const [hasVariants, setHasVariants] = useState(false)
   const [selectedAttributes, setSelectedAttributes] = useState<string[]>([])
@@ -117,6 +121,12 @@ export default function ItemForm() {
   const itemCodeMode = empresa?.itemCodeMode ?? 'manual'
   const isAutoCode = itemCodeMode === 'auto' || itemCodeMode === 'prefix_auto'
 
+  const { data: existingItem, isLoading: itemLoading } = useQuery({
+    queryKey: ['item', id],
+    queryFn: () => getItem(id!),
+    enabled: isEdit,
+  })
+
   const createMutation = useMutation({
     mutationFn: (data: Parameters<typeof createItem>[0]) => createItem(data),
     onSuccess: (result) => {
@@ -129,12 +139,26 @@ export default function ItemForm() {
     },
   })
 
+  const updateMutation = useMutation({
+    mutationFn: (data: Partial<CreateItemDto>) => updateItem(id!, data),
+    onSuccess: () => {
+      toast.success('Artículo actualizado')
+      queryClient.invalidateQueries({ queryKey: ['items'] })
+      queryClient.invalidateQueries({ queryKey: ['item', id] })
+      navigate(`/inventario/articulos/${id}`)
+    },
+    onError: () => {
+      toast.error('Error al actualizar el artículo')
+    },
+  })
+
   const {
     register,
     handleSubmit,
     watch,
     control,
     setValue,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -156,6 +180,7 @@ export default function ItemForm() {
       description: '',
       shortName: '',
       notes: '',
+      image: '',
       hasWarranty: false,
       warrantyPeriod: undefined,
       defaultWarehouse: '',
@@ -167,6 +192,44 @@ export default function ItemForm() {
       salesTaxTemplate: '',
     },
   })
+
+  // Precarga el formulario al editar — se corre una sola vez cuando llega el artículo.
+  useEffect(() => {
+    if (!existingItem) return
+    reset({
+      itemName: existingItem.itemName,
+      type: existingItem.type,
+      category: existingItem.category ?? '',
+      subcategory: existingItem.subcategory ?? '',
+      brand: existingItem.brand ?? '',
+      itemCode: existingItem.id,
+      priceA: existingItem.prices?.A,
+      priceB: existingItem.prices?.B ?? existingItem.standardRate ?? 0,
+      priceC: existingItem.prices?.C,
+      priceMode: existingItem.priceMode ?? 'manual',
+      marginA: existingItem.marginA,
+      marginB: existingItem.marginB,
+      marginC: existingItem.marginC,
+      valuationRate: existingItem.valuationRate,
+      description: existingItem.internalDescription ?? '',
+      shortName: existingItem.shortName ?? '',
+      notes: existingItem.notes ?? '',
+      image: existingItem.image ?? '',
+      hasWarranty: existingItem.hasWarranty ?? false,
+      warrantyPeriod: existingItem.warrantyPeriod,
+      defaultWarehouse: existingItem.defaultWarehouse ?? '',
+      stockUom: existingItem.stockUom ?? '',
+      allowsDiscount: existingItem.allowsDiscount ?? true,
+      maxDiscountPct: existingItem.maxDiscountPct ?? 0,
+      trackingType: existingItem.trackingType ?? 'none',
+      purchaseTaxTemplate: existingItem.purchaseTaxTemplate ?? '',
+      salesTaxTemplate: existingItem.salesTaxTemplate ?? '',
+    })
+    setBarcodes(existingItem.barcodes ?? [])
+    setShowWarranty(!!existingItem.hasWarranty)
+    setNoPurchaseTax(!existingItem.purchaseTaxTemplate)
+    setNoSalesTax(!existingItem.salesTaxTemplate)
+  }, [existingItem, reset])
 
   const selectedType = watch('type')
   const watchedPriceMode = watch('priceMode')
@@ -192,12 +255,13 @@ export default function ItemForm() {
       toast.error('Selecciona el impuesto de venta o marca "No lleva impuesto de venta"')
       return
     }
-    const { description, ...rest } = data
-    createMutation.mutate({
+    const { description, itemCode, ...rest } = data
+    const payload = {
       ...rest,
       brand: data.brand || undefined,
       subcategory: data.subcategory || undefined,
       internalDescription: description || undefined,
+      image: data.image || undefined,
       defaultWarehouse: data.defaultWarehouse || undefined,
       valuationRate: data.valuationRate || undefined,
       stockUom: data.stockUom || undefined,
@@ -218,12 +282,22 @@ export default function ItemForm() {
       trackingType: data.trackingType === 'none' ? undefined : data.trackingType,
       purchaseTaxTemplate: noPurchaseTax ? undefined : data.purchaseTaxTemplate || undefined,
       salesTaxTemplate: noSalesTax ? undefined : data.salesTaxTemplate || undefined,
-      hasVariants: hasVariants || undefined,
-      attributes:
-        hasVariants && selectedAttributes.length > 0
-          ? selectedAttributes.map((attr) => ({ attribute: attr }))
-          : undefined,
-    })
+    }
+
+    if (isEdit) {
+      // itemCode nunca se manda en el update — el backend lo rechaza (400) si viene en el body.
+      updateMutation.mutate(payload)
+    } else {
+      createMutation.mutate({
+        ...payload,
+        itemCode: itemCode || undefined,
+        hasVariants: hasVariants || undefined,
+        attributes:
+          hasVariants && selectedAttributes.length > 0
+            ? selectedAttributes.map((attr) => ({ attribute: attr }))
+            : undefined,
+      })
+    }
   }
 
   const parentCategories = useMemo(() => {
@@ -343,10 +417,6 @@ export default function ItemForm() {
 
   const selectedBrandLabel = brands.find((b) => b.id === watchedBrand)?.name ?? ''
 
-  useEffect(() => {
-    setValue('subcategory', '')
-  }, [watchedCategory, setValue])
-
   const taxRate = useMemo(() => {
     const selected = itemTaxTemplates?.find((t) => String(t.id) === watchedSalesTaxTemplate)
     return selected?.taxes?.reduce((sum, t) => sum + (t.notApplicable ? 0 : t.rate), 0) ?? 0
@@ -375,17 +445,35 @@ export default function ItemForm() {
     return watchedValuationRate / (1 - (marginPct / 100))
   }
 
+  if (isEdit && itemLoading) {
+    return (
+      <div className="page-container">
+        <div className="skeleton-box" style={{ height: 28, width: '30%', marginBottom: 16 }} />
+        <div className="skeleton-box" style={{ height: 400, width: '100%' }} />
+      </div>
+    )
+  }
+
+  const backTo = isEdit ? `/inventario/articulos/${id}` : '/inventario/articulos'
+  const isTemplate = isEdit && !!existingItem?.hasVariants
+
   return (
     <div className="page-container">
-      <button className="page-back-link" onClick={() => navigate('/inventario/articulos')}>
-        <ArrowLeft size={14} /> Artículos
+      <button className="page-back-link" onClick={() => navigate(backTo)}>
+        <ArrowLeft size={14} /> {isEdit ? 'Volver al artículo' : 'Artículos'}
       </button>
 
       <PageHeader
-        title="Nuevo Artículo"
-        description="Registra un nuevo producto o servicio en el catálogo"
+        title={isEdit ? `Editar ${existingItem?.itemName ?? 'Artículo'}` : 'Nuevo Artículo'}
+        description={isEdit ? 'Modifica los datos del artículo' : 'Registra un nuevo producto o servicio en el catálogo'}
         overline="Catálogo"
       />
+
+      {isTemplate && (
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
+          Este artículo es un template con variantes — el tipo y las variantes no se pueden editar aquí. Usa la ficha del artículo para gestionar variantes.
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 420px', gap: 20, alignItems: 'start' }}>
 
@@ -411,6 +499,7 @@ export default function ItemForm() {
                         options={typeOptions}
                         onSearch={setTypeSearch}
                         selectedLabel={TYPE_OPTIONS_ALL.find((o) => o.value === field.value)?.label ?? ''}
+                        disabled={isTemplate}
                       />
                     )}
                   />
@@ -418,9 +507,13 @@ export default function ItemForm() {
 
                 <div className="ff-wrap">
                   <label className="ff-label" htmlFor="itemCode">
-                    Código {!isAutoCode && <span className="ff-required">*</span>}
+                    Código {!isEdit && !isAutoCode && <span className="ff-required">*</span>}
                   </label>
-                  {isAutoCode ? (
+                  {isEdit ? (
+                    <div className="ff-input" style={{ color: 'var(--text-secondary)', cursor: 'default', background: 'var(--bg-muted)', fontFamily: 'var(--font-mono)' }}>
+                      {existingItem?.id}
+                    </div>
+                  ) : isAutoCode ? (
                     <div className="ff-input" style={{ color: 'var(--text-secondary)', cursor: 'default', background: 'var(--bg-muted)', fontFamily: codePreviewPrefix ? 'var(--font-mono)' : undefined }}>
                       {codePreviewPrefix
                         ? `${codePreviewPrefix}-XXXX`
@@ -434,12 +527,13 @@ export default function ItemForm() {
                       {...register('itemCode')}
                     />
                   )}
-                  {codePreviewPrefix && (
+                  {!isEdit && codePreviewPrefix && (
                     <p className="ff-hint">
                       Se usará el prefijo de la{subcategoryOptions.length > 0 && watchedSubcategory ? ' subcategoría' : ' categoría'}: <strong style={{ fontFamily: 'var(--font-mono)' }}>{codePreviewPrefix}-XXXX</strong>
                     </p>
                   )}
-                  {errors.itemCode && <span className="ff-error">{errors.itemCode.message}</span>}
+                  {isEdit && <p className="ff-hint">El código del artículo no se puede modificar.</p>}
+                  {!isEdit && errors.itemCode && <span className="ff-error">{errors.itemCode.message}</span>}
                 </div>
               </div>
 
@@ -483,6 +577,16 @@ export default function ItemForm() {
                 <textarea id="notes" className="ff-textarea" rows={2} placeholder="Notas que aparecen en documentos" {...register('notes')} />
               </div>
 
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="image">Imagen (URL)</label>
+                <input
+                  id="image"
+                  className="ff-input"
+                  placeholder="https://…"
+                  {...register('image')}
+                />
+              </div>
+
               <div className="form-row">
                 <div className="ff-wrap">
                   <label className="ff-label ff-required" htmlFor="category">Categoría</label>
@@ -493,7 +597,12 @@ export default function ItemForm() {
                       <SearchSelect
                         id="category"
                         value={field.value ?? ''}
-                        onChange={(val) => field.onChange(val)}
+                        onChange={(val) => {
+                          field.onChange(val)
+                          // Solo se limpia al elegir manualmente una categoría distinta —
+                          // no debe correr al precargar el formulario en modo edición.
+                          if (val !== field.value) setValue('subcategory', '')
+                        }}
                         options={categoryOptions}
                         onSearch={setCatSearch}
                         selectedLabel={selectedCategoryLabel}
@@ -605,8 +714,9 @@ export default function ItemForm() {
             </div>
           )}
 
-          {/* ── Variantes (opcional) ───────────────────────────────────── */}
-          {selectedType === 'product' && (
+          {/* ── Variantes (opcional) — solo al crear; editar variantes/atributos
+                de un template ya existente no está soportado por este formulario ── */}
+          {!isEdit && selectedType === 'product' && (
             <>
               <button
                 type="button"
@@ -968,11 +1078,17 @@ export default function ItemForm() {
 
         {/* ════════════════ BOTONES (ancho completo) ════════════════ */}
         <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/inventario/articulos')}>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate(backTo)}>
             Cancelar
           </button>
-          <button type="submit" className="btn btn-primary" disabled={isSubmitting || createMutation.isPending}>
-            {createMutation.isPending ? 'Guardando…' : 'Crear Artículo'}
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={isSubmitting || createMutation.isPending || updateMutation.isPending}
+          >
+            {isEdit
+              ? (updateMutation.isPending ? 'Guardando…' : 'Guardar Cambios')
+              : (createMutation.isPending ? 'Guardando…' : 'Crear Artículo')}
           </button>
         </div>
       </form>

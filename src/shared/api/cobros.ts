@@ -10,6 +10,7 @@ import type {
   PaginatedResponse,
   PaginationParams,
   EstadoCuentaResponse,
+  FormatoImpresion,
 } from './types'
 
 // ─── List Cobros ──────────────────────────────────────────────────────────────
@@ -34,6 +35,33 @@ export async function getCobro(id: string) {
 export async function submitCobro(id: string) {
   const res = await client.post<{ success: true; data: PaymentEntry }>(ENDPOINTS.cobros.submit(id), {})
   return unwrap(res)
+}
+
+export async function getCobroPdfBlobUrl(id: string, formato?: FormatoImpresion): Promise<string> {
+  const params = new URLSearchParams()
+  if (formato) params.set('formato', formato)
+  const qs = params.toString()
+  const url = qs ? `${ENDPOINTS.cobros.pdf(id)}?${qs}` : ENDPOINTS.cobros.pdf(id)
+  const res = await client.get<Blob>(url, {
+    responseType: 'blob',
+  })
+  return URL.createObjectURL(res.data)
+}
+
+export async function downloadCobroPdf(id: string, filename?: string, formato?: FormatoImpresion): Promise<void> {
+  const params = new URLSearchParams()
+  if (formato) params.set('formato', formato)
+  const qs = params.toString()
+  const url = qs ? `${ENDPOINTS.cobros.pdf(id)}?${qs}` : ENDPOINTS.cobros.pdf(id)
+  const res = await client.get<Blob>(url, {
+    responseType: 'blob',
+  })
+  const blobUrl = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = filename ?? `cobro-${id}.pdf`
+  a.click()
+  URL.revokeObjectURL(blobUrl)
 }
 
 // ─── Aging ────────────────────────────────────────────────────────────────────

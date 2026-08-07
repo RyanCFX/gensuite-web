@@ -11,6 +11,9 @@ import { toast } from 'sonner'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
+import { Select, SelectItem } from '@/components/ui/select'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -40,6 +43,10 @@ export default function PedidosPage() {
     queryFn: () => listSucursales({ limit: 100 }),
   })
   const sucursales = sucursalesData?.items ?? []
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchOptions: SearchSelectOption[] = sucursales
+    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((s) => ({ value: s.name, label: s.name }))
 
   const params: ListPedidosParams = {
     search: search || undefined,
@@ -89,18 +96,22 @@ export default function PedidosPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <select className="filter-select" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="all">Todos los estados</option>
-            <option value="draft">Borrador</option>
-            <option value="submitted">En Proceso</option>
-            <option value="cancelled">Cancelado</option>
-          </select>
-          <select className="filter-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
-            <option value="">Todas las sucursales</option>
-            {sucursales.map((s) => (
-              <option key={s.id} value={s.name}>{s.name}</option>
-            ))}
-          </select>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectItem value="all">Todos los estados</SelectItem>
+            <SelectItem value="draft">Borrador</SelectItem>
+            <SelectItem value="submitted">En Proceso</SelectItem>
+            <SelectItem value="cancelled">Cancelado</SelectItem>
+          </Select>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={branch}
+              onChange={setBranch}
+              options={branchOptions}
+              onSearch={setBranchSearch}
+              selectedLabel={branch}
+              placeholder="Todas las sucursales"
+            />
+          </div>
           <input
             type="date"
             className="ff-input ff-input-sm"

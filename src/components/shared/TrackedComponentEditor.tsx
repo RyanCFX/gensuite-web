@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { listSeriales, listLotes } from '@/shared/api/inventory'
 import type { TrackedComponent } from './ComponentTrackingModal'
 import { Plus, Trash2 } from 'lucide-react'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 export function TrackedComponentEditor({
   component, serials, onChangeSerials, batches, onChangeBatches,
@@ -33,6 +35,16 @@ export function TrackedComponentEditor({
   const batchSum = batches.reduce((s, b) => s + Number(b.qty || 0), 0)
   const unusedSerials = (availableSerials?.items ?? []).filter((s) => !serials.includes(s.id))
 
+  const [serialSearch, setSerialSearch] = useState('')
+  const serialOptions: SearchSelectOption[] = unusedSerials
+    .filter((s) => !serialSearch || s.id.toLowerCase().includes(serialSearch.toLowerCase()))
+    .map((s) => ({ value: s.id, label: s.id }))
+
+  const [batchSearch, setBatchSearch] = useState('')
+  const batchOptions: SearchSelectOption[] = (availableLotes?.items ?? [])
+    .filter((l) => !batchSearch || l.id.toLowerCase().includes(batchSearch.toLowerCase()))
+    .map((l) => ({ value: l.id, label: l.id, sublabel: `${l.qty} disp.` }))
+
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -45,18 +57,17 @@ export function TrackedComponentEditor({
       {trackingType === 'serial' ? (
         <>
           <div style={{ display: 'flex', gap: 8 }}>
-            <select
-              className="ff-select"
-              style={{ fontSize: 12, padding: '4px 8px', flex: 1 }}
-              value={serialToAdd}
-              onChange={(e) => setSerialToAdd(e.target.value)}
-              disabled={loadingSerials || serials.length >= qtyNeeded}
-            >
-              <option value="">{loadingSerials ? 'Cargando…' : 'Seleccionar serial…'}</option>
-              {unusedSerials.map((s) => (
-                <option key={s.id} value={s.id}>{s.id}</option>
-              ))}
-            </select>
+            <div style={{ flex: 1 }}>
+              <SearchSelect
+                value={serialToAdd}
+                onChange={setSerialToAdd}
+                options={serialOptions}
+                onSearch={setSerialSearch}
+                selectedLabel={serialToAdd}
+                placeholder={loadingSerials ? 'Cargando…' : 'Seleccionar serial…'}
+                disabled={loadingSerials || serials.length >= qtyNeeded}
+              />
+            </div>
             <button
               type="button"
               className="btn btn-secondary btn-size-xs"
@@ -88,18 +99,17 @@ export function TrackedComponentEditor({
       ) : (
         <>
           <div style={{ display: 'flex', gap: 8 }}>
-            <select
-              className="ff-select"
-              style={{ fontSize: 12, padding: '4px 8px', flex: 1 }}
-              value={batchToAdd}
-              onChange={(e) => setBatchToAdd(e.target.value)}
-              disabled={loadingLotes}
-            >
-              <option value="">{loadingLotes ? 'Cargando…' : 'Seleccionar lote…'}</option>
-              {(availableLotes?.items ?? []).map((l) => (
-                <option key={l.id} value={l.id}>{l.id} ({l.qty} disp.)</option>
-              ))}
-            </select>
+            <div style={{ flex: 1 }}>
+              <SearchSelect
+                value={batchToAdd}
+                onChange={setBatchToAdd}
+                options={batchOptions}
+                onSearch={setBatchSearch}
+                selectedLabel={batchToAdd}
+                placeholder={loadingLotes ? 'Cargando…' : 'Seleccionar lote…'}
+                disabled={loadingLotes}
+              />
+            </div>
             <input
               className="ff-input"
               type="number"

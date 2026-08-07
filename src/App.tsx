@@ -155,6 +155,7 @@ export default function App() {
             {/* Inventario */}
              <Route path="/inventario/articulos" element={<Suspense fallback={<PageLoader />}><ItemsPage /></Suspense>} />
             <Route path="/inventario/articulos/nuevo" element={<Suspense fallback={<PageLoader />}><ItemForm /></Suspense>} />
+            <Route path="/inventario/articulos/:id/editar" element={<Suspense fallback={<PageLoader />}><ItemForm /></Suspense>} />
             <Route path="/inventario/articulos/:id" element={<Suspense fallback={<PageLoader />}><ItemDetail /></Suspense>} />
             <Route path="/catalogo/atributos" element={<Suspense fallback={<PageLoader />}><AttributesPage /></Suspense>} />
             <Route path="/inventario/stock" element={<Suspense fallback={<PageLoader />}><StockPage /></Suspense>} />

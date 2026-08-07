@@ -7,6 +7,9 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { Select, SelectItem } from '@/components/ui/select'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const PAGE_SIZE = 30
 
@@ -38,6 +41,16 @@ export default function HistoryPage() {
     queryFn: () => listSucursales({ limit: 100 }),
   })
 
+  const [warehouseSearch, setWarehouseSearch] = useState('')
+  const warehouseOptions: SearchSelectOption[] = (warehouses ?? [])
+    .filter((w) => !warehouseSearch || w.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
+    .map((w) => ({ value: w.name, label: w.name }))
+
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchOptions: SearchSelectOption[] = (sucursales?.items ?? [])
+    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((s) => ({ value: s.id, label: s.name }))
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ['inventory-history', { warehouse, branch, voucherType, fromDate, toDate, offset, orderBy }],
     queryFn: () =>
@@ -64,40 +77,36 @@ export default function HistoryPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <select
-            className="filter-select"
-            value={warehouse}
-            onChange={(e) => { setWarehouse(e.target.value); setPage(1); if (e.target.value !== 'all') setBranch('') }}
-          >
-            <option value="all">Todos los almacenes</option>
-            {warehouses?.map((w) => (
-              <option key={w.name} value={w.name}>{w.name}</option>
-            ))}
-          </select>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={warehouse === 'all' ? '' : warehouse}
+              onChange={(val) => { setWarehouse(val || 'all'); setPage(1); if (val) setBranch('') }}
+              options={warehouseOptions}
+              onSearch={setWarehouseSearch}
+              selectedLabel={warehouse === 'all' ? '' : warehouse}
+              placeholder="Todos los almacenes"
+            />
+          </div>
 
           {warehouse === 'all' && (
-            <select
-              className="filter-select"
-              value={branch}
-              onChange={(e) => { setBranch(e.target.value); setPage(1) }}
-            >
-              <option value="">Todas las sucursales</option>
-              {sucursales?.items.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+            <div style={{ width: 200 }}>
+              <SearchSelect
+                value={branch}
+                onChange={(val) => { setBranch(val); setPage(1) }}
+                options={branchOptions}
+                onSearch={setBranchSearch}
+                selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
+                placeholder="Todas las sucursales"
+              />
+            </div>
           )}
 
-          <select
-            className="filter-select"
-            value={voucherType}
-            onChange={(e) => { setVoucherType(e.target.value); setPage(1) }}
-          >
-            <option value="all">Todos los tipos</option>
+          <Select value={voucherType} onValueChange={(val) => { setVoucherType(val); setPage(1) }}>
+            <SelectItem value="all">Todos los tipos</SelectItem>
             {VOUCHER_TYPES.map((t) => (
-              <option key={t} value={t}>{t}</option>
+              <SelectItem key={t} value={t}>{t}</SelectItem>
             ))}
-          </select>
+          </Select>
 
           <input
             type="date"

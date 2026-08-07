@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { createCompra, updateCompra, getCompra } from '@/shared/api/compras-gastos'
 import { listSuppliers } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
-import { listAlmacenes, listImpuestosCompras, getCatalogosFiscales } from '@/shared/api/config'
+import { listAlmacenes, listImpuestosCompras, getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateCompraDto } from '@/shared/api/types'
@@ -23,6 +23,7 @@ import { listItems } from '@/shared/api/catalog'
 import { useAuthStore } from '@/stores/auth.store'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 
 interface ItemRow {
   itemCode: string
@@ -446,6 +447,14 @@ export default function CompraForm() {
   const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
 
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
+  const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
+
   const [ncfProveedor, setNcfProveedor] = useState('')
   const [tipoBienes606, setTipoBienes606] = useState('')
   const [formaPago606, setFormaPago606] = useState('')
@@ -472,6 +481,15 @@ export default function CompraForm() {
     queryFn: getCatalogosFiscales,
     staleTime: 60 * 60_000,
   })
+  const [tipoBienes606Search, setTipoBienes606Search] = useState('')
+  const tipoBienes606Options: SearchSelectOption[] = (catalogos?.tipoBienes606 ?? [])
+    .filter((t) => !tipoBienes606Search || t.label.toLowerCase().includes(tipoBienes606Search.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
+
+  const [formaPago606Search, setFormaPago606Search] = useState('')
+  const formaPago606Options: SearchSelectOption[] = (catalogos?.formaPago606 ?? [])
+    .filter((f) => !formaPago606Search || f.label.toLowerCase().includes(formaPago606Search.toLowerCase()))
+    .map((f) => ({ value: f.value, label: f.label }))
 
   const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
     queryKey: ['supplierSearch', supplierQuery],
@@ -536,6 +554,10 @@ export default function CompraForm() {
   const branchOptions = isSystemManager
     ? (allSucursales?.items.map((s) => s.name) ?? [])
     : (myBranches?.branches ?? [])
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchSelectOptions: SearchSelectOption[] = branchOptions
+    .filter((b) => !branchSearch || b.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((b) => ({ value: b, label: b }))
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
@@ -680,7 +702,7 @@ export default function CompraForm() {
       postingDate,
       dueDate: dueDate || undefined,
       branch: branch || undefined,
-      department: department || undefined,
+      department: usaDepartamentos ? (department || undefined) : undefined,
       items: items.map((i) => ({
         itemCode: i.itemCode,
         description: i.description,
@@ -695,7 +717,7 @@ export default function CompraForm() {
       tipoBienes606: tipoBienes606 || undefined,
       formaPago606: formaPago606 || undefined,
       tipoPago,
-      taxesTemplate: taxesTemplate || undefined,
+      taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
     }
     saveMutation.mutate(dto)
   }
@@ -820,33 +842,41 @@ export default function CompraForm() {
 
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal</label>
-                  <select className={`ff-select${branchError ? ' ff-input-error' : ''}`} value={branch} onChange={(e) => { setBranch(e.target.value); setBranchError(false) }} disabled={isReturn}>
-                    <option value="">Sin especificar</option>
-                    {branchOptions.map((b) => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="ff-wrap">
-                  <label className="ff-label">Departamento</label>
-                  <DepartmentSelect value={department} onChange={setDepartment} placeholder="Buscar departamento…" disabled={isReturn} />
-                </div>
-
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
                   <SearchSelect
-                    id="taxesTemplate"
-                    value={taxesTemplate}
+                    value={branch}
+                    onChange={(val) => { setBranch(val); setBranchError(false) }}
+                    options={branchSelectOptions}
+                    onSearch={setBranchSearch}
+                    selectedLabel={branch}
+                    placeholder="Sin especificar"
+                    error={branchError}
                     disabled={isReturn}
-                    onChange={(val) => setTaxesTemplate(val)}
-                    options={taxesTemplateOptions}
-                    onSearch={setTaxesTemplateSearch}
-                    selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
-                    placeholder="Usar el default de la compañía"
                   />
-                  <p className="ff-hint">Impuesto aplicado al total de la compra (ej. ITBIS 18%, retenciones). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
                 </div>
+
+                {usaDepartamentos && (
+                  <div className="ff-wrap">
+                    <label className="ff-label">Departamento</label>
+                    <DepartmentSelect value={department} onChange={setDepartment} placeholder="Buscar departamento…" disabled={isReturn} />
+                  </div>
+                )}
+
+                {usaImpuestoDocumento && (
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
+                    <SearchSelect
+                      id="taxesTemplate"
+                      value={taxesTemplate}
+                      disabled={isReturn}
+                      onChange={(val) => setTaxesTemplate(val)}
+                      options={taxesTemplateOptions}
+                      onSearch={setTaxesTemplateSearch}
+                      selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
+                      placeholder="Usar el default de la compañía"
+                    />
+                    <p className="ff-hint">Impuesto aplicado al total de la compra (ej. ITBIS 18%, retenciones). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -941,51 +971,37 @@ export default function CompraForm() {
 
               <div className="ff-wrap">
                 <label className="ff-label">Tipo de Bienes 606</label>
-                <select
-                  className="ff-select"
+                <SearchSelect
                   value={tipoBienes606}
-                  onChange={(e) => { setTipoBienes606(e.target.value); setTipoBienes606Touched(true) }}
-                >
-                  <option value="">Seleccionar tipo</option>
-                  {/* El default del proveedor puede no estar en el catálogo vigente
-                      (formato distinto o valor legado) — se inyecta como opción para
-                      que el select nunca se muestre en blanco con un valor ya seteado. */}
-                  {tipoBienes606 && !(catalogos?.tipoBienes606 ?? []).some((t) => t.value === tipoBienes606) && (
-                    <option value={tipoBienes606}>{tipoBienes606}</option>
-                  )}
-                  {(catalogos?.tipoBienes606 ?? []).map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
+                  onChange={(val) => { setTipoBienes606(val); setTipoBienes606Touched(true) }}
+                  options={tipoBienes606Options}
+                  onSearch={setTipoBienes606Search}
+                  selectedLabel={catalogos?.tipoBienes606?.find((t) => t.value === tipoBienes606)?.label ?? tipoBienes606}
+                  placeholder="Seleccionar tipo"
+                />
               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label">Forma de Pago 606</label>
-                <select
-                  className="ff-select"
+                <SearchSelect
                   value={formaPago606}
-                  onChange={(e) => { setFormaPago606(e.target.value); setFormaPago606Touched(true) }}
-                >
-                  <option value="">Seleccionar forma</option>
-                  {formaPago606 && !(catalogos?.formaPago606 ?? []).some((f) => f.value === formaPago606) && (
-                    <option value={formaPago606}>{formaPago606}</option>
-                  )}
-                  {(catalogos?.formaPago606 ?? []).map((f) => (
-                    <option key={f.value} value={f.value}>{f.label}</option>
-                  ))}
-                </select>
+                  onChange={(val) => { setFormaPago606(val); setFormaPago606Touched(true) }}
+                  options={formaPago606Options}
+                  onSearch={setFormaPago606Search}
+                  selectedLabel={catalogos?.formaPago606?.find((f) => f.value === formaPago606)?.label ?? formaPago606}
+                  placeholder="Seleccionar forma"
+                />
               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label">Tipo de Pago</label>
-                <select
-                  className="ff-select"
+                <Select
                   value={tipoPago}
-                  onChange={(e) => { setTipoPago(e.target.value as 'Contado' | 'Crédito'); setTipoPagoTouched(true) }}
+                  onValueChange={(val) => { setTipoPago(val as 'Contado' | 'Crédito'); setTipoPagoTouched(true) }}
                 >
-                  <option value="Contado">Contado</option>
-                  <option value="Crédito">Crédito</option>
-                </select>
+                  <SelectItem value="Contado">Contado</SelectItem>
+                  <SelectItem value="Crédito">Crédito</SelectItem>
+                </Select>
               </div>
 
               <div className="ff-wrap">

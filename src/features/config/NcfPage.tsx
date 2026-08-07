@@ -13,6 +13,7 @@ import {
   AlertTriangle, AlertCircle, Plus, Eye, Pencil,
   XCircle, RefreshCw, ChevronRight,
 } from 'lucide-react'
+import { Select, SelectItem } from '@/components/ui/select'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -165,11 +166,11 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             {/* Tipo NCF */}
             <div className="ff-wrap">
               <label className="ff-label">Tipo de Comprobante <span className="ff-required">*</span></label>
-              <select className="ff-select" value={ncfType} onChange={(e) => setNcfType(e.target.value as typeof ncfType)}>
+              <Select value={ncfType} onValueChange={(val) => setNcfType(val as typeof ncfType)}>
                 {Object.entries(NCF_TYPE_INFO).map(([k, v]) => (
-                  <option key={k} value={k}>{k} — {v.description}</option>
+                  <SelectItem key={k} value={k}>{k} — {v.description}</SelectItem>
                 ))}
-              </select>
+              </Select>
               <p className="ff-hint">{NCF_TYPE_INFO[ncfType]?.description}</p>
             </div>
 
@@ -333,17 +334,15 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
               {/* Tipo NCF — disabled if has movements */}
               <div className="ff-wrap">
                 <label className="ff-label">Tipo de Comprobante</label>
-                <select
-                  className="ff-select"
+                <Select
                   value={ncfType}
-                  onChange={(e) => setNcfType(e.target.value as typeof ncfType)}
+                  onValueChange={(val) => setNcfType(val as typeof ncfType)}
                   disabled={hasUsed}
-                  title={hasUsed ? `El tipo no puede cambiarse porque ya se emitieron ${serie.used} comprobantes` : undefined}
                 >
                   {Object.entries(NCF_TYPE_INFO).map(([k, v]) => (
-                    <option key={k} value={k}>{k} — {v.description}</option>
+                    <SelectItem key={k} value={k}>{k} — {v.description}</SelectItem>
                   ))}
-                </select>
+                </Select>
                 {hasUsed && (
                   <p className="ff-hint">🔒 No editable — ya se emitieron {(serie.used ?? 0).toLocaleString('es-DO')} comprobantes</p>
                 )}

@@ -106,6 +106,16 @@ export default function CreditNotesPage() {
     queryFn: () => listDepartamentos({ limit: 100 }),
   })
 
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchOptions: SearchSelectOption[] = (sucursales?.items ?? [])
+    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((s) => ({ value: s.id, label: s.name }))
+
+  const [departmentSearch, setDepartmentSearch] = useState('')
+  const departmentOptions: SearchSelectOption[] = (departamentos?.items ?? [])
+    .filter((d) => !departmentSearch || d.name.toLowerCase().includes(departmentSearch.toLowerCase()))
+    .map((d) => ({ value: d.id, label: d.name }))
+
   const { data: preselectedCustomer } = useQuery({
     queryKey: ['customer', customerId],
     queryFn: () => getCustomer(customerId),
@@ -160,6 +170,11 @@ export default function CreditNotesPage() {
     enabled: !!refundTarget,
     staleTime: 5 * 60_000,
   })
+  const [refundModeOfPaymentSearch, setRefundModeOfPaymentSearch] = useState('')
+  const refundModeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
+    .filter((m) => !m.disabled)
+    .filter((m) => !refundModeOfPaymentSearch || m.name.toLowerCase().includes(refundModeOfPaymentSearch.toLowerCase()))
+    .map((m) => ({ value: m.name, label: m.name }))
 
   // El listado de facturas (GET /invoices) no incluye `items[]` — solo el detalle (GET /invoices/:id) lo tiene.
   // Se necesita el detalle completo para poder poblar/editar los artículos a devolver.
@@ -195,6 +210,10 @@ export default function CreditNotesPage() {
   const availableToAdd = (selectedInvoiceDetail?.items ?? []).filter(
     (i) => !noteItems.some((n) => n.itemCode === i.itemCode),
   )
+  const [addItemSearch, setAddItemSearch] = useState('')
+  const addItemOptions: SearchSelectOption[] = availableToAdd
+    .filter((i) => !addItemSearch || i.itemCode.toLowerCase().includes(addItemSearch.toLowerCase()) || i.description?.toLowerCase().includes(addItemSearch.toLowerCase()))
+    .map((i) => ({ value: i.itemCode, label: i.itemCode, sublabel: i.description ?? undefined }))
 
   const downloadPdfMutation = useMutation({
     mutationFn: (id: string) => downloadCreditNotePdf(id, `nota-credito-${id}.pdf`),
@@ -255,13 +274,12 @@ export default function CreditNotesPage() {
     queryFn: async () => {
       const customer = applyOriginalInvoice!.customer
       const search = applyInvoiceQuery || undefined
-      const [draft, unpaid, partial] = await Promise.all([
+      const [draft, pending] = await Promise.all([
         listInvoices({ customer, search, status: 'draft', limit: 20 }),
-        listInvoices({ customer, search, status: 'submitted', paymentStatus: 'unpaid', limit: 20 }),
-        listInvoices({ customer, search, status: 'submitted', paymentStatus: 'partial', limit: 20 }),
+        listInvoices({ customer, search, status: 'submitted', paymentStatus: ['unpaid', 'partly_paid'], limit: 20 }),
       ])
       const seen = new Set<string>()
-      const items = [...draft.items, ...unpaid.items, ...partial.items].filter((inv) => {
+      const items = [...draft.items, ...pending.items].filter((inv) => {
         if (seen.has(inv.id)) return false
         seen.add(inv.id)
         return true
@@ -406,18 +424,26 @@ export default function CreditNotesPage() {
               placeholder="Filtrar por cliente…"
             />
           </div>
-          <select className="filter-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
-            <option value="">Todas las sucursales</option>
-            {sucursales?.items.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-          <select className="filter-select" value={department} onChange={(e) => setDepartment(e.target.value)}>
-            <option value="">Todos los departamentos</option>
-            {departamentos?.items.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={branch}
+              onChange={setBranch}
+              options={branchOptions}
+              onSearch={setBranchSearch}
+              selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
+              placeholder="Todas las sucursales"
+            />
+          </div>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={department}
+              onChange={setDepartment}
+              options={departmentOptions}
+              onSearch={setDepartmentSearch}
+              selectedLabel={departamentos?.items.find((d) => d.id === department)?.name ?? ''}
+              placeholder="Todos los departamentos"
+            />
+          </div>
         </div>
       </div>
 
@@ -619,20 +645,19 @@ export default function CreditNotesPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <label className="ff-label" style={{ margin: 0 }}>Artículos a devolver</label>
                     {selectedInvoice && availableToAdd.length > 0 && (
-                      <select
-                        className="ff-select"
-                        style={{ width: 240, height: 30 }}
-                        value=""
-                        onChange={(e) => {
-                          const item = selectedInvoiceDetail?.items.find((i) => i.itemCode === e.target.value)
-                          if (item) setNoteItems((prev) => [...prev, { itemCode: item.itemCode, qty: item.qty, rate: item.rate }])
-                        }}
-                      >
-                        <option value="">+ Agregar artículo…</option>
-                        {availableToAdd.map((i) => (
-                          <option key={i.itemCode} value={i.itemCode}>{i.itemCode}{i.description ? ` — ${i.description}` : ''}</option>
-                        ))}
-                      </select>
+                      <div style={{ width: 240 }}>
+                        <SearchSelect
+                          value=""
+                          onChange={(val) => {
+                            const item = selectedInvoiceDetail?.items.find((i) => i.itemCode === val)
+                            if (item) setNoteItems((prev) => [...prev, { itemCode: item.itemCode, qty: item.qty, rate: item.rate }])
+                          }}
+                          options={addItemOptions}
+                          onSearch={setAddItemSearch}
+                          selectedLabel=""
+                          placeholder="+ Agregar artículo…"
+                        />
+                      </div>
                     )}
                   </div>
                   {noteItems.length === 0 ? (
@@ -732,17 +757,15 @@ export default function CreditNotesPage() {
               </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="refundModeOfPayment">Método de pago</label>
-                <select
+                <SearchSelect
                   id="refundModeOfPayment"
-                  className="ff-select"
                   value={refundModeOfPayment}
-                  onChange={(e) => setRefundModeOfPayment(e.target.value)}
-                >
-                  <option value="">Seleccionar…</option>
-                  {metodos?.filter((m) => !m.disabled).map((m) => (
-                    <option key={m.name} value={m.name}>{m.name}</option>
-                  ))}
-                </select>
+                  onChange={setRefundModeOfPayment}
+                  options={refundModeOfPaymentOptions}
+                  onSearch={setRefundModeOfPaymentSearch}
+                  selectedLabel={refundModeOfPayment}
+                  placeholder="Seleccionar…"
+                />
               </div>
             </div>
             <div className="modal-foot">

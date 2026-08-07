@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -18,6 +18,8 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { useDebounce } from '@/lib/useDebounce'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const PAGE_SIZE = 20
 
@@ -78,8 +80,14 @@ export default function CentrosCostoPage() {
     setPage(1)
   }, [])
 
+  const [parentSearch, setParentSearch] = useState('')
+  const parentSelectOptions: SearchSelectOption[] = parentOptions
+    .filter((p) => !parentSearch || p.name.toLowerCase().includes(parentSearch.toLowerCase()))
+    .map((p) => ({ value: p.id, label: p.name }))
+
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
@@ -357,12 +365,21 @@ export default function CentrosCostoPage() {
                   <>
                     <div className="ff-wrap">
                       <label className="ff-label" htmlFor="ccParent">Centro de costo padre</label>
-                      <select id="ccParent" className="ff-input" {...register('parentCostCenter')}>
-                        <option value="">— Sin padre —</option>
-                        {parentOptions.map((p) => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
+                      <Controller
+                        name="parentCostCenter"
+                        control={control}
+                        render={({ field }) => (
+                          <SearchSelect
+                            id="ccParent"
+                            value={field.value ?? ''}
+                            onChange={(val) => field.onChange(val)}
+                            options={parentSelectOptions}
+                            onSearch={setParentSearch}
+                            selectedLabel={parentOptions.find((p) => p.id === field.value)?.name ?? ''}
+                            placeholder="— Sin padre —"
+                          />
+                        )}
+                      />
                     </div>
 
                     <div className="ff-wrap" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>

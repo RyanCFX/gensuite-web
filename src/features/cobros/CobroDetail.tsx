@@ -2,9 +2,13 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { getCobro, submitCobro } from '@/shared/api/cobros'
+import { getCobro, submitCobro, downloadCobroPdf, getCobroPdfBlobUrl } from '@/shared/api/cobros'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { ArrowLeft, Send } from 'lucide-react'
+import { ArrowLeft, Send, Eye } from 'lucide-react'
+import { PdfFormatButton } from '@/components/shared/PdfFormatButton'
+import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
+import type { FormatoImpresion } from '@/shared/api/types'
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
@@ -32,6 +36,26 @@ export default function CobroDetail() {
     queryKey: ['cobro', id],
     queryFn: () => getCobro(id!),
     enabled: !!id,
+  })
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const formatoImpresionDefault = facturacionConfig?.formatoImpresionDefault ?? 'a4'
+  const formatosPermitidos = facturacionConfig?.formatosPermitidos
+
+  const downloadMutation = useMutation({
+    mutationFn: (formato?: FormatoImpresion) => downloadCobroPdf(id!, `cobro-${id}.pdf`, formato ?? formatoImpresionDefault),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo descargar el PDF'),
+  })
+
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const previewMutation = useMutation({
+    mutationFn: (formato?: FormatoImpresion) => getCobroPdfBlobUrl(id!, formato ?? formatoImpresionDefault),
+    onSuccess: (url) => setPreviewUrl(url),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo generar la vista previa del PDF'),
   })
 
   const submitMutation = useMutation({
@@ -116,7 +140,7 @@ export default function CobroDetail() {
       </div>
 
       {/* Actions bar */}
-      {isDraft && (
+      {isDraft ? (
         <div className="doc-actions-bar">
           <button
             className="btn btn-primary btn-size-sm"
@@ -125,6 +149,22 @@ export default function CobroDetail() {
           >
             <Send size={14} /> Someter
           </button>
+        </div>
+      ) : (
+        <div className="doc-actions-bar">
+          <PdfFormatButton
+            onSelect={(formato) => previewMutation.mutate(formato)}
+            loading={previewMutation.isPending}
+            label="Ver PDF"
+            loadingLabel="Generando…"
+            icon={<Eye size={14} />}
+            formatosPermitidos={formatosPermitidos}
+          />
+          <PdfFormatButton
+            onSelect={(formato) => downloadMutation.mutate(formato)}
+            loading={downloadMutation.isPending}
+            formatosPermitidos={formatosPermitidos}
+          />
         </div>
       )}
 
@@ -282,6 +322,7 @@ export default function CobroDetail() {
           </div>
         </div>
       )}
+      <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
     </div>
   )
 }

@@ -7,8 +7,11 @@ import { listWarehouses } from '@/shared/api/inventory'
 import { listZonas } from '@/shared/api/zonas'
 import { listUbicaciones, getItemUbicaciones, assignItemUbicacion, unassignItemUbicacion, moverStockUbicacion } from '@/shared/api/ubicaciones'
 import { formatDOP } from '@/lib/formatters'
-import { ToggleLeft, ToggleRight, Package, ArrowLeft, X, MapPin, Trash2, Info, DollarSign, ArrowRightLeft } from 'lucide-react'
+import { ToggleLeft, ToggleRight, Package, ArrowLeft, X, MapPin, Trash2, Info, DollarSign, ArrowRightLeft, Pencil } from 'lucide-react'
 import type { Item, GenerateVariantsResult, ItemAttribute, ApiError, UpdateItemPricesDto, ItemPricesResult } from '@/shared/api/types'
+import { Select, SelectItem } from '@/components/ui/select'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 // ─── Update Prices Modal ──────────────────────────────────────────────────────
 
@@ -130,14 +133,10 @@ function UpdatePricesModal({
             </div>
             <div className="ff-wrap">
               <label className="ff-label">Modo de Precio</label>
-              <select
-                className="ff-select"
-                value={priceMode}
-                onChange={(e) => setPriceMode(e.target.value as 'manual' | 'cost_plus')}
-              >
-                <option value="manual">Manual</option>
-                <option value="cost_plus">Sobre Costo</option>
-              </select>
+              <Select value={priceMode} onValueChange={(val) => setPriceMode(val as 'manual' | 'cost_plus')}>
+                <SelectItem value="manual">Manual</SelectItem>
+                <SelectItem value="cost_plus">Sobre Costo</SelectItem>
+              </Select>
             </div>
 
             {isCostPlus ? (
@@ -308,6 +307,7 @@ function CreateVariantModal({
 
   const [standardRate, setStandardRate] = useState(0)
   const [attrValues, setAttrValues] = useState<Record<string, string>>({})
+  const [attrSearches, setAttrSearches] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -340,6 +340,10 @@ function CreateVariantModal({
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {attributeIds.map((attrId, i) => {
               const attrData = attributeQueries[i]?.data
+              const attrSearch = attrSearches[attrId] ?? ''
+              const attrOptions: SearchSelectOption[] = (attrData?.values ?? [])
+                .filter((val) => !attrSearch || val.value.toLowerCase().includes(attrSearch.toLowerCase()))
+                .map((val) => ({ value: val.value, label: val.value }))
               return (
                 <div key={attrId} className="ff-wrap">
                   <label className="ff-label">
@@ -354,17 +358,14 @@ function CreateVariantModal({
                       required
                     />
                   ) : (
-                    <select
-                      className="ff-select"
+                    <SearchSelect
                       value={attrValues[attrId] ?? ''}
-                      onChange={(e) => setAttrValues((v) => ({ ...v, [attrId]: e.target.value }))}
-                      required
-                    >
-                      <option value="">Seleccionar…</option>
-                      {(attrData?.values ?? []).map((val) => (
-                        <option key={val.value} value={val.value}>{val.value}</option>
-                      ))}
-                    </select>
+                      onChange={(val) => setAttrValues((v) => ({ ...v, [attrId]: val }))}
+                      options={attrOptions}
+                      onSearch={(q) => setAttrSearches((s) => ({ ...s, [attrId]: q }))}
+                      selectedLabel={attrValues[attrId] ?? ''}
+                      placeholder="Seleccionar…"
+                    />
                   )}
                 </div>
               )
@@ -580,6 +581,16 @@ function AssignUbicacionModal({
   })
   const ubicaciones = ubicacionesData?.items ?? []
 
+  const [zonaSearch, setZonaSearch] = useState('')
+  const zonaOptions: SearchSelectOption[] = zonas
+    .filter((z) => !zonaSearch || z.zonaName.toLowerCase().includes(zonaSearch.toLowerCase()))
+    .map((z) => ({ value: z.id, label: z.zonaName }))
+
+  const [ubicacionSearch, setUbicacionSearch] = useState('')
+  const ubicacionOptions: SearchSelectOption[] = ubicaciones
+    .filter((u) => !ubicacionSearch || u.ubicacionName.toLowerCase().includes(ubicacionSearch.toLowerCase()))
+    .map((u) => ({ value: u.id, label: u.ubicacionName }))
+
   const assignMutation = useMutation({
     mutationFn: () => assignItemUbicacion({ itemCode, warehouse, ubicacionId, esPrincipal, notas: notas || undefined }),
     onSuccess: () => {
@@ -599,24 +610,29 @@ function AssignUbicacionModal({
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="ff-wrap">
             <label className="ff-label ff-required">Zona</label>
-            <select className="ff-select" value={zonaId} onChange={(e) => { setZonaId(e.target.value); setUbicacionId('') }}>
-              <option value="">Seleccionar zona…</option>
-              {zonas.map((z) => (
-                <option key={z.id} value={z.id}>{z.zonaName}</option>
-              ))}
-            </select>
+            <SearchSelect
+              value={zonaId}
+              onChange={(val) => { setZonaId(val); setUbicacionId('') }}
+              options={zonaOptions}
+              onSearch={setZonaSearch}
+              selectedLabel={zonas.find((z) => z.id === zonaId)?.zonaName ?? ''}
+              placeholder="Seleccionar zona…"
+            />
             {zonasData && zonas.length === 0 && (
               <p className="ff-hint">Este almacén no tiene zonas todavía. Créalas en Inventario → Zonas y Ubicaciones.</p>
             )}
           </div>
           <div className="ff-wrap">
             <label className="ff-label ff-required">Ubicación / Rack</label>
-            <select className="ff-select" value={ubicacionId} onChange={(e) => setUbicacionId(e.target.value)} disabled={!zonaId}>
-              <option value="">Seleccionar ubicación…</option>
-              {ubicaciones.map((u) => (
-                <option key={u.id} value={u.id}>{u.ubicacionName}</option>
-              ))}
-            </select>
+            <SearchSelect
+              value={ubicacionId}
+              onChange={setUbicacionId}
+              options={ubicacionOptions}
+              onSearch={setUbicacionSearch}
+              selectedLabel={ubicaciones.find((u) => u.id === ubicacionId)?.ubicacionName ?? ''}
+              placeholder="Seleccionar ubicación…"
+              disabled={!zonaId}
+            />
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
             <input type="checkbox" checked={esPrincipal} onChange={(e) => setEsPrincipal(e.target.checked)} />
@@ -675,6 +691,16 @@ function MoverUbicacionModal({
   })
   const ubicaciones = (ubicacionesData?.items ?? []).filter((u) => u.id !== origen.id)
 
+  const [zonaSearch, setZonaSearch] = useState('')
+  const zonaOptions: SearchSelectOption[] = zonas
+    .filter((z) => !zonaSearch || z.zonaName.toLowerCase().includes(zonaSearch.toLowerCase()))
+    .map((z) => ({ value: z.id, label: z.zonaName }))
+
+  const [ubicacionSearch, setUbicacionSearch] = useState('')
+  const ubicacionOptions: SearchSelectOption[] = ubicaciones
+    .filter((u) => !ubicacionSearch || u.ubicacionName.toLowerCase().includes(ubicacionSearch.toLowerCase()))
+    .map((u) => ({ value: u.id, label: u.ubicacionName }))
+
   const moverMutation = useMutation({
     mutationFn: () => moverStockUbicacion({ itemCode, cantidad, ubicacionOrigen: origen.id, ubicacionDestino, notas: notas || undefined }),
     onSuccess: () => {
@@ -698,21 +724,26 @@ function MoverUbicacionModal({
           </div>
           <div className="ff-wrap">
             <label className="ff-label ff-required">Zona destino</label>
-            <select className="ff-select" value={zonaId} onChange={(e) => { setZonaId(e.target.value); setUbicacionDestino('') }}>
-              <option value="">Seleccionar zona…</option>
-              {zonas.map((z) => (
-                <option key={z.id} value={z.id}>{z.zonaName}</option>
-              ))}
-            </select>
+            <SearchSelect
+              value={zonaId}
+              onChange={(val) => { setZonaId(val); setUbicacionDestino('') }}
+              options={zonaOptions}
+              onSearch={setZonaSearch}
+              selectedLabel={zonas.find((z) => z.id === zonaId)?.zonaName ?? ''}
+              placeholder="Seleccionar zona…"
+            />
           </div>
           <div className="ff-wrap">
             <label className="ff-label ff-required">Ubicación destino</label>
-            <select className="ff-select" value={ubicacionDestino} onChange={(e) => setUbicacionDestino(e.target.value)} disabled={!zonaId}>
-              <option value="">Seleccionar ubicación…</option>
-              {ubicaciones.map((u) => (
-                <option key={u.id} value={u.id}>{u.ubicacionName}</option>
-              ))}
-            </select>
+            <SearchSelect
+              value={ubicacionDestino}
+              onChange={setUbicacionDestino}
+              options={ubicacionOptions}
+              onSearch={setUbicacionSearch}
+              selectedLabel={ubicaciones.find((u) => u.id === ubicacionDestino)?.ubicacionName ?? ''}
+              placeholder="Seleccionar ubicación…"
+              disabled={!zonaId}
+            />
           </div>
           <div className="ff-wrap">
             <label className="ff-label ff-required">Cantidad</label>
@@ -757,9 +788,13 @@ function UbicacionesPanel({ itemCode }: { itemCode: string }) {
     queryKey: ['warehouses'],
     queryFn: listWarehouses,
   })
+  const [warehouseSearch, setWarehouseSearch] = useState('')
 
   // Selecciona el primer almacén disponible por defecto
   const activeWarehouse = warehouse || warehouses?.[0]?.id || ''
+  const warehouseOptions: SearchSelectOption[] = (warehouses ?? [])
+    .filter((w) => !warehouseSearch || w.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
+    .map((w) => ({ value: w.id, label: w.name }))
 
   const { data, isLoading } = useQuery({
     queryKey: ['item-ubicaciones', itemCode, activeWarehouse],
@@ -786,11 +821,16 @@ function UbicacionesPanel({ itemCode }: { itemCode: string }) {
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {(warehouses?.length ?? 0) > 1 && (
-            <select className="filter-select" value={activeWarehouse} onChange={(e) => setWarehouse(e.target.value)}>
-              {warehouses?.map((w) => (
-                <option key={w.id} value={w.id}>{w.name}</option>
-              ))}
-            </select>
+            <div style={{ width: 200 }}>
+              <SearchSelect
+                value={activeWarehouse}
+                onChange={setWarehouse}
+                options={warehouseOptions}
+                onSearch={setWarehouseSearch}
+                selectedLabel={warehouses?.find((w) => w.id === activeWarehouse)?.name ?? ''}
+                placeholder="Seleccionar almacén"
+              />
+            </div>
           )}
           <button className="btn btn-primary btn-size-sm" onClick={() => setShowAssign(true)} disabled={!activeWarehouse}>
             + Asignar ubicación
@@ -966,6 +1006,9 @@ export default function ItemDetail() {
           <p className="page-sub" style={{ fontFamily: 'monospace' }}>{item.id}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-secondary" onClick={() => navigate(`/inventario/articulos/${item.id}/editar`)}>
+            <Pencil size={15} /> Editar
+          </button>
           {!item.hasVariants && (
             <button className="btn btn-secondary" onClick={() => setShowPricesModal(true)}>
               <DollarSign size={15} /> Actualizar Precios

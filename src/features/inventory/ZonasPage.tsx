@@ -745,6 +745,10 @@ function HistorialMovimientosSection({ warehouse }: { warehouse: string }) {
     queryFn: () => listUbicaciones({ warehouse, limit: 200 }),
     enabled: !!warehouse,
   })
+  const [ubicacionFilterSearch, setUbicacionFilterSearch] = useState('')
+  const ubicacionFilterOptions: SearchSelectOption[] = (ubicacionesData?.items ?? [])
+    .filter((u) => !ubicacionFilterSearch || u.ubicacionName.toLowerCase().includes(ubicacionFilterSearch.toLowerCase()))
+    .map((u) => ({ value: u.id, label: u.ubicacionName }))
 
   return (
     <div className="card">
@@ -759,18 +763,17 @@ function HistorialMovimientosSection({ warehouse }: { warehouse: string }) {
           value={itemCode}
           onChange={(e) => setItemCode(e.target.value)}
         />
-        <select
-          className="ff-select"
-          style={{ maxWidth: 220 }}
-          value={ubicacionFilter}
-          onChange={(e) => setUbicacionFilter(e.target.value)}
-          disabled={!warehouse}
-        >
-          <option value="">Todas las ubicaciones</option>
-          {(ubicacionesData?.items ?? []).map((u) => (
-            <option key={u.id} value={u.id}>{u.ubicacionName}</option>
-          ))}
-        </select>
+        <div style={{ maxWidth: 220, width: '100%' }}>
+          <SearchSelect
+            value={ubicacionFilter}
+            onChange={setUbicacionFilter}
+            options={ubicacionFilterOptions}
+            onSearch={setUbicacionFilterSearch}
+            selectedLabel={ubicacionesData?.items.find((u) => u.id === ubicacionFilter)?.ubicacionName ?? ''}
+            placeholder="Todas las ubicaciones"
+            disabled={!warehouse}
+          />
+        </div>
         <input className="ff-input" style={{ maxWidth: 160 }} type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
         <input className="ff-input" style={{ maxWidth: 160 }} type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
       </div>

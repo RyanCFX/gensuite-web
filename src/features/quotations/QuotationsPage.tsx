@@ -11,6 +11,9 @@ import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
+import { Select, SelectItem } from '@/components/ui/select'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 type StatusFilter = 'draft' | 'submitted' | 'ordered' | 'lost' | 'cancelled' | 'all'
 
@@ -45,6 +48,10 @@ export default function QuotationsPage() {
     queryFn: () => listSucursales({ limit: 100 }),
   })
   const sucursales = sucursalesData?.items ?? []
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchOptions: SearchSelectOption[] = sucursales
+    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((s) => ({ value: s.name, label: s.name }))
 
   const params: ListQuotationsParams = {
     search: search || undefined,
@@ -93,24 +100,24 @@ export default function QuotationsPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <select
-            className="filter-select"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as StatusFilter)}
-          >
-            <option value="all">Todos los estados</option>
-            <option value="draft">Borrador</option>
-            <option value="submitted">Sometido</option>
-            <option value="ordered">Ordenado</option>
-            <option value="lost">Perdido</option>
-            <option value="cancelled">Cancelado</option>
-          </select>
-          <select className="filter-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
-            <option value="">Todas las sucursales</option>
-            {sucursales.map((s) => (
-              <option key={s.id} value={s.name}>{s.name}</option>
-            ))}
-          </select>
+          <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
+            <SelectItem value="all">Todos los estados</SelectItem>
+            <SelectItem value="draft">Borrador</SelectItem>
+            <SelectItem value="submitted">Sometido</SelectItem>
+            <SelectItem value="ordered">Ordenado</SelectItem>
+            <SelectItem value="lost">Perdido</SelectItem>
+            <SelectItem value="cancelled">Cancelado</SelectItem>
+          </Select>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={branch}
+              onChange={setBranch}
+              options={branchOptions}
+              onSearch={setBranchSearch}
+              selectedLabel={branch}
+              placeholder="Todas las sucursales"
+            />
+          </div>
           <input
             type="date"
             className="ff-input ff-input-sm"

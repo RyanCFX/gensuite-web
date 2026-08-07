@@ -15,6 +15,8 @@ import type { Brand } from '@/shared/api/types'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const brandSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -41,6 +43,16 @@ export default function BrandsPage() {
     queryKey: ['categories', { tree: false }],
     queryFn: () => listCategories(),
   })
+
+  const [categoryFilterSearch, setCategoryFilterSearch] = useState('')
+  const categoryFilterOptions: SearchSelectOption[] = (categoriesData?.items ?? [])
+    .filter((c) => !categoryFilterSearch || c.name.toLowerCase().includes(categoryFilterSearch.toLowerCase()))
+    .map((c) => ({ value: c.id, label: c.name }))
+
+  const [formCategorySearch, setFormCategorySearch] = useState('')
+  const formCategoryOptions: SearchSelectOption[] = (categoriesData?.items ?? [])
+    .filter((c) => !formCategorySearch || c.name.toLowerCase().includes(formCategorySearch.toLowerCase()))
+    .map((c) => ({ value: c.id, label: c.name }))
 
   const {
     register,
@@ -134,16 +146,16 @@ export default function BrandsPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <select
-            className="filter-select"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value === '_all' ? '' : e.target.value)}
-          >
-            <option value="_all">Todas las categorías</option>
-            {categoriesData?.items.map((cat) => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
-            ))}
-          </select>
+          <div style={{ width: 220 }}>
+            <SearchSelect
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              options={categoryFilterOptions}
+              onSearch={setCategoryFilterSearch}
+              selectedLabel={categoriesData?.items.find((c) => c.id === categoryFilter)?.name ?? ''}
+              placeholder="Todas las categorías"
+            />
+          </div>
         </div>
       </div>
 
@@ -238,12 +250,14 @@ export default function BrandsPage() {
                     name="categoryId"
                     control={control}
                     render={({ field }) => (
-                      <select className="ff-select" value={field.value ?? ''} onChange={field.onChange}>
-                        <option value="">Sin categoría</option>
-                        {categoriesData?.items.map((cat) => (
-                          <option key={cat.id} value={cat.id}>{cat.name}</option>
-                        ))}
-                      </select>
+                      <SearchSelect
+                        value={field.value ?? ''}
+                        onChange={(val) => field.onChange(val)}
+                        options={formCategoryOptions}
+                        onSearch={setFormCategorySearch}
+                        selectedLabel={categoriesData?.items.find((c) => c.id === field.value)?.name ?? ''}
+                        placeholder="Sin categoría"
+                      />
                     )}
                   />
                 </div>

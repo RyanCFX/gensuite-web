@@ -1,7 +1,7 @@
 // Sección de uso poco frecuente: ajustes avanzados por módulo (Cuentas/Inventario/Ventas/Compras).
 // Cada tab es un singleton GET+PUT independiente (no hay lista/CRUD aquí).
-import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useEffect, useMemo, useState } from 'react'
+import { useForm, Controller } from 'react-hook-form'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -13,9 +13,17 @@ import {
   updateSellingSettings,
   getBuyingSettings,
   updateBuyingSettings,
+  listGruposProveedores,
+  listPaises,
 } from '@/shared/api/config'
+import { listWarehouses } from '@/shared/api/inventory'
+import { listCustomerGroups } from '@/shared/api/customers'
+import { listUsuarios, listRoles } from '@/shared/api/usuarios'
 import type { AccountsSettings, StockSettings, SellingSettings, BuyingSettings } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 import { Save, Settings2 } from 'lucide-react'
 
 type TabKey = 'cuentas' | 'inventario' | 'ventas' | 'compras'
@@ -77,13 +85,32 @@ function CuentasTab() {
     queryFn: getAccountsSettings,
   })
 
-  const { register, handleSubmit, reset } = useForm<AccountsSettings>({
+  const { register, control, handleSubmit, reset } = useForm<AccountsSettings>({
     defaultValues: {},
   })
 
   useEffect(() => {
     if (data) reset(data)
   }, [data, reset])
+
+  const { data: usuariosData } = useQuery({
+    queryKey: ['usuarios-all'],
+    queryFn: () => listUsuarios({ limit: 100 }),
+  })
+  const { data: rolesData } = useQuery({
+    queryKey: ['roles-all'],
+    queryFn: listRoles,
+  })
+
+  const [creditControllerSearch, setCreditControllerSearch] = useState('')
+  const creditControllerOptions: SearchSelectOption[] = (usuariosData?.items ?? [])
+    .filter((u) => !creditControllerSearch || u.fullName.toLowerCase().includes(creditControllerSearch.toLowerCase()))
+    .map((u) => ({ value: u.email, label: u.fullName, sublabel: u.email }))
+
+  const [overBillRoleSearch, setOverBillRoleSearch] = useState('')
+  const overBillRoleOptions: SearchSelectOption[] = (rolesData ?? [])
+    .filter((r) => !overBillRoleSearch || r.toLowerCase().includes(overBillRoleSearch.toLowerCase()))
+    .map((r) => ({ value: r, label: r }))
 
   const saveMutation = useMutation({
     mutationFn: (dto: Partial<AccountsSettings>) => updateAccountsSettings(dto),
@@ -136,12 +163,38 @@ function CuentasTab() {
 
           <div className="ff-wrap">
             <label className="ff-label">Controlador de Crédito</label>
-            <input className="ff-input" {...register('creditController')} placeholder="Usuario responsable" />
+            <Controller
+              name="creditController"
+              control={control}
+              render={({ field }) => (
+                <SearchSelect
+                  value={field.value ?? ''}
+                  onChange={(val) => field.onChange(val)}
+                  options={creditControllerOptions}
+                  onSearch={setCreditControllerSearch}
+                  selectedLabel={usuariosData?.items.find((u) => u.email === field.value)?.fullName ?? ''}
+                  placeholder="Usuario responsable"
+                />
+              )}
+            />
           </div>
 
           <div className="ff-wrap">
             <label className="ff-label">Rol Autorizado a Sobrefacturar</label>
-            <input className="ff-input" {...register('roleAllowedToOverBill')} placeholder="Rol del sistema" />
+            <Controller
+              name="roleAllowedToOverBill"
+              control={control}
+              render={({ field }) => (
+                <SearchSelect
+                  value={field.value ?? ''}
+                  onChange={(val) => field.onChange(val)}
+                  options={overBillRoleOptions}
+                  onSearch={setOverBillRoleSearch}
+                  selectedLabel={field.value ?? ''}
+                  placeholder="Rol del sistema"
+                />
+              )}
+            />
           </div>
 
           <div className="ff-wrap">
@@ -174,15 +227,30 @@ function InventarioTab() {
     queryFn: getStockSettings,
   })
 
-  const { register, handleSubmit, reset, watch } = useForm<StockSettings>({
+  const { register, handleSubmit, reset, watch, control } = useForm<StockSettings>({
     defaultValues: {},
   })
 
   const enableSerialAndBatchNoForItem = watch('enableSerialAndBatchNoForItem')
+  const watchedDefaultWarehouse = watch('defaultWarehouse')
 
   useEffect(() => {
     if (data) reset(data)
   }, [data, reset])
+
+  const { data: warehousesData } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: () => listWarehouses(),
+  })
+  const warehouses = warehousesData ?? []
+  const [warehouseSearch, setWarehouseSearch] = useState('')
+
+  const warehouseOptions: SearchSelectOption[] = useMemo(() => {
+    const q = warehouseSearch.toLowerCase()
+    return warehouses
+      .filter((w) => !q || w.name.toLowerCase().includes(q))
+      .map((w) => ({ value: w.id, label: w.name }))
+  }, [warehouses, warehouseSearch])
 
   const saveMutation = useMutation({
     mutationFn: (dto: Partial<StockSettings>) => updateStockSettings(dto),
@@ -216,13 +284,19 @@ function InventarioTab() {
         </div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="ff-wrap">
-            <label className="ff-label">Método de Valuación</label>
-            <select className="ff-select" {...register('valuationMethod')}>
-              <option value="">Sin definir</option>
-              <option value="FIFO">FIFO</option>
-              <option value="Moving Average">Promedio Móvil</option>
-              <option value="LIFO">LIFO</option>
-            </select>
+            <label className="ff-label" htmlFor="valuationMethod">Método de Valuación</label>
+            <Controller
+              name="valuationMethod"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value ?? ''} onValueChange={field.onChange} placeholder="Sin definir">
+                  <SelectItem value="">Sin definir</SelectItem>
+                  <SelectItem value="FIFO">FIFO</SelectItem>
+                  <SelectItem value="Moving Average">Promedio Móvil</SelectItem>
+                  <SelectItem value="LIFO">LIFO</SelectItem>
+                </Select>
+              )}
+            />
             <p className="ff-hint">
               Este campo puede ser rechazado por el servidor si ya existen movimientos de inventario (Stock Ledger Entry)
               registrados para artículos afectados. No es posible saberlo de antemano; si ocurre, verás un mensaje de error al guardar.
@@ -230,8 +304,22 @@ function InventarioTab() {
           </div>
 
           <div className="ff-wrap">
-            <label className="ff-label">Almacén por Defecto</label>
-            <input className="ff-input" {...register('defaultWarehouse')} placeholder="Nombre del almacén" />
+            <label className="ff-label" htmlFor="defaultWarehouse">Almacén por Defecto</label>
+            <Controller
+              name="defaultWarehouse"
+              control={control}
+              render={({ field }) => (
+                <SearchSelect
+                  id="defaultWarehouse"
+                  value={field.value ?? ''}
+                  onChange={(val) => field.onChange(val)}
+                  options={warehouseOptions}
+                  onSearch={setWarehouseSearch}
+                  selectedLabel={warehouses.find((w) => w.id === watchedDefaultWarehouse)?.name ?? ''}
+                  placeholder="Seleccionar almacén"
+                />
+              )}
+            />
           </div>
 
           <div className="ff-wrap">
@@ -300,13 +388,39 @@ function VentasTab() {
     queryFn: getSellingSettings,
   })
 
-  const { register, handleSubmit, reset } = useForm<SellingSettings>({
+  const { register, handleSubmit, reset, control } = useForm<SellingSettings>({
     defaultValues: {},
   })
 
   useEffect(() => {
     if (data) reset(data)
   }, [data, reset])
+
+  const { data: customerGroups } = useQuery({
+    queryKey: ['customer-groups'],
+    queryFn: listCustomerGroups,
+    staleTime: 60_000,
+  })
+  const [customerGroupSearch, setCustomerGroupSearch] = useState('')
+  const customerGroupOptions: SearchSelectOption[] = useMemo(() => {
+    const q = customerGroupSearch.toLowerCase()
+    return (customerGroups ?? [])
+      .filter((g) => !q || g.name.toLowerCase().includes(q))
+      .map((g) => ({ value: g.name, label: g.name }))
+  }, [customerGroups, customerGroupSearch])
+
+  const { data: paises } = useQuery({
+    queryKey: ['paises-all'],
+    queryFn: listPaises,
+    staleTime: 60_000,
+  })
+  const [territorySearch, setTerritorySearch] = useState('')
+  const territoryOptions: SearchSelectOption[] = useMemo(() => {
+    const q = territorySearch.toLowerCase()
+    return (paises ?? [])
+      .filter((p) => !q || p.name.toLowerCase().includes(q))
+      .map((p) => ({ value: p.name, label: p.name }))
+  }, [paises, territorySearch])
 
   const saveMutation = useMutation({
     mutationFn: (dto: Partial<SellingSettings>) => updateSellingSettings(dto),
@@ -336,13 +450,40 @@ function VentasTab() {
         </div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="ff-wrap">
-            <label className="ff-label">Grupo de Clientes por Defecto</label>
-            <input className="ff-input" {...register('customerGroup')} placeholder="Grupo de clientes" />
+            <label className="ff-label" htmlFor="customerGroup">Grupo de Clientes por Defecto</label>
+            <Controller
+              name="customerGroup"
+              control={control}
+              render={({ field }) => (
+                <SearchSelect
+                  id="customerGroup"
+                  value={field.value ?? ''}
+                  onChange={(val) => field.onChange(val)}
+                  options={customerGroupOptions}
+                  onSearch={setCustomerGroupSearch}
+                  selectedLabel={field.value ?? ''}
+                  placeholder="Sin predeterminado"
+                />
+              )}
+            />
           </div>
 
           <div className="ff-wrap">
             <label className="ff-label">Territorio por Defecto</label>
-            <input className="ff-input" {...register('territory')} placeholder="Territorio" />
+            <Controller
+              name="territory"
+              control={control}
+              render={({ field }) => (
+                <SearchSelect
+                  value={field.value ?? ''}
+                  onChange={(val) => field.onChange(val)}
+                  options={territoryOptions}
+                  onSearch={setTerritorySearch}
+                  selectedLabel={field.value ?? ''}
+                  placeholder="Sin predeterminado"
+                />
+              )}
+            />
           </div>
 
           <div className="ff-wrap">
@@ -386,13 +527,26 @@ function ComprasTab() {
     queryFn: getBuyingSettings,
   })
 
-  const { register, handleSubmit, reset } = useForm<BuyingSettings>({
+  const { register, control, handleSubmit, reset } = useForm<BuyingSettings>({
     defaultValues: {},
   })
 
   useEffect(() => {
     if (data) reset(data)
   }, [data, reset])
+
+  const { data: supplierGroups } = useQuery({
+    queryKey: ['supplier-groups'],
+    queryFn: listGruposProveedores,
+    staleTime: 60_000,
+  })
+  const [supplierGroupSearch, setSupplierGroupSearch] = useState('')
+  const supplierGroupOptions: SearchSelectOption[] = useMemo(() => {
+    const q = supplierGroupSearch.toLowerCase()
+    return (supplierGroups ?? [])
+      .filter((g) => !q || g.name.toLowerCase().includes(q))
+      .map((g) => ({ value: g.name, label: g.name }))
+  }, [supplierGroups, supplierGroupSearch])
 
   const saveMutation = useMutation({
     mutationFn: (dto: Partial<BuyingSettings>) => updateBuyingSettings(dto),
@@ -423,7 +577,20 @@ function ComprasTab() {
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="ff-wrap">
             <label className="ff-label">Grupo de Proveedores por Defecto</label>
-            <input className="ff-input" {...register('supplierGroup')} placeholder="Grupo de proveedores" />
+            <Controller
+              name="supplierGroup"
+              control={control}
+              render={({ field }) => (
+                <SearchSelect
+                  value={field.value ?? ''}
+                  onChange={(val) => field.onChange(val)}
+                  options={supplierGroupOptions}
+                  onSearch={setSupplierGroupSearch}
+                  selectedLabel={field.value ?? ''}
+                  placeholder="Sin predeterminado"
+                />
+              )}
+            />
           </div>
 
           <div className="ff-wrap">

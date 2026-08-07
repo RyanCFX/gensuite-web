@@ -9,6 +9,9 @@ import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 
 const PAGE_SIZE = 20
 
@@ -29,6 +32,11 @@ export default function ComprasPage() {
     queryFn: () => listSucursales({ limit: 100 }),
   })
   const sucursales = sucursalesData?.items ?? []
+
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchOptions: SearchSelectOption[] = sucursales
+    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((s) => ({ value: s.name, label: s.name }))
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['compras', { supplier, status, fromDate, toDate, branch, offset, orderBy }],
@@ -72,26 +80,25 @@ export default function ComprasPage() {
                 onChange={(e) => { setSupplier(e.target.value); setPage(1) }}
               />
             </div>
-            <select
-              className="filter-select"
+            <Select
               value={status}
-              onChange={(e) => { setStatus(e.target.value); setPage(1) }}
+              onValueChange={(val) => { setStatus(val); setPage(1) }}
             >
-              <option value="all">Todos</option>
-              <option value="Draft">Borrador</option>
-              <option value="Submitted">Sometido</option>
-              <option value="Cancelled">Anulado</option>
-            </select>
-            <select
-              className="filter-select"
-              value={branch}
-              onChange={(e) => { setBranch(e.target.value); setPage(1) }}
-            >
-              <option value="">Todas las sucursales</option>
-              {sucursales.map((s) => (
-                <option key={s.id} value={s.name}>{s.name}</option>
-              ))}
-            </select>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="Draft">Borrador</SelectItem>
+              <SelectItem value="Submitted">Sometido</SelectItem>
+              <SelectItem value="Cancelled">Anulado</SelectItem>
+            </Select>
+            <div style={{ width: 200 }}>
+              <SearchSelect
+                value={branch}
+                onChange={(val) => { setBranch(val); setPage(1) }}
+                options={branchOptions}
+                onSearch={setBranchSearch}
+                selectedLabel={branch}
+                placeholder="Todas las sucursales"
+              />
+            </div>
             <input
               type="date"
               className="filter-select"

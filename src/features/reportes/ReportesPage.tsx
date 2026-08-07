@@ -21,6 +21,9 @@ import { listUsuarios } from '@/shared/api/usuarios'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { formatDate, formatDateTime, formatDOP } from '@/lib/formatters'
 import { BarChart3, AlertCircle, Download, FileText, Loader2 } from 'lucide-react'
+import { Select, SelectItem } from '@/components/ui/select'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 // ─── Branch / Department filter ──────────────────────────────────────────────
 
@@ -57,20 +60,38 @@ function BranchDepartmentFilters({
   const branches = useBranchOptions()
   const departments = useDepartmentOptions()
 
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchOptions: SearchSelectOption[] = branches
+    .filter((b) => !branchSearch || b.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((b) => ({ value: b.name, label: b.name }))
+
+  const [departmentSearch, setDepartmentSearch] = useState('')
+  const departmentOptions: SearchSelectOption[] = departments
+    .filter((d) => !departmentSearch || d.name.toLowerCase().includes(departmentSearch.toLowerCase()))
+    .map((d) => ({ value: d.name, label: d.name }))
+
   return (
     <>
-      <select className="filter-select" value={branch} onChange={(e) => onBranchChange(e.target.value)}>
-        <option value="">Todas las sucursales</option>
-        {branches.map((b) => (
-          <option key={b.id} value={b.name}>{b.name}</option>
-        ))}
-      </select>
-      <select className="filter-select" value={department} onChange={(e) => onDepartmentChange(e.target.value)}>
-        <option value="">Todos los departamentos</option>
-        {departments.map((d) => (
-          <option key={d.id} value={d.name}>{d.name}</option>
-        ))}
-      </select>
+      <div style={{ width: 200 }}>
+        <SearchSelect
+          value={branch}
+          onChange={onBranchChange}
+          options={branchOptions}
+          onSearch={setBranchSearch}
+          selectedLabel={branch}
+          placeholder="Todas las sucursales"
+        />
+      </div>
+      <div style={{ width: 200 }}>
+        <SearchSelect
+          value={department}
+          onChange={onDepartmentChange}
+          options={departmentOptions}
+          onSearch={setDepartmentSearch}
+          selectedLabel={department}
+          placeholder="Todos los departamentos"
+        />
+      </div>
     </>
   )
 }
@@ -273,19 +294,19 @@ function DgiiReport({ tipo }: { tipo: '606' | '607' | '608' }) {
         <div className="filter-bar-left">
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
             Año:
-            <select className="filter-select" value={year} onChange={(e) => setYear(Number(e.target.value))}>
-              {[thisYear(), thisYear() - 1, thisYear() - 2].map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
+            <Select value={String(year)} onValueChange={(val) => setYear(Number(val))}>
+              {[thisYear(), thisYear() - 1, thisYear() - 2].map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+            </Select>
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
             Mes:
-            <select className="filter-select" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+            <Select value={String(month)} onValueChange={(val) => setMonth(Number(val))}>
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <option key={m} value={m}>
+                <SelectItem key={m} value={String(m)}>
                   {new Date(2000, m - 1, 1).toLocaleString('es-DO', { month: 'long' })}
-                </option>
+                </SelectItem>
               ))}
-            </select>
+            </Select>
           </label>
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
@@ -337,11 +358,11 @@ function FinancialReport({ tipo }: { tipo: 'balance' | 'pl' }) {
         <div className="filter-bar-left">
           <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
           <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-          <select className="filter-select" value={periodicity} onChange={(e) => setPeriodicity(e.target.value as typeof periodicity)}>
-            <option value="monthly">Mensual</option>
-            <option value="quarterly">Trimestral</option>
-            <option value="yearly">Anual</option>
-          </select>
+          <Select value={periodicity} onValueChange={(val) => setPeriodicity(val as typeof periodicity)}>
+            <SelectItem value="monthly">Mensual</SelectItem>
+            <SelectItem value="quarterly">Trimestral</SelectItem>
+            <SelectItem value="yearly">Anual</SelectItem>
+          </Select>
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
             department={department} onDepartmentChange={setDepartment}
@@ -390,11 +411,11 @@ function VentasReport() {
         <div className="filter-bar-left">
           <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
           <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-          <select className="filter-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value as typeof groupBy)}>
-            <option value="day">Por día</option>
-            <option value="week">Por semana</option>
-            <option value="month">Por mes</option>
-          </select>
+          <Select value={groupBy} onValueChange={(val) => setGroupBy(val as typeof groupBy)}>
+            <SelectItem value="day">Por día</SelectItem>
+            <SelectItem value="week">Por semana</SelectItem>
+            <SelectItem value="month">Por mes</SelectItem>
+          </Select>
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
             department={department} onDepartmentChange={setDepartment}
@@ -644,6 +665,10 @@ function CuadreTurnoReport() {
   const [cajero, setCajero] = useState('')
   const [downloadingExcel, setDownloadingExcel] = useState(false)
   const cajeros = useCajeroOptions()
+  const [cajeroSearch, setCajeroSearch] = useState('')
+  const cajeroOptions: SearchSelectOption[] = cajeros
+    .filter((u) => !cajeroSearch || u.fullName.toLowerCase().includes(cajeroSearch.toLowerCase()))
+    .map((u) => ({ value: u.email, label: u.fullName }))
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-cuadre-turno', fromDate, toDate, cajero],
@@ -681,12 +706,16 @@ function CuadreTurnoReport() {
         <div className="filter-bar-left">
           <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
           <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-          <select className="filter-select" value={cajero} onChange={(e) => setCajero(e.target.value)}>
-            <option value="">Todos los cajeros</option>
-            {cajeros.map((u) => (
-              <option key={u.email} value={u.email}>{u.fullName}</option>
-            ))}
-          </select>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={cajero}
+              onChange={setCajero}
+              options={cajeroOptions}
+              onSearch={setCajeroSearch}
+              selectedLabel={cajeros.find((u) => u.email === cajero)?.fullName ?? ''}
+              placeholder="Todos los cajeros"
+            />
+          </div>
         </div>
         <div className="filter-bar-right">
           <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadExcel} disabled={downloadingExcel}>
@@ -833,13 +862,13 @@ function LibroDiarioReport() {
         <div className="filter-bar-left">
           <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
           <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-          <select className="filter-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value as typeof groupBy)}>
-            <option value="Group by Voucher">Agrupar por Voucher</option>
-            <option value="Group by Voucher (Consolidated)">Agrupar por Voucher (Consolidado)</option>
-            <option value="Group by Account">Agrupar por Cuenta</option>
-            <option value="Group by Sucursal">Agrupar por Sucursal</option>
-            <option value="Group by Departamento">Agrupar por Departamento</option>
-          </select>
+          <Select value={groupBy} onValueChange={(val) => setGroupBy(val as typeof groupBy)}>
+            <SelectItem value="Group by Voucher">Agrupar por Voucher</SelectItem>
+            <SelectItem value="Group by Voucher (Consolidated)">Agrupar por Voucher (Consolidado)</SelectItem>
+            <SelectItem value="Group by Account">Agrupar por Cuenta</SelectItem>
+            <SelectItem value="Group by Sucursal">Agrupar por Sucursal</SelectItem>
+            <SelectItem value="Group by Departamento">Agrupar por Departamento</SelectItem>
+          </Select>
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
             department={department} onDepartmentChange={setDepartment}

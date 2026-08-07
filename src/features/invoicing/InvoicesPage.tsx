@@ -9,9 +9,12 @@ import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { getCatalogosFiscales } from '@/shared/api/config'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { Select, SelectItem } from '@/components/ui/select'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 type StatusFilter = 'draft' | 'submitted' | 'cancelled' | 'all'
-type PaymentFilter = 'paid' | 'unpaid' | 'partial' | 'overdue' | 'all'
+type PaymentFilter = 'paid' | 'unpaid' | 'partly_paid' | 'all'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -53,6 +56,10 @@ export default function InvoicesPage() {
     queryFn: () => listSucursales({ limit: 100 }),
   })
   const sucursales = sucursalesData?.items ?? []
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchOptions: SearchSelectOption[] = sucursales
+    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((s) => ({ value: s.name, label: s.name }))
 
   const params: ListInvoicesParams = {
     search: search || undefined,
@@ -76,6 +83,10 @@ export default function InvoicesPage() {
     queryFn: getCatalogosFiscales,
     staleTime: 60 * 60_000,
   })
+  const [ncfTypeSearch, setNcfTypeSearch] = useState('')
+  const ncfTypeOptions: SearchSelectOption[] = (catalogos?.ncfTypes ?? [])
+    .filter((t) => !ncfTypeSearch || t.label.toLowerCase().includes(ncfTypeSearch.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
 
   const invoices = data?.items ?? []
 
@@ -126,31 +137,38 @@ export default function InvoicesPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <select className="filter-select" value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}>
-            <option value="all">Todos</option>
-            <option value="draft">Borrador</option>
-            <option value="submitted">Sometido</option>
-            <option value="cancelled">Cancelado</option>
-          </select>
-          <select className="filter-select" value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value as PaymentFilter)}>
-            <option value="all">Todo estado pago</option>
-            <option value="unpaid">Pendiente</option>
-            <option value="partial">Parcial</option>
-            <option value="paid">Pagado</option>
-            <option value="overdue">Vencido</option>
-          </select>
-          <select className="filter-select" value={ncfType} onChange={(e) => setNcfType(e.target.value)}>
-            <option value="">Todos los tipos NCF</option>
-            {(catalogos?.ncfTypes ?? []).map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
-          <select className="filter-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
-            <option value="">Todas las sucursales</option>
-            {sucursales.map((s) => (
-              <option key={s.id} value={s.name}>{s.name}</option>
-            ))}
-          </select>
+          <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="draft">Borrador</SelectItem>
+            <SelectItem value="submitted">Sometido</SelectItem>
+            <SelectItem value="cancelled">Cancelado</SelectItem>
+          </Select>
+          <Select value={paymentStatus} onValueChange={(val) => setPaymentStatus(val as PaymentFilter)}>
+            <SelectItem value="all">Todo estado pago</SelectItem>
+            <SelectItem value="unpaid">Pendiente</SelectItem>
+            <SelectItem value="partly_paid">Parcial</SelectItem>
+            <SelectItem value="paid">Pagado</SelectItem>
+          </Select>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={ncfType}
+              onChange={setNcfType}
+              options={ncfTypeOptions}
+              onSearch={setNcfTypeSearch}
+              selectedLabel={catalogos?.ncfTypes?.find((t) => t.value === ncfType)?.label ?? ''}
+              placeholder="Todos los tipos NCF"
+            />
+          </div>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={branch}
+              onChange={setBranch}
+              options={branchOptions}
+              onSearch={setBranchSearch}
+              selectedLabel={branch}
+              placeholder="Todas las sucursales"
+            />
+          </div>
           <input
             type="date"
             className="ff-input ff-input-sm"

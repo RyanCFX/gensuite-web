@@ -6,6 +6,7 @@ import { getCuenta, createCuenta, updateCuenta } from '@/shared/api/cuentas'
 import type { CreateCuentaDto, UpdateCuentaDto } from '@/shared/api/types'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { ArrowLeft, AlertTriangle } from 'lucide-react'
+import { Select, SelectItem } from '@/components/ui/select'
 
 const ACCOUNT_TYPES = [
   'Bank',
@@ -284,17 +285,16 @@ export default function CuentaForm() {
                 <label className="ff-label" htmlFor="rootType">
                   Tipo Raíz <span className="ff-required">*</span>
                 </label>
-                <select
-                  id="rootType"
-                  className={`ff-select${errors.rootType ? ' ff-input-error' : ''}`}
+                <Select
                   value={form.rootType}
-                  onChange={(e) => setField('rootType', e.target.value)}
+                  onValueChange={(val) => setField('rootType', val)}
+                  placeholder="— Seleccionar —"
+                  className={errors.rootType ? 'ff-input-error' : ''}
                 >
-                  <option value="">— Seleccionar —</option>
                   {ROOT_TYPES.map((rt) => (
-                    <option key={rt} value={rt}>{ROOT_TYPE_LABELS[rt]}</option>
+                    <SelectItem key={rt} value={rt}>{ROOT_TYPE_LABELS[rt]}</SelectItem>
                   ))}
-                </select>
+                </Select>
                 {errors.rootType && <p className="ff-error">{errors.rootType}</p>}
               </div>
             )}
@@ -304,18 +304,16 @@ export default function CuentaForm() {
               <label className="ff-label" htmlFor="accountType">
                 Tipo de Cuenta
               </label>
-              <select
-                id="accountType"
-                className="ff-select"
+              <Select
                 value={form.accountType}
-                onChange={(e) => setField('accountType', e.target.value)}
+                onValueChange={(val) => setField('accountType', val)}
+                placeholder="— Sin tipo específico —"
                 disabled={hasMovements}
               >
-                <option value="">— Sin tipo específico —</option>
                 {ACCOUNT_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* Moneda */}
@@ -323,17 +321,15 @@ export default function CuentaForm() {
               <label className="ff-label" htmlFor="currency">
                 Moneda
               </label>
-              <select
-                id="currency"
-                className="ff-select"
+              <Select
                 value={form.currency}
-                onChange={(e) => setField('currency', e.target.value)}
+                onValueChange={(val) => setField('currency', val)}
                 disabled={hasMovements}
               >
                 {CURRENCIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* Es cuenta grupo — only on create, no aplica si es cuenta raíz (siempre es grupo) */}

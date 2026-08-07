@@ -8,6 +8,7 @@ import type { CreateLandedCostVoucherDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, ChevronLeft, ChevronRight, Search, Trash2 } from 'lucide-react'
 
@@ -131,16 +132,15 @@ export default function CostosImportacionPage() {
                 onChange={(e) => { setSearch(e.target.value); setPage(1) }}
               />
             </div>
-            <select
-              className="filter-select"
+            <Select
               value={status}
-              onChange={(e) => { setStatus(e.target.value); setPage(1) }}
+              onValueChange={(val) => { setStatus(val); setPage(1) }}
             >
-              <option value="all">Todos</option>
-              <option value="draft">Borrador</option>
-              <option value="submitted">Sometido</option>
-              <option value="cancelled">Anulado</option>
-            </select>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="draft">Borrador</SelectItem>
+              <SelectItem value="submitted">Sometido</SelectItem>
+              <SelectItem value="cancelled">Anulado</SelectItem>
+            </Select>
           </div>
         </div>
 
@@ -280,9 +280,15 @@ export default function CostosImportacionPage() {
                         {receiptsArray.fields.map((field, idx) => (
                           <tr key={field.id}>
                             <td>
-                              <select className="ff-input" {...register(`purchaseReceipts.${idx}.receiptDocumentType` as const)}>
-                                {RECEIPT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                              </select>
+                              <Controller
+                                control={control}
+                                name={`purchaseReceipts.${idx}.receiptDocumentType` as const}
+                                render={({ field: f }) => (
+                                  <Select value={f.value} onValueChange={f.onChange}>
+                                    {RECEIPT_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                  </Select>
+                                )}
+                              />
                             </td>
                             <td>
                               <input
@@ -382,9 +388,15 @@ export default function CostosImportacionPage() {
 
                 <div className="ff-group">
                   <label className="ff-label">Distribuir Cargos Según</label>
-                  <select className="ff-input" {...register('distributeChargesBasedOn')}>
-                    {DISTRIBUTE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
+                  <Controller
+                    control={control}
+                    name="distributeChargesBasedOn"
+                    render={({ field: f }) => (
+                      <Select value={f.value} onValueChange={f.onChange}>
+                        {DISTRIBUTE_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                      </Select>
+                    )}
+                  />
                 </div>
               </div>
               <div className="modal-foot">

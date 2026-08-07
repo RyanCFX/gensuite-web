@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -18,6 +18,8 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { useDebounce } from '@/lib/useDebounce'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const PAGE_SIZE = 20
 
@@ -75,6 +77,7 @@ export default function DepartamentosPage() {
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
@@ -149,6 +152,10 @@ export default function DepartamentosPage() {
   const departamentos = data?.items ?? []
   const totalPages = data ? Math.ceil((data.meta.total ?? 0) / PAGE_SIZE) : 1
   const parentOptions = (parentOptionsData?.items ?? []).filter((d) => d.id !== editTarget?.id)
+  const [parentSearch, setParentSearch] = useState('')
+  const parentSelectOptions: SearchSelectOption[] = parentOptions
+    .filter((d) => !parentSearch || d.name.toLowerCase().includes(parentSearch.toLowerCase()))
+    .map((d) => ({ value: d.id, label: d.name }))
 
   return (
     <div className="page-container">
@@ -319,12 +326,21 @@ export default function DepartamentosPage() {
                 </div>
                 <div className="ff-wrap">
                   <label className="ff-label" htmlFor="depParent">Departamento Padre</label>
-                  <select id="depParent" className="ff-input" {...register('parentDepartment')}>
-                    <option value="">— Ninguno —</option>
-                    {parentOptions.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
+                  <Controller
+                    name="parentDepartment"
+                    control={control}
+                    render={({ field }) => (
+                      <SearchSelect
+                        id="depParent"
+                        value={field.value ?? ''}
+                        onChange={(val) => field.onChange(val)}
+                        options={parentSelectOptions}
+                        onSearch={setParentSearch}
+                        selectedLabel={parentOptions.find((d) => d.id === field.value)?.name ?? ''}
+                        placeholder="— Ninguno —"
+                      />
+                    )}
+                  />
                 </div>
               </div>
               <div className="modal-foot">

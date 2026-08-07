@@ -7,13 +7,14 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { getSupplier, createSupplier, updateSupplier } from '@/shared/api/suppliers'
 import type { ApiError } from '@/shared/api/types'
-import { listGruposProveedores, getCatalogosFiscales, listPaises } from '@/shared/api/config'
+import { listGruposProveedores, getCatalogosFiscales, listPaises, listBancos } from '@/shared/api/config'
 import { validateRNCDetailed, validateCedulaDetailed, formatRNC, formatCedula } from '@/lib/validators/dgii'
 import { TIPO_IDENTIFICACION } from '@/lib/constants'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 import { CheckCircle2, XCircle } from 'lucide-react'
 
 const schema = z
@@ -80,6 +81,15 @@ export default function SupplierForm() {
     queryFn: getCatalogosFiscales,
     staleTime: 60 * 60_000,
   })
+  const [defaultTipoBienes606Search, setDefaultTipoBienes606Search] = useState('')
+  const defaultTipoBienes606Options: SearchSelectOption[] = (catalogos?.tipoBienes606 ?? [])
+    .filter((t) => !defaultTipoBienes606Search || t.label.toLowerCase().includes(defaultTipoBienes606Search.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
+
+  const [defaultFormaPago606Search, setDefaultFormaPago606Search] = useState('')
+  const defaultFormaPago606Options: SearchSelectOption[] = (catalogos?.formaPago606 ?? [])
+    .filter((t) => !defaultFormaPago606Search || t.label.toLowerCase().includes(defaultFormaPago606Search.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
 
   const { data: paisesData, isLoading: paisesLoading } = useQuery({
     queryKey: ['paises'],
@@ -100,6 +110,19 @@ export default function SupplierForm() {
       .filter((p) => !q || p.name.toLowerCase().includes(q))
       .map((p) => ({ value: p.name, label: p.name }))
   }, [paisesData, paisSearch])
+
+  const { data: bancosData } = useQuery({
+    queryKey: ['bancos'],
+    queryFn: listBancos,
+    staleTime: 60 * 60_000,
+  })
+  const [bancoSearch, setBancoSearch] = useState('')
+  const bancoOptions: SearchSelectOption[] = useMemo(() => {
+    const q = bancoSearch.toLowerCase()
+    return (bancosData ?? [])
+      .filter((b) => !q || b.name.toLowerCase().includes(q))
+      .map((b) => ({ value: b.name, label: b.name }))
+  }, [bancosData, bancoSearch])
 
   const {
     register,
@@ -283,10 +306,10 @@ export default function SupplierForm() {
                       name="supplierType"
                       control={control}
                       render={({ field }) => (
-                        <select className="ff-select" value={field.value} onChange={field.onChange}>
-                          <option value="Company">Empresa</option>
-                          <option value="Individual">Individual</option>
-                        </select>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectItem value="Company">Empresa</SelectItem>
+                          <SelectItem value="Individual">Individual</SelectItem>
+                        </Select>
                       )}
                     />
                   </div>
@@ -297,12 +320,11 @@ export default function SupplierForm() {
                       name="tipoIdentificacion"
                       control={control}
                       render={({ field }) => (
-                        <select className="ff-select" value={field.value ?? ''} onChange={field.onChange}>
-                          <option value="">Seleccionar</option>
+                        <Select value={field.value ?? ''} onValueChange={field.onChange} placeholder="Seleccionar">
                           {TIPO_IDENTIFICACION.map((t) => (
-                            <option key={t.value} value={t.value}>{t.label}</option>
+                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                           ))}
-                        </select>
+                        </Select>
                       )}
                     />
                   </div>
@@ -474,7 +496,20 @@ export default function SupplierForm() {
               <div className="form-section">
                 <div className="ff-wrap">
                   <label className="ff-label">Banco</label>
-                  <input className="ff-input" {...register('banco')} placeholder="Ej: Banco Popular" />
+                  <Controller
+                    name="banco"
+                    control={control}
+                    render={({ field }) => (
+                      <SearchSelect
+                        value={field.value ?? ''}
+                        onChange={(val) => field.onChange(val)}
+                        options={bancoOptions}
+                        onSearch={setBancoSearch}
+                        selectedLabel={field.value ?? ''}
+                        placeholder="Ej: Banco Popular"
+                      />
+                    )}
+                  />
                 </div>
                 <div className="ff-wrap">
                   <label className="ff-label">Tipo de Cuenta</label>
@@ -482,12 +517,11 @@ export default function SupplierForm() {
                     name="tipoCuenta"
                     control={control}
                     render={({ field }) => (
-                      <select className="ff-select" value={field.value ?? ''} onChange={field.onChange}>
-                        <option value="">Seleccionar</option>
-                        <option value="Corriente">Corriente</option>
-                        <option value="Ahorros">Ahorros</option>
-                        <option value="Internacional">Internacional</option>
-                      </select>
+                      <Select value={field.value ?? ''} onValueChange={field.onChange} placeholder="Seleccionar">
+                        <SelectItem value="Corriente">Corriente</SelectItem>
+                        <SelectItem value="Ahorros">Ahorros</SelectItem>
+                        <SelectItem value="Internacional">Internacional</SelectItem>
+                      </Select>
                     )}
                   />
                 </div>
@@ -516,12 +550,14 @@ export default function SupplierForm() {
                     name="defaultTipoBienes606"
                     control={control}
                     render={({ field }) => (
-                      <select className="ff-select" value={field.value ?? ''} onChange={field.onChange}>
-                        <option value="">Sin configurar</option>
-                        {(catalogos?.tipoBienes606 ?? []).map((t) => (
-                          <option key={t.value} value={t.value}>{t.label}</option>
-                        ))}
-                      </select>
+                      <SearchSelect
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        options={defaultTipoBienes606Options}
+                        onSearch={setDefaultTipoBienes606Search}
+                        selectedLabel={catalogos?.tipoBienes606?.find((t) => t.value === field.value)?.label ?? ''}
+                        placeholder="Sin configurar"
+                      />
                     )}
                   />
                 </div>
@@ -531,12 +567,14 @@ export default function SupplierForm() {
                     name="defaultFormaPago606"
                     control={control}
                     render={({ field }) => (
-                      <select className="ff-select" value={field.value ?? ''} onChange={field.onChange}>
-                        <option value="">Sin configurar</option>
-                        {(catalogos?.formaPago606 ?? []).map((t) => (
-                          <option key={t.value} value={t.value}>{t.label}</option>
-                        ))}
-                      </select>
+                      <SearchSelect
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        options={defaultFormaPago606Options}
+                        onSearch={setDefaultFormaPago606Search}
+                        selectedLabel={catalogos?.formaPago606?.find((t) => t.value === field.value)?.label ?? ''}
+                        placeholder="Sin configurar"
+                      />
                     )}
                   />
                 </div>
@@ -546,11 +584,10 @@ export default function SupplierForm() {
                     name="defaultTipoPagoProveedor"
                     control={control}
                     render={({ field }) => (
-                      <select className="ff-select" value={field.value ?? ''} onChange={field.onChange}>
-                        <option value="">Sin configurar</option>
-                        <option value="Contado">Contado</option>
-                        <option value="Crédito">Crédito</option>
-                      </select>
+                      <Select value={field.value ?? ''} onValueChange={field.onChange} placeholder="Sin configurar">
+                        <SelectItem value="Contado">Contado</SelectItem>
+                        <SelectItem value="Crédito">Crédito</SelectItem>
+                      </Select>
                     )}
                   />
                 </div>

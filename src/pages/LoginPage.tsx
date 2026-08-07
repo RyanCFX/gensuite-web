@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -34,14 +34,28 @@ const TENANT_ERROR_MESSAGES: Record<string, string> = {
 }
 
 export default function LoginPage() {
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const next = params.get('next') ?? '/dashboard'
 
-  const [serverError, setServerError] = useState<string | null>(null)
+  // El interceptor de axios redirige acá con ?sessionExpired=1 cuando el BFF
+  // responde ERPNEXT_AUTH_ERROR (credenciales de la integración rechazadas) —
+  // se trata como sesión inválida del lado del usuario.
+  const [serverError, setServerError] = useState<string | null>(() =>
+    params.get('sessionExpired') ? 'La sesión ha expirado, por favor vuelva a iniciar sesión.' : null,
+  )
   const [isRateLimited, setIsRateLimited] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const authLogin = useAuthStore((s) => s.login)
+
+  useEffect(() => {
+    if (params.get('sessionExpired')) {
+      const cleaned = new URLSearchParams(params)
+      cleaned.delete('sessionExpired')
+      setParams(cleaned, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const {
     register,

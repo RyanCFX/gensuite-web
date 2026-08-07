@@ -4,7 +4,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { createPedido, updatePedido, getPedido, getPedidoDuplicateSource } from '@/shared/api/pedidos'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getQuotation } from '@/shared/api/quotations'
-import { getLayawayConfig, listAlmacenes } from '@/shared/api/config'
+import { getLayawayConfig, listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
 import type { Item, ItemPrices, CreatePedidoDto, Bundle } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
@@ -102,6 +102,13 @@ const [customerId, setCustomerId] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
 
   const { data: layawayConfig } = useQuery({
     queryKey: ['layaway-config'],
@@ -238,6 +245,10 @@ useEffect(() => {
   const branchOptions = isSystemManager
     ? (allSucursales?.items.map((s) => s.name) ?? [])
     : (myBranches?.branches ?? [])
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchSelectOptions: SearchSelectOption[] = branchOptions
+    .filter((b) => !branchSearch || b.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((b) => ({ value: b, label: b }))
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch && !isEdit) setBranch(myBranches.defaultBranch)
@@ -441,7 +452,7 @@ function submitDto() {
        transactionDate,
        deliveryDate: deliveryDate || undefined,
        branch: branch || undefined,
-       department: department || undefined,
+       department: usaDepartamentos ? (department || undefined) : undefined,
        items: itemsDto,
        quotation: quotationId || undefined,
        isLayaway: isLayaway || undefined,
@@ -555,17 +566,22 @@ try {
               </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Sucursal</label>
-                <select className={`ff-select${!branch || branchError ? ' ff-input-error' : ''}`} value={branch} onChange={(e) => { setBranch(e.target.value); setBranchError(false) }}>
-                  <option value="">Sin especificar</option>
-                  {branchOptions.map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
+                <SearchSelect
+                  value={branch}
+                  onChange={(val) => { setBranch(val); setBranchError(false) }}
+                  options={branchSelectOptions}
+                  onSearch={setBranchSearch}
+                  selectedLabel={branch}
+                  placeholder="Sin especificar"
+                  error={!branch || branchError}
+                />
               </div>
-              <div className="ff-wrap">
-                <label className="ff-label">Departamento</label>
-                <DepartmentSelect value={department} onChange={setDepartment} placeholder="Buscar departamento…" />
-              </div>
+              {usaDepartamentos && (
+                <div className="ff-wrap">
+                  <label className="ff-label">Departamento</label>
+                  <DepartmentSelect value={department} onChange={setDepartment} placeholder="Buscar departamento…" />
+                </div>
+              )}
             </div>
 
             {!isEdit && (

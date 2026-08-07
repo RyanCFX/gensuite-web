@@ -8,6 +8,8 @@ import { toast } from 'sonner'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { getCatalogosFiscales } from '@/shared/api/config'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const STATUS_BADGE: Record<string, string> = {
   Draft: 'badge-draft',
@@ -42,6 +44,10 @@ export default function QuotationDetail() {
     queryFn: getCatalogosFiscales,
     staleTime: 60 * 60_000,
   })
+  const [ncfTypeSearch, setNcfTypeSearch] = useState('')
+  const ncfTypeOptions: SearchSelectOption[] = (catalogos?.ncfTypes ?? [])
+    .filter((t) => !ncfTypeSearch || t.label.toLowerCase().includes(ncfTypeSearch.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
 
   const submitMutation = useMutation({
     mutationFn: () => submitQuotation(id!),
@@ -362,15 +368,14 @@ export default function QuotationDetail() {
               </p>
               <div className="ff-wrap">
                 <label className="ff-label">Tipo NCF</label>
-                <select
-                  className="ff-select"
+                <SearchSelect
                   value={selectedNcfType}
-                  onChange={(e) => setSelectedNcfType(e.target.value)}
-                >
-                  {(catalogos?.ncfTypes ?? []).map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
+                  onChange={setSelectedNcfType}
+                  options={ncfTypeOptions}
+                  onSearch={setNcfTypeSearch}
+                  selectedLabel={catalogos?.ncfTypes?.find((t) => t.value === selectedNcfType)?.label ?? ''}
+                  placeholder="Seleccionar tipo"
+                />
               </div>
             </div>
             <div className="modal-foot">

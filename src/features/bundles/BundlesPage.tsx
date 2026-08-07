@@ -11,6 +11,7 @@ import { useDebounce } from '@/lib/useDebounce'
 import { Plus, Trash2, X, Loader2, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { Select, SelectItem } from '@/components/ui/select'
 
 const PAGE_SIZE = 20
 
@@ -79,15 +80,11 @@ export default function BundlesPage() {
               onChange={handleSearchChange}
             />
           </div>
-          <select
-            className="filter-select"
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value as 'all' | 'active' | 'disabled'); setPage(1) }}
-          >
-            <option value="all">Todos</option>
-            <option value="active">Activos</option>
-            <option value="disabled">Desactivados</option>
-          </select>
+          <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val as 'all' | 'active' | 'disabled'); setPage(1) }}>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="active">Activos</SelectItem>
+            <SelectItem value="disabled">Desactivados</SelectItem>
+          </Select>
         </div>
         <div className="table-wrap">
           <table className="table-config">

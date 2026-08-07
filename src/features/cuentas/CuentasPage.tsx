@@ -7,6 +7,7 @@ import type { ListCuentasParams } from '@/shared/api/cuentas'
 import { useDebounce } from '@/lib/useDebounce'
 import { Plus, Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightSmall, Folder, FileText, BarChart2 } from 'lucide-react'
 import { CuentaMovimientosModal } from '@/features/contabilidad/CuentaMovimientosModal'
+import { Select, SelectItem } from '@/components/ui/select'
 
 const PAGE_SIZE = 25
 
@@ -230,21 +231,20 @@ export default function CuentasPage() {
                 />
               </div>
 
-              <select
-                className="filter-select"
+              <Select
                 value={rootTypeFilter}
-                onChange={(e) => {
-                  setRootTypeFilter(e.target.value as RootTypeFilter)
+                onValueChange={(val) => {
+                  setRootTypeFilter(val as RootTypeFilter)
                   setPage(1)
                 }}
+                placeholder="Todos los tipos"
               >
-                <option value="">Todos los tipos</option>
-                <option value="Asset">Activos</option>
-                <option value="Liability">Pasivos</option>
-                <option value="Equity">Patrimonio</option>
-                <option value="Income">Ingresos</option>
-                <option value="Expense">Gastos</option>
-              </select>
+                <SelectItem value="Asset">Activos</SelectItem>
+                <SelectItem value="Liability">Pasivos</SelectItem>
+                <SelectItem value="Equity">Patrimonio</SelectItem>
+                <SelectItem value="Income">Ingresos</SelectItem>
+                <SelectItem value="Expense">Gastos</SelectItem>
+              </Select>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
                 <input

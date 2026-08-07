@@ -81,6 +81,15 @@ export default function DebitNotesPage() {
     queryFn: () => listSucursales({ limit: 100 }),
   })
   const sucursales = sucursalesData?.items ?? []
+  const [filterBranchSearch, setFilterBranchSearch] = useState('')
+  const filterBranchOptions: SearchSelectOption[] = sucursales
+    .filter((s) => !filterBranchSearch || s.name.toLowerCase().includes(filterBranchSearch.toLowerCase()))
+    .map((s) => ({ value: s.name, label: s.name }))
+
+  const [formBranchSearch, setFormBranchSearch] = useState('')
+  const formBranchOptions: SearchSelectOption[] = sucursales
+    .filter((s) => !formBranchSearch || s.name.toLowerCase().includes(formBranchSearch.toLowerCase()))
+    .map((s) => ({ value: s.name, label: s.name }))
 
   const { data: notesData, isLoading } = useQuery({
     queryKey: ['debit-notes', orderBy, filterBranch, filterDepartment],
@@ -190,12 +199,16 @@ export default function DebitNotesPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <select className="filter-select" value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)}>
-            <option value="">Todas las sucursales</option>
-            {sucursales.map((s) => (
-              <option key={s.id} value={s.name}>{s.name}</option>
-            ))}
-          </select>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={filterBranch}
+              onChange={setFilterBranch}
+              options={filterBranchOptions}
+              onSearch={setFilterBranchSearch}
+              selectedLabel={filterBranch}
+              placeholder="Todas las sucursales"
+            />
+          </div>
           <div style={{ minWidth: 220 }}>
             <DepartmentSelect value={filterDepartment} onChange={setFilterDepartment} placeholder="Todos los departamentos" />
           </div>
@@ -330,21 +343,16 @@ export default function DebitNotesPage() {
                 <div style={{ display: 'flex', gap: 16 }}>
                   <div className="ff-wrap" style={{ flex: 1 }}>
                     <label className="ff-label" htmlFor="branch-debit">Sucursal</label>
-                    <select
+                    <SearchSelect
                       id="branch-debit"
-                      className={`filter-select${branchError ? ' ff-error' : ''}`}
-                      style={{ width: '100%' }}
                       value={branch}
-                      onChange={(e) => {
-                        setBranch(e.target.value)
-                        setBranchError(false)
-                      }}
-                    >
-                      <option value="">Sin sucursal</option>
-                      {sucursales.map((s) => (
-                        <option key={s.id} value={s.name}>{s.name}</option>
-                      ))}
-                    </select>
+                      onChange={(val) => { setBranch(val); setBranchError(false) }}
+                      options={formBranchOptions}
+                      onSearch={setFormBranchSearch}
+                      selectedLabel={branch}
+                      placeholder="Sin sucursal"
+                      error={branchError}
+                    />
                     {branchError && (
                       <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal</p>
                     )}

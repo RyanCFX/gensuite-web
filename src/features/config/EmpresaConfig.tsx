@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getEmpresa, updateEmpresa, getCuentasEmpresa, updateCuentasEmpresa, listAlmacenes } from '@/shared/api/config'
-import type { Empresa, CuentasEmpresa, AlmacenListItem, ItemProps } from '@/shared/api/types'
+import type { Empresa, CuentasEmpresa, ItemProps } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { CostCenterSelect } from '@/components/shared/CostCenterSelect'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 import { REGIMENES_FISCALES } from '@/lib/constants'
 import { Building2, Save } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -62,6 +65,16 @@ export default function EmpresaConfig() {
     queryFn: () => listAlmacenes(),
   })
   const transitWarehouses = (warehouses ?? []).filter((w) => w.warehouseType === 'Transit')
+  const [warehouseSearch, setWarehouseSearch] = useState('')
+  const [transitWarehouseSearch, setTransitWarehouseSearch] = useState('')
+
+  const warehouseOptions: SearchSelectOption[] = (warehouses ?? [])
+    .filter((w) => !warehouseSearch || w.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
+    .map((w) => ({ value: w.id, label: w.name }))
+
+  const transitWarehouseOptions: SearchSelectOption[] = transitWarehouses
+    .filter((w) => !transitWarehouseSearch || w.name.toLowerCase().includes(transitWarehouseSearch.toLowerCase()))
+    .map((w) => ({ value: w.id, label: w.name }))
 
   // ── Cuentas por Defecto tab state ──────────────────────────────────────────
   const { data: cuentasData, isLoading: cuentasLoading } = useQuery({
@@ -267,16 +280,16 @@ export default function EmpresaConfig() {
                     </div>
                     <div className="ff-wrap">
                       <label className="ff-label">Régimen Fiscal</label>
-                      <select
-                        className="ff-select"
+                      <Select
                         value={form.regimenFiscal ?? ''}
-                        onChange={(e) => set('regimenFiscal', e.target.value as Empresa['regimenFiscal'])}
+                        onValueChange={(val) => set('regimenFiscal', val as Empresa['regimenFiscal'])}
+                        placeholder="Seleccionar régimen"
                       >
-                        <option value="">Seleccionar régimen</option>
+                        <SelectItem value="">Seleccionar régimen</SelectItem>
                         {REGIMENES_FISCALES.map((r) => (
-                          <option key={r.value} value={r.value}>{r.label}</option>
+                          <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                         ))}
-                      </select>
+                      </Select>
                     </div>
                     <div className="ff-wrap">
                       <label className="ff-label">Actividad Económica</label>
@@ -318,15 +331,14 @@ export default function EmpresaConfig() {
                 <div className="form-row">
                   <div className="ff-wrap">
                     <label className="ff-label">Modo de código de artículo</label>
-                    <select
-                      className="ff-select"
+                    <Select
                       value={form.itemCodeMode ?? 'manual'}
-                      onChange={(e) => set('itemCodeMode', e.target.value as 'manual' | 'auto' | 'prefix_auto')}
+                      onValueChange={(val) => set('itemCodeMode', val as 'manual' | 'auto' | 'prefix_auto')}
                     >
-                      <option value="manual">Manual</option>
-                      <option value="auto">Automático</option>
-                      <option value="prefix_auto">Por prefijo de categoría</option>
-                    </select>
+                      <SelectItem value="manual">Manual</SelectItem>
+                      <SelectItem value="auto">Automático</SelectItem>
+                      <SelectItem value="prefix_auto">Por prefijo de categoría</SelectItem>
+                    </Select>
                     <p className="ff-hint">Define cómo se asigna el código a nuevos artículos</p>
                     {itemCodeWarning && (
                       <div className="inline-alert inline-alert-warn" style={{ marginTop: 8 }}>
@@ -337,30 +349,26 @@ export default function EmpresaConfig() {
                   </div>
                   <div className="ff-wrap">
                     <label className="ff-label">Almacén por defecto</label>
-                    <select
-                      className="ff-select"
+                    <SearchSelect
                       value={form.defaultWarehouse ?? ''}
-                      onChange={(e) => set('defaultWarehouse', e.target.value || undefined)}
-                    >
-                      <option value="">Sin predeterminado</option>
-                      {(warehouses ?? []).map((w: AlmacenListItem) => (
-                        <option key={w.name} value={w.name}>{w.name}</option>
-                      ))}
-                    </select>
+                      onChange={(val) => set('defaultWarehouse', val || undefined)}
+                      options={warehouseOptions}
+                      onSearch={setWarehouseSearch}
+                      selectedLabel={(warehouses ?? []).find((w) => w.id === form.defaultWarehouse)?.name ?? ''}
+                      placeholder="Sin predeterminado"
+                    />
                     <p className="ff-hint">Se usará al crear documentos si el usuario no tiene almacén asignado</p>
                   </div>
                   <div className="ff-wrap">
                     <label className="ff-label">Almacén de Tránsito</label>
-                    <select
-                      className="ff-select"
+                    <SearchSelect
                       value={form.transitWarehouse ?? ''}
-                      onChange={(e) => set('transitWarehouse', e.target.value || undefined)}
-                    >
-                      <option value="">Sin configurar</option>
-                      {transitWarehouses.map((w) => (
-                        <option key={w.name} value={w.name}>{w.name}</option>
-                      ))}
-                    </select>
+                      onChange={(val) => set('transitWarehouse', val || undefined)}
+                      options={transitWarehouseOptions}
+                      onSearch={setTransitWarehouseSearch}
+                      selectedLabel={transitWarehouses.find((w) => w.id === form.transitWarehouse)?.name ?? ''}
+                      placeholder="Sin configurar"
+                    />
                     {transitWarehouses.length === 0 ? (
                       <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
                         No hay ningún almacén de tipo "Tránsito" todavía. Crea uno primero en{' '}
@@ -372,16 +380,16 @@ export default function EmpresaConfig() {
                   </div>
                   <div className="ff-wrap">
                     <label className="ff-label">Nivel de precio por defecto</label>
-                    <select
-                      className="ff-select"
+                    <Select
                       value={form.defaultPriceTipo ?? ''}
-                      onChange={(e) => set('defaultPriceTipo', e.target.value as 'A' | 'B' | 'C' | undefined || undefined)}
+                      onValueChange={(val) => set('defaultPriceTipo', (val || undefined) as 'A' | 'B' | 'C' | undefined)}
+                      placeholder="Sin predeterminado"
                     >
-                      <option value="">Sin predeterminado</option>
-                      <option value="A">A — Minorista</option>
-                      <option value="B">B — Medio mayoreo</option>
-                      <option value="C">C — Mayorista</option>
-                    </select>
+                      <SelectItem value="">Sin predeterminado</SelectItem>
+                      <SelectItem value="A">A — Minorista</SelectItem>
+                      <SelectItem value="B">B — Medio mayoreo</SelectItem>
+                      <SelectItem value="C">C — Mayorista</SelectItem>
+                    </Select>
                     <p className="ff-hint">Nivel de precio sugerido para nuevos documentos</p>
                   </div>
                 </div>

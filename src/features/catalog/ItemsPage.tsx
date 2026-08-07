@@ -11,6 +11,9 @@ import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 
 const PAGE_SIZE = 20
 
@@ -96,6 +99,16 @@ export default function ItemsPage() {
     queryFn: () => listBrands(),
   })
 
+  const [categorySearch, setCategorySearch] = useState('')
+  const categoryOptions: SearchSelectOption[] = (categoriesData?.items ?? [])
+    .filter((c) => !categorySearch || c.name.toLowerCase().includes(categorySearch.toLowerCase()))
+    .map((c) => ({ value: c.id, label: c.name }))
+
+  const [brandSearch, setBrandSearch] = useState('')
+  const brandOptions: SearchSelectOption[] = (brandsData?.items ?? [])
+    .filter((b) => !brandSearch || b.name.toLowerCase().includes(brandSearch.toLowerCase()))
+    .map((b) => ({ value: b.id, label: b.name }))
+
   const toggleMutation = useMutation({
     mutationFn: (id: string) => toggleItem(id),
     onSuccess: (item: Item) => {
@@ -138,44 +151,42 @@ export default function ItemsPage() {
               onChange={handleSearchChange}
             />
           </div>
-          <select
-            className="filter-select"
+          <Select
             value={kindFilter}
-            onChange={(e) => { setKindFilter(e.target.value as 'all' | 'product' | 'service'); setPage(1) }}
+            onValueChange={(val) => { setKindFilter(val as 'all' | 'product' | 'service'); setPage(1) }}
           >
-            <option value="all">Todos los tipos</option>
-            <option value="product">Producto</option>
-            <option value="service">Servicio</option>
-          </select>
-          <select
-            className="filter-select"
-            value={categoryFilter}
-            onChange={(e) => { setCategoryFilter(e.target.value === '_all' ? '' : e.target.value); setPage(1) }}
-          >
-            <option value="_all">Todas las categorías</option>
-            {categoriesData?.items.map((cat) => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
-            ))}
-          </select>
-          <select
-            className="filter-select"
-            value={brandFilter}
-            onChange={(e) => { setBrandFilter(e.target.value === '_all' ? '' : e.target.value); setPage(1) }}
-          >
-            <option value="_all">Todas las marcas</option>
-            {brandsData?.items.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-          <select
-            className="filter-select"
+            <SelectItem value="all">Todos los tipos</SelectItem>
+            <SelectItem value="product">Producto</SelectItem>
+            <SelectItem value="service">Servicio</SelectItem>
+          </Select>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={categoryFilter}
+              onChange={(val) => { setCategoryFilter(val); setPage(1) }}
+              options={categoryOptions}
+              onSearch={setCategorySearch}
+              selectedLabel={categoriesData?.items.find((c) => c.id === categoryFilter)?.name ?? ''}
+              placeholder="Todas las categorías"
+            />
+          </div>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={brandFilter}
+              onChange={(val) => { setBrandFilter(val); setPage(1) }}
+              options={brandOptions}
+              onSearch={setBrandSearch}
+              selectedLabel={brandsData?.items.find((b) => b.id === brandFilter)?.name ?? ''}
+              placeholder="Todas las marcas"
+            />
+          </div>
+          <Select
             value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value as 'all' | 'active' | 'disabled'); setPage(1) }}
+            onValueChange={(val) => { setStatusFilter(val as 'all' | 'active' | 'disabled'); setPage(1) }}
           >
-            <option value="all">Todos</option>
-            <option value="active">Activos</option>
-            <option value="disabled">Inactivos</option>
-          </select>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="active">Activos</SelectItem>
+            <SelectItem value="disabled">Inactivos</SelectItem>
+          </Select>
         </div>
         {/* Template / standalone toggle */}
         <div style={{ display: 'flex', gap: 4 }}>

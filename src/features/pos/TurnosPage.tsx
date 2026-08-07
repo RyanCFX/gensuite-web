@@ -5,6 +5,7 @@ import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { listTurnos, type ListTurnosParams } from '@/shared/api/pos'
 import { formatDateTime, formatDOP } from '@/lib/formatters'
 import { useDebounce } from '@/lib/useDebounce'
+import { Select, SelectItem } from '@/components/ui/select'
 
 const PAGE_SIZE = 20
 
@@ -70,15 +71,11 @@ export default function TurnosPage() {
               onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             />
           </div>
-          <select
-            className="filter-select"
-            value={status}
-            onChange={(e) => { setStatus(e.target.value as StatusFilter); setPage(1) }}
-          >
-            <option value="all">Todos los estados</option>
-            <option value="Open">Abiertos</option>
-            <option value="Closed">Cerrados</option>
-          </select>
+          <Select value={status} onValueChange={(val) => { setStatus(val as StatusFilter); setPage(1) }}>
+            <SelectItem value="all">Todos los estados</SelectItem>
+            <SelectItem value="Open">Abiertos</SelectItem>
+            <SelectItem value="Closed">Cerrados</SelectItem>
+          </Select>
           <input
             type="date"
             className="filter-select"

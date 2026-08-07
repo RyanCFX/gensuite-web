@@ -691,6 +691,7 @@ export interface Item {
   barcodes?: ItemBarcode[];
   image?: string;
   disabled: boolean;
+  defaultWarehouse?: string;
   stockUom?: string;
   uoms?: ItemUomConversion[];
   hasVariants?: boolean;
@@ -1292,7 +1293,11 @@ export interface CreateAlmacenDto {
   branch?: string;
 }
 
-export type UpdateAlmacenDto = Partial<CreateAlmacenDto>;
+// warehouseType es un enum estricto en ERPNext (Transit/Finished Goods/Raw Material/Stores)
+// sin miembro "vacío" — el backend rechaza `""` (400) pero acepta `null` para limpiarlo.
+export type UpdateAlmacenDto = Partial<Omit<CreateAlmacenDto, 'warehouseType'>> & {
+  warehouseType?: string | null;
+};
 
 export interface InventoryHistory {
   itemCode: string;
@@ -1732,6 +1737,9 @@ export interface CobrosConfig {
   enviarRecordatorioAutomatico: boolean;
 }
 
+/** Formato de impresión de PDF para facturas, cobros y compras. "a4"/"carta"/"a6": página completa (mismo diseño, distinto tamaño de papel). "pos": ticket angosto 80mm. */
+export type FormatoImpresion = "a4" | "carta" | "a6" | "pos"
+
 // GET/PUT /config/facturacion
 export interface FacturacionConfig {
   rolesCancelacionFactura: string[];
@@ -1739,6 +1747,10 @@ export interface FacturacionConfig {
   flujoCobro: "directo" | "caja";
   /** Si está activo, no se puede vender un artículo de inventario sin una Ubicación asignada dentro del almacén de facturación. */
   requiereUbicacionVenta?: boolean;
+  /** Si está en false, oculta el selector de Departamento (opcional, análogo a Sucursal) en los formularios de Factura, Cotización, Pedido, Cobro, Compra y Gasto. Puramente de presentación — no afecta documentos ya guardados con departamento. Default true. */
+  usaDepartamentos?: boolean;
+  /** Si está en false, oculta el selector de plantilla de Impuesto de Documento en Factura, Cotización y Compra. Puramente de presentación. Default true. */
+  usaImpuestoDocumento?: boolean;
   /** true si el módulo POS (turnos de caja) está activo para este tenant. */
   usaModuloPos?: boolean;
   /** Nombre del POS Profile provisionado — solo informativo, no editable desde aquí. */
@@ -1749,8 +1761,10 @@ export interface FacturacionConfig {
   modosPagoConciliar?: string[];
   /** Si está activo, cerrar un turno de caja exige el desglose de denominaciones contadas para el/los modos de pago en efectivo. */
   arqueoEfectivoRequerido?: boolean;
-/** Formato de impresión default al generar el PDF de una factura. "pdf": hoja carta/A4 (histórico). "pos": ticket angosto 80mm para impresora térmica. */
-  formatoImpresionDefault?: "pdf" | "pos"
+/** Formato de impresión default al generar el PDF de una factura, cobro o compra. "a4"/"carta"/"a6": página completa (mismo diseño, distinto tamaño de papel). "pos": ticket angosto 80mm para impresora térmica. Siempre debe estar incluido en formatosPermitidos. */
+  formatoImpresionDefault?: FormatoImpresion
+  /** Formatos de impresión habilitados para este tenant — el selector de formato al generar un PDF solo debe ofrecer estos. Si nunca se configuró, vienen los 4. Mínimo 1. */
+  formatosPermitidos?: FormatoImpresion[]
   /** Máximo de horas que un turno de caja puede estar abierto antes de obligar al cajero a cerrarlo. 0.1 = 6 minutos. Default 24 si no se configura. */
   turnoMaxHoras?: number
 }

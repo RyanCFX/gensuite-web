@@ -124,11 +124,15 @@ export async function updateDenominacion(id: string, data: UpdateDenominacionDto
 }
 
 export async function listAlmacenes(params?: { branch?: string }) {
-  const res = await client.get<{ success: true; data: AlmacenListItem[] }>(
+  // GET /config/almacenes devuelve el tipo de almacén como `type`, no `warehouseType`
+  // (a diferencia de Create/UpdateAlmacenDto, que sí usan `warehouseType` en el body) —
+  // normalizamos acá para que el resto del frontend use un solo nombre de campo.
+  const res = await client.get<{ success: true; data: (AlmacenListItem & { type?: string | null })[] }>(
     ENDPOINTS.config.almacenes,
     { params },
   )
-  return unwrap(res)
+  const items = unwrap(res)
+  return items.map(({ type, ...item }) => ({ ...item, warehouseType: item.warehouseType ?? type ?? undefined }))
 }
 
 export async function createAlmacen(data: CreateAlmacenDto) {
