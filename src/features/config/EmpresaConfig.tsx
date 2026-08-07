@@ -48,7 +48,11 @@ export default function EmpresaConfig() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    saveMutation.mutate(form)
+    const payload: Partial<Empresa> = {}
+    for (const key of ['rnc', 'regimenFiscal', 'actividadEconomica', 'representanteLegal', 'cedulaRepresentante', 'logoUrl', 'telefono', 'email', 'website', 'direccion', 'itemCodeMode', 'defaultWarehouse', 'defaultPriceTipo', 'transitWarehouse'] as const) {
+      if (form[key] !== undefined) payload[key] = form[key]
+    }
+    saveMutation.mutate(payload)
   }
 
   // ── Warehouses lookup ──────────────────────────────────────────────────────
@@ -242,13 +246,14 @@ export default function EmpresaConfig() {
                   <p className="form-section-title">Información Fiscal</p>
                   <div className="form-row">
                     <div className="ff-wrap">
-                      <label className="ff-label">Nombre de la Empresa <span className="ff-required">*</span></label>
+                      <label className="ff-label">Nombre de la Empresa</label>
                       <input
                         className="ff-input"
                         value={form.companyName ?? ''}
-                        onChange={(e) => set('companyName', e.target.value)}
+                        disabled
                         placeholder="Mi Empresa SRL"
                       />
+                      <p className="ff-hint">El nombre proviene del tenant y no se edita desde esta pantalla.</p>
                     </div>
                     <div className="ff-wrap">
                       <label className="ff-label">RNC</label>

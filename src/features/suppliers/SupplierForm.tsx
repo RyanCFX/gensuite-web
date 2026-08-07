@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
@@ -7,8 +7,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { getSupplier, createSupplier, updateSupplier } from '@/shared/api/suppliers'
 import type { ApiError } from '@/shared/api/types'
-import { listGruposProveedores, getCatalogosFiscales } from '@/shared/api/config'
-import { validateRNC, validateCedula, formatRNC, formatCedula } from '@/lib/validators/dgii'
+import { listGruposProveedores, getCatalogosFiscales, listPaises } from '@/shared/api/config'
+import { validateRNCDetailed, validateCedulaDetailed, formatRNC, formatCedula } from '@/lib/validators/dgii'
 import { TIPO_IDENTIFICACION } from '@/lib/constants'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -42,13 +42,15 @@ const schema = z
   })
   .superRefine((data, ctx) => {
     if (data.tipoIdentificacion === 'RNC' && data.rnc) {
-      if (!validateRNC(data.rnc)) {
-        ctx.addIssue({ code: 'custom', path: ['rnc'], message: 'RNC inválido' })
+      const result = validateRNCDetailed(data.rnc)
+      if (!result.valid) {
+        ctx.addIssue({ code: 'custom', path: ['rnc'], message: result.reason ?? 'RNC inválido' })
       }
     }
     if (data.tipoIdentificacion === 'Cedula' && data.cedula) {
-      if (!validateCedula(data.cedula)) {
-        ctx.addIssue({ code: 'custom', path: ['cedula'], message: 'Cédula inválida' })
+      const result = validateCedulaDetailed(data.cedula)
+      if (!result.valid) {
+        ctx.addIssue({ code: 'custom', path: ['cedula'], message: result.reason ?? 'Cédula inválida' })
       }
     }
   })
@@ -79,11 +81,25 @@ export default function SupplierForm() {
     staleTime: 60 * 60_000,
   })
 
+  const { data: paisesData, isLoading: paisesLoading } = useQuery({
+    queryKey: ['paises'],
+    queryFn: listPaises,
+    staleTime: 60 * 60_000,
+  })
+
   const grupoOptions: SearchSelectOption[] = (gruposData ?? []).map((g) => ({
     value: g.name,
     label: g.name,
     sublabel: g.parentGroup ? `Sub de: ${g.parentGroup}` : undefined,
   }))
+
+  const [paisSearch, setPaisSearch] = useState('')
+  const paisOptions: SearchSelectOption[] = useMemo(() => {
+    const q = paisSearch.toLowerCase()
+    return (paisesData ?? [])
+      .filter((p) => !q || p.name.toLowerCase().includes(q))
+      .map((p) => ({ value: p.name, label: p.name }))
+  }, [paisesData, paisSearch])
 
   const {
     register,
@@ -223,8 +239,10 @@ export default function SupplierForm() {
   const showRNC = tipoId === 'RNC'
   const showCedula = tipoId === 'Cedula'
 
-  const rncValid = showRNC && rncValue ? validateRNC(rncValue) : null
-  const cedulaValid = showCedula && cedulaValue ? validateCedula(cedulaValue) : null
+  const rncDetail = showRNC && rncValue ? validateRNCDetailed(rncValue) : null
+  const cedulaDetail = showCedula && cedulaValue ? validateCedulaDetailed(cedulaValue) : null
+  const rncValid = rncDetail?.valid ?? null
+  const cedulaValid = cedulaDetail?.valid ?? null
 
   if (isEdit && isLoading) {
     return (
@@ -312,7 +330,11 @@ export default function SupplierForm() {
                         </span>
                       )}
                     </div>
-                    {errors.rnc && <span className="ff-error">{errors.rnc.message}</span>}
+                    {errors.rnc
+                      ? <span className="ff-error">{errors.rnc.message}</span>
+                      : rncDetail && !rncDetail.valid && (
+                        <span className="ff-error" style={{ display: 'block' }}>{rncDetail.reason}</span>
+                      )}
                   </div>
                 )}
 
@@ -338,7 +360,11 @@ export default function SupplierForm() {
                         </span>
                       )}
                     </div>
-                    {errors.cedula && <span className="ff-error">{errors.cedula.message}</span>}
+                    {errors.cedula
+                      ? <span className="ff-error">{errors.cedula.message}</span>
+                      : cedulaDetail && !cedulaDetail.valid && (
+                        <span className="ff-error" style={{ display: 'block' }}>{cedulaDetail.reason}</span>
+                      )}
                   </div>
                 )}
 
@@ -417,7 +443,22 @@ export default function SupplierForm() {
                 {esExterior && (
                   <div className="ff-wrap">
                     <label className="ff-label">País de Origen</label>
-                    <input className="ff-input" {...register('paisOrigen')} placeholder="Ej: Estados Unidos" />
+                    <Controller
+                      name="paisOrigen"
+                      control={control}
+                      render={({ field }) => (
+                        <SearchSelect
+                          id="paisOrigen"
+                          value={field.value ?? ''}
+                          onChange={(v) => field.onChange(v || undefined)}
+                          options={paisOptions}
+                          onSearch={setPaisSearch}
+                          loading={paisesLoading}
+                          placeholder="Buscar país…"
+                        />
+                      )}
+                    />
+                    <p className="ff-hint">El país se guarda tal cual lo maneja ERPNext (en inglés).</p>
                   </div>
                 )}
               </div>

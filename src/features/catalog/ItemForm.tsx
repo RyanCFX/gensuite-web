@@ -75,6 +75,8 @@ export default function ItemForm() {
   const [selectedAttributes, setSelectedAttributes] = useState<string[]>([])
   const [showWarranty, setShowWarranty] = useState(false)
   const [barcodes, setBarcodes] = useState<{ barcode: string; barcodeType: string }[]>([])
+  const [noPurchaseTax, setNoPurchaseTax] = useState(false)
+  const [noSalesTax, setNoSalesTax] = useState(false)
 
   const { data: categoriesData } = useQuery({
     queryKey: ['categories-tree'],
@@ -182,6 +184,14 @@ export default function ItemForm() {
       toast.error('Selecciona una subcategoría')
       return
     }
+    if (!noPurchaseTax && !data.purchaseTaxTemplate) {
+      toast.error('Selecciona el impuesto de compra o marca "No lleva impuesto de compra"')
+      return
+    }
+    if (!noSalesTax && !data.salesTaxTemplate) {
+      toast.error('Selecciona el impuesto de venta o marca "No lleva impuesto de venta"')
+      return
+    }
     const { description, ...rest } = data
     createMutation.mutate({
       ...rest,
@@ -206,8 +216,8 @@ export default function ItemForm() {
       warrantyPeriod: data.warrantyPeriod || undefined,
       barcodes: barcodes.length > 0 ? barcodes : undefined,
       trackingType: data.trackingType === 'none' ? undefined : data.trackingType,
-      purchaseTaxTemplate: data.purchaseTaxTemplate || undefined,
-      salesTaxTemplate: data.salesTaxTemplate || undefined,
+      purchaseTaxTemplate: noPurchaseTax ? undefined : data.purchaseTaxTemplate || undefined,
+      salesTaxTemplate: noSalesTax ? undefined : data.salesTaxTemplate || undefined,
       hasVariants: hasVariants || undefined,
       attributes:
         hasVariants && selectedAttributes.length > 0
@@ -667,7 +677,9 @@ export default function ItemForm() {
                 </div>
               )}
               <div className="ff-wrap">
-                <label className="ff-label" htmlFor="purchaseTaxTemplate">Impuesto de Compra</label>
+                <label className="ff-label" htmlFor="purchaseTaxTemplate">
+                  Impuesto de Compra {!noPurchaseTax && <span className="ff-required">*</span>}
+                </label>
                 <Controller
                   name="purchaseTaxTemplate"
                   control={control}
@@ -679,10 +691,20 @@ export default function ItemForm() {
                       options={purchaseTaxOptions}
                       onSearch={setPurchaseTaxSearch}
                       selectedLabel={itemTaxTemplates?.find((t) => String(t.id) === field.value)?.title ?? ''}
-                      placeholder="Sin impuesto"
+                      placeholder="Seleccionar impuesto"
+                      disabled={noPurchaseTax}
                     />
                   )}
                 />
+                <label className="ff-check-wrap" style={{ marginTop: 8 }}>
+                  <input
+                    type="checkbox"
+                    className="ff-check"
+                    checked={noPurchaseTax}
+                    onChange={(e) => setNoPurchaseTax(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 13 }}>No lleva impuesto de compra</span>
+                </label>
                 <p className="ff-hint">Excepción de impuesto para este artículo en compras y gastos (Item Tax Template)</p>
               </div>
             </div>
@@ -763,7 +785,9 @@ export default function ItemForm() {
 
               <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="salesTaxTemplate">Impuesto de Venta</label>
+                  <label className="ff-label" htmlFor="salesTaxTemplate">
+                    Impuesto de Venta {!noSalesTax && <span className="ff-required">*</span>}
+                  </label>
                   <Controller
                     name="salesTaxTemplate"
                     control={control}
@@ -775,15 +799,25 @@ export default function ItemForm() {
                         options={salesTaxOptions}
                         onSearch={setSalesTaxSearch}
                         selectedLabel={itemTaxTemplates?.find((t) => String(t.id) === field.value)?.title ?? ''}
-                        placeholder="Sin impuesto"
+                        placeholder="Seleccionar impuesto"
+                        disabled={noSalesTax}
                       />
                     )}
                   />
-                  {taxRate > 0 && (
+                  {!noSalesTax && taxRate > 0 && (
                     <p className="ff-hint" style={{ marginTop: 4 }}>
                       Tasa de impuesto: {taxRate}%
                     </p>
                   )}
+                  <label className="ff-check-wrap" style={{ marginTop: 8 }}>
+                    <input
+                      type="checkbox"
+                      className="ff-check"
+                      checked={noSalesTax}
+                      onChange={(e) => setNoSalesTax(e.target.checked)}
+                    />
+                    <span style={{ fontSize: 13 }}>No lleva impuesto de venta</span>
+                  </label>
                   <p className="ff-hint">Excepción de impuesto para este artículo en cotizaciones, pedidos y facturas (Item Tax Template)</p>
                 </div>
               </div>

@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { getCustomer, createCustomer, updateCustomer, listCustomerGroups } from '@/shared/api/customers'
 import type { ApiError } from '@/shared/api/types'
-import { validateRNC, validateCedula, formatRNC, formatCedula } from '@/lib/validators/dgii'
+import { validateRNCDetailed, validateCedulaDetailed, formatRNC, formatCedula } from '@/lib/validators/dgii'
 import { SearchSelect, type SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { CheckCircle2, XCircle, Info, ArrowLeft, HelpCircle } from 'lucide-react'
 
@@ -35,11 +35,17 @@ const schema = z.object({
   customerGroup: z.string().optional(),
 }).superRefine((data, ctx) => {
   // Only validate if the user filled in the field
-  if (data.rnc && !validateRNC(data.rnc.replace(/[-\s]/g, ''))) {
-    ctx.addIssue({ code: 'custom', path: ['rnc'], message: 'RNC inválido (dígito verificador)' })
+  if (data.rnc) {
+    const result = validateRNCDetailed(data.rnc)
+    if (!result.valid) {
+      ctx.addIssue({ code: 'custom', path: ['rnc'], message: result.reason ?? 'RNC inválido' })
+    }
   }
-  if (data.cedula && !validateCedula(data.cedula.replace(/[-\s]/g, ''))) {
-    ctx.addIssue({ code: 'custom', path: ['cedula'], message: 'Cédula inválida (dígito verificador)' })
+  if (data.cedula) {
+    const result = validateCedulaDetailed(data.cedula)
+    if (!result.valid) {
+      ctx.addIssue({ code: 'custom', path: ['cedula'], message: result.reason ?? 'Cédula inválida' })
+    }
   }
 })
 
@@ -178,8 +184,10 @@ export default function CustomerForm() {
   const cedulaValue = watch('cedula') ?? ''
   const rncClean = rncValue.replace(/[-\s]/g, '')
   const cedulaClean = cedulaValue.replace(/[-\s]/g, '')
-  const rncValid = rncClean.length === 9 ? validateRNC(rncClean) : null
-  const cedulaValid = cedulaClean.length === 11 ? validateCedula(cedulaClean) : null
+  const rncDetail = rncClean ? validateRNCDetailed(rncClean) : null
+  const cedulaDetail = cedulaClean ? validateCedulaDetailed(cedulaClean) : null
+  const rncValid = rncClean.length === 9 ? (rncDetail?.valid ?? null) : null
+  const cedulaValid = cedulaClean.length === 11 ? (cedulaDetail?.valid ?? null) : null
 
   if (isEdit && isLoading) {
     return (
@@ -293,7 +301,11 @@ export default function CustomerForm() {
                     </span>
                   )}
                 </div>
-                {errors.rnc && <p className="ff-error">{errors.rnc.message}</p>}
+                {errors.rnc
+                  ? <p className="ff-error">{errors.rnc.message}</p>
+                  : rncDetail && !rncDetail.valid && (
+                    <p className="ff-error">{rncDetail.reason}</p>
+                  )}
               </div>
             )}
 
@@ -319,7 +331,11 @@ export default function CustomerForm() {
                     </span>
                   )}
                 </div>
-                {errors.cedula && <p className="ff-error">{errors.cedula.message}</p>}
+                {errors.cedula
+                  ? <p className="ff-error">{errors.cedula.message}</p>
+                  : cedulaDetail && !cedulaDetail.valid && (
+                    <p className="ff-error">{cedulaDetail.reason}</p>
+                  )}
               </div>
             )}
 

@@ -5,11 +5,12 @@ import { createInvoice } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
 import { listItems, getDefaultPriceTier, getItem } from '@/shared/api/catalog'
-import { listImpuestosVentas, listAlmacenes, getCatalogosFiscales } from '@/shared/api/config'
+import { listImpuestosVentas, listAlmacenes, getCatalogosFiscales, getStockSettings } from '@/shared/api/config'
 import { getItemUbicaciones } from '@/shared/api/ubicaciones'
 import type { CreateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking } from '@/shared/api/types'
 import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingModal'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
+import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info } from 'lucide-react'
@@ -203,6 +204,15 @@ export default function InvoiceForm() {
   const [taxesTemplate, setTaxesTemplate] = useState('')
   const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
+
+  // ── Stock settings: define si los seriales/lotes se capturan inline en la fila (useSerialBatchFields)
+  //    o vía diálogo emergente (ComponentTrackingModal). El catálogo es fijo, se cachea 1h.
+  const { data: stockSettings } = useQuery({
+    queryKey: ['stock-settings'],
+    queryFn: getStockSettings,
+    staleTime: 60 * 60_000,
+  })
+  const useInlineSerialBatch = stockSettings?.useSerialBatchFields === true
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
@@ -475,6 +485,24 @@ export default function InvoiceForm() {
     )
   }
 
+  function updateComponentTracking(
+    index: number,
+    itemCode: string,
+    patch: { serials?: string[]; batches?: { batchId: string; qty: number }[] },
+  ) {
+    setItems((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row
+        const others = (row.componentTracking ?? []).filter((t) => t.itemCode !== itemCode)
+        return { ...row, componentTracking: [...others, { itemCode, ...patch }] }
+      }),
+    )
+  }
+
+  function trackingEntry(row: LineItem, itemCode: string) {
+    return row.componentTracking?.find((t) => t.itemCode === itemCode)
+  }
+
   async function selectCatalogItem(index: number, catalogItem: Item) {
     setItems((prev) =>
       prev.map((row, i) => {
@@ -564,7 +592,8 @@ export default function InvoiceForm() {
       const tracked = results.filter((r): r is NonNullable<typeof r> => r != null)
       if (tracked.length === 0) return
       setItems((prev) => prev.map((row, i) => (i === index ? { ...row, _comboComponents: tracked } : row)))
-      setTrackingModalIndex(index)
+      // En modo inline (useSerialBatchFields) los campos se muestran en la fila; sin modal.
+      if (!useInlineSerialBatch) setTrackingModalIndex(index)
     })
   }
 
@@ -1079,7 +1108,23 @@ const itemsDto = items.map((i) => ({
                     {item.itemType === 'combo' && item._comboComponents && item._comboComponents.length > 0 && (
                       <tr>
                         <td colSpan={11} style={{ padding: '4px 12px 10px' }}>
-                          {isTrackingComplete(item) ? (
+                          {useInlineSerialBatch ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {getTrackingRequirement(item).map((req) => {
+                                const entry = trackingEntry(item, req.itemCode)
+                                return (
+                                  <TrackedComponentEditor
+                                    key={req.itemCode}
+                                    component={req}
+                                    serials={entry?.serials ?? []}
+                                    onChangeSerials={(s) => updateComponentTracking(index, req.itemCode, { serials: s })}
+                                    batches={entry?.batches ?? []}
+                                    onChangeBatches={(b) => updateComponentTracking(index, req.itemCode, { batches: b })}
+                                  />
+                                )
+                              })}
+                            </div>
+                          ) : isTrackingComplete(item) ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-success)' }}>
                               ✓ Series/lotes de componentes asignados
                               <button type="button" className="btn btn-ghost btn-size-xs" onClick={() => setTrackingModalIndex(index)}>

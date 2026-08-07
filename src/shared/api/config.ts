@@ -27,6 +27,7 @@ import type {
   AlmacenListItem,
   CreateAlmacenDto,
   UpdateAlmacenDto,
+  PaisCatalogo,
   Banco,
   Denominacion,
   CreateDenominacionDto,
@@ -385,5 +386,10 @@ export interface CatalogosFiscales {
 
 export async function getCatalogosFiscales() {
   const res = await client.get<{ success: true; data: CatalogosFiscales }>(ENDPOINTS.config.catalogosFiscales)
+  return unwrap(res)
+}
+
+export async function listPaises(): Promise<PaisCatalogo[]> {
+  const res = await client.get<{ success: true; data: PaisCatalogo[] }>(ENDPOINTS.config.paises)
   return unwrap(res)
 }

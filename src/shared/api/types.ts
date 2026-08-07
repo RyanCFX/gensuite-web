@@ -2038,6 +2038,14 @@ export interface Grupo {
   parentGroup?: string;
 }
 
+// GET /config/paises — catálogo de países tal cual existen en ERPNext (Country).
+// `name` es el nombre exacto del documento en ERPNext (inglés). paisOrigen debe
+// enviar siempre `name`, nunca una traducción.
+export interface PaisCatalogo {
+  id: string;
+  name: string;
+}
+
 // NcfSerie — matches actual BFF response exactly.
 // id is an integer (ERPNext autoincrement), NOT a UUID.
 // nextNcf = -1 is a special signal meaning "exhausted" — never display -1 to users.
@@ -2597,6 +2605,8 @@ export interface StockSettings {
   defaultWarehouse?: string;
   allowNegativeStock?: boolean;
   enableStockReservation?: boolean;
+  /** true → capturar Serial No / Batch No directamente en la fila del documento (sin diálogo emergente). */
+  useSerialBatchFields?: boolean;
   [key: string]: unknown;
 }
 export type UpdateStockSettingsDto = Partial<StockSettings>;

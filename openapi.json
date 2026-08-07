@@ -2174,6 +2174,36 @@
         ]
       }
     },
+    "/api/v1/config/paises": {
+      "get": {
+        "description": "El campo `country` de Supplier/Customer/Company es un Link a `Country` — ERPNext exige el nombre exacto del documento (ej. \"United States\", no \"Estados Unidos\"). Usar este catálogo para poblar un select en vez de digitar el país a mano.",
+        "operationId": "ConfigController_getPaises",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar países (Country) tal cual existen en ERPNext",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
     "/api/v1/config/uom": {
       "get": {
         "operationId": "ConfigController_getUom",

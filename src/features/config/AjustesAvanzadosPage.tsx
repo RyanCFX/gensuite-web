@@ -245,6 +245,17 @@ function InventarioTab() {
               Habilitar Reserva de Stock
             </label>
           </div>
+
+          <div className="ff-wrap">
+            <label className="ff-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" className="ff-check" {...register('useSerialBatchFields')} />
+              Usar campos de Serie/Lote en los documentos
+            </label>
+            <p className="ff-hint">
+              Cuando está activo, los documentos (facturas, pedidos, compras, transferencias) muestran los campos de Número de
+              Serie y Lote directamente en la fila del artículo, en lugar del diálogo emergente de captura.
+            </p>
+          </div>
         </div>
       </div>
 
