@@ -341,7 +341,9 @@ export interface CancelInvoiceDto {
   motivoAnulacion?: string;
 }
 
-// POST /invoices/:id/submit — optional body to control cash vs. credit at submit time
+// POST /invoices/:id/submit — el cobro ya no ocurre aquí (ver módulo Caja). Este endpoint solo
+// asigna el NCF y somete la factura; queda con outstandingAmount === grandTotal (menos crédito ya
+// aplicado) pendiente de cobrar.
 export interface SubmitInvoiceDto {
   /** Force cash payment even if the customer has credit. */
   payCash?: boolean;
@@ -2242,6 +2244,34 @@ export interface CompletarCobroResult {
  }
 
 export type SubmitInvoiceResult = Invoice | PendienteCobroSubmitResult;
+
+// ─── Caja (cobro de facturas ya sometidas) ────────────────────────────────────
+
+// GET /caja/pendientes
+export interface CajaPendienteItem {
+  id: string
+  customer: string
+  customerName: string
+  ncf?: string
+  grandTotal: number
+  outstandingAmount: number
+  postingDate: string
+}
+
+// POST /caja/facturas/:id/cobrar
+export interface CobrarFacturaDto {
+  payments: PaymentLine[]
+  vuelto?: VueltoLine[]
+  tenderedCash?: number
+}
+
+export interface CobrarFacturaResult {
+  invoiceId: string
+  paymentEntryIds: string[]
+  outstandingAmount: number
+  fullyPaid: boolean
+  vuelto: VueltoLine[]
+}
 
 export interface ListaPrecio {
   name: string;

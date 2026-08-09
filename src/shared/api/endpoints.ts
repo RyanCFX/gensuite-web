@@ -284,6 +284,10 @@ export const ENDPOINTS = {
     cancel: (id: string) => `/pagos/${id}/cancel`,
     saldoFavor: (supplierId: string) => `/pagos/saldo-favor/${encodeURIComponent(supplierId)}`,
   },
+  caja: {
+    pendientes: '/caja/pendientes',
+    cobrar: (invoiceId: string) => `/caja/facturas/${invoiceId}/cobrar`,
+  },
   reportes: {
     ventas: '/reportes/ventas',
     ventasPdf: '/reportes/ventas/pdf',

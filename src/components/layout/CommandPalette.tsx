@@ -54,6 +54,7 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'proveedores',  label: 'Proveedores',          group: 'Operaciones',  path: '/proveedores',                    icon: <Truck size={15} />, keywords: 'suppliers vendor proveedor' },
 
   // ── Finanzas / CxC ─────────────────────────────────────────────────────────
+  { id: 'caja',         label: 'Caja',                 group: 'Finanzas',     path: '/caja',                           icon: <Wallet size={15} />, keywords: 'cobrar pago vuelto contado caja factura pendiente' },
   { id: 'cobros',       label: 'Cobros',               group: 'Finanzas',     path: '/cobros',                         icon: <Wallet size={15} />, keywords: 'pagos cuentas cobrar aging' },
   { id: 'registrar-cobro', label: 'Registrar Cobro',   group: 'Finanzas',     path: '/cobros/pago',                    icon: <Wallet size={15} />, keywords: 'pago cobro payment' },
   { id: 'aging',        label: 'Aging CxC',            group: 'Finanzas',     path: '/cobros/aging',                   icon: <Wallet size={15} />, keywords: 'aging cuentas cobrar vencidas' },
