@@ -9,12 +9,14 @@ import {
   getCxcAging, getCxpAging, getCajaCuadre,
   getLibroDiario, getLibroMayor,
   getCuadreTurno, downloadCuadreTurnoExcel, downloadCuadreTurnoPdf,
+  getCorteCajaDia, downloadCorteCajaDiaPdf,
   downloadReporteExcel,
   downloadBalanceGeneralPdf, downloadIngresosEgresosPdf, downloadVentasPdf,
   downloadInventarioValoracionPdf, downloadInventarioMovimientosPdf,
   downloadCxcAgingPdf, downloadCxpAgingPdf, downloadCajaCuadrePdf,
 } from '@/shared/api/reportes'
-import type { LibroDiarioByDimension, CuadreTurnoRow } from '@/shared/api/types'
+import type { LibroDiarioByDimension, CuadreTurnoRow, CorteCajaDiaTurno } from '@/shared/api/types'
+import { CorteCajaView } from '@/components/shared/CorteCajaView'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listDepartamentos } from '@/shared/api/departamentos'
 import { listUsuarios } from '@/shared/api/usuarios'
@@ -24,6 +26,7 @@ import { BarChart3, AlertCircle, Download, FileText, Loader2 } from 'lucide-reac
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 // ─── Branch / Department filter ──────────────────────────────────────────────
 
@@ -82,7 +85,7 @@ function BranchDepartmentFilters({
           placeholder="Todas las sucursales"
         />
       </div>
-      <div style={{ width: 200 }}>
+      {/*<div style={{ width: 200 }}>
         <SearchSelect
           value={department}
           onChange={onDepartmentChange}
@@ -91,7 +94,7 @@ function BranchDepartmentFilters({
           selectedLabel={department}
           placeholder="Todos los departamentos"
         />
-      </div>
+      </div>*/}
     </>
   )
 }
@@ -130,6 +133,7 @@ const REPORT_META: Record<string, { label: string; description: string }> = {
   libroDiario:  { label: 'Libro Diario',         description: 'Movimientos contables (GL) del período' },
   libroMayor:   { label: 'Libro Mayor',          description: 'Movimientos por cuenta con saldo inicial y final' },
   cuadreTurno:  { label: 'Cuadre por Turno',     description: 'Historial de turnos de caja cerrados y su cuadre' },
+  corteCajaDia: { label: 'Corte de Caja del Día', description: 'Ventas, ingresos, egresos e importe a entregar del día, consolidado y por turno' },
 }
 
 function thisYear() { return new Date().getFullYear() }
@@ -356,8 +360,8 @@ function FinancialReport({ tipo }: { tipo: 'balance' | 'pl' }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-          <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
           <Select value={periodicity} onValueChange={(val) => setPeriodicity(val as typeof periodicity)}>
             <SelectItem value="monthly">Mensual</SelectItem>
             <SelectItem value="quarterly">Trimestral</SelectItem>
@@ -409,8 +413,8 @@ function VentasReport() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-          <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
           <Select value={groupBy} onValueChange={(val) => setGroupBy(val as typeof groupBy)}>
             <SelectItem value="day">Por día</SelectItem>
             <SelectItem value="week">Por semana</SelectItem>
@@ -456,8 +460,8 @@ function InventarioReport({ tipo }: { tipo: 'stock' | 'movimientos' }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-          <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
             department={department} onDepartmentChange={setDepartment}
@@ -561,7 +565,7 @@ function CajaCuadreReport() {
       <div className="filter-bar">
         <div className="filter-bar-left">
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-            Fecha: <input type="date" className="filter-select" value={date} onChange={(e) => setDate(e.target.value)} />
+            Fecha: <DatePicker className="filter-select" clearable value={date} onChange={setDate} />
           </label>
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
@@ -704,8 +708,8 @@ function CuadreTurnoReport() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-          <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
           <div style={{ width: 200 }}>
             <SearchSelect
               value={cajero}
@@ -810,6 +814,120 @@ function CuadreTurnoReport() {
   )
 }
 
+function CorteCajaDiaReport() {
+  const [date, setDate] = useState(today())
+  const [cajero, setCajero] = useState('')
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const cajeros = useCajeroOptions()
+  const [cajeroSearch, setCajeroSearch] = useState('')
+  const cajeroOptions: SearchSelectOption[] = cajeros
+    .filter((u) => !cajeroSearch || u.fullName.toLowerCase().includes(cajeroSearch.toLowerCase()))
+    .map((u) => ({ value: u.email, label: u.fullName }))
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reporte-corte-caja-dia', date, cajero],
+    queryFn: () => getCorteCajaDia({ date, cajero: cajero || undefined }),
+    enabled: !!date,
+    retry: false,
+  })
+
+  const result = data?.data
+  const turnos: CorteCajaDiaTurno[] = result?.turnos ?? []
+
+  async function handleDownloadPdf() {
+    setDownloadingPdf(true)
+    try {
+      await downloadCorteCajaDiaPdf({ date, cajero: cajero || undefined })
+    } catch (err) {
+      toast.error((err as { message?: string })?.message ?? 'No se pudo descargar el PDF')
+    } finally {
+      setDownloadingPdf(false)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <DatePicker className="filter-select" value={date} onChange={setDate} />
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={cajero}
+              onChange={setCajero}
+              options={cajeroOptions}
+              onSearch={setCajeroSearch}
+              selectedLabel={cajeros.find((u) => u.email === cajero)?.fullName ?? ''}
+              placeholder="Todos los cajeros"
+            />
+          </div>
+        </div>
+        <div className="filter-bar-right">
+          <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadPdf} disabled={downloadingPdf || !date}>
+            {downloadingPdf ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
+            {' '}Descargar PDF
+          </button>
+        </div>
+      </div>
+
+      {isLoading && <LoadingRows />}
+      {error && <ErrorBanner err={error} />}
+
+      {!isLoading && !error && result && (
+        <>
+          {turnos.length === 0 ? (
+            <div className="card">
+              <div className="empty-state">
+                <span className="empty-icon"><FileText size={20} /></span>
+                <p className="empty-title">Sin turnos cerrados</p>
+                <p className="empty-sub">No hay turnos de caja cerrados para la fecha y filtros seleccionados.</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Consolidado del día</h2>
+              <CorteCajaView corteCaja={result.consolidado} />
+
+              <div className="card">
+                <div className="card-header">
+                  <span className="card-title">Turnos del día</span>
+                </div>
+                <div className="table-scroll">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Turno</th>
+                        <th>Cajero</th>
+                        <th>Apertura</th>
+                        <th>Cierre</th>
+                        <th style={{ textAlign: 'right' }}>Ventas del Día</th>
+                        <th style={{ textAlign: 'right' }}>Egresos</th>
+                        <th style={{ textAlign: 'right' }}>Importe a Entregar</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {turnos.map((t) => (
+                        <tr key={t.id}>
+                          <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{t.id}</td>
+                          <td>{t.cajero}</td>
+                          <td style={{ fontSize: 12 }}>{formatDateTime(t.periodStartDate)}</td>
+                          <td style={{ fontSize: 12 }}>{formatDateTime(t.periodEndDate)}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatDOP(t.corteCaja.ventasDelDia.total)}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatDOP(t.corteCaja.egresos.total)}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{formatDOP(t.corteCaja.importeAEntregar)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 function ByDimensionTable({ rows }: { rows: LibroDiarioByDimension[] }) {
   return (
     <div className="table-scroll">
@@ -860,8 +978,8 @@ function LibroDiarioReport() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-          <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
           <Select value={groupBy} onValueChange={(val) => setGroupBy(val as typeof groupBy)}>
             <SelectItem value="Group by Voucher">Agrupar por Voucher</SelectItem>
             <SelectItem value="Group by Voucher (Consolidated)">Agrupar por Voucher (Consolidado)</SelectItem>
@@ -910,8 +1028,8 @@ function LibroMayorReport() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-          <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
             department={department} onDepartmentChange={setDepartment}
@@ -942,6 +1060,7 @@ const REPORT_NAV = [
   { key: 'cxpaging',   group: 'CXP',        label: 'Aging CXP' },
   { key: 'caja',        group: 'Caja',       label: 'Cuadre de Caja' },
   { key: 'cuadreTurno', group: 'Caja',       label: 'Cuadre por Turno' },
+  { key: 'corteCajaDia', group: 'Caja',      label: 'Corte de Caja del Día' },
   { key: 'libroDiario', group: 'Contabilidad', label: 'Libro Diario' },
   { key: 'libroMayor',  group: 'Contabilidad', label: 'Libro Mayor' },
 ]
@@ -969,6 +1088,7 @@ export default function ReportesPage() {
       case 'cxpaging':  return <CxpAgingReport />
       case 'caja':       return <CajaCuadreReport />
       case 'cuadreTurno': return <CuadreTurnoReport />
+      case 'corteCajaDia': return <CorteCajaDiaReport />
       case 'libroDiario': return <LibroDiarioReport />
       case 'libroMayor':  return <LibroMayorReport />
       default:           return <ServiceUnavailable message="Reporte no encontrado." />

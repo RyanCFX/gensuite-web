@@ -1,19 +1,35 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Clock, Lock } from 'lucide-react'
-import { getTurnoDetail } from '@/shared/api/pos'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { ArrowLeft, Clock, Lock, Download, Eye, Loader2 } from 'lucide-react'
+import { getTurnoDetail, downloadTurnoPdf, getTurnoPdfBlobUrl } from '@/shared/api/pos'
 import { listDenominaciones } from '@/shared/api/config'
 import { formatDateTime, formatDOP } from '@/lib/formatters'
+import { CorteCajaView } from '@/components/shared/CorteCajaView'
+import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import type { TurnoClosing } from '@/shared/api/types'
 
 export default function TurnoDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   const { data: turno, isLoading, isError } = useQuery({
     queryKey: ['turno', id],
     queryFn: () => getTurnoDetail(id!),
     enabled: !!id,
+  })
+
+  const previewMutation = useMutation({
+    mutationFn: () => getTurnoPdfBlobUrl(id!),
+    onSuccess: (url) => setPreviewUrl(url),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo generar la vista previa del PDF'),
+  })
+
+  const downloadPdfMutation = useMutation({
+    mutationFn: () => downloadTurnoPdf(id!),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo descargar el PDF'),
   })
 
   if (isLoading) {
@@ -55,6 +71,27 @@ export default function TurnoDetailPage() {
         </p>
       </div>
 
+      {turno.closing && (
+        <div className="doc-actions-bar">
+          <button
+            className="btn btn-secondary btn-size-sm"
+            onClick={() => previewMutation.mutate()}
+            disabled={previewMutation.isPending}
+          >
+            {previewMutation.isPending ? <Loader2 size={13} className="spin" /> : <Eye size={13} aria-hidden="true" />}
+            {' '}Ver PDF
+          </button>
+          <button
+            className="btn btn-secondary btn-size-sm"
+            onClick={() => downloadPdfMutation.mutate()}
+            disabled={downloadPdfMutation.isPending}
+          >
+            {downloadPdfMutation.isPending ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
+            {' '}Descargar PDF
+          </button>
+        </div>
+      )}
+
       {/* Información de apertura */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
@@ -95,6 +132,8 @@ export default function TurnoDetailPage() {
           </div>
         </div>
       )}
+
+      <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
     </div>
   )
 }
@@ -199,6 +238,14 @@ function ClosingSection({ closing }: { closing: TurnoClosing }) {
           </table>
         </div>
       </div>
+
+      {/* Corte de Caja */}
+      {closing.corteCaja && (
+        <div style={{ marginBottom: 16 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 12px' }}>Corte de Caja</h2>
+          <CorteCajaView corteCaja={closing.corteCaja} />
+        </div>
+      )}
 
       {/* Arqueo de efectivo */}
       <div className="card">

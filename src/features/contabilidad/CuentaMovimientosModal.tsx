@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { X, Search } from 'lucide-react'
 import { getCuentaMovimientos, type CuentaMovimientosParams } from '@/shared/api/libroDiario'
 import { formatDate, formatDOP } from '@/lib/formatters'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 function firstOfMonth(): string {
   const d = new Date()
@@ -65,20 +66,20 @@ export function CuentaMovimientosModal({ accountId, onClose }: Props) {
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginBottom: 16, flexWrap: 'wrap' }}>
             <div className="ff-wrap">
               <label className="ff-label">Desde</label>
-              <input
-                type="date"
+              <DatePicker
                 className="ff-input"
                 value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
+                onChange={setFromDate}
+                clearable
               />
             </div>
             <div className="ff-wrap">
               <label className="ff-label">Hasta</label>
-              <input
-                type="date"
+              <DatePicker
                 className="ff-input"
                 value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
+                onChange={setToDate}
+                clearable
               />
             </div>
             <button className="btn btn-primary btn-size-sm" onClick={handleSearch}>

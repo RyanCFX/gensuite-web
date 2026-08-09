@@ -3,11 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listCobros } from '@/shared/api/cobros'
 import type { ListCobrosParams } from '@/shared/api/cobros'
+import { listCustomers } from '@/shared/api/customers'
+import { listMetodosPago } from '@/shared/api/config'
+import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { Plus, Search } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
@@ -29,17 +35,52 @@ type StatusFilter = 'Draft' | 'Submitted' | 'Cancelled' | 'all'
 export default function CobrosPage() {
   const navigate = useNavigate()
 
-  const [search, setSearch] = useState('')
+  const [customerId, setCustomerId] = useState('')
+  const [customerLabel, setCustomerLabel] = useState('')
+  const [customerQuery, setCustomerQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [modeOfPayment, setModeOfPayment] = useState('')
+  const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState('')
+  const [bankAccount, setBankAccount] = useState('')
+  const [bankAccountSearch, setBankAccountSearch] = useState('')
+  const [paidAmountMin, setPaidAmountMin] = useState('')
+  const [paidAmountMax, setPaidAmountMax] = useState('')
   const { orderBy, sort } = useSortState()
 
+  const { data: customersData, isLoading: customersLoading } = useQuery({
+    queryKey: ['customerSearch', customerQuery],
+    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
+  })
+  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
+    value: c.id,
+    label: c.customerName,
+  }))
+
+  const { data: metodos } = useQuery({ queryKey: ['metodos-pago'], queryFn: listMetodosPago })
+  const modeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
+    .filter((m) => !m.disabled)
+    .filter((m) => !modeOfPaymentSearch || m.name.toLowerCase().includes(modeOfPaymentSearch.toLowerCase()))
+    .map((m) => ({ value: m.name, label: m.name }))
+
+  const { data: cuentasBancarias } = useQuery({
+    queryKey: ['cuentas-bancarias-activas'],
+    queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
+  })
+  const bankAccountOptions: SearchSelectOption[] = (cuentasBancarias?.items ?? [])
+    .filter((c) => !bankAccountSearch || c.accountName.toLowerCase().includes(bankAccountSearch.toLowerCase()))
+    .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))
+
   const params: ListCobrosParams = {
-    customer: search || undefined,
+    customer: customerId || undefined,
     status: status === 'all' ? undefined : status,
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
+    modeOfPayment: modeOfPayment || undefined,
+    bankAccount: bankAccount || undefined,
+    paidAmountMin: paidAmountMin !== '' ? Number(paidAmountMin) : undefined,
+    paidAmountMax: paidAmountMax !== '' ? Number(paidAmountMax) : undefined,
     orderBy: orderBy || undefined,
     limit: 50,
   }
@@ -69,13 +110,15 @@ export default function CobrosPage() {
       {/* ── Filtros ─────────────────────────────────────────────────────── */}
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={15} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por cliente…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+          <div style={{ width: 260 }}>
+            <SearchSelect
+              value={customerId}
+              selectedLabel={customerLabel}
+              onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
+              options={customerOptions}
+              onSearch={setCustomerQuery}
+              loading={customersLoading}
+              placeholder="Filtrar por cliente…"
             />
           </div>
 
@@ -86,20 +129,58 @@ export default function CobrosPage() {
             <SelectItem value="Cancelled">Cancelado</SelectItem>
           </Select>
 
-          <input
-            type="date"
+          <DatePicker
             className="filter-select"
             value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            title="Desde"
+            onChange={setFromDate}
+            clearable
           />
-          <input
-            type="date"
+          <DatePicker
             className="filter-select"
             value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            title="Hasta"
+            onChange={setToDate}
+            clearable
           />
+
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={modeOfPayment}
+              onChange={(val) => setModeOfPayment(val)}
+              options={modeOfPaymentOptions}
+              onSearch={setModeOfPaymentSearch}
+              placeholder="Todos los métodos de pago"
+            />
+          </div>
+
+          <div style={{ width: 220 }}>
+            <SearchSelect
+              value={bankAccount}
+              onChange={(val) => setBankAccount(val)}
+              options={bankAccountOptions}
+              onSearch={setBankAccountSearch}
+              placeholder="Todas las cuentas bancarias"
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 100 }}
+              placeholder="Mín."
+              value={paidAmountMin}
+              onChange={(e) => setPaidAmountMin(e.target.value)}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 100 }}
+              placeholder="Máx."
+              value={paidAmountMax}
+              onChange={(e) => setPaidAmountMax(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 

@@ -71,6 +71,20 @@ export interface LoginResponse {
   user: AuthUser;
 }
 
+export interface ForgotPasswordDto {
+  email: string;
+}
+
+export interface ForgotPasswordResult {
+  message: string;
+}
+
+export interface ResetPasswordDto {
+  email: string;
+  key: string;
+  newPassword: string;
+}
+
 export interface JwtPayload {
   sub: string;
   tenant: string;
@@ -265,6 +279,8 @@ export interface Invoice {
   clienteOcasionalNombre?: string;
   /** RNC del cliente ocasional (solo presente cuando esClienteOcasional=true y ncfType=B01). */
   clienteOcasionalRnc?: string;
+  /** Dirección del cliente ocasional (solo presente cuando esClienteOcasional=true). */
+  clienteOcasionalDireccion?: string;
 }
 
 export interface PendingTrackingEntry {
@@ -293,6 +309,7 @@ export interface CreateInvoiceDto {
   customer?: string;
   clienteOcasionalNombre?: string;
   clienteOcasionalRnc?: string;
+  clienteOcasionalDireccion?: string;
   postingDate: string;
   dueDate?: string;
   branch?: string;
@@ -360,6 +377,7 @@ export interface Quotation {
   customerName: string;
   esClienteOcasional: boolean;
   clienteOcasionalNombre?: string;
+  clienteOcasionalDireccion?: string;
   date: string;
   validTill: string;
   branch?: string | null;
@@ -377,6 +395,7 @@ export interface Quotation {
 export interface CreateQuotationDto {
   customer?: string;
   clienteOcasionalNombre?: string;
+  clienteOcasionalDireccion?: string;
   date: string; // required per API
   validTill?: string;
   branch?: string;
@@ -401,6 +420,7 @@ export type UpdateQuotationDto = Partial<CreateQuotationDto>;
 export interface DuplicateQuotationSource {
    customer: string;
    clienteOcasionalNombre?: string;
+   clienteOcasionalDireccion?: string;
    items: {
     itemCode: string;
     description?: string;
@@ -463,6 +483,8 @@ export interface CreateCreditNoteDto {
 export interface RefundCreditNoteDto {
   modeOfPayment: string;
   amount: number;
+  /** Cuenta bancaria (id de CuentaBancaria) — requerida si el método de pago tiene requiresBankAccount=true y no tiene defaultBankAccount. */
+  bankAccount?: string;
 }
 
 // POST /credit-notes/:id/aplicar-a-factura — invoiceId es obligatorio, siempre se enlaza a una factura
@@ -858,6 +880,7 @@ export interface Pedido {
   customerName: string;
   esClienteOcasional: boolean;
   clienteOcasionalNombre?: string;
+  clienteOcasionalDireccion?: string;
   transactionDate: string;
   deliveryDate?: string;
   branch?: string | null;
@@ -883,6 +906,7 @@ export interface Pedido {
 export interface CreatePedidoDto {
   customer?: string;
   clienteOcasionalNombre?: string;
+  clienteOcasionalDireccion?: string;
   transactionDate?: string;
   deliveryDate?: string;
   branch?: string;
@@ -1418,6 +1442,71 @@ export interface CreateCompraDto {
 
 export type UpdateCompraDto = Partial<CreateCompraDto>;
 
+// ─── Purchase Receipt (Recepción de Mercancía — flujo de 2 pasos) ─────────────
+// Paso 1: se recibe la mercancía y entra a inventario sin datos fiscales.
+// Paso 2 ("facturar"): cuando llega la factura real del proveedor, se genera
+// una Purchase Invoice (update_stock=0) referenciando este receipt.
+
+export interface PurchaseReceiptItem {
+  itemCode: string;
+  itemName: string;
+  qty: number;
+  rate: number;
+  amount: number;
+  warehouse: string;
+  uom: string;
+  /** Monto de esta línea ya facturado desde este receipt */
+  billedAmt: number;
+}
+
+export interface PurchaseReceipt {
+  id: string;
+  supplier: string;
+  supplierName: string;
+  postingDate: string;
+  supplierDeliveryNote: string | null;
+  status: "draft" | "submitted" | "cancelled" | "unknown";
+  /** 0-100, % ya facturado desde este receipt */
+  perBilled: number;
+  branch: string | null;
+  department: string | null;
+  items: PurchaseReceiptItem[];
+  amendedFrom?: string;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+export interface CreatePurchaseReceiptDto {
+  supplier: string;
+  postingDate: string;
+  supplierDeliveryNote?: string;
+  branch?: string;
+  department?: string;
+  items: {
+    itemCode: string;
+    description?: string;
+    qty: number;
+    rate: number;
+    warehouse?: string;
+    uom?: string;
+    serials?: string[];
+    batches?: { batchId: string; expiryDate?: string; qty: number }[];
+  }[];
+}
+
+export type UpdatePurchaseReceiptDto = Partial<CreatePurchaseReceiptDto>;
+
+export interface FacturarPurchaseReceiptDto {
+  dueDate?: string;
+  ncfProveedor?: string;
+  tipoBienes606?: string;
+  formaPago606?: string;
+  retencionItbis?: number;
+  retencionIsr?: number;
+  tipoPago?: "Contado" | "Crédito";
+  taxesTemplate?: string;
+}
+
 // ─── Gasto (Purchase Invoice — update_stock=0) ────────────────────────────────
 // GastoItemDto: itemCode, qty, rate, uom?, description? (description is allowed)
 
@@ -1767,6 +1856,8 @@ export interface FacturacionConfig {
   formatosPermitidos?: FormatoImpresion[]
   /** Máximo de horas que un turno de caja puede estar abierto antes de obligar al cajero a cerrarlo. 0.1 = 6 minutos. Default 24 si no se configura. */
   turnoMaxHoras?: number
+  /** Cuando a una Secuencia NCF le queden este número de comprobantes o menos, GET /config/ncf marca esa serie con alertaActiva=true y se envía el correo del tipo de notificación "Secuencia NCF por agotarse" (una vez por día por serie). Default 50. */
+  ncfAlertaMinimo?: number
 }
 
 // POST /config/pos/habilitar
@@ -1887,6 +1978,62 @@ export interface TurnoClosing {
   totalQuantity: number;
   paymentReconciliation: PaymentReconciliationLine[];
   denominacionesEfectivo: DenominacionCierreDto[];
+  corteCaja: CorteCaja;
+}
+
+// ─── Corte de Caja ────────────────────────────────────────────────────────────
+// Reporte "Corte de Caja" — GET /pos/turnos/:id (dentro de `closing.corteCaja`) y
+// GET /reportes/pos/corte-caja-dia (consolidado + por turno). No existe una fila
+// "Delivery" en este sistema (no hay canal de venta delivery separado del POS).
+// "ventasCredito" y "recibosCobrados" de nivel raíz siempre vienen en 0 — es
+// correcto: una venta dentro de un turno POS siempre es de contado, y un cobro
+// de CxC nunca es "de contado". No tratar como dato faltante.
+
+/** Una fila por método de pago real configurado en el tenant (Cash, Tarjeta, etc.) — cantidad dinámica, no asumir un número fijo. */
+export interface CorteCajaIngresoLine {
+  metodo: string;
+  ventasContado: number;
+  recibosCobrados: number;
+  total: number;
+}
+
+export interface CorteCaja {
+  ventasDelDia: {
+    ventasContado: number;
+    /** Siempre 0 en este sistema — una venta POS siempre es de contado. */
+    ventasCredito: number;
+    total: number;
+  };
+  devoluciones: { total: number };
+  /** Siempre 0 en este sistema — un cobro de CxC nunca es "de contado" dentro de un turno POS. */
+  recibosCobrados: { total: number };
+  ventasNetas: { total: number };
+  /** Filas dinámicas por método de pago real — iterar tal cual, no asumir 4 categorías fijas. */
+  ingresos: CorteCajaIngresoLine[];
+  egresos: {
+    devoluciones: number;
+    otrosEgresos: number;
+    total: number;
+  };
+  fondoApertura: number;
+  /** Efectivo físico a entregar (solo métodos tipo Cash) — NO es el total general de ingresos. */
+  importeAEntregar: number;
+}
+
+// GET /reportes/pos/corte-caja-dia
+export interface CorteCajaDiaTurno {
+  id: string;
+  cajero: string;
+  posProfile: string;
+  periodStartDate: string;
+  periodEndDate: string;
+  corteCaja: CorteCaja;
+}
+
+export interface CorteCajaDiaResult {
+  date: string;
+  turnos: CorteCajaDiaTurno[];
+  consolidado: CorteCaja;
 }
 
 // GET /reportes/pos/cuadre-turno — una fila por combinación turno + modo de pago
@@ -1914,12 +2061,92 @@ export interface MetodoPago {
   type: "Cash" | "Bank" | "General";
   codigo606?: string;
   disabled: boolean;
+  /** Si es true, el backend exige `bankAccount` en cobros/pagos con este método (salvo que tenga defaultBankAccount). */
+  requiresBankAccount?: boolean;
+  /** Cuenta bancaria (id de CuentaBancaria) usada automáticamente si la operación no especifica una. */
+  defaultBankAccount?: string;
 }
 
 // GET /config/bancos — catálogo nativo ERPNext (Bank), solo lectura
 export interface Banco {
   id: string;
   name: string;
+}
+
+// GET/POST/PUT /cuentas-bancarias/bancos — catálogo de bancos propio (mutable), separado del
+// catálogo nativo ERPNext de solo lectura (`Banco` arriba, GET /config/bancos).
+export interface BancoCatalogo {
+  id: string;
+  name: string;
+  swiftNumber?: string;
+  website?: string;
+}
+
+export interface CreateBancoDto {
+  name: string;
+  swiftNumber?: string;
+}
+
+export interface UpdateBancoDto {
+  name?: string;
+  swiftNumber?: string;
+}
+
+// ─── Cuentas Bancarias ──────────────────────────────────────────────────────
+
+export type CuentaBancariaEstado = "Activa" | "Inactiva" | "Cerrada";
+export type ChequeFormat = "Estándar" | "Voucher" | "Media Carta" | "Cartera";
+
+export interface CuentaBancaria {
+  id: string;
+  accountName: string;
+  bank: string;
+  account: string;
+  bankAccountNo?: string;
+  currency: string;
+  estado: CuentaBancariaEstado;
+  chequeFormat: ChequeFormat;
+  chequesManuales: boolean;
+  isDefault: boolean;
+  disabled: boolean;
+  ultimoCheque?: number;
+  ultimoDeposito?: number;
+  balanceInicial: number;
+  /** Solo presente cuando se solicita explícitamente (?withBalance=true o GET .../balance) */
+  balance?: number;
+}
+
+export interface CreateCuentaBancariaDto {
+  accountName: string;
+  bank: string;
+  account: string;
+  bankAccountNo?: string;
+  currency: string;
+  estado?: CuentaBancariaEstado;
+  chequeFormat?: ChequeFormat;
+  chequesManuales?: boolean;
+  isDefault?: boolean;
+  balanceInicial?: number;
+}
+
+export interface UpdateCuentaBancariaDto {
+  accountName?: string;
+  bank?: string;
+  account?: string;
+  bankAccountNo?: string;
+  currency?: string;
+  estado?: CuentaBancariaEstado;
+  chequeFormat?: ChequeFormat;
+  chequesManuales?: boolean;
+  isDefault?: boolean;
+  ultimoCheque?: number;
+  ultimoDeposito?: number;
+}
+
+export interface CuentaBancariaBalance {
+  balance: number;
+  balanceInicial: number;
+  moneda: string;
 }
 
 // GET/POST/PUT /config/denominaciones — catálogo de billetes/monedas para el desglose de vuelto
@@ -1948,6 +2175,8 @@ export interface PaymentLine {
   authorizationCode?: string;
   bank?: string;
   checkNumber?: string;
+  /** Cuenta bancaria (id de CuentaBancaria) — requerida si el método de pago tiene requiresBankAccount=true y no tiene defaultBankAccount. */
+  bankAccount?: string;
 }
 
 export interface VueltoLine {
@@ -2072,6 +2301,10 @@ export interface NcfSerie {
   expirationDate: string;
   disabled: boolean;
   remaining: number;
+  /** Umbral configurado (FacturacionConfig.ncfAlertaMinimo) contra el que se compara `remaining` para decidir `alertaActiva`. */
+  umbralAlerta?: number;
+  /** true si remaining <= umbralAlerta y la serie no está agotada ni deshabilitada. Ya viene calculado por el backend. */
+  alertaActiva?: boolean;
   // Detail-only fields (GET /config/ncf/:id)
   exhausted?: boolean;
   used?: number;
@@ -2160,6 +2393,13 @@ export interface PaymentEntry {
   modifiedAt?: string;
   /** true when this row comes from a POS sale (is_pos=1) — id is a Sales Invoice, not a Payment Entry */
   isPosSale?: boolean;
+  /** Bank Account nativo asociado al pago (id de CuentaBancaria) */
+  bankAccount?: string;
+  /** Banco emisor (custom field, cheque/transferencia) */
+  bank?: string;
+  checkNumber?: string;
+  cardNumber?: string;
+  authorizationCode?: string;
 }
 
 // CreateCobroDto — matches BFF's CreateCobroDto exactly
@@ -2173,6 +2413,8 @@ export interface CreateCobroDto {
   remarks?: string;
   branch?: string;
   department?: string;
+  /** Cuenta bancaria (id de CuentaBancaria) — requerida si el método de pago tiene requiresBankAccount=true y no tiene defaultBankAccount. */
+  bankAccount?: string;
   referencias?: {
     invoiceId: string;
     allocatedAmount: number;
@@ -2298,6 +2540,8 @@ export interface CreatePagoDto {
   referencias?: PagoReferenciaDto[];
   branch?: string;
   department?: string;
+  /** Cuenta bancaria (id de CuentaBancaria) — requerida si el método de pago tiene requiresBankAccount=true y no tiene defaultBankAccount. */
+  bankAccount?: string;
 }
 
 export interface SaldoFavorProveedorAppliedTo {
@@ -2683,7 +2927,7 @@ export type UpdateRetencionDto = Partial<CreateRetencionDto>;
 // ─── Costos de Importación (Landed Cost Voucher) ──────────────────────────────
 
 export interface LandedCostReceiptRef {
-  receiptDocumentType: "Purchase Receipt" | "Purchase Invoice" | "Stock Entry";
+  receiptDocumentType: "Purchase Receipt" | "Purchase Invoice" | "Stock Entry" | "Subcontracting Receipt";
   receiptDocument: string;
 }
 

@@ -5,8 +5,12 @@ import { Mail, Plus, Trash2, AlertTriangle, Clock, CheckCircle2, XCircle, AlertC
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import {
   listNotificacionTipos,
@@ -234,6 +238,9 @@ function DestinatariosModal({ codigo, onClose }: { codigo: string; onClose: () =
   const [testNombre, setTestNombre] = useState('')
   const [testError, setTestError] = useState('')
 
+  const isDirty = useDirtyCheck({ rows, testEmail, testNombre }, true)
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
+
   const { data: detalle, isLoading } = useQuery({
     queryKey: ['notificaciones', 'tipo', codigo],
     queryFn: () => getNotificacionTipo(codigo),
@@ -311,11 +318,11 @@ function DestinatariosModal({ codigo, onClose }: { codigo: string; onClose: () =
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-box" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2 className="modal-title">Destinatarios — {detalle?.nombre ?? codigo}</h2>
-          <button className="modal-close" type="button" onClick={onClose}>×</button>
+          <button className="modal-close" type="button" onClick={requestClose}>×</button>
         </div>
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {isLoading ? (
@@ -408,7 +415,7 @@ function DestinatariosModal({ codigo, onClose }: { codigo: string; onClose: () =
           )}
         </div>
         <div className="modal-foot">
-          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>
           <button
             type="button"
             className="btn btn-primary"
@@ -419,6 +426,15 @@ function DestinatariosModal({ codigo, onClose }: { codigo: string; onClose: () =
           </button>
         </div>
       </div>
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }
@@ -727,19 +743,17 @@ function HistorialTab() {
             ))}
           </Select>
 
-          <input
-            type="date"
+          <DatePicker
             className="filter-select"
-            title="Desde"
             value={filtroDesde}
-            onChange={(e) => { setFiltroDesde(e.target.value); resetPage() }}
+            onChange={(v) => { setFiltroDesde(v); resetPage() }}
+            clearable
           />
-          <input
-            type="date"
+          <DatePicker
             className="filter-select"
-            title="Hasta"
             value={filtroHasta}
-            onChange={(e) => { setFiltroHasta(e.target.value); resetPage() }}
+            onChange={(v) => { setFiltroHasta(v); resetPage() }}
+            clearable
           />
         </div>
       </div>

@@ -14,6 +14,10 @@ import {
   XCircle, RefreshCw, ChevronRight,
 } from 'lucide-react'
 import { Select, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -109,6 +113,13 @@ function StatusBadgePill({ serie }: { serie: NcfSerie }) {
       </span>
     )
   }
+  if (serie.alertaActiva) {
+    return (
+      <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <AlertTriangle size={11} aria-hidden="true" /> Por agotarse
+      </span>
+    )
+  }
   return (
     <span className="badge badge-success">
       Activa
@@ -141,6 +152,9 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   const preview = formatNcfPreview(ncfType, start)
   const today = new Date().toISOString().slice(0, 10)
 
+  const isDirty = useDirtyCheck({ ncfType, start, end, expiration }, true)
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -151,14 +165,14 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <div>
             <div className="modal-title">Nueva Secuencia NCF</div>
             <div className="modal-sub">DGII — República Dominicana</div>
           </div>
-          <button className="modal-close" onClick={onClose} aria-label="Cerrar"><XCircle size={16} /></button>
+          <button className="modal-close" onClick={requestClose} aria-label="Cerrar"><XCircle size={16} /></button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -199,9 +213,9 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             {/* Vencimiento */}
             <div className="ff-wrap">
               <label className="ff-label">Fecha de vencimiento <span className="ff-required">*</span></label>
-              <input
-                type="date" className="ff-input" min={today}
-                value={expiration} onChange={(e) => setExpiration(e.target.value)}
+              <DatePicker
+                className="ff-input" min={today}
+                value={expiration} onChange={setExpiration}
               />
               <p className="ff-hint">Fecha que aparece en la resolución de la DGII</p>
             </div>
@@ -233,7 +247,7 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
           </div>
 
           <div className="modal-foot">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+            <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>
             <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
               {createMutation.isPending
                 ? <><span className="spinner spinner-white spinner-sm" /> Creando…</>
@@ -242,6 +256,16 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
           </div>
         </form>
       </div>
+
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }
@@ -291,15 +315,18 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
     onClose()
   }
 
+  const isDirty = useDirtyCheck({ ncfType, end, expiration }, true)
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <div>
             <div className="modal-title">Editar Secuencia #{serie.id}</div>
             <div className="modal-sub"><NcfTypeBadge type={serie.ncfType} /> Rango: {serie.start.toLocaleString()} — {serie.end.toLocaleString()}</div>
           </div>
-          <button className="modal-close" onClick={onClose} aria-label="Cerrar"><XCircle size={16} /></button>
+          <button className="modal-close" onClick={requestClose} aria-label="Cerrar"><XCircle size={16} /></button>
         </div>
 
         {warnings.length > 0 ? (
@@ -364,11 +391,10 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
               {/* Expiration date */}
               <div className="ff-wrap">
                 <label className="ff-label">Fecha de vencimiento</label>
-                <input
-                  type="date"
+                <DatePicker
                   className="ff-input"
                   value={expiration}
-                  onChange={(e) => setExpiration(e.target.value)}
+                  onChange={setExpiration}
                 />
                 {isExpired(expiration) && (
                   <p className="ff-error">⚠ Esta fecha está en el pasado. La DGII podría rechazar comprobantes emitidos después del vencimiento.</p>
@@ -384,7 +410,7 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
             </div>
 
             <div className="modal-foot">
-              <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+              <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>
               <button type="submit" className="btn btn-primary" disabled={updateMutation.isPending}>
                 {updateMutation.isPending
                   ? <><span className="spinner spinner-white spinner-sm" /> Guardando…</>
@@ -394,6 +420,16 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
           </form>
         )}
       </div>
+
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }
@@ -445,7 +481,7 @@ function DetailDrawer({ serieId }: { serieId: number; onClose?: () => void }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
         {[
           { label: 'Emitidos', value: (data.used ?? 0).toLocaleString('es-DO'), color: 'var(--text-primary)' },
-          { label: 'Disponibles', value: data.nextNcf === -1 ? 'Agotada' : data.remaining.toLocaleString('es-DO'), color: data.remaining < 1000 ? 'var(--error-text)' : 'var(--success-text)' },
+          { label: 'Disponibles', value: data.nextNcf === -1 ? 'Agotada' : data.remaining.toLocaleString('es-DO'), color: data.alertaActiva ? 'var(--warning-text)' : 'var(--success-text)' },
           { label: '% Usado', value: `${usedPct.toFixed(2)}%`, color: usedPct > 90 ? 'var(--error-text)' : usedPct > 70 ? 'var(--warning-text)' : 'var(--text-primary)' },
         ].map((kpi) => (
           <div key={kpi.label} className="stat-card" style={{ padding: '12px 14px', gap: 4 }}>
@@ -653,9 +689,7 @@ export default function NcfPage() {
 
   // ── Proactive alerts ───────────────────────────────────────────────────────
   const today = new Date().toISOString().slice(0, 10)
-  const lowAlerts = (series ?? []).filter(
-    (s) => getSerieStatus(s) === 'active' && s.remaining < 1000 && s.remaining >= 0
-  )
+  const lowAlerts = (series ?? []).filter((s) => s.alertaActiva)
 
   const expiredActive = (series ?? []).filter(
     (s) => getSerieStatus(s) === 'active' && s.expirationDate < today
@@ -681,7 +715,7 @@ export default function NcfPage() {
           <div key={s.id} className="inline-alert inline-alert-warn">
             <AlertTriangle size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
             <span>
-              La secuencia NCF tipo <strong>{s.ncfType}</strong> tiene menos de 1,000 comprobantes disponibles
+              La secuencia NCF tipo <strong>{s.ncfType}</strong> está por agotarse
               ({s.remaining.toLocaleString('es-DO')} restantes). Considera crear una nueva secuencia antes de que se agote.
             </span>
           </div>
@@ -783,7 +817,7 @@ export default function NcfPage() {
                                   ? <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                                   : (
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                        <span style={{ fontSize: 12, fontWeight: 600, color: s.remaining < 1000 ? 'var(--error-text)' : 'var(--text-primary)' }}>
+                                        <span style={{ fontSize: 12, fontWeight: 600, color: s.alertaActiva ? 'var(--warning-text)' : 'var(--text-primary)' }}>
                                           {s.remaining.toLocaleString('es-DO')}
                                         </span>
                                         <ProgressBar used={usedCount} total={total} />

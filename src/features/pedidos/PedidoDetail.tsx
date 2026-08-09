@@ -264,8 +264,23 @@ export default function PedidoDetail() {
           <div className="fields-grid">
             <div className="detail-field">
               <span className="detail-label">Cliente</span>
-              <span className="detail-value">{pedido.customerName}</span>
+              <span className="detail-value">
+                {pedido.esClienteOcasional ? (
+                  <span>
+                    {pedido.clienteOcasionalNombre ?? pedido.customerName}
+                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 6 }}>(ocasional)</span>
+                  </span>
+                ) : (
+                  pedido.customerName
+                )}
+              </span>
             </div>
+            {pedido.esClienteOcasional && pedido.clienteOcasionalDireccion && (
+              <div className="detail-field">
+                <span className="detail-label">Dirección</span>
+                <span className="detail-value">{pedido.clienteOcasionalDireccion}</span>
+              </div>
+            )}
             <div className="detail-field">
               <span className="detail-label">Fecha</span>
               <span className="detail-value">{formatDate(pedido.transactionDate)}</span>

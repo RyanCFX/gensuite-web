@@ -27,6 +27,7 @@ import { client } from '@/shared/api/client'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -107,6 +108,7 @@ export default function QuotationForm() {
   const [customerQuery, setCustomerQuery] = useState('')
   const [esClienteOcasional, setEsClienteOcasional] = useState(false)
   const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
+  const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
   const [date, setDate] = useState(todayIso())
   const [validTill, setValidTill] = useState(defaultValidTill())
   const [items, setItems] = useState<LineItem[]>([])
@@ -160,6 +162,7 @@ useEffect(() => {
      if (existingQuotation.esClienteOcasional) {
        setEsClienteOcasional(true)
        setClienteOcasionalNombre(existingQuotation.clienteOcasionalNombre ?? '')
+       setClienteOcasionalDireccion(existingQuotation.clienteOcasionalDireccion ?? '')
      }
      setInitialized(true)
    }, [existingQuotation, initialized])
@@ -363,7 +366,9 @@ useEffect(() => {
 
 function submitDto() {
      const dto: CreateQuotationDto = {
-       ...(esClienteOcasional ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined } : { customer: customerId }),
+       ...(esClienteOcasional
+         ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalDireccion: clienteOcasionalDireccion || undefined }
+         : { customer: customerId }),
        date,
        validTill,
        branch: branch || undefined,
@@ -668,6 +673,19 @@ if (esClienteOcasional) {
                    />
                  )}
                </div>
+               {esClienteOcasional && (
+                 <div className="ff-wrap">
+                   <label className="ff-label" htmlFor="clienteOcasionalDireccion">Dirección</label>
+                   <input
+                     id="clienteOcasionalDireccion"
+                     className="ff-input"
+                     value={clienteOcasionalDireccion}
+                     onChange={(e) => setClienteOcasionalDireccion(e.target.value)}
+                     placeholder="Dirección del cliente ocasional (opcional)"
+                   />
+                 </div>
+               )}
+
                <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
                    <input type="checkbox" checked={esClienteOcasional} onChange={(e) => { setEsClienteOcasional(e.target.checked); if (e.target.checked) setCustomerId('') }} />
@@ -682,24 +700,22 @@ if (esClienteOcasional) {
 
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="date">Fecha</label>
-                <input
+                <DatePicker
                   id="date"
-                  type="date"
                   className="ff-input"
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  required
+                  onChange={setDate}
                 />
               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="validTill">Válida hasta</label>
-                <input
+                <DatePicker
                   id="validTill"
-                  type="date"
                   className="ff-input"
                   value={validTill}
-                  onChange={(e) => setValidTill(e.target.value)}
+                  onChange={setValidTill}
+                  clearable
                 />
               </div>
 

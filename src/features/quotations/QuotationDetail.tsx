@@ -255,8 +255,23 @@ export default function QuotationDetail() {
           <div className="fields-grid">
             <div className="detail-field">
               <span className="detail-label">Cliente</span>
-              <span className="detail-value">{quotation.customerName}</span>
+              <span className="detail-value">
+                {quotation.esClienteOcasional ? (
+                  <span>
+                    {quotation.clienteOcasionalNombre ?? quotation.customerName}
+                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 6 }}>(ocasional)</span>
+                  </span>
+                ) : (
+                  quotation.customerName
+                )}
+              </span>
             </div>
+            {quotation.esClienteOcasional && quotation.clienteOcasionalDireccion && (
+              <div className="detail-field">
+                <span className="detail-label">Dirección</span>
+                <span className="detail-value">{quotation.clienteOcasionalDireccion}</span>
+              </div>
+            )}
             <div className="detail-field">
               <span className="detail-label">Fecha</span>
               <span className="detail-value">{formatDate(quotation.date)}</span>

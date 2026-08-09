@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, Pencil, Eye } from 'lucide-react'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import {
   listAttributes,
   getAttribute,
@@ -165,6 +168,9 @@ function AttributeModal({
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({})
 
+  const isDirty = useDirtyCheck(form, true)
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
+
   function setField<K extends keyof FormState>(key: K, val: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: val }))
     setErrors((prev) => ({ ...prev, [key]: undefined }))
@@ -249,11 +255,12 @@ function AttributeModal({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-box" style={{ maxWidth: 540 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <span className="modal-title">{isEdit ? 'Editar Atributo' : 'Nuevo Atributo'}</span>
-          <button className="modal-close" onClick={onClose} aria-label="Cerrar" />
+          <button className="modal-close" onClick={requestClose} aria-label="Cerrar" />
         </div>
 
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -384,7 +391,7 @@ function AttributeModal({
         </div>
 
         <div className="modal-foot">
-          <button className="btn btn-secondary" onClick={onClose} disabled={saving}>
+          <button className="btn btn-secondary" onClick={requestClose} disabled={saving}>
             Cancelar
           </button>
           <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
@@ -393,6 +400,16 @@ function AttributeModal({
         </div>
       </div>
     </div>
+    <ConfirmModal
+      open={confirming}
+      onClose={cancelDiscard}
+      onConfirm={confirmDiscard}
+      title="¿Descartar cambios?"
+      description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+      confirmLabel="Descartar cambios"
+      variant="danger"
+    />
+    </>
   )
 }
 

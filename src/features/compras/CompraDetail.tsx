@@ -13,6 +13,9 @@ import { Send, X, RotateCcw, Undo2, Info, FileText, Trash2, Eye } from 'lucide-r
 import { PdfFormatButton } from '@/components/shared/PdfFormatButton'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import type { FormatoImpresion } from '@/shared/api/types'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | 'delete' | null
 
@@ -107,6 +110,9 @@ export default function CompraDetail() {
     onSuccess: () => { toast.success('Devolución registrada'); queryClient.invalidateQueries({ queryKey: ['compra', id] }); queryClient.invalidateQueries({ queryKey: ['compras'] }); setShowReturn(false) },
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al registrar la devolución'),
   })
+
+  const returnIsDirty = useDirtyCheck(returnQtys, showReturn)
+  const returnClose = useConfirmClose(returnIsDirty, () => setShowReturn(false))
 
   function handleConfirm() {
     if (confirmAction === 'submit') submitMutation.mutate()
@@ -335,11 +341,11 @@ export default function CompraDetail() {
 
       {/* Return Modal */}
       {showReturn && (
-        <div className="modal-overlay" onClick={() => setShowReturn(false)}>
+        <div className="modal-overlay" onClick={returnClose.requestClose}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">Registrar Devolución</h2>
-              <button className="modal-close" onClick={() => setShowReturn(false)}>×</button>
+              <button className="modal-close" onClick={returnClose.requestClose}>×</button>
             </div>
             <div className="modal-body" style={{ maxHeight: 320 }}>
               <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Selecciona los artículos y cantidades a devolver.</p>
@@ -363,7 +369,7 @@ export default function CompraDetail() {
               ))}
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setShowReturn(false)}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={returnClose.requestClose}>Cancelar</button>
               <button className="btn btn-primary" onClick={() => returnMutation.mutate()} disabled={returnMutation.isPending}>
                 {returnMutation.isPending ? 'Procesando…' : 'Registrar Devolución'}
               </button>
@@ -371,6 +377,15 @@ export default function CompraDetail() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={returnClose.confirming}
+        onClose={returnClose.cancelDiscard}
+        onConfirm={returnClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
       <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
     </div>
   )

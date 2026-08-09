@@ -10,6 +10,9 @@ import {
   PERMISO_PTYPES, PERMISO_PTYPE_LABELS,
 } from '@/shared/api/permisos'
 import type { PermisoRow, PermisoPtype, ApiError, AssignPermisoDto } from '@/shared/api/types'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 
 function toOptions(names: string[]): SearchSelectOption[] {
   return names.map((n) => ({ value: n, label: n }))
@@ -314,6 +317,9 @@ function AddRoleModal({
     Object.fromEntries(PERMISO_PTYPES.map((pt) => [pt, pt === 'read'])) as Record<PermisoPtype, boolean>,
   )
 
+  const isDirty = useDirtyCheck({ role, flags }, true)
+  const closeModal = useConfirmClose(isDirty, onClose)
+
   const mutation = useMutation({
     mutationFn: (dto: AssignPermisoDto) => assignPermiso(dto),
     onSuccess: (row) => {
@@ -330,11 +336,11 @@ function AddRoleModal({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={closeModal.requestClose}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2 className="modal-title">Agregar rol a {doctype}</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <button className="modal-close" onClick={closeModal.requestClose}>×</button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -367,13 +373,22 @@ function AddRoleModal({
             </div>
           </div>
           <div className="modal-foot">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+            <button type="button" className="btn btn-ghost" onClick={closeModal.requestClose}>Cancelar</button>
             <button type="submit" className="btn btn-primary" disabled={!role || mutation.isPending}>
               Agregar rol
             </button>
           </div>
         </form>
       </div>
+      <ConfirmModal
+        open={closeModal.confirming}
+        onClose={closeModal.cancelDiscard}
+        onConfirm={closeModal.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }

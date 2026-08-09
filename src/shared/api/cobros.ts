@@ -20,6 +20,10 @@ export interface ListCobrosParams extends PaginationParams {
   customer?: string
   fromDate?: string
   toDate?: string
+  modeOfPayment?: string
+  bankAccount?: string
+  paidAmountMin?: number
+  paidAmountMax?: number
 }
 
 export async function listCobros(params?: ListCobrosParams) {

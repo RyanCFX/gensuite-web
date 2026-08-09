@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { listItems, toggleItem, listCategories, listBrands } from '@/shared/api/catalog'
+import { listUOMs } from '@/shared/api/config'
 import type { Item } from '@/shared/api/types'
 import { useDebounce } from '@/lib/useDebounce'
 import { formatDOP } from '@/lib/formatters'
@@ -67,13 +68,28 @@ export default function ItemsPage() {
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
 
+  const [stockUomFilter, setStockUomFilter] = useState('')
+  const [hasWarrantyFilter, setHasWarrantyFilter] = useState<'all' | 'true' | 'false'>('all')
+  const [warrantyPeriodMin, setWarrantyPeriodMin] = useState('')
+  const [warrantyPeriodMax, setWarrantyPeriodMax] = useState('')
+  const [pricesMin, setPricesMin] = useState('')
+  const [pricesMax, setPricesMax] = useState('')
+  const [priceModeFilter, setPriceModeFilter] = useState<'all' | 'manual' | 'cost_plus'>('all')
+  const [maxDiscountPctMin, setMaxDiscountPctMin] = useState('')
+  const [maxDiscountPctMax, setMaxDiscountPctMax] = useState('')
+  const [trackingTypeFilter, setTrackingTypeFilter] = useState<'all' | 'none' | 'serial' | 'batch'>('all')
+
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
     queryKey: [
       'items',
-      { search: debouncedSearch, kindFilter, templateFilter, categoryFilter, brandFilter, statusFilter, offset, orderBy },
+      {
+        search: debouncedSearch, kindFilter, templateFilter, categoryFilter, brandFilter, statusFilter, offset, orderBy,
+        stockUomFilter, hasWarrantyFilter, warrantyPeriodMin, warrantyPeriodMax,
+        pricesMin, pricesMax, priceModeFilter, maxDiscountPctMin, maxDiscountPctMax, trackingTypeFilter,
+      },
     ],
     queryFn: () =>
       listItems({
@@ -86,6 +102,16 @@ export default function ItemsPage() {
         limit: PAGE_SIZE,
         offset,
         orderBy: orderBy || undefined,
+        stockUom: stockUomFilter || undefined,
+        hasWarranty: hasWarrantyFilter === 'all' ? undefined : hasWarrantyFilter === 'true',
+        warrantyPeriodMin: warrantyPeriodMin ? Number(warrantyPeriodMin) : undefined,
+        warrantyPeriodMax: warrantyPeriodMax ? Number(warrantyPeriodMax) : undefined,
+        pricesMin: pricesMin ? Number(pricesMin) : undefined,
+        pricesMax: pricesMax ? Number(pricesMax) : undefined,
+        priceMode: priceModeFilter === 'all' ? undefined : priceModeFilter,
+        maxDiscountPctMin: maxDiscountPctMin ? Number(maxDiscountPctMin) : undefined,
+        maxDiscountPctMax: maxDiscountPctMax ? Number(maxDiscountPctMax) : undefined,
+        trackingType: trackingTypeFilter === 'all' ? undefined : trackingTypeFilter,
       }),
   })
 
@@ -99,6 +125,12 @@ export default function ItemsPage() {
     queryFn: () => listBrands(),
   })
 
+  const { data: uomsData } = useQuery({
+    queryKey: ['uoms-all'],
+    queryFn: () => listUOMs(),
+    staleTime: 60 * 60_000,
+  })
+
   const [categorySearch, setCategorySearch] = useState('')
   const categoryOptions: SearchSelectOption[] = (categoriesData?.items ?? [])
     .filter((c) => !categorySearch || c.name.toLowerCase().includes(categorySearch.toLowerCase()))
@@ -108,6 +140,11 @@ export default function ItemsPage() {
   const brandOptions: SearchSelectOption[] = (brandsData?.items ?? [])
     .filter((b) => !brandSearch || b.name.toLowerCase().includes(brandSearch.toLowerCase()))
     .map((b) => ({ value: b.id, label: b.name }))
+
+  const [stockUomSearch, setStockUomSearch] = useState('')
+  const stockUomOptions: SearchSelectOption[] = (uomsData ?? [])
+    .filter((u) => !stockUomSearch || u.name.toLowerCase().includes(stockUomSearch.toLowerCase()))
+    .map((u) => ({ value: u.name, label: u.name }))
 
   const toggleMutation = useMutation({
     mutationFn: (id: string) => toggleItem(id),
@@ -203,6 +240,97 @@ export default function ItemsPage() {
               {opt.label}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <div style={{ width: 160 }}>
+            <SearchSelect
+              value={stockUomFilter}
+              onChange={(val) => { setStockUomFilter(val); setPage(1) }}
+              options={stockUomOptions}
+              onSearch={setStockUomSearch}
+              selectedLabel={stockUomFilter}
+              placeholder="Todas las UOM"
+            />
+          </div>
+          <Select
+            value={hasWarrantyFilter}
+            onValueChange={(val) => { setHasWarrantyFilter(val as 'all' | 'true' | 'false'); setPage(1) }}
+          >
+            <SelectItem value="all">Garantía: Todos</SelectItem>
+            <SelectItem value="true">Con garantía</SelectItem>
+            <SelectItem value="false">Sin garantía</SelectItem>
+          </Select>
+          <input
+            type="number"
+            className="ff-input ff-input-sm"
+            style={{ width: 100 }}
+            placeholder="Garant. mín."
+            value={warrantyPeriodMin}
+            onChange={(e) => { setWarrantyPeriodMin(e.target.value); setPage(1) }}
+          />
+          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+          <input
+            type="number"
+            className="ff-input ff-input-sm"
+            style={{ width: 100 }}
+            placeholder="Garant. máx."
+            value={warrantyPeriodMax}
+            onChange={(e) => { setWarrantyPeriodMax(e.target.value); setPage(1) }}
+          />
+          <input
+            type="number"
+            className="ff-input ff-input-sm"
+            style={{ width: 100 }}
+            placeholder="Precio mín."
+            value={pricesMin}
+            onChange={(e) => { setPricesMin(e.target.value); setPage(1) }}
+          />
+          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+          <input
+            type="number"
+            className="ff-input ff-input-sm"
+            style={{ width: 100 }}
+            placeholder="Precio máx."
+            value={pricesMax}
+            onChange={(e) => { setPricesMax(e.target.value); setPage(1) }}
+          />
+          <Select
+            value={priceModeFilter}
+            onValueChange={(val) => { setPriceModeFilter(val as 'all' | 'manual' | 'cost_plus'); setPage(1) }}
+          >
+            <SelectItem value="all">Modo precio: Todos</SelectItem>
+            <SelectItem value="manual">Manual</SelectItem>
+            <SelectItem value="cost_plus">Costo + Margen</SelectItem>
+          </Select>
+          <input
+            type="number"
+            className="ff-input ff-input-sm"
+            style={{ width: 100 }}
+            placeholder="Dto. máx. mín."
+            value={maxDiscountPctMin}
+            onChange={(e) => { setMaxDiscountPctMin(e.target.value); setPage(1) }}
+          />
+          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+          <input
+            type="number"
+            className="ff-input ff-input-sm"
+            style={{ width: 100 }}
+            placeholder="Dto. máx. máx."
+            value={maxDiscountPctMax}
+            onChange={(e) => { setMaxDiscountPctMax(e.target.value); setPage(1) }}
+          />
+          <Select
+            value={trackingTypeFilter}
+            onValueChange={(val) => { setTrackingTypeFilter(val as 'all' | 'none' | 'serial' | 'batch'); setPage(1) }}
+          >
+            <SelectItem value="all">Tracking: Todos</SelectItem>
+            <SelectItem value="none">Sin tracking</SelectItem>
+            <SelectItem value="serial">Serial</SelectItem>
+            <SelectItem value="batch">Lote</SelectItem>
+          </Select>
         </div>
       </div>
 

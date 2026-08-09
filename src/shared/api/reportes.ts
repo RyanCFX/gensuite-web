@@ -1,7 +1,7 @@
 import { client, BASE_URL } from './client'
 import { ENDPOINTS } from './endpoints'
 import { getToken, getTenant } from './storage'
-import type { CuadreTurnoResult } from './types'
+import type { CuadreTurnoResult, CorteCajaDiaResult } from './types'
 
 // ─── DGII (606 / 607 / 608) ──────────────────────────────────────────────────
 
@@ -312,6 +312,31 @@ export async function downloadCuadreTurnoExcel(params?: CuadreTurnoParams) {
   const a = document.createElement('a')
   a.href = url
   a.download = `cuadre-turno_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.xlsx`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── POS — Corte de Caja del Día ──────────────────────────────────────────────
+
+export interface CorteCajaDiaParams {
+  date: string
+  cajero?: string
+}
+
+export async function getCorteCajaDia(params: CorteCajaDiaParams) {
+  const res = await client.get<{ success: true; data: CorteCajaDiaResult }>(
+    ENDPOINTS.reportes.corteCajaDia,
+    { params },
+  )
+  return res.data
+}
+
+export async function downloadCorteCajaDiaPdf(params: CorteCajaDiaParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.corteCajaDiaPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `corte-caja-dia_${params.date}${params.cajero ? `_${params.cajero}` : ''}.pdf`
   a.click()
   URL.revokeObjectURL(url)
 }

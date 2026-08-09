@@ -20,11 +20,15 @@ import {
   habilitarPos,
 } from '@/shared/api/config'
 import { listSucursales } from '@/shared/api/sucursales'
+import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { listCustomerGroups, createCustomerGroup, deleteCustomerGroup } from '@/shared/api/customers'
 import { listRoles } from '@/shared/api/usuarios'
 import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, TaxLineCategory, TaxLineAddDeduct, CreateTaxTemplateDto, ItemTaxTemplate, ItemTaxLine, CreateItemTaxTemplateDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError, UpdateAlmacenDto, FormatoImpresion } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { AccountSelect } from '@/components/shared/AccountSelect'
@@ -184,6 +188,11 @@ function AlmacenesSection() {
     setToDelete(null)
   }
 
+  const newIsDirty = useDirtyCheck({ newName, newBranch, newWarehouseType, newAccount }, showNew)
+  const newClose = useConfirmClose(newIsDirty, () => setShowNew(false))
+  const editIsDirty = useDirtyCheck({ editWarehouseAccount, editBranch, editWarehouseType }, !!editTarget)
+  const editClose = useConfirmClose(editIsDirty, () => setEditTarget(null))
+
   return (
     <>
       <div className="card">
@@ -258,11 +267,11 @@ function AlmacenesSection() {
       </div>
 
       {showNew && (
-        <div className="modal-overlay" onClick={() => setShowNew(false)}>
+        <div className="modal-overlay" onClick={newClose.requestClose}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">Nuevo Almacén</h2>
-              <button className="modal-close" onClick={() => setShowNew(false)}><X size={16} /></button>
+              <button className="modal-close" onClick={newClose.requestClose}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="ff-wrap">
@@ -299,7 +308,7 @@ function AlmacenesSection() {
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setShowNew(false)}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={newClose.requestClose}>Cancelar</button>
               <button className="btn btn-primary" onClick={() => createMutation.mutate()} disabled={!newName || createMutation.isPending}>
                 {createMutation.isPending ? 'Creando…' : 'Crear'}
               </button>
@@ -307,13 +316,22 @@ function AlmacenesSection() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={newClose.confirming}
+        onClose={newClose.cancelDiscard}
+        onConfirm={newClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {editTarget && (
-        <div className="modal-overlay" onClick={() => setEditTarget(null)}>
+        <div className="modal-overlay" onClick={editClose.requestClose}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">Editar Almacén</h2>
-              <button className="modal-close" onClick={() => setEditTarget(null)}><X size={16} /></button>
+              <button className="modal-close" onClick={editClose.requestClose}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="ff-wrap">
@@ -345,7 +363,7 @@ function AlmacenesSection() {
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setEditTarget(null)}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={editClose.requestClose}>Cancelar</button>
               <button
                 className="btn btn-primary"
                 onClick={() => updateMutation.mutate({ id: editTarget.id, data: { account: editWarehouseAccount, branch: editBranch, warehouseType: editWarehouseType || null } })}
@@ -357,6 +375,15 @@ function AlmacenesSection() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={editClose.confirming}
+        onClose={editClose.cancelDiscard}
+        onConfirm={editClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {toDelete && (
         <div className="modal-overlay" onClick={() => setToDelete(null)}>
@@ -393,8 +420,25 @@ function MetodosPagoSection() {
   const [newType, setNewType] = useState<MetodoPago['type']>('Cash')
   const [editTarget, setEditTarget] = useState<MetodoPago | null>(null)
   const [editAccount, setEditAccount] = useState('')
+  const [editRequiresBankAccount, setEditRequiresBankAccount] = useState(false)
+  const [editDefaultBankAccount, setEditDefaultBankAccount] = useState('')
+  const [defaultBankAccountSearch, setDefaultBankAccountSearch] = useState('')
 
   const { data, isLoading } = useQuery({ queryKey: ['metodos-pago'], queryFn: listMetodosPago })
+
+  const { data: cuentasBancariasData } = useQuery({
+    queryKey: ['cuentas-bancarias-activas'],
+    queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
+    enabled: !!editTarget && editRequiresBankAccount,
+  })
+  const cuentaBancariaOptions: SearchSelectOption[] = (cuentasBancariasData?.items ?? [])
+    .filter((c) => !defaultBankAccountSearch || c.accountName.toLowerCase().includes(defaultBankAccountSearch.toLowerCase()))
+    .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))
+
+  const newIsDirty = useDirtyCheck({ newName, newType }, showNew)
+  const newClose = useConfirmClose(newIsDirty, () => setShowNew(false))
+  const editIsDirty = useDirtyCheck({ editAccount, editRequiresBankAccount, editDefaultBankAccount }, !!editTarget)
+  const editClose = useConfirmClose(editIsDirty, () => setEditTarget(null))
 
   const createMutation = useMutation({
     mutationFn: () => createMetodoPago({ name: newName, type: newType }),
@@ -412,6 +456,8 @@ function MetodosPagoSection() {
   function openEdit(m: MetodoPago) {
     setEditTarget(m)
     setEditAccount('')
+    setEditRequiresBankAccount(m.requiresBankAccount ?? false)
+    setEditDefaultBankAccount(m.defaultBankAccount ?? '')
     setShowNew(false)
   }
 
@@ -461,11 +507,11 @@ function MetodosPagoSection() {
       </div>
 
       {showNew && (
-        <div className="modal-overlay" onClick={() => setShowNew(false)}>
+        <div className="modal-overlay" onClick={newClose.requestClose}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">Nuevo Método de Pago</h2>
-              <button className="modal-close" onClick={() => setShowNew(false)}><X size={16} /></button>
+              <button className="modal-close" onClick={newClose.requestClose}><X size={16} /></button>
             </div>
             <div className="modal-body">
               <div className="ff-wrap">
@@ -482,7 +528,7 @@ function MetodosPagoSection() {
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setShowNew(false)}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={newClose.requestClose}>Cancelar</button>
               <button className="btn btn-primary" onClick={() => createMutation.mutate()} disabled={!newName || createMutation.isPending}>
                 {createMutation.isPending ? 'Creando…' : 'Crear'}
               </button>
@@ -491,12 +537,22 @@ function MetodosPagoSection() {
         </div>
       )}
 
+      <ConfirmModal
+        open={newClose.confirming}
+        onClose={newClose.cancelDiscard}
+        onConfirm={newClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
+
       {editTarget && (
-        <div className="modal-overlay" onClick={() => setEditTarget(null)}>
+        <div className="modal-overlay" onClick={editClose.requestClose}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">Editar Método de Pago</h2>
-              <button className="modal-close" onClick={() => setEditTarget(null)}><X size={16} /></button>
+              <button className="modal-close" onClick={editClose.requestClose}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="ff-wrap">
@@ -508,12 +564,43 @@ function MetodosPagoSection() {
                 />
                 <p className="ff-hint">Ej: "Efectivo RD" → "Cash - JB"</p>
               </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={editRequiresBankAccount}
+                  onChange={(e) => setEditRequiresBankAccount(e.target.checked)}
+                />
+                Requiere cuenta bancaria
+              </label>
+
+              {editRequiresBankAccount && (
+                <div className="ff-wrap">
+                  <label className="ff-label">Cuenta bancaria por defecto</label>
+                  <SearchSelect
+                    value={editDefaultBankAccount}
+                    onChange={setEditDefaultBankAccount}
+                    options={cuentaBancariaOptions}
+                    onSearch={setDefaultBankAccountSearch}
+                    selectedLabel={cuentaBancariaOptions.find((o) => o.value === editDefaultBankAccount)?.label ?? ''}
+                    placeholder="— Sin cuenta por defecto —"
+                  />
+                  <p className="ff-hint">Opcional. Si se deja vacío, el usuario deberá elegir la cuenta en cada cobro/pago.</p>
+                </div>
+              )}
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setEditTarget(null)}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={editClose.requestClose}>Cancelar</button>
               <button
                 className="btn btn-primary"
-                onClick={() => updateMutation.mutate({ id: editTarget.name, data: { account: editAccount || undefined } })}
+                onClick={() => updateMutation.mutate({
+                  id: editTarget.name,
+                  data: {
+                    account: editAccount || undefined,
+                    requiresBankAccount: editRequiresBankAccount,
+                    defaultBankAccount: editRequiresBankAccount ? (editDefaultBankAccount || undefined) : undefined,
+                  },
+                })}
                 disabled={updateMutation.isPending}
               >
                 {updateMutation.isPending ? 'Guardando…' : 'Guardar'}
@@ -522,6 +609,16 @@ function MetodosPagoSection() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={editClose.confirming}
+        onClose={editClose.cancelDiscard}
+        onConfirm={editClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </>
   )
 }
@@ -666,6 +763,12 @@ function UomSection() {
   // UOMs disponibles para seleccionar como destino (excluye la UOM que se está creando)
   const availableUoms = uoms.filter(u => u.name !== newUomName)
 
+  const createIsDirty = useDirtyCheck({ newUomName, conversions }, showCreate)
+  const createClose = useConfirmClose(createIsDirty, () => setShowCreate(false))
+  const editIsDirty = useDirtyCheck({ editName, editConversions }, editing)
+  const detailClose = useConfirmClose(editIsDirty, () => { setDetailId(null); setEditing(false) })
+  const editCancelClose = useConfirmClose(editIsDirty, () => setEditing(false))
+
   return (
     <>
       <div className="card">
@@ -751,11 +854,11 @@ function UomSection() {
 
       {/* Create modal */}
       {showCreate && (
-        <div className="modal-overlay" onClick={() => setShowCreate(false)}>
+        <div className="modal-overlay" onClick={createClose.requestClose}>
           <div className="modal-box" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">Nueva Unidad de Medida</h2>
-              <button className="modal-close" onClick={() => setShowCreate(false)}><X size={16} /></button>
+              <button className="modal-close" onClick={createClose.requestClose}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="ff-wrap">
@@ -835,7 +938,7 @@ function UomSection() {
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={createClose.requestClose}>Cancelar</button>
               <button
                 className="btn btn-primary"
                 onClick={validateAndSave}
@@ -847,14 +950,23 @@ function UomSection() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={createClose.confirming}
+        onClose={createClose.cancelDiscard}
+        onConfirm={createClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {/* Detail / Edit modal */}
       {detailId && (
-        <div className="modal-overlay" onClick={() => { setDetailId(null); setEditing(false) }}>
+        <div className="modal-overlay" onClick={detailClose.requestClose}>
           <div className="modal-box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">{editing ? 'Editar UOM' : detailId}</h2>
-              <button className="modal-close" onClick={() => { setDetailId(null); setEditing(false) }}><X size={16} /></button>
+              <button className="modal-close" onClick={detailClose.requestClose}><X size={16} /></button>
             </div>
 
             {editing ? (
@@ -949,7 +1061,7 @@ function UomSection() {
                   </div>
                 </div>
                 <div className="modal-foot">
-                  <button className="btn btn-secondary" onClick={() => setEditing(false)}>Cancelar</button>
+                  <button className="btn btn-secondary" onClick={editCancelClose.requestClose}>Cancelar</button>
                   <button className="btn btn-primary" onClick={handleUpdate} disabled={updateMutation.isPending}>
                     {updateMutation.isPending ? 'Guardando…' : 'Guardar'}
                   </button>
@@ -993,6 +1105,15 @@ function UomSection() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={detailClose.confirming || editCancelClose.confirming}
+        onClose={detailClose.confirming ? detailClose.cancelDiscard : editCancelClose.cancelDiscard}
+        onConfirm={detailClose.confirming ? detailClose.confirmDiscard : editCancelClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </>
   )
 }
@@ -1259,6 +1380,9 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
     setEditTarget(null)
   }
 
+  const formIsDirty = useDirtyCheck({ formTitle, formDefault, formTaxes }, showForm)
+  const formClose = useConfirmClose(formIsDirty, closeForm)
+
   function updateTaxLine(idx: number, patch: Partial<TaxTemplateLine>) {
     setFormTaxes((prev) => prev.map((l, i) => i === idx ? { ...l, ...patch } : l))
   }
@@ -1374,11 +1498,11 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
 
       {/* Create / Edit modal */}
       {showForm && (
-        <div className="modal-overlay" onClick={closeForm}>
+        <div className="modal-overlay" onClick={formClose.requestClose}>
           <div className="modal-box" style={{ maxWidth: 680 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">{editTarget ? 'Editar Plantilla' : 'Nueva Plantilla'} — {label}</h2>
-              <button className="modal-close" onClick={closeForm}><X size={16} /></button>
+              <button className="modal-close" onClick={formClose.requestClose}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'flex', gap: 16 }}>
@@ -1515,7 +1639,7 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={closeForm}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={formClose.requestClose}>Cancelar</button>
               <button
                 className="btn btn-primary"
                 onClick={() => saveMutation.mutate()}
@@ -1527,6 +1651,15 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={formClose.confirming}
+        onClose={formClose.cancelDiscard}
+        onConfirm={formClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {/* Delete confirm */}
       {toDelete && (
@@ -1592,6 +1725,9 @@ function ItemTaxTemplatesSection() {
     setShowForm(false)
     setEditTarget(null)
   }
+
+  const formIsDirty = useDirtyCheck({ formTitle, formTaxes }, showForm)
+  const formClose = useConfirmClose(formIsDirty, closeForm)
 
   function updateTaxLine(idx: number, patch: Partial<ItemTaxLine>) {
     setFormTaxes((prev) => prev.map((l, i) => i === idx ? { ...l, ...patch } : l))
@@ -1691,11 +1827,11 @@ function ItemTaxTemplatesSection() {
 
       {/* Create / Edit modal */}
       {showForm && (
-        <div className="modal-overlay" onClick={closeForm}>
+        <div className="modal-overlay" onClick={formClose.requestClose}>
           <div className="modal-box" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">{editTarget ? 'Editar Plantilla' : 'Nueva Plantilla'} — Impuesto por Artículo</h2>
-              <button className="modal-close" onClick={closeForm}><X size={16} /></button>
+              <button className="modal-close" onClick={formClose.requestClose}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="ff-wrap">
@@ -1781,7 +1917,7 @@ function ItemTaxTemplatesSection() {
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={closeForm}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={formClose.requestClose}>Cancelar</button>
               <button
                 className="btn btn-primary"
                 onClick={() => saveMutation.mutate()}
@@ -1793,6 +1929,15 @@ function ItemTaxTemplatesSection() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={formClose.confirming}
+        onClose={formClose.cancelDiscard}
+        onConfirm={formClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {/* Delete confirm */}
       {toDelete && (
@@ -1871,6 +2016,9 @@ function GruposClientesSection() {
     },
   })
 
+  const formIsDirty = useDirtyCheck({ formName, formPriceTier }, showForm)
+  const formClose = useConfirmClose(formIsDirty, () => setShowForm(false))
+
   return (
     <>
       <div className="card">
@@ -1926,11 +2074,11 @@ function GruposClientesSection() {
 
       {/* Create modal */}
       {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
+        <div className="modal-overlay" onClick={formClose.requestClose}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">Nuevo Grupo</h2>
-              <button className="modal-close" onClick={() => setShowForm(false)}><X size={16} /></button>
+              <button className="modal-close" onClick={formClose.requestClose}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="ff-wrap">
@@ -1948,7 +2096,7 @@ function GruposClientesSection() {
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={formClose.requestClose}>Cancelar</button>
               <button
                 className="btn btn-primary"
                 onClick={() => createMutation.mutate()}
@@ -1960,6 +2108,15 @@ function GruposClientesSection() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={formClose.confirming}
+        onClose={formClose.cancelDiscard}
+        onConfirm={formClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {/* Delete confirm */}
       {toDelete && (
@@ -2033,6 +2190,7 @@ function FacturacionConfigSection() {
    const [formatoImpresionDefault, setFormatoImpresionDefault] = useState<FormatoImpresion>("a4")
    const [formatosPermitidos, setFormatosPermitidos] = useState<FormatoImpresion[]>(ALL_FORMATOS_IMPRESION)
     const [turnoMaxHoras, setTurnoMaxHoras] = useState(24)
+   const [ncfAlertaMinimo, setNcfAlertaMinimo] = useState(50)
    const [modoPagoCaja, setModoPagoCaja] = useState<string | null>(null)
    const [modosPagoConciliar, setModosPagoConciliar] = useState<string[]>([])
 
@@ -2047,6 +2205,7 @@ function FacturacionConfigSection() {
         setFormatoImpresionDefault(data.formatoImpresionDefault ?? "a4")
         setFormatosPermitidos(data.formatosPermitidos && data.formatosPermitidos.length > 0 ? data.formatosPermitidos : ALL_FORMATOS_IMPRESION)
         setTurnoMaxHoras(data.turnoMaxHoras ?? 24)
+        setNcfAlertaMinimo(data.ncfAlertaMinimo ?? 50)
         setModoPagoCaja(data.modoPagoCaja ?? null)
         setModosPagoConciliar(data.modosPagoConciliar ?? [])
       }
@@ -2389,6 +2548,23 @@ function FacturacionConfigSection() {
           </div>
         </div>
 
+        <div className="ff-wrap">
+          <label className="ff-label">Mínimo de comprobantes para alertar</label>
+          <p className="ff-hint" style={{ marginBottom: 8 }}>
+            Cuando a una secuencia NCF le queden este número de comprobantes o menos, se marcará como "por agotarse"
+            en la pantalla de Secuencias NCF y, si está activo, se enviará un correo automático. Default: 50.
+          </p>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            className="ff-input"
+            style={{ width: 120 }}
+            value={ncfAlertaMinimo}
+            onChange={(e) => setNcfAlertaMinimo(Math.max(0, parseInt(e.target.value, 10) || 0))}
+          />
+        </div>
+
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <button
             className="btn btn-primary btn-size-sm"
@@ -2402,6 +2578,7 @@ function FacturacionConfigSection() {
                 formatoImpresionDefault,
                 formatosPermitidos,
                 turnoMaxHoras,
+                ncfAlertaMinimo,
                 modoPagoCaja,
                 modosPagoConciliar,
               })}
@@ -2458,6 +2635,11 @@ function DenominacionesSection() {
     setShowNew(false)
   }
 
+  const newIsDirty = useDirtyCheck({ newDenominacion, newValor, newActivo }, showNew)
+  const newClose = useConfirmClose(newIsDirty, () => setShowNew(false))
+  const editIsDirty = useDirtyCheck({ editValor, editActivo }, !!editTarget)
+  const editClose = useConfirmClose(editIsDirty, () => setEditTarget(null))
+
   return (
     <>
       <div className="card">
@@ -2504,11 +2686,11 @@ function DenominacionesSection() {
       </div>
 
       {showNew && (
-        <div className="modal-overlay" onClick={() => setShowNew(false)}>
+        <div className="modal-overlay" onClick={newClose.requestClose}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">Nueva Denominación</h2>
-              <button className="modal-close" onClick={() => setShowNew(false)}><X size={16} /></button>
+              <button className="modal-close" onClick={newClose.requestClose}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="ff-wrap">
@@ -2525,7 +2707,7 @@ function DenominacionesSection() {
               </label>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setShowNew(false)}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={newClose.requestClose}>Cancelar</button>
               <button
                 className="btn btn-primary"
                 onClick={() => createMutation.mutate()}
@@ -2537,13 +2719,22 @@ function DenominacionesSection() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={newClose.confirming}
+        onClose={newClose.cancelDiscard}
+        onConfirm={newClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {editTarget && (
-        <div className="modal-overlay" onClick={() => setEditTarget(null)}>
+        <div className="modal-overlay" onClick={editClose.requestClose}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">Editar Denominación</h2>
-              <button className="modal-close" onClick={() => setEditTarget(null)}><X size={16} /></button>
+              <button className="modal-close" onClick={editClose.requestClose}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="ff-wrap">
@@ -2556,7 +2747,7 @@ function DenominacionesSection() {
               </label>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setEditTarget(null)}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={editClose.requestClose}>Cancelar</button>
               <button className="btn btn-primary" onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
                 {updateMutation.isPending ? 'Guardando…' : 'Guardar'}
               </button>
@@ -2564,6 +2755,15 @@ function DenominacionesSection() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={editClose.confirming}
+        onClose={editClose.cancelDiscard}
+        onConfirm={editClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </>
   )
 }

@@ -35,6 +35,16 @@ export interface ListItemsParams extends PaginationParams {
   validateStock?: boolean
   /** Filtra artículos con stock en almacenes de esta sucursal, y agrega stockByWarehouse a cada item */
   branch?: string
+  stockUom?: string
+  hasWarranty?: boolean
+  warrantyPeriodMin?: number
+  warrantyPeriodMax?: number
+  pricesMin?: number
+  pricesMax?: number
+  priceMode?: 'manual' | 'cost_plus'
+  maxDiscountPctMin?: number
+  maxDiscountPctMax?: number
+  trackingType?: 'none' | 'serial' | 'batch'
 }
 
 export async function listItems(params?: ListItemsParams) {

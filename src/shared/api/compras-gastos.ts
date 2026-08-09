@@ -18,6 +18,9 @@ export interface ListComprasParams extends PaginationParams {
   fromDate?: string
   toDate?: string
   branch?: string
+  ncf?: string
+  grandTotalMin?: number
+  grandTotalMax?: number
 }
 
 export async function listCompras(params?: ListComprasParams) {
@@ -101,6 +104,9 @@ export interface ListGastosParams extends PaginationParams {
   toDate?: string
   tipoComprobante?: string
   esDeducible?: boolean
+  ncfProveedor?: string
+  grandTotalMin?: number
+  grandTotalMax?: number
 }
 
 export async function listGastos(params?: ListGastosParams) {

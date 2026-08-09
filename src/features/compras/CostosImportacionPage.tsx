@@ -2,30 +2,111 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { useForm, useFieldArray, Controller } from 'react-hook-form'
-import { listCostosImportacion, createCostoImportacion } from '@/shared/api/costos-importacion'
+import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form'
+import { listCostosImportacion, createCostoImportacion, listTiposDocumentoCostoImportacion } from '@/shared/api/costos-importacion'
+import { listPurchaseReceipts } from '@/shared/api/purchase-receipt'
+import { listCompras } from '@/shared/api/compras-gastos'
 import type { CreateLandedCostVoucherDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, ChevronLeft, ChevronRight, Search, Trash2 } from 'lucide-react'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 
 const PAGE_SIZE = 20
 
-const RECEIPT_TYPES = ['Purchase Receipt', 'Purchase Invoice', 'Stock Entry'] as const
 const DISTRIBUTE_OPTIONS = ['Qty', 'Amount', 'Distribute Manually'] as const
+
+type ReceiptDocumentType = 'Purchase Receipt' | 'Purchase Invoice' | 'Stock Entry' | 'Subcontracting Receipt'
 
 interface FormValues {
   postingDate: string
-  purchaseReceipts: { receiptDocumentType: 'Purchase Receipt' | 'Purchase Invoice' | 'Stock Entry'; receiptDocument: string }[]
+  purchaseReceipts: { receiptDocumentType: ReceiptDocumentType; receiptDocument: string }[]
   taxes: { description: string; amount: number; expenseAccount: string }[]
   distributeChargesBasedOn: 'Qty' | 'Amount' | 'Distribute Manually'
 }
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
+}
+
+// Solo documentos sometidos tienen sentido para prorratear costos de importación.
+// Stock Entry se queda en texto libre: no hay endpoint de listado en este frontend.
+function ReceiptDocumentCell({
+  control, idx,
+}: {
+  control: ReturnType<typeof useForm<FormValues>>['control']
+  idx: number
+}) {
+  const receiptDocumentType = useWatch({ control, name: `purchaseReceipts.${idx}.receiptDocumentType` })
+  const [search, setSearch] = useState('')
+
+  const { data: receiptsData, isLoading: receiptsLoading } = useQuery({
+    queryKey: ['purchase-receipts-search', search],
+    queryFn: () => listPurchaseReceipts({ search: search || undefined, status: 'submitted', limit: 15 }),
+    enabled: receiptDocumentType === 'Purchase Receipt',
+  })
+  const receiptOptions: SearchSelectOption[] = (receiptsData?.items ?? []).map((r) => ({
+    value: r.id,
+    label: r.id,
+    sublabel: r.supplierName,
+  }))
+
+  const { data: comprasData, isLoading: comprasLoading } = useQuery({
+    queryKey: ['compras-search', search],
+    queryFn: () => listCompras({ search: search || undefined, status: 'submitted', limit: 15 }),
+    enabled: receiptDocumentType === 'Purchase Invoice',
+  })
+  const compraOptions: SearchSelectOption[] = (comprasData?.items ?? []).map((c) => ({
+    value: c.id,
+    label: c.id,
+    sublabel: c.supplierName,
+  }))
+
+  if (receiptDocumentType === 'Stock Entry' || receiptDocumentType === 'Subcontracting Receipt') {
+    return (
+      <Controller
+        control={control}
+        name={`purchaseReceipts.${idx}.receiptDocument` as const}
+        rules={{ required: true }}
+        render={({ field }) => (
+          <input
+            className="ff-input"
+            placeholder={receiptDocumentType === 'Stock Entry' ? 'Ej. STE-2026-00001' : 'Ej. SCR-2026-00001'}
+            value={field.value}
+            onChange={field.onChange}
+          />
+        )}
+      />
+    )
+  }
+
+  const isReceipt = receiptDocumentType === 'Purchase Receipt'
+
+  return (
+    <Controller
+      control={control}
+      name={`purchaseReceipts.${idx}.receiptDocument` as const}
+      rules={{ required: true }}
+      render={({ field }) => (
+        <SearchSelect
+          value={field.value}
+          onChange={(val) => field.onChange(val)}
+          options={isReceipt ? receiptOptions : compraOptions}
+          onSearch={setSearch}
+          loading={isReceipt ? receiptsLoading : comprasLoading}
+          selectedLabel={field.value}
+          placeholder={isReceipt ? 'Buscar recepción sometida…' : 'Buscar factura sometida…'}
+        />
+      )}
+    />
+  )
 }
 
 function defaultValues(): FormValues {
@@ -47,6 +128,12 @@ export default function CostosImportacionPage() {
 
   const offset = (page - 1) * PAGE_SIZE
 
+  const { data: tiposDocumento } = useQuery({
+    queryKey: ['costos-importacion-tipos-documento'],
+    queryFn: listTiposDocumentoCostoImportacion,
+    staleTime: 60 * 60_000,
+  })
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ['costos-importacion', { status, offset }],
     queryFn: () =>
@@ -64,11 +151,17 @@ export default function CostosImportacionPage() {
 
   const {
     control, register, handleSubmit, reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<FormValues>({ defaultValues: defaultValues() })
 
   const receiptsArray = useFieldArray({ control, name: 'purchaseReceipts' })
   const taxesArray = useFieldArray({ control, name: 'taxes' })
+
+  function closeCreate() {
+    setShowCreate(false)
+  }
+
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, closeCreate)
 
   const createMutation = useMutation({
     mutationFn: (dto: CreateLandedCostVoucherDto) => createCostoImportacion(dto),
@@ -241,17 +334,24 @@ export default function CostosImportacionPage() {
 
       {/* Create Modal */}
       {showCreate && (
-        <div className="modal-overlay" onClick={() => setShowCreate(false)}>
+        <div className="modal-overlay" onClick={requestClose}>
           <div className="modal-box" style={{ maxWidth: 760 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">Nuevo Costo de Importación</h2>
-              <button className="modal-close" onClick={() => setShowCreate(false)}>×</button>
+              <button className="modal-close" onClick={requestClose}>×</button>
             </div>
             <form onSubmit={handleSubmit(onSubmit)}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 20, maxHeight: '70vh', overflowY: 'auto' }}>
                 <div className="ff-group">
                   <label className="ff-label">Fecha</label>
-                  <input type="date" className="ff-input" {...register('postingDate', { required: true })} />
+                  <Controller
+                    name="postingDate"
+                    control={control}
+                    rules={{ required: true }}
+                    render={({ field }) => (
+                      <DatePicker value={field.value ?? ''} onChange={field.onChange} className="ff-input" />
+                    )}
+                  />
                   {errors.postingDate && <span className="ff-error">La fecha es requerida</span>}
                 </div>
 
@@ -285,17 +385,15 @@ export default function CostosImportacionPage() {
                                 name={`purchaseReceipts.${idx}.receiptDocumentType` as const}
                                 render={({ field: f }) => (
                                   <Select value={f.value} onValueChange={f.onChange}>
-                                    {RECEIPT_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                    {(tiposDocumento ?? []).map((t) => (
+                                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                                    ))}
                                   </Select>
                                 )}
                               />
                             </td>
                             <td>
-                              <input
-                                className="ff-input"
-                                placeholder="Ej. PR-2026-00001"
-                                {...register(`purchaseReceipts.${idx}.receiptDocument` as const, { required: true })}
-                              />
+                              <ReceiptDocumentCell control={control} idx={idx} />
                             </td>
                             <td>
                               <button
@@ -400,7 +498,7 @@ export default function CostosImportacionPage() {
                 </div>
               </div>
               <div className="modal-foot">
-                <button type="button" className="btn btn-secondary" disabled={createMutation.isPending} onClick={() => setShowCreate(false)}>
+                <button type="button" className="btn btn-secondary" disabled={createMutation.isPending} onClick={requestClose}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
@@ -411,6 +509,16 @@ export default function CostosImportacionPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }

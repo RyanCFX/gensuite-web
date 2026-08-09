@@ -24,6 +24,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { Select, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 interface ItemRow {
   itemCode: string
@@ -819,24 +820,22 @@ export default function CompraForm() {
 
                 <div className="ff-wrap">
                   <label className="ff-label">Fecha <span className="ff-required">*</span></label>
-                  <input
-                    type="date"
+                  <DatePicker
                     className="ff-input"
                     value={postingDate}
-                    onChange={(e) => setPostingDate(e.target.value)}
-                    required
+                    onChange={setPostingDate}
                     disabled={isReturn}
                   />
                 </div>
 
                 <div className="ff-wrap">
                   <label className="ff-label">Fecha Vencimiento</label>
-                  <input
-                    type="date"
+                  <DatePicker
                     className="ff-input"
                     value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
+                    onChange={setDueDate}
                     disabled={isReturn}
+                    clearable
                   />
                 </div>
 

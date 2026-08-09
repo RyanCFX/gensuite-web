@@ -23,6 +23,9 @@ import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useDebounce } from '@/lib/useDebounce'
 import { formatDOP } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 
 const PAGE_SIZE = 20
 
@@ -225,7 +228,7 @@ export default function PricingRulesPage() {
     handleSubmit,
     reset,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<PricingRuleFormValues>({
     resolver: zodResolver(pricingRuleSchema) as Resolver<PricingRuleFormValues>,
     defaultValues: {
@@ -244,6 +247,8 @@ export default function PricingRulesPage() {
 
   const watchedApplyOn = watch('applyOn')
   const watchedDiscountType = watch('discountType')
+
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, closeDialog)
 
   const itemOptions = useMemo(() => {
     return (itemsData?.items ?? []).map((item) => ({
@@ -515,11 +520,11 @@ export default function PricingRulesPage() {
       </div>
 
       {dialogOpen && (
-        <div className="modal-overlay" onClick={closeDialog}>
+        <div className="modal-overlay" onClick={requestClose}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">{editTarget ? 'Editar Regla' : 'Nueva Regla de Descuento'}</h2>
-              <button className="modal-close" type="button" onClick={closeDialog}>×</button>
+              <button className="modal-close" type="button" onClick={requestClose}>×</button>
             </div>
             <form onSubmit={handleSubmit(onSubmit)}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -655,11 +660,23 @@ export default function PricingRulesPage() {
                     <div style={{ display: 'flex', gap: 12 }}>
                       <div className="ff-wrap" style={{ flex: 1 }}>
                         <label className="ff-label" htmlFor="pr-validFrom">Vigencia desde</label>
-                        <input id="pr-validFrom" type="date" className="ff-input" {...register('validFrom')} />
+                        <Controller
+                          name="validFrom"
+                          control={control}
+                          render={({ field }) => (
+                            <DatePicker id="pr-validFrom" value={field.value ?? ''} onChange={field.onChange} className="ff-input" clearable />
+                          )}
+                        />
                       </div>
                       <div className="ff-wrap" style={{ flex: 1 }}>
                         <label className="ff-label" htmlFor="pr-validUpto">Vigencia hasta</label>
-                        <input id="pr-validUpto" type="date" className="ff-input" {...register('validUpto')} />
+                        <Controller
+                          name="validUpto"
+                          control={control}
+                          render={({ field }) => (
+                            <DatePicker id="pr-validUpto" value={field.value ?? ''} onChange={field.onChange} className="ff-input" clearable />
+                          )}
+                        />
                       </div>
                     </div>
                     <div className="ff-wrap">
@@ -670,7 +687,7 @@ export default function PricingRulesPage() {
                 </details>
               </div>
               <div className="modal-foot">
-                <button type="button" className="btn btn-ghost" onClick={closeDialog}>Cancelar</button>
+                <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                   {isSubmitting ? 'Guardando…' : editTarget ? 'Guardar' : 'Crear'}
                 </button>
@@ -679,6 +696,16 @@ export default function PricingRulesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }

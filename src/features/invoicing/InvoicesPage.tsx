@@ -12,6 +12,7 @@ import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 type StatusFilter = 'draft' | 'submitted' | 'cancelled' | 'all'
 type PaymentFilter = 'paid' | 'unpaid' | 'partly_paid' | 'all'
@@ -49,6 +50,9 @@ export default function InvoicesPage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [branch, setBranch] = useState('')
+  const [ncf, setNcf] = useState('')
+  const [grandTotalMin, setGrandTotalMin] = useState('')
+  const [grandTotalMax, setGrandTotalMax] = useState('')
   const { orderBy, sort } = useSortState()
 
   const { data: sucursalesData } = useQuery({
@@ -69,6 +73,9 @@ export default function InvoicesPage() {
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
     branch: branch || undefined,
+    ncf: ncf || undefined,
+    grandTotalMin: grandTotalMin !== '' ? Number(grandTotalMin) : undefined,
+    grandTotalMax: grandTotalMax !== '' ? Number(grandTotalMax) : undefined,
     orderBy: orderBy || undefined,
     limit: 50,
   }
@@ -169,20 +176,43 @@ export default function InvoicesPage() {
               placeholder="Todas las sucursales"
             />
           </div>
-          <input
-            type="date"
+          <DatePicker
             className="ff-input ff-input-sm"
             value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
+            onChange={setFromDate}
             style={{ width: 144 }}
+            clearable
+          />
+          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+          <DatePicker
+            className="ff-input ff-input-sm"
+            value={toDate}
+            onChange={setToDate}
+            style={{ width: 144 }}
+            clearable
+          />
+          <input
+            className="ff-input ff-input-sm"
+            placeholder="Buscar NCF…"
+            value={ncf}
+            onChange={(e) => setNcf(e.target.value)}
+          />
+          <input
+            type="number"
+            className="ff-input ff-input-sm"
+            style={{ width: 100 }}
+            placeholder="Total mín."
+            value={grandTotalMin}
+            onChange={(e) => setGrandTotalMin(e.target.value)}
           />
           <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
           <input
-            type="date"
+            type="number"
             className="ff-input ff-input-sm"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            style={{ width: 144 }}
+            style={{ width: 100 }}
+            placeholder="Total máx."
+            value={grandTotalMax}
+            onChange={(e) => setGrandTotalMax(e.target.value)}
           />
         </div>
       </div>

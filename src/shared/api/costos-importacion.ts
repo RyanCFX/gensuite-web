@@ -8,6 +8,16 @@ import type {
   PaginationParams,
 } from './types'
 
+export interface ReceiptDocumentTypeOption {
+  value: string
+  label: string
+}
+
+export async function listTiposDocumentoCostoImportacion() {
+  const res = await client.get<{ success: true; data: ReceiptDocumentTypeOption[] }>(ENDPOINTS.costosImportacion.tiposDocumento)
+  return unwrap(res)
+}
+
 export async function listCostosImportacion(params?: PaginationParams) {
   const res = await client.get<PaginatedResponse<LandedCostVoucherListItem>>(ENDPOINTS.costosImportacion.list, { params })
   return unwrapPaginated(res)

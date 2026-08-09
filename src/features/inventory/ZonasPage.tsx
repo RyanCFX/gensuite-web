@@ -10,9 +10,13 @@ import {
 } from '@/shared/api/ubicaciones'
 import type { ZonaResponseDto, UbicacionResponseDto, ApiError, DistribuirUbicacionItemDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { Plus, Pencil, Trash2, X, MapPin, Info } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 // ─── Banner "doctype no instalado" ─────────────────────────────────────────
 
@@ -92,6 +96,9 @@ function ZonasSection({
     setShowForm(false)
     setEditTarget(null)
   }
+
+  const formIsDirty = useDirtyCheck({ formName, formCode, formDescripcion }, showForm)
+  const formClose = useConfirmClose(formIsDirty, closeForm)
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -224,11 +231,11 @@ function ZonasSection({
       )}
 
       {showForm && (
-        <div className="modal-overlay" onClick={closeForm}>
+        <div className="modal-overlay" onClick={formClose.requestClose}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">{editTarget ? 'Editar Zona' : 'Nueva Zona'}</h2>
-              <button className="modal-close" onClick={closeForm}><X size={16} /></button>
+              <button className="modal-close" onClick={formClose.requestClose}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="ff-wrap">
@@ -245,7 +252,7 @@ function ZonasSection({
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={closeForm}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={formClose.requestClose}>Cancelar</button>
               <button
                 className="btn btn-primary"
                 onClick={() => saveMutation.mutate()}
@@ -257,6 +264,16 @@ function ZonasSection({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={formClose.confirming}
+        onClose={formClose.cancelDiscard}
+        onConfirm={formClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {toDelete && (
         <div className="modal-overlay" onClick={() => setToDelete(null)}>
@@ -324,6 +341,9 @@ function UbicacionesSection({ zona }: { zona: ZonaResponseDto }) {
     setShowForm(false)
     setEditTarget(null)
   }
+
+  const formIsDirty = useDirtyCheck({ formName, formCode, formDescripcion }, showForm)
+  const formClose = useConfirmClose(formIsDirty, closeForm)
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -444,11 +464,11 @@ function UbicacionesSection({ zona }: { zona: ZonaResponseDto }) {
       )}
 
       {showForm && (
-        <div className="modal-overlay" onClick={closeForm}>
+        <div className="modal-overlay" onClick={formClose.requestClose}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">{editTarget ? 'Editar Ubicación' : 'Nueva Ubicación'}</h2>
-              <button className="modal-close" onClick={closeForm}><X size={16} /></button>
+              <button className="modal-close" onClick={formClose.requestClose}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="ff-wrap">
@@ -465,7 +485,7 @@ function UbicacionesSection({ zona }: { zona: ZonaResponseDto }) {
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={closeForm}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={formClose.requestClose}>Cancelar</button>
               <button
                 className="btn btn-primary"
                 onClick={() => saveMutation.mutate()}
@@ -477,6 +497,16 @@ function UbicacionesSection({ zona }: { zona: ZonaResponseDto }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={formClose.confirming}
+        onClose={formClose.cancelDiscard}
+        onConfirm={formClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {toDelete && (
         <div className="modal-overlay" onClick={() => setToDelete(null)}>
@@ -774,8 +804,8 @@ function HistorialMovimientosSection({ warehouse }: { warehouse: string }) {
             disabled={!warehouse}
           />
         </div>
-        <input className="ff-input" style={{ maxWidth: 160 }} type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-        <input className="ff-input" style={{ maxWidth: 160 }} type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+        <DatePicker className="ff-input" style={{ maxWidth: 160 }} value={fromDate} onChange={setFromDate} clearable />
+        <DatePicker className="ff-input" style={{ maxWidth: 160 }} value={toDate} onChange={setToDate} clearable />
       </div>
       <div className="card-body" style={{ paddingTop: 0, padding: 0 }}>
         <NoteBanner note={data?.note} />

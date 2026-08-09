@@ -3,11 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listPagos } from '@/shared/api/pagos'
 import type { ListPagosParams } from '@/shared/api/pagos'
+import { listSuppliers } from '@/shared/api/suppliers'
+import { listMetodosPago } from '@/shared/api/config'
+import { listSucursales } from '@/shared/api/sucursales'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { Plus, Search } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -25,17 +31,53 @@ type StatusFilter = 'draft' | 'submitted' | 'cancelled' | 'all'
 export default function PagosPage() {
   const navigate = useNavigate()
 
-  const [search, setSearch] = useState('')
+  const [supplierId, setSupplierId] = useState('')
+  const [supplierLabel, setSupplierLabel] = useState('')
+  const [supplierQuery, setSupplierQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [modeOfPayment, setModeOfPayment] = useState('')
+  const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState('')
+  const [branch, setBranch] = useState('')
+  const [branchSearch, setBranchSearch] = useState('')
+  const [paidAmountMin, setPaidAmountMin] = useState('')
+  const [paidAmountMax, setPaidAmountMax] = useState('')
+  const [referenceNo, setReferenceNo] = useState('')
   const { orderBy, sort } = useSortState()
 
+  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
+    queryKey: ['supplierSearch', supplierQuery],
+    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
+  })
+  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
+    value: s.id,
+    label: s.supplierName,
+    sublabel: s.rnc,
+  }))
+
+  const { data: metodos } = useQuery({ queryKey: ['metodos-pago'], queryFn: listMetodosPago })
+  const modeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
+    .filter((m) => !m.disabled)
+    .filter((m) => !modeOfPaymentSearch || m.name.toLowerCase().includes(modeOfPaymentSearch.toLowerCase()))
+    .map((m) => ({ value: m.name, label: m.name }))
+
+  const { data: sucursalesData } = useQuery({ queryKey: ['sucursales-all'], queryFn: () => listSucursales({ limit: 100 }) })
+  const sucursales = sucursalesData?.items ?? []
+  const branchOptions: SearchSelectOption[] = sucursales
+    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((s) => ({ value: s.name, label: s.name }))
+
   const params: ListPagosParams = {
-    supplier: search || undefined,
+    supplier: supplierId || undefined,
     status: status === 'all' ? undefined : status,
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
+    modeOfPayment: modeOfPayment || undefined,
+    branch: branch || undefined,
+    paidAmountMin: paidAmountMin !== '' ? Number(paidAmountMin) : undefined,
+    paidAmountMax: paidAmountMax !== '' ? Number(paidAmountMax) : undefined,
+    referenceNo: referenceNo || undefined,
     orderBy: orderBy || undefined,
     limit: 50,
   }
@@ -62,13 +104,15 @@ export default function PagosPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={15} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por proveedor…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+          <div style={{ width: 260 }}>
+            <SearchSelect
+              value={supplierId}
+              selectedLabel={supplierLabel}
+              onChange={(val, opt) => { setSupplierId(val); setSupplierLabel(opt?.label ?? '') }}
+              options={supplierOptions}
+              onSearch={setSupplierQuery}
+              loading={suppliersLoading}
+              placeholder="Filtrar por proveedor…"
             />
           </div>
 
@@ -79,20 +123,67 @@ export default function PagosPage() {
             <SelectItem value="cancelled">Cancelado</SelectItem>
           </Select>
 
-          <input
-            type="date"
+          <DatePicker
             className="filter-select"
             value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            title="Desde"
+            onChange={setFromDate}
+            clearable
           />
-          <input
-            type="date"
+          <DatePicker
             className="filter-select"
             value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            title="Hasta"
+            onChange={setToDate}
+            clearable
           />
+
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={modeOfPayment}
+              onChange={(val) => setModeOfPayment(val)}
+              options={modeOfPaymentOptions}
+              onSearch={setModeOfPaymentSearch}
+              placeholder="Todos los métodos de pago"
+            />
+          </div>
+
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={branch}
+              onChange={(val) => setBranch(val)}
+              options={branchOptions}
+              onSearch={setBranchSearch}
+              selectedLabel={branch}
+              placeholder="Todas las sucursales"
+            />
+          </div>
+
+          <input
+            className="ff-input ff-input-sm"
+            style={{ width: 180 }}
+            placeholder="Número de referencia…"
+            value={referenceNo}
+            onChange={(e) => setReferenceNo(e.target.value)}
+          />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 100 }}
+              placeholder="Mín."
+              value={paidAmountMin}
+              onChange={(e) => setPaidAmountMin(e.target.value)}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 100 }}
+              placeholder="Máx."
+              value={paidAmountMax}
+              onChange={(e) => setPaidAmountMax(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 

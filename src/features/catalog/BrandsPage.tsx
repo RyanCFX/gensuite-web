@@ -17,6 +17,8 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 
 const brandSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -59,11 +61,13 @@ export default function BrandsPage() {
     control,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<BrandFormValues>({
     resolver: zodResolver(brandSchema),
     defaultValues: { name: '', description: '', categoryId: '' },
   })
+
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, closeDialog)
 
   const createMutation = useMutation({
     mutationFn: createBrand,
@@ -225,11 +229,11 @@ export default function BrandsPage() {
       </div>
 
       {dialogOpen && (
-        <div className="modal-overlay" onClick={closeDialog}>
+        <div className="modal-overlay" onClick={requestClose}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">{editTarget ? 'Editar Marca' : 'Nueva Marca'}</h2>
-              <button className="modal-close" type="button" onClick={closeDialog}>×</button>
+              <button className="modal-close" type="button" onClick={requestClose}>×</button>
             </div>
             <form onSubmit={handleSubmit(onSubmit)}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -263,7 +267,7 @@ export default function BrandsPage() {
                 </div>
               </div>
               <div className="modal-foot">
-                <button type="button" className="btn btn-ghost" onClick={closeDialog}>Cancelar</button>
+                <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                   {isSubmitting ? 'Guardando…' : editTarget ? 'Guardar' : 'Crear'}
                 </button>
@@ -272,6 +276,16 @@ export default function BrandsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {toDelete && (
         <div className="modal-overlay" onClick={() => setToDelete(null)}>

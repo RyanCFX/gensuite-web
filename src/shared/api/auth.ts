@@ -1,5 +1,14 @@
 import { client, unwrap } from './client'
-import type { LoginRequest, LoginResponse, VerifyPinResponse, AuthUser } from './types'
+import { ENDPOINTS } from './endpoints'
+import type {
+  LoginRequest,
+  LoginResponse,
+  VerifyPinResponse,
+  AuthUser,
+  ForgotPasswordDto,
+  ForgotPasswordResult,
+  ResetPasswordDto,
+} from './types'
 import { saveSession } from './storage'
 import type { ApiError } from './types'
 
@@ -17,10 +26,7 @@ function decodeJwt(token: string): Record<string, unknown> {
   }
 }
 
-export async function login(data: LoginRequest): Promise<AuthResult> {
-  const res = await client.post<{ success: true; data: LoginResponse }>('/auth/login', data)
-  const payload = unwrap(res)
-
+function handleLoginPayload(payload: LoginResponse): AuthResult {
   const jwtPayload = decodeJwt(payload.access_token)
   const user: AuthUser = {
     ...payload.user,
@@ -35,6 +41,38 @@ export async function login(data: LoginRequest): Promise<AuthResult> {
     user,
     tenant: payload.tenant,
   }
+}
+
+export async function login(data: LoginRequest): Promise<AuthResult> {
+  const res = await client.post<{ success: true; data: LoginResponse }>('/auth/login', data)
+  return handleLoginPayload(unwrap(res))
+}
+
+export async function forgotPassword(data: ForgotPasswordDto, tenant: string): Promise<ForgotPasswordResult> {
+  const res = await client.post<{ success: true; data: ForgotPasswordResult }>(
+    ENDPOINTS.auth.forgotPassword,
+    data,
+    { headers: { 'X-Tenant': tenant } },
+  )
+  return unwrap(res)
+}
+
+export async function resetPassword(data: ResetPasswordDto, tenant: string): Promise<AuthResult> {
+  const res = await client.post<{ success: true; data: LoginResponse }>(
+    ENDPOINTS.auth.resetPassword,
+    data,
+    { headers: { 'X-Tenant': tenant } },
+  )
+  return handleLoginPayload(unwrap(res))
+}
+
+export async function completeRegistration(data: ResetPasswordDto, tenant: string): Promise<AuthResult> {
+  const res = await client.post<{ success: true; data: LoginResponse }>(
+    ENDPOINTS.auth.completeRegistration,
+    data,
+    { headers: { 'X-Tenant': tenant } },
+  )
+  return handleLoginPayload(unwrap(res))
 }
 
 export async function verifyAdminPin(pin: string) {

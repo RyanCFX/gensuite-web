@@ -10,6 +10,17 @@ import type {
 
 export interface ListCustomersParams extends PaginationParams {
   disabled?: boolean
+  customerName?: string
+  customerType?: 'Company' | 'Individual'
+  tipoIdentificacion?: string
+  identificacion?: string
+  hasCredit?: boolean
+  createdAtFrom?: string
+  createdAtTo?: string
+  creditLimitMin?: number
+  creditLimitMax?: number
+  creditDaysMin?: number
+  creditDaysMax?: number
 }
 
 export async function listCustomers(params?: ListCustomersParams) {

@@ -23,6 +23,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
 import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
@@ -197,6 +198,7 @@ export default function InvoiceForm() {
   const [esClienteOcasional, setEsClienteOcasional] = useState(false)
   const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
   const [clienteOcasionalRnc, setClienteOcasionalRnc] = useState('')
+  const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
   const [postingDate, setPostingDate] = useState(todayIso())
   const [dueDate, setDueDate] = useState(defaultDueDate())
   const [ncfType, setNcfType] = useState<NcfType>('B02')
@@ -741,7 +743,11 @@ const itemsDto = items.map((i) => ({
 
      const baseDto = {
        ...(esClienteOcasional
-         ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalRnc: clienteOcasionalRnc || undefined }
+         ? {
+             clienteOcasionalNombre: clienteOcasionalNombre || undefined,
+             clienteOcasionalRnc: clienteOcasionalRnc || undefined,
+             clienteOcasionalDireccion: clienteOcasionalDireccion || undefined,
+           }
          : { customer: customerId }),
        postingDate,
        dueDate,
@@ -831,6 +837,19 @@ const itemsDto = items.map((i) => ({
                    </div>
                  )}
                </div>
+               {esClienteOcasional && (
+                 <div className="ff-wrap">
+                   <label className="ff-label" htmlFor="clienteOcasionalDireccion">Dirección</label>
+                   <input
+                     id="clienteOcasionalDireccion"
+                     className="ff-input"
+                     value={clienteOcasionalDireccion}
+                     onChange={(e) => setClienteOcasionalDireccion(e.target.value)}
+                     placeholder="Dirección del cliente ocasional (opcional)"
+                   />
+                 </div>
+               )}
+
                <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
                    <input type="checkbox" checked={esClienteOcasional} onChange={(e) => { setEsClienteOcasional(e.target.checked); if (e.target.checked) { setCustomerId(''); setSelectedCustomer(null); setSemaforo(null) } }} />
@@ -845,24 +864,22 @@ const itemsDto = items.map((i) => ({
 
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="postingDate">Fecha</label>
-                <input
+                <DatePicker
                   id="postingDate"
-                  type="date"
                   className="ff-input"
                   value={postingDate}
-                  onChange={(e) => setPostingDate(e.target.value)}
-                  required
+                  onChange={setPostingDate}
                 />
               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="dueDate">Fecha vencimiento</label>
-                <input
+                <DatePicker
                   id="dueDate"
-                  type="date"
                   className="ff-input"
                   value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
+                  onChange={setDueDate}
+                  clearable
                 />
               </div>
 
@@ -1252,7 +1269,11 @@ onAuthorized={(userId) => {
            }))
            const baseDto = {
              ...(esClienteOcasional
-               ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalRnc: clienteOcasionalRnc || undefined }
+               ? {
+                   clienteOcasionalNombre: clienteOcasionalNombre || undefined,
+                   clienteOcasionalRnc: clienteOcasionalRnc || undefined,
+                   clienteOcasionalDireccion: clienteOcasionalDireccion || undefined,
+                 }
                : { customer: customerId }),
              postingDate, dueDate, branch: branch || undefined, department: usaDepartamentos ? (department || undefined) : undefined, ncfType,
              items: itemsDto,

@@ -540,6 +540,10 @@ export default function CustomerDetail() {
               <span className="detail-value">{customer.emailInvoice ?? '—'}</span>
             </div>
             <div className="detail-field">
+              <span className="detail-label">Dirección</span>
+              <span className="detail-value">{customer.address ?? '—'}</span>
+            </div>
+            <div className="detail-field">
               <span className="detail-label">Grupo de clientes</span>
               <span className="detail-value">{customer.customerGroup ?? '—'}</span>
             </div>

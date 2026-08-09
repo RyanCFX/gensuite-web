@@ -22,6 +22,9 @@ export interface ListInvoicesParams extends PaginationParams {
   paymentStatus?: 'paid' | 'unpaid' | 'partly_paid' | ('paid' | 'unpaid' | 'partly_paid')[]
   ncfType?: string
   branch?: string
+  ncf?: string
+  grandTotalMin?: number
+  grandTotalMax?: number
 }
 
 export async function listInvoices(params?: ListInvoicesParams) {

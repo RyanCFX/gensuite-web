@@ -19,6 +19,16 @@ export interface ListNotesParams extends PaginationParams {
   customer?: string
   branch?: string
   department?: string
+  createdAtFrom?: string
+  createdAtTo?: string
+  postingDateFrom?: string
+  postingDateTo?: string
+  ncf?: string
+  ncfType?: string
+  grandTotalMin?: number
+  grandTotalMax?: number
+  refundedAmountMin?: number
+  refundedAmountMax?: number
 }
 
 export async function listCreditNotes(params?: ListNotesParams) {

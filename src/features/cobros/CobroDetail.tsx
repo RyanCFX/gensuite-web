@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getCobro, submitCobro, downloadCobroPdf, getCobroPdfBlobUrl } from '@/shared/api/cobros'
 import { getFacturacionConfig } from '@/shared/api/config'
+import { getCuentaBancaria } from '@/shared/api/cuentas-bancarias'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { ArrowLeft, Send, Eye } from 'lucide-react'
 import { PdfFormatButton } from '@/components/shared/PdfFormatButton'
@@ -45,6 +46,12 @@ export default function CobroDetail() {
   })
   const formatoImpresionDefault = facturacionConfig?.formatoImpresionDefault ?? 'a4'
   const formatosPermitidos = facturacionConfig?.formatosPermitidos
+
+  const { data: cuentaBancaria } = useQuery({
+    queryKey: ['cuenta-bancaria', cobro?.bankAccount],
+    queryFn: () => getCuentaBancaria(cobro!.bankAccount!),
+    enabled: !!cobro?.bankAccount,
+  })
 
   const downloadMutation = useMutation({
     mutationFn: (formato?: FormatoImpresion) => downloadCobroPdf(id!, `cobro-${id}.pdf`, formato ?? formatoImpresionDefault),
@@ -207,6 +214,46 @@ export default function CobroDetail() {
               <div className="detail-field">
                 <span className="detail-label">Fecha de Referencia</span>
                 <span className="detail-value">{formatDate(cobro.referenceDate)}</span>
+              </div>
+            )}
+
+            {cobro.bankAccount && (
+              <div className="detail-field">
+                <span className="detail-label">Cuenta Bancaria</span>
+                <button
+                  style={{ fontSize: 13, color: 'var(--color-brand)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 500, textAlign: 'left' }}
+                  onClick={() => navigate('/config/cuentas-bancarias')}
+                >
+                  {cuentaBancaria?.accountName ?? cobro.bankAccount}
+                </button>
+              </div>
+            )}
+
+            {cobro.bank && (
+              <div className="detail-field">
+                <span className="detail-label">Banco</span>
+                <span className="detail-value">{cobro.bank}</span>
+              </div>
+            )}
+
+            {cobro.checkNumber && (
+              <div className="detail-field">
+                <span className="detail-label">No. de Cheque</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{cobro.checkNumber}</span>
+              </div>
+            )}
+
+            {cobro.cardNumber && (
+              <div className="detail-field">
+                <span className="detail-label">No. de Tarjeta</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{cobro.cardNumber}</span>
+              </div>
+            )}
+
+            {cobro.authorizationCode && (
+              <div className="detail-field">
+                <span className="detail-label">Código de Autorización</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{cobro.authorizationCode}</span>
               </div>
             )}
 

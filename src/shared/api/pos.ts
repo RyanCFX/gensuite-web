@@ -43,6 +43,8 @@ export interface ListTurnosParams extends PaginationParams {
   status?: 'Open' | 'Closed'
   from?: string
   to?: string
+  grandTotalMin?: number
+  grandTotalMax?: number
 }
 
 export async function listTurnos(params?: ListTurnosParams) {
@@ -53,4 +55,19 @@ export async function listTurnos(params?: ListTurnosParams) {
 export async function getTurnoDetail(id: string) {
   const res = await client.get<{ success: true; data: TurnoDetail }>(ENDPOINTS.pos.turnoById(id))
   return unwrap(res)
+}
+
+export async function downloadTurnoPdf(id: string) {
+  const res = await client.get<Blob>(ENDPOINTS.pos.turnoPdf(id), { responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `corte-caja-${id}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export async function getTurnoPdfBlobUrl(id: string): Promise<string> {
+  const res = await client.get<Blob>(ENDPOINTS.pos.turnoPdf(id), { responseType: 'blob' })
+  return URL.createObjectURL(res.data)
 }

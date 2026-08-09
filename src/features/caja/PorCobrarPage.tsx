@@ -13,6 +13,9 @@ import { PaymentLinesEditor } from '@/components/shared/PaymentLinesEditor'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { TurnoCajaIndicator } from '@/components/shared/TurnoCajaIndicator'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import {
   EMPTY_PAYMENT_LINES_VALUE,
   buildSubmitPayload,
@@ -188,6 +191,12 @@ function openModal(invoice: PendienteCobroItem) {
     setSelectedInvoice(null)
     setDirectoMop('')
   }
+
+  const cobroIsDirty = useDirtyCheck(
+    { directoMop, paymentsValue, condicionFiscal, clienteOcasionalRnc },
+    !!selectedInvoice,
+  )
+  const { requestClose: requestCloseModal, confirming: confirmingCloseModal, confirmDiscard: confirmDiscardModal, cancelDiscard: cancelDiscardModal } = useConfirmClose(cobroIsDirty, closeModal)
 
 function validateAndSubmit() {
      if (!selectedInvoice) return
@@ -387,11 +396,11 @@ function validateAndSubmit() {
 
        {/* ── Modal: completar cobro ──────────────────────────────── */}
        {selectedInvoice && (
-         <div className="modal-overlay" onClick={closeModal}>
+         <div className="modal-overlay" onClick={requestCloseModal}>
            <div className="modal-box" style={{ maxWidth: flujoCobro === 'caja' ? 640 : 480 }} onClick={(e) => e.stopPropagation()}>
              <div className="modal-head">
                <h2 className="modal-title">Completar cobro — {selectedInvoice.id}</h2>
-               <button className="modal-close" type="button" onClick={closeModal}><X size={16} /></button>
+               <button className="modal-close" type="button" onClick={requestCloseModal}><X size={16} /></button>
              </div>
 
              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -498,7 +507,7 @@ function validateAndSubmit() {
              </div>
 
              <div className="modal-foot">
-               <button className="btn btn-ghost" onClick={closeModal}>Cancelar</button>
+               <button className="btn btn-ghost" onClick={requestCloseModal}>Cancelar</button>
                <button
                  className="btn btn-primary"
                  onClick={validateAndSubmit}
@@ -549,6 +558,16 @@ function validateAndSubmit() {
            </div>
          </div>
        )}
+
+       <ConfirmModal
+         open={confirmingCloseModal}
+         onClose={cancelDiscardModal}
+         onConfirm={confirmDiscardModal}
+         title="¿Descartar cambios?"
+         description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+         confirmLabel="Descartar cambios"
+         variant="danger"
+       />
      </div>
    )
  }

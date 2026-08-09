@@ -8,6 +8,9 @@ import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { listRoles } from '@/shared/api/usuarios'
 import { createRole } from '@/shared/api/roles'
 import type { ApiError, CreateRoleDto } from '@/shared/api/types'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 
 function apiMessage(err: unknown, fallback: string): string {
   return (err as ApiError)?.message ?? fallback
@@ -139,6 +142,9 @@ function CreateRoleModal({
   const [roleName, setRoleName] = useState('')
   const [deskAccess, setDeskAccess] = useState(true)
 
+  const isDirty = useDirtyCheck({ roleName, deskAccess }, true)
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!roleName.trim()) return
@@ -146,11 +152,11 @@ function CreateRoleModal({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2 className="modal-title">Nuevo Rol</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <button className="modal-close" onClick={requestClose}>×</button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -177,13 +183,22 @@ function CreateRoleModal({
             </label>
           </div>
           <div className="modal-foot">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+            <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>
             <button type="submit" className="btn btn-primary" disabled={!roleName.trim() || isPending}>
               Crear Rol
             </button>
           </div>
         </form>
       </div>
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }

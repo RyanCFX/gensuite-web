@@ -6,6 +6,7 @@ import { listInvoices } from '@/shared/api/invoices'
 import { listPedidos } from '@/shared/api/pedidos'
 import { listCustomers } from '@/shared/api/customers'
 import { listMetodosPago, getLayawayConfig, getFacturacionConfig } from '@/shared/api/config'
+import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { CheckCircle2, AlertTriangle, Wallet, PackageOpen } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -16,6 +17,7 @@ import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -44,6 +46,7 @@ export default function PagoPage() {
   const [customerQuery, setCustomerQuery] = useState('')
   const [paidAmount, setPaidAmount] = useState<number>(0)
   const [modeOfPayment, setModeOfPayment] = useState('')
+  const [bankAccount, setBankAccount] = useState('')
   const [referenceNo, setReferenceNo] = useState('')
   const [referenceDate, setReferenceDate] = useState('')
   const [remarks, setRemarks] = useState('')
@@ -212,6 +215,19 @@ export default function PagoPage() {
     .filter((m) => !modeOfPaymentSearch || m.name.toLowerCase().includes(modeOfPaymentSearch.toLowerCase()))
     .map((m) => ({ value: m.name, label: m.name }))
 
+  const metodoSeleccionado = (metodos ?? []).find((m) => m.name === modeOfPayment)
+  const requiresBankAccount = metodoSeleccionado?.requiresBankAccount && !metodoSeleccionado.defaultBankAccount
+
+  const { data: cuentasBancarias } = useQuery({
+    queryKey: ['cuentas-bancarias-activas'],
+    queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
+    enabled: !!requiresBankAccount,
+  })
+  const [bankAccountSearch, setBankAccountSearch] = useState('')
+  const bankAccountOptions: SearchSelectOption[] = (cuentasBancarias?.items ?? [])
+    .filter((c) => !bankAccountSearch || c.accountName.toLowerCase().includes(bankAccountSearch.toLowerCase()))
+    .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))
+
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   function toggleReferencia(invoiceId: string) {
@@ -246,6 +262,7 @@ export default function PagoPage() {
       setCustomerQuery('')
       setPaidAmount(0)
       setModeOfPayment('')
+      setBankAccount('')
       setReferenceNo('')
       setReferenceDate('')
       setRemarks('')
@@ -273,6 +290,7 @@ export default function PagoPage() {
     if (!customerId) { toast.error('Selecciona un cliente'); return }
     if (!paidAmount || paidAmount <= 0) { toast.error('Ingresa un monto válido'); return }
     if (!modeOfPayment) { toast.error('Selecciona un método de pago'); return }
+    if (requiresBankAccount && !bankAccount) { toast.error('Selecciona una cuenta bancaria'); return }
 
     for (const ref of checkedPedidoRefs) {
       if (ref.allocatedAmount < ref.minRequired) {
@@ -295,6 +313,7 @@ export default function PagoPage() {
       postingDate,
       paidAmount,
       modeOfPayment,
+      bankAccount: bankAccount || undefined,
       referenceNo: referenceNo || undefined,
       referenceDate: referenceDate || undefined,
       remarks: remarks || undefined,
@@ -585,12 +604,10 @@ export default function PagoPage() {
               {/* Fecha */}
               <div className="ff-wrap">
                 <label className="ff-label">Fecha <span className="ff-required">*</span></label>
-                <input
-                  type="date"
+                <DatePicker
                   className="ff-input"
                   value={postingDate}
-                  onChange={(e) => setPostingDate(e.target.value)}
-                  required
+                  onChange={setPostingDate}
                 />
               </div>
 
@@ -614,13 +631,31 @@ export default function PagoPage() {
                 <label className="ff-label">Método de Pago <span className="ff-required">*</span></label>
                 <SearchSelect
                   value={modeOfPayment}
-                  onChange={setModeOfPayment}
+                  onChange={(val) => { setModeOfPayment(val); setBankAccount('') }}
                   options={modeOfPaymentOptions}
                   onSearch={setModeOfPaymentSearch}
                   selectedLabel={modeOfPayment}
                   placeholder="Seleccionar método…"
                 />
               </div>
+
+              {/* Cuenta bancaria (requerida por el método de pago seleccionado) */}
+              {metodoSeleccionado?.requiresBankAccount && (
+                <div className="ff-wrap">
+                  <label className="ff-label">
+                    Cuenta Bancaria {requiresBankAccount && <span className="ff-required">*</span>}
+                  </label>
+                  <SearchSelect
+                    value={bankAccount}
+                    onChange={setBankAccount}
+                    options={bankAccountOptions}
+                    onSearch={setBankAccountSearch}
+                    selectedLabel={cuentasBancarias?.items.find((c) => c.id === bankAccount)?.accountName ?? ''}
+                    placeholder={metodoSeleccionado.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
+                    error={requiresBankAccount && !bankAccount}
+                  />
+                </div>
+              )}
 
               {/* Referencia */}
               <div className="ff-wrap">
@@ -634,11 +669,11 @@ export default function PagoPage() {
               </div>
               <div className="ff-wrap">
                 <label className="ff-label">Fecha de Referencia</label>
-                <input
-                  type="date"
+                <DatePicker
                   className="ff-input"
                   value={referenceDate}
-                  onChange={(e) => setReferenceDate(e.target.value)}
+                  onChange={setReferenceDate}
+                  clearable
                 />
               </div>
 

@@ -33,6 +33,7 @@ const schema = z.object({
   creditDays: z.number().min(0).optional(),
   emailInvoice: z.string().email('Email inválido').optional().or(z.literal('')),
   customerGroup: z.string().optional(),
+  address: z.string().optional(),
 }).superRefine((data, ctx) => {
   // Only validate if the user filled in the field
   if (data.rnc) {
@@ -87,6 +88,7 @@ export default function CustomerForm() {
       creditDays: 30,
       emailInvoice: '',
       customerGroup: '',
+      address: '',
     },
   })
 
@@ -106,6 +108,7 @@ export default function CustomerForm() {
         creditDays: customer.creditDays,
         emailInvoice: customer.emailInvoice ?? '',
         customerGroup: customer.customerGroup ?? '',
+        address: customer.address ?? '',
       })
     }
   }, [customer, reset])
@@ -158,6 +161,7 @@ export default function CustomerForm() {
       creditDays: values.hasCredit ? values.creditDays : undefined,
       emailInvoice: values.emailInvoice || undefined,
       customerGroup: values.customerGroup || undefined,
+      address: values.address || undefined,
     }
     if (isEdit) updateMutation.mutate(payload)
     else createMutation.mutate(payload)
@@ -350,6 +354,17 @@ export default function CustomerForm() {
                 {...register('emailInvoice')}
               />
               {errors.emailInvoice && <p className="ff-error">{errors.emailInvoice.message}</p>}
+            </div>
+
+            {/* Dirección */}
+            <div className="ff-wrap">
+              <label className="ff-label" htmlFor="address">Dirección</label>
+              <input
+                id="address"
+                className="ff-input"
+                placeholder="Calle, número, sector, ciudad…"
+                {...register('address')}
+              />
             </div>
 
             {/* Grupo de clientes */}

@@ -52,7 +52,10 @@ export function ItemSelect({
 
   const { data, isLoading } = useQuery({
     queryKey: ['itemSearch', query, typeFilter, branch],
-    queryFn: () => listItems({ search: query || undefined, disabled: 'false', limit: 15, ...(typeFilter && { type: typeFilter }), ...(validateStock && { validateStock: true }), ...(branch && { branch }) }),
+    // `branch` ya filtra a artículos con stock en almacenes de esa sucursal — combinarlo con
+    // `validateStock` hace que el backend devuelva 0 resultados, así que se omite validateStock
+    // cuando ya hay una sucursal seleccionada (branch cubre esa validación).
+    queryFn: () => listItems({ search: query || undefined, disabled: 'false', limit: 15, ...(typeFilter && { type: typeFilter }), ...(validateStock && !branch && { validateStock: true }), ...(branch && { branch }) }),
     enabled: true,
     staleTime: 30_000,
   })

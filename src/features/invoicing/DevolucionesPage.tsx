@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { listDevoluciones } from '@/shared/api/devoluciones'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listDepartamentos } from '@/shared/api/departamentos'
+import { listCustomers } from '@/shared/api/customers'
+import { getCatalogosFiscales } from '@/shared/api/config'
 import { useDebounce } from '@/lib/useDebounce'
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { formatDate, formatDOP } from '@/lib/formatters'
@@ -11,6 +13,8 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { Select, SelectItem } from '@/components/ui/select'
 
 const PAGE_SIZE = 20
 
@@ -55,7 +59,42 @@ export default function DevolucionesPage() {
   const [page, setPage] = useState(1)
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
+  const [status, setStatus] = useState('all')
+  const [createdAtFrom, setCreatedAtFrom] = useState('')
+  const [createdAtTo, setCreatedAtTo] = useState('')
+  const [postingDateFrom, setPostingDateFrom] = useState('')
+  const [postingDateTo, setPostingDateTo] = useState('')
+  const [ncf, setNcf] = useState('')
+  const [ncfType, setNcfType] = useState('')
+  const [grandTotalMin, setGrandTotalMin] = useState('')
+  const [grandTotalMax, setGrandTotalMax] = useState('')
+  const [refundedAmountMin, setRefundedAmountMin] = useState('')
+  const [refundedAmountMax, setRefundedAmountMax] = useState('')
   const { orderBy, sort } = useSortState()
+
+  // ── Filtro por cliente (autocomplete real, mismo patrón que CreditNotesPage) ──
+  const [customerId, setCustomerId] = useState('')
+  const [customerLabel, setCustomerLabel] = useState('')
+  const [customerQuery, setCustomerQuery] = useState('')
+  const { data: customersData, isLoading: customersLoading } = useQuery({
+    queryKey: ['customerSearch', customerQuery],
+    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
+  })
+  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
+    value: c.id,
+    label: c.customerName,
+    sublabel: c.rnc ?? c.cedula,
+  }))
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+  const [ncfTypeSearch, setNcfTypeSearch] = useState('')
+  const ncfTypeOptions: SearchSelectOption[] = (catalogos?.ncfTypes ?? [])
+    .filter((t) => !ncfTypeSearch || t.label.toLowerCase().includes(ncfTypeSearch.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
@@ -81,7 +120,14 @@ export default function DevolucionesPage() {
     .map((d) => ({ value: d.id, label: d.name }))
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['devoluciones', { search: debouncedSearch, offset, orderBy, branch, department }],
+    queryKey: [
+      'devoluciones',
+      {
+        search: debouncedSearch, offset, orderBy, branch, department, customerId, status,
+        createdAtFrom, createdAtTo, postingDateFrom, postingDateTo,
+        ncf, ncfType, grandTotalMin, grandTotalMax, refundedAmountMin, refundedAmountMax,
+      },
+    ],
     queryFn: () =>
       listDevoluciones({
         search: debouncedSearch || undefined,
@@ -90,6 +136,18 @@ export default function DevolucionesPage() {
         orderBy: orderBy || undefined,
         branch: branch || undefined,
         department: department || undefined,
+        customer: customerId || undefined,
+        status: status === 'all' ? undefined : status,
+        createdAtFrom: createdAtFrom || undefined,
+        createdAtTo: createdAtTo || undefined,
+        postingDateFrom: postingDateFrom || undefined,
+        postingDateTo: postingDateTo || undefined,
+        ncf: ncf || undefined,
+        ncfType: ncfType || undefined,
+        grandTotalMin: grandTotalMin ? Number(grandTotalMin) : undefined,
+        grandTotalMax: grandTotalMax ? Number(grandTotalMax) : undefined,
+        refundedAmountMin: refundedAmountMin ? Number(refundedAmountMin) : undefined,
+        refundedAmountMax: refundedAmountMax ? Number(refundedAmountMax) : undefined,
       }),
   })
 
@@ -120,6 +178,17 @@ export default function DevolucionesPage() {
               onChange={handleSearchChange}
             />
           </div>
+          <div style={{ width: 220 }}>
+            <SearchSelect
+              value={customerId}
+              selectedLabel={customerLabel}
+              onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? ''); setPage(1) }}
+              options={customerOptions}
+              onSearch={setCustomerQuery}
+              loading={customersLoading}
+              placeholder="Filtrar por cliente…"
+            />
+          </div>
           <div style={{ width: 200 }}>
             <SearchSelect
               value={branch}
@@ -140,6 +209,98 @@ export default function DevolucionesPage() {
               placeholder="Todos los departamentos"
             />
           </div>
+          <Select
+            value={status}
+            onValueChange={(val) => { setStatus(val); setPage(1) }}
+          >
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="draft">Borrador</SelectItem>
+            <SelectItem value="submitted">Sometido</SelectItem>
+            <SelectItem value="cancelled">Cancelado</SelectItem>
+          </Select>
+        </div>
+        <div className="filter-bar-left" style={{ marginTop: 8 }}>
+          <input
+            className="ff-input ff-input-sm"
+            style={{ width: 160 }}
+            placeholder="Buscar NCF…"
+            value={ncf}
+            onChange={(e) => { setNcf(e.target.value); setPage(1) }}
+          />
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={ncfType}
+              onChange={(val) => { setNcfType(val); setPage(1) }}
+              options={ncfTypeOptions}
+              onSearch={setNcfTypeSearch}
+              selectedLabel={catalogos?.ncfTypes?.find((t) => t.value === ncfType)?.label ?? ''}
+              placeholder="Todos los tipos NCF"
+            />
+          </div>
+          <DatePicker
+            className="ff-input ff-input-sm"
+            value={createdAtFrom}
+            onChange={(v) => { setCreatedAtFrom(v); setPage(1) }}
+            style={{ width: 144 }}
+            clearable
+          />
+          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+          <DatePicker
+            className="ff-input ff-input-sm"
+            value={createdAtTo}
+            onChange={(v) => { setCreatedAtTo(v); setPage(1) }}
+            style={{ width: 144 }}
+            clearable
+          />
+          <DatePicker
+            className="ff-input ff-input-sm"
+            value={postingDateFrom}
+            onChange={(v) => { setPostingDateFrom(v); setPage(1) }}
+            style={{ width: 144 }}
+            clearable
+          />
+          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+          <DatePicker
+            className="ff-input ff-input-sm"
+            value={postingDateTo}
+            onChange={(v) => { setPostingDateTo(v); setPage(1) }}
+            style={{ width: 144 }}
+            clearable
+          />
+          <input
+            type="number"
+            className="ff-input ff-input-sm"
+            style={{ width: 100 }}
+            placeholder="Total mín."
+            value={grandTotalMin}
+            onChange={(e) => { setGrandTotalMin(e.target.value); setPage(1) }}
+          />
+          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+          <input
+            type="number"
+            className="ff-input ff-input-sm"
+            style={{ width: 100 }}
+            placeholder="Total máx."
+            value={grandTotalMax}
+            onChange={(e) => { setGrandTotalMax(e.target.value); setPage(1) }}
+          />
+          <input
+            type="number"
+            className="ff-input ff-input-sm"
+            style={{ width: 100 }}
+            placeholder="Reemb. mín."
+            value={refundedAmountMin}
+            onChange={(e) => { setRefundedAmountMin(e.target.value); setPage(1) }}
+          />
+          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+          <input
+            type="number"
+            className="ff-input ff-input-sm"
+            style={{ width: 100 }}
+            placeholder="Reemb. máx."
+            value={refundedAmountMax}
+            onChange={(e) => { setRefundedAmountMax(e.target.value); setPage(1) }}
+          />
         </div>
       </div>
 

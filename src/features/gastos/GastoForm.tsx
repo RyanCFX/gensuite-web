@@ -19,6 +19,7 @@ import { getUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { Select, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -327,11 +328,11 @@ export default function GastoForm() {
                 </div>
                 <div className="ff-wrap">
                   <label className="ff-label">Fecha <span className="ff-required">*</span></label>
-                  <input type="date" className="ff-input" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} required />
+                  <DatePicker value={postingDate} onChange={setPostingDate} error={!postingDate} />
                 </div>
                 <div className="ff-wrap">
                   <label className="ff-label">Fecha Vencimiento</label>
-                  <input type="date" className="ff-input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                  <DatePicker value={dueDate} onChange={setDueDate} clearable />
                 </div>
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal <span className="ff-required">*</span></label>

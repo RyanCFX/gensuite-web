@@ -3,6 +3,9 @@ import { ProtectedRoute } from '@/components/ProtectedRoute'
 import AppLayout from '@/components/layout/AppLayout'
 import LoginPage from '@/pages/LoginPage'
 import NotFoundPage from '@/pages/NotFoundPage'
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
+import ResetPasswordPage from '@/pages/ResetPasswordPage'
+import CompletarRegistroPage from '@/pages/CompletarRegistroPage'
 
 // Lazy-loaded pages
 import { lazy, Suspense } from 'react'
@@ -34,6 +37,9 @@ const ZonasPage       = lazy(() => import('@/features/inventory/ZonasPage'))
 const ComprasPage     = lazy(() => import('@/features/compras/ComprasPage'))
 const CompraDetail    = lazy(() => import('@/features/compras/CompraDetail'))
 const CompraForm      = lazy(() => import('@/features/compras/CompraForm'))
+const RecepcionesPage = lazy(() => import('@/features/compras/RecepcionesPage'))
+const RecepcionDetail = lazy(() => import('@/features/compras/RecepcionDetail'))
+const RecepcionForm   = lazy(() => import('@/features/compras/RecepcionForm'))
 const GastosPage      = lazy(() => import('@/features/gastos/GastosPage'))
 const GastoDetail     = lazy(() => import('@/features/gastos/GastoDetail'))
 const GastoForm       = lazy(() => import('@/features/gastos/GastoForm'))
@@ -74,6 +80,8 @@ const TransferenciasPage = lazy(() => import('@/features/transferencias/Transfer
 const TransferenciaForm  = lazy(() => import('@/features/transferencias/TransferenciaForm'))
 const TransferenciaDetail = lazy(() => import('@/features/transferencias/TransferenciaDetail'))
 const CentrosCostoPage    = lazy(() => import('@/features/config/CentrosCostoPage'))
+const BancosPage          = lazy(() => import('@/features/config/BancosPage'))
+const CuentasBancariasPage = lazy(() => import('@/features/config/CuentasBancariasPage'))
 const DepartamentosPage   = lazy(() => import('@/features/config/DepartamentosPage'))
 const RetencionesPage     = lazy(() => import('@/features/config/RetencionesPage'))
 const AjustesAvanzadosPage = lazy(() => import('@/features/config/AjustesAvanzadosPage'))
@@ -108,6 +116,9 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/completar-registro" element={<CompletarRegistroPage />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
         <Route element={<ProtectedRoute />}>
@@ -168,6 +179,12 @@ export default function App() {
             <Route path="/compras/nueva" element={<Suspense fallback={<PageLoader />}><CompraForm /></Suspense>} />
             <Route path="/compras/:id/editar" element={<Suspense fallback={<PageLoader />}><CompraForm /></Suspense>} />
             <Route path="/compras/:id" element={<Suspense fallback={<PageLoader />}><CompraDetail /></Suspense>} />
+
+            {/* Recepción de Mercancía (Purchase Receipt — flujo de 2 pasos) */}
+            <Route path="/compras/recepciones" element={<Suspense fallback={<PageLoader />}><RecepcionesPage /></Suspense>} />
+            <Route path="/compras/recepciones/nueva" element={<Suspense fallback={<PageLoader />}><RecepcionForm /></Suspense>} />
+            <Route path="/compras/recepciones/:id/editar" element={<Suspense fallback={<PageLoader />}><RecepcionForm /></Suspense>} />
+            <Route path="/compras/recepciones/:id" element={<Suspense fallback={<PageLoader />}><RecepcionDetail /></Suspense>} />
 
             {/* Costos de Importación (Landed Cost) */}
             <Route path="/compras/costos-importacion" element={<Suspense fallback={<PageLoader />}><CostosImportacionPage /></Suspense>} />
@@ -236,6 +253,8 @@ export default function App() {
             <Route path="/config/ncf" element={<Suspense fallback={<PageLoader />}><NcfPage /></Suspense>} />
             <Route path="/config/sucursales" element={<Suspense fallback={<PageLoader />}><SucursalesPage /></Suspense>} />
             <Route path="/config/centros-costo" element={<Suspense fallback={<PageLoader />}><CentrosCostoPage /></Suspense>} />
+            <Route path="/config/bancos" element={<Suspense fallback={<PageLoader />}><BancosPage /></Suspense>} />
+            <Route path="/config/cuentas-bancarias" element={<Suspense fallback={<PageLoader />}><CuentasBancariasPage /></Suspense>} />
             <Route path="/config/departamentos" element={<Suspense fallback={<PageLoader />}><DepartamentosPage /></Suspense>} />
             <Route path="/config/retenciones" element={<Suspense fallback={<PageLoader />}><RetencionesPage /></Suspense>} />
             <Route path="/config/ajustes-avanzados" element={<Suspense fallback={<PageLoader />}><AjustesAvanzadosPage /></Suspense>} />

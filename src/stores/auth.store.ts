@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { getToken, getTenant, getUser, clearSession } from '@/shared/api/storage'
-import { login as apiLogin } from '@/shared/api/auth'
+import { login as apiLogin, type AuthResult } from '@/shared/api/auth'
 import type { AuthUser, AuthTenant } from '@/shared/api/types'
 
 function decodeJwt(token: string): Record<string, unknown> {
@@ -17,6 +17,7 @@ interface AuthState {
   tenant: AuthTenant | null
   isAuthenticated: boolean
   login: (email: string, password: string, tenantSlug?: string) => Promise<void>
+  setSession: (result: AuthResult) => void
   logout: () => void
   hydrate: () => void
 }
@@ -44,6 +45,15 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   login: async (email, password, tenantSlug) => {
     const result = await apiLogin({ email, password, tenant: tenantSlug })
+    set({
+      token: result.token,
+      user: result.user,
+      tenant: result.tenant,
+      isAuthenticated: true,
+    })
+  },
+
+  setSession: (result) => {
     set({
       token: result.token,
       user: result.user,

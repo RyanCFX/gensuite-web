@@ -21,6 +21,9 @@ import { useDebounce } from '@/lib/useDebounce'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 
 const PAGE_SIZE = 20
 
@@ -81,13 +84,15 @@ export default function RetencionesPage() {
     control,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<RetencionFormValues>({
     resolver: zodResolver(retencionSchema) as Resolver<RetencionFormValues>,
     defaultValues: { name: '', taxDeductionBasis: '', account: '', rates: [emptyRate] },
   })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'rates' })
+
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, closeDialog)
 
   useEffect(() => {
     if (editDetail) {
@@ -281,11 +286,11 @@ export default function RetencionesPage() {
       </div>
 
       {dialogOpen && (
-        <div className="modal-overlay" onClick={closeDialog}>
+        <div className="modal-overlay" onClick={requestClose}>
           <div className="modal-box" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">{editId ? 'Editar Retención' : 'Nueva Retención'}</h2>
-              <button className="modal-close" type="button" onClick={closeDialog}>×</button>
+              <button className="modal-close" type="button" onClick={requestClose}>×</button>
             </div>
             <form onSubmit={handleSubmit(onSubmit)}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -358,17 +363,31 @@ export default function RetencionesPage() {
                                   />
                                 </td>
                                 <td>
-                                  <input
-                                    type="date"
-                                    className={`ff-input${errors.rates?.[index]?.fromDate ? ' ff-input-error' : ''}`}
-                                    {...register(`rates.${index}.fromDate` as const)}
+                                  <Controller
+                                    name={`rates.${index}.fromDate` as const}
+                                    control={control}
+                                    render={({ field }) => (
+                                      <DatePicker
+                                        value={field.value ?? ''}
+                                        onChange={field.onChange}
+                                        className="ff-input"
+                                        error={!!errors.rates?.[index]?.fromDate}
+                                      />
+                                    )}
                                   />
                                 </td>
                                 <td>
-                                  <input
-                                    type="date"
-                                    className={`ff-input${errors.rates?.[index]?.toDate ? ' ff-input-error' : ''}`}
-                                    {...register(`rates.${index}.toDate` as const)}
+                                  <Controller
+                                    name={`rates.${index}.toDate` as const}
+                                    control={control}
+                                    render={({ field }) => (
+                                      <DatePicker
+                                        value={field.value ?? ''}
+                                        onChange={field.onChange}
+                                        className="ff-input"
+                                        error={!!errors.rates?.[index]?.toDate}
+                                      />
+                                    )}
                                   />
                                 </td>
                                 <td>
@@ -391,7 +410,7 @@ export default function RetencionesPage() {
                 )}
               </div>
               <div className="modal-foot">
-                <button type="button" className="btn btn-ghost" onClick={closeDialog}>Cancelar</button>
+                <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={isSubmitting || (!!editId && isLoadingDetail)}>
                   {isSubmitting ? 'Guardando…' : editId ? 'Guardar' : 'Crear'}
                 </button>
@@ -400,6 +419,16 @@ export default function RetencionesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {toDelete && (
         <div className="modal-overlay" onClick={() => setToDelete(null)}>

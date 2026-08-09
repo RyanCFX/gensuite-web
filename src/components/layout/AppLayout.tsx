@@ -182,6 +182,11 @@ const NAV_OPS: NavEntry[] = [
     children: [
       { label: "Compras", icon: <ShoppingCart size={14} />, path: "/compras" },
       {
+        label: "Recepción de Mercancía",
+        icon: <Truck size={14} />,
+        path: "/compras/recepciones",
+      },
+      {
         label: "Costos de Importación",
         icon: <Truck size={14} />,
         path: "/compras/costos-importacion",
@@ -308,6 +313,16 @@ const NAV_CONFIG: NavEntry = {
       label: "Centros de Costo",
       icon: <Building2 size={14} />,
       path: "/config/centros-costo",
+    },
+    {
+      label: "Bancos",
+      icon: <Building2 size={14} />,
+      path: "/config/bancos",
+    },
+    {
+      label: "Cuentas Bancarias",
+      icon: <CreditCard size={14} />,
+      path: "/config/cuentas-bancarias",
     },
     {
       label: "Departamentos",

@@ -9,6 +9,7 @@ import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { CostCenterSelect } from '@/components/shared/CostCenterSelect'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
 import { listSucursales } from '@/shared/api/sucursales'
 import { getCuenta } from '@/shared/api/cuentas'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
@@ -188,12 +189,11 @@ export default function JournalForm() {
                 <label className="ff-label" htmlFor="postingDate">
                   Fecha <span className="ff-required">*</span>
                 </label>
-                <input
+                <DatePicker
                   id="postingDate"
-                  type="date"
                   className="ff-input"
                   value={postingDate}
-                  onChange={(e) => setPostingDate(e.target.value)}
+                  onChange={setPostingDate}
                 />
               </div>
               <div className="ff-wrap">

@@ -26,6 +26,108 @@
         ]
       }
     },
+    "/api/v1/auth/forgot-password": {
+      "post": {
+        "operationId": "AuthController_forgotPassword",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Recuperar contraseña — envía un correo propio (no el nativo de ERPNext) con un link al frontend desde el que se hizo la request (header Origin, validado contra ALLOWED_ORIGINS). Siempre responde con el mismo mensaje genérico, exista o no el correo.",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/reset-password": {
+      "post": {
+        "operationId": "AuthController_resetPassword",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordKeyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Completa la recuperación de contraseña con el key recibido por correo (link de forgot-password) — autologuea al usuario y devuelve un JWT, igual que /auth/login.",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/complete-registration": {
+      "post": {
+        "operationId": "AuthController_completeRegistration",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordKeyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Completa el registro de un usuario nuevo con el key recibido por correo de bienvenida (link enviado al crear el usuario, POST /usuarios) — mismo mecanismo que /auth/reset-password; autologuea al usuario y devuelve un JWT.",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/v1/auth/verify-admin-pin": {
       "post": {
         "operationId": "AuthController_verifyAdminPin",
@@ -500,7 +602,7 @@
             "bearer": []
           }
         ],
-        "summary": "Ejecuta manualmente los disparadores programados (vencimientos, límites, stock sin movimiento)",
+        "summary": "Ejecuta manualmente los disparadores programados (vencimientos, límites, stock sin movimiento, secuencias NCF)",
         "tags": [
           "Notificaciones"
         ]
@@ -532,6 +634,1999 @@
         "summary": "Ejecuta manualmente el cierre diario (resumen contable)",
         "tags": [
           "Notificaciones"
+        ]
+      }
+    },
+    "/api/v1/reportes/ventas": {
+      "get": {
+        "operationId": "ReportesController_getVentas",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "month",
+              "type": "string",
+              "enum": [
+                "day",
+                "week",
+                "month"
+              ]
+            }
+          },
+          {
+            "name": "customer",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sales Analytics — ventas por período, cliente o artículo",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/ventas/pdf": {
+      "get": {
+        "operationId": "ReportesController_getVentasPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "month",
+              "type": "string",
+              "enum": [
+                "day",
+                "week",
+                "month"
+              ]
+            }
+          },
+          {
+            "name": "customer",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de Ventas — mismos filtros que la versión JSON",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/ingresos-egresos": {
+      "get": {
+        "operationId": "ReportesController_getIngresosEgresos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodicity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "Monthly",
+              "type": "string",
+              "enum": [
+                "Monthly",
+                "Quarterly",
+                "Yearly"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Profit & Loss Statement — ingresos y egresos del período",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/ingresos-egresos/pdf": {
+      "get": {
+        "operationId": "ReportesController_getIngresosEgresosPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodicity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "Monthly",
+              "type": "string",
+              "enum": [
+                "Monthly",
+                "Quarterly",
+                "Yearly"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de Ingresos y Egresos — mismos filtros que la versión JSON",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/balance-general": {
+      "get": {
+        "operationId": "ReportesController_getBalanceGeneral",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodicity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "Monthly",
+              "type": "string",
+              "enum": [
+                "Monthly",
+                "Quarterly",
+                "Yearly"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Balance Sheet — estado de situación financiera",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/balance-general/pdf": {
+      "get": {
+        "operationId": "ReportesController_getBalanceGeneralPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodicity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "Monthly",
+              "type": "string",
+              "enum": [
+                "Monthly",
+                "Quarterly",
+                "Yearly"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de Balance General — mismos filtros que la versión JSON",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/inventario/valoracion": {
+      "get": {
+        "operationId": "ReportesController_getValoracionStock",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de corte para valoración (default: hoy)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Stock Balance — valor actual del inventario",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/inventario/valoracion/pdf": {
+      "get": {
+        "operationId": "ReportesController_getValoracionStockPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de corte para valoración (default: hoy)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de Valoración de Inventario — mismos filtros que la versión JSON",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/inventario/movimientos": {
+      "get": {
+        "operationId": "ReportesController_getMovimientosStock",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de corte para valoración (default: hoy)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Stock Ledger — movimientos de inventario del período",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/inventario/movimientos/pdf": {
+      "get": {
+        "operationId": "ReportesController_getMovimientosStockPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de corte para valoración (default: hoy)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de Movimientos de Inventario — mismos filtros que la versión JSON",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/dgii/606": {
+      "get": {
+        "operationId": "ReportesController_get606",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "year",
+            "required": false,
+            "in": "query",
+            "description": "Año del período. Default: año actual",
+            "schema": {
+              "example": "2026",
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "description": "Mes del período 1-12. Default: mes actual",
+            "schema": {
+              "example": "6",
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "json",
+              "type": "string",
+              "enum": [
+                "json",
+                "txt",
+                "excel"
+              ]
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "📌 Comodidad — la DGII reporta por RNC de la compañía, no por sucursal. No filtra el 606/607/608 en sí.",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Formato 606 DGII — compras del período (requiere dgii-compliance). ?format=json|txt|excel",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/dgii/607": {
+      "get": {
+        "operationId": "ReportesController_get607",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "year",
+            "required": false,
+            "in": "query",
+            "description": "Año del período. Default: año actual",
+            "schema": {
+              "example": "2026",
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "description": "Mes del período 1-12. Default: mes actual",
+            "schema": {
+              "example": "6",
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "json",
+              "type": "string",
+              "enum": [
+                "json",
+                "txt",
+                "excel"
+              ]
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "📌 Comodidad — la DGII reporta por RNC de la compañía, no por sucursal. No filtra el 606/607/608 en sí.",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Formato 607 DGII — ventas del período (requiere dgii-compliance). ?format=json|txt|excel",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/dgii/608": {
+      "get": {
+        "operationId": "ReportesController_get608",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "year",
+            "required": false,
+            "in": "query",
+            "description": "Año del período. Default: año actual",
+            "schema": {
+              "example": "2026",
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "description": "Mes del período 1-12. Default: mes actual",
+            "schema": {
+              "example": "6",
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "json",
+              "type": "string",
+              "enum": [
+                "json",
+                "txt",
+                "excel"
+              ]
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "📌 Comodidad — la DGII reporta por RNC de la compañía, no por sucursal. No filtra el 606/607/608 en sí.",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Formato 608 DGII — comprobantes anulados (requiere dgii-compliance). ?format=json|txt|excel",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/caja/cuadre": {
+      "get": {
+        "operationId": "ReportesController_getCuadre",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Fecha del cuadre. Default: hoy",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cuadre de caja del día — cobros por método de pago vs facturas emitidas",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/caja/cuadre/pdf": {
+      "get": {
+        "operationId": "ReportesController_getCuadrePdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Fecha del cuadre. Default: hoy",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF del Cuadre de Caja — mismos filtros que la versión JSON",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/pos/cuadre-turno": {
+      "get": {
+        "operationId": "ReportesController_getCuadreTurno",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cajero",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por cajero (User).",
+            "schema": {
+              "example": "rcastrofelix06@gmail.com",
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "json",
+              "type": "string",
+              "enum": [
+                "json",
+                "excel"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cuadre de caja por turno (POS Closing Entry) — reusa el cuadre ya calculado por ERPNext al cerrar cada turno.",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/pos/cuadre-turno/pdf": {
+      "get": {
+        "operationId": "ReportesController_getCuadreTurnoPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cajero",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por cajero (User).",
+            "schema": {
+              "example": "rcastrofelix06@gmail.com",
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "json",
+              "type": "string",
+              "enum": [
+                "json",
+                "excel"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF del Cuadre por Turno — mismos filtros que la versión JSON (ignora ?format)",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/pos/corte-caja-dia": {
+      "get": {
+        "operationId": "ReportesController_getCorteCajaDia",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Fecha del corte de caja. Default: hoy",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cajero",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por cajero (User) — un solo turno o todos los suyos del día.",
+            "schema": {
+              "example": "rcastrofelix06@gmail.com",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Corte de Caja consolidado de todos los turnos de un día (o de un cajero puntual) — Ventas del Día, Devoluciones, Recibos Cobrados, Ventas Netas, Ingresos, Egresos, Fondo de Apertura e Importe a Entregar, por turno y consolidado.",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/pos/corte-caja-dia/pdf": {
+      "get": {
+        "operationId": "ReportesController_getCorteCajaDiaPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Fecha del corte de caja. Default: hoy",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cajero",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por cajero (User) — un solo turno o todos los suyos del día.",
+            "schema": {
+              "example": "rcastrofelix06@gmail.com",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF del Corte de Caja del Día — mismos filtros que la versión JSON",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/cxc/aging": {
+      "get": {
+        "operationId": "ReportesController_getCxcAging",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accounts Receivable — antigüedad de cuentas por cobrar",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/cxc/aging/pdf": {
+      "get": {
+        "operationId": "ReportesController_getCxcAgingPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de Cuentas por Cobrar (Aging)",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/cxp/aging": {
+      "get": {
+        "operationId": "ReportesController_getCxpAging",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accounts Payable — antigüedad de cuentas por pagar",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/cxp/aging/pdf": {
+      "get": {
+        "operationId": "ReportesController_getCxpAgingPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de Cuentas por Pagar (Aging)",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/libro-mayor": {
+      "get": {
+        "description": "Para cada cuenta con actividad en el período retorna: saldo inicial acumulado, movimientos del período con saldo acumulado por fila, y saldo de cierre. Invariante: openingBalance + periodDebit - periodCredit === closingBalance.",
+        "operationId": "ReportesController_getLibroMayor",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "account",
+            "required": false,
+            "in": "query",
+            "description": "Limitar a una sola cuenta contable",
+            "schema": {
+              "example": "Ventas - JB",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Libro Mayor — movimientos agrupados por cuenta con saldo inicial y final",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/libro-diario": {
+      "get": {
+        "description": "Retorna los GL Entries generados automáticamente por ERPNext al someter facturas, cobros, compras, etc. Filtros opcionales: cuenta, tipo de voucher, número de voucher, parte (cliente/proveedor).",
+        "operationId": "ReportesController_getLibroDiario",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "account",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por cuenta contable específica",
+            "schema": {
+              "example": "Cuentas por Cobrar - EMP",
+              "type": "string"
+            }
+          },
+          {
+            "name": "voucherNo",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por nombre de voucher (factura, cobro, etc.)",
+            "schema": {
+              "example": "ACC-SINV-2026-00001",
+              "type": "string"
+            }
+          },
+          {
+            "name": "voucherType",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por tipo de documento origen",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Sales Invoice",
+                "Purchase Invoice",
+                "Payment Entry",
+                "Journal Entry",
+                "Stock Entry"
+              ]
+            }
+          },
+          {
+            "name": "party",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por parte (cliente/proveedor)",
+            "schema": {
+              "example": "Juan Perez",
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "Group by Voucher (Consolidated)",
+              "type": "string",
+              "enum": [
+                "Group by Voucher",
+                "Group by Voucher (Consolidated)",
+                "Group by Account",
+                "Group by Sucursal",
+                "Group by Departamento"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Libro Diario (General Ledger) — todos los movimientos contables",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/libro-diario/pdf": {
+      "get": {
+        "operationId": "ReportesController_getLibroDiarioPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "account",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por cuenta contable específica",
+            "schema": {
+              "example": "Cuentas por Cobrar - EMP",
+              "type": "string"
+            }
+          },
+          {
+            "name": "voucherNo",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por nombre de voucher (factura, cobro, etc.)",
+            "schema": {
+              "example": "ACC-SINV-2026-00001",
+              "type": "string"
+            }
+          },
+          {
+            "name": "voucherType",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por tipo de documento origen",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Sales Invoice",
+                "Purchase Invoice",
+                "Payment Entry",
+                "Journal Entry",
+                "Stock Entry"
+              ]
+            }
+          },
+          {
+            "name": "party",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por parte (cliente/proveedor)",
+            "schema": {
+              "example": "Juan Perez",
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "Group by Voucher (Consolidated)",
+              "type": "string",
+              "enum": [
+                "Group by Voucher",
+                "Group by Voucher (Consolidated)",
+                "Group by Account",
+                "Group by Sucursal",
+                "Group by Departamento"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF del Libro Diario — mismas filas/columnas que la versión JSON",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/libro-mayor/pdf": {
+      "get": {
+        "operationId": "ReportesController_getLibroMayorPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "account",
+            "required": false,
+            "in": "query",
+            "description": "Limitar a una sola cuenta contable",
+            "schema": {
+              "example": "Ventas - JB",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF del Libro Mayor — mismas filas/columnas que la versión JSON",
+        "tags": [
+          "Reportes"
         ]
       }
     },
@@ -604,6 +2699,100 @@
             "schema": {
               "default": false,
               "type": "boolean"
+            }
+          },
+          {
+            "name": "customerName",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda aproximada por nombre del cliente",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerType",
+            "required": false,
+            "in": "query",
+            "description": "Tipo de cliente (customer_type nativo de ERPNext, ej. \"Individual\", \"Company\")",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipoIdentificacion",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "identificacion",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda aproximada por RNC o cédula (busca en ambos campos, cualquiera que aplique)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasCredit",
+            "required": false,
+            "in": "query",
+            "description": "true = solo clientes con crédito habilitado (custom_tiene_credito)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "createdAtFrom",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de creación desde (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "createdAtTo",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de creación hasta (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "creditLimitMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "creditLimitMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "creditDaysMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "creditDaysMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
             }
           }
         ],
@@ -987,11 +3176,36 @@
             }
           },
           {
+            "name": "ncf",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda aproximada por NCF de la factura",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "ncfType",
             "required": false,
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "grandTotalMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "grandTotalMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
             }
           },
           {
@@ -6362,6 +8576,24 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "grandTotalMin",
+            "required": false,
+            "in": "query",
+            "description": "Solo turnos cerrados (Closed) con grand_total de cierre \u003E= este valor",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "grandTotalMax",
+            "required": false,
+            "in": "query",
+            "description": "Solo turnos cerrados (Closed) con grand_total de cierre \u003C= este valor",
+            "schema": {
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -6412,6 +8644,43 @@
           }
         ],
         "summary": "Detalle completo de un turno específico: apertura y, si ya cerró, el detalle del cierre (incluye arqueo de efectivo).",
+        "tags": [
+          "POS"
+        ]
+      }
+    },
+    "/api/v1/pos/turnos/{id}/pdf": {
+      "get": {
+        "operationId": "PosController_getTurnoPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF \"Corte de Caja\" de un turno cerrado — mismas secciones que el campo corteCaja de GET /pos/turnos/:id.",
         "tags": [
           "POS"
         ]
@@ -7135,6 +9404,97 @@
             "description": "Filtrar artículos por sucursal — solo muestra artículos con stock en almacenes de esa sucursal, y desglosa stock por almacén en stockByWarehouse.",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "stockUom",
+            "required": false,
+            "in": "query",
+            "description": "UOM de stock (stock_uom)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasWarranty",
+            "required": false,
+            "in": "query",
+            "description": "true = solo artículos con garantía (warranty_period \u003E 0). false = sin garantía.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "warrantyPeriodMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "warrantyPeriodMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "pricesMin",
+            "required": false,
+            "in": "query",
+            "description": "Precio mínimo — coincide si CUALQUIERA de las listas de precio (A/B/C) del artículo cae en el rango.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "pricesMax",
+            "required": false,
+            "in": "query",
+            "description": "Precio máximo — coincide si CUALQUIERA de las listas de precio (A/B/C) del artículo cae en el rango.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "priceMode",
+            "required": false,
+            "in": "query",
+            "description": "custom_price_mode: \"manual\" o \"cost_plus\"",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "maxDiscountPctMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "maxDiscountPctMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "trackingType",
+            "required": false,
+            "in": "query",
+            "description": "custom_tracking_type — no aplica el fallback legacy que sí usa el mapeo de respuesta.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "none",
+                "serial",
+                "batch"
+              ]
             }
           }
         ],
@@ -8285,6 +10645,40 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "rnc",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda aproximada por RNC (custom_rnc_sup)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierType",
+            "required": false,
+            "in": "query",
+            "description": "supplier_type nativo de ERPNext (ej. \"Company\", \"Individual\")",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "diasCreditoMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "diasCreditoMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -8563,6 +10957,31 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "ncf",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda aproximada por NCF del proveedor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "grandTotalMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "grandTotalMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
             }
           },
           {
@@ -9123,6 +11542,31 @@
             }
           },
           {
+            "name": "ncfProveedor",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda aproximada por NCF del proveedor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "grandTotalMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "grandTotalMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
             "name": "categoriaGasto",
             "required": false,
             "in": "query",
@@ -9676,7 +12120,7 @@
             "bearer": []
           }
         ],
-        "summary": "Enviar email de reset de contraseña via ERPNext",
+        "summary": "Enviar email de reset de contraseña (link propio al frontend, no a ERPNext)",
         "tags": [
           "Usuarios"
         ]
@@ -10554,6 +12998,108 @@
               "example": "Ventas - JBC",
               "type": "string"
             }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "all",
+              "type": "string",
+              "enum": [
+                "draft",
+                "submitted",
+                "cancelled",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "createdAtFrom",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de creación en sistema, desde (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "createdAtTo",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de creación en sistema, hasta (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "postingDateFrom",
+            "required": false,
+            "in": "query",
+            "description": "Fecha contable/fiscal, desde (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "postingDateTo",
+            "required": false,
+            "in": "query",
+            "description": "Fecha contable/fiscal, hasta (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ncf",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda aproximada por NCF — busca tanto el NCF propio del documento como el NCF del documento afectado/referenciado (return_against), lo que aplique.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ncfType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "grandTotalMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "grandTotalMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "refundedAmountMin",
+            "required": false,
+            "in": "query",
+            "description": "Monto ya reembolsado en efectivo, desde",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "refundedAmountMax",
+            "required": false,
+            "in": "query",
+            "description": "Monto ya reembolsado en efectivo, hasta",
+            "schema": {
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -10941,6 +13487,125 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "customer",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por id de cliente",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "all",
+              "type": "string",
+              "enum": [
+                "draft",
+                "submitted",
+                "cancelled",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "createdAtFrom",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de creación en sistema, desde (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "createdAtTo",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de creación en sistema, hasta (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "postingDateFrom",
+            "required": false,
+            "in": "query",
+            "description": "Fecha contable/fiscal, desde (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "postingDateTo",
+            "required": false,
+            "in": "query",
+            "description": "Fecha contable/fiscal, hasta (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ncf",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda aproximada por NCF — las notas de débito no referencian un documento afectado, así que solo busca el NCF propio.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ncfType",
+            "required": false,
+            "in": "query",
+            "description": "Siempre es B03 en este sistema — filtro incluido por simetría con notas de crédito.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "grandTotalMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "grandTotalMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "refundedAmountMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "refundedAmountMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
             }
           }
         ],
@@ -11366,6 +14031,31 @@
               "example": "Ventas - JBC",
               "type": "string"
             }
+          },
+          {
+            "name": "paidAmountMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "paidAmountMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "bankAccount",
+            "required": false,
+            "in": "query",
+            "description": "Cuenta bancaria (bank_account) — solo aplica a Payment Entry, las ventas POS al contado no tienen cuenta bancaria propia.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11603,6 +14293,31 @@
             "in": "query",
             "schema": {
               "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "paidAmountMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "paidAmountMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "bankAccount",
+            "required": false,
+            "in": "query",
+            "description": "Cuenta bancaria (bank_account) — solo aplica a Payment Entry, las ventas POS al contado no tienen cuenta bancaria propia.",
+            "schema": {
               "type": "string"
             }
           }
@@ -12052,6 +14767,31 @@
               "example": "Compras - JBC",
               "type": "string"
             }
+          },
+          {
+            "name": "paidAmountMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "paidAmountMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "referenceNo",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda aproximada por número de referencia del pago",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -12217,6 +14957,31 @@
               "example": "Compras - JBC",
               "type": "string"
             }
+          },
+          {
+            "name": "paidAmountMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "paidAmountMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "referenceNo",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda aproximada por número de referencia del pago",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -12380,1903 +15145,6 @@
         "summary": "Cancelar pago sometido",
         "tags": [
           "Cuentas por Pagar"
-        ]
-      }
-    },
-    "/api/v1/reportes/ventas": {
-      "get": {
-        "operationId": "ReportesController_getVentas",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "example": "2026-06-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Sucursal (Accounting Dimension).",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          },
-          {
-            "name": "department",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Departamento (Accounting Dimension).",
-            "schema": {
-              "example": "Ventas - JBC",
-              "type": "string"
-            }
-          },
-          {
-            "name": "groupBy",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "month",
-              "type": "string",
-              "enum": [
-                "day",
-                "week",
-                "month"
-              ]
-            }
-          },
-          {
-            "name": "customer",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "itemCode",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Sales Analytics — ventas por período, cliente o artículo",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/ventas/pdf": {
-      "get": {
-        "operationId": "ReportesController_getVentasPdf",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "example": "2026-06-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Sucursal (Accounting Dimension).",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          },
-          {
-            "name": "department",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Departamento (Accounting Dimension).",
-            "schema": {
-              "example": "Ventas - JBC",
-              "type": "string"
-            }
-          },
-          {
-            "name": "groupBy",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "month",
-              "type": "string",
-              "enum": [
-                "day",
-                "week",
-                "month"
-              ]
-            }
-          },
-          {
-            "name": "customer",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "itemCode",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "PDF de Ventas — mismos filtros que la versión JSON",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/ingresos-egresos": {
-      "get": {
-        "operationId": "ReportesController_getIngresosEgresos",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "example": "2026-06-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Sucursal (Accounting Dimension).",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          },
-          {
-            "name": "department",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Departamento (Accounting Dimension).",
-            "schema": {
-              "example": "Ventas - JBC",
-              "type": "string"
-            }
-          },
-          {
-            "name": "periodicity",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "Monthly",
-              "type": "string",
-              "enum": [
-                "Monthly",
-                "Quarterly",
-                "Yearly"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Profit & Loss Statement — ingresos y egresos del período",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/ingresos-egresos/pdf": {
-      "get": {
-        "operationId": "ReportesController_getIngresosEgresosPdf",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "example": "2026-06-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Sucursal (Accounting Dimension).",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          },
-          {
-            "name": "department",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Departamento (Accounting Dimension).",
-            "schema": {
-              "example": "Ventas - JBC",
-              "type": "string"
-            }
-          },
-          {
-            "name": "periodicity",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "Monthly",
-              "type": "string",
-              "enum": [
-                "Monthly",
-                "Quarterly",
-                "Yearly"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "PDF de Ingresos y Egresos — mismos filtros que la versión JSON",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/balance-general": {
-      "get": {
-        "operationId": "ReportesController_getBalanceGeneral",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "example": "2026-06-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Sucursal (Accounting Dimension).",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          },
-          {
-            "name": "department",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Departamento (Accounting Dimension).",
-            "schema": {
-              "example": "Ventas - JBC",
-              "type": "string"
-            }
-          },
-          {
-            "name": "periodicity",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "Monthly",
-              "type": "string",
-              "enum": [
-                "Monthly",
-                "Quarterly",
-                "Yearly"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Balance Sheet — estado de situación financiera",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/balance-general/pdf": {
-      "get": {
-        "operationId": "ReportesController_getBalanceGeneralPdf",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "example": "2026-06-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Sucursal (Accounting Dimension).",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          },
-          {
-            "name": "department",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Departamento (Accounting Dimension).",
-            "schema": {
-              "example": "Ventas - JBC",
-              "type": "string"
-            }
-          },
-          {
-            "name": "periodicity",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "Monthly",
-              "type": "string",
-              "enum": [
-                "Monthly",
-                "Quarterly",
-                "Yearly"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "PDF de Balance General — mismos filtros que la versión JSON",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/inventario/valoracion": {
-      "get": {
-        "operationId": "ReportesController_getValoracionStock",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "example": "2026-06-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Sucursal (Accounting Dimension).",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          },
-          {
-            "name": "department",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Departamento (Accounting Dimension).",
-            "schema": {
-              "example": "Ventas - JBC",
-              "type": "string"
-            }
-          },
-          {
-            "name": "warehouse",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "itemCode",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "date",
-            "required": false,
-            "in": "query",
-            "description": "Fecha de corte para valoración (default: hoy)",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Stock Balance — valor actual del inventario",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/inventario/valoracion/pdf": {
-      "get": {
-        "operationId": "ReportesController_getValoracionStockPdf",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "example": "2026-06-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Sucursal (Accounting Dimension).",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          },
-          {
-            "name": "department",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Departamento (Accounting Dimension).",
-            "schema": {
-              "example": "Ventas - JBC",
-              "type": "string"
-            }
-          },
-          {
-            "name": "warehouse",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "itemCode",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "date",
-            "required": false,
-            "in": "query",
-            "description": "Fecha de corte para valoración (default: hoy)",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "PDF de Valoración de Inventario — mismos filtros que la versión JSON",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/inventario/movimientos": {
-      "get": {
-        "operationId": "ReportesController_getMovimientosStock",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "example": "2026-06-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Sucursal (Accounting Dimension).",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          },
-          {
-            "name": "department",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Departamento (Accounting Dimension).",
-            "schema": {
-              "example": "Ventas - JBC",
-              "type": "string"
-            }
-          },
-          {
-            "name": "warehouse",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "itemCode",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "date",
-            "required": false,
-            "in": "query",
-            "description": "Fecha de corte para valoración (default: hoy)",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Stock Ledger — movimientos de inventario del período",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/inventario/movimientos/pdf": {
-      "get": {
-        "operationId": "ReportesController_getMovimientosStockPdf",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "example": "2026-06-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Sucursal (Accounting Dimension).",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          },
-          {
-            "name": "department",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Departamento (Accounting Dimension).",
-            "schema": {
-              "example": "Ventas - JBC",
-              "type": "string"
-            }
-          },
-          {
-            "name": "warehouse",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "itemCode",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "date",
-            "required": false,
-            "in": "query",
-            "description": "Fecha de corte para valoración (default: hoy)",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "PDF de Movimientos de Inventario — mismos filtros que la versión JSON",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/dgii/606": {
-      "get": {
-        "operationId": "ReportesController_get606",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "year",
-            "required": false,
-            "in": "query",
-            "description": "Año del período. Default: año actual",
-            "schema": {
-              "example": "2026",
-              "type": "string"
-            }
-          },
-          {
-            "name": "month",
-            "required": false,
-            "in": "query",
-            "description": "Mes del período 1-12. Default: mes actual",
-            "schema": {
-              "example": "6",
-              "type": "string"
-            }
-          },
-          {
-            "name": "format",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "json",
-              "type": "string",
-              "enum": [
-                "json",
-                "txt",
-                "excel"
-              ]
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "📌 Comodidad — la DGII reporta por RNC de la compañía, no por sucursal. No filtra el 606/607/608 en sí.",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Formato 606 DGII — compras del período (requiere dgii-compliance). ?format=json|txt|excel",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/dgii/607": {
-      "get": {
-        "operationId": "ReportesController_get607",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "year",
-            "required": false,
-            "in": "query",
-            "description": "Año del período. Default: año actual",
-            "schema": {
-              "example": "2026",
-              "type": "string"
-            }
-          },
-          {
-            "name": "month",
-            "required": false,
-            "in": "query",
-            "description": "Mes del período 1-12. Default: mes actual",
-            "schema": {
-              "example": "6",
-              "type": "string"
-            }
-          },
-          {
-            "name": "format",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "json",
-              "type": "string",
-              "enum": [
-                "json",
-                "txt",
-                "excel"
-              ]
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "📌 Comodidad — la DGII reporta por RNC de la compañía, no por sucursal. No filtra el 606/607/608 en sí.",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Formato 607 DGII — ventas del período (requiere dgii-compliance). ?format=json|txt|excel",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/dgii/608": {
-      "get": {
-        "operationId": "ReportesController_get608",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "year",
-            "required": false,
-            "in": "query",
-            "description": "Año del período. Default: año actual",
-            "schema": {
-              "example": "2026",
-              "type": "string"
-            }
-          },
-          {
-            "name": "month",
-            "required": false,
-            "in": "query",
-            "description": "Mes del período 1-12. Default: mes actual",
-            "schema": {
-              "example": "6",
-              "type": "string"
-            }
-          },
-          {
-            "name": "format",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "json",
-              "type": "string",
-              "enum": [
-                "json",
-                "txt",
-                "excel"
-              ]
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "📌 Comodidad — la DGII reporta por RNC de la compañía, no por sucursal. No filtra el 606/607/608 en sí.",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Formato 608 DGII — comprobantes anulados (requiere dgii-compliance). ?format=json|txt|excel",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/caja/cuadre": {
-      "get": {
-        "operationId": "ReportesController_getCuadre",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "date",
-            "required": false,
-            "in": "query",
-            "description": "Fecha del cuadre. Default: hoy",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Cuadre de caja del día — cobros por método de pago vs facturas emitidas",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/caja/cuadre/pdf": {
-      "get": {
-        "operationId": "ReportesController_getCuadrePdf",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "date",
-            "required": false,
-            "in": "query",
-            "description": "Fecha del cuadre. Default: hoy",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "PDF del Cuadre de Caja — mismos filtros que la versión JSON",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/pos/cuadre-turno": {
-      "get": {
-        "operationId": "ReportesController_getCuadreTurno",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "cajero",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por cajero (User).",
-            "schema": {
-              "example": "rcastrofelix06@gmail.com",
-              "type": "string"
-            }
-          },
-          {
-            "name": "format",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "json",
-              "type": "string",
-              "enum": [
-                "json",
-                "excel"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Cuadre de caja por turno (POS Closing Entry) — reusa el cuadre ya calculado por ERPNext al cerrar cada turno.",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/pos/cuadre-turno/pdf": {
-      "get": {
-        "operationId": "ReportesController_getCuadreTurnoPdf",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "cajero",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por cajero (User).",
-            "schema": {
-              "example": "rcastrofelix06@gmail.com",
-              "type": "string"
-            }
-          },
-          {
-            "name": "format",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "json",
-              "type": "string",
-              "enum": [
-                "json",
-                "excel"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "PDF del Cuadre por Turno — mismos filtros que la versión JSON (ignora ?format)",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/cxc/aging": {
-      "get": {
-        "operationId": "ReportesController_getCxcAging",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Accounts Receivable — antigüedad de cuentas por cobrar",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/cxc/aging/pdf": {
-      "get": {
-        "operationId": "ReportesController_getCxcAgingPdf",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "PDF de Cuentas por Cobrar (Aging)",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/cxp/aging": {
-      "get": {
-        "operationId": "ReportesController_getCxpAging",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Accounts Payable — antigüedad de cuentas por pagar",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/cxp/aging/pdf": {
-      "get": {
-        "operationId": "ReportesController_getCxpAgingPdf",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "PDF de Cuentas por Pagar (Aging)",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/libro-mayor": {
-      "get": {
-        "description": "Para cada cuenta con actividad en el período retorna: saldo inicial acumulado, movimientos del período con saldo acumulado por fila, y saldo de cierre. Invariante: openingBalance + periodDebit - periodCredit === closingBalance.",
-        "operationId": "ReportesController_getLibroMayor",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "example": "2026-06-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Sucursal (Accounting Dimension).",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          },
-          {
-            "name": "department",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Departamento (Accounting Dimension).",
-            "schema": {
-              "example": "Ventas - JBC",
-              "type": "string"
-            }
-          },
-          {
-            "name": "account",
-            "required": false,
-            "in": "query",
-            "description": "Limitar a una sola cuenta contable",
-            "schema": {
-              "example": "Ventas - JB",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Libro Mayor — movimientos agrupados por cuenta con saldo inicial y final",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/libro-diario": {
-      "get": {
-        "description": "Retorna los GL Entries generados automáticamente por ERPNext al someter facturas, cobros, compras, etc. Filtros opcionales: cuenta, tipo de voucher, número de voucher, parte (cliente/proveedor).",
-        "operationId": "ReportesController_getLibroDiario",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "example": "2026-06-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Sucursal (Accounting Dimension).",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          },
-          {
-            "name": "department",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Departamento (Accounting Dimension).",
-            "schema": {
-              "example": "Ventas - JBC",
-              "type": "string"
-            }
-          },
-          {
-            "name": "account",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por cuenta contable específica",
-            "schema": {
-              "example": "Cuentas por Cobrar - EMP",
-              "type": "string"
-            }
-          },
-          {
-            "name": "voucherNo",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por nombre de voucher (factura, cobro, etc.)",
-            "schema": {
-              "example": "ACC-SINV-2026-00001",
-              "type": "string"
-            }
-          },
-          {
-            "name": "voucherType",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por tipo de documento origen",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "Sales Invoice",
-                "Purchase Invoice",
-                "Payment Entry",
-                "Journal Entry",
-                "Stock Entry"
-              ]
-            }
-          },
-          {
-            "name": "party",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por parte (cliente/proveedor)",
-            "schema": {
-              "example": "Juan Perez",
-              "type": "string"
-            }
-          },
-          {
-            "name": "groupBy",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "Group by Voucher (Consolidated)",
-              "type": "string",
-              "enum": [
-                "Group by Voucher",
-                "Group by Voucher (Consolidated)",
-                "Group by Account",
-                "Group by Sucursal",
-                "Group by Departamento"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Libro Diario (General Ledger) — todos los movimientos contables",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/libro-diario/pdf": {
-      "get": {
-        "operationId": "ReportesController_getLibroDiarioPdf",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "example": "2026-06-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Sucursal (Accounting Dimension).",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          },
-          {
-            "name": "department",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Departamento (Accounting Dimension).",
-            "schema": {
-              "example": "Ventas - JBC",
-              "type": "string"
-            }
-          },
-          {
-            "name": "account",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por cuenta contable específica",
-            "schema": {
-              "example": "Cuentas por Cobrar - EMP",
-              "type": "string"
-            }
-          },
-          {
-            "name": "voucherNo",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por nombre de voucher (factura, cobro, etc.)",
-            "schema": {
-              "example": "ACC-SINV-2026-00001",
-              "type": "string"
-            }
-          },
-          {
-            "name": "voucherType",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por tipo de documento origen",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "Sales Invoice",
-                "Purchase Invoice",
-                "Payment Entry",
-                "Journal Entry",
-                "Stock Entry"
-              ]
-            }
-          },
-          {
-            "name": "party",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por parte (cliente/proveedor)",
-            "schema": {
-              "example": "Juan Perez",
-              "type": "string"
-            }
-          },
-          {
-            "name": "groupBy",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "Group by Voucher (Consolidated)",
-              "type": "string",
-              "enum": [
-                "Group by Voucher",
-                "Group by Voucher (Consolidated)",
-                "Group by Account",
-                "Group by Sucursal",
-                "Group by Departamento"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "PDF del Libro Diario — mismas filas/columnas que la versión JSON",
-        "tags": [
-          "Reportes"
-        ]
-      }
-    },
-    "/api/v1/reportes/libro-mayor/pdf": {
-      "get": {
-        "operationId": "ReportesController_getLibroMayorPdf",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: inicio del mes actual",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Default: hoy",
-            "schema": {
-              "example": "2026-06-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Sucursal (Accounting Dimension).",
-            "schema": {
-              "example": "Santo Domingo",
-              "type": "string"
-            }
-          },
-          {
-            "name": "department",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por Departamento (Accounting Dimension).",
-            "schema": {
-              "example": "Ventas - JBC",
-              "type": "string"
-            }
-          },
-          {
-            "name": "account",
-            "required": false,
-            "in": "query",
-            "description": "Limitar a una sola cuenta contable",
-            "schema": {
-              "example": "Ventas - JB",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "PDF del Libro Mayor — mismas filas/columnas que la versión JSON",
-        "tags": [
-          "Reportes"
         ]
       }
     },
@@ -15858,6 +16726,108 @@
               "example": "Ventas - JBC",
               "type": "string"
             }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "all",
+              "type": "string",
+              "enum": [
+                "draft",
+                "submitted",
+                "cancelled",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "createdAtFrom",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de creación en sistema, desde (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "createdAtTo",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de creación en sistema, hasta (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "postingDateFrom",
+            "required": false,
+            "in": "query",
+            "description": "Fecha contable/fiscal, desde (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "postingDateTo",
+            "required": false,
+            "in": "query",
+            "description": "Fecha contable/fiscal, hasta (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ncf",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda aproximada por NCF — busca tanto el NCF propio del documento como el NCF del documento afectado/referenciado (return_against), lo que aplique.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ncfType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "grandTotalMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "grandTotalMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "refundedAmountMin",
+            "required": false,
+            "in": "query",
+            "description": "Monto ya reembolsado en efectivo, desde",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "refundedAmountMax",
+            "required": false,
+            "in": "query",
+            "description": "Monto ya reembolsado en efectivo, hasta",
+            "schema": {
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -17018,6 +17988,35 @@
         ]
       }
     },
+    "/api/v1/compras/costos-importacion/tipos-documento": {
+      "get": {
+        "operationId": "CostosImportacionController_getTiposDocumento",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Catálogo de tipos de documento válidos para receiptDocumentType al crear un costo de importación",
+        "tags": [
+          "Costos de Importación (Landed Cost Voucher)"
+        ]
+      }
+    },
     "/api/v1/compras/costos-importacion/{id}": {
       "get": {
         "operationId": "CostosImportacionController_findOne",
@@ -17126,6 +18125,419 @@
         "summary": "Cancelar",
         "tags": [
           "Costos de Importación (Landed Cost Voucher)"
+        ]
+      }
+    },
+    "/api/v1/compras/purchase-receipt": {
+      "get": {
+        "operationId": "PurchaseReceiptController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplier",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "submitted",
+                "cancelled",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "billingStatus",
+            "required": false,
+            "in": "query",
+            "description": "pending = per_billed \u003C 100 (aún falta facturar total o parcialmente). billed = per_billed = 100.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "billed",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Sucursal Norte",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Compras - JBC",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar recepciones de mercancía (con o sin factura del proveedor todavía)",
+        "tags": [
+          "Compras — Recepción de Mercancía (Purchase Receipt)"
+        ]
+      },
+      "post": {
+        "description": "Para compras donde la mercancía llega antes que la factura final. Al someter, entra el inventario contra la cuenta \"Mercancía Recibida No Facturada\". Facture después con POST /:id/facturar.",
+        "operationId": "PurchaseReceiptController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePurchaseReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar recepción de mercancía (Draft) — sin factura del proveedor todavía",
+        "tags": [
+          "Compras — Recepción de Mercancía (Purchase Receipt)"
+        ]
+      }
+    },
+    "/api/v1/compras/purchase-receipt/{id}": {
+      "get": {
+        "operationId": "PurchaseReceiptController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una recepción de mercancía",
+        "tags": [
+          "Compras — Recepción de Mercancía (Purchase Receipt)"
+        ]
+      },
+      "put": {
+        "operationId": "PurchaseReceiptController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePurchaseReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar recepción en Draft",
+        "tags": [
+          "Compras — Recepción de Mercancía (Purchase Receipt)"
+        ]
+      }
+    },
+    "/api/v1/compras/purchase-receipt/{id}/submit": {
+      "post": {
+        "operationId": "PurchaseReceiptController_submit",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Someter recepción — actualiza inventario",
+        "tags": [
+          "Compras — Recepción de Mercancía (Purchase Receipt)"
+        ]
+      }
+    },
+    "/api/v1/compras/purchase-receipt/{id}/cancel": {
+      "post": {
+        "operationId": "PurchaseReceiptController_cancel",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar recepción sometida (solo si no tiene facturas asociadas)",
+        "tags": [
+          "Compras — Recepción de Mercancía (Purchase Receipt)"
+        ]
+      }
+    },
+    "/api/v1/compras/purchase-receipt/{id}/amend": {
+      "post": {
+        "operationId": "PurchaseReceiptController_amend",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enmendar recepción cancelada (crea Draft con amended_from)",
+        "tags": [
+          "Compras — Recepción de Mercancía (Purchase Receipt)"
+        ]
+      }
+    },
+    "/api/v1/compras/purchase-receipt/{id}/facturar": {
+      "post": {
+        "description": "Cierra el ciclo de 2 pasos: crea la Purchase Invoice referenciando las líneas pendientes de facturar de esta recepción. No reafecta inventario (eso ya ocurrió al someter la recepción).",
+        "operationId": "PurchaseReceiptController_facturar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvoiceFromReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Generar la factura del proveedor (Purchase Invoice, update_stock=0) para esta recepción",
+        "tags": [
+          "Compras — Recepción de Mercancía (Purchase Receipt)"
         ]
       }
     },
@@ -17393,6 +18805,396 @@
           "Permisos"
         ]
       }
+    },
+    "/api/v1/cuentas-bancarias": {
+      "get": {
+        "operationId": "CuentasBancariasController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Activa",
+                "Inactiva",
+                "Cerrada"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar cuentas bancarias",
+        "tags": [
+          "Cuentas Bancarias"
+        ]
+      },
+      "post": {
+        "operationId": "CuentasBancariasController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCuentaBancariaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear cuenta bancaria",
+        "tags": [
+          "Cuentas Bancarias"
+        ]
+      }
+    },
+    "/api/v1/cuentas-bancarias/{id}": {
+      "get": {
+        "operationId": "CuentasBancariasController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "withBalance",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obtener cuenta bancaria por ID",
+        "tags": [
+          "Cuentas Bancarias"
+        ]
+      },
+      "put": {
+        "operationId": "CuentasBancariasController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCuentaBancariaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar cuenta bancaria",
+        "tags": [
+          "Cuentas Bancarias"
+        ]
+      },
+      "delete": {
+        "operationId": "CuentasBancariasController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar cuenta bancaria",
+        "tags": [
+          "Cuentas Bancarias"
+        ]
+      }
+    },
+    "/api/v1/cuentas-bancarias/{id}/balance": {
+      "get": {
+        "description": "balance_inicial + suma de los Payment Entry (cobros/pagos) vinculados a esta cuenta.",
+        "operationId": "CuentasBancariasController_getBalance",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Balance actual de la cuenta bancaria",
+        "tags": [
+          "Cuentas Bancarias"
+        ]
+      }
+    },
+    "/api/v1/cuentas-bancarias/bancos": {
+      "get": {
+        "operationId": "BancosController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar bancos (doctype nativo Bank de ERPNext)",
+        "tags": [
+          "Cuentas Bancarias - Bancos"
+        ]
+      },
+      "post": {
+        "operationId": "BancosController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBancoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear banco",
+        "tags": [
+          "Cuentas Bancarias - Bancos"
+        ]
+      }
+    },
+    "/api/v1/cuentas-bancarias/bancos/{id}": {
+      "put": {
+        "operationId": "BancosController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBancoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar banco",
+        "tags": [
+          "Cuentas Bancarias - Bancos"
+        ]
+      }
     }
   },
   "info": {
@@ -17444,6 +19246,40 @@
         "required": [
           "email",
           "password"
+        ]
+      },
+      "ForgotPasswordDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "maria@empresa.com"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ResetPasswordKeyDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "maria@empresa.com"
+          },
+          "key": {
+            "type": "string",
+            "description": "Key recibido por correo (query param \"key\" del link)."
+          },
+          "newPassword": {
+            "type": "string",
+            "example": "NuevaClave2026!"
+          }
+        },
+        "required": [
+          "email",
+          "key",
+          "newPassword"
         ]
       },
       "VerifyPinDto": {
@@ -17841,6 +19677,11 @@
             "example": "132456789",
             "description": "RNC del comprador ocasional (sin registrar como cliente). Obligatorio cuando `clienteOcasionalNombre` viene junto con `ncfType: \"B01\"` (Crédito Fiscal) — la DGII exige el RNC del comprador en ese caso. Sin efecto para clientes registrados (customer)."
           },
+          "clienteOcasionalDireccion": {
+            "type": "string",
+            "example": "Av. Independencia 45, Santo Domingo",
+            "description": "Dirección del comprador ocasional (sin registrar como cliente). Solo tiene efecto junto con `clienteOcasionalNombre`."
+          },
           "postingDate": {
             "type": "string"
           },
@@ -17977,6 +19818,11 @@
           "checkNumber": {
             "type": "string",
             "description": "Número de cheque/documento (pago con cheque)."
+          },
+          "bankAccount": {
+            "type": "string",
+            "example": "BA-00001",
+            "description": "Cuenta bancaria (Bank Account) a la que se acredita este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
           }
         },
         "required": [
@@ -18196,6 +20042,16 @@
             "default": false,
             "description": "Si está activo, no se podrá vender un artículo de inventario si no tiene una Ubicación asignada dentro del almacén desde el cual se factura."
           },
+          "usaDepartamentos": {
+            "type": "boolean",
+            "default": true,
+            "description": "Si está activo, el frontend debe mostrar el selector de Departamento (campo `department`) en factura, cotización, pedido, cobro, compra y gasto. Departamento es siempre opcional a nivel de backend (nunca bloquea un documento) — este flag es puramente para que el frontend decida si mostrar u ocultar el campo en los formularios."
+          },
+          "usaImpuestoDocumento": {
+            "type": "boolean",
+            "default": true,
+            "description": "Si está activo, el frontend debe mostrar el selector de plantilla de impuestos a nivel de documento (campo `taxesTemplate`) en factura, cotización y compra. Si está inactivo, el frontend debe ocultarlo y dejar que cada documento use siempre la plantilla default de la compañía. taxesTemplate es siempre opcional a nivel de backend — este flag es puramente para que el frontend decida si mostrar u ocultar el campo."
+          },
           "modoPagoCaja": {
             "type": "string",
             "description": "Método de pago (Mode of Payment) que se compara contra el efectivo físico en caja al cuadrar el turno. GET /pos/turnos/actual expone el monto cobrado con este método desde que se abrió el turno, para comparar en el frontend antes de cerrar. Solo aplica cuando usaModuloPos está activo."
@@ -18221,12 +20077,36 @@
               "pos"
             ],
             "default": "a4",
-            "description": "Qué formato se imprime por defecto al cobrar una factura, registrar un cobro o generar una compra: \"a4\"/\"carta\"/\"a6\" (página completa, mismo diseño, distinto tamaño de papel) o \"pos\" (ticket angosto 80mm para impresora térmica). El frontend puede pedir explícitamente otro formato vía GET /invoices|cobros|compras/:id/pdf?formato=... sin importar este default."
+            "description": "Qué formato se imprime por defecto al cobrar una factura, registrar un cobro o generar una compra: \"a4\"/\"carta\"/\"a6\" (página completa, mismo diseño, distinto tamaño de papel) o \"pos\" (ticket angosto 80mm para impresora térmica). El frontend puede pedir explícitamente otro formato vía GET /invoices|cobros|compras/:id/pdf?formato=... sin importar este default. Debe estar incluido en formatosPermitidos."
+          },
+          "formatosPermitidos": {
+            "type": "array",
+            "default": [
+              "a4",
+              "carta",
+              "a6",
+              "pos"
+            ],
+            "description": "Formatos de impresión habilitados para este tenant (factura/cobro/compra). Un GET /invoices|cobros|compras/:id/pdf?formato=X con X fuera de esta lista se rechaza con 400. Si se omite (no se configura nunca), se consideran permitidos los 4 formatos.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "a4",
+                "carta",
+                "a6",
+                "pos"
+              ]
+            }
           },
           "turnoMaxHoras": {
             "type": "number",
             "default": 24,
             "description": "Cantidad máxima de horas que un turno de caja (POS) puede permanecer abierto antes de que el frontend deba obligar a cerrarlo. Puramente informativo — el backend no cierra turnos automáticamente ni rechaza ventas por esto; GET /pos/turnos/actual devuelve este valor junto con periodStartDate para que el frontend calcule si ya se venció."
+          },
+          "ncfAlertaMinimo": {
+            "type": "number",
+            "default": 50,
+            "description": "Cuando a una Secuencia NCF le queden este número de comprobantes o menos: GET /config/ncf y GET /config/ncf/:id marcan esa serie con alertaActiva=true, y el disparador programado de notificaciones envía el correo configurado en el tipo \"facturacion_ncf_secuencia_baja\" (una sola vez por día por serie)."
           }
         }
       },
@@ -18289,6 +20169,15 @@
             "type": "string",
             "example": "Cash - JB",
             "description": "Cuenta GL asociada a este método de pago (Banco, Caja, etc.)"
+          },
+          "requiresBankAccount": {
+            "type": "boolean",
+            "description": "Si es true, los cobros/pagos con este método deben indicar una cuenta bancaria (Bank Account) — se usa para calcular el balance de la cuenta a partir de sus Payment Entry."
+          },
+          "defaultBankAccount": {
+            "type": "string",
+            "example": "BA-00001",
+            "description": "Cuenta bancaria (Bank Account) usada por defecto cuando requiresBankAccount es true y el cobro/pago no especifica una explícitamente."
           }
         }
       },
@@ -20938,6 +22827,11 @@
           "sendWelcomeEmail": {
             "type": "boolean",
             "default": true
+          },
+          "maxDiscountPct": {
+            "type": "number",
+            "example": 15,
+            "description": "Descuento máximo (%) que puede aplicar este usuario en ventas. 0 = sin permiso de descuento."
           }
         },
         "required": [
@@ -21101,6 +22995,11 @@
             "example": "Juan Pérez",
             "description": "Nombre de la persona cuando la cotización es para alguien sin registrar como cliente. No enviar junto con `customer`."
           },
+          "clienteOcasionalDireccion": {
+            "type": "string",
+            "example": "Av. Independencia 45, Santo Domingo",
+            "description": "Dirección de la persona cuando la cotización es para alguien sin registrar como cliente. Solo tiene efecto junto con `clienteOcasionalNombre`."
+          },
           "date": {
             "type": "string",
             "example": "2025-01-15"
@@ -21198,6 +23097,11 @@
           "amount": {
             "type": "number",
             "description": "Monto a reembolsar (no puede exceder el total de la nota de crédito)"
+          },
+          "bankAccount": {
+            "type": "string",
+            "example": "BA-00001",
+            "description": "Cuenta bancaria (Bank Account) involucrada en el reembolso. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
           }
         },
         "required": [
@@ -21330,6 +23234,11 @@
             "type": "string",
             "example": "Ventas - JBC",
             "description": "Departamento del cobro (dimensión contable informativa, nunca obligatoria)."
+          },
+          "bankAccount": {
+            "type": "string",
+            "example": "BA-00001",
+            "description": "Cuenta bancaria (Bank Account) a la que se acredita este cobro. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
           }
         },
         "required": [
@@ -21402,6 +23311,11 @@
             "type": "string",
             "example": "Compras - JBC",
             "description": "Departamento del pago (dimensión contable informativa, nunca obligatoria)."
+          },
+          "bankAccount": {
+            "type": "string",
+            "example": "BA-00001",
+            "description": "Cuenta bancaria (Bank Account) desde la que se hace este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
           }
         },
         "required": [
@@ -21722,6 +23636,11 @@
             "type": "string",
             "example": "Juan Pérez",
             "description": "Nombre de la persona cuando el pedido es para alguien sin registrar como cliente. No enviar junto con `customer`."
+          },
+          "clienteOcasionalDireccion": {
+            "type": "string",
+            "example": "Av. Independencia 45, Santo Domingo",
+            "description": "Dirección de la persona cuando el pedido es para alguien sin registrar como cliente. Solo tiene efecto junto con `clienteOcasionalNombre`."
           },
           "transactionDate": {
             "type": "string",
@@ -22057,6 +23976,181 @@
           "taxes"
         ]
       },
+      "ReceiptBatchLineDto": {
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string",
+            "example": "LOTE-2024-001"
+          },
+          "expiryDate": {
+            "type": "string",
+            "example": "2026-12",
+            "description": "Fecha de vencimiento MM/YYYY o YYYY-MM-DD"
+          },
+          "qty": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "batchId",
+          "qty"
+        ]
+      },
+      "PurchaseReceiptItemDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "description": "Descripción/nombre del artículo recibido"
+          },
+          "qty": {
+            "type": "number",
+            "description": "Cantidad recibida — siempre positiva. Este documento no maneja devoluciones."
+          },
+          "rate": {
+            "type": "number",
+            "description": "Costo unitario estimado/pactado con el proveedor (aún sin factura final)."
+          },
+          "warehouse": {
+            "type": "string"
+          },
+          "uom": {
+            "type": "string"
+          },
+          "serials": {
+            "example": [
+              "SN-001",
+              "SN-002"
+            ],
+            "description": "Números de serie para artículos con tracking de serial. Cantidad debe coincidir con qty.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "batches": {
+            "description": "Lotes para artículos con tracking de lote. La suma de qty debe coincidir con qty de la línea.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptBatchLineDto"
+            }
+          }
+        },
+        "required": [
+          "itemCode",
+          "qty",
+          "rate"
+        ]
+      },
+      "CreatePurchaseReceiptDto": {
+        "type": "object",
+        "properties": {
+          "supplier": {
+            "type": "string"
+          },
+          "postingDate": {
+            "type": "string"
+          },
+          "supplierDeliveryNote": {
+            "type": "string",
+            "description": "Número de la nota de entrega/remisión del proveedor, si trae una."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseReceiptItemDto"
+            }
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal donde se recibe la mercancía. Si se omite, se resuelve en cascada igual que en Compras."
+          },
+          "department": {
+            "type": "string",
+            "example": "Compras - JBC",
+            "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
+          }
+        },
+        "required": [
+          "supplier",
+          "postingDate",
+          "items"
+        ]
+      },
+      "UpdatePurchaseReceiptDto": {
+        "type": "object",
+        "properties": {
+          "supplier": {
+            "type": "string"
+          },
+          "postingDate": {
+            "type": "string"
+          },
+          "supplierDeliveryNote": {
+            "type": "string",
+            "description": "Número de la nota de entrega/remisión del proveedor, si trae una."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseReceiptItemDto"
+            }
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal donde se recibe la mercancía. Si se omite, se resuelve en cascada igual que en Compras."
+          },
+          "department": {
+            "type": "string",
+            "example": "Compras - JBC",
+            "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
+          }
+        }
+      },
+      "CreateInvoiceFromReceiptDto": {
+        "type": "object",
+        "properties": {
+          "dueDate": {
+            "type": "string"
+          },
+          "ncfProveedor": {
+            "type": "string",
+            "description": "NCF del comprobante del proveedor (B01, E31, etc.)"
+          },
+          "tipoBienes606": {
+            "type": "string",
+            "description": "Tipo de bienes/servicios según categoría 606"
+          },
+          "formaPago606": {
+            "type": "string",
+            "description": "Forma de pago 606: 01=Efectivo, 02=Cheque, etc."
+          },
+          "retencionItbis": {
+            "type": "number"
+          },
+          "retencionIsr": {
+            "type": "number"
+          },
+          "tipoPago": {
+            "type": "string",
+            "enum": [
+              "Contado",
+              "Crédito"
+            ]
+          },
+          "taxesTemplate": {
+            "type": "string",
+            "example": "Dominican Republic Tax - JB",
+            "description": "ID del template de impuestos del documento. Si se omite, se usa el default de la compañía."
+          }
+        }
+      },
       "CreatePermisoDto": {
         "type": "object",
         "properties": {
@@ -22234,6 +24328,168 @@
           "doctype",
           "role"
         ]
+      },
+      "CreateCuentaBancariaDto": {
+        "type": "object",
+        "properties": {
+          "accountName": {
+            "type": "string",
+            "example": "Cuenta Corriente Operativa",
+            "description": "Nombre descriptivo de la cuenta"
+          },
+          "bank": {
+            "type": "string",
+            "example": "Banreservas",
+            "description": "Nombre del Bank (ver GET /cuentas-bancarias/bancos)"
+          },
+          "account": {
+            "type": "string",
+            "example": "111-01",
+            "description": "Cuenta contable (GL Account) asociada"
+          },
+          "bankAccountNo": {
+            "type": "string",
+            "example": "000123456789"
+          },
+          "currency": {
+            "type": "string",
+            "example": "DOP",
+            "description": "Moneda de la cuenta"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "Activa",
+              "Inactiva",
+              "Cerrada"
+            ],
+            "default": "Activa"
+          },
+          "chequeFormat": {
+            "type": "string",
+            "enum": [
+              "Estándar",
+              "Voucher",
+              "Media Carta",
+              "Cartera"
+            ]
+          },
+          "chequesManuales": {
+            "type": "boolean",
+            "default": false
+          },
+          "isDefault": {
+            "type": "boolean",
+            "default": false
+          },
+          "balanceInicial": {
+            "type": "number",
+            "default": 0,
+            "description": "Balance de arranque de la cuenta al momento de registrarla (balance conciliado inicial)."
+          }
+        },
+        "required": [
+          "accountName",
+          "bank",
+          "account"
+        ]
+      },
+      "UpdateCuentaBancariaDto": {
+        "type": "object",
+        "properties": {
+          "accountName": {
+            "type": "string",
+            "example": "Cuenta Corriente Operativa",
+            "description": "Nombre descriptivo de la cuenta"
+          },
+          "bank": {
+            "type": "string",
+            "example": "Banreservas",
+            "description": "Nombre del Bank (ver GET /cuentas-bancarias/bancos)"
+          },
+          "account": {
+            "type": "string",
+            "example": "111-01",
+            "description": "Cuenta contable (GL Account) asociada"
+          },
+          "bankAccountNo": {
+            "type": "string",
+            "example": "000123456789"
+          },
+          "currency": {
+            "type": "string",
+            "example": "DOP",
+            "description": "Moneda de la cuenta"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "Activa",
+              "Inactiva",
+              "Cerrada"
+            ],
+            "default": "Activa"
+          },
+          "chequeFormat": {
+            "type": "string",
+            "enum": [
+              "Estándar",
+              "Voucher",
+              "Media Carta",
+              "Cartera"
+            ]
+          },
+          "chequesManuales": {
+            "type": "boolean",
+            "default": false
+          },
+          "isDefault": {
+            "type": "boolean",
+            "default": false
+          },
+          "balanceInicial": {
+            "type": "number",
+            "default": 0,
+            "description": "Balance de arranque de la cuenta al momento de registrarla (balance conciliado inicial)."
+          },
+          "ultimoCheque": {
+            "type": "number",
+            "description": "Monto del último cheque emitido"
+          },
+          "ultimoDeposito": {
+            "type": "number",
+            "description": "Monto del último depósito registrado"
+          }
+        }
+      },
+      "CreateBancoDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Banreservas"
+          },
+          "swiftNumber": {
+            "type": "string",
+            "example": "BRSNDOSD"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateBancoDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Banreservas"
+          },
+          "swiftNumber": {
+            "type": "string",
+            "example": "BRSNDOSD"
+          }
+        }
       }
     }
   }

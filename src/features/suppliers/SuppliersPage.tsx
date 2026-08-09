@@ -11,6 +11,7 @@ import { Plus, ChevronLeft, ChevronRight, Search, Pencil, Ban } from 'lucide-rea
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { Select, SelectItem } from '@/components/ui/select'
 
 const PAGE_SIZE = 20
 
@@ -20,19 +21,28 @@ export default function SuppliersPage() {
 
   const [search, setSearch] = useState('')
   const [showExterior, setShowExterior] = useState(false)
+  const [rnc, setRnc] = useState('')
+  const [supplierType, setSupplierType] = useState<string>('all')
+  const [diasCreditoMin, setDiasCreditoMin] = useState('')
+  const [diasCreditoMax, setDiasCreditoMax] = useState('')
   const [page, setPage] = useState(1)
   const [toDisable, setToDisable] = useState<Supplier | null>(null)
   const { orderBy, sort } = useSortState()
 
   const debouncedSearch = useDebounce(search, 300)
+  const debouncedRnc = useDebounce(rnc, 300)
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['suppliers', { search: debouncedSearch, showExterior, offset, orderBy }],
+    queryKey: ['suppliers', { search: debouncedSearch, showExterior, rnc: debouncedRnc, supplierType, diasCreditoMin, diasCreditoMax, offset, orderBy }],
     queryFn: () =>
       listSuppliers({
         search: debouncedSearch || undefined,
         esProveedorExterior: showExterior ? true : undefined,
+        rnc: debouncedRnc || undefined,
+        supplierType: supplierType !== 'all' ? (supplierType as 'Company' | 'Individual') : undefined,
+        diasCreditoMin: diasCreditoMin ? Number(diasCreditoMin) : undefined,
+        diasCreditoMax: diasCreditoMax ? Number(diasCreditoMax) : undefined,
         limit: PAGE_SIZE,
         offset,
         orderBy: orderBy || undefined,
@@ -98,6 +108,37 @@ export default function SuppliersPage() {
               />
               <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Solo proveedores exterior</span>
             </label>
+            <div className="search-input-wrap">
+              <Search size={14} className="search-input-icon" />
+              <input
+                className="search-input"
+                placeholder="Buscar RNC…"
+                value={rnc}
+                onChange={(e) => { setRnc(e.target.value); setPage(1) }}
+              />
+            </div>
+            <Select value={supplierType} onValueChange={(val) => { setSupplierType(val); setPage(1) }}>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="Company">Empresa</SelectItem>
+              <SelectItem value="Individual">Individual</SelectItem>
+            </Select>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 100 }}
+              placeholder="Días crédito min"
+              value={diasCreditoMin}
+              onChange={(e) => { setDiasCreditoMin(e.target.value); setPage(1) }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 100 }}
+              placeholder="Días crédito max"
+              value={diasCreditoMax}
+              onChange={(e) => { setDiasCreditoMax(e.target.value); setPage(1) }}
+            />
           </div>
         </div>
 

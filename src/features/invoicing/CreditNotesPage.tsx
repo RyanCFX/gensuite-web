@@ -11,12 +11,16 @@ import {
   downloadCreditNotePdf,
 } from '@/shared/api/notes'
 import { listInvoices, getInvoice } from '@/shared/api/invoices'
-import { listMetodosPago } from '@/shared/api/config'
+import { listMetodosPago, getCatalogosFiscales } from '@/shared/api/config'
+import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listDepartamentos } from '@/shared/api/departamentos'
 import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo } from '@/shared/api/types'
 import { Plus, Loader2, Wallet, ArrowRightLeft, ChevronDown, ChevronRight, Download } from 'lucide-react'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { formatDate, formatDOP } from '@/lib/formatters'
@@ -24,6 +28,7 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 interface NoteItem {
   itemCode: string
@@ -95,6 +100,26 @@ export default function CreditNotesPage() {
   const [customerQuery, setCustomerQuery] = useState('')
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
+  const [createdAtFrom, setCreatedAtFrom] = useState('')
+  const [createdAtTo, setCreatedAtTo] = useState('')
+  const [postingDateFrom, setPostingDateFrom] = useState('')
+  const [postingDateTo, setPostingDateTo] = useState('')
+  const [ncf, setNcf] = useState('')
+  const [ncfType, setNcfType] = useState('')
+  const [grandTotalMin, setGrandTotalMin] = useState('')
+  const [grandTotalMax, setGrandTotalMax] = useState('')
+  const [refundedAmountMin, setRefundedAmountMin] = useState('')
+  const [refundedAmountMax, setRefundedAmountMax] = useState('')
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+  const [ncfTypeSearch, setNcfTypeSearch] = useState('')
+  const ncfTypeOptions: SearchSelectOption[] = (catalogos?.ncfTypes ?? [])
+    .filter((t) => !ncfTypeSearch || t.label.toLowerCase().includes(ncfTypeSearch.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
 
   const { data: sucursales } = useQuery({
     queryKey: ['sucursales-all'],
@@ -146,6 +171,7 @@ export default function CreditNotesPage() {
   const [refundTarget, setRefundTarget] = useState<CreditNoteRow | null>(null)
   const [refundAmount, setRefundAmount] = useState(0)
   const [refundModeOfPayment, setRefundModeOfPayment] = useState('')
+  const [refundBankAccount, setRefundBankAccount] = useState('')
 
   // ── Aplicar a factura / convertir a saldo a favor ─────────────────────────
   const [applyTarget, setApplyTarget] = useState<CreditNoteRow | null>(null)
@@ -155,12 +181,26 @@ export default function CreditNotesPage() {
   const [applyAmount, setApplyAmount] = useState(0)
 
   const { data: notesData, isLoading } = useQuery({
-    queryKey: ['credit-notes', orderBy, customerId, branch, department],
+    queryKey: [
+      'credit-notes', orderBy, customerId, branch, department,
+      createdAtFrom, createdAtTo, postingDateFrom, postingDateTo,
+      ncf, ncfType, grandTotalMin, grandTotalMax, refundedAmountMin, refundedAmountMax,
+    ],
     queryFn: () => listCreditNotes({
       orderBy: orderBy || undefined,
       customer: customerId || undefined,
       branch: branch || undefined,
       department: department || undefined,
+      createdAtFrom: createdAtFrom || undefined,
+      createdAtTo: createdAtTo || undefined,
+      postingDateFrom: postingDateFrom || undefined,
+      postingDateTo: postingDateTo || undefined,
+      ncf: ncf || undefined,
+      ncfType: ncfType || undefined,
+      grandTotalMin: grandTotalMin ? Number(grandTotalMin) : undefined,
+      grandTotalMax: grandTotalMax ? Number(grandTotalMax) : undefined,
+      refundedAmountMin: refundedAmountMin ? Number(refundedAmountMin) : undefined,
+      refundedAmountMax: refundedAmountMax ? Number(refundedAmountMax) : undefined,
     }),
   })
 
@@ -175,6 +215,19 @@ export default function CreditNotesPage() {
     .filter((m) => !m.disabled)
     .filter((m) => !refundModeOfPaymentSearch || m.name.toLowerCase().includes(refundModeOfPaymentSearch.toLowerCase()))
     .map((m) => ({ value: m.name, label: m.name }))
+
+  const refundMetodoSeleccionado = (metodos ?? []).find((m) => m.name === refundModeOfPayment)
+  const refundRequiresBankAccount = refundMetodoSeleccionado?.requiresBankAccount && !refundMetodoSeleccionado.defaultBankAccount
+
+  const { data: refundCuentasBancarias } = useQuery({
+    queryKey: ['cuentas-bancarias-activas'],
+    queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
+    enabled: !!refundRequiresBankAccount,
+  })
+  const [refundBankAccountSearch, setRefundBankAccountSearch] = useState('')
+  const refundBankAccountOptions: SearchSelectOption[] = (refundCuentasBancarias?.items ?? [])
+    .filter((c) => !refundBankAccountSearch || c.accountName.toLowerCase().includes(refundBankAccountSearch.toLowerCase()))
+    .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))
 
   // El listado de facturas (GET /invoices) no incluye `items[]` — solo el detalle (GET /invoices/:id) lo tiene.
   // Se necesita el detalle completo para poder poblar/editar los artículos a devolver.
@@ -242,8 +295,15 @@ export default function CreditNotesPage() {
     setNoteItems([])
   }
 
+  const crearIsDirty = useDirtyCheck({ selectedInvoiceId, reason, noteItems }, modalOpen)
+  const crearClose = useConfirmClose(crearIsDirty, handleCloseModal)
+
   const refundMutation = useMutation({
-    mutationFn: () => refundCreditNote(refundTarget!.id, { modeOfPayment: refundModeOfPayment, amount: refundAmount }),
+    mutationFn: () => refundCreditNote(refundTarget!.id, {
+      modeOfPayment: refundModeOfPayment,
+      amount: refundAmount,
+      bankAccount: refundBankAccount || undefined,
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
       toast.success('Nota de crédito reembolsada')
@@ -258,6 +318,7 @@ export default function CreditNotesPage() {
     setRefundTarget(note)
     setRefundAmount(Math.abs(note.grandTotal ?? 0))
     setRefundModeOfPayment('')
+    setRefundBankAccount('')
   }
 
   // La nota de crédito no expone el `customer` directamente — lo obtenemos de su factura original.
@@ -367,14 +428,21 @@ export default function CreditNotesPage() {
   const applyAmountValid = applyAmount > 0
   const canConfirmApply = applyAmountValid && !!applyInvoiceId && !alreadyAppliedToSelected
 
+  const aplicarIsDirty = useDirtyCheck({ applyInvoiceId, applyAmount }, !!applyTarget)
+  const aplicarClose = useConfirmClose(aplicarIsDirty, closeApplyModal)
+
   function closeRefundModal() {
     setRefundTarget(null)
     setRefundAmount(0)
     setRefundModeOfPayment('')
+    setRefundBankAccount('')
   }
 
   const refundAmountValid = refundAmount > 0 && refundAmount <= Math.abs(refundTarget?.grandTotal ?? 0)
-  const canConfirmRefund = refundAmountValid && !!refundModeOfPayment
+  const canConfirmRefund = refundAmountValid && !!refundModeOfPayment && (!refundRequiresBankAccount || !!refundBankAccount)
+
+  const reembolsoIsDirty = useDirtyCheck({ refundAmount, refundModeOfPayment, refundBankAccount }, !!refundTarget)
+  const reembolsoClose = useConfirmClose(reembolsoIsDirty, closeRefundModal)
 
   function updateNoteItem(index: number, patch: Partial<NoteLineItem>) {
     setNoteItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)))
@@ -444,6 +512,89 @@ export default function CreditNotesPage() {
               placeholder="Todos los departamentos"
             />
           </div>
+        </div>
+        <div className="filter-bar-left" style={{ marginTop: 8 }}>
+          <input
+            className="ff-input ff-input-sm"
+            style={{ width: 160 }}
+            placeholder="Buscar NCF…"
+            value={ncf}
+            onChange={(e) => setNcf(e.target.value)}
+          />
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={ncfType}
+              onChange={setNcfType}
+              options={ncfTypeOptions}
+              onSearch={setNcfTypeSearch}
+              selectedLabel={catalogos?.ncfTypes?.find((t) => t.value === ncfType)?.label ?? ''}
+              placeholder="Todos los tipos NCF"
+            />
+          </div>
+          <DatePicker
+            className="ff-input ff-input-sm"
+            value={createdAtFrom}
+            onChange={setCreatedAtFrom}
+            style={{ width: 144 }}
+            clearable
+          />
+          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+          <DatePicker
+            className="ff-input ff-input-sm"
+            value={createdAtTo}
+            onChange={setCreatedAtTo}
+            style={{ width: 144 }}
+            clearable
+          />
+          <DatePicker
+            className="ff-input ff-input-sm"
+            value={postingDateFrom}
+            onChange={setPostingDateFrom}
+            style={{ width: 144 }}
+            clearable
+          />
+          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+          <DatePicker
+            className="ff-input ff-input-sm"
+            value={postingDateTo}
+            onChange={setPostingDateTo}
+            style={{ width: 144 }}
+            clearable
+          />
+          <input
+            type="number"
+            className="ff-input ff-input-sm"
+            style={{ width: 100 }}
+            placeholder="Total mín."
+            value={grandTotalMin}
+            onChange={(e) => setGrandTotalMin(e.target.value)}
+          />
+          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+          <input
+            type="number"
+            className="ff-input ff-input-sm"
+            style={{ width: 100 }}
+            placeholder="Total máx."
+            value={grandTotalMax}
+            onChange={(e) => setGrandTotalMax(e.target.value)}
+          />
+          <input
+            type="number"
+            className="ff-input ff-input-sm"
+            style={{ width: 100 }}
+            placeholder="Reemb. mín."
+            value={refundedAmountMin}
+            onChange={(e) => setRefundedAmountMin(e.target.value)}
+          />
+          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+          <input
+            type="number"
+            className="ff-input ff-input-sm"
+            style={{ width: 100 }}
+            placeholder="Reemb. máx."
+            value={refundedAmountMax}
+            onChange={(e) => setRefundedAmountMax(e.target.value)}
+          />
         </div>
       </div>
 
@@ -595,11 +746,11 @@ export default function CreditNotesPage() {
       </div>
 
       {modalOpen && (
-        <div className="modal-overlay" onClick={handleCloseModal}>
+        <div className="modal-overlay" onClick={crearClose.requestClose}>
           <div className="modal-box modal-box-lg" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="modal-head">
               <h2 className="modal-title">Nueva Nota de Crédito</h2>
-              <button className="modal-close" type="button" onClick={handleCloseModal}>×</button>
+              <button className="modal-close" type="button" onClick={crearClose.requestClose}>×</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -715,7 +866,7 @@ export default function CreditNotesPage() {
                 </div>
               </div>
               <div className="modal-foot">
-                <button type="button" className="btn btn-ghost" onClick={handleCloseModal}>Cancelar</button>
+                <button type="button" className="btn btn-ghost" onClick={crearClose.requestClose}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
                   {createMutation.isPending && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
                   Crear y Someter
@@ -726,14 +877,24 @@ export default function CreditNotesPage() {
         </div>
       )}
 
+      <ConfirmModal
+        open={crearClose.confirming}
+        onClose={crearClose.cancelDiscard}
+        onConfirm={crearClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
+
       {refundTarget && (
-        <div className="modal-overlay" onClick={closeRefundModal}>
+        <div className="modal-overlay" onClick={reembolsoClose.requestClose}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Wallet size={16} /> Reembolsar nota de crédito
               </h2>
-              <button className="modal-close" onClick={closeRefundModal}>×</button>
+              <button className="modal-close" onClick={reembolsoClose.requestClose}>×</button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
@@ -760,16 +921,34 @@ export default function CreditNotesPage() {
                 <SearchSelect
                   id="refundModeOfPayment"
                   value={refundModeOfPayment}
-                  onChange={setRefundModeOfPayment}
+                  onChange={(val) => { setRefundModeOfPayment(val); setRefundBankAccount('') }}
                   options={refundModeOfPaymentOptions}
                   onSearch={setRefundModeOfPaymentSearch}
                   selectedLabel={refundModeOfPayment}
                   placeholder="Seleccionar…"
                 />
               </div>
+
+              {refundMetodoSeleccionado?.requiresBankAccount && (
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="refundBankAccount">
+                    Cuenta Bancaria {refundRequiresBankAccount && <span className="ff-required">*</span>}
+                  </label>
+                  <SearchSelect
+                    id="refundBankAccount"
+                    value={refundBankAccount}
+                    onChange={setRefundBankAccount}
+                    options={refundBankAccountOptions}
+                    onSearch={setRefundBankAccountSearch}
+                    selectedLabel={refundCuentasBancarias?.items.find((c) => c.id === refundBankAccount)?.accountName ?? ''}
+                    placeholder={refundMetodoSeleccionado.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
+                    error={!!refundRequiresBankAccount && !refundBankAccount}
+                  />
+                </div>
+              )}
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={closeRefundModal}>Volver</button>
+              <button className="btn btn-secondary" onClick={reembolsoClose.requestClose}>Volver</button>
               <button
                 className="btn btn-primary"
                 onClick={() => refundMutation.mutate()}
@@ -783,14 +962,24 @@ export default function CreditNotesPage() {
         </div>
       )}
 
+      <ConfirmModal
+        open={reembolsoClose.confirming}
+        onClose={reembolsoClose.cancelDiscard}
+        onConfirm={reembolsoClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
+
       {applyTarget && (
-        <div className="modal-overlay" onClick={closeApplyModal}>
+        <div className="modal-overlay" onClick={aplicarClose.requestClose}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <ArrowRightLeft size={16} /> Aplicar nota de crédito
               </h2>
-              <button className="modal-close" onClick={closeApplyModal}>×</button>
+              <button className="modal-close" onClick={aplicarClose.requestClose}>×</button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
@@ -853,7 +1042,7 @@ export default function CreditNotesPage() {
               )}
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={closeApplyModal}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={aplicarClose.requestClose}>Cancelar</button>
               {alreadyAppliedToSelected ? (
                 <button
                   className="btn btn-danger"
@@ -878,6 +1067,16 @@ export default function CreditNotesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={aplicarClose.confirming}
+        onClose={aplicarClose.cancelDiscard}
+        onConfirm={aplicarClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }

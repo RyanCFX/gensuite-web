@@ -22,6 +22,9 @@ export interface ListPagosParams extends PaginationParams {
   modeOfPayment?: string
   branch?: string
   department?: string
+  paidAmountMin?: number
+  paidAmountMax?: number
+  referenceNo?: string
 }
 
 export async function listPagos(params?: ListPagosParams) {

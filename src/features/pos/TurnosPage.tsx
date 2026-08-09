@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { listTurnos, type ListTurnosParams } from '@/shared/api/pos'
+import { listUsuarios } from '@/shared/api/usuarios'
 import { formatDateTime, formatDOP } from '@/lib/formatters'
-import { useDebounce } from '@/lib/useDebounce'
 import { Select, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const PAGE_SIZE = 20
 
@@ -22,20 +25,35 @@ type StatusFilter = 'Open' | 'Closed' | 'all'
 
 export default function TurnosPage() {
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
+  const [cajero, setCajero] = useState('')
+  const [cajeroLabel, setCajeroLabel] = useState('')
+  const [cajeroQuery, setCajeroQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [grandTotalMin, setGrandTotalMin] = useState('')
+  const [grandTotalMax, setGrandTotalMax] = useState('')
   const [page, setPage] = useState(1)
 
-  const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
 
+  const { data: usuariosData, isLoading: usuariosLoading } = useQuery({
+    queryKey: ['usuariosSearch', cajeroQuery],
+    queryFn: () => listUsuarios({ search: cajeroQuery || undefined, limit: 15 }),
+  })
+  const cajeroOptions: SearchSelectOption[] = (usuariosData?.items ?? []).map((u) => ({
+    value: u.email,
+    label: u.fullName,
+    sublabel: u.email,
+  }))
+
   const params: ListTurnosParams = {
-    search: debouncedSearch || undefined,
+    cajero: cajero || undefined,
     status: status === 'all' ? undefined : status,
     from: fromDate || undefined,
     to: toDate || undefined,
+    grandTotalMin: grandTotalMin !== '' ? Number(grandTotalMin) : undefined,
+    grandTotalMax: grandTotalMax !== '' ? Number(grandTotalMax) : undefined,
     offset,
     limit: PAGE_SIZE,
   }
@@ -62,13 +80,15 @@ export default function TurnosPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={15} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por cajero…"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+          <div style={{ width: 240 }}>
+            <SearchSelect
+              value={cajero}
+              selectedLabel={cajeroLabel}
+              onChange={(val, opt) => { setCajero(val); setCajeroLabel(opt?.label ?? ''); setPage(1) }}
+              options={cajeroOptions}
+              onSearch={setCajeroQuery}
+              loading={usuariosLoading}
+              placeholder="Filtrar por cajero…"
             />
           </div>
           <Select value={status} onValueChange={(val) => { setStatus(val as StatusFilter); setPage(1) }}>
@@ -76,20 +96,38 @@ export default function TurnosPage() {
             <SelectItem value="Open">Abiertos</SelectItem>
             <SelectItem value="Closed">Cerrados</SelectItem>
           </Select>
-          <input
-            type="date"
+          <DatePicker
             className="filter-select"
             value={fromDate}
-            onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
-            title="Desde"
+            onChange={(v) => { setFromDate(v); setPage(1) }}
+            clearable
           />
-          <input
-            type="date"
+          <DatePicker
             className="filter-select"
             value={toDate}
-            onChange={(e) => { setToDate(e.target.value); setPage(1) }}
-            title="Hasta"
+            onChange={(v) => { setToDate(v); setPage(1) }}
+            clearable
           />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 100 }}
+              placeholder="Mín."
+              value={grandTotalMin}
+              onChange={(e) => { setGrandTotalMin(e.target.value); setPage(1) }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 100 }}
+              placeholder="Máx."
+              value={grandTotalMax}
+              onChange={(e) => { setGrandTotalMax(e.target.value); setPage(1) }}
+            />
+            <span className="ff-hint" title="El filtro de total solo aplica a turnos cerrados">Total (solo cerrados)</span>
+          </div>
         </div>
       </div>
 

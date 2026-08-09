@@ -12,6 +12,7 @@ import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 const PAGE_SIZE = 20
 
@@ -22,6 +23,9 @@ export default function ComprasPage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [branch, setBranch] = useState('')
+  const [ncf, setNcf] = useState('')
+  const [grandTotalMin, setGrandTotalMin] = useState('')
+  const [grandTotalMax, setGrandTotalMax] = useState('')
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
 
@@ -39,7 +43,7 @@ export default function ComprasPage() {
     .map((s) => ({ value: s.name, label: s.name }))
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['compras', { supplier, status, fromDate, toDate, branch, offset, orderBy }],
+    queryKey: ['compras', { supplier, status, fromDate, toDate, branch, ncf, grandTotalMin, grandTotalMax, offset, orderBy }],
     queryFn: () =>
       listCompras({
         supplier: supplier || undefined,
@@ -47,6 +51,9 @@ export default function ComprasPage() {
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
         branch: branch || undefined,
+        ncf: ncf || undefined,
+        grandTotalMin: grandTotalMin ? Number(grandTotalMin) : undefined,
+        grandTotalMax: grandTotalMax ? Number(grandTotalMax) : undefined,
         orderBy: orderBy || undefined,
         limit: PAGE_SIZE,
         offset,
@@ -99,17 +106,43 @@ export default function ComprasPage() {
                 placeholder="Todas las sucursales"
               />
             </div>
-            <input
-              type="date"
+            <DatePicker
               className="filter-select"
               value={fromDate}
-              onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
+              onChange={(v) => { setFromDate(v); setPage(1) }}
+              clearable
             />
-            <input
-              type="date"
+            <DatePicker
               className="filter-select"
               value={toDate}
-              onChange={(e) => { setToDate(e.target.value); setPage(1) }}
+              onChange={(v) => { setToDate(v); setPage(1) }}
+              clearable
+            />
+            <div className="search-input-wrap">
+              <Search size={14} className="search-input-icon" />
+              <input
+                className="search-input"
+                placeholder="Buscar NCF…"
+                value={ncf}
+                onChange={(e) => { setNcf(e.target.value); setPage(1) }}
+              />
+            </div>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 100 }}
+              placeholder="Total min"
+              value={grandTotalMin}
+              onChange={(e) => { setGrandTotalMin(e.target.value); setPage(1) }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 100 }}
+              placeholder="Total max"
+              value={grandTotalMax}
+              onChange={(e) => { setGrandTotalMax(e.target.value); setPage(1) }}
             />
           </div>
         </div>

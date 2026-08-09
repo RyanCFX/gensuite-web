@@ -5,7 +5,8 @@ import { listQuotations, cancelQuotation } from '@/shared/api/quotations'
 import type { ListQuotationsParams } from '@/shared/api/quotations'
 import type { Quotation } from '@/shared/api/types'
 import { listSucursales } from '@/shared/api/sucursales'
-import { Plus, Eye, Search, GitBranch, Copy, X, Loader2 } from 'lucide-react'
+import { listCustomers } from '@/shared/api/customers'
+import { Plus, Eye, GitBranch, Copy, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -14,6 +15,7 @@ import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 type StatusFilter = 'draft' | 'submitted' | 'ordered' | 'lost' | 'cancelled' | 'all'
 
@@ -35,7 +37,9 @@ const STATUS_LABEL: Record<string, string> = {
 export default function QuotationsPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [search, setSearch] = useState('')
+  const [customerId, setCustomerId] = useState('')
+  const [customerLabel, setCustomerLabel] = useState('')
+  const [customerQuery, setCustomerQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -53,8 +57,19 @@ export default function QuotationsPage() {
     .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
     .map((s) => ({ value: s.name, label: s.name }))
 
+  const { data: customersData, isLoading: customersLoading } = useQuery({
+    queryKey: ['customerSearch', customerQuery],
+    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
+  })
+
+  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
+    value: c.id,
+    label: c.customerName,
+    sublabel: c.rnc ?? c.cedula,
+  }))
+
   const params: ListQuotationsParams = {
-    search: search || undefined,
+    customer: customerId || undefined,
     status: status === 'all' ? undefined : status,
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
@@ -91,13 +106,15 @@ export default function QuotationsPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={15} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por cliente..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+          <div style={{ width: 260 }}>
+            <SearchSelect
+              value={customerId}
+              selectedLabel={customerLabel}
+              onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
+              options={customerOptions}
+              onSearch={setCustomerQuery}
+              loading={customersLoading}
+              placeholder="Filtrar por cliente…"
             />
           </div>
           <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
@@ -118,20 +135,20 @@ export default function QuotationsPage() {
               placeholder="Todas las sucursales"
             />
           </div>
-          <input
-            type="date"
+          <DatePicker
             className="ff-input ff-input-sm"
             value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
+            onChange={setFromDate}
             style={{ width: 144 }}
+            clearable
           />
           <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-          <input
-            type="date"
+          <DatePicker
             className="ff-input ff-input-sm"
             value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
+            onChange={setToDate}
             style={{ width: 144 }}
+            clearable
           />
         </div>
       </div>

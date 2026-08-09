@@ -13,6 +13,7 @@ import {
 } from '@/shared/api/ejercicioFiscal'
 import type { EjercicioFiscal, CreateEjercicioFiscalDto } from '@/shared/api/types'
 import { formatDate } from '@/lib/formatters'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 export default function EjercicioFiscalSection() {
   const queryClient = useQueryClient()
@@ -226,20 +227,18 @@ export default function EjercicioFiscalSection() {
               </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Fecha de inicio</label>
-                <input
-                  type="date"
+                <DatePicker
                   className="ff-input"
                   value={formStart}
-                  onChange={(e) => setFormStart(e.target.value)}
+                  onChange={setFormStart}
                 />
               </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Fecha de fin</label>
-                <input
-                  type="date"
+                <DatePicker
                   className="ff-input"
                   value={formEnd}
-                  onChange={(e) => setFormEnd(e.target.value)}
+                  onChange={setFormEnd}
                 />
               </div>
               {formError && (

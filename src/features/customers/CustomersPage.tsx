@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -6,10 +6,13 @@ import { listCustomers, deleteCustomer } from '@/shared/api/customers'
 import { downloadEstadoCuentaPdf } from '@/shared/api/cobros'
 import type { Customer, ApiError } from '@/shared/api/types'
 import { useDebounce } from '@/lib/useDebounce'
-import { Plus, Pencil, Ban, ChevronLeft, ChevronRight, Search, Download } from 'lucide-react'
+import { Plus, Pencil, Ban, ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { Select, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { TIPO_IDENTIFICACION } from '@/lib/constants'
 
 const PAGE_SIZE = 20
 
@@ -17,21 +20,57 @@ export default function CustomersPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const [search, setSearch] = useState('')
   const [showDisabled, setShowDisabled] = useState(false)
+  const [customerName, setCustomerName] = useState('')
+  const [customerType, setCustomerType] = useState('all')
+  const [tipoIdentificacion, setTipoIdentificacion] = useState('all')
+  const [identificacion, setIdentificacion] = useState('')
+  const [hasCredit, setHasCredit] = useState('all')
+  const [createdAtFrom, setCreatedAtFrom] = useState('')
+  const [createdAtTo, setCreatedAtTo] = useState('')
+  const [creditLimitMin, setCreditLimitMin] = useState('')
+  const [creditLimitMax, setCreditLimitMax] = useState('')
+  const [creditDaysMin, setCreditDaysMin] = useState('')
+  const [creditDaysMax, setCreditDaysMax] = useState('')
   const [page, setPage] = useState(1)
   const [toDisable, setToDisable] = useState<Customer | null>(null)
   const { orderBy, sort } = useSortState()
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedCustomerName = useDebounce(customerName, 300)
+  const debouncedIdentificacion = useDebounce(identificacion, 300)
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['customers', { search: debouncedSearch, showDisabled, offset, orderBy }],
+    queryKey: ['customers', {
+      showDisabled,
+      customerName: debouncedCustomerName,
+      customerType,
+      tipoIdentificacion,
+      identificacion: debouncedIdentificacion,
+      hasCredit,
+      createdAtFrom,
+      createdAtTo,
+      creditLimitMin,
+      creditLimitMax,
+      creditDaysMin,
+      creditDaysMax,
+      offset,
+      orderBy,
+    }],
     queryFn: () =>
       listCustomers({
-        search: debouncedSearch || undefined,
         disabled: showDisabled || undefined,
+        customerName: debouncedCustomerName || undefined,
+        customerType: customerType === 'all' ? undefined : (customerType as 'Company' | 'Individual'),
+        tipoIdentificacion: tipoIdentificacion === 'all' ? undefined : tipoIdentificacion,
+        identificacion: debouncedIdentificacion || undefined,
+        hasCredit: hasCredit === 'all' ? undefined : hasCredit === 'true',
+        createdAtFrom: createdAtFrom || undefined,
+        createdAtTo: createdAtTo || undefined,
+        creditLimitMin: creditLimitMin !== '' ? Number(creditLimitMin) : undefined,
+        creditLimitMax: creditLimitMax !== '' ? Number(creditLimitMax) : undefined,
+        creditDaysMin: creditDaysMin !== '' ? Number(creditDaysMin) : undefined,
+        creditDaysMax: creditDaysMax !== '' ? Number(creditDaysMax) : undefined,
         limit: PAGE_SIZE,
         offset,
         orderBy: orderBy || undefined,
@@ -49,14 +88,6 @@ export default function CustomersPage() {
       toast.error(err?.message ?? 'Error al desactivar el cliente')
     },
   })
-
-  const handleSearchChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setSearch(e.target.value)
-      setPage(1)
-    },
-    [],
-  )
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
 
@@ -79,18 +110,47 @@ export default function CustomersPage() {
         </button>
       </div>
 
-      <div className="filter-bar">
+      <div className="filter-bar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
         <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={15} className="search-input-icon" />
+          <div style={{ width: 200 }}>
             <input
-              className="search-input"
-              placeholder="Buscar por nombre, RNC, cédula…"
-              value={search}
-              onChange={handleSearchChange}
+              className="ff-input ff-input-sm"
+              placeholder="Nombre del cliente…"
+              value={customerName}
+              onChange={(e) => { setCustomerName(e.target.value); setPage(1) }}
             />
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+          <div style={{ width: 160 }}>
+            <Select value={customerType} onValueChange={(val) => { setCustomerType(val); setPage(1) }}>
+              <SelectItem value="all">Todos los tipos</SelectItem>
+              <SelectItem value="Company">Empresa</SelectItem>
+              <SelectItem value="Individual">Individual</SelectItem>
+            </Select>
+          </div>
+          <div style={{ width: 180 }}>
+            <Select value={tipoIdentificacion} onValueChange={(val) => { setTipoIdentificacion(val); setPage(1) }}>
+              <SelectItem value="all">Todas las identificaciones</SelectItem>
+              {TIPO_IDENTIFICACION.map((t) => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              ))}
+            </Select>
+          </div>
+          <div style={{ width: 180 }}>
+            <input
+              className="ff-input ff-input-sm"
+              placeholder="RNC o Cédula…"
+              value={identificacion}
+              onChange={(e) => { setIdentificacion(e.target.value); setPage(1) }}
+            />
+          </div>
+          <div style={{ width: 160 }}>
+            <Select value={hasCredit} onValueChange={(val) => { setHasCredit(val); setPage(1) }}>
+              <SelectItem value="all">Crédito: Todos</SelectItem>
+              <SelectItem value="true">Con crédito</SelectItem>
+              <SelectItem value="false">Sin crédito</SelectItem>
+            </Select>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
             <input
               type="checkbox"
               checked={showDisabled}
@@ -101,6 +161,69 @@ export default function CustomersPage() {
             />
             Mostrar desactivados
           </label>
+        </div>
+
+        <div className="filter-bar-left">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="td-muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>Fecha creación</span>
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={createdAtFrom}
+              onChange={(val) => { setCreatedAtFrom(val); setPage(1) }}
+              style={{ width: 140 }}
+              clearable
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={createdAtTo}
+              onChange={(val) => { setCreatedAtTo(val); setPage(1) }}
+              style={{ width: 140 }}
+              clearable
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="td-muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>Límite de crédito</span>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 96 }}
+              placeholder="Mín."
+              value={creditLimitMin}
+              onChange={(e) => { setCreditLimitMin(e.target.value); setPage(1) }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 96 }}
+              placeholder="Máx."
+              value={creditLimitMax}
+              onChange={(e) => { setCreditLimitMax(e.target.value); setPage(1) }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="td-muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>Días de crédito</span>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 80 }}
+              placeholder="Mín."
+              value={creditDaysMin}
+              onChange={(e) => { setCreditDaysMin(e.target.value); setPage(1) }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 80 }}
+              placeholder="Máx."
+              value={creditDaysMax}
+              onChange={(e) => { setCreditDaysMax(e.target.value); setPage(1) }}
+            />
+          </div>
         </div>
       </div>
 

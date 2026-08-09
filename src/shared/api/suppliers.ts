@@ -11,6 +11,10 @@ export interface ListSuppliersParams extends PaginationParams {
   disabled?: boolean
   esProveedorExterior?: boolean
   supplierGroup?: string
+  rnc?: string
+  supplierType?: 'Company' | 'Individual'
+  diasCreditoMin?: number
+  diasCreditoMax?: number
 }
 
 export async function listSuppliers(params?: ListSuppliersParams) {

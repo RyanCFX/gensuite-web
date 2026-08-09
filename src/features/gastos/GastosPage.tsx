@@ -12,6 +12,7 @@ import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 const PAGE_SIZE = 20
 
@@ -45,6 +46,9 @@ export default function GastosPage() {
   const [esDeducible, setEsDeducible] = useState<string>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [ncfProveedor, setNcfProveedor] = useState('')
+  const [grandTotalMin, setGrandTotalMin] = useState('')
+  const [grandTotalMax, setGrandTotalMax] = useState('')
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
 
@@ -66,7 +70,7 @@ export default function GastosPage() {
   })
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['gastos', { supplier, status, tipoComprobante, esDeducible, fromDate, toDate, offset, orderBy }],
+    queryKey: ['gastos', { supplier, status, tipoComprobante, esDeducible, fromDate, toDate, ncfProveedor, grandTotalMin, grandTotalMax, offset, orderBy }],
     queryFn: () =>
       listGastos({
         supplier: supplier || undefined,
@@ -75,6 +79,9 @@ export default function GastosPage() {
         esDeducible: esDeducible !== 'all' ? esDeducible === 'true' : undefined,
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
+        ncfProveedor: ncfProveedor || undefined,
+        grandTotalMin: grandTotalMin ? Number(grandTotalMin) : undefined,
+        grandTotalMax: grandTotalMax ? Number(grandTotalMax) : undefined,
         orderBy: orderBy || undefined,
         limit: PAGE_SIZE,
         offset,
@@ -166,8 +173,34 @@ export default function GastosPage() {
               <SelectItem value="true">Deducibles</SelectItem>
               <SelectItem value="false">No deducibles</SelectItem>
             </Select>
-            <input type="date" className="filter-select" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }} />
-            <input type="date" className="filter-select" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }} />
+            <DatePicker className="filter-select" value={fromDate} onChange={(v) => { setFromDate(v); setPage(1) }} clearable />
+            <DatePicker className="filter-select" value={toDate} onChange={(v) => { setToDate(v); setPage(1) }} clearable />
+            <div className="search-input-wrap">
+              <Search size={14} className="search-input-icon" />
+              <input
+                className="search-input"
+                placeholder="Buscar NCF del proveedor…"
+                value={ncfProveedor}
+                onChange={(e) => { setNcfProveedor(e.target.value); setPage(1) }}
+              />
+            </div>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 100 }}
+              placeholder="Total min"
+              value={grandTotalMin}
+              onChange={(e) => { setGrandTotalMin(e.target.value); setPage(1) }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input ff-input-sm"
+              style={{ width: 100 }}
+              placeholder="Total max"
+              value={grandTotalMax}
+              onChange={(e) => { setGrandTotalMax(e.target.value); setPage(1) }}
+            />
           </div>
         </div>
 

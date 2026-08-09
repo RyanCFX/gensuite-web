@@ -7,6 +7,7 @@ import { getQuotation } from '@/shared/api/quotations'
 import { getLayawayConfig, listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
 import type { Item, ItemPrices, CreatePedidoDto, Bundle } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDOP } from '@/lib/formatters'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -87,6 +88,7 @@ const [customerId, setCustomerId] = useState('')
    const [customerQuery, setCustomerQuery] = useState('')
    const [esClienteOcasional, setEsClienteOcasional] = useState(false)
    const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
+   const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
    const [transactionDate, setTransactionDate] = useState(todayIso())
   const [deliveryDate, setDeliveryDate] = useState(defaultDelivery())
   const [items, setItems] = useState<LineItem[]>([])
@@ -204,6 +206,7 @@ useEffect(() => {
      if (existing.esClienteOcasional) {
        setEsClienteOcasional(true)
        setClienteOcasionalNombre(existing.clienteOcasionalNombre ?? '')
+       setClienteOcasionalDireccion(existing.clienteOcasionalDireccion ?? '')
      }
      setLoaded(true)
    }, [existing])
@@ -448,7 +451,9 @@ function submitDto() {
        warehouse: i.warehouse || undefined,
      }))
      const baseDto = {
-       ...(esClienteOcasional ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined } : { customer: customerId }),
+       ...(esClienteOcasional
+         ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalDireccion: clienteOcasionalDireccion || undefined }
+         : { customer: customerId }),
        transactionDate,
        deliveryDate: deliveryDate || undefined,
        branch: branch || undefined,
@@ -545,6 +550,18 @@ try {
                    />
                  )}
                </div>
+               {esClienteOcasional && (
+                 <div className="ff-wrap">
+                   <label className="ff-label">Dirección</label>
+                   <input
+                     className="ff-input"
+                     value={clienteOcasionalDireccion}
+                     onChange={(e) => setClienteOcasionalDireccion(e.target.value)}
+                     placeholder="Dirección del cliente ocasional (opcional)"
+                   />
+                 </div>
+               )}
+
                <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
                    <input type="checkbox" checked={esClienteOcasional} onChange={(e) => { setEsClienteOcasional(e.target.checked); if (e.target.checked) setCustomerId('') }} />
@@ -558,11 +575,11 @@ try {
                </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Fecha</label>
-                <input type="date" className="ff-input" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
+                <DatePicker value={transactionDate} onChange={setTransactionDate} className="ff-input" />
               </div>
               <div className="ff-wrap">
                 <label className="ff-label">Entrega estimada</label>
-                <input type="date" className="ff-input" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
+                <DatePicker value={deliveryDate} onChange={setDeliveryDate} className="ff-input" clearable />
               </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Sucursal</label>

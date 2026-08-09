@@ -27,6 +27,9 @@ import { getTurnoActual, abrirTurno } from "@/shared/api/pos";
 import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion } from "@/shared/api/types";
 import { MOTIVOS_ANULACION_DGII } from "@/lib/constants";
 import { PaymentLinesEditor } from "@/components/shared/PaymentLinesEditor";
+import { ConfirmModal } from "@/shared/ui/Modal";
+import { useConfirmClose } from "@/shared/hooks/useConfirmClose";
+import { useDirtyCheck } from "@/shared/hooks/useDirtyCheck";
 import {
   EMPTY_PAYMENT_LINES_VALUE,
   isPaymentLinesValid,
@@ -125,6 +128,41 @@ export default function InvoiceDetail() {
   const [returnResolutionSearch, setReturnResolutionSearch] = useState("");
   const [returnModeOfPaymentSearch, setReturnModeOfPaymentSearch] =
     useState("");
+
+  const creditErrorIsDirty = useDirtyCheck(
+    { cashPayments, modeOfPayment },
+    creditErrorOpen,
+  );
+  const creditErrorClose = useConfirmClose(creditErrorIsDirty, () =>
+    setCreditErrorOpen(false),
+  );
+
+  const cancelIsDirty = useDirtyCheck(
+    { cancelReason, cancelMotivo },
+    cancelModalOpen,
+  );
+  const cancelClose = useConfirmClose(cancelIsDirty, () =>
+    setCancelModalOpen(false),
+  );
+
+  const returnIsDirty = useDirtyCheck(
+    {
+      returnFullInvoice,
+      returnRows,
+      returnResolution,
+      returnModeOfPayment,
+      returnReason,
+    },
+    returnModalOpen,
+  );
+  const returnClose = useConfirmClose(returnIsDirty, () =>
+    setReturnModalOpen(false),
+  );
+
+  const turnoIsDirty = useDirtyCheck({ turnoOpeningAmount }, turnoModalOpen);
+  const turnoClose = useConfirmClose(turnoIsDirty, () =>
+    setTurnoModalOpen(false),
+  );
 
   const { data: invoice, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -1084,6 +1122,12 @@ export default function InvoiceDetail() {
                 <span className="detail-value" style={{ fontFamily: 'monospace' }}>{invoice.clienteOcasionalRnc}</span>
               </div>
             )}
+            {invoice.esClienteOcasional && invoice.clienteOcasionalDireccion && (
+              <div className="detail-field">
+                <span className="detail-label">Dirección</span>
+                <span className="detail-value">{invoice.clienteOcasionalDireccion}</span>
+              </div>
+            )}
             <div className="detail-field">
               <span className="detail-label">Fecha</span>
               <span className="detail-value">
@@ -1970,7 +2014,7 @@ export default function InvoiceDetail() {
       {creditErrorOpen && (
         <div
           className="modal-overlay"
-          onClick={() => setCreditErrorOpen(false)}
+          onClick={creditErrorClose.requestClose}
         >
           <div
             className={flujoCobro === "caja" ? "modal-box" : "modal-box modal-box-sm"}
@@ -1989,7 +2033,7 @@ export default function InvoiceDetail() {
               </h2>
               <button
                 className="modal-close"
-                onClick={() => setCreditErrorOpen(false)}
+                onClick={creditErrorClose.requestClose}
               >
                 ×
               </button>
@@ -2030,7 +2074,7 @@ export default function InvoiceDetail() {
             <div className="modal-foot">
               <button
                 className="btn btn-secondary"
-                onClick={() => setCreditErrorOpen(false)}
+                onClick={creditErrorClose.requestClose}
               >
                 Volver
               </button>
@@ -2045,12 +2089,21 @@ export default function InvoiceDetail() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={creditErrorClose.confirming}
+        onClose={creditErrorClose.cancelDiscard}
+        onConfirm={creditErrorClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {/* Modal: cancelar factura con motivo obligatorio */}
       {cancelModalOpen && (
         <div
           className="modal-overlay"
-          onClick={() => setCancelModalOpen(false)}
+          onClick={cancelClose.requestClose}
         >
           <div
             className="modal-box modal-box-sm"
@@ -2066,7 +2119,7 @@ export default function InvoiceDetail() {
               </h2>
               <button
                 className="modal-close"
-                onClick={() => setCancelModalOpen(false)}
+                onClick={cancelClose.requestClose}
               >
                 ×
               </button>
@@ -2126,7 +2179,7 @@ export default function InvoiceDetail() {
             <div className="modal-foot">
               <button
                 className="btn btn-secondary"
-                onClick={() => setCancelModalOpen(false)}
+                onClick={cancelClose.requestClose}
               >
                 Volver
               </button>
@@ -2146,12 +2199,21 @@ export default function InvoiceDetail() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={cancelClose.confirming}
+        onClose={cancelClose.cancelDiscard}
+        onConfirm={cancelClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {/* Modal: devolver producto(s) */}
       {returnModalOpen && (
         <div
           className="modal-overlay"
-          onClick={() => setReturnModalOpen(false)}
+          onClick={returnClose.requestClose}
         >
           <div
             className="modal-box modal-box-lg"
@@ -2167,7 +2229,7 @@ export default function InvoiceDetail() {
               </h2>
               <button
                 className="modal-close"
-                onClick={() => setReturnModalOpen(false)}
+                onClick={returnClose.requestClose}
               >
                 ×
               </button>
@@ -2346,7 +2408,7 @@ export default function InvoiceDetail() {
             <div className="modal-foot">
               <button
                 className="btn btn-secondary"
-                onClick={() => setReturnModalOpen(false)}
+                onClick={returnClose.requestClose}
               >
                 Volver
               </button>
@@ -2362,16 +2424,25 @@ export default function InvoiceDetail() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={returnClose.confirming}
+        onClose={returnClose.cancelDiscard}
+        onConfirm={returnClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {/* Modal: abrir turno */}
       {turnoModalOpen && (
-        <div className="modal-overlay" onClick={() => setTurnoModalOpen(false)}>
+        <div className="modal-overlay" onClick={turnoClose.requestClose}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Clock size={16} /> Abrir turno de caja
               </h2>
-              <button className="modal-close" onClick={() => setTurnoModalOpen(false)}>×</button>
+              <button className="modal-close" onClick={turnoClose.requestClose}>×</button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="ff-wrap">
@@ -2390,7 +2461,7 @@ export default function InvoiceDetail() {
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setTurnoModalOpen(false)}>
+              <button className="btn btn-secondary" onClick={turnoClose.requestClose}>
                 Cancelar
               </button>
               <button
@@ -2404,6 +2475,15 @@ export default function InvoiceDetail() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={turnoClose.confirming}
+        onClose={turnoClose.cancelDiscard}
+        onConfirm={turnoClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
       <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
     </div>
   );

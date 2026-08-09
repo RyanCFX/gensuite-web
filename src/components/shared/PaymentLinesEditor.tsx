@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { listMetodosPago, listBancos, listDenominaciones } from '@/shared/api/config'
+import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import {
   emptyPaymentLine,
   sumPayments,
@@ -41,9 +42,15 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
   const { data: metodos } = useQuery({ queryKey: ['metodos-pago'], queryFn: listMetodosPago, staleTime: 5 * 60_000 })
   const { data: bancos } = useQuery({ queryKey: ['bancos'], queryFn: listBancos, staleTime: 5 * 60_000 })
   const { data: denominaciones } = useQuery({ queryKey: ['denominaciones'], queryFn: listDenominaciones, staleTime: 5 * 60_000 })
+  const { data: cuentasBancarias } = useQuery({
+    queryKey: ['cuentas-bancarias-activas'],
+    queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
+    staleTime: 60_000,
+  })
 
   const [metodoSearch, setMetodoSearch] = useState<Record<number, string>>({})
   const [bancoSearch, setBancoSearch] = useState<Record<number, string>>({})
+  const [bankAccountSearch, setBankAccountSearch] = useState<Record<number, string>>({})
   const [vueltoDenomSearch, setVueltoDenomSearch] = useState<Record<number, string>>({})
   const prevTenderedCashRef = useRef<string>('')
 
@@ -149,6 +156,29 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
                 <Trash2 size={13} />
               </button>
             </div>
+
+            {(() => {
+              const metodo = metodosActivos.find((m) => m.name === p.modeOfPayment)
+              if (!metodo?.requiresBankAccount) return null
+              return (
+                <div className="ff-wrap">
+                  <label className="ff-label">
+                    Cuenta Bancaria{!metodo.defaultBankAccount && <span className="ff-required"> *</span>}
+                  </label>
+                  <SearchSelect
+                    value={p.bankAccount}
+                    error={!metodo.defaultBankAccount && !p.bankAccount}
+                    onChange={(val) => updateLine(idx, { bankAccount: val })}
+                    options={(cuentasBancarias?.items ?? [])
+                      .filter((c) => !bankAccountSearch[idx] || c.accountName.toLowerCase().includes(bankAccountSearch[idx].toLowerCase()))
+                      .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))}
+                    onSearch={(q) => setBankAccountSearch((prev) => ({ ...prev, [idx]: q }))}
+                    selectedLabel={cuentasBancarias?.items.find((c) => c.id === p.bankAccount)?.accountName ?? ''}
+                    placeholder={metodo.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
+                  />
+                </div>
+              )
+            })()}
 
             <button
               type="button"

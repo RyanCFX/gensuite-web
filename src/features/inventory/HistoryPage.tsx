@@ -10,6 +10,7 @@ import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 const PAGE_SIZE = 30
 
@@ -108,18 +109,18 @@ export default function HistoryPage() {
             ))}
           </Select>
 
-          <input
-            type="date"
+          <DatePicker
             className="filter-select"
             value={fromDate}
-            onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
+            onChange={(v) => { setFromDate(v); setPage(1) }}
+            clearable
           />
           <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-          <input
-            type="date"
+          <DatePicker
             className="filter-select"
             value={toDate}
-            onChange={(e) => { setToDate(e.target.value); setPage(1) }}
+            onChange={(v) => { setToDate(v); setPage(1) }}
+            clearable
           />
         </div>
       </div>

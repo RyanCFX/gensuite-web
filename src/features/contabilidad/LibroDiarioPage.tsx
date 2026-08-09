@@ -7,6 +7,7 @@ import { getLibroDiario, downloadLibroDiarioPdf, type LibroDiarioParams } from '
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 function firstOfMonth(): string {
   const d = new Date()
@@ -114,20 +115,20 @@ export default function LibroDiarioPage() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
             <div className="ff-wrap">
               <label className="ff-label">Desde</label>
-              <input
-                type="date"
+              <DatePicker
                 className="ff-input"
                 value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
+                onChange={setFromDate}
+                clearable
               />
             </div>
             <div className="ff-wrap">
               <label className="ff-label">Hasta</label>
-              <input
-                type="date"
+              <DatePicker
                 className="ff-input"
                 value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
+                onChange={setToDate}
+                clearable
               />
             </div>
             <div className="ff-wrap" style={{ minWidth: 240 }}>

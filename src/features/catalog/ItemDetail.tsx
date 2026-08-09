@@ -12,6 +12,9 @@ import type { Item, GenerateVariantsResult, ItemAttribute, ApiError, UpdateItemP
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 
 // ─── Update Prices Modal ──────────────────────────────────────────────────────
 
@@ -42,6 +45,12 @@ function UpdatePricesModal({
   const [marginC, setMarginC] = useState(item.marginC?.toString() ?? '')
 
   const isCostPlus = priceMode === 'cost_plus'
+
+  const isDirty = useDirtyCheck(
+    { purchasePrice, standardRate, priceMode, priceA, priceB, priceC, marginA, marginB, marginC },
+    true,
+  )
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
 
   const mutation = useMutation({
     mutationFn: (data: UpdateItemPricesDto) => updateItemPrices(item.id, data),
@@ -91,11 +100,11 @@ function UpdatePricesModal({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2 className="modal-title">Actualizar Precios</h2>
-          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+          <button className="modal-close" onClick={requestClose}><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -207,13 +216,22 @@ function UpdatePricesModal({
             )}
           </div>
           <div className="modal-foot">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+            <button type="button" className="btn btn-secondary" onClick={requestClose}>Cancelar</button>
             <button type="submit" className="btn btn-primary" disabled={mutation.isPending}>
               {mutation.isPending ? 'Guardando…' : 'Guardar'}
             </button>
           </div>
         </form>
       </div>
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }
@@ -310,6 +328,9 @@ function CreateVariantModal({
   const [attrSearches, setAttrSearches] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
 
+  const isDirty = useDirtyCheck({ standardRate, attrValues }, true)
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
@@ -330,11 +351,11 @@ function CreateVariantModal({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2 className="modal-title">Agregar variante</h2>
-          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+          <button className="modal-close" onClick={requestClose}><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -384,13 +405,22 @@ function CreateVariantModal({
             </div>
           </div>
           <div className="modal-foot">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+            <button type="button" className="btn btn-secondary" onClick={requestClose}>Cancelar</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
               {saving ? 'Guardando…' : 'Crear variante'}
             </button>
           </div>
         </form>
       </div>
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }
@@ -568,6 +598,9 @@ function AssignUbicacionModal({
   const [esPrincipal, setEsPrincipal] = useState(false)
   const [notas, setNotas] = useState('')
 
+  const isDirty = useDirtyCheck({ zonaId, ubicacionId, esPrincipal, notas }, true)
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
+
   const { data: zonasData } = useQuery({
     queryKey: ['zonas', warehouse],
     queryFn: () => listZonas({ warehouse, limit: 100 }),
@@ -601,11 +634,11 @@ function AssignUbicacionModal({
   })
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2 className="modal-title">Asignar ubicación</h2>
-          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+          <button className="modal-close" onClick={requestClose}><X size={16} /></button>
         </div>
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="ff-wrap">
@@ -644,7 +677,7 @@ function AssignUbicacionModal({
           </div>
         </div>
         <div className="modal-foot">
-          <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-secondary" onClick={requestClose}>Cancelar</button>
           <button
             className="btn btn-primary"
             onClick={() => assignMutation.mutate()}
@@ -654,6 +687,15 @@ function AssignUbicacionModal({
           </button>
         </div>
       </div>
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }
@@ -677,6 +719,9 @@ function MoverUbicacionModal({
   const [ubicacionDestino, setUbicacionDestino] = useState('')
   const [cantidad, setCantidad] = useState(1)
   const [notas, setNotas] = useState('')
+
+  const isDirty = useDirtyCheck({ zonaId, ubicacionDestino, cantidad, notas }, true)
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
 
   const { data: zonasData } = useQuery({
     queryKey: ['zonas', warehouse],
@@ -711,11 +756,11 @@ function MoverUbicacionModal({
   })
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2 className="modal-title">Mover stock</h2>
-          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+          <button className="modal-close" onClick={requestClose}><X size={16} /></button>
         </div>
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="ff-wrap">
@@ -762,7 +807,7 @@ function MoverUbicacionModal({
           </div>
         </div>
         <div className="modal-foot">
-          <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-secondary" onClick={requestClose}>Cancelar</button>
           <button
             className="btn btn-primary"
             onClick={() => moverMutation.mutate()}
@@ -772,6 +817,15 @@ function MoverUbicacionModal({
           </button>
         </div>
       </div>
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }

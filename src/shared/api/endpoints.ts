@@ -2,6 +2,9 @@ export const ENDPOINTS = {
   auth: {
     login: '/auth/login',
     verifyAdminPin: '/auth/verify-admin-pin',
+    forgotPassword: '/auth/forgot-password',
+    resetPassword: '/auth/reset-password',
+    completeRegistration: '/auth/complete-registration',
   },
   customers: {
     list: '/customers',
@@ -129,6 +132,14 @@ export const ENDPOINTS = {
     delete: (id: string) => `/compras/${id}`,
     pdf: (id: string) => `/compras/${id}/pdf`,
   },
+  purchaseReceipt: {
+    list: '/compras/purchase-receipt',
+    byId: (id: string) => `/compras/purchase-receipt/${id}`,
+    submit: (id: string) => `/compras/purchase-receipt/${id}/submit`,
+    cancel: (id: string) => `/compras/purchase-receipt/${id}/cancel`,
+    amend: (id: string) => `/compras/purchase-receipt/${id}/amend`,
+    facturar: (id: string) => `/compras/purchase-receipt/${id}/facturar`,
+  },
   pedidos: {
     list: '/pedidos',
     byId: (id: string) => `/pedidos/${id}`,
@@ -227,6 +238,7 @@ export const ENDPOINTS = {
     turnoCerrar: (openingEntryId: string) => `/pos/turnos/${encodeURIComponent(openingEntryId)}/cerrar`,
     turnos: '/pos/turnos',
     turnoById: (id: string) => `/pos/turnos/${encodeURIComponent(id)}`,
+    turnoPdf: (id: string) => `/pos/turnos/${encodeURIComponent(id)}/pdf`,
   },
   caja: {
     pendientes: '/caja/pendientes',
@@ -298,6 +310,8 @@ export const ENDPOINTS = {
     libroMayorPdf: '/reportes/libro-mayor/pdf',
     cuadreTurno: '/reportes/pos/cuadre-turno',
     cuadreTurnoPdf: '/reportes/pos/cuadre-turno/pdf',
+    corteCajaDia: '/reportes/pos/corte-caja-dia',
+    corteCajaDiaPdf: '/reportes/pos/corte-caja-dia/pdf',
   },
   cuentasMovimientos: {
     byId: (id: string) => `/cuentas/${encodeURIComponent(id)}/movimientos`,
@@ -306,6 +320,15 @@ export const ENDPOINTS = {
     list: '/centros-costo',
     tree: '/centros-costo/tree',
     byId: (id: string) => `/centros-costo/${encodeURIComponent(id)}`,
+  },
+  cuentasBancarias: {
+    list: '/cuentas-bancarias',
+    byId: (id: string) => `/cuentas-bancarias/${encodeURIComponent(id)}`,
+    balance: (id: string) => `/cuentas-bancarias/${encodeURIComponent(id)}/balance`,
+    bancos: {
+      list: '/cuentas-bancarias/bancos',
+      byId: (id: string) => `/cuentas-bancarias/bancos/${encodeURIComponent(id)}`,
+    },
   },
   departamentos: {
     list: '/departamentos',
@@ -321,6 +344,7 @@ export const ENDPOINTS = {
     byId: (id: string) => `/compras/costos-importacion/${encodeURIComponent(id)}`,
     submit: (id: string) => `/compras/costos-importacion/${encodeURIComponent(id)}/submit`,
     cancel: (id: string) => `/compras/costos-importacion/${encodeURIComponent(id)}/cancel`,
+    tiposDocumento: '/compras/costos-importacion/tipos-documento',
   },
   settings: {
     accounts: '/config/accounts-settings',

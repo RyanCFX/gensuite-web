@@ -8,6 +8,9 @@ import {
 import { listSucursales } from '@/shared/api/sucursales'
 import type { Usuario, CreateUsuarioDto, UpdateUsuarioDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { formatDate } from '@/lib/formatters'
 import { Plus, Ban, KeyRound, UserCheck, Pencil, X } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
@@ -121,6 +124,12 @@ export default function UsuariosPage() {
   })
 
   const isSystemManager = selectedRoles.includes(SYSTEM_MANAGER_ROLE)
+
+  const formIsDirty = useDirtyCheck(
+    { email, firstName, lastName, maxDiscountPct, selectedRoles, selectedBranches, defaultBranch },
+    showForm && (!editingUser || !!usuarioSucursales),
+  )
+  const formClose = useConfirmClose(formIsDirty, resetForm)
 
   function openEdit(user: Usuario) {
     setEditingUser(user)
@@ -283,14 +292,14 @@ export default function UsuariosPage() {
 
       {/* User Form Modal */}
       {showForm && (
-        <div className="modal-overlay" onClick={resetForm}>
+        <div className="modal-overlay" onClick={formClose.requestClose}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <div>
                 <h2 className="modal-title">{editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}</h2>
                 <p className="modal-sub">{editingUser ? 'Actualiza los datos del usuario.' : 'Crea un nuevo usuario con acceso al sistema.'}</p>
               </div>
-              <button className="modal-close" onClick={resetForm}><X size={16} /></button>
+              <button className="modal-close" onClick={formClose.requestClose}><X size={16} /></button>
             </div>
               <form onSubmit={handleSubmit}>
               <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
@@ -450,7 +459,7 @@ export default function UsuariosPage() {
                 )}
               </div>
               <div className="modal-foot">
-                <button type="button" className="btn btn-secondary" onClick={resetForm}>Cancelar</button>
+                <button type="button" className="btn btn-secondary" onClick={formClose.requestClose}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={createMutation.isPending || updateMutation.isPending}>
                   {(createMutation.isPending || updateMutation.isPending) ? 'Guardando…' : (editingUser ? 'Guardar Cambios' : 'Crear Usuario')}
                 </button>
@@ -459,6 +468,16 @@ export default function UsuariosPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={formClose.confirming}
+        onClose={formClose.cancelDiscard}
+        onConfirm={formClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {/* Confirm disable/enable */}
       {confirm && (

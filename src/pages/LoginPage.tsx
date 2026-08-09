@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -137,6 +137,11 @@ export default function LoginPage() {
           {errors.password?.message && (
             <span className="form-error">{errors.password.message}</span>
           )}
+          <div style={{ textAlign: 'right', marginTop: 4 }}>
+            <Link to="/forgot-password" className="auth-link" style={{ fontSize: 13 }}>
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
         </div>
 
         <div className="form-field">
