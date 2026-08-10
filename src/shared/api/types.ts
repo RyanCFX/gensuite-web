@@ -118,6 +118,7 @@ export interface Customer {
   birthday?: string;
   photo?: string;
   disabled: boolean;
+  isSystemManaged?: boolean;
   customerGroup?: string;
   priceTier?: "A" | "B" | "C";
   createdAt: string;
@@ -1245,6 +1246,35 @@ export interface Warehouse {
   parent?: string;
 }
 
+// ─── Cajas (POS Profiles) — soporte de múltiples cajas simultáneas ────────────
+
+export interface Caja {
+  id: string;
+  label: string;
+  company: string;
+  warehouse: string;
+  branch?: string | null;
+  disabled: boolean;
+  /** true si esta caja tiene un turno abierto ahora mismo */
+  isOpen: boolean;
+  /** true si es la caja por defecto del usuario que hace la consulta */
+  isUserDefault: boolean;
+  /** true si es la caja default del tenant (creada al habilitar POS) */
+  isTenantDefault: boolean;
+}
+
+export interface CreateCajaDto {
+  label: string;
+  warehouse: string;
+  branch?: string;
+}
+
+export interface UpdateCajaDto {
+  warehouse?: string;
+  branch?: string;
+  disabled?: boolean;
+}
+
 // ─── Sucursales (Branches) ─────────────────────────────────────────────────────
 
 export interface Sucursal {
@@ -1593,6 +1623,8 @@ export interface Usuario {
   defaultWarehouse?: string;
   branches?: string[];
   defaultBranch?: string;
+  /** Caja (POS Profile) por defecto al abrir turno, id de src/shared/api/cajas.ts listCajas() */
+  defaultPosProfile?: string;
 }
 
 export interface CreateUsuarioDto {
@@ -1618,6 +1650,7 @@ export interface UpdateUsuarioDto {
   maxDiscountPct?: number;
   branches?: string[];
   defaultBranch?: string;
+  defaultPosProfile?: string;
 }
 
 export interface Role {
@@ -1850,6 +1883,8 @@ export interface FacturacionConfig {
   modosPagoConciliar?: string[];
   /** Si está activo, cerrar un turno de caja exige el desglose de denominaciones contadas para el/los modos de pago en efectivo. */
   arqueoEfectivoRequerido?: boolean;
+  /** Roles de ERPNext autorizados para cerrar el turno de OTRO cajero (mismas validaciones que cerrar el propio turno). Vacío/omitido = nadie puede cerrar turnos ajenos. */
+  rolesCierreCajaAjena?: string[];
 /** Formato de impresión default al generar el PDF de una factura, cobro o compra. "a4"/"carta"/"a6": página completa (mismo diseño, distinto tamaño de papel). "pos": ticket angosto 80mm para impresora térmica. Siempre debe estar incluido en formatosPermitidos. */
   formatoImpresionDefault?: FormatoImpresion
   /** Formatos de impresión habilitados para este tenant — el selector de formato al generar un PDF solo debe ofrecer estos. Si nunca se configuró, vienen los 4. Mínimo 1. */
@@ -1936,6 +1971,10 @@ export interface CierreTurnoResult {
   id: string;
   status: string;
   paymentReconciliation: PaymentReconciliationLine[];
+  /** El cajero DUEÑO del turno (sin cambios). */
+  user?: string;
+  /** Quién ejecutó el cierre realmente — igual a `user` en el caso normal, distinto cuando un supervisor cerró el turno de otro cajero. */
+  closedBy?: string;
 }
 
 // GET /pos/turnos — fila del historial de turnos
@@ -1959,6 +1998,8 @@ export interface TurnoDetail {
    posProfile: string;
    company: string;
    user: string;
+   /** Quién ejecutó el cierre realmente (presente cuando el turno ya cerró) — igual a `user` en el caso normal, distinto cuando un supervisor cerró el turno de otro cajero. */
+   closedBy?: string;
    periodStartDate: string;
    modeOfPayment?: string;
    openingAmount?: number;
@@ -1971,6 +2012,8 @@ export interface TurnoClosing {
   posOpeningEntry: string;
   posProfile: string;
   user: string;
+  /** Quién ejecutó el cierre realmente — igual a `user` en el caso normal, distinto cuando un supervisor cerró el turno de otro cajero. */
+  closedBy?: string;
   periodStartDate: string;
   periodEndDate: string;
   grandTotal: number;

@@ -121,7 +121,7 @@ export default function TurnoDetailPage() {
 
       {/* Información de cierre (si existe) */}
       {turno.closing ? (
-        <ClosingSection closing={turno.closing} />
+        <ClosingSection closing={turno.closing} turnoCajero={turno.user} closedBy={turno.closedBy} />
       ) : (
         <div className="card">
           <div className="card-body">
@@ -138,7 +138,7 @@ export default function TurnoDetailPage() {
   )
 }
 
-function ClosingSection({ closing }: { closing: TurnoClosing }) {
+function ClosingSection({ closing, turnoCajero, closedBy }: { closing: TurnoClosing; turnoCajero: string; closedBy?: string }) {
   const { data: denominaciones } = useQuery({
     queryKey: ['denominaciones'],
     queryFn: listDenominaciones,
@@ -164,6 +164,28 @@ function ClosingSection({ closing }: { closing: TurnoClosing }) {
           <span style={{ fontWeight: 500 }}>{formatDateTime(closing.periodStartDate)}</span>
           <span style={{ color: 'var(--text-secondary)' }}>Fecha de cierre</span>
           <span style={{ fontWeight: 500 }}>{formatDateTime(closing.periodEndDate)}</span>
+          {(() => {
+            const cerradoPor = closedBy ?? closing.closedBy
+            if (!cerradoPor) return null
+            const esSupervisor = cerradoPor !== turnoCajero
+            return (
+              <>
+                <span style={{ color: 'var(--text-secondary)' }}>Cerrado por</span>
+                <span style={{ fontWeight: 500 }}>
+                  {cerradoPor}
+                  {esSupervisor && (
+                    <span
+                      className="badge badge-info"
+                      style={{ marginLeft: 6, fontSize: 10 }}
+                      title={`El turno pertenece a ${turnoCajero}, pero lo cerró ${cerradoPor}`}
+                    >
+                      Supervisor
+                    </span>
+                  )}
+                </span>
+              </>
+            )
+          })()}
           <span style={{ color: 'var(--text-secondary)' }}>Total facturado</span>
           <span style={{ fontWeight: 600 }}>{formatDOP(closing.grandTotal)}</span>
           <span style={{ color: 'var(--text-secondary)' }}>Total neto</span>

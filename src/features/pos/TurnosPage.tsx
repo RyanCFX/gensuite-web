@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { ChevronLeft, ChevronRight, Lock } from 'lucide-react'
 import { listTurnos, type ListTurnosParams } from '@/shared/api/pos'
 import { listUsuarios } from '@/shared/api/usuarios'
 import { formatDateTime, formatDOP } from '@/lib/formatters'
@@ -9,6 +9,8 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { CerrarTurnoModal } from '@/components/shared/CerrarTurnoModal'
+import type { TurnoListItem } from '@/shared/api/types'
 
 const PAGE_SIZE = 20
 
@@ -25,6 +27,7 @@ type StatusFilter = 'Open' | 'Closed' | 'all'
 
 export default function TurnosPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [cajero, setCajero] = useState('')
   const [cajeroLabel, setCajeroLabel] = useState('')
   const [cajeroQuery, setCajeroQuery] = useState('')
@@ -34,6 +37,7 @@ export default function TurnosPage() {
   const [grandTotalMin, setGrandTotalMin] = useState('')
   const [grandTotalMax, setGrandTotalMax] = useState('')
   const [page, setPage] = useState(1)
+  const [closeTarget, setCloseTarget] = useState<TurnoListItem | null>(null)
 
   const offset = (page - 1) * PAGE_SIZE
 
@@ -144,14 +148,15 @@ export default function TurnosPage() {
                 <th>Cierre</th>
                 <th>Total</th>
                 <th>Diferencia</th>
-                <th style={{ width: 80 }} />
+                <th>Estado</th>
+                <th style={{ width: 90 }} />
               </tr>
             </thead>
             <tbody>
               {isLoading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 9 }).map((__, j) => (
+                      {Array.from({ length: 10 }).map((__, j) => (
                         <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                       ))}
                     </tr>
@@ -159,7 +164,7 @@ export default function TurnosPage() {
                 : turnos.length === 0
                   ? (
                       <tr>
-                        <td colSpan={9}>
+                        <td colSpan={10}>
                           <div className="empty-state">
                             <p className="empty-title">Sin turnos</p>
                             <p className="empty-sub">No se encontraron turnos de caja con los filtros actuales.</p>
@@ -209,6 +214,19 @@ export default function TurnosPage() {
                             {STATUS_LABEL[t.status] ?? t.status}
                           </span>
                         </td>
+                        <td>
+                          {t.status === 'Open' ? (
+                            <button
+                              className="btn btn-secondary btn-size-xs"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setCloseTarget(t)
+                              }}
+                            >
+                              <Lock size={12} /> Cerrar
+                            </button>
+                          ) : null}
+                        </td>
                       </tr>
                     ))}
             </tbody>
@@ -234,6 +252,21 @@ export default function TurnosPage() {
           </div>
         )}
       </div>
+
+      <CerrarTurnoModal
+        open={!!closeTarget}
+        openingEntryId={closeTarget?.id ?? null}
+        turnoLabel={
+          closeTarget
+            ? `Cerrando el turno de ${closeTarget.cajero}${closeTarget.posProfile ? ` (${closeTarget.posProfile})` : ''}.`
+            : undefined
+        }
+        onClose={() => setCloseTarget(null)}
+        onClosed={() => {
+          queryClient.invalidateQueries({ queryKey: ['turnos'] })
+          if (closeTarget) queryClient.invalidateQueries({ queryKey: ['turno', closeTarget.id] })
+        }}
+      />
     </div>
   )
 }

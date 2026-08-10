@@ -18,7 +18,6 @@ import {
 import type { LibroDiarioByDimension, CuadreTurnoRow, CorteCajaDiaTurno } from '@/shared/api/types'
 import { CorteCajaView } from '@/components/shared/CorteCajaView'
 import { listSucursales } from '@/shared/api/sucursales'
-import { listDepartamentos } from '@/shared/api/departamentos'
 import { listUsuarios } from '@/shared/api/usuarios'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { formatDate, formatDateTime, formatDOP } from '@/lib/formatters'
@@ -39,21 +38,10 @@ function useBranchOptions() {
   return data?.items ?? []
 }
 
-function useDepartmentOptions() {
-  const { data } = useQuery({
-    queryKey: ['reportes-departamentos-options'],
-    queryFn: () => listDepartamentos({ limit: 100 }),
-    staleTime: 60_000,
-  })
-  return data?.items ?? []
-}
-
 /** Selectores opcionales de Sucursal / Departamento para reportes con rango de fechas. */
 function BranchDepartmentFilters({
   branch,
   onBranchChange,
-  department,
-  onDepartmentChange,
 }: {
   branch: string
   onBranchChange: (v: string) => void
@@ -61,17 +49,11 @@ function BranchDepartmentFilters({
   onDepartmentChange: (v: string) => void
 }) {
   const branches = useBranchOptions()
-  const departments = useDepartmentOptions()
 
   const [branchSearch, setBranchSearch] = useState('')
   const branchOptions: SearchSelectOption[] = branches
     .filter((b) => !branchSearch || b.name.toLowerCase().includes(branchSearch.toLowerCase()))
     .map((b) => ({ value: b.name, label: b.name }))
-
-  const [departmentSearch, setDepartmentSearch] = useState('')
-  const departmentOptions: SearchSelectOption[] = departments
-    .filter((d) => !departmentSearch || d.name.toLowerCase().includes(departmentSearch.toLowerCase()))
-    .map((d) => ({ value: d.name, label: d.name }))
 
   return (
     <>
@@ -85,16 +67,6 @@ function BranchDepartmentFilters({
           placeholder="Todas las sucursales"
         />
       </div>
-      {/*<div style={{ width: 200 }}>
-        <SearchSelect
-          value={department}
-          onChange={onDepartmentChange}
-          options={departmentOptions}
-          onSearch={setDepartmentSearch}
-          selectedLabel={department}
-          placeholder="Todos los departamentos"
-        />
-      </div>*/}
     </>
   )
 }

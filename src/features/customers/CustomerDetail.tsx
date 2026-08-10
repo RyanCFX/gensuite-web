@@ -477,21 +477,24 @@ export default function CustomerDetail() {
               ? <Building2 size={20} style={{ color: 'var(--text-secondary)' }} />
               : <User size={20} style={{ color: 'var(--text-secondary)' }} />}
             {customer.customerName}
+            {customer.isSystemManaged && <span className="badge badge-neutral">Cliente del sistema</span>}
             {customer.disabled && <span className="badge badge-error">Inactivo</span>}
           </h1>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={() => navigate(`/clientes/${id}/editar`)}>
-            <Pencil size={14} />
-            Editar
-          </button>
+          {!customer.isSystemManaged && (
+            <button className="btn btn-secondary" onClick={() => navigate(`/clientes/${id}/editar`)}>
+              <Pencil size={14} />
+              Editar
+            </button>
+          )}
           {id && (
             <button className="btn btn-secondary" onClick={() => setShowEstadoCuenta(!showEstadoCuenta)}>
               <FileText size={14} />
               Estado de Cuenta
             </button>
           )}
-          {!customer.disabled && (
+          {!customer.disabled && !customer.isSystemManaged && (
             <button className="btn btn-danger" onClick={() => setShowDisableDialog(true)}>
               <Ban size={14} />
               Desactivar

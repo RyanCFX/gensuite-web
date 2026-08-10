@@ -11,11 +11,15 @@ import { PaymentLinesEditor } from '@/components/shared/PaymentLinesEditor'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { TurnoCajaIndicator } from '@/components/shared/TurnoCajaIndicator'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import {
   EMPTY_PAYMENT_LINES_VALUE,
   buildSubmitPayload,
   sumPayments,
   cashAmount,
+  emptyPaymentLine,
   PAYMENT_LINES_TOLERANCE,
   type PaymentLinesValue,
 } from '@/lib/paymentLines'
@@ -137,7 +141,15 @@ function openModal(invoice: Invoice) {
        setDirectoMop('')
        setDirectoAmount(String(invoice.outstandingAmount))
      } else {
-       setPaymentsValue(EMPTY_PAYMENT_LINES_VALUE)
+       const cashMethod = turno?.modeOfPayment ?? turno?.modoPagoCaja ?? ''
+       setPaymentsValue({
+         ...EMPTY_PAYMENT_LINES_VALUE,
+         payments: [{
+           ...emptyPaymentLine(),
+           modeOfPayment: cashMethod,
+           amount: String(invoice.outstandingAmount),
+         }],
+       })
      }
    }
 
@@ -146,6 +158,12 @@ function openModal(invoice: Invoice) {
     setDirectoMop('')
     setDirectoAmount('')
   }
+
+  const cobroIsDirty = useDirtyCheck(
+    { directoMop, directoAmount, paymentsValue, condicionFiscal, clienteOcasionalRnc },
+    !!selectedInvoice,
+  )
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(cobroIsDirty, closeModal)
 
 function validateAndSubmit() {
      if (!selectedInvoice) return
@@ -342,11 +360,11 @@ function validateAndSubmit() {
 
        {/* ── Modal de cobro ────────────────────────────────────────────── */}
        {selectedInvoice && (
-         <div className="modal-overlay" onClick={closeModal}>
+         <div className="modal-overlay" onClick={requestClose}>
            <div className="modal-box" style={{ maxWidth: flujoCobro === 'caja' ? 640 : 480, maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
              <div className="modal-head">
                <h2 className="modal-title">Cobrar {selectedInvoice.id}</h2>
-               <button className="modal-close" type="button" onClick={closeModal}><X size={16} /></button>
+               <button className="modal-close" type="button" onClick={requestClose}><X size={16} /></button>
              </div>
 
              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -418,7 +436,7 @@ function validateAndSubmit() {
              </div>
 
              <div className="modal-foot">
-               <button className="btn btn-ghost" onClick={closeModal}>Cancelar</button>
+               <button className="btn btn-ghost" onClick={requestClose}>Cancelar</button>
                <button
                  className="btn btn-primary"
                  onClick={validateAndSubmit}
@@ -434,6 +452,16 @@ function validateAndSubmit() {
             </div>
           </div>
         )}
+
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
       </>
     )}
   </div>

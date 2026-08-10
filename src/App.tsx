@@ -61,6 +61,7 @@ const ReportesPage    = lazy(() => import('@/features/reportes/ReportesPage'))
 const EmpresaConfig   = lazy(() => import('@/features/config/EmpresaConfig'))
 const NcfPage         = lazy(() => import('@/features/config/NcfPage'))
 const SucursalesPage  = lazy(() => import('@/features/config/SucursalesPage'))
+const CajasPage       = lazy(() => import('@/features/config/CajasPage'))
 const ConfigPage      = lazy(() => import('@/features/config/ConfigPage'))
 const CuentasPage     = lazy(() => import('@/features/cuentas/CuentasPage'))
 const CuentaDetail    = lazy(() => import('@/features/cuentas/CuentaDetail'))
@@ -252,6 +253,7 @@ export default function App() {
             {/* /config/ncf and /config/sucursales must be before /config/:seccion to avoid being caught as seccion */}
             <Route path="/config/ncf" element={<Suspense fallback={<PageLoader />}><NcfPage /></Suspense>} />
             <Route path="/config/sucursales" element={<Suspense fallback={<PageLoader />}><SucursalesPage /></Suspense>} />
+            <Route path="/config/cajas" element={<Suspense fallback={<PageLoader />}><CajasPage /></Suspense>} />
             <Route path="/config/centros-costo" element={<Suspense fallback={<PageLoader />}><CentrosCostoPage /></Suspense>} />
             <Route path="/config/bancos" element={<Suspense fallback={<PageLoader />}><BancosPage /></Suspense>} />
             <Route path="/config/cuentas-bancarias" element={<Suspense fallback={<PageLoader />}><CuentasBancariasPage /></Suspense>} />

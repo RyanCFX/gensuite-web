@@ -2193,6 +2193,7 @@ function FacturacionConfigSection() {
    const [ncfAlertaMinimo, setNcfAlertaMinimo] = useState(50)
    const [modoPagoCaja, setModoPagoCaja] = useState<string | null>(null)
    const [modosPagoConciliar, setModosPagoConciliar] = useState<string[]>([])
+   const [rolesCierreCajaAjena, setRolesCierreCajaAjena] = useState<string[]>([])
 
    useEffect(() => {
      if (data) {
@@ -2208,6 +2209,7 @@ function FacturacionConfigSection() {
         setNcfAlertaMinimo(data.ncfAlertaMinimo ?? 50)
         setModoPagoCaja(data.modoPagoCaja ?? null)
         setModosPagoConciliar(data.modosPagoConciliar ?? [])
+        setRolesCierreCajaAjena(data.rolesCierreCajaAjena ?? [])
       }
     }, [data])
 
@@ -2250,6 +2252,10 @@ function FacturacionConfigSection() {
 
   function toggleRole(name: string) {
     setSelectedRoles((prev) => (prev.includes(name) ? prev.filter((r) => r !== name) : [...prev, name]))
+  }
+
+  function toggleCierreCajaAjenaRole(name: string) {
+    setRolesCierreCajaAjena((prev) => (prev.includes(name) ? prev.filter((r) => r !== name) : [...prev, name]))
   }
 
   return (
@@ -2497,18 +2503,62 @@ function FacturacionConfigSection() {
                El turno se bloqueará automáticamente al superar este límite. El cajero deberá cerrar y abrir uno nuevo.
                Valor 0.1 equivale a 6 minutos. Default: 24 horas.
              </p>
-             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-               <input
-                 type="number"
-                 min={0.1}
-                 step={0.1}
-                 className="ff-input"
-                 style={{ width: 120 }}
-                 value={turnoMaxHoras}
-                 onChange={(e) => setTurnoMaxHoras(parseFloat(e.target.value) || 0.1)}
-               />
-               <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>horas</span>
+<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="number"
+                  min={0.1}
+                  step={0.1}
+                  className="ff-input"
+                  style={{ width: 120 }}
+                  value={turnoMaxHoras}
+                  onChange={(e) => setTurnoMaxHoras(parseFloat(e.target.value) || 0.1)}
+                />
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>horas</span>
+              </div>
+            </div>
+          )}
+
+         {data?.usaModuloPos && (
+           <div className="ff-wrap">
+             <label className="ff-label">Roles autorizados para cerrar cajas de otros usuarios</label>
+             <p className="ff-hint" style={{ marginBottom: 8 }}>
+               Solo usuarios con alguno de estos roles de ERPNext pueden cerrar el turno de OTRO cajero
+               (mismas validaciones que cerrar el propio turno). Si esta lista queda vacía, nadie puede cerrar
+               turnos ajenos — es el comportamiento por defecto.
+             </p>
+             <div style={{
+               display: 'grid',
+               gridTemplateColumns: '1fr 1fr',
+               gap: 8,
+               maxHeight: 200,
+               overflowY: 'auto',
+               border: '1px solid var(--border-default)',
+               borderRadius: 'var(--radius-md)',
+               padding: 12,
+             }}>
+               {(roles ?? []).length === 0 ? (
+                 <p style={{ fontSize: 13, color: 'var(--text-tertiary)', gridColumn: '1 / -1' }}>
+                   No hay roles disponibles.
+                 </p>
+               ) : (
+                 (roles ?? []).map((role) => (
+                   <label key={role} className="ff-check-wrap">
+                     <input
+                       type="checkbox"
+                       className="ff-check"
+                       checked={rolesCierreCajaAjena.includes(role)}
+                       onChange={() => toggleCierreCajaAjenaRole(role)}
+                     />
+                     <span style={{ fontSize: 13 }}>{role}</span>
+                   </label>
+                 ))
+               )}
              </div>
+             {rolesCierreCajaAjena.length === 0 && (
+               <p className="ff-hint" style={{ marginTop: 6, color: 'var(--color-warning)' }}>
+                 Sin roles seleccionados: ningún usuario podrá cerrar el turno de otro cajero.
+               </p>
+             )}
            </div>
          )}
 
@@ -2581,6 +2631,7 @@ function FacturacionConfigSection() {
                 ncfAlertaMinimo,
                 modoPagoCaja,
                 modosPagoConciliar,
+                rolesCierreCajaAjena,
               })}
             disabled={saveMutation.isPending}
           >

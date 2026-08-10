@@ -310,6 +310,11 @@ const NAV_CONFIG: NavEntry = {
       path: "/config/sucursales",
     },
     {
+      label: "Cajas",
+      icon: <Wallet size={14} />,
+      path: "/config/cajas",
+    },
+    {
       label: "Centros de Costo",
       icon: <Building2 size={14} />,
       path: "/config/centros-costo",
@@ -413,7 +418,7 @@ const NAV_CONFIG: NavEntry = {
   ],
 };
 
-const ADMIN_ONLY_PATHS = new Set(["/config/permisos", "/config/roles"]);
+const ADMIN_ONLY_PATHS = new Set(["/config/permisos", "/config/roles", "/config/cajas"]);
 
 // ─── NavItem component ────────────────────────────────────────────────────────
 

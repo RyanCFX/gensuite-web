@@ -3,9 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   listUsuarios, createUsuario, updateUsuario, enableUsuario, deleteUsuario, resetPasswordUsuario, listRoles,
-  getUsuarioSucursales, getUsuarioAlmacenesPermitidos,
+  getUsuarioSucursales, getUsuarioAlmacenesPermitidos, getUsuario,
 } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
+import { listCajas } from '@/shared/api/cajas'
 import type { Usuario, CreateUsuarioDto, UpdateUsuarioDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { ConfirmModal } from '@/shared/ui/Modal'
@@ -40,6 +41,8 @@ export default function UsuariosPage() {
   const [selectedBranches, setSelectedBranches] = useState<string[]>([])
   const [defaultBranch, setDefaultBranch] = useState('')
   const [defaultBranchSearch, setDefaultBranchSearch] = useState('')
+  const [defaultPosProfile, setDefaultPosProfile] = useState('')
+  const [defaultPosProfileSearch, setDefaultPosProfileSearch] = useState('')
   const { orderBy, sort } = useSortState()
 
   const { data, isLoading, isError } = useQuery({
@@ -70,12 +73,30 @@ export default function UsuariosPage() {
     enabled: !!editingUser,
   })
 
+  const { data: editingUserDetail } = useQuery({
+    queryKey: ['usuario-detail', editingUser?.email],
+    queryFn: () => getUsuario(editingUser!.email),
+    enabled: !!editingUser,
+  })
+
+  const { data: cajas } = useQuery({
+    queryKey: ['cajas'],
+    queryFn: listCajas,
+  })
+  const cajasHabilitadas = (cajas ?? []).filter((c) => !c.disabled)
+
   useEffect(() => {
     if (usuarioSucursales) {
       setSelectedBranches(usuarioSucursales.branches)
       setDefaultBranch(usuarioSucursales.defaultBranch ?? '')
     }
   }, [usuarioSucursales])
+
+  useEffect(() => {
+    if (editingUserDetail) {
+      setDefaultPosProfile(editingUserDetail.defaultPosProfile ?? '')
+    }
+  }, [editingUserDetail])
 
   const createMutation = useMutation({
     mutationFn: (dto: CreateUsuarioDto) => createUsuario(dto),
@@ -126,8 +147,8 @@ export default function UsuariosPage() {
   const isSystemManager = selectedRoles.includes(SYSTEM_MANAGER_ROLE)
 
   const formIsDirty = useDirtyCheck(
-    { email, firstName, lastName, maxDiscountPct, selectedRoles, selectedBranches, defaultBranch },
-    showForm && (!editingUser || !!usuarioSucursales),
+    { email, firstName, lastName, maxDiscountPct, selectedRoles, selectedBranches, defaultBranch, defaultPosProfile },
+    showForm && (!editingUser || (!!usuarioSucursales && !!editingUserDetail)),
   )
   const formClose = useConfirmClose(formIsDirty, resetForm)
 
@@ -140,6 +161,7 @@ export default function UsuariosPage() {
     setSelectedRoles(user.roles)
     setSelectedBranches([])
     setDefaultBranch('')
+    setDefaultPosProfile('')
     setShowForm(true)
   }
 
@@ -151,6 +173,7 @@ export default function UsuariosPage() {
     setSelectedRoles([])
     setSelectedBranches([])
     setDefaultBranch('')
+    setDefaultPosProfile('')
     setEditingUser(null)
     setShowForm(false)
   }
@@ -173,6 +196,7 @@ export default function UsuariosPage() {
         roles: selectedRoles,
         branches: isSystemManager ? undefined : selectedBranches,
         defaultBranch: isSystemManager ? undefined : (defaultBranch || undefined),
+        defaultPosProfile: defaultPosProfile || undefined,
       }
       updateMutation.mutate({ email, data: payload })
       if (email === authUser?.email && defaultBranch !== usuarioSucursales?.defaultBranch) {
@@ -446,6 +470,21 @@ export default function UsuariosPage() {
                         </div>
                       </>
                     )}
+
+                    <div className="ff-wrap">
+                      <label className="ff-label">Caja por defecto</label>
+                      <SearchSelect
+                        value={defaultPosProfile}
+                        onChange={setDefaultPosProfile}
+                        options={cajasHabilitadas
+                          .filter((c) => !defaultPosProfileSearch || c.label.toLowerCase().includes(defaultPosProfileSearch.toLowerCase()))
+                          .map((c): SearchSelectOption => ({ value: c.id, label: c.label }))}
+                        onSearch={setDefaultPosProfileSearch}
+                        selectedLabel={cajasHabilitadas.find((c) => c.id === defaultPosProfile)?.label ?? ''}
+                        placeholder="Sin caja por defecto"
+                      />
+                      <p className="ff-hint">Se preseleccionará al abrir turno de caja.</p>
+                    </div>
 
                     {almacenesPermitidos && almacenesPermitidos.warehouses.length > 0 && (
                       <div className="ff-wrap">

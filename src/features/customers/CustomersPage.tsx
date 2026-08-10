@@ -271,7 +271,10 @@ export default function CustomersPage() {
                         className="table-row-clickable"
                         onClick={() => navigate(`/clientes/${customer.id}`)}
                       >
-                        <td style={{ fontWeight: 500 }}>{customer.customerName}</td>
+                        <td style={{ fontWeight: 500 }}>
+                          {customer.customerName}
+                          {customer.isSystemManaged && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>Sistema</span>}
+                        </td>
                         <td className="td-muted">{getIdentifier(customer)}</td>
                         <td>{customer.customerType === 'Company' ? 'Empresa' : 'Individual'}</td>
                         <td className="td-muted">{customer.customerGroup ?? '—'}</td>
@@ -287,13 +290,15 @@ export default function CustomersPage() {
                         </td>
                         <td onClick={(e) => e.stopPropagation()} className="actions-cell">
                           <ActionsMenu>
-                            <ActionsMenuItem onClick={() => navigate(`/clientes/${customer.id}/editar`)}>
-                              <Pencil size={14} /> Editar
-                            </ActionsMenuItem>
+                            {!customer.isSystemManaged && (
+                              <ActionsMenuItem onClick={() => navigate(`/clientes/${customer.id}/editar`)}>
+                                <Pencil size={14} /> Editar
+                              </ActionsMenuItem>
+                            )}
                             <ActionsMenuItem onClick={() => downloadEstadoCuentaPdf(customer.id, `estado-cuenta-${customer.customerName}.pdf`)}>
                               <Download size={14} /> Estado de Cuenta PDF
                             </ActionsMenuItem>
-                            {!customer.disabled && (
+                            {!customer.disabled && !customer.isSystemManaged && (
                               <ActionsMenuItem danger onClick={() => setToDisable(customer)}>
                                 <Ban size={14} /> Desactivar
                               </ActionsMenuItem>

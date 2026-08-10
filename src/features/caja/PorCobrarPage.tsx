@@ -21,6 +21,7 @@ import {
   buildSubmitPayload,
   sumPayments,
   cashAmount,
+  emptyPaymentLine,
   PAYMENT_LINES_TOLERANCE,
   type PaymentLinesValue,
 } from '@/lib/paymentLines'
@@ -173,6 +174,7 @@ const [directoMop, setDirectoMop] = useState('')
   // ─── Modal handlers ────────────────────────────────────────────────
 function openModal(invoice: PendienteCobroItem) {
      setSelectedInvoice(invoice)
+     setClienteOcasionalRnc('')
      if (invoice.esClienteOcasional) {
        setCondicionFiscal('CREDITO_FISCAL')
      } else if (customerData?.rnc) {
@@ -183,7 +185,15 @@ function openModal(invoice: PendienteCobroItem) {
      if (flujoCobro === 'directo') {
        setDirectoMop('')
      } else {
-       setPaymentsValue(EMPTY_PAYMENT_LINES_VALUE)
+       const cashMethod = turno?.modeOfPayment ?? turno?.modoPagoCaja ?? ''
+       setPaymentsValue({
+         ...EMPTY_PAYMENT_LINES_VALUE,
+         payments: [{
+           ...emptyPaymentLine(),
+           modeOfPayment: cashMethod,
+           amount: String(invoice.grandTotal),
+         }],
+       })
      }
    }
 

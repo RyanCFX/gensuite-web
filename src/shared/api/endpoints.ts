@@ -182,6 +182,10 @@ export const ENDPOINTS = {
     list: '/sucursales',
     byId: (id: string) => `/sucursales/${encodeURIComponent(id)}`,
   },
+  cajas: {
+    list: '/pos/cajas',
+    byId: (id: string) => `/pos/cajas/${encodeURIComponent(id)}`,
+  },
   transferencias: {
     list: '/transferencias',
     byId: (id: string) => `/transferencias/${encodeURIComponent(id)}`,

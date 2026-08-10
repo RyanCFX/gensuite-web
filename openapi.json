@@ -8764,6 +8764,7 @@
     },
     "/api/v1/pos/turnos/{openingEntryId}/cerrar": {
       "post": {
+        "description": "Mismas validaciones (arqueo, conciliación) sin importar de quién sea el turno. Si el turno NO es del usuario que llama, solo procede si tiene alguno de los roles listados en Facturacion Config.rolesCierreCajaAjena (vacío por defecto = nadie puede cerrar turnos ajenos) — devuelve 403 en caso contrario.",
         "operationId": "PosController_closeSession",
         "parameters": [
           {
@@ -17365,6 +17366,190 @@
         ]
       }
     },
+    "/api/v1/pos/cajas": {
+      "get": {
+        "description": "Cada caja indica si tiene un turno abierto ahora mismo (isOpen), si es la caja por defecto del usuario que consulta (isUserDefault, para preseleccionarla en el front) y si es la caja por defecto del tenant (isTenantDefault).",
+        "operationId": "PosProfilesController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar cajas (POS Profile) del tenant",
+        "tags": [
+          "POS — Cajas (POS Profile)"
+        ]
+      },
+      "post": {
+        "operationId": "PosProfilesController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePosProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear una caja adicional",
+        "tags": [
+          "POS — Cajas (POS Profile)"
+        ]
+      }
+    },
+    "/api/v1/pos/cajas/{id}": {
+      "get": {
+        "operationId": "PosProfilesController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una caja",
+        "tags": [
+          "POS — Cajas (POS Profile)"
+        ]
+      },
+      "put": {
+        "operationId": "PosProfilesController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePosProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar almacén/sucursal, o habilitar/deshabilitar una caja",
+        "tags": [
+          "POS — Cajas (POS Profile)"
+        ]
+      },
+      "delete": {
+        "operationId": "PosProfilesController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar una caja (solo si nunca se abrió un turno contra ella)",
+        "tags": [
+          "POS — Cajas (POS Profile)"
+        ]
+      }
+    },
     "/api/v1/centros-costo": {
       "get": {
         "operationId": "CentrosCostoController_findAll",
@@ -20067,6 +20252,16 @@
             "type": "boolean",
             "default": false,
             "description": "Si está activo, cerrar un turno de caja (POS) exige el desglose de denominaciones contadas para el/los modos de pago en efectivo — el cierre se rechaza si falta. Solo aplica cuando usaModuloPos está activo."
+          },
+          "rolesCierreCajaAjena": {
+            "example": [
+              "Sales Manager"
+            ],
+            "description": "Roles de ERPNext autorizados para cerrar el turno de OTRO cajero (mismas validaciones que cerrar el propio turno). Vacío/omitido = nadie puede cerrar turnos ajenos.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "formatoImpresionDefault": {
             "type": "string",
@@ -22888,6 +23083,11 @@
             "example": "Sucursal Norte",
             "description": "Sucursal preseleccionada por defecto para este usuario."
           },
+          "defaultPosProfile": {
+            "type": "string",
+            "example": "POS Caja 1",
+            "description": "Caja (POS Profile) preseleccionada por defecto al abrir turno si el usuario no especifica ninguna. Ver GET /pos/cajas para las opciones disponibles."
+          },
           "maxDiscountPct": {
             "type": "number",
             "example": 15,
@@ -23830,6 +24030,45 @@
           "toWarehouse",
           "items"
         ]
+      },
+      "CreatePosProfileDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "example": "Caja 1",
+            "description": "Nombre/etiqueta de la caja. El documento en ERPNext se crea como \"POS \u003Clabel\u003E\"."
+          },
+          "warehouse": {
+            "type": "string",
+            "example": "Almacén Principal - JB",
+            "description": "Almacén desde el que esta caja descuenta inventario"
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal de esta caja. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados — si se omite en ese caso, se rechaza con un mensaje explícito."
+          }
+        },
+        "required": [
+          "label",
+          "warehouse"
+        ]
+      },
+      "UpdatePosProfileDto": {
+        "type": "object",
+        "properties": {
+          "warehouse": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "disabled": {
+            "type": "boolean",
+            "description": "true = deshabilita la caja (no se podrá abrir turno contra ella)"
+          }
+        }
       },
       "CreateCentroCostoDto": {
         "type": "object",

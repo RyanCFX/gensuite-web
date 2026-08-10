@@ -171,6 +171,7 @@ export default function CustomerForm() {
   const isGovernment = watch('isGovernment')
   const customerType = watch('customerType')
   const customerGroup = watch('customerGroup')
+  const isSystemManaged = Boolean(customer?.isSystemManaged)
 
   // Si el cliente es Empresa, la identificación siempre es RNC — se fuerza y se bloquea el selector.
   useEffect(() => {
@@ -214,6 +215,13 @@ export default function CustomerForm() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 680 }}>
+        {isSystemManaged && (
+          <div className="inline-alert inline-alert-info">
+            <Info size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
+            Este cliente es gestionado por el sistema y no puede ser editado.
+          </div>
+        )}
+
         {/* ── Información general ── */}
         <div className="card">
           <div className="card-header">
@@ -467,7 +475,7 @@ export default function CustomerForm() {
 
         {/* ── Botones ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+          <button type="submit" className="btn btn-primary" disabled={isSubmitting || isSystemManaged}>
             {isSubmitting
               ? <><span className="spinner spinner-white spinner-sm" /> Guardando…</>
               : isEdit ? 'Guardar Cambios' : 'Crear Cliente'}
