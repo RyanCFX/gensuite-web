@@ -67,8 +67,6 @@ import type { SearchSelectOption } from "@/shared/ui/SearchSelect";
 import { ComponentTrackingModal } from "@/components/shared/ComponentTrackingModal";
 import type { TrackedComponent } from "@/components/shared/ComponentTrackingModal";
 
-const CREDIT_NOTE_MODE_OF_PAYMENT = "Nota de crédito";
-
 const RETURN_RESOLUTION_OPTIONS: SearchSelectOption[] = [
   { value: "credit_note_only", label: "Saldo a favor" },
   { value: "refund", label: "Reembolsar ahora" },
@@ -90,9 +88,11 @@ export default function InvoiceDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [payCash, setPayCash] = useState(false);
-  const [modeOfPayment, setModeOfPayment] = useState("");
-  const [cashPayments, setCashPayments] = useState(EMPTY_PAYMENT_LINES_VALUE);
+  const [paymentMethodModalOpen, setPaymentMethodModalOpen] = useState(false);
+  const [paymentConfirmModalOpen, setPaymentConfirmModalOpen] = useState(false);
+  const [chosenPaymentMethod, setChosenPaymentMethod] = useState<
+    "contado" | "credito" | null
+  >(null);
   const [creditErrorOpen, setCreditErrorOpen] = useState(false);
   const [creditErrorMsg, setCreditErrorMsg] = useState("");
   const [lastSubmitBody, setLastSubmitBody] = useState<SubmitInvoiceDto | undefined>(undefined);
@@ -176,17 +176,12 @@ export default function InvoiceDetail() {
     enabled: !!invoice?.customer && invoice.status === "draft",
   });
 
+  // Solo se usa para el selector de método de pago del reembolso en el modal de Devolución —
+  // el cobro de la factura ya no ocurre aquí (ver módulo Caja).
   const { data: metodos } = useQuery({
     queryKey: ["metodos-pago"],
     queryFn: listMetodosPago,
-    enabled: invoice?.status === "draft" || invoice?.status === "submitted",
-    staleTime: 5 * 60_000,
-  });
-
-  const { data: denominaciones } = useQuery({
-    queryKey: ["denominaciones"],
-    queryFn: listDenominaciones,
-    enabled: invoice?.status === "draft",
+    enabled: invoice?.status === "submitted",
     staleTime: 5 * 60_000,
   });
 
@@ -394,14 +389,13 @@ export default function InvoiceDetail() {
     : 0;
 
   const noCredit = invoice?.status === "draft" && customer?.hasCredit === false;
-  // Cubierta al 100% por crédito ya aplicado (saldo a favor y/o notas de crédito) — no hace falta cobrar al contado.
+  // Cubierta al 100% por crédito ya aplicado (saldo a favor y/o notas de crédito) — no hace falta preguntar forma de pago.
   const paidByCreditNote =
     !!invoice &&
     invoice.status === "draft" &&
     invoice.grandTotal > 0 &&
     creditoAplicado > 0 &&
     pendingAmount <= 0.01;
-  const showCashSelector = !paidByCreditNote && (noCredit || payCash);
 
   const submitMutation = useMutation({
     mutationFn: (body?: SubmitInvoiceDto) => submitInvoice(id!, body),
@@ -553,18 +547,26 @@ export default function InvoiceDetail() {
     },
   });
 
-  function buildCashSubmitBody(): SubmitInvoiceDto {
-    if (flujoCobro === "caja") {
-      return { payCash: true, ...buildSubmitPayload(cashPayments) };
+  function handleSubmitClick() {
+    // Ya cubierta al 100% por saldo a favor / nota de crédito — no hace falta preguntar forma de pago.
+    if (paidByCreditNote) {
+      setLastSubmitBody(undefined);
+      submitMutation.mutate(undefined);
+      return;
     }
-    return { payCash: true, payments: [{ modeOfPayment, amount: pendingAmount }] };
+    // Cliente sin crédito habilitado — se salta la pregunta y va directo a confirmar "al contado".
+    if (noCredit) {
+      setChosenPaymentMethod("contado");
+      setPaymentConfirmModalOpen(true);
+      return;
+    }
+    setPaymentMethodModalOpen(true);
   }
 
-  function isCashReadyToSubmit(): boolean {
-    if (flujoCobro === "caja") {
-      return isPaymentLinesValid(cashPayments, pendingAmount, metodos ?? [], denominaciones ?? []);
-    }
-    return !!modeOfPayment;
+  function selectPaymentMethod(method: "contado" | "credito") {
+    setChosenPaymentMethod(method);
+    setPaymentMethodModalOpen(false);
+    setPaymentConfirmModalOpen(true);
   }
 
   function handleSubmitClick() {
@@ -586,16 +588,10 @@ export default function InvoiceDetail() {
     }
   }
 
+  // Reintento tras el modal de "crédito excedido" — solo necesita forzar payCash, ya no requiere
+  // ningún dato de pago (el cobro se hace después, por separado, en Caja).
   function handleCashRetry() {
-    if (!isCashReadyToSubmit()) {
-      toast.error(
-        flujoCobro === "caja"
-          ? "Verifica que el total ingresado coincida con el monto a cobrar"
-          : "Selecciona un método de pago",
-      );
-      return;
-    }
-    const body = buildCashSubmitBody();
+    const body: SubmitInvoiceDto = { payCash: true };
     setLastSubmitBody(body);
     submitMutation.mutate(body);
   }
@@ -999,7 +995,7 @@ export default function InvoiceDetail() {
                 }}
               >
                 <AlertTriangle size={12} /> Este cliente no tiene crédito
-                habilitado — se cobrará al contado.
+                habilitado — se someterá al contado.
               </p>
             )}
             {paidByCreditNote && (
@@ -1014,7 +1010,7 @@ export default function InvoiceDetail() {
                 }}
               >
                 <Wallet size={12} /> Cubierta al 100% por saldo a favor / nota
-                de crédito aplicada — se someterá sin cobro adicional.
+                de crédito aplicada.
               </p>
             )}
           </div>
@@ -2010,6 +2006,111 @@ export default function InvoiceDetail() {
         />
       )}
 
+      {/* Modal: elegir forma de pago al someter */}
+      {paymentMethodModalOpen && (
+        <div
+          className="modal-overlay"
+          onClick={() => setPaymentMethodModalOpen(false)}
+        >
+          <div
+            className="modal-box modal-box-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-head">
+              <h2
+                className="modal-title"
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <Send size={16} /> Forma de pago
+              </h2>
+              <button
+                className="modal-close"
+                onClick={() => setPaymentMethodModalOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div
+              className="modal-body"
+              style={{ display: "flex", flexDirection: "column", gap: 12 }}
+            >
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
+                ¿Cómo se pagará esta factura?
+              </p>
+              <button
+                className="btn btn-secondary"
+                style={{ justifyContent: "flex-start", gap: 8 }}
+                onClick={() => selectPaymentMethod("contado")}
+              >
+                <Banknote size={16} /> Al contado
+              </button>
+              <button
+                className="btn btn-secondary"
+                style={{ justifyContent: "flex-start", gap: 8 }}
+                onClick={() => selectPaymentMethod("credito")}
+              >
+                <CreditCard size={16} /> A crédito
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: confirmar someter con la forma de pago elegida */}
+      {paymentConfirmModalOpen && (
+        <div
+          className="modal-overlay"
+          onClick={() => setPaymentConfirmModalOpen(false)}
+        >
+          <div
+            className="modal-box modal-box-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-head">
+              <h2
+                className="modal-title"
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <Send size={16} /> Confirmar sometimiento
+              </h2>
+              <button
+                className="modal-close"
+                onClick={() => setPaymentConfirmModalOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div
+              className="modal-body"
+              style={{ display: "flex", flexDirection: "column", gap: 8 }}
+            >
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
+                La factura se someterá con forma de pago{" "}
+                <strong style={{ color: "var(--text-primary)" }}>
+                  {chosenPaymentMethod === "contado" ? "al contado" : "a crédito"}
+                </strong>
+                .
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setPaymentConfirmModalOpen(false)}
+              >
+                Volver
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={confirmSubmitWithPaymentMethod}
+                disabled={submitMutation.isPending}
+              >
+                <Send size={14} /> Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal: crédito excedido al someter */}
       {creditErrorOpen && (
         <div
@@ -2017,7 +2118,7 @@ export default function InvoiceDetail() {
           onClick={creditErrorClose.requestClose}
         >
           <div
-            className={flujoCobro === "caja" ? "modal-box" : "modal-box modal-box-sm"}
+            className="modal-box modal-box-sm"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-head">
@@ -2045,31 +2146,10 @@ export default function InvoiceDetail() {
               <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
                 {creditErrorMsg}
               </p>
-              {flujoCobro === "caja" ? (
-                <PaymentLinesEditor
-                  amountDue={pendingAmount}
-                  value={cashPayments}
-                  onChange={setCashPayments}
-                />
-              ) : (
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="modeOfPaymentRetry">
-                    Método de pago <span className="ff-required">*</span>
-                  </label>
-                  <SearchSelect
-                    id="modeOfPaymentRetry"
-                    value={modeOfPayment}
-                    selectedLabel={
-                      metodos?.find((m) => m.name === modeOfPayment)?.name ?? ""
-                    }
-                    onChange={(val) => setModeOfPayment(val)}
-                    options={metodosRetryOptions}
-                    onSearch={setModeOfPaymentRetrySearch}
-                    placeholder="Seleccionar…"
-                    className="ff-select"
-                  />
-                </div>
-              )}
+              <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                Puedes someter de todas formas, saltando la verificación de
+                crédito disponible. El cobro se registra por separado en Caja.
+              </p>
             </div>
             <div className="modal-foot">
               <button
@@ -2081,9 +2161,9 @@ export default function InvoiceDetail() {
               <button
                 className="btn btn-primary"
                 onClick={handleCashRetry}
-                disabled={submitMutation.isPending || !isCashReadyToSubmit()}
+                disabled={submitMutation.isPending}
               >
-                <Send size={14} /> Cobrar al contado y someter
+                <Send size={14} /> Someter de todas formas
               </button>
             </div>
           </div>

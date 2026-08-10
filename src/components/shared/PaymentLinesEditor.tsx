@@ -109,52 +109,170 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {value.payments.map((p, idx) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <span className="form-section-title">Métodos de pago</span>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {value.payments.map((p, idx) => (
+            <div
+              key={idx}
+              style={{
+                border: '1px solid var(--border-default)',
+                borderRadius: 'var(--radius-lg)',
+                background: 'var(--surface-sunken)',
+                padding: 16,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
+              }}
+            >
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+                <div style={{ flex: 1 }} className="ff-wrap">
+                  <label className="ff-label">Método de pago</label>
+                  <SearchSelect
+                    value={p.modeOfPayment}
+                    selectedLabel={p.modeOfPayment}
+                    onChange={(val) => updateLine(idx, { modeOfPayment: val })}
+                    options={metodosActivos
+                      .filter((m) => !metodoSearch[idx] || m.name.toLowerCase().includes(metodoSearch[idx].toLowerCase()))
+                      .map((m) => ({ value: m.name, label: m.name }))}
+                    onSearch={(q) => setMetodoSearch((prev) => ({ ...prev, [idx]: q }))}
+                    placeholder="Método de pago…"
+                  />
+                </div>
+                <div className="ff-wrap" style={{ width: 140 }}>
+                  <label className="ff-label">Monto</label>
+                  <input
+                    className="ff-input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={p.amount}
+                    onChange={(e) => updateLine(idx, { amount: e.target.value })}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-size-icon-sm"
+                  onClick={() => removeLine(idx)}
+                  disabled={value.payments.length <= 1}
+                  aria-label="Quitar línea de pago"
+                  style={{ marginBottom: 2 }}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-ghost btn-size-xs"
+                style={{ alignSelf: 'flex-start' }}
+                onClick={() => updateLine(idx, { showDetails: !p.showDetails })}
+              >
+                {p.showDetails ? <ChevronUp size={12} /> : <ChevronDown size={12} />} Detalles adicionales
+              </button>
+
+              {p.showDetails && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 12,
+                    paddingTop: 12,
+                    borderTop: '1px solid var(--border-subtle)',
+                  }}
+                >
+                  <input
+                    className="ff-input"
+                    placeholder="Número de tarjeta"
+                    value={p.cardNumber}
+                    onChange={(e) => updateLine(idx, { cardNumber: e.target.value })}
+                  />
+                  <input
+                    className="ff-input"
+                    placeholder="Código de autorización"
+                    value={p.authorizationCode}
+                    onChange={(e) => updateLine(idx, { authorizationCode: e.target.value })}
+                  />
+                  <SearchSelect
+                    value={p.bank}
+                    selectedLabel={p.bank}
+                    onChange={(val) => updateLine(idx, { bank: val })}
+                    options={(bancos ?? [])
+                      .filter((b) => !bancoSearch[idx] || b.name.toLowerCase().includes(bancoSearch[idx].toLowerCase()))
+                      .map((b) => ({ value: b.name, label: b.name }))}
+                    onSearch={(q) => setBancoSearch((prev) => ({ ...prev, [idx]: q }))}
+                    placeholder="Banco…"
+                  />
+                  <input
+                    className="ff-input"
+                    placeholder="Número de cheque/documento"
+                    value={p.checkNumber}
+                    onChange={(e) => updateLine(idx, { checkNumber: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <button type="button" className="btn btn-secondary btn-size-sm" style={{ alignSelf: 'flex-start' }} onClick={addLine}>
+          <Plus size={13} /> Agregar método de pago
+        </button>
+
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '10px 14px',
+            borderRadius: 'var(--radius-md)',
+            background: totalOk ? 'var(--success-bg, rgba(34,197,94,0.08))' : 'var(--error-bg, rgba(239,68,68,0.08))',
+            fontSize: 13,
+          }}
+        >
+          <span>Total ingresado: <strong>{formatDOP(total)}</strong></span>
+          <span style={{ color: totalOk ? 'var(--color-success)' : 'var(--error-text)', fontWeight: 600 }}>
+            Total a cobrar: {formatDOP(amountDue)}
+          </span>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 4, borderTop: '1px solid var(--border-subtle)' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', paddingTop: 10 }}>
+          <input
+            type="checkbox"
+            checked={value.vueltoEnabled}
+            onChange={(e) => onChange({ ...value, vueltoEnabled: e.target.checked })}
+          />
+          Registrar vuelto entregado
+        </label>
+
+        {value.vueltoEnabled && (
           <div
-            key={idx}
             style={{
               border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-md)',
-              padding: 10,
+              borderRadius: 'var(--radius-lg)',
+              background: 'var(--surface-sunken)',
+              padding: 16,
               display: 'flex',
               flexDirection: 'column',
-              gap: 8,
+              gap: 14,
             }}
           >
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <div style={{ flex: 1 }}>
-                <SearchSelect
-                  value={p.modeOfPayment}
-                  selectedLabel={p.modeOfPayment}
-                  onChange={(val) => updateLine(idx, { modeOfPayment: val })}
-                  options={metodosActivos
-                    .filter((m) => !metodoSearch[idx] || m.name.toLowerCase().includes(metodoSearch[idx].toLowerCase()))
-                    .map((m) => ({ value: m.name, label: m.name }))}
-                  onSearch={(q) => setMetodoSearch((prev) => ({ ...prev, [idx]: q }))}
-                  placeholder="Método de pago…"
-                />
-              </div>
+            <div className="ff-wrap">
+              <label className="ff-label">Efectivo entregado por el cliente</label>
               <input
                 className="ff-input"
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Monto"
-                value={p.amount}
-                onChange={(e) => updateLine(idx, { amount: e.target.value })}
-                style={{ width: 120 }}
+                value={value.tenderedCash}
+                onChange={(e) => onChange({ ...value, tenderedCash: e.target.value })}
+                style={{ width: 200 }}
               />
-              <button
-                type="button"
-                className="btn btn-ghost btn-size-icon-sm"
-                onClick={() => removeLine(idx)}
-                disabled={value.payments.length <= 1}
-                aria-label="Quitar línea de pago"
-              >
-                <Trash2 size={13} />
-              </button>
             </div>
 
             {(() => {
@@ -283,53 +401,55 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
                 </p>
               )}
 
-              {value.vuelto.map((v, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <div style={{ flex: 1 }}>
-                    <SearchSelect
-                      value={v.denominacion}
-                      selectedLabel={v.denominacion}
-                      onChange={(val) => updateVueltoLine(idx, { denominacion: val })}
-                      options={denominacionesActivas
-                        .filter(
-                          (d) =>
-                            !vueltoDenomSearch[idx] ||
-                            d.denominacion.toLowerCase().includes(vueltoDenomSearch[idx].toLowerCase()),
-                        )
-                        .map((d) => ({ value: d.denominacion, label: d.denominacion }))}
-                      onSearch={(q) => setVueltoDenomSearch((prev) => ({ ...prev, [idx]: q }))}
-                      placeholder="Denominación…"
-                    />
-                  </div>
-                  <input
-                    className="ff-input"
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="Cantidad"
-                    value={v.cantidad}
-                    onChange={(e) => updateVueltoLine(idx, { cantidad: e.target.value })}
-                    style={{ width: 100 }}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-size-icon-sm"
-                    onClick={() => removeVueltoLine(idx)}
-                    aria-label="Quitar denominación"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {value.vuelto.map((v, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <div style={{ flex: 1 }}>
+                        <SearchSelect
+                          value={v.denominacion}
+                          selectedLabel={v.denominacion}
+                          onChange={(val) => updateVueltoLine(idx, { denominacion: val })}
+                          options={denominacionesActivas
+                            .filter(
+                              (d) =>
+                                !vueltoDenomSearch[idx] ||
+                                d.denominacion.toLowerCase().includes(vueltoDenomSearch[idx].toLowerCase()),
+                            )
+                            .map((d) => ({ value: d.denominacion, label: d.denominacion }))}
+                          onSearch={(q) => setVueltoDenomSearch((prev) => ({ ...prev, [idx]: q }))}
+                          placeholder="Denominación…"
+                        />
+                      </div>
+                      <input
+                        className="ff-input"
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="Cantidad"
+                        value={v.cantidad}
+                        onChange={(e) => updateVueltoLine(idx, { cantidad: e.target.value })}
+                        style={{ width: 110 }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-size-icon-sm"
+                        onClick={() => removeVueltoLine(idx)}
+                        aria-label="Quitar denominación"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
 
-              <button
-                type="button"
-                className="btn btn-secondary btn-size-sm"
-                style={{ alignSelf: 'flex-start' }}
-                onClick={addVueltoLine}
-              >
-                <Plus size={13} /> Agregar denominación
-              </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-size-sm"
+                  style={{ alignSelf: 'flex-start' }}
+                  onClick={addVueltoLine}
+                >
+                  <Plus size={13} /> Agregar denominación
+                </button>
 
               <p style={{ fontSize: 13, margin: 0, color: vueltoEsperado >= 0 && vueltoOk ? 'var(--color-success)' : 'var(--error-text)' }}>
                 Total desglosado: {formatDOP(vueltoDeclarado)} / Vuelto esperado: {formatDOP(vueltoEsperado)}

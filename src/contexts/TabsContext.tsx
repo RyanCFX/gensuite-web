@@ -70,6 +70,7 @@ function getTitleForPath(pathname: string): string {
     [/^\/cobros\/semaforo$/, 'Semáforo'],
     [/^\/cobros\/lista$/, 'Cobros'],
     [/^\/cobros\/(.+)$/, (m) => `Cobro: ${m[1]}`],
+    [/^\/caja$/, 'Caja'],
     [/^\/usuarios$/, 'Usuarios'],
     [/^\/reportes\/(.+)$/, (m) => `Reporte ${m[1].toUpperCase()}`],
     [/^\/cuentas\/nueva$/, 'Nueva Cuenta'],
