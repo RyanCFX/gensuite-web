@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -29,6 +29,13 @@ import { MOTIVOS_ANULACION_DGII } from "@/lib/constants";
 import { ConfirmModal } from "@/shared/ui/Modal";
 import { useConfirmClose } from "@/shared/hooks/useConfirmClose";
 import { useDirtyCheck } from "@/shared/hooks/useDirtyCheck";
+import { PaymentLinesEditor } from "@/components/shared/PaymentLinesEditor";
+import {
+  EMPTY_PAYMENT_LINES_VALUE,
+  buildSubmitPayload,
+  sumPayments,
+  emptyPaymentLine,
+} from "@/lib/paymentLines";
 import {
   ArrowLeft,
   Send,
@@ -43,8 +50,6 @@ import {
   Clock,
   BookOpen,
   Eye,
-  Banknote,
-  CreditCard,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -84,11 +89,14 @@ export default function InvoiceDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [paymentMethodModalOpen, setPaymentMethodModalOpen] = useState(false);
-  const [paymentConfirmModalOpen, setPaymentConfirmModalOpen] = useState(false);
-  const [chosenPaymentMethod, setChosenPaymentMethod] = useState<
-    "contado" | "credito" | null
-  >(null);
+  // Bloque opcional (u obligatorio si el cliente no tiene crédito) de "¿Cómo se cobra?"
+  // al someter — ver escenarios en handleSubmitClick. La forma del bloque depende de
+  // flujoCobro: "directo" = un solo método + monto, sin vuelto; "caja" = PaymentLinesEditor
+  // completo (varias líneas + vuelto), igual que en CajaPage.tsx/PorCobrarPage.tsx.
+  const [payments, setPayments] = useState(EMPTY_PAYMENT_LINES_VALUE);
+  const [directoMop, setDirectoMop] = useState("");
+  const [directoMopSearch, setDirectoMopSearch] = useState("");
+  const [directoAmount, setDirectoAmount] = useState("");
   const [creditErrorOpen, setCreditErrorOpen] = useState(false);
   const [creditErrorMsg, setCreditErrorMsg] = useState("");
   const [lastSubmitBody, setLastSubmitBody] = useState<SubmitInvoiceDto | undefined>(undefined);
@@ -169,12 +177,12 @@ export default function InvoiceDetail() {
     enabled: !!invoice?.customer && invoice.status === "draft",
   });
 
-  // Solo se usa para el selector de método de pago del reembolso en el modal de Devolución —
-  // el cobro de la factura ya no ocurre aquí (ver módulo Caja).
+  // Usado por el selector de método de pago del reembolso en el modal de Devolución,
+  // y por el bloque de "¿Cómo se cobra?" al someter (validación de requiresBankAccount).
   const { data: metodos } = useQuery({
     queryKey: ["metodos-pago"],
     queryFn: listMetodosPago,
-    enabled: invoice?.status === "submitted",
+    enabled: invoice?.status === "draft" || invoice?.status === "submitted",
     staleTime: 5 * 60_000,
   });
 
@@ -184,6 +192,7 @@ export default function InvoiceDetail() {
     staleTime: 5 * 60_000,
   });
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false;
+  const flujoCobro = facturacionConfig?.flujoCobro ?? "directo";
   const formatoImpresionDefault = facturacionConfig?.formatoImpresionDefault ?? "a4";
   const formatosPermitidos = facturacionConfig?.formatosPermitidos;
 
@@ -371,6 +380,67 @@ export default function InvoiceDetail() {
     creditoAplicado > 0 &&
     pendingAmount <= 0.01;
 
+  // Escenario 3: tenant con módulo POS + cliente "de consumo" (sin crédito fiscal) —
+  // el backend ignora `payments` por completo y siempre manda la factura a Caja
+  // (custom_enviada_a_caja=1, sin NCF). No tiene sentido mostrar el bloque de pago.
+  const posCliente = usaModuloPos && noCredit;
+  // Escenarios 1 y 2: se muestra el bloque "¿Cómo se cobra?" — opcional en general,
+  // obligatorio si el cliente no tiene crédito (limitación temporal del backend: si se
+  // somete a crédito sin payments, la factura queda en CxC igual aunque no debería).
+  const showPaymentBlock =
+    invoice?.status === "draft" && !paidByCreditNote && !posCliente;
+  const paymentRequired = showPaymentBlock && noCredit;
+
+  const metodosActivos = (metodos ?? []).filter((m) => !m.disabled);
+  const directoMopOptions: SearchSelectOption[] = metodosActivos
+    .filter((m) => !directoMopSearch || m.name.toLowerCase().includes(directoMopSearch.toLowerCase()))
+    .map((m) => ({ value: m.name, label: m.name }));
+  const paymentsFilled =
+    flujoCobro === "directo"
+      ? !!directoMop && Number(directoAmount) > 0
+      : payments.payments.some((p) => p.modeOfPayment && Number(p.amount) > 0);
+
+  // Igual que en Caja: si el cliente no tiene crédito y el tenant no usa el módulo
+  // POS, el bloque de pago es obligatorio — se precarga el monto total (el cajero
+  // solo tiene que elegir el método), una sola vez por factura.
+  const [paymentsSeededFor, setPaymentsSeededFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!invoice || paymentsSeededFor === invoice.id) return;
+    if (paymentRequired && !usaModuloPos && pendingAmount > 0) {
+      if (flujoCobro === "directo") {
+        setDirectoAmount(String(pendingAmount));
+      } else {
+        setPayments({
+          ...EMPTY_PAYMENT_LINES_VALUE,
+          payments: [{ ...emptyPaymentLine(), amount: String(pendingAmount) }],
+        });
+      }
+      setPaymentsSeededFor(invoice.id);
+    }
+  }, [invoice, paymentRequired, usaModuloPos, pendingAmount, flujoCobro, paymentsSeededFor]);
+
+  function paymentsAreValid(): boolean {
+    if (flujoCobro === "directo") {
+      if (!directoMop) return false;
+      const metodo = metodosActivos.find((m) => m.name === directoMop);
+      if (metodo?.requiresBankAccount && !metodo.defaultBankAccount) return false;
+      const amount = Number(directoAmount);
+      return amount > 0 && amount <= pendingAmount + 0.01;
+    }
+    const filled = payments.payments.filter(
+      (p) => p.modeOfPayment && Number(p.amount) > 0,
+    );
+    if (filled.length !== payments.payments.length) return false;
+    for (const p of filled) {
+      const metodo = metodosActivos.find((m) => m.name === p.modeOfPayment);
+      if (metodo?.requiresBankAccount && !metodo.defaultBankAccount && !p.bankAccount) {
+        return false;
+      }
+    }
+    const sum = sumPayments(payments.payments);
+    return sum > 0 && sum <= pendingAmount + 0.01;
+  }
+
   const submitMutation = useMutation({
     mutationFn: (body?: SubmitInvoiceDto) => submitInvoice(id!, body),
     onSuccess: (updated) => {
@@ -379,6 +449,9 @@ export default function InvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: ["turno-actual"] });
       setCreditErrorOpen(false);
       setSubmitResult(null);
+      setPayments(EMPTY_PAYMENT_LINES_VALUE);
+      setDirectoMop("");
+      setDirectoAmount("");
 
       // Nuevo flujo POS: la factura va a "por cobrar" sin NCF — redirigir a Caja
       if ("status" in updated && updated.status === "pendiente_cobro") {
@@ -525,27 +598,32 @@ export default function InvoiceDetail() {
       submitMutation.mutate(undefined);
       return;
     }
-    // Cliente sin crédito habilitado — se salta la pregunta y va directo a confirmar "al contado".
-    if (noCredit) {
-      setChosenPaymentMethod("contado");
-      setPaymentConfirmModalOpen(true);
+    // Escenario 3 (usaModuloPos + cliente de consumo) — el backend ignora payments y
+    // siempre manda a Caja; no hace falta armar ni validar nada de pago.
+    if (posCliente) {
+      setLastSubmitBody(undefined);
+      submitMutation.mutate(undefined);
       return;
     }
-    setPaymentMethodModalOpen(true);
-  }
-
-  function selectPaymentMethod(method: "contado" | "credito") {
-    setChosenPaymentMethod(method);
-    setPaymentMethodModalOpen(false);
-    setPaymentConfirmModalOpen(true);
-  }
-
-  // Confirma el sometimiento con la forma de pago elegida en el modal —
-  // "al contado" fuerza payCash (afecta el 606/cobro), "a crédito" somete normal.
-  function confirmSubmitWithPaymentMethod() {
-    setPaymentConfirmModalOpen(false);
-    const body: SubmitInvoiceDto | undefined =
-      chosenPaymentMethod === "contado" ? { payCash: true } : undefined;
+    // Cliente sin crédito — el bloque de pago es obligatorio (limitación temporal del
+    // backend, ver comentario en `paymentRequired`).
+    if (paymentRequired && !paymentsFilled) {
+      toast.error(
+        "Este cliente no tiene crédito habilitado — indica el método de pago antes de someter.",
+      );
+      return;
+    }
+    if (paymentsFilled && !paymentsAreValid()) {
+      toast.error(
+        "Verifica las líneas de pago: falta información o el monto supera el total pendiente.",
+      );
+      return;
+    }
+    const body: SubmitInvoiceDto | undefined = !paymentsFilled
+      ? undefined
+      : flujoCobro === "directo"
+        ? { payments: [{ modeOfPayment: directoMop, amount: Number(directoAmount) }] }
+        : buildSubmitPayload(payments);
     setLastSubmitBody(body);
     submitMutation.mutate(body);
   }
@@ -866,16 +944,18 @@ export default function InvoiceDetail() {
                 </span>
               )}
 
-              <button
-                className="btn btn-primary btn-size-sm"
-                onClick={handleSubmitClick}
-                disabled={isActionsLoading}
-              >
-                <Send size={14} /> Someter
-              </button>
+              {!showPaymentBlock && (
+                <button
+                  className="btn btn-primary btn-size-sm"
+                  onClick={handleSubmitClick}
+                  disabled={isActionsLoading}
+                >
+                  <Send size={14} /> Someter
+                </button>
+              )}
             </div>
 
-            {noCredit && !paidByCreditNote && (
+            {posCliente && (
               <p
                 style={{
                   fontSize: 12,
@@ -886,10 +966,12 @@ export default function InvoiceDetail() {
                   margin: 0,
                 }}
               >
-                <AlertTriangle size={12} /> Este cliente no tiene crédito
-                habilitado — se someterá al contado.
+                <Clock size={12} /> Cliente de consumo — al someter, la
+                factura se enviará a Caja para completar el cobro (ahí se
+                asigna el NCF).
               </p>
             )}
+
             {paidByCreditNote && (
               <p
                 style={{
@@ -904,6 +986,106 @@ export default function InvoiceDetail() {
                 <Wallet size={12} /> Cubierta al 100% por saldo a favor / nota
                 de crédito aplicada.
               </p>
+            )}
+
+            {showPaymentBlock && (
+              <div
+                style={{
+                  border: "1px solid var(--border-default)",
+                  borderRadius: "var(--radius-md)",
+                  padding: 14,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  width: "100%",
+                }}
+              >
+                <div>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      margin: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    ¿Cómo se cobra?
+                    {!paymentRequired && (
+                      <span
+                        style={{ fontWeight: 400, color: "var(--text-tertiary)" }}
+                      >
+                        (opcional)
+                      </span>
+                    )}
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-tertiary)",
+                      margin: "2px 0 0",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    {paymentRequired ? (
+                      <>
+                        <AlertTriangle size={12} /> Este cliente no tiene
+                        crédito habilitado — indica el método de pago para
+                        poder someter.
+                      </>
+                    ) : flujoCobro === "directo" ? (
+                      "Si indicas un método de pago, la factura se somete cobrada. Si lo dejas vacío, se somete a crédito para cobrarse después en Caja."
+                    ) : (
+                      "Si llenas las líneas de pago, la factura se somete cobrada. Si las dejas vacías, se somete a crédito para cobrarse después en Caja."
+                    )}
+                  </p>
+                </div>
+
+                {flujoCobro === "directo" ? (
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <div className="ff-wrap" style={{ minWidth: 220, flex: 1 }}>
+                      <label className="ff-label">Método de pago</label>
+                      <SearchSelect
+                        value={directoMop}
+                        selectedLabel={directoMop}
+                        onChange={setDirectoMop}
+                        options={directoMopOptions}
+                        onSearch={setDirectoMopSearch}
+                        placeholder="Seleccionar…"
+                      />
+                    </div>
+                    <div className="ff-wrap" style={{ width: 160 }}>
+                      <label className="ff-label">Monto</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="ff-input"
+                        value={directoAmount}
+                        onChange={(e) => setDirectoAmount(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <PaymentLinesEditor
+                    amountDue={pendingAmount}
+                    value={payments}
+                    onChange={setPayments}
+                  />
+                )}
+
+                <button
+                  className="btn btn-primary btn-size-sm"
+                  style={{ alignSelf: "flex-start" }}
+                  onClick={handleSubmitClick}
+                  disabled={isActionsLoading}
+                >
+                  <Send size={14} /> Someter
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -1896,111 +2078,6 @@ export default function InvoiceDetail() {
           onConfirm={(tracking) => assignPendingTrackingMutation.mutate(tracking)}
           onClose={() => setPendingTrackingModalOpen(false)}
         />
-      )}
-
-      {/* Modal: elegir forma de pago al someter */}
-      {paymentMethodModalOpen && (
-        <div
-          className="modal-overlay"
-          onClick={() => setPaymentMethodModalOpen(false)}
-        >
-          <div
-            className="modal-box modal-box-sm"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-head">
-              <h2
-                className="modal-title"
-                style={{ display: "flex", alignItems: "center", gap: 6 }}
-              >
-                <Send size={16} /> Forma de pago
-              </h2>
-              <button
-                className="modal-close"
-                onClick={() => setPaymentMethodModalOpen(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div
-              className="modal-body"
-              style={{ display: "flex", flexDirection: "column", gap: 12 }}
-            >
-              <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
-                ¿Cómo se pagará esta factura?
-              </p>
-              <button
-                className="btn btn-secondary"
-                style={{ justifyContent: "flex-start", gap: 8 }}
-                onClick={() => selectPaymentMethod("contado")}
-              >
-                <Banknote size={16} /> Al contado
-              </button>
-              <button
-                className="btn btn-secondary"
-                style={{ justifyContent: "flex-start", gap: 8 }}
-                onClick={() => selectPaymentMethod("credito")}
-              >
-                <CreditCard size={16} /> A crédito
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: confirmar someter con la forma de pago elegida */}
-      {paymentConfirmModalOpen && (
-        <div
-          className="modal-overlay"
-          onClick={() => setPaymentConfirmModalOpen(false)}
-        >
-          <div
-            className="modal-box modal-box-sm"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-head">
-              <h2
-                className="modal-title"
-                style={{ display: "flex", alignItems: "center", gap: 6 }}
-              >
-                <Send size={16} /> Confirmar sometimiento
-              </h2>
-              <button
-                className="modal-close"
-                onClick={() => setPaymentConfirmModalOpen(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div
-              className="modal-body"
-              style={{ display: "flex", flexDirection: "column", gap: 8 }}
-            >
-              <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
-                La factura se someterá con forma de pago{" "}
-                <strong style={{ color: "var(--text-primary)" }}>
-                  {chosenPaymentMethod === "contado" ? "al contado" : "a crédito"}
-                </strong>
-                .
-              </p>
-            </div>
-            <div className="modal-foot">
-              <button
-                className="btn btn-secondary"
-                onClick={() => setPaymentConfirmModalOpen(false)}
-              >
-                Volver
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={confirmSubmitWithPaymentMethod}
-                disabled={submitMutation.isPending}
-              >
-                <Send size={14} /> Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Modal: crédito excedido al someter */}

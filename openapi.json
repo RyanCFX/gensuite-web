@@ -20237,6 +20237,10 @@
             "default": true,
             "description": "Si está activo, el frontend debe mostrar el selector de plantilla de impuestos a nivel de documento (campo `taxesTemplate`) en factura, cotización y compra. Si está inactivo, el frontend debe ocultarlo y dejar que cada documento use siempre la plantilla default de la compañía. taxesTemplate es siempre opcional a nivel de backend — este flag es puramente para que el frontend decida si mostrar u ocultar el campo."
           },
+          "usaModuloPos": {
+            "type": "boolean",
+            "description": "Activa/desactiva el módulo POS para este tenant. Para ACTIVARLO por primera vez use POST /config/facturacion/habilitar-pos (provisiona el POS Profile default + rol \"Cajero POS\"). Este campo solo sirve para DESACTIVARLO después, o reactivarlo sin volver a provisionar nada — no crea el POS Profile ni el rol si nunca se habilitó. No cancela turnos ya abiertos: verifique que no haya ninguno (GET /pos/turnos?status=Open) antes de desactivar."
+          },
           "modoPagoCaja": {
             "type": "string",
             "description": "Método de pago (Mode of Payment) que se compara contra el efectivo físico en caja al cuadrar el turno. GET /pos/turnos/actual expone el monto cobrado con este método desde que se abrió el turno, para comparar en el frontend antes de cerrar. Solo aplica cuando usaModuloPos está activo."
