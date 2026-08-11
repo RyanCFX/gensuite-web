@@ -26,7 +26,8 @@ export interface TopProduct {
   itemCode: string
   itemName: string
   qty: number
-  total: number
+  amount: number
+  percentage: number
 }
 
 export interface TopCustomer {

@@ -2106,6 +2106,8 @@ export interface MetodoPago {
   type: "Cash" | "Bank" | "General";
   codigo606?: string;
   disabled: boolean;
+  /** Cuenta bancaria o de caja asociada a este método de pago. */
+  account?: string;
   /** Si es true, el backend exige `bankAccount` en cobros/pagos con este método (salvo que tenga defaultBankAccount). */
   requiresBankAccount?: boolean;
   /** Cuenta bancaria (id de CuentaBancaria) usada automáticamente si la operación no especifica una. */

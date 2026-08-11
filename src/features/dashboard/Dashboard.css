@@ -369,6 +369,64 @@
 
 .list-card:hover { box-shadow: var(--shadow-sm); }
 
+/* Top Productos — proportional share bar (real % of top-3 total, no invented deltas) */
+.top-bar-wrap {
+  padding: 14px 20px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.top-bar-shares {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.top-bar-share {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--success-text);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--border-default);
+  overflow: hidden;
+}
+
+.top-bar-seg {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 480ms var(--ease-out);
+  background: var(--brand-primary);
+}
+
+.top-bar-seg[data-rank='2'] { background: color-mix(in oklch, var(--brand-primary) 60%, white); }
+.top-bar-seg[data-rank='3'] { background: color-mix(in oklch, var(--brand-primary) 30%, white); }
+
+.list-row-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full);
+  background: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.list-row-dot[data-rank='1'] { background: var(--brand-primary); }
+.list-row-dot[data-rank='2'] { background: color-mix(in oklch, var(--brand-primary) 60%, white); }
+.list-row-dot[data-rank='3'] { background: color-mix(in oklch, var(--brand-primary) 30%, white); }
+
 .list-card-rows {
   display: flex;
   flex-direction: column;

@@ -7,7 +7,7 @@ import {
 } from 'recharts'
 import {
   TrendingUp, ShoppingCart, Wallet, Clock, TrendingDown,
-  Package, Users, Activity, Receipt, Banknote, ArrowRight,
+  Package, Users, Activity, Receipt, Banknote, ArrowRight, ArrowUp,
 } from 'lucide-react'
 import { formatDOP, formatDate, formatNumber } from '@/lib/formatters'
 import {
@@ -371,23 +371,52 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ) : (
-                <div className="list-card-rows">
-                  {data.topProducts.map((row, i) => (
-                    <div key={row.itemCode} className="list-row" style={{ '--i': i } as React.CSSProperties}>
-                      <span className="list-row-avatar" data-rank={i + 1 <= 3 ? String(i + 1) : undefined}>
-                        {i + 1}
-                      </span>
-                      <div className="list-row-main">
-                        <div className="list-row-name">{row.itemName}</div>
-                        <div className="list-row-sub" style={{ fontFamily: 'var(--font-mono)' }}>{row.itemCode}</div>
+                <>
+                  {(() => {
+                    const top3 = data.topProducts.slice(0, 3)
+                    return (
+                      <div className="top-bar-wrap">
+                        <div className="top-bar-shares">
+                          {top3.map((row) => (
+                            <span
+                              key={row.itemCode}
+                              className="top-bar-share"
+                              style={{ width: `${row.percentage}%` }}
+                            >
+                              <ArrowUp size={10} aria-hidden="true" />
+                              {row.percentage.toFixed(1)}%
+                            </span>
+                          ))}
+                        </div>
+                        <div className="top-bar">
+                          {top3.map((row, i) => (
+                            <span
+                              key={row.itemCode}
+                              className="top-bar-seg"
+                              data-rank={i + 1}
+                              style={{ width: `${row.percentage}%` }}
+                            />
+                          ))}
+                        </div>
                       </div>
-                      <div className="list-row-meta">
-                        <div className="list-row-value">{formatDOP(row.total)}</div>
-                        <div className="list-row-sub">{formatNumber(row.qty)} unid.</div>
+                    )
+                  })()}
+                  <div className="list-card-rows">
+                    {data.topProducts.map((row, i) => (
+                      <div key={row.itemCode} className="list-row" style={{ '--i': i } as React.CSSProperties}>
+                        <span className="list-row-dot" data-rank={i + 1 <= 3 ? String(i + 1) : undefined} />
+                        <div className="list-row-main">
+                          <div className="list-row-name">{row.itemName}</div>
+                          <div className="list-row-sub" style={{ fontFamily: 'var(--font-mono)' }}>{row.itemCode}</div>
+                        </div>
+                        <div className="list-row-meta">
+                          <div className="list-row-value">{formatDOP(row.amount)}</div>
+                          <div className="list-row-sub">{formatNumber(row.qty)} unid.</div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </>
               )}
               <Link to="/inventario/articulos" className="list-card-footer">
                 Ver catálogo <ArrowRight size={13} />
@@ -409,22 +438,22 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ) : (
-                <div className="list-card-rows">
-                  {data.topCustomers.map((row, i) => (
-                    <div key={row.customer} className="list-row" style={{ '--i': i } as React.CSSProperties}>
-                      <span className="list-row-avatar" data-rank={i + 1 <= 3 ? String(i + 1) : undefined}>
-                        {i + 1}
-                      </span>
-                      <div className="list-row-main">
-                        <div className="list-row-name">{row.customerName}</div>
-                        <div className="list-row-sub">{row.count} {row.count === 1 ? 'factura' : 'facturas'}</div>
+                <>
+                  <div className="list-card-rows">
+                    {data.topCustomers.map((row, i) => (
+                      <div key={row.customer} className="list-row" style={{ '--i': i } as React.CSSProperties}>
+                        <span className="list-row-dot" data-rank={i + 1 <= 3 ? String(i + 1) : undefined} />
+                        <div className="list-row-main">
+                          <div className="list-row-name">{row.customerName}</div>
+                          <div className="list-row-sub">{row.count} {row.count === 1 ? 'factura' : 'facturas'}</div>
+                        </div>
+                        <div className="list-row-meta">
+                          <div className="list-row-value">{formatDOP(row.total)}</div>
+                        </div>
                       </div>
-                      <div className="list-row-meta">
-                        <div className="list-row-value">{formatDOP(row.total)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </>
               )}
               <Link to="/clientes" className="list-card-footer">
                 Ver clientes <ArrowRight size={13} />
@@ -446,15 +475,14 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ) : (
-                <div className="list-card-rows">
+                <>
+                  <div className="list-card-rows">
                   {data.recentActivity.map((item, idx) => {
                     const accentColor = ACTIVITY_COLORS[item.type] ?? 'var(--border-strong)'
                     const label = ACTIVITY_LABELS[item.type] ?? item.type
                     return (
                       <div key={idx} className="list-row" style={{ '--i': idx } as React.CSSProperties}>
-                        <span className="list-row-avatar" style={{ background: `color-mix(in oklch, ${accentColor} 16%, var(--surface-sunken))`, color: accentColor }}>
-                          {label.charAt(0)}
-                        </span>
+                        <span className="list-row-dot" style={{ background: accentColor }} />
                         <div className="list-row-main">
                           <div className="list-row-name">{item.description}</div>
                           <div className="list-row-sub">{label} · {formatDate(item.timestamp)}</div>
@@ -465,7 +493,8 @@ export default function DashboardPage() {
                       </div>
                     )
                   })}
-                </div>
+                  </div>
+                </>
               )}
               <Link to="/facturas" className="list-card-footer">
                 Ver facturación <ArrowRight size={13} />

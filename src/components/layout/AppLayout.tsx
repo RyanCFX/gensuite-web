@@ -135,6 +135,15 @@ const NAV_VENTAS: NavEntry[] = [
     icon: <FileText size={16} aria-hidden="true" />,
     path: "/devoluciones",
   },
+  {
+    label: "Reportes",
+    icon: <BarChart3 size={16} aria-hidden="true" />,
+    prefix: "/reportes/ventas|/reportes/607",
+    children: [
+      { label: "Ventas", icon: <BarChart3 size={14} />, path: "/reportes/ventas" },
+      { label: "DGII 607", icon: <FileText size={14} />, path: "/reportes/607" },
+    ],
+  },
 ];
 
 const NAV_OPS: NavEntry[] = [
@@ -173,6 +182,16 @@ const NAV_OPS: NavEntry[] = [
         icon: <Truck size={14} />,
         path: "/transferencias",
       },
+      {
+        label: "Valoración de Stock",
+        icon: <BarChart3 size={14} />,
+        path: "/reportes/stock",
+      },
+      {
+        label: "Movimientos de Stock",
+        icon: <BarChart3 size={14} />,
+        path: "/reportes/movimientos",
+      },
     ],
   },
   {
@@ -190,6 +209,11 @@ const NAV_OPS: NavEntry[] = [
         label: "Costos de Importación",
         icon: <Truck size={14} />,
         path: "/compras/costos-importacion",
+      },
+      {
+        label: "Reportes",
+        icon: <BarChart3 size={14} />,
+        path: "/reportes/606",
       },
     ],
   },
@@ -240,6 +264,16 @@ const NAV_FINANZAS: NavEntry[] = [
       { label: "Pendientes de Pago", icon: <Receipt size={14} />, path: "/pagos/pendientes" },
       { label: "Registrar Pago", icon: <Wallet size={14} />, path: "/pagos/nuevo" },
       { label: "Aging CxP", icon: <BarChart3 size={14} />, path: "/pagos/aging" },
+    ],
+  },
+  {
+    label: "Reportes",
+    icon: <BarChart3 size={16} aria-hidden="true" />,
+    prefix: "/reportes/cuadreTurno|/reportes/caja|/reportes/corteCajaDia",
+    children: [
+      { label: "Cuadre por Turno", icon: <Clock size={14} />, path: "/reportes/cuadreTurno" },
+      { label: "Cuadre por Caja", icon: <DollarSign size={14} />, path: "/reportes/caja" },
+      { label: "Corte de Caja del Día", icon: <BarChart3 size={14} />, path: "/reportes/corteCajaDia" },
     ],
   },
 ];

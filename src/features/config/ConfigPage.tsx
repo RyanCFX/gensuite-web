@@ -429,7 +429,7 @@ function MetodosPagoSection() {
   const { data: cuentasBancariasData } = useQuery({
     queryKey: ['cuentas-bancarias-activas'],
     queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
-    enabled: !!editTarget && editRequiresBankAccount,
+    enabled: !!editTarget && !!editRequiresBankAccount,
   })
   const cuentaBancariaOptions: SearchSelectOption[] = (cuentasBancariasData?.items ?? [])
     .filter((c) => !defaultBankAccountSearch || c.accountName.toLowerCase().includes(defaultBankAccountSearch.toLowerCase()))
@@ -455,8 +455,8 @@ function MetodosPagoSection() {
 
   function openEdit(m: MetodoPago) {
     setEditTarget(m)
-    setEditAccount('')
-    setEditRequiresBankAccount(m.requiresBankAccount ?? false)
+    setEditAccount(m.account ?? '')
+    setEditRequiresBankAccount(!!m.requiresBankAccount)
     setEditDefaultBankAccount(m.defaultBankAccount ?? '')
     setShowNew(false)
   }
