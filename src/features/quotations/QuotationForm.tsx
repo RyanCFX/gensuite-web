@@ -6,12 +6,13 @@ import { createQuotation, updateQuotation, getQuotation, getQuotationDuplicateSo
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getDefaultPriceTier } from '@/shared/api/catalog'
 import { listImpuestosVentas, listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
-import type { CreateQuotationDto, ItemPrices, Bundle } from '@/shared/api/types'
+import type { CreateQuotationDto, ItemPrices, Bundle, Customer } from '@/shared/api/types'
 import type { Item } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDOP, displayId } from '@/lib/formatters'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
+import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -106,6 +107,7 @@ export default function QuotationForm() {
   const [customerName, setCustomerName] = useState('')
   const [customerPriceTier, setCustomerPriceTier] = useState<keyof ItemPrices | undefined>(undefined)
   const [customerQuery, setCustomerQuery] = useState('')
+  const [showCreateCustomer, setShowCreateCustomer] = useState(false)
   const [esClienteOcasional, setEsClienteOcasional] = useState(false)
   const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
   const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
@@ -329,6 +331,14 @@ useEffect(() => {
     label: c.customerName,
     sublabel: c.rnc ?? c.cedula,
   }))
+
+  function handleCustomerCreated(customer: Customer) {
+    setShowCreateCustomer(false)
+    setCustomerId(customer.id)
+    setCustomerName(customer.customerName)
+    setCustomerPriceTier(customer.priceTier)
+    queryClient.invalidateQueries({ queryKey: ['customerSearch'] })
+  }
 
   // ── Mutations ────────────────────────────────────────────────────────────
 
@@ -670,6 +680,16 @@ if (esClienteOcasional) {
                      loading={loadingCustomers}
                      placeholder="Buscar cliente…"
                      error={!customerId}
+                     headerContent={
+                       <button
+                         type="button"
+                         className="btn btn-ghost btn-size-sm"
+                         style={{ width: '100%', justifyContent: 'flex-start' }}
+                         onClick={() => setShowCreateCustomer(true)}
+                       >
+                         <UserPlus size={14} /> Agregar cliente
+                       </button>
+                     }
                    />
                  )}
                </div>
@@ -1029,6 +1049,13 @@ if (esClienteOcasional) {
 
       {viewItemCode && (
         <ItemDetailModal itemCode={viewItemCode} onClose={() => setViewItemCode(null)} />
+      )}
+
+      {showCreateCustomer && (
+        <CustomerQuickCreateModal
+          onCreated={handleCustomerCreated}
+          onClose={() => setShowCreateCustomer(false)}
+        />
       )}
     </div>
   )

@@ -165,6 +165,29 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
                 </button>
               </div>
 
+              {(() => {
+                const metodo = metodosActivos.find((m) => m.name === p.modeOfPayment)
+                if (!metodo?.requiresBankAccount) return null
+                return (
+                  <div className="ff-wrap">
+                    <label className="ff-label">
+                      Cuenta Bancaria{!metodo.defaultBankAccount && <span className="ff-required"> *</span>}
+                    </label>
+                    <SearchSelect
+                      value={p.bankAccount}
+                      error={!metodo.defaultBankAccount && !p.bankAccount}
+                      onChange={(val) => updateLine(idx, { bankAccount: val })}
+                      options={(cuentasBancarias?.items ?? [])
+                        .filter((c) => !bankAccountSearch[idx] || c.accountName.toLowerCase().includes(bankAccountSearch[idx].toLowerCase()))
+                        .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))}
+                      onSearch={(q) => setBankAccountSearch((prev) => ({ ...prev, [idx]: q }))}
+                      selectedLabel={cuentasBancarias?.items.find((c) => c.id === p.bankAccount)?.accountName ?? ''}
+                      placeholder={metodo.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
+                    />
+                  </div>
+                )
+              })()}
+
               <button
                 type="button"
                 className="btn btn-ghost btn-size-xs"
@@ -275,131 +298,22 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
               />
             </div>
 
-            {(() => {
-              const metodo = metodosActivos.find((m) => m.name === p.modeOfPayment)
-              if (!metodo?.requiresBankAccount) return null
-              return (
-                <div className="ff-wrap">
-                  <label className="ff-label">
-                    Cuenta Bancaria{!metodo.defaultBankAccount && <span className="ff-required"> *</span>}
-                  </label>
-                  <SearchSelect
-                    value={p.bankAccount}
-                    error={!metodo.defaultBankAccount && !p.bankAccount}
-                    onChange={(val) => updateLine(idx, { bankAccount: val })}
-                    options={(cuentasBancarias?.items ?? [])
-                      .filter((c) => !bankAccountSearch[idx] || c.accountName.toLowerCase().includes(bankAccountSearch[idx].toLowerCase()))
-                      .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))}
-                    onSearch={(q) => setBankAccountSearch((prev) => ({ ...prev, [idx]: q }))}
-                    selectedLabel={cuentasBancarias?.items.find((c) => c.id === p.bankAccount)?.accountName ?? ''}
-                    placeholder={metodo.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
-                  />
-                </div>
-              )
-            })()}
-
-            <button
-              type="button"
-              className="btn btn-ghost btn-size-xs"
-              style={{ alignSelf: 'flex-start' }}
-              onClick={() => updateLine(idx, { showDetails: !p.showDetails })}
-            >
-              {p.showDetails ? <ChevronUp size={12} /> : <ChevronDown size={12} />} Detalles adicionales
-            </button>
-
-            {p.showDetails && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <input
-                  className="ff-input"
-                  placeholder="Número de tarjeta"
-                  value={p.cardNumber}
-                  onChange={(e) => updateLine(idx, { cardNumber: e.target.value })}
-                />
-                <input
-                  className="ff-input"
-                  placeholder="Código de autorización"
-                  value={p.authorizationCode}
-                  onChange={(e) => updateLine(idx, { authorizationCode: e.target.value })}
-                />
-                <SearchSelect
-                  value={p.bank}
-                  selectedLabel={p.bank}
-                  onChange={(val) => updateLine(idx, { bank: val })}
-                  options={(bancos ?? [])
-                    .filter((b) => !bancoSearch[idx] || b.name.toLowerCase().includes(bancoSearch[idx].toLowerCase()))
-                    .map((b) => ({ value: b.name, label: b.name }))}
-                  onSearch={(q) => setBancoSearch((prev) => ({ ...prev, [idx]: q }))}
-                  placeholder="Banco…"
-                />
-                <input
-                  className="ff-input"
-                  placeholder="Número de cheque/documento"
-                  value={p.checkNumber}
-                  onChange={(e) => updateLine(idx, { checkNumber: e.target.value })}
-                />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <button type="button" className="btn btn-secondary btn-size-sm" style={{ alignSelf: 'flex-start' }} onClick={addLine}>
-        <Plus size={13} /> Agregar método de pago
-      </button>
-
-      <p style={{ fontSize: 13, margin: 0, color: totalOk ? 'var(--color-success)' : 'var(--error-text)' }}>
-        Total ingresado: {formatDOP(total)} / Total a cobrar: {formatDOP(amountDue)}
-      </p>
-
-      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={value.vueltoEnabled}
-          onChange={(e) => onChange({ ...value, vueltoEnabled: e.target.checked })}
-        />
-        Registrar vuelto entregado
-      </label>
-
-      {value.vueltoEnabled && (
-        <div
-          style={{
-            border: '1px solid var(--border-default)',
-            borderRadius: 'var(--radius-md)',
-            padding: 10,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-          }}
-        >
-          <div className="ff-wrap">
-            <label className="ff-label">Efectivo entregado por el cliente</label>
-            <input
-              className="ff-input"
-              type="number"
-              min="0"
-              step="0.01"
-              value={value.tenderedCash}
-              onChange={(e) => onChange({ ...value, tenderedCash: e.target.value })}
-              style={{ width: 160 }}
-            />
-          </div>
-
-          {tenderedCash > 0 && (
-            <>
-              <p style={{ fontSize: 13, margin: 0, color: vueltoEsperado < 0 ? 'var(--color-error)' : undefined }}>
-                Vuelto a entregar: {formatDOP(vueltoEsperado)}
-                {vueltoEsperado < 0 && (
-                  <span style={{ display: 'block', fontSize: 12, color: 'var(--color-error)', marginTop: 2 }}>
-                    El efectivo entregado es menor al total de pagos en efectivo
-                  </span>
-                )}
-              </p>
-
-              {value.vuelto.length > 0 && (
-                <p style={{ fontSize: 11, color: 'var(--text-tertiary)', margin: 0 }}>
-                  Desglose calculado automáticamente. Puedes ajustar las cantidades manualmente si es necesario.
+            {tenderedCash > 0 && (
+              <>
+                <p style={{ fontSize: 13, margin: 0, color: vueltoEsperado < 0 ? 'var(--color-error)' : undefined }}>
+                  Vuelto a entregar: {formatDOP(vueltoEsperado)}
+                  {vueltoEsperado < 0 && (
+                    <span style={{ display: 'block', fontSize: 12, color: 'var(--color-error)', marginTop: 2 }}>
+                      El efectivo entregado es menor al total de pagos en efectivo
+                    </span>
+                  )}
                 </p>
-              )}
+
+                {value.vuelto.length > 0 && (
+                  <p style={{ fontSize: 11, color: 'var(--text-tertiary)', margin: 0 }}>
+                    Desglose calculado automáticamente. Puedes ajustar las cantidades manualmente si es necesario.
+                  </p>
+                )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {value.vuelto.map((v, idx) => (
@@ -451,18 +365,19 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
                   <Plus size={13} /> Agregar denominación
                 </button>
 
-              <p style={{ fontSize: 13, margin: 0, color: vueltoEsperado >= 0 && vueltoOk ? 'var(--color-success)' : 'var(--error-text)' }}>
-                Total desglosado: {formatDOP(vueltoDeclarado)} / Vuelto esperado: {formatDOP(vueltoEsperado)}
-                {vueltoEsperado >= 0 && !vueltoOk && (
-                  <span style={{ display: 'block', fontSize: 12, color: 'var(--color-error)', marginTop: 2 }}>
-                    El desglose no coincide con el vuelto esperado
-                  </span>
-                )}
-              </p>
-            </>
-          )}
-        </div>
-      )}
+                <p style={{ fontSize: 13, margin: 0, color: vueltoEsperado >= 0 && vueltoOk ? 'var(--color-success)' : 'var(--error-text)' }}>
+                  Total desglosado: {formatDOP(vueltoDeclarado)} / Vuelto esperado: {formatDOP(vueltoEsperado)}
+                  {vueltoEsperado >= 0 && !vueltoOk && (
+                    <span style={{ display: 'block', fontSize: 12, color: 'var(--color-error)', marginTop: 2 }}>
+                      El desglose no coincide con el vuelto esperado
+                    </span>
+                  )}
+                </p>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

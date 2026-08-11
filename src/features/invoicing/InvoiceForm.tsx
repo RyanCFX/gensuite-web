@@ -13,7 +13,8 @@ import type { TrackedComponent } from '@/components/shared/ComponentTrackingModa
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP } from '@/lib/formatters'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
+import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { toast } from 'sonner'
@@ -195,6 +196,7 @@ export default function InvoiceForm() {
   const [customerId, setCustomerId] = useState('')
   const [customerQuery, setCustomerQuery] = useState('')
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [showCreateCustomer, setShowCreateCustomer] = useState(false)
   const [esClienteOcasional, setEsClienteOcasional] = useState(false)
   const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
   const [clienteOcasionalRnc, setClienteOcasionalRnc] = useState('')
@@ -375,6 +377,13 @@ export default function InvoiceForm() {
     label: c.customerName,
     sublabel: c.rnc ?? c.cedula,
   }))
+
+  function handleCustomerCreated(customer: Customer) {
+    setShowCreateCustomer(false)
+    setCustomerId(customer.id)
+    setSelectedCustomer(customer)
+    queryClient.invalidateQueries({ queryKey: ['customerSearch'] })
+  }
 
   // ── Semaforo ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -821,6 +830,16 @@ const itemsDto = items.map((i) => ({
                      loading={loadingCustomers}
                      placeholder="Buscar cliente…"
                      error={!customerId}
+                     headerContent={
+                       <button
+                         type="button"
+                         className="btn btn-ghost btn-size-sm"
+                         style={{ width: '100%', justifyContent: 'flex-start' }}
+                         onClick={() => setShowCreateCustomer(true)}
+                       >
+                         <UserPlus size={14} /> Agregar cliente
+                       </button>
+                     }
                    />
                  )}
                  {selectedCustomer && !esClienteOcasional && (
@@ -1296,6 +1315,13 @@ createMutation.mutate(baseDto as CreateInvoiceDto)
 
       {viewItemCode && (
         <ItemDetailModal itemCode={viewItemCode} onClose={() => setViewItemCode(null)} />
+      )}
+
+      {showCreateCustomer && (
+        <CustomerQuickCreateModal
+          onCreated={handleCustomerCreated}
+          onClose={() => setShowCreateCustomer(false)}
+        />
       )}
 
       {trackingModalIndex != null && items[trackingModalIndex] && (

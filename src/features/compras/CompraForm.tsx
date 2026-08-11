@@ -8,9 +8,10 @@ import { listWarehouses } from '@/shared/api/inventory'
 import { listAlmacenes, listImpuestosCompras, getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
-import type { CreateCompraDto } from '@/shared/api/types'
+import type { CreateCompraDto, Supplier } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { Plus, Trash2, Info } from 'lucide-react'
+import { Plus, Trash2, Info, UserPlus } from 'lucide-react'
+import { SupplierQuickCreateModal } from '@/features/suppliers/SupplierQuickCreateModal'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
@@ -438,6 +439,7 @@ export default function CompraForm() {
   const [supplierId, setSupplierId] = useState('')
   const [supplierName, setSupplierName] = useState('')
   const [supplierQuery, setSupplierQuery] = useState('')
+  const [showCreateSupplier, setShowCreateSupplier] = useState(false)
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0])
   const [dueDate, setDueDate] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem(defaultWh)])
@@ -503,6 +505,16 @@ export default function CompraForm() {
     label: s.supplierName,
     sublabel: s.rnc ?? s.cedula,
   }))
+
+  function handleSupplierCreated(supplier: Supplier) {
+    setShowCreateSupplier(false)
+    setSupplierId(supplier.id)
+    setSupplierName(supplier.supplierName)
+    if (!tipoBienes606Touched && supplier.defaultTipoBienes606) setTipoBienes606(supplier.defaultTipoBienes606)
+    if (!formaPago606Touched && supplier.defaultFormaPago606) setFormaPago606(supplier.defaultFormaPago606)
+    if (!tipoPagoTouched && supplier.defaultTipoPagoProveedor) setTipoPago(supplier.defaultTipoPagoProveedor)
+    queryClient.invalidateQueries({ queryKey: ['supplierSearch'] })
+  }
 
   // Sin sucursal elegida: todos los almacenes del tenant (comportamiento actual).
   // Con sucursal elegida: solo los almacenes de esa sucursal.
@@ -815,6 +827,16 @@ export default function CompraForm() {
                     loading={suppliersLoading}
                     placeholder="Buscar proveedor…"
                     error={!supplierId}
+                    headerContent={
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-size-sm"
+                        style={{ width: '100%', justifyContent: 'flex-start' }}
+                        onClick={() => setShowCreateSupplier(true)}
+                      >
+                        <UserPlus size={14} /> Agregar proveedor
+                      </button>
+                    }
                   />
                 </div>
 
@@ -1034,6 +1056,13 @@ export default function CompraForm() {
             setVariantTemplate(null)
           }}
           onClose={() => setVariantTemplate(null)}
+        />
+      )}
+
+      {showCreateSupplier && (
+        <SupplierQuickCreateModal
+          onCreated={handleSupplierCreated}
+          onClose={() => setShowCreateSupplier(false)}
         />
       )}
     </div>

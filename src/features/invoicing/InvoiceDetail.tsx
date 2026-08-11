@@ -19,22 +19,16 @@ import {
   aplicarCreditNoteAFactura,
   removerCreditNoteAplicada,
 } from "@/shared/api/notes";
-import { listMetodosPago, getFacturacionConfig, listDenominaciones, getCatalogosFiscales } from "@/shared/api/config";
+import { listMetodosPago, getFacturacionConfig, getCatalogosFiscales } from "@/shared/api/config";
 import { createDevolucion } from "@/shared/api/devoluciones";
 import { getItem } from "@/shared/api/catalog";
 import { getBundle } from "@/shared/api/bundles";
 import { getTurnoActual, abrirTurno } from "@/shared/api/pos";
 import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion } from "@/shared/api/types";
 import { MOTIVOS_ANULACION_DGII } from "@/lib/constants";
-import { PaymentLinesEditor } from "@/components/shared/PaymentLinesEditor";
 import { ConfirmModal } from "@/shared/ui/Modal";
 import { useConfirmClose } from "@/shared/hooks/useConfirmClose";
 import { useDirtyCheck } from "@/shared/hooks/useDirtyCheck";
-import {
-  EMPTY_PAYMENT_LINES_VALUE,
-  isPaymentLinesValid,
-  buildSubmitPayload,
-} from "@/lib/paymentLines";
 import {
   ArrowLeft,
   Send,
@@ -49,6 +43,8 @@ import {
   Clock,
   BookOpen,
   Eye,
+  Banknote,
+  CreditCard,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -123,16 +119,13 @@ export default function InvoiceDetail() {
   const [turnoModalOpen, setTurnoModalOpen] = useState(false);
   const [turnoOpeningAmount, setTurnoOpeningAmount] = useState(0);
 
-  const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState("");
-  const [modeOfPaymentRetrySearch, setModeOfPaymentRetrySearch] = useState("");
   const [returnResolutionSearch, setReturnResolutionSearch] = useState("");
   const [returnModeOfPaymentSearch, setReturnModeOfPaymentSearch] =
     useState("");
 
-  const creditErrorIsDirty = useDirtyCheck(
-    { cashPayments, modeOfPayment },
-    creditErrorOpen,
-  );
+  // El modal de "crédito excedido" ya no captura ningún dato de pago (el cobro
+  // se hace después en Caja) — no hay nada que pueda quedar sin guardar.
+  const creditErrorIsDirty = useDirtyCheck({}, creditErrorOpen);
   const creditErrorClose = useConfirmClose(creditErrorIsDirty, () =>
     setCreditErrorOpen(false),
   );
@@ -201,9 +194,6 @@ export default function InvoiceDetail() {
     staleTime: 30_000,
   });
 
-  // Si la llamada falla o el campo no viene, se trata como "directo" (comportamiento histórico/seguro).
-  const flujoCobro = facturacionConfig?.flujoCobro ?? "directo";
-
   const abrirTurnoMutation = useMutation({
     mutationFn: () =>
       abrirTurno({
@@ -225,22 +215,6 @@ export default function InvoiceDetail() {
     queryFn: getCatalogosFiscales,
     staleTime: 60 * 60_000,
   });
-
-  const metodosOptions: SearchSelectOption[] = useMemo(() => {
-    const q = modeOfPaymentSearch.toLowerCase();
-    return (metodos ?? [])
-      .filter((m) => !m.disabled)
-      .filter((m) => !q || m.name.toLowerCase().includes(q))
-      .map((m) => ({ value: m.name, label: m.name }));
-  }, [metodos, modeOfPaymentSearch]);
-
-  const metodosRetryOptions: SearchSelectOption[] = useMemo(() => {
-    const q = modeOfPaymentRetrySearch.toLowerCase();
-    return (metodos ?? [])
-      .filter((m) => !m.disabled)
-      .filter((m) => !q || m.name.toLowerCase().includes(q))
-      .map((m) => ({ value: m.name, label: m.name }));
-  }, [metodos, modeOfPaymentRetrySearch]);
 
   const returnModeOptions: SearchSelectOption[] = useMemo(() => {
     const q = returnModeOfPaymentSearch.toLowerCase();
@@ -404,9 +378,6 @@ export default function InvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: ["invoice", id] });
       queryClient.invalidateQueries({ queryKey: ["turno-actual"] });
       setCreditErrorOpen(false);
-      setPayCash(false);
-      setModeOfPayment("");
-      setCashPayments(EMPTY_PAYMENT_LINES_VALUE);
       setSubmitResult(null);
 
       // Nuevo flujo POS: la factura va a "por cobrar" sin NCF — redirigir a Caja
@@ -569,23 +540,14 @@ export default function InvoiceDetail() {
     setPaymentConfirmModalOpen(true);
   }
 
-  function handleSubmitClick() {
-    if (!usaModuloPos && showCashSelector) {
-      if (!isCashReadyToSubmit()) {
-        toast.error(
-          flujoCobro === "caja"
-            ? "Verifica que el total ingresado coincida con el monto a cobrar"
-            : "Selecciona un método de pago",
-        );
-        return;
-      }
-      const body = buildCashSubmitBody();
-      setLastSubmitBody(body);
-      submitMutation.mutate(body);
-    } else {
-      setLastSubmitBody(undefined);
-      submitMutation.mutate(undefined);
-    }
+  // Confirma el sometimiento con la forma de pago elegida en el modal —
+  // "al contado" fuerza payCash (afecta el 606/cobro), "a crédito" somete normal.
+  function confirmSubmitWithPaymentMethod() {
+    setPaymentConfirmModalOpen(false);
+    const body: SubmitInvoiceDto | undefined =
+      chosenPaymentMethod === "contado" ? { payCash: true } : undefined;
+    setLastSubmitBody(body);
+    submitMutation.mutate(body);
   }
 
   // Reintento tras el modal de "crédito excedido" — solo necesita forzar payCash, ya no requiere
@@ -904,86 +866,16 @@ export default function InvoiceDetail() {
                 </span>
               )}
 
-              {!usaModuloPos && !noCredit && !paidByCreditNote && (
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontSize: 13,
-                    cursor: "pointer",
-                    userSelect: "none",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={payCash}
-                    onChange={(e) => setPayCash(e.target.checked)}
-                  />
-                  Cobrar al contado
-                </label>
-              )}
-
-              {!usaModuloPos && (paidByCreditNote || flujoCobro !== "caja" || !showCashSelector) && (
-                <div>
-                  {paidByCreditNote ? (
-                    <SearchSelect
-                      value={CREDIT_NOTE_MODE_OF_PAYMENT}
-                      selectedLabel={CREDIT_NOTE_MODE_OF_PAYMENT}
-                      onChange={() => {}}
-                      options={[]}
-                      onSearch={() => {}}
-                      disabled
-                      className="ff-select"
-                    />
-                  ) : (
-                    showCashSelector && (
-                      <SearchSelect
-                        value={modeOfPayment}
-                        selectedLabel={
-                          metodos?.find((m) => m.name === modeOfPayment)?.name ??
-                          ""
-                        }
-                        onChange={(val) => setModeOfPayment(val)}
-                        options={metodosOptions}
-                        onSearch={setModeOfPaymentSearch}
-                        placeholder="Método de pago…"
-                        className="ff-select"
-                      />
-                    )
-                  )}
-                </div>
-              )}
-
-              {usaModuloPos || !(flujoCobro === "caja" && showCashSelector && !paidByCreditNote) ? (
-                <button
-                  className="btn btn-primary btn-size-sm"
-                  onClick={handleSubmitClick}
-                  disabled={isActionsLoading}
-                >
-                  <Send size={14} /> Someter
-                </button>
-              ) : null}
+              <button
+                className="btn btn-primary btn-size-sm"
+                onClick={handleSubmitClick}
+                disabled={isActionsLoading}
+              >
+                <Send size={14} /> Someter
+              </button>
             </div>
 
-            {!usaModuloPos && flujoCobro === "caja" && showCashSelector && !paidByCreditNote && (
-              <>
-                <PaymentLinesEditor
-                  amountDue={pendingAmount}
-                  value={cashPayments}
-                  onChange={setCashPayments}
-                />
-                <button
-                  className="btn btn-primary btn-size-sm"
-                  style={{ alignSelf: "flex-start" }}
-                  onClick={handleSubmitClick}
-                  disabled={isActionsLoading || !isCashReadyToSubmit()}
-                >
-                  <Send size={14} /> Someter
-                </button>
-              </>
-            )}
-            {!usaModuloPos && noCredit && !paidByCreditNote && (
+            {noCredit && !paidByCreditNote && (
               <p
                 style={{
                   fontSize: 12,

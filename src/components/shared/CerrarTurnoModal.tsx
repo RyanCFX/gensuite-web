@@ -3,7 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Lock } from 'lucide-react'
 import { getFacturacionConfig, listDenominaciones } from '@/shared/api/config'
-import { getPreviewCierreTurno, cerrarTurno } from '@/shared/api/pos'
+import { getPreviewCierreTurno, cerrarTurno, getTurnoPdfBlobUrl } from '@/shared/api/pos'
 import type {
   ApiError,
   ClosingAmountLine,
@@ -11,6 +11,7 @@ import type {
   DenominacionCierreDto,
 } from '@/shared/api/types'
 import { formatDOP } from '@/lib/formatters'
+import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 
 interface CerrarTurnoModalProps {
   open: boolean
@@ -31,6 +32,7 @@ export function CerrarTurnoModal({
   const [closingAmounts, setClosingAmounts] = useState<ClosingAmountLine[]>([])
   const [cierreResult, setCierreResult] = useState<CierreTurnoResult | null>(null)
   const [seededKey, setSeededKey] = useState<string | null>(null)
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
 
   // Reinicia el flujo cuando se abre el modal o cambia el turno objetivo.
   // Patrón "adjust state during render" (comparando el valor previo) — evita
@@ -45,6 +47,7 @@ export function CerrarTurnoModal({
     setCierreResult(null)
     setClosingAmounts([])
     setSeededKey(null)
+    setPdfPreviewUrl(null)
   }
 
   const { data: facturacionConfig } = useQuery({
@@ -109,6 +112,12 @@ export function CerrarTurnoModal({
       setCierreResult(result)
       setCierreStep('result')
       onClosed?.()
+      // /pos/turnos/:id espera el ID de apertura (POS Opening Entry) — el mismo
+      // que se usó para llamar a cerrarTurno, NO result.id (ese es el del cierre,
+      // POS Closing Entry, un documento distinto en ERPNext).
+      getTurnoPdfBlobUrl(openingEntryId!)
+        .then(setPdfPreviewUrl)
+        .catch(() => toast.error('No se pudo generar la vista previa del PDF del turno'))
     },
     onError: (err: ApiError) => {
       toast.error(
@@ -199,6 +208,7 @@ export function CerrarTurnoModal({
   if (!open) return null
 
   return (
+    <>
     <div className="modal-overlay" onClick={closeModal}>
       <div
         className="modal-box"
@@ -625,5 +635,13 @@ export function CerrarTurnoModal({
         </div>
       </div>
     </div>
+    <PdfPreviewModal
+      url={pdfPreviewUrl}
+      onClose={() => {
+        setPdfPreviewUrl(null)
+        closeModal()
+      }}
+    />
+    </>
   )
 }

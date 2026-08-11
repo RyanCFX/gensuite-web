@@ -5,14 +5,15 @@ import { createPedido, updatePedido, getPedido, getPedidoDuplicateSource } from 
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getQuotation } from '@/shared/api/quotations'
 import { getLayawayConfig, listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
-import type { Item, ItemPrices, CreatePedidoDto, Bundle } from '@/shared/api/types'
+import type { Item, ItemPrices, CreatePedidoDto, Bundle, Customer } from '@/shared/api/types'
+import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDOP } from '@/lib/formatters'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, PackageOpen } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, PackageOpen, UserPlus } from 'lucide-react'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { toast } from 'sonner'
@@ -86,6 +87,7 @@ const [customerId, setCustomerId] = useState('')
    const [customerName, setCustomerName] = useState('')
    const [customerPriceTier, setCustomerPriceTier] = useState<keyof ItemPrices | undefined>(undefined)
    const [customerQuery, setCustomerQuery] = useState('')
+   const [showCreateCustomer, setShowCreateCustomer] = useState(false)
    const [esClienteOcasional, setEsClienteOcasional] = useState(false)
    const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
    const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
@@ -230,6 +232,14 @@ useEffect(() => {
   })
 
   const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({ value: c.id, label: c.customerName, sublabel: c.rnc ?? c.cedula }))
+
+  function handleCustomerCreated(customer: Customer) {
+    setShowCreateCustomer(false)
+    setCustomerId(customer.id)
+    setCustomerName(customer.customerName)
+    setCustomerPriceTier(customer.priceTier)
+    queryClient.invalidateQueries({ queryKey: ['customerSearch'] })
+  }
 
   // ── Sucursal (branch) selector ────────────────────────────────────────────
   const isSystemManager = currentUser?.roles?.includes(SYSTEM_MANAGER_ROLE) ?? false
@@ -547,6 +557,16 @@ try {
                      loading={false}
                      placeholder="Buscar cliente…"
                      error={submitted && !customerId}
+                     headerContent={
+                       <button
+                         type="button"
+                         className="btn btn-ghost btn-size-sm"
+                         style={{ width: '100%', justifyContent: 'flex-start' }}
+                         onClick={() => setShowCreateCustomer(true)}
+                       >
+                         <UserPlus size={14} /> Agregar cliente
+                       </button>
+                     }
                    />
                  )}
                </div>
@@ -759,6 +779,13 @@ try {
 
       {viewItemCode && (
         <ItemDetailModal itemCode={viewItemCode} onClose={() => setViewItemCode(null)} />
+      )}
+
+      {showCreateCustomer && (
+        <CustomerQuickCreateModal
+          onCreated={handleCustomerCreated}
+          onClose={() => setShowCreateCustomer(false)}
+        />
       )}
 
       <PinModal

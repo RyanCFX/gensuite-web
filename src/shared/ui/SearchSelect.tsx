@@ -31,6 +31,8 @@ export interface SearchSelectProps {
   selectedLabel?: string
   className?: string
   id?: string
+  /** Contenido fijo renderizado encima de la lista de opciones (ej. botón "+ Agregar cliente") */
+  headerContent?: React.ReactNode
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -48,6 +50,7 @@ export function SearchSelect({
   selectedLabel,
   className = '',
   id,
+  headerContent,
 }: SearchSelectProps) {
   const [inputValue, setInputValue] = useState('')
   const [focusedIdx, setFocusedIdx] = useState(-1)
@@ -210,6 +213,11 @@ export function SearchSelect({
       <FloatingPortal open={open} style={style} portalRef={portalRef}>
         <div className="search-select-dropdown" role="listbox" ref={listRef}
           style={{ position: 'static', maxHeight: 220 }}>
+          {headerContent && (
+            <div className="search-select-header" onMouseDown={(e) => e.preventDefault()}>
+              {headerContent}
+            </div>
+          )}
           {loading ? (
             <div className="search-select-loading">
               <span className="spinner spinner-brand spinner-sm" aria-hidden="true" />
