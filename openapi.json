@@ -20306,6 +20306,11 @@
             "type": "number",
             "default": 50,
             "description": "Cuando a una Secuencia NCF le queden este número de comprobantes o menos: GET /config/ncf y GET /config/ncf/:id marcan esa serie con alertaActiva=true, y el disparador programado de notificaciones envía el correo configurado en el tipo \"facturacion_ncf_secuencia_baja\" (una sola vez por día por serie)."
+          },
+          "requiereSerialLoteCompra": {
+            "type": "boolean",
+            "default": false,
+            "description": "Si está activo, comprar un artículo con tracking de serial/lote (has_serial_no/has_batch_no) exige que la línea de compra incluya `serials`/`batches` — hoy es opcional. Además, al VENDER ese artículo el serial/lote debe existir YA en ERPNext (se asume que entró por una compra registrada); un serial inexistente se rechaza. Si está inactivo (default), la compra sigue siendo opcional y, al vender, un serial/lote que no existe se crea sobre la marcha en vez de rechazarse. En ambos casos ERPNext sigue exigiendo que se asigne algún serial/lote a la línea antes de someter el documento — eso no cambia."
           }
         }
       },
@@ -22729,6 +22734,13 @@
             "items": {
               "$ref": "#/components/schemas/BatchLineDto"
             }
+          },
+          "componentTracking": {
+            "description": "Solo cuando itemCode es un Combo y alguno de sus componentes tiene tracking de serial/lote — indica qué serial(es)/lote(s) específicos de ese componente se están comprando. La expansión del combo (expandComboLines) no asigna tracking automáticamente a los componentes.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComponentTrackingDto"
+            }
           }
         },
         "required": [
@@ -23820,6 +23832,11 @@
             "type": "string",
             "example": "Productos terminados - JB",
             "description": "Almacén de despacho"
+          },
+          "uom": {
+            "type": "string",
+            "example": "Caja x12",
+            "description": "UOM de venta para esta línea (debe estar configurada como conversión del artículo, ver `uoms` en GET catalog/items/:id). Si se omite, se usa la UOM de stock del artículo. ERPNext resuelve automáticamente el conversion_factor y el stock_qty (descuento real de inventario)."
           }
         },
         "required": [
@@ -24240,6 +24257,32 @@
           "qty"
         ]
       },
+      "ReceiptComponentTrackingDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "example": "PROD-0005",
+            "description": "Código del componente del combo (no el del combo en sí)."
+          },
+          "serials": {
+            "description": "Seriales específicos a recibir de este componente (debe coincidir en cantidad con lo que aporta el combo).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "batches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptBatchLineDto"
+            }
+          }
+        },
+        "required": [
+          "itemCode"
+        ]
+      },
       "PurchaseReceiptItemDto": {
         "type": "object",
         "properties": {
@@ -24280,6 +24323,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ReceiptBatchLineDto"
+            }
+          },
+          "componentTracking": {
+            "description": "Solo cuando itemCode es un Combo y alguno de sus componentes tiene tracking de serial/lote — indica qué serial(es)/lote(s) específicos de ese componente se están recibiendo. La expansión del combo (expandComboLines) no asigna tracking automáticamente a los componentes.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptComponentTrackingDto"
             }
           }
         },

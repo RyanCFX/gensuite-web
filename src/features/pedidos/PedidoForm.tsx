@@ -41,6 +41,7 @@ interface LineItem {
   amount: number
   discountPct: number
   uom: string
+  conversionFactor: number
   maxDiscountPct?: number
   _prices?: ItemPrices
   warehouse: string
@@ -150,7 +151,8 @@ const [customerId, setCustomerId] = useState('')
         rate: i.rate,
         amount: i.amount,
         discountPct: (i as any).discountPct ?? 0,
-        uom: i.uom,
+         uom: i.uom,
+         conversionFactor: 1,
         warehouse: '',
       })))
       setNotes(q.notes ?? '')
@@ -171,8 +173,9 @@ const [customerId, setCustomerId] = useState('')
         rate: i.rate,
         amount: calcAmount(i.qty, i.rate, i.discountPct ?? 0),
         discountPct: i.discountPct ?? 0,
-        uom: 'Unidad',
-        warehouse: '',
+         uom: 'Unidad',
+         conversionFactor: 1,
+         warehouse: '',
       })))
       getCustomer(src.customer).then((c) => {
         setCustomerName(c.customerName)
@@ -199,7 +202,8 @@ useEffect(() => {
        rate: i.rate,
        amount: i.amount,
        discountPct: (i as any).discountPct ?? 0,
-       uom: i.uom ?? 'Unidad',
+        uom: i.uom ?? 'Unidad',
+        conversionFactor: 1,
        warehouse: '',
      })))
      setNotes(existing.notes ?? '')
@@ -369,8 +373,9 @@ useEffect(() => {
         description: catalogItem.internalDescription ?? catalogItem.itemName,
         rate,
         amount: calcAmount(row.qty, rate, row.discountPct),
-        uom: catalogItem.stockUom ?? row.uom,
-        maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
+         uom: catalogItem.stockUom ?? row.uom,
+         conversionFactor: 1,
+         maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
         _prices: catalogItem.prices,
         warehouse: defaultWarehouse(),
         _stockByWarehouse: catalogItem.stockByWarehouse,
@@ -391,8 +396,9 @@ useEffect(() => {
         description: bundle.itemName,
         rate,
         amount: calcAmount(row.qty, rate, row.discountPct),
-        uom: bundle.itemUom ?? '',
-        maxDiscountPct: undefined,
+         uom: bundle.itemUom ?? '',
+         conversionFactor: 1,
+         maxDiscountPct: undefined,
         _prices: bundle.prices,
         warehouse: defaultWarehouse(),
         _stockByWarehouse: undefined,
@@ -416,6 +422,7 @@ useEffect(() => {
           amount: calcAmount(s.qty, rate, 0),
           discountPct: 0,
           uom: s.item.stockUom ?? 'Unidad',
+          conversionFactor: 1,
           maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
           _prices: s.item.prices,
           warehouse: defaultWarehouse(),
@@ -443,7 +450,7 @@ useEffect(() => {
       toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
       return
     }
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, uom: 'Unidad', warehouse: '' }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, uom: 'Unidad', conversionFactor: 1, warehouse: '' }])
   }
   function removeRow(index: number) { setItems((prev) => prev.filter((_, i) => i !== index)) }
 

@@ -918,6 +918,7 @@ export interface CreatePedidoDto {
     itemCode: string;
     qty: number;
     rate: number;
+    uom?: string;
     discountPct?: number;
     warehouse?: string;
   }[];
@@ -2421,6 +2422,16 @@ export interface AgingEntry {
   range2: number;
   range3: number;
   range4: number;
+}
+
+export interface AgingConfig {
+  rangos: string[];
+}
+
+export interface AgingResult {
+  rows: AgingEntry[];
+  config: AgingConfig;
+  note?: string;
 }
 
 export interface SemaforoEntry {

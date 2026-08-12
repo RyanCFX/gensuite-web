@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Info } from 'lucide-react'
 import { AuthLayout } from '@/shared/layout/AuthLayout'
 import LogoMark from '@/components/LogoMark'
 import { isApiError } from '@/shared/api/auth'
@@ -97,6 +97,17 @@ export default function LoginPage() {
       </div>
 
       <form className="auth-form" onSubmit={handleSubmit(onSubmit)} noValidate>
+        {serverError && (
+          <div className="auth-server-error" role="alert">
+            {serverError}
+          </div>
+        )}
+
+        {isRateLimited && (
+          <div className="auth-server-error" role="alert" aria-live="polite">
+            Demasiados intentos. Espera unos segundos e intenta de nuevo.
+          </div>
+        )}
         <div className="form-field">
           <Label htmlFor="email">Correo electrónico</Label>
           <Input
@@ -159,17 +170,10 @@ export default function LoginPage() {
           )}
         </div>
 
-        {serverError && (
-          <div className="auth-server-error" role="alert">
-            {serverError}
-          </div>
-        )}
-
-        {isRateLimited && (
-          <div className="auth-server-error" role="alert" aria-live="polite">
-            Demasiados intentos. Espera unos segundos e intenta de nuevo.
-          </div>
-        )}
+        <div className="auth-security-note">
+          <Info size={13} />
+          <span>Recibirás un correo de seguridad en cada inicio de sesión exitoso y en cada intento fallido.</span>
+        </div>
 
         <button
           type="submit"

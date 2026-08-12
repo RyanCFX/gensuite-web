@@ -2,6 +2,8 @@ import { client, unwrap, unwrapPaginated } from './client'
 import { ENDPOINTS } from './endpoints'
 import type {
   AgingEntry,
+  AgingConfig,
+  AgingResult,
   SemaforoEntry,
   SemaforoResult,
   PaymentEntry,
@@ -69,10 +71,17 @@ export async function downloadCobroPdf(id: string, filename?: string, formato?: 
 }
 
 // ─── Aging ────────────────────────────────────────────────────────────────────
+// GET /cobros/aging responde { success, data: AgingEntry[], config, note? }
+// — config y note NO están anidados dentro de `data`, van al mismo nivel.
 
-export async function getAging() {
-  const res = await client.get<{ success: true; data: AgingEntry[] }>(ENDPOINTS.cobros.aging)
-  return unwrap(res)
+export async function getAging(): Promise<AgingResult> {
+  const res = await client.get<{
+    success: true
+    data: AgingEntry[]
+    config: AgingConfig
+    note?: string
+  }>(ENDPOINTS.cobros.aging)
+  return { rows: res.data.data, config: res.data.config, note: res.data.note }
 }
 
 // ─── Semáforo ─────────────────────────────────────────────────────────────────

@@ -411,7 +411,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="list-row-meta">
                           <div className="list-row-value">{formatDOP(row.amount)}</div>
-                          <div className="list-row-sub">{formatNumber(row.qty)} unid.</div>
+                          <div className="list-row-sub">{formatNumber(row.qty)} unid. · {row.percentage.toFixed(1)}% del total</div>
                         </div>
                       </div>
                     ))}
