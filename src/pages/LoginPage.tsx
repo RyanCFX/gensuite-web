@@ -170,10 +170,6 @@ export default function LoginPage() {
           )}
         </div>
 
-        <div className="auth-security-note">
-          <Info size={13} />
-          <span>Recibirás un correo de seguridad en cada inicio de sesión exitoso y en cada intento fallido.</span>
-        </div>
 
         <button
           type="submit"
