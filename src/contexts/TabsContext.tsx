@@ -66,7 +66,7 @@ function getTitleForPath(pathname: string): string {
     [/^\/proveedores\/(.+)$/, (m) => `Proveedor: ${m[1]}`],
     [/^\/proveedores$/, 'Proveedores'],
     [/^\/cobros\/pago$/, 'Registrar Cobro'],
-    [/^\/cobros\/aging$/, 'Aging CxC'],
+    [/^\/cobros\/aging$/, 'Antiguedad de saldos CxC'],
     [/^\/cobros\/semaforo$/, 'Semáforo'],
     [/^\/cobros\/lista$/, 'Cobros'],
     [/^\/cobros\/(.+)$/, (m) => `Cobro: ${m[1]}`],

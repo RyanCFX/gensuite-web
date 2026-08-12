@@ -28,7 +28,7 @@ export default function AgingPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Aging de Cuentas por Cobrar"
+        title="Antiguedad de saldos por Cobrar"
         description="Análisis de saldos vencidos por cliente"
         action={
           <button

@@ -19,6 +19,7 @@ import type { LibroDiarioByDimension, CuadreTurnoRow, CorteCajaDiaTurno } from '
 import { CorteCajaView } from '@/components/shared/CorteCajaView'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listUsuarios } from '@/shared/api/usuarios'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { formatDate, formatDateTime, formatDOP } from '@/lib/formatters'
 import { BarChart3, AlertCircle, Download, FileText, Loader2 } from 'lucide-react'
@@ -100,7 +101,7 @@ const REPORT_META: Record<string, { label: string; description: string }> = {
   ventas:       { label: 'Ventas',               description: 'Reporte de ventas por período' },
   stock:        { label: 'Valoración de Stock',  description: 'Costo y valor del inventario' },
   movimientos:  { label: 'Movimientos de Stock', description: 'Historial de entradas y salidas' },
-  cxcaging:    { label: 'Aging CxC',            description: 'Antigüedad de cuentas por cobrar' },
+  cxcaging:    { label: 'Antiguedad de saldos CxC', description: 'Antigüedad de cuentas por cobrar' },
   caja:         { label: 'Cuadre de Caja',       description: 'Resumen de movimientos de caja' },
   libroDiario:  { label: 'Libro Diario',         description: 'Movimientos contables (GL) del período' },
   libroMayor:   { label: 'Libro Mayor',          description: 'Movimientos por cuenta con saldo inicial y final' },
@@ -1028,14 +1029,17 @@ const REPORT_NAV = [
   { key: 'pl',          group: 'Financiero', label: 'Estado de Resultados' },
   { key: 'stock',       group: 'Inventario', label: 'Valoración de Stock' },
   { key: 'movimientos', group: 'Inventario', label: 'Movimientos de Stock' },
-  { key: 'cxcaging',   group: 'CxC',        label: 'Aging CxC' },
-  { key: 'cxpaging',   group: 'CXP',        label: 'Aging CXP' },
+  { key: 'cxcaging',   group: 'CxC',        label: 'Antiguedad de saldos CxC' },
+  { key: 'cxpaging',   group: 'CXP',        label: 'Antiguedad de saldos CxP' },
   { key: 'caja',        group: 'Caja',       label: 'Cuadre de Caja' },
   { key: 'cuadreTurno', group: 'Caja',       label: 'Cuadre por Turno' },
   { key: 'corteCajaDia', group: 'Caja',      label: 'Corte de Caja del Día' },
   { key: 'libroDiario', group: 'Contabilidad', label: 'Libro Diario' },
   { key: 'libroMayor',  group: 'Contabilidad', label: 'Libro Mayor' },
 ]
+
+// Reportes que solo tienen sentido con el módulo POS habilitado (Facturacion Config.usaModuloPos).
+const POS_ONLY_REPORT_KEYS = new Set(['caja', 'cuadreTurno', 'corteCajaDia'])
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -1044,9 +1048,23 @@ export default function ReportesPage() {
   const navigate = useNavigate()
   const active = tipo ?? '606'
   const meta = REPORT_META[active]
-  const groups = [...new Set(REPORT_NAV.map((n) => n.group))]
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const usaModuloPos = facturacionConfig?.usaModuloPos ?? false
+
+  const reportNav = usaModuloPos
+    ? REPORT_NAV
+    : REPORT_NAV.filter((n) => !POS_ONLY_REPORT_KEYS.has(n.key))
+  const groups = [...new Set(reportNav.map((n) => n.group))]
 
   function renderReport() {
+    if (!usaModuloPos && POS_ONLY_REPORT_KEYS.has(active)) {
+      return <ServiceUnavailable message="Este reporte requiere el módulo POS habilitado." />
+    }
     switch (active) {
       case '606':        return <DgiiReport tipo="606" />
       case '607':        return <DgiiReport tipo="607" />
@@ -1080,7 +1098,7 @@ export default function ReportesPage() {
         {groups.map((group) => (
           <div key={group} style={{ marginBottom: 4, padding:'0px 10px' }}>
             <div style={{ padding: '6px 12px 2px' }}>{group}</div>
-            {REPORT_NAV.filter((n) => n.group === group).map((n) => (
+            {reportNav.filter((n) => n.group === group).map((n) => (
               <button
                 key={n.key}
                 className={`nav-item${active === n.key ? ' active' : ''}`}

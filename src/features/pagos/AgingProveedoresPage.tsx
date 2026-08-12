@@ -30,7 +30,7 @@ export default function AgingProveedoresPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Aging de Cuentas por Pagar"
+        title="Antiguedad de saldos por Pagar"
         description="Análisis de saldos vencidos a proveedores"
         action={
           <button

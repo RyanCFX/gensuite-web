@@ -23,6 +23,7 @@ import type { AccountsSettings, StockSettings, SellingSettings, BuyingSettings }
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { TagInput } from '@/shared/ui/TagInput'
 import { Select, SelectItem } from '@/components/ui/select'
 import { Save, Settings2 } from 'lucide-react'
 
@@ -157,8 +158,20 @@ function CuentasTab() {
           </div>
 
           <div className="ff-wrap">
-            <label className="ff-label">Rango de Antigüedad por Defecto</label>
-            <input className="ff-input" {...register('defaultAgeingRange')} placeholder="30, 60, 90" />
+            <label className="ff-label" htmlFor="defaultAgeingRange">Rango de Antigüedad por Defecto</label>
+            <Controller
+              name="defaultAgeingRange"
+              control={control}
+              render={({ field }) => (
+                <TagInput
+                  id="defaultAgeingRange"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  placeholder="Escribe días y presiona Enter (ej. 60, 90, 120)"
+                />
+              )}
+            />
+            <p className="ff-hint">Solo números. Separa los rangos con Enter o coma (ej. 60, 90, 120).</p>
           </div>
 
           <div className="ff-wrap">

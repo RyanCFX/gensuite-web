@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, Fragment } from "react";
 import { useNavigate, useLocation, useOutlet } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { getFacturacionConfig } from "@/shared/api/config";
 import {
   LayoutDashboard,
   Users,
@@ -251,7 +253,7 @@ const NAV_FINANZAS: NavEntry[] = [
     children: [
       { label: "Cobros", icon: <ClipboardList size={14} />, path: "/cobros/lista" },
       { label: "Registrar Cobro", icon: <Wallet size={14} />, path: "/cobros/pago" },
-      { label: "Aging CxC", icon: <BarChart3 size={14} />, path: "/cobros/aging" },
+      { label: "Antiguedad de saldos CxC", icon: <BarChart3 size={14} />, path: "/cobros/aging" },
       { label: "Semáforo", icon: <Shield size={14} />, path: "/cobros/semaforo" },
     ],
   },
@@ -263,7 +265,7 @@ const NAV_FINANZAS: NavEntry[] = [
       { label: "Pagos", icon: <ClipboardList size={14} />, path: "/pagos/lista" },
       { label: "Pendientes de Pago", icon: <Receipt size={14} />, path: "/pagos/pendientes" },
       { label: "Registrar Pago", icon: <Wallet size={14} />, path: "/pagos/nuevo" },
-      { label: "Aging CxP", icon: <BarChart3 size={14} />, path: "/pagos/aging" },
+      { label: "Antiguedad de saldos CxP", icon: <BarChart3 size={14} />, path: "/pagos/aging" },
     ],
   },
   {
@@ -453,6 +455,14 @@ const NAV_CONFIG: NavEntry = {
 };
 
 const ADMIN_ONLY_PATHS = new Set(["/config/permisos", "/config/roles", "/config/cajas"]);
+
+// Grupos/ítems de NAV_FINANZAS que solo tienen sentido con el módulo POS habilitado
+// (Facturacion Config.usaModuloPos) — identificados por su `prefix` (grupos) o `path` (ítems sueltos).
+const POS_ONLY_NAV_KEYS = new Set([
+  "/caja",
+  "/turnos",
+  "/reportes/cuadreTurno|/reportes/caja|/reportes/corteCajaDia",
+]);
 
 // ─── NavItem component ────────────────────────────────────────────────────────
 
@@ -774,6 +784,18 @@ function AppLayoutInner() {
           (item) => !ADMIN_ONLY_PATHS.has(item.path),
         ),
       };
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ["facturacion-config"],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  });
+  const usaModuloPos = facturacionConfig?.usaModuloPos ?? false;
+  const financeNav: NavEntry[] = usaModuloPos
+    ? NAV_FINANZAS
+    : NAV_FINANZAS.filter(
+        (entry) => !POS_ONLY_NAV_KEYS.has(isGroup(entry) ? entry.prefix : entry.path),
+      );
   const { tabs, activeId, closeTab, multiTab } = useTabs();
   const navigate = useNavigate();
   const location = useLocation();
@@ -896,7 +918,7 @@ function AppLayoutInner() {
       {/* Finanzas */}
       <div className="sb-section">
         {!collapsed && <div className="sb-label">Finanzas</div>}
-        {NAV_FINANZAS.map((entry) => renderEntry(entry, handleNav, collapsed))}
+        {financeNav.map((entry) => renderEntry(entry, handleNav, collapsed))}
       </div>
 
       {/* Contabilidad */}
