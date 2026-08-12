@@ -466,6 +466,7 @@ function submitDto() {
        rate: i.rate,
        discountPct: i.discountPct || undefined,
        warehouse: i.warehouse || undefined,
+       uom: i.uom || undefined,
      }))
      const baseDto = {
        ...(esClienteOcasional

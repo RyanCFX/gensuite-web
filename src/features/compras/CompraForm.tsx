@@ -20,7 +20,10 @@ import type { Item } from '@/shared/api/types'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
-import { listItems } from '@/shared/api/catalog'
+import { listItems, getItem } from '@/shared/api/catalog'
+import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
+import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
+import type { ComponentTracking } from '@/shared/api/types'
 import { useAuthStore } from '@/stores/auth.store'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
@@ -43,6 +46,9 @@ interface ItemRow {
   purchaseTaxPct: number
   purchaseTaxTemplate: string
   lineError?: string
+  /** Componentes del combo con tracking de serial/lote activo (solo si el artículo es un combo) */
+  _comboComponents?: { itemCode: string; itemName?: string; trackingType: 'serial' | 'batch'; qtyPerCombo: number }[]
+  componentTracking?: ComponentTracking[]
 }
 
 function emptyItem(defaultWh?: string): ItemRow {
@@ -115,10 +121,34 @@ function removeBatch(idx: number, batchIdx: number, setItems: React.Dispatch<Rea
   ))
 }
 
+/** Requerimiento de seriales/lotes por componente, recalculado según la cantidad actual de la línea */
+function getTrackingRequirement(row: ItemRow): TrackedComponent[] {
+  return (row._comboComponents ?? []).map((c) => ({
+    itemCode: c.itemCode,
+    itemName: c.itemName,
+    trackingType: c.trackingType,
+    qtyNeeded: c.qtyPerCombo * row.qty,
+    warehouse: row.warehouse || undefined,
+  }))
+}
+
+function updateComponentTracking(
+  idx: number,
+  itemCode: string,
+  patch: { serials?: string[]; batches?: { batchId: string; qty: number }[] },
+  setItems: React.Dispatch<React.SetStateAction<ItemRow[]>>,
+) {
+  setItems((prev) => prev.map((row, i) => {
+    if (i !== idx) return row
+    const others = (row.componentTracking ?? []).filter((t) => t.itemCode !== itemCode)
+    return { ...row, componentTracking: [...others, { itemCode, ...patch }] }
+  }))
+}
+
 // ─── SerialBatchRow Sub-component ────────────────────────────────────────
 
 function SerialBatchRow({
-  item, idx, items, setItems, warehouses, warehouseOptions, onWarehouseSearch, updateItem, selectCatalogItem, clearCatalogItem, setVariantTemplate, isReturn,
+  item, idx, items, setItems, warehouses, warehouseOptions, onWarehouseSearch, updateItem, selectCatalogItem, clearCatalogItem, setVariantTemplate, isReturn, allowNewTracking,
 }: {
   item: ItemRow
   idx: number
@@ -132,6 +162,7 @@ function SerialBatchRow({
   clearCatalogItem: (idx: number) => void
   setVariantTemplate: (t: Item | null) => void
   isReturn: boolean
+  allowNewTracking: boolean
 }) {
   const serialInputRef = useRef<HTMLInputElement>(null)
   const [serialInput, setSerialInput] = useState('')
@@ -266,7 +297,7 @@ function SerialBatchRow({
       </tr>
 
       {/* Tracking row */}
-      {(item.trackingType === 'serial' || item.trackingType === 'batch') && (
+      {(item.trackingType === 'serial' || item.trackingType === 'batch' || (item._comboComponents && item._comboComponents.length > 0)) && (
         <tr className="tracking-row">
           <td colSpan={8} style={{ padding: '4px 8px 8px' }}>
             {item.lineError && (
@@ -421,6 +452,28 @@ function SerialBatchRow({
                 </div>
               </div>
             )}
+
+            {item._comboComponents && item._comboComponents.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  Series/lotes de componentes del combo
+                </span>
+                {getTrackingRequirement(item).map((req) => {
+                  const entry = item.componentTracking?.find((t) => t.itemCode === req.itemCode)
+                  return (
+                    <TrackedComponentEditor
+                      key={req.itemCode}
+                      component={req}
+                      serials={entry?.serials ?? []}
+                      onChangeSerials={(s) => updateComponentTracking(idx, req.itemCode, { serials: s }, setItems)}
+                      batches={entry?.batches ?? []}
+                      onChangeBatches={(b) => updateComponentTracking(idx, req.itemCode, { batches: b }, setItems)}
+                      allowNew={allowNewTracking}
+                    />
+                  )
+                })}
+              </div>
+            )}
           </td>
         </tr>
       )}
@@ -457,6 +510,7 @@ export default function CompraForm() {
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
   const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
+  const requiereSerialLoteCompra = facturacionConfig?.requiereSerialLoteCompra ?? false
 
   const [ncfProveedor, setNcfProveedor] = useState('')
   const [tipoBienes606, setTipoBienes606] = useState('')
@@ -680,31 +734,45 @@ export default function CompraForm() {
     // Clear previous line errors
     setItems((prev) => prev.map((i) => ({ ...i, lineError: undefined })))
 
-    // Validate tracking data
+    // Validate tracking data — solo se exige capturar seriales/lotes si el flag "Requiere Serial/Lote al Comprar" está activo
     let hasTrackingError = false
-    for (const item of items) {
-      if (item.trackingType === 'serial') {
-        if (item.serials.length !== Math.round(item.qty)) {
-          hasTrackingError = true
-          setItems((prev) => prev.map((r, idx) =>
-            idx === items.indexOf(item) ? { ...r, lineError: `Debe capturar ${Math.round(item.qty)} serial(es) (ingresó ${item.serials.length})` } : r,
-          ))
+    if (requiereSerialLoteCompra) {
+      for (const item of items) {
+        if (item.trackingType === 'serial') {
+          if (item.serials.length === 0) {
+            hasTrackingError = true
+            setItems((prev) => prev.map((r, idx) =>
+              idx === items.indexOf(item) ? { ...r, lineError: 'Debe capturar los seriales de este artículo (requerido por configuración)' } : r,
+            ))
+          } else if (item.serials.length !== Math.round(item.qty)) {
+            hasTrackingError = true
+            setItems((prev) => prev.map((r, idx) =>
+              idx === items.indexOf(item) ? { ...r, lineError: `Debe capturar ${Math.round(item.qty)} serial(es) (ingresó ${item.serials.length})` } : r,
+            ))
+          }
+          const dups = item.serials.filter((s, i, a) => a.indexOf(s) !== i)
+          if (dups.length > 0) {
+            hasTrackingError = true
+            setItems((prev) => prev.map((r, idx) =>
+              idx === items.indexOf(item) ? { ...r, lineError: `Seriales duplicados: ${[...new Set(dups)].join(', ')}` } : r,
+            ))
+          }
         }
-        const dups = item.serials.filter((s, i, a) => a.indexOf(s) !== i)
-        if (dups.length > 0) {
-          hasTrackingError = true
-          setItems((prev) => prev.map((r, idx) =>
-            idx === items.indexOf(item) ? { ...r, lineError: `Seriales duplicados: ${[...new Set(dups)].join(', ')}` } : r,
-          ))
-        }
-      }
-      if (item.trackingType === 'batch') {
-        const sum = item.batches.reduce((s, b) => s + b.qty, 0)
-        if (Math.round(sum) !== Math.round(item.qty)) {
-          hasTrackingError = true
-          setItems((prev) => prev.map((r, idx) =>
-            idx === items.indexOf(item) ? { ...r, lineError: `Suma de lotes (${sum}) debe ser igual a la cantidad (${item.qty})` } : r,
-          ))
+        if (item.trackingType === 'batch') {
+          if (item.batches.length === 0) {
+            hasTrackingError = true
+            setItems((prev) => prev.map((r, idx) =>
+              idx === items.indexOf(item) ? { ...r, lineError: 'Debe capturar los lotes de este artículo (requerido por configuración)' } : r,
+            ))
+          } else {
+            const sum = item.batches.reduce((s, b) => s + b.qty, 0)
+            if (Math.round(sum) !== Math.round(item.qty)) {
+              hasTrackingError = true
+              setItems((prev) => prev.map((r, idx) =>
+                idx === items.indexOf(item) ? { ...r, lineError: `Suma de lotes (${sum}) debe ser igual a la cantidad (${item.qty})` } : r,
+              ))
+            }
+          }
         }
       }
     }
@@ -725,6 +793,7 @@ export default function CompraForm() {
         uom: i.uom || undefined,
         ...(i.serials.length > 0 ? { serials: i.serials } : {}),
         ...(i.batches.length > 0 ? { batches: i.batches } : {}),
+        ...(i.componentTracking?.length > 0 ? { componentTracking: i.componentTracking } : {}),
       })),
       ncfProveedor: ncfProveedor || undefined,
       tipoBienes606: tipoBienes606 || undefined,
@@ -745,7 +814,7 @@ export default function CompraForm() {
       // Para compras usamos valuationRate (costo) si existe, si no standardRate
       const baseRate = catalogItem.valuationRate ?? catalogItem.standardRate ?? 0
       const trackingType = catalogItem.trackingType ?? 'none'
-      return {
+      const newRow: ItemRow = {
         ...row,
         itemCode: catalogItem.id,
         itemLabel: catalogItem.itemName,
@@ -759,12 +828,38 @@ export default function CompraForm() {
         purchaseTaxPct: catalogItem.purchaseTaxPct ?? 0,
         purchaseTaxTemplate: catalogItem.purchaseTaxTemplate ?? '',
       }
+      // Detecta componentes del combo con tracking de serial/lote
+      if (catalogItem.type === 'combo') {
+        Promise.all(
+          (catalogItem.components ?? []).map(async (c) => {
+            try {
+              const item = await getItem(c.itemCode)
+              if (item.trackingType === 'serial' || item.trackingType === 'batch') {
+                return { itemCode: c.itemCode, itemName: item.itemName, trackingType: item.trackingType, qtyPerCombo: c.qty }
+              }
+            } catch {
+              // ignora — si falla la consulta del componente, no se bloquea la selección del combo
+            }
+            return null
+          }),
+        ).then((results) => {
+          const tracked = results.filter((r): r is NonNullable<typeof r> => r != null)
+          if (tracked.length > 0) {
+            setItems((prev) =>
+              prev.map((row, i) =>
+                i === idx ? { ...row, _comboComponents: tracked } : row
+              )
+            )
+          }
+        })
+      }
+      return newRow
     }))
   }, [])
 
   const clearCatalogItem = useCallback((idx: number) => {
     setItems((prev) => prev.map((row, i) =>
-      i === idx ? { ...row, itemCode: '', itemLabel: undefined, description: '', rate: 0, trackingType: 'none', serials: [], batches: [] } : row,
+      i === idx ? { ...row, itemCode: '', itemLabel: undefined, description: '', rate: 0, trackingType: 'none', serials: [], batches: [], _comboComponents: undefined, componentTracking: undefined } : row,
     ))
   }, [])
 
@@ -946,6 +1041,7 @@ export default function CompraForm() {
                         clearCatalogItem={clearCatalogItem}
                         setVariantTemplate={setVariantTemplate}
                         isReturn={isReturn}
+                        allowNewTracking={!requiereSerialLoteCompra}
                       />
                     ))}
                   </tbody>

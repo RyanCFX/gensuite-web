@@ -229,6 +229,8 @@ export default function InvoiceForm() {
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
   const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
+  // Si está inactivo, se permite capturar un serial/lote nuevo al vender en vez de exigir que ya exista.
+  const requiereSerialLoteCompra = facturacionConfig?.requiereSerialLoteCompra ?? false
 
   // ── Stock settings: define si los seriales/lotes se capturan inline en la fila (useSerialBatchFields)
   //    o vía diálogo emergente (ComponentTrackingModal). El catálogo es fijo, se cachea 1h.
@@ -1181,6 +1183,7 @@ const itemsDto = items.map((i) => ({
                                     onChangeSerials={(s) => updateComponentTracking(index, req.itemCode, { serials: s })}
                                     batches={entry?.batches ?? []}
                                     onChangeBatches={(b) => updateComponentTracking(index, req.itemCode, { batches: b })}
+                                    allowNew={!requiereSerialLoteCompra}
                                   />
                                 )
                               })}
@@ -1329,6 +1332,7 @@ createMutation.mutate(baseDto as CreateInvoiceDto)
           bundleName={items[trackingModalIndex].itemLabel ?? items[trackingModalIndex].itemCode}
           components={getTrackingRequirement(items[trackingModalIndex])}
           initial={items[trackingModalIndex].componentTracking}
+          allowNew={!requiereSerialLoteCompra}
           onConfirm={(tracking) => {
             updateItem(trackingModalIndex, { componentTracking: tracking })
             setTrackingModalIndex(null)

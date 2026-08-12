@@ -7,13 +7,15 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 export function TrackedComponentEditor({
-  component, serials, onChangeSerials, batches, onChangeBatches,
+  component, serials, onChangeSerials, batches, onChangeBatches, allowNew = false,
 }: {
   component: TrackedComponent
   serials: string[]
   onChangeSerials: (s: string[]) => void
   batches: { batchId: string; qty: number }[]
   onChangeBatches: (b: { batchId: string; qty: number }[]) => void
+  /** Si está activo, permite capturar un serial/lote nuevo (no existente en el sistema) en vez de exigir seleccionarlo de la lista disponible. */
+  allowNew?: boolean
 }) {
   const { itemCode, itemName, trackingType, qtyNeeded, warehouse } = component
 
@@ -56,28 +58,49 @@ export function TrackedComponentEditor({
 
       {trackingType === 'serial' ? (
         <>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{ flex: 1 }}>
-              <SearchSelect
+          {allowNew ? (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                className="ff-input"
+                style={{ flex: 1, fontSize: 12, padding: '4px 8px' }}
+                placeholder="Escribir serial nuevo…"
                 value={serialToAdd}
-                onChange={setSerialToAdd}
-                options={serialOptions}
-                onSearch={setSerialSearch}
-                selectedLabel={serialToAdd}
-                placeholder={loadingSerials ? 'Cargando…' : 'Seleccionar serial…'}
-                disabled={loadingSerials || serials.length >= qtyNeeded}
+                onChange={(e) => setSerialToAdd(e.target.value)}
+                disabled={serials.length >= qtyNeeded}
               />
+              <button
+                type="button"
+                className="btn btn-secondary btn-size-xs"
+                disabled={!serialToAdd.trim() || serials.length >= qtyNeeded}
+                onClick={() => { const v = serialToAdd.trim(); if (v) { onChangeSerials([...serials, v]); setSerialToAdd('') } }}
+              >
+                <Plus size={13} /> Agregar
+              </button>
             </div>
-            <button
-              type="button"
-              className="btn btn-secondary btn-size-xs"
-              disabled={!serialToAdd || serials.length >= qtyNeeded}
-              onClick={() => { if (serialToAdd) { onChangeSerials([...serials, serialToAdd]); setSerialToAdd('') } }}
-            >
-              <Plus size={13} /> Agregar
-            </button>
-          </div>
-          {!loadingSerials && (availableSerials?.items?.length ?? 0) === 0 && (
+          ) : (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <SearchSelect
+                  value={serialToAdd}
+                  onChange={setSerialToAdd}
+                  options={serialOptions}
+                  onSearch={setSerialSearch}
+                  selectedLabel={serialToAdd}
+                  placeholder={loadingSerials ? 'Cargando…' : 'Seleccionar serial…'}
+                  disabled={loadingSerials || serials.length >= qtyNeeded}
+                />
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-size-xs"
+                disabled={!serialToAdd || serials.length >= qtyNeeded}
+                onClick={() => { if (serialToAdd) { onChangeSerials([...serials, serialToAdd]); setSerialToAdd('') } }}
+              >
+                <Plus size={13} /> Agregar
+              </button>
+            </div>
+          )}
+          {!allowNew && !loadingSerials && (availableSerials?.items?.length ?? 0) === 0 && (
             <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
               No hay seriales disponibles de {itemName ?? itemCode}{warehouse ? ` en el almacén ${warehouse}` : ''}.
               Debes recibir/transferir stock antes de poder facturarlo{warehouse ? ', o cambiar el almacén de la línea' : ''}.
@@ -100,15 +123,25 @@ export function TrackedComponentEditor({
         <>
           <div style={{ display: 'flex', gap: 8 }}>
             <div style={{ flex: 1 }}>
-              <SearchSelect
-                value={batchToAdd}
-                onChange={setBatchToAdd}
-                options={batchOptions}
-                onSearch={setBatchSearch}
-                selectedLabel={batchToAdd}
-                placeholder={loadingLotes ? 'Cargando…' : 'Seleccionar lote…'}
-                disabled={loadingLotes}
-              />
+              {allowNew ? (
+                <input
+                  className="ff-input"
+                  style={{ width: '100%', fontSize: 12, padding: '4px 8px' }}
+                  placeholder="Escribir lote nuevo…"
+                  value={batchToAdd}
+                  onChange={(e) => setBatchToAdd(e.target.value)}
+                />
+              ) : (
+                <SearchSelect
+                  value={batchToAdd}
+                  onChange={setBatchToAdd}
+                  options={batchOptions}
+                  onSearch={setBatchSearch}
+                  selectedLabel={batchToAdd}
+                  placeholder={loadingLotes ? 'Cargando…' : 'Seleccionar lote…'}
+                  disabled={loadingLotes}
+                />
+              )}
             </div>
             <input
               className="ff-input"
@@ -122,10 +155,11 @@ export function TrackedComponentEditor({
             <button
               type="button"
               className="btn btn-secondary btn-size-xs"
-              disabled={!batchToAdd || batchQtyToAdd <= 0}
+              disabled={!batchToAdd.trim() || batchQtyToAdd <= 0}
               onClick={() => {
-                if (!batchToAdd) return
-                onChangeBatches([...batches, { batchId: batchToAdd, qty: batchQtyToAdd }])
+                const v = batchToAdd.trim()
+                if (!v) return
+                onChangeBatches([...batches, { batchId: v, qty: batchQtyToAdd }])
                 setBatchToAdd('')
                 setBatchQtyToAdd(1)
               }}
@@ -133,7 +167,7 @@ export function TrackedComponentEditor({
               <Plus size={13} /> Agregar
             </button>
           </div>
-          {!loadingLotes && (availableLotes?.items?.length ?? 0) === 0 && (
+          {!allowNew && !loadingLotes && (availableLotes?.items?.length ?? 0) === 0 && (
             <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
               No hay lotes disponibles de {itemName ?? itemCode}{warehouse ? ` en el almacén ${warehouse}` : ''}.
               Debes recibir/transferir stock antes de poder facturarlo{warehouse ? ', o cambiar el almacén de la línea' : ''}.

@@ -22,11 +22,12 @@ interface ComponentTrackingModalProps {
   title?: string
   description?: string
   confirmLabel?: string
+  allowNew?: boolean
 }
 
 export function ComponentTrackingModal({
   bundleName, components, initial, onConfirm, onClose,
-  title, description, confirmLabel = 'Confirmar selección',
+  title, description, confirmLabel = 'Confirmar selección', allowNew = false,
 }: ComponentTrackingModalProps) {
   const [serialsByItem, setSerialsByItem] = useState<Record<string, string[]>>(() => {
     const init: Record<string, string[]> = {}
@@ -75,6 +76,7 @@ export function ComponentTrackingModal({
               onChangeSerials={(s) => setSerialsByItem((prev) => ({ ...prev, [c.itemCode]: s }))}
               batches={batchesByItem[c.itemCode] ?? []}
               onChangeBatches={(b) => setBatchesByItem((prev) => ({ ...prev, [c.itemCode]: b }))}
+              allowNew={allowNew}
             />
           ))}
         </div>

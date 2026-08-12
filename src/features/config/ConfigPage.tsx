@@ -2182,6 +2182,7 @@ function FacturacionConfigSection() {
     .map((m) => ({ value: m.name, label: m.name }))
   const [flujoCobro, setFlujoCobro] = useState<'directo' | 'caja'>('directo')
   const [requiereUbicacionVenta, setRequiereUbicacionVenta] = useState(false)
+  const [requiereSerialLoteCompra, setRequiereSerialLoteCompra] = useState(false)
   const [usaDepartamentos, setUsaDepartamentos] = useState(true)
   const [usaImpuestoDocumento, setUsaImpuestoDocumento] = useState(true)
   const [showPosActivar, setShowPosActivar] = useState(false)
@@ -2200,6 +2201,7 @@ function FacturacionConfigSection() {
        setSelectedRoles(data.rolesCancelacionFactura ?? [])
        setFlujoCobro(data.flujoCobro ?? "directo")
        setRequiereUbicacionVenta(data.requiereUbicacionVenta ?? false)
+       setRequiereSerialLoteCompra(data.requiereSerialLoteCompra ?? false)
        setUsaDepartamentos(data.usaDepartamentos ?? true)
        setUsaImpuestoDocumento(data.usaImpuestoDocumento ?? true)
         setArqueoEfectivoRequerido(data.arqueoEfectivoRequerido ?? false)
@@ -2324,6 +2326,23 @@ function FacturacionConfigSection() {
           <p className="ff-hint" style={{ marginTop: 4 }}>
             Si está activo, no se podrá vender un artículo de inventario si no tiene una Ubicación asignada dentro
             del almacén desde el cual se factura.
+          </p>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-check-wrap">
+            <input
+              type="checkbox"
+              className="ff-check"
+              checked={requiereSerialLoteCompra}
+              onChange={(e) => setRequiereSerialLoteCompra(e.target.checked)}
+            />
+            <span style={{ fontSize: 13 }}>Requiere Serial/Lote al Comprar</span>
+          </label>
+          <p className="ff-hint" style={{ marginTop: 4 }}>
+            Si está activo, al comprar un artículo con tracking de serial/lote se exige capturar los mismos en la
+            línea de compra, y al vender solo se podrá elegir un serial/lote que ya exista en el sistema. Si está
+            inactivo, la captura es opcional al comprar y se puede crear un serial/lote nuevo automáticamente al vender.
           </p>
         </div>
 
@@ -2622,6 +2641,7 @@ function FacturacionConfigSection() {
                 rolesCancelacionFactura: selectedRoles,
                 flujoCobro,
                 requiereUbicacionVenta,
+                requiereSerialLoteCompra,
                 usaDepartamentos,
                 usaImpuestoDocumento,
                 arqueoEfectivoRequerido,

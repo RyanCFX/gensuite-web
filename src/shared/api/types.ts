@@ -1462,6 +1462,12 @@ export interface CreateCompraDto {
     uom?: string;
     serials?: string[];
     batches?: { batchId: string; expiryDate?: string; qty: number }[];
+    /** Solo cuando itemCode es un Combo y algún componente tiene has_serial_no/has_batch_no activo. */
+    componentTracking?: {
+      itemCode: string;
+      serials?: string[];
+      batches?: { batchId: string; expiryDate?: string; qty: number }[];
+    }[];
     // NO description
   }[];
   ncfProveedor?: string;
@@ -1872,6 +1878,8 @@ export interface FacturacionConfig {
   flujoCobro: "directo" | "caja";
   /** Si está activo, no se puede vender un artículo de inventario sin una Ubicación asignada dentro del almacén de facturación. */
   requiereUbicacionVenta?: boolean;
+  /** Si está activo, al comprar un artículo con tracking de serial/lote exige capturar los mismos en la línea de compra. */
+  requiereSerialLoteCompra?: boolean;
   /** Si está en false, oculta el selector de Departamento (opcional, análogo a Sucursal) en los formularios de Factura, Cotización, Pedido, Cobro, Compra y Gasto. Puramente de presentación — no afecta documentos ya guardados con departamento. Default true. */
   usaDepartamentos?: boolean;
   /** Si está en false, oculta el selector de plantilla de Impuesto de Documento en Factura, Cotización y Compra. Puramente de presentación. Default true. */
