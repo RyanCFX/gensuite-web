@@ -5438,125 +5438,6 @@
         "tags": [
           "Configuración"
         ]
-      },
-      "post": {
-        "operationId": "ConfigController_createImpuestoVentas",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateImpuestoTemplateDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Crear template de impuestos de ventas",
-        "tags": [
-          "Configuración"
-        ]
-      }
-    },
-    "/api/v1/config/impuestos-ventas/{id}": {
-      "put": {
-        "operationId": "ConfigController_updateImpuestoVentas",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateImpuestoTemplateDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Actualizar template de impuestos de ventas",
-        "tags": [
-          "Configuración"
-        ]
-      },
-      "delete": {
-        "operationId": "ConfigController_deleteImpuestoVentas",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Eliminar template de impuestos de ventas",
-        "tags": [
-          "Configuración"
-        ]
       }
     },
     "/api/v1/config/impuestos-compras": {
@@ -5586,125 +5467,6 @@
         "tags": [
           "Configuración"
         ]
-      },
-      "post": {
-        "operationId": "ConfigController_createImpuestoCompras",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateImpuestoTemplateDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Crear template de impuestos de compras",
-        "tags": [
-          "Configuración"
-        ]
-      }
-    },
-    "/api/v1/config/impuestos-compras/{id}": {
-      "put": {
-        "operationId": "ConfigController_updateImpuestoCompras",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateImpuestoTemplateDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Actualizar template de impuestos de compras",
-        "tags": [
-          "Configuración"
-        ]
-      },
-      "delete": {
-        "operationId": "ConfigController_deleteImpuestoCompras",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Eliminar template de impuestos de compras",
-        "tags": [
-          "Configuración"
-        ]
       }
     },
     "/api/v1/config/item-tax-templates": {
@@ -5731,43 +5493,6 @@
           }
         ],
         "summary": "Listar Item Tax Templates (con sus tasas) disponibles para asignar a artículos",
-        "tags": [
-          "Configuración"
-        ]
-      },
-      "post": {
-        "operationId": "ConfigController_createItemTaxTemplate",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateItemTaxTemplateDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Crear Item Tax Template",
         "tags": [
           "Configuración"
         ]
@@ -5808,9 +5533,112 @@
         "tags": [
           "Configuración"
         ]
+      }
+    },
+    "/api/v1/config/tasas-impuesto": {
+      "get": {
+        "operationId": "ConfigController_getTasasImpuesto",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar catálogo de tasas de impuesto (base y combos)",
+        "tags": [
+          "Configuración"
+        ]
+      },
+      "post": {
+        "operationId": "ConfigController_createTasaImpuesto",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTasaImpuestoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear tasa de impuesto base o combo (suma de otras tasas del catálogo)",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/tasas-impuesto/{id}": {
+      "get": {
+        "operationId": "ConfigController_getTasaImpuesto",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una tasa de impuesto o combo",
+        "tags": [
+          "Configuración"
+        ]
       },
       "put": {
-        "operationId": "ConfigController_updateItemTaxTemplate",
+        "operationId": "ConfigController_updateTasaImpuesto",
         "parameters": [
           {
             "name": "X-Tenant",
@@ -5834,7 +5662,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateItemTaxTemplateDto"
+                "$ref": "#/components/schemas/UpdateTasaImpuestoDto"
               }
             }
           }
@@ -5849,13 +5677,13 @@
             "bearer": []
           }
         ],
-        "summary": "Actualizar Item Tax Template",
+        "summary": "Actualizar tasa de impuesto o combo",
         "tags": [
           "Configuración"
         ]
       },
       "delete": {
-        "operationId": "ConfigController_deleteItemTaxTemplate",
+        "operationId": "ConfigController_deleteTasaImpuesto",
         "parameters": [
           {
             "name": "X-Tenant",
@@ -5884,7 +5712,7 @@
             "bearer": []
           }
         ],
-        "summary": "Eliminar Item Tax Template",
+        "summary": "Eliminar tasa de impuesto o combo (rechaza si otro combo depende de ella)",
         "tags": [
           "Configuración"
         ]
@@ -8875,6 +8703,19 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Filtra a categorías que apliquen a este tipo de artículo (aplicaA = \"Ambas\" o el tipo pedido).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "product",
+                "service"
+              ]
+            }
           }
         ],
         "responses": {
@@ -9496,6 +9337,15 @@
                 "serial",
                 "batch"
               ]
+            }
+          },
+          {
+            "name": "barcode",
+            "required": false,
+            "in": "query",
+            "description": "Código de barra exacto (match = sobre Item Barcode.barcode). Más rápido que `search` para lectura por scanner.",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -10575,6 +10425,224 @@
         ]
       }
     },
+    "/api/v1/catalog/cuentas-por-pagar": {
+      "get": {
+        "operationId": "CuentasPorPagarController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Busca en el título (item_name)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar catálogo de conceptos de gasto (cuentas por pagar)",
+        "tags": [
+          "Catalog - Cuentas por Pagar"
+        ]
+      },
+      "post": {
+        "operationId": "CuentasPorPagarController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCuentaPorPagarDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear un nuevo concepto de gasto (cuenta por pagar)",
+        "tags": [
+          "Catalog - Cuentas por Pagar"
+        ]
+      }
+    },
+    "/api/v1/catalog/cuentas-por-pagar/{id}": {
+      "get": {
+        "operationId": "CuentasPorPagarController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obtener un concepto de gasto por ID",
+        "tags": [
+          "Catalog - Cuentas por Pagar"
+        ]
+      },
+      "put": {
+        "operationId": "CuentasPorPagarController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCuentaPorPagarDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar un concepto de gasto",
+        "tags": [
+          "Catalog - Cuentas por Pagar"
+        ]
+      },
+      "delete": {
+        "operationId": "CuentasPorPagarController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Desactivar un concepto de gasto (sets disabled=1 en el Item)",
+        "tags": [
+          "Catalog - Cuentas por Pagar"
+        ]
+      }
+    },
     "/api/v1/suppliers": {
       "get": {
         "operationId": "ProveedoresController_findAll",
@@ -11375,9 +11443,397 @@
         ]
       }
     },
-    "/api/v1/compras/{id}/return": {
+    "/api/v1/devoluciones-compras": {
+      "get": {
+        "operationId": "DevolucionesComprasController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplier",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por id de proveedor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "all",
+              "type": "string",
+              "enum": [
+                "draft",
+                "submitted",
+                "cancelled",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Fecha contable, desde (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Fecha contable, hasta (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ncf",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "grandTotalMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "grandTotalMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar devoluciones de compra (Purchase Invoice con is_return=1)",
+        "tags": [
+          "Devoluciones de Compras"
+        ]
+      },
       "post": {
-        "operationId": "ComprasController_createReturn",
+        "operationId": "DevolucionesComprasController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDevolucionCompraDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear devolución de compra (Draft) a partir de una factura original",
+        "tags": [
+          "Devoluciones de Compras"
+        ]
+      }
+    },
+    "/api/v1/devoluciones-compras/saldo-favor/{supplierId}": {
+      "get": {
+        "operationId": "DevolucionesComprasController_getSaldoFavor",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Devoluciones de compra sometidas de un proveedor, con su uso detallado: cuánto está aplicado a qué factura(s) y cuánto queda disponible.",
+        "tags": [
+          "Devoluciones de Compras"
+        ]
+      }
+    },
+    "/api/v1/devoluciones-compras/{id}": {
+      "get": {
+        "operationId": "DevolucionesComprasController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de devolución de compra",
+        "tags": [
+          "Devoluciones de Compras"
+        ]
+      },
+      "put": {
+        "operationId": "DevolucionesComprasController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDevolucionCompraDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar devolución de compra en Draft",
+        "tags": [
+          "Devoluciones de Compras"
+        ]
+      },
+      "delete": {
+        "operationId": "DevolucionesComprasController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar devolución de compra en Draft",
+        "tags": [
+          "Devoluciones de Compras"
+        ]
+      }
+    },
+    "/api/v1/devoluciones-compras/{id}/pdf": {
+      "get": {
+        "operationId": "DevolucionesComprasController_getPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "formato",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "a4",
+                "carta",
+                "a6",
+                "pos"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Devolución de compra en PDF",
+        "tags": [
+          "Devoluciones de Compras"
+        ]
+      }
+    },
+    "/api/v1/devoluciones-compras/{id}/submit": {
+      "post": {
+        "operationId": "DevolucionesComprasController_submit",
         "parameters": [
           {
             "name": "X-Tenant",
@@ -11406,9 +11862,175 @@
             "bearer": []
           }
         ],
-        "summary": "Nota de crédito de compra (devolución al proveedor)",
+        "summary": "Someter devolución — revierte inventario y crea asientos contables",
         "tags": [
-          "Compras"
+          "Devoluciones de Compras"
+        ]
+      }
+    },
+    "/api/v1/devoluciones-compras/{id}/cancel": {
+      "post": {
+        "operationId": "DevolucionesComprasController_cancel",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar devolución de compra sometida",
+        "tags": [
+          "Devoluciones de Compras"
+        ]
+      }
+    },
+    "/api/v1/devoluciones-compras/{id}/amend": {
+      "post": {
+        "operationId": "DevolucionesComprasController_amend",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enmendar devolución cancelada (crea Draft con amended_from)",
+        "tags": [
+          "Devoluciones de Compras"
+        ]
+      }
+    },
+    "/api/v1/devoluciones-compras/{id}/aplicar-a-cxp": {
+      "post": {
+        "operationId": "DevolucionesComprasController_aplicarACxP",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AplicarCxpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Aplica una devolución sometida directamente a una factura de compra (invoiceId obligatorio) — nunca genera un Payment Entry ni saldo a favor genérico. Si la factura ya está Sometida, se reconcilia de inmediato en ERPNext (Journal Entry nativo tipo \"Credit Note\"). Si sigue en Draft, solo se registra el enlace (sin efecto contable); se reconcilia automáticamente al someter esa factura.",
+        "tags": [
+          "Devoluciones de Compras"
+        ]
+      }
+    },
+    "/api/v1/devoluciones-compras/{id}/aplicar-a-cxp/{invoiceId}": {
+      "delete": {
+        "operationId": "DevolucionesComprasController_deshacerAplicacion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deshace el enlace de esta devolución con una factura — solo posible mientras siga pendiente (factura destino todavía en Draft, sin reconciliar).",
+        "tags": [
+          "Devoluciones de Compras"
         ]
       }
     },
@@ -11693,6 +12315,51 @@
           }
         ],
         "summary": "Detalle de gasto",
+        "tags": [
+          "Gastos"
+        ]
+      },
+      "put": {
+        "operationId": "GastosController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGastoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar gasto en Draft",
         "tags": [
           "Gastos"
         ]
@@ -15464,6 +16131,15 @@
             "description": "Incluir cuentas deshabilitadas",
             "schema": {
               "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "soloImpuesto",
+            "required": false,
+            "in": "query",
+            "description": "Solo cuentas cuyo account_type sirve para impuestos (Tax, Chargeable, Income Account, Expense Account, Expenses Included In Valuation) — las únicas que ERPNext acepta en una fila de Item Tax Template / Sales o Purchase Taxes and Charges. Útil para poblar el selector de cuenta en Tasas de Impuesto. Se combina con `isGroup=false` implícito (una cuenta de grupo nunca es válida para impuestos, sin importar su account_type).",
+            "schema": {
               "type": "boolean"
             }
           }
@@ -19878,10 +20554,17 @@
             "enum": [
               "B01",
               "B02",
+              "B03",
+              "B04",
+              "B11",
+              "B12",
+              "B13",
               "B14",
               "B15",
-              "B16"
-            ]
+              "B16",
+              "B17"
+            ],
+            "description": "B01=Crédito Fiscal, B02=Consumo, B03=Nota de Débito, B04=Nota de Crédito, B11=Compras/Informal, B12=Registro Único de Ingresos, B13=Gastos Menores, B14=Regímenes Especiales, B15=Gubernamentales, B16=Exportaciones, B17=Pagos al Exterior"
           },
           "items": {
             "type": "array",
@@ -20236,6 +20919,14 @@
             "type": "boolean",
             "default": true,
             "description": "Si está activo, el frontend debe mostrar el selector de plantilla de impuestos a nivel de documento (campo `taxesTemplate`) en factura, cotización y compra. Si está inactivo, el frontend debe ocultarlo y dejar que cada documento use siempre la plantilla default de la compañía. taxesTemplate es siempre opcional a nivel de backend — este flag es puramente para que el frontend decida si mostrar u ocultar el campo."
+          },
+          "plantillaImpuestoVentasDefault": {
+            "type": "string",
+            "description": "Name de la plantilla dedicada de Sales Taxes and Charges Template (generada desde config/tasas-impuesto) que se marca is_default para esta compañía — la que aplican Factura/Cotización/Pedido de Venta cuando no se especifica una explícitamente."
+          },
+          "plantillaImpuestoComprasDefault": {
+            "type": "string",
+            "description": "Name de la plantilla dedicada de Purchase Taxes and Charges Template (generada desde config/tasas-impuesto) que se marca is_default para esta compañía — la que aplican Compra/Gasto cuando no se especifica una explícitamente."
           },
           "usaModuloPos": {
             "type": "boolean",
@@ -20748,156 +21439,125 @@
           }
         }
       },
-      "TaxLineDto": {
+      "TasaImpuestoComponenteDto": {
         "type": "object",
         "properties": {
-          "chargeType": {
+          "impuestoBaseId": {
             "type": "string",
-            "enum": [
-              "Actual",
-              "On Net Total",
-              "On Previous Row Amount",
-              "On Previous Row Total",
-              "On Item Quantity"
-            ],
-            "example": "On Net Total"
+            "example": "ITBIS",
+            "description": "ID (name de ERPNext) del impuesto base que compone este combo"
           },
-          "accountHead": {
-            "type": "string",
-            "example": "ITBIS por Pagar - ACC",
-            "description": "Cuenta contable GL del impuesto"
-          },
-          "rate": {
+          "factor": {
             "type": "number",
-            "example": 18,
-            "description": "Tasa en porcentaje"
-          },
-          "description": {
-            "type": "string",
-            "example": "ITBIS 18%"
-          },
-          "category": {
-            "type": "string",
-            "enum": [
-              "Valuation and Total",
-              "Valuation",
-              "Total"
-            ],
-            "description": "Solo aplica a impuestos de COMPRA. Determina si el cargo afecta la valuación del inventario (costo del artículo), el total a pagar, o ambos. Se ignora si el template es de ventas."
-          },
-          "addDeductTax": {
-            "type": "string",
-            "enum": [
-              "Add",
-              "Deduct"
-            ],
-            "description": "Solo aplica a impuestos de COMPRA. \"Deduct\" para retenciones (ITBIS/ISR) que restan del monto a pagar al proveedor. Se ignora si el template es de ventas."
+            "example": 100,
+            "default": 100,
+            "description": "100 = suma completa de la tasa. Ej. 30 = \"30% de este impuesto\" (retenciones)."
           }
         },
         "required": [
-          "chargeType",
-          "accountHead",
-          "rate"
+          "impuestoBaseId"
         ]
       },
-      "CreateImpuestoTemplateDto": {
+      "CreateTasaImpuestoDto": {
         "type": "object",
         "properties": {
-          "title": {
+          "nombre": {
             "type": "string",
-            "example": "ITBIS 18%",
-            "description": "Nombre/título del template"
+            "example": "ITBIS",
+            "description": "Nombre del impuesto o combo"
           },
-          "isDefault": {
-            "type": "boolean",
-            "default": false,
-            "description": "¿Es el template por defecto para la compañía?"
-          },
-          "taxes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TaxLineDto"
-            }
-          }
-        },
-        "required": [
-          "title",
-          "taxes"
-        ]
-      },
-      "UpdateImpuestoTemplateDto": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "example": "ITBIS 18%"
-          },
-          "isDefault": {
-            "type": "boolean"
-          },
-          "taxes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TaxLineDto"
-            }
-          }
-        }
-      },
-      "ItemTaxLineDto": {
-        "type": "object",
-        "properties": {
-          "taxType": {
+          "account": {
             "type": "string",
             "example": "ITBIS por Pagar - JB",
-            "description": "Cuenta contable (Account) del impuesto"
+            "description": "Cuenta contable (Account) para Ventas/Artículos. Se usa también para Compras si no se especifica accountCompras."
           },
-          "rate": {
-            "type": "number",
-            "example": 18,
-            "description": "Tasa en porcentaje"
+          "accountCompras": {
+            "type": "string",
+            "example": "ITBIS Adelantado - JB",
+            "description": "Cuenta contable (Account) específica para Compras/Gastos. Si se omite, se usa la misma que \"account\"."
           },
-          "notApplicable": {
+          "esCombo": {
             "type": "boolean",
             "default": false,
-            "description": "Si es true, el artículo queda exento de este impuesto (tasa 0 explícita, distinto de no tener el impuesto en la lista)"
+            "description": "Si es true, la tasa se calcula automáticamente a partir de \"componentes\" y no se puede editar directamente"
+          },
+          "tasa": {
+            "type": "number",
+            "example": 18,
+            "description": "Tasa en porcentaje. Requerido si esCombo=false; se ignora (se recalcula) si esCombo=true"
+          },
+          "componentes": {
+            "description": "Requerido si esCombo=true",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TasaImpuestoComponenteDto"
+            }
+          },
+          "aplicaArticulos": {
+            "type": "boolean",
+            "default": false,
+            "description": "Aplica este impuesto a Artículos (Item Tax Template). Se crea/mantiene sola la plantilla automática de la compañía — no hay que elegir ninguna."
+          },
+          "aplicaVentas": {
+            "type": "boolean",
+            "default": false,
+            "description": "Aplica este impuesto a Ventas (Sales Taxes and Charges Template, marcada como default de la compañía)"
+          },
+          "aplicaCompras": {
+            "type": "boolean",
+            "default": false,
+            "description": "Aplica este impuesto a Compras (Purchase Taxes and Charges Template, marcada como default de la compañía)"
+          },
+          "descripcion": {
+            "type": "string",
+            "example": "Impuesto al Valor Agregado"
           }
         },
         "required": [
-          "taxType",
-          "rate"
+          "nombre",
+          "account"
         ]
       },
-      "CreateItemTaxTemplateDto": {
+      "UpdateTasaImpuestoDto": {
         "type": "object",
         "properties": {
-          "title": {
+          "nombre": {
             "type": "string",
-            "example": "ITBIS 18% Artículo"
+            "example": "ITBIS"
           },
-          "taxes": {
+          "account": {
+            "type": "string",
+            "example": "ITBIS por Pagar - JB"
+          },
+          "accountCompras": {
+            "type": "string",
+            "example": "ITBIS Adelantado - JB",
+            "description": "Cuenta contable específica para Compras/Gastos. Enviar cadena vacía para volver a usar la misma que \"account\"."
+          },
+          "esCombo": {
+            "type": "boolean"
+          },
+          "tasa": {
+            "type": "number",
+            "example": 18
+          },
+          "componentes": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ItemTaxLineDto"
+              "$ref": "#/components/schemas/TasaImpuestoComponenteDto"
             }
-          }
-        },
-        "required": [
-          "title",
-          "taxes"
-        ]
-      },
-      "UpdateItemTaxTemplateDto": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "example": "ITBIS 18% Artículo"
           },
-          "taxes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ItemTaxLineDto"
-            }
+          "aplicaArticulos": {
+            "type": "boolean"
+          },
+          "aplicaVentas": {
+            "type": "boolean"
+          },
+          "aplicaCompras": {
+            "type": "boolean"
+          },
+          "descripcion": {
+            "type": "string"
           }
         }
       },
@@ -21109,18 +21769,22 @@
       "RetencionRateDto": {
         "type": "object",
         "properties": {
-          "taxWithholdingRate": {
-            "type": "number",
-            "example": 5.4,
-            "description": "% de retención (Float, no 0-100 normalizado más allá del propio %)"
+          "componentes": {
+            "description": "Impuestos del catálogo (config/tasas-impuestos) que componen esta tasa de retención — mismo mecanismo que un \"combo\" de Tasa Impuesto RD. tax_withholding_rate ya no se fija a mano: se calcula en ERPNext como suma de factor/100 x tasa de cada impuesto referenciado.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TasaImpuestoComponenteDto"
+            }
           },
           "fromDate": {
             "type": "string",
-            "example": "2026-01-01"
+            "example": "2026-01-01",
+            "description": "Omitir = válido desde siempre (sin límite inferior)"
           },
           "toDate": {
             "type": "string",
-            "example": "2026-12-31"
+            "example": "2026-12-31",
+            "description": "Omitir = válido para siempre (sin límite superior)"
           },
           "singleThreshold": {
             "type": "number",
@@ -21136,9 +21800,7 @@
           }
         },
         "required": [
-          "taxWithholdingRate",
-          "fromDate",
-          "toDate"
+          "componentes"
         ]
       },
       "CreateRetencionDto": {
@@ -21608,6 +22270,16 @@
             "example": "ELEC",
             "maxLength": 5,
             "description": "Prefijo (máx 5 chars) para generación automática de códigos cuando el modo es prefix_auto"
+          },
+          "aplicaA": {
+            "type": "string",
+            "enum": [
+              "Ambas",
+              "Productos",
+              "Servicios"
+            ],
+            "default": "Ambas",
+            "description": "Restringe qué tipo de artículo puede usar esta categoría/subcategoría. \"Ambas\" no restringe nada."
           }
         },
         "required": [
@@ -21636,6 +22308,16 @@
             "example": "ELEC",
             "maxLength": 5,
             "description": "Prefijo (máx 5 chars) para generación automática de códigos cuando el modo es prefix_auto"
+          },
+          "aplicaA": {
+            "type": "string",
+            "enum": [
+              "Ambas",
+              "Productos",
+              "Servicios"
+            ],
+            "default": "Ambas",
+            "description": "Restringe qué tipo de artículo puede usar esta categoría/subcategoría. \"Ambas\" no restringe nada."
           },
           "incomeAccount": {
             "type": "string",
@@ -22430,6 +23112,92 @@
           }
         }
       },
+      "CreateCuentaPorPagarDto": {
+        "type": "object",
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "example": "Alquiler de oficina"
+          },
+          "descripcion": {
+            "type": "string",
+            "example": "Alquiler mensual de la oficina principal"
+          },
+          "tipoDocumento": {
+            "type": "string",
+            "enum": [
+              "Factura",
+              "Pago",
+              "Nota de Crédito",
+              "Nota de Débito",
+              "Devolución"
+            ],
+            "description": "En qué tipo de documento se usa este concepto de gasto."
+          },
+          "cuenta": {
+            "type": "string",
+            "example": "61-01-002 - Alquileres - JBC",
+            "description": "Cuenta contable por defecto al registrar un Gasto con este concepto. Si se omite, ERPNext usa el default de la compañía."
+          },
+          "tipoBienes606": {
+            "type": "string",
+            "example": "03 - Arrendamientos",
+            "description": "Default para prellenar Purchase Invoice.custom_tipo_bienes_606 al registrar un Gasto con este concepto (ver GET /config/catalogos-fiscales → tipoBienes606). Se puede mandar el código corto o el string completo."
+          },
+          "claseFiscal": {
+            "type": "string",
+            "enum": [
+              "Bienes",
+              "Servicios"
+            ]
+          }
+        },
+        "required": [
+          "titulo",
+          "tipoDocumento"
+        ]
+      },
+      "UpdateCuentaPorPagarDto": {
+        "type": "object",
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "example": "Alquiler de oficina"
+          },
+          "descripcion": {
+            "type": "string",
+            "example": "Alquiler mensual de la oficina principal"
+          },
+          "tipoDocumento": {
+            "type": "string",
+            "enum": [
+              "Factura",
+              "Pago",
+              "Nota de Crédito",
+              "Nota de Débito",
+              "Devolución"
+            ],
+            "description": "En qué tipo de documento se usa este concepto de gasto."
+          },
+          "cuenta": {
+            "type": "string",
+            "example": "61-01-002 - Alquileres - JBC",
+            "description": "Cuenta contable por defecto al registrar un Gasto con este concepto. Si se omite, ERPNext usa el default de la compañía."
+          },
+          "tipoBienes606": {
+            "type": "string",
+            "example": "03 - Arrendamientos",
+            "description": "Default para prellenar Purchase Invoice.custom_tipo_bienes_606 al registrar un Gasto con este concepto (ver GET /config/catalogos-fiscales → tipoBienes606). Se puede mandar el código corto o el string completo."
+          },
+          "claseFiscal": {
+            "type": "string",
+            "enum": [
+              "Bienes",
+              "Servicios"
+            ]
+          }
+        }
+      },
       "CreateProveedorDto": {
         "type": "object",
         "properties": {
@@ -22546,6 +23314,36 @@
             "type": "string",
             "example": "21-01-002 - CXP - PROVEEDORES EXTERIOR",
             "description": "Cuenta CxP alterna — si se configura, las compras a este proveedor afectan esta cuenta en vez del default de la empresa."
+          },
+          "retencionesDefault": {
+            "example": [
+              "Retención ISR Servicios 10%"
+            ],
+            "description": "Retenciones (config/retenciones, ids de Tax Withholding Category) que aplican por defecto a los GASTOS (servicios) de este proveedor — no aplica a Compras (bienes). Al crear un Gasto sin especificar retencionItbis/retencionIsr, el BFF las calcula automáticamente a partir de esta lista.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "impuestoComprasDefault": {
+            "example": [
+              "ITBIS 18% - JB"
+            ],
+            "description": "Plantillas de impuestos de documento (Purchase Taxes and Charges Template) aplicadas por defecto al registrar una Compra (bienes) a este proveedor, si el caller no especifica taxesTemplate explícito. Admite varias — las líneas de todas se combinan en el documento.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "impuestoGastosDefault": {
+            "example": [
+              "ITBIS 18% - JB"
+            ],
+            "description": "Plantillas de impuestos de documento (Purchase Taxes and Charges Template) aplicadas por defecto al registrar un Gasto (servicios) con este proveedor, si el caller no especifica taxesTemplate explícito. Admite varias — las líneas de todas se combinan en el documento.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -22670,6 +23468,36 @@
             "type": "string",
             "example": "21-01-002 - CXP - PROVEEDORES EXTERIOR",
             "description": "Cuenta CxP alterna — si se configura, las compras a este proveedor afectan esta cuenta en vez del default de la empresa."
+          },
+          "retencionesDefault": {
+            "example": [
+              "Retención ISR Servicios 10%"
+            ],
+            "description": "Retenciones (config/retenciones, ids de Tax Withholding Category) que aplican por defecto a los GASTOS (servicios) de este proveedor — no aplica a Compras (bienes). Al crear un Gasto sin especificar retencionItbis/retencionIsr, el BFF las calcula automáticamente a partir de esta lista.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "impuestoComprasDefault": {
+            "example": [
+              "ITBIS 18% - JB"
+            ],
+            "description": "Plantillas de impuestos de documento (Purchase Taxes and Charges Template) aplicadas por defecto al registrar una Compra (bienes) a este proveedor, si el caller no especifica taxesTemplate explícito. Admite varias — las líneas de todas se combinan en el documento.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "impuestoGastosDefault": {
+            "example": [
+              "ITBIS 18% - JB"
+            ],
+            "description": "Plantillas de impuestos de documento (Purchase Taxes and Charges Template) aplicadas por defecto al registrar un Gasto (servicios) con este proveedor, si el caller no especifica taxesTemplate explícito. Admite varias — las líneas de todas se combinan en el documento.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -22753,7 +23581,19 @@
         "type": "object",
         "properties": {
           "supplier": {
-            "type": "string"
+            "type": "string",
+            "example": "PROV-0001",
+            "description": "Proveedor registrado. Exactamente uno de `supplier`/`proveedorOcasionalNombre` es requerido."
+          },
+          "proveedorOcasionalNombre": {
+            "type": "string",
+            "example": "Juan Pérez",
+            "description": "Nombre del vendedor cuando la compra es a alguien sin registrar como proveedor. No enviar junto con `supplier`."
+          },
+          "proveedorOcasionalRnc": {
+            "type": "string",
+            "example": "132456789",
+            "description": "RNC/Cédula del vendedor ocasional (sin registrar como proveedor). Se usa en el reporte 606 en vez del RNC del Supplier genérico. Sin efecto para proveedores registrados (supplier)."
           },
           "postingDate": {
             "type": "string"
@@ -22770,6 +23610,7 @@
             "default": 1
           },
           "items": {
+            "description": "Las líneas sin itemCode (vacío/omitido) se descartan silenciosamente antes de validar — no generan error, simplemente no se incluyen en la compra.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CompraItemDto"
@@ -22777,7 +23618,11 @@
           },
           "ncfProveedor": {
             "type": "string",
-            "description": "NCF del comprobante del proveedor (B01, E31, etc.)"
+            "description": "NCF del comprobante del proveedor (B01, E31, etc.). Obligatorio al guardar/editar una compra."
+          },
+          "billNo": {
+            "type": "string",
+            "description": "Número o ID de la factura del vendedor/proveedor (mapea al campo nativo \"Supplier Invoice No\" de ERPNext)."
           },
           "tipoBienes606": {
             "type": "string",
@@ -22817,16 +23662,28 @@
           }
         },
         "required": [
-          "supplier",
           "postingDate",
-          "items"
+          "items",
+          "ncfProveedor"
         ]
       },
       "UpdateCompraDto": {
         "type": "object",
         "properties": {
           "supplier": {
-            "type": "string"
+            "type": "string",
+            "example": "PROV-0001",
+            "description": "Proveedor registrado. Exactamente uno de `supplier`/`proveedorOcasionalNombre` es requerido."
+          },
+          "proveedorOcasionalNombre": {
+            "type": "string",
+            "example": "Juan Pérez",
+            "description": "Nombre del vendedor cuando la compra es a alguien sin registrar como proveedor. No enviar junto con `supplier`."
+          },
+          "proveedorOcasionalRnc": {
+            "type": "string",
+            "example": "132456789",
+            "description": "RNC/Cédula del vendedor ocasional (sin registrar como proveedor). Se usa en el reporte 606 en vez del RNC del Supplier genérico. Sin efecto para proveedores registrados (supplier)."
           },
           "postingDate": {
             "type": "string"
@@ -22843,6 +23700,7 @@
             "default": 1
           },
           "items": {
+            "description": "Las líneas sin itemCode (vacío/omitido) se descartan silenciosamente antes de validar — no generan error, simplemente no se incluyen en la compra.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CompraItemDto"
@@ -22850,7 +23708,11 @@
           },
           "ncfProveedor": {
             "type": "string",
-            "description": "NCF del comprobante del proveedor (B01, E31, etc.)"
+            "description": "NCF del comprobante del proveedor (B01, E31, etc.). Obligatorio al guardar/editar una compra."
+          },
+          "billNo": {
+            "type": "string",
+            "description": "Número o ID de la factura del vendedor/proveedor (mapea al campo nativo \"Supplier Invoice No\" de ERPNext)."
           },
           "tipoBienes606": {
             "type": "string",
@@ -22890,6 +23752,88 @@
           }
         }
       },
+      "DevolucionCompraItemDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "example": "ITEM-001"
+          },
+          "qty": {
+            "type": "number",
+            "example": 2,
+            "description": "Cantidad a devolver — siempre positiva, se convierte a negativa al armar el documento."
+          }
+        },
+        "required": [
+          "itemCode",
+          "qty"
+        ]
+      },
+      "CreateDevolucionCompraDto": {
+        "type": "object",
+        "properties": {
+          "originalInvoice": {
+            "type": "string",
+            "example": "ACC-PINV-2026-00032",
+            "description": "Factura de compra original (Purchase Invoice) que se está devolviendo."
+          },
+          "items": {
+            "description": "Artículos/cantidades a devolver — cada itemCode debe existir en la factura original.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DevolucionCompraItemDto"
+            }
+          },
+          "postingDate": {
+            "type": "string",
+            "description": "Fecha contable. Default: hoy."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Motivo de la devolución (se guarda en `terms`)."
+          }
+        },
+        "required": [
+          "originalInvoice",
+          "items"
+        ]
+      },
+      "UpdateDevolucionCompraDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Reemplaza las líneas de la devolución en Draft (misma cantidad positiva que create).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DevolucionCompraItemDto"
+            }
+          },
+          "postingDate": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "AplicarCxpDto": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string",
+            "example": "ACC-PINV-2026-00040",
+            "description": "Factura de compra (Draft o sometida) a la que aplicar el saldo de la devolución de inmediato. Obligatorio — una devolución siempre debe aplicarse a una CxP concreta, nunca queda como saldo a favor genérico sin destino."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Monto a mover desde la devolución. Si se omite, usa el saldo restante completo de la devolución."
+          }
+        },
+        "required": [
+          "invoiceId"
+        ]
+      },
       "GastoItemDto": {
         "type": "object",
         "properties": {
@@ -22919,7 +23863,19 @@
         "type": "object",
         "properties": {
           "supplier": {
-            "type": "string"
+            "type": "string",
+            "example": "PROV-0001",
+            "description": "Proveedor registrado. Exactamente uno de `supplier`/`proveedorOcasionalNombre` es requerido."
+          },
+          "proveedorOcasionalNombre": {
+            "type": "string",
+            "example": "Juan Pérez",
+            "description": "Nombre del vendedor cuando el gasto es a alguien sin registrar como proveedor. No enviar junto con `supplier`."
+          },
+          "proveedorOcasionalRnc": {
+            "type": "string",
+            "example": "132456789",
+            "description": "RNC/Cédula del vendedor ocasional (sin registrar como proveedor). Se usa en el reporte 606 en vez del RNC del Supplier genérico. Sin efecto para proveedores registrados (supplier)."
           },
           "postingDate": {
             "type": "string"
@@ -22944,17 +23900,26 @@
           "ncfProveedor": {
             "type": "string"
           },
+          "billNo": {
+            "type": "string",
+            "description": "Número o ID de la factura del vendedor/proveedor (mapea al campo nativo \"Supplier Invoice No\" de ERPNext)."
+          },
           "tipoComprobante": {
             "type": "string",
             "enum": [
               "B01",
+              "B02",
+              "B03",
+              "B04",
+              "B11",
+              "B12",
               "B13",
               "B14",
               "B15",
               "B16",
-              "B17",
-              "E31"
-            ]
+              "B17"
+            ],
+            "description": "B01=Crédito Fiscal, B02=Consumo, B03=Nota de Débito, B04=Nota de Crédito, B11=Compras/Informal, B12=Registro Único de Ingresos, B13=Gastos Menores, B14=Regímenes Especiales, B15=Gubernamentales, B16=Exportaciones, B17=Pagos al Exterior"
           },
           "tipoBienes606": {
             "type": "string"
@@ -22962,11 +23927,15 @@
           "formaPago606": {
             "type": "string"
           },
-          "retencionItbis": {
-            "type": "number"
-          },
-          "retencionIsr": {
-            "type": "number"
+          "retenciones": {
+            "example": [
+              "Retención ISR Servicios 10%"
+            ],
+            "description": "Retenciones (ids de Tax Withholding Category) que aplican a este Gasto — el monto de custom_retencion_itbis/custom_retencion_isr se calcula a partir de estas (tasa × net_total o grand_total según cada categoría). Si se omite, se usan las retenciones por defecto del proveedor (Supplier.custom_retenciones_default). Nunca se acepta un monto/porcentaje manual.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "categoriaGasto": {
             "type": "string",
@@ -22989,13 +23958,134 @@
             "type": "string",
             "example": "Ventas - JBC",
             "description": "Departamento del gasto (dimensión contable informativa, nunca obligatoria)."
+          },
+          "taxesTemplate": {
+            "example": [
+              "ITBIS 18% - JB"
+            ],
+            "description": "IDs de template(s) de impuestos del documento (Purchase Taxes and Charges Template) — admite varios, las líneas de todos se combinan en el documento. Si se omite, se usan los default configurados en el proveedor (Supplier.custom_impuesto_gastos_default).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
-          "supplier",
           "postingDate",
           "items"
         ]
+      },
+      "UpdateGastoDto": {
+        "type": "object",
+        "properties": {
+          "supplier": {
+            "type": "string",
+            "example": "PROV-0001",
+            "description": "Proveedor registrado. Exactamente uno de `supplier`/`proveedorOcasionalNombre` es requerido."
+          },
+          "proveedorOcasionalNombre": {
+            "type": "string",
+            "example": "Juan Pérez",
+            "description": "Nombre del vendedor cuando el gasto es a alguien sin registrar como proveedor. No enviar junto con `supplier`."
+          },
+          "proveedorOcasionalRnc": {
+            "type": "string",
+            "example": "132456789",
+            "description": "RNC/Cédula del vendedor ocasional (sin registrar como proveedor). Se usa en el reporte 606 en vez del RNC del Supplier genérico. Sin efecto para proveedores registrados (supplier)."
+          },
+          "postingDate": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "default": "DOP"
+          },
+          "conversionRate": {
+            "type": "number",
+            "default": 1
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GastoItemDto"
+            }
+          },
+          "ncfProveedor": {
+            "type": "string"
+          },
+          "billNo": {
+            "type": "string",
+            "description": "Número o ID de la factura del vendedor/proveedor (mapea al campo nativo \"Supplier Invoice No\" de ERPNext)."
+          },
+          "tipoComprobante": {
+            "type": "string",
+            "enum": [
+              "B01",
+              "B02",
+              "B03",
+              "B04",
+              "B11",
+              "B12",
+              "B13",
+              "B14",
+              "B15",
+              "B16",
+              "B17"
+            ],
+            "description": "B01=Crédito Fiscal, B02=Consumo, B03=Nota de Débito, B04=Nota de Crédito, B11=Compras/Informal, B12=Registro Único de Ingresos, B13=Gastos Menores, B14=Regímenes Especiales, B15=Gubernamentales, B16=Exportaciones, B17=Pagos al Exterior"
+          },
+          "tipoBienes606": {
+            "type": "string"
+          },
+          "formaPago606": {
+            "type": "string"
+          },
+          "retenciones": {
+            "example": [
+              "Retención ISR Servicios 10%"
+            ],
+            "description": "Retenciones (ids de Tax Withholding Category) que aplican a este Gasto — el monto de custom_retencion_itbis/custom_retencion_isr se calcula a partir de estas (tasa × net_total o grand_total según cada categoría). Si se omite, se usan las retenciones por defecto del proveedor (Supplier.custom_retenciones_default). Nunca se acepta un monto/porcentaje manual.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "categoriaGasto": {
+            "type": "string",
+            "enum": [
+              "Operativo",
+              "Administrativo",
+              "Ventas",
+              "Financiero"
+            ]
+          },
+          "esDeducible": {
+            "type": "boolean"
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+          },
+          "department": {
+            "type": "string",
+            "example": "Ventas - JBC",
+            "description": "Departamento del gasto (dimensión contable informativa, nunca obligatoria)."
+          },
+          "taxesTemplate": {
+            "example": [
+              "ITBIS 18% - JB"
+            ],
+            "description": "IDs de template(s) de impuestos del documento (Purchase Taxes and Charges Template) — admite varios, las líneas de todos se combinan en el documento. Si se omite, se usan los default configurados en el proveedor (Supplier.custom_impuesto_gastos_default).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
       },
       "CreateUsuarioDto": {
         "type": "object",
@@ -24415,6 +25505,10 @@
           "ncfProveedor": {
             "type": "string",
             "description": "NCF del comprobante del proveedor (B01, E31, etc.)"
+          },
+          "billNo": {
+            "type": "string",
+            "description": "Número o ID de la factura del vendedor/proveedor (mapea al campo nativo \"Supplier Invoice No\" de ERPNext)."
           },
           "tipoBienes606": {
             "type": "string",

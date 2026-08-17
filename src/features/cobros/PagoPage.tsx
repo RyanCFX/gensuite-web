@@ -221,7 +221,7 @@ export default function PagoPage() {
   const { data: cuentasBancarias } = useQuery({
     queryKey: ['cuentas-bancarias-activas'],
     queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
-    enabled: !!requiresBankAccount,
+    enabled: !!metodoSeleccionado?.requiresBankAccount,
   })
   const [bankAccountSearch, setBankAccountSearch] = useState('')
   const bankAccountOptions: SearchSelectOption[] = (cuentasBancarias?.items ?? [])
@@ -332,9 +332,169 @@ export default function PagoPage() {
         description="Registra un pago recibido de un cliente"
       />
 
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: 20, alignItems: 'start' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-        {/* ════════════════ COLUMNA IZQUIERDA — facturas / apartados ════════════════ */}
+        {/* ════════════════ INFORMACIÓN DEL PAGO ════════════════ */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <CheckCircle2 size={18} style={{ color: 'var(--success-text)' }} aria-hidden="true" />
+              Información del Pago
+            </span>
+          </div>
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* Monto / Método de Pago / Cuenta Bancaria */}
+            <div className="form-row form-row-3">
+              <div className="ff-wrap">
+                <label className="ff-label">Monto (RD$) <span className="ff-required">*</span></label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  className="ff-input"
+                  value={paidAmount || ''}
+                  onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label">Método de Pago <span className="ff-required">*</span></label>
+                <SearchSelect
+                  value={modeOfPayment}
+                  onChange={(val) => { setModeOfPayment(val); setBankAccount('') }}
+                  options={modeOfPaymentOptions}
+                  onSearch={setModeOfPaymentSearch}
+                  selectedLabel={modeOfPayment}
+                  placeholder="Seleccionar método…"
+                />
+              </div>
+
+              {metodoSeleccionado?.requiresBankAccount && (
+                <div className="ff-wrap">
+                  <label className="ff-label">
+                    Cuenta Bancaria {requiresBankAccount && <span className="ff-required">*</span>}
+                  </label>
+                  <SearchSelect
+                    value={bankAccount}
+                    onChange={setBankAccount}
+                    options={bankAccountOptions}
+                    onSearch={setBankAccountSearch}
+                    selectedLabel={cuentasBancarias?.items.find((c) => c.id === bankAccount)?.accountName ?? ''}
+                    placeholder={metodoSeleccionado.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
+                    error={requiresBankAccount && !bankAccount}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Referencia / Fecha de Referencia / Fecha */}
+            <div className="form-row form-row-3">
+              <div className="ff-wrap">
+                <label className="ff-label">No. de Referencia</label>
+                <input
+                  className="ff-input"
+                  placeholder="# cheque, transferencia…"
+                  value={referenceNo}
+                  onChange={(e) => setReferenceNo(e.target.value)}
+                />
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Fecha de Referencia</label>
+                <DatePicker
+                  className="ff-input"
+                  value={referenceDate}
+                  onChange={setReferenceDate}
+                  clearable
+                />
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Fecha <span className="ff-required">*</span></label>
+                <DatePicker
+                  className="ff-input"
+                  value={postingDate}
+                  onChange={setPostingDate}
+                />
+              </div>
+            </div>
+
+            {/* Notas */}
+            <div className="ff-wrap">
+              <label className="ff-label">Notas</label>
+              <textarea
+                className="ff-textarea"
+                rows={2}
+                placeholder="Observaciones opcionales…"
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+              />
+            </div>
+
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border-default)', margin: '4px 0' }} />
+
+            {/* Cliente / Sucursal / Departamento */}
+            <div className="form-row form-row-3">
+              <div className="ff-wrap">
+                <label className="ff-label">
+                  Cliente <span className="ff-required">*</span>
+                </label>
+                <SearchSelect
+                  id="customer"
+                  value={customerId}
+                  onChange={(id, opt) => setCustomerId(id === '' ? '' : (opt?.value ?? id))}
+                  options={customerOptions}
+                  onSearch={setCustomerQuery}
+                  loading={customersLoading}
+                  placeholder="Buscar cliente…"
+                  error={!customerId}
+                />
+              </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label ff-required" htmlFor="branch">Sucursal</label>
+                <SearchSelect
+                  id="branch"
+                  value={branch}
+                  selectedLabel={branch}
+                  error={!branch || branchError}
+                  onChange={(val) => { setBranch(val); setBranchError(false) }}
+                  options={branchSelectOptions}
+                  onSearch={setBranchSearch}
+                  placeholder="Sin especificar"
+                  className="ff-select"
+                  disabled={branchOptions.length === 1}
+                />
+                {branchError && <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal para continuar</p>}
+              </div>
+
+              {usaDepartamentos && (
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="department">Departamento</label>
+                  <DepartmentSelect id="department" value={department} onChange={setDepartment} />
+                </div>
+              )}
+            </div>
+
+            {/* Cobro anticipado / sin aplicar a factura */}
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={advancePayment}
+                onChange={(e) => setAdvancePayment(e.target.checked)}
+                style={{ marginTop: 2 }}
+              />
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Wallet size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+                Cobro anticipado — no aplicar a ninguna factura (queda como saldo a favor del cliente)
+              </span>
+            </label>
+
+          </div>
+        </div>
+
+        {/* ════════════════ FACTURAS / APARTADOS ════════════════ */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
           {/* ── Facturas a Aplicar ───────────────────────────────────────── */}
@@ -533,175 +693,16 @@ export default function PagoPage() {
           )}
         </div>
 
-        {/* ════════════════ COLUMNA DERECHA — información del pago ════════════════ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <CheckCircle2 size={18} style={{ color: 'var(--success-text)' }} aria-hidden="true" />
-                Información del Pago
-              </span>
-            </div>
-            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-              {/* Cliente */}
-              <div className="ff-wrap">
-                <label className="ff-label">
-                  Cliente <span className="ff-required">*</span>
-                </label>
-                <SearchSelect
-                  id="customer"
-                  value={customerId}
-                  onChange={(id, opt) => setCustomerId(id === '' ? '' : (opt?.value ?? id))}
-                  options={customerOptions}
-                  onSearch={setCustomerQuery}
-                  loading={customersLoading}
-                  placeholder="Buscar cliente…"
-                  error={!customerId}
-                />
-              </div>
-
-              {/* Sucursal */}
-              <div className="ff-wrap">
-                <label className="ff-label ff-required" htmlFor="branch">Sucursal</label>
-                <SearchSelect
-                  id="branch"
-                  value={branch}
-                  selectedLabel={branch}
-                  error={!branch || branchError}
-                  onChange={(val) => { setBranch(val); setBranchError(false) }}
-                  options={branchSelectOptions}
-                  onSearch={setBranchSearch}
-                  placeholder="Sin especificar"
-                  className="ff-select"
-                  disabled={branchOptions.length === 1}
-                />
-                {branchError && <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal para continuar</p>}
-              </div>
-
-              {/* Departamento */}
-              {usaDepartamentos && (
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="department">Departamento</label>
-                  <DepartmentSelect id="department" value={department} onChange={setDepartment} />
-                </div>
-              )}
-
-              {/* Cobro anticipado / sin aplicar a factura */}
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
-                <input
-                  type="checkbox"
-                  checked={advancePayment}
-                  onChange={(e) => setAdvancePayment(e.target.checked)}
-                  style={{ marginTop: 2 }}
-                />
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Wallet size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-                  Cobro anticipado — no aplicar a ninguna factura (queda como saldo a favor del cliente)
-                </span>
-              </label>
-
-              {/* Fecha */}
-              <div className="ff-wrap">
-                <label className="ff-label">Fecha <span className="ff-required">*</span></label>
-                <DatePicker
-                  className="ff-input"
-                  value={postingDate}
-                  onChange={setPostingDate}
-                />
-              </div>
-
-              {/* Monto */}
-              <div className="ff-wrap">
-                <label className="ff-label">Monto (RD$) <span className="ff-required">*</span></label>
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  className="ff-input"
-                  value={paidAmount || ''}
-                  onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                  required
-                />
-              </div>
-
-              {/* Método de pago */}
-              <div className="ff-wrap">
-                <label className="ff-label">Método de Pago <span className="ff-required">*</span></label>
-                <SearchSelect
-                  value={modeOfPayment}
-                  onChange={(val) => { setModeOfPayment(val); setBankAccount('') }}
-                  options={modeOfPaymentOptions}
-                  onSearch={setModeOfPaymentSearch}
-                  selectedLabel={modeOfPayment}
-                  placeholder="Seleccionar método…"
-                />
-              </div>
-
-              {/* Cuenta bancaria (requerida por el método de pago seleccionado) */}
-              {metodoSeleccionado?.requiresBankAccount && (
-                <div className="ff-wrap">
-                  <label className="ff-label">
-                    Cuenta Bancaria {requiresBankAccount && <span className="ff-required">*</span>}
-                  </label>
-                  <SearchSelect
-                    value={bankAccount}
-                    onChange={setBankAccount}
-                    options={bankAccountOptions}
-                    onSearch={setBankAccountSearch}
-                    selectedLabel={cuentasBancarias?.items.find((c) => c.id === bankAccount)?.accountName ?? ''}
-                    placeholder={metodoSeleccionado.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
-                    error={requiresBankAccount && !bankAccount}
-                  />
-                </div>
-              )}
-
-              {/* Referencia */}
-              <div className="ff-wrap">
-                <label className="ff-label">No. de Referencia</label>
-                <input
-                  className="ff-input"
-                  placeholder="# cheque, transferencia…"
-                  value={referenceNo}
-                  onChange={(e) => setReferenceNo(e.target.value)}
-                />
-              </div>
-              <div className="ff-wrap">
-                <label className="ff-label">Fecha de Referencia</label>
-                <DatePicker
-                  className="ff-input"
-                  value={referenceDate}
-                  onChange={setReferenceDate}
-                  clearable
-                />
-              </div>
-
-              {/* Notas */}
-              <div className="ff-wrap">
-                <label className="ff-label">Notas</label>
-                <textarea
-                  className="ff-textarea"
-                  rows={2}
-                  placeholder="Observaciones opcionales…"
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                />
-              </div>
-
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%' }}
-            disabled={pagoMutation.isPending}
-          >
-            {pagoMutation.isPending
-              ? <><span className="spinner spinner-white spinner-sm" /> Registrando…</>
-              : 'Registrar Cobro'}
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={pagoMutation.isPending}
+        >
+          {pagoMutation.isPending
+            ? <><span className="spinner spinner-white spinner-sm" /> Registrando…</>
+            : 'Registrar Cobro'}
+        </button>
         </div>
 
       </form>

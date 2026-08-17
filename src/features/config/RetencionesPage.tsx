@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm, useFieldArray, Controller } from 'react-hook-form'
-import type { Resolver } from 'react-hook-form'
+import { useForm, useFieldArray, useWatch, Controller, useController } from 'react-hook-form'
+import type { Resolver, Control, UseFormRegister, FieldErrors } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -12,7 +12,8 @@ import {
   updateRetencion,
   deleteRetencion,
 } from '@/shared/api/retenciones'
-import type { RetencionListItem, CreateRetencionDto } from '@/shared/api/types'
+import { listTasasImpuesto } from '@/shared/api/config'
+import type { RetencionListItem, CreateRetencionDto, TasaImpuesto } from '@/shared/api/types'
 import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -29,22 +30,28 @@ const PAGE_SIZE = 20
 
 const TAX_DEDUCTION_BASIS_OPTIONS = ['Gross Total', 'Net Total'] as const
 
+const componenteSchema = z.object({
+  impuestoBaseId: z.string().min(1, 'Selecciona un impuesto'),
+  factor: z.coerce.number().min(0, 'Debe ser >= 0').optional(),
+})
+
 const rateSchema = z.object({
-  taxWithholdingRate: z.coerce.number().min(0, 'Debe ser >= 0'),
-  fromDate: z.string().min(1, 'La fecha desde es requerida'),
-  toDate: z.string().min(1, 'La fecha hasta es requerida'),
+  componentes: z.array(componenteSchema).min(1, 'Agrega al menos un impuesto'),
+  fromDate: z.string().optional(),
+  toDate: z.string().optional(),
 })
 
 const retencionSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   taxDeductionBasis: z.string().optional(),
   account: z.string().optional(),
-  rates: z.array(rateSchema).min(1, 'Agrega al menos una tasa'),
+  rates: z.array(rateSchema).min(1, 'Agrega al menos un tramo'),
 })
 
 type RetencionFormValues = z.infer<typeof retencionSchema>
 
-const emptyRate = { taxWithholdingRate: 0, fromDate: '', toDate: '' }
+const emptyComponente = { impuestoBaseId: '', factor: 100 }
+const emptyRate = { componentes: [{ ...emptyComponente }], fromDate: '', toDate: '' }
 
 export default function RetencionesPage() {
   const queryClient = useQueryClient()
@@ -74,6 +81,8 @@ export default function RetencionesPage() {
     enabled: !!editId,
   })
 
+  const { data: tasasImpuesto } = useQuery({ queryKey: ['tasas-impuesto'], queryFn: listTasasImpuesto })
+
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value)
     setPage(1)
@@ -102,7 +111,9 @@ export default function RetencionesPage() {
         account: editDetail.accounts?.[0]?.account ?? '',
         rates: (editDetail.rates ?? []).length > 0
           ? (editDetail.rates ?? []).map((r) => ({
-              taxWithholdingRate: r.taxWithholdingRate,
+              componentes: r.componentes.length > 0
+                ? r.componentes.map((c) => ({ impuestoBaseId: c.impuestoBaseId, factor: c.factor ?? 100 }))
+                : [{ ...emptyComponente }],
               fromDate: r.fromDate?.slice(0, 10) ?? '',
               toDate: r.toDate?.slice(0, 10) ?? '',
             }))
@@ -165,9 +176,12 @@ export default function RetencionesPage() {
       taxDeductionBasis: values.taxDeductionBasis || undefined,
       account: values.account || undefined,
       rates: values.rates.map((r) => ({
-        taxWithholdingRate: r.taxWithholdingRate,
-        fromDate: r.fromDate,
-        toDate: r.toDate,
+        componentes: r.componentes.map((c) => ({
+          impuestoBaseId: c.impuestoBaseId,
+          factor: c.factor || 100,
+        })),
+        ...(r.fromDate ? { fromDate: r.fromDate } : {}),
+        ...(r.toDate ? { toDate: r.toDate } : {}),
       })),
     }
     if (editId) {
@@ -331,79 +345,29 @@ export default function RetencionesPage() {
 
                     <div className="ff-wrap">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <label className="ff-label ff-required">Tasas</label>
+                        <label className="ff-label ff-required">Tramos</label>
                         <button
                           type="button"
                           className="btn btn-ghost btn-size-sm"
-                          onClick={() => append({ ...emptyRate })}
+                          onClick={() => append({ ...emptyRate, componentes: [{ ...emptyComponente }] })}
                         >
-                          <Plus size={14} /> Agregar tasa
+                          <Plus size={14} /> Agregar tramo
                         </button>
                       </div>
                       {errors.rates?.message && <p className="ff-error">{errors.rates.message}</p>}
-                      <div className="table-scroll">
-                        <table className="data-table">
-                          <thead>
-                            <tr>
-                              <th>Tasa (%)</th>
-                              <th>Desde</th>
-                              <th>Hasta</th>
-                              <th style={{ width: 40 }} />
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {fields.map((field, index) => (
-                              <tr key={field.id}>
-                                <td>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    className={`ff-input${errors.rates?.[index]?.taxWithholdingRate ? ' ff-input-error' : ''}`}
-                                    {...register(`rates.${index}.taxWithholdingRate` as const)}
-                                  />
-                                </td>
-                                <td>
-                                  <Controller
-                                    name={`rates.${index}.fromDate` as const}
-                                    control={control}
-                                    render={({ field }) => (
-                                      <DatePicker
-                                        value={field.value ?? ''}
-                                        onChange={field.onChange}
-                                        className="ff-input"
-                                        error={!!errors.rates?.[index]?.fromDate}
-                                      />
-                                    )}
-                                  />
-                                </td>
-                                <td>
-                                  <Controller
-                                    name={`rates.${index}.toDate` as const}
-                                    control={control}
-                                    render={({ field }) => (
-                                      <DatePicker
-                                        value={field.value ?? ''}
-                                        onChange={field.onChange}
-                                        className="ff-input"
-                                        error={!!errors.rates?.[index]?.toDate}
-                                      />
-                                    )}
-                                  />
-                                </td>
-                                <td>
-                                  <button
-                                    type="button"
-                                    className="btn btn-ghost btn-size-icon-sm"
-                                    onClick={() => remove(index)}
-                                    disabled={fields.length <= 1}
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {fields.map((field, index) => (
+                          <RateRow
+                            key={field.id}
+                            index={index}
+                            control={control}
+                            register={register}
+                            errors={errors}
+                            tasasImpuesto={tasasImpuesto ?? []}
+                            onRemoveRate={() => remove(index)}
+                            canRemoveRate={fields.length > 1}
+                          />
+                        ))}
                       </div>
                     </div>
                   </>
@@ -460,8 +424,6 @@ export default function RetencionesPage() {
 }
 
 // Small wrapper so AccountSelect (controlled value/onChange) plugs into react-hook-form control.
-import { useController, type Control } from 'react-hook-form'
-
 function RetencionAccountField({ control }: { control: Control<RetencionFormValues> }) {
   const { field } = useController({ control, name: 'account' })
   return (
@@ -469,5 +431,147 @@ function RetencionAccountField({ control }: { control: Control<RetencionFormValu
       value={field.value ?? ''}
       onChange={field.onChange}
     />
+  )
+}
+
+// Un tramo de retención: N impuestos referenciados (con su factor) + vigencia opcional.
+// useFieldArray para `componentes` vive aquí (no en el padre) porque los hooks de RHF por
+// índice de un array anidado deben llamarse desde un componente propio por fila.
+function RateRow({
+  index,
+  control,
+  register,
+  errors,
+  tasasImpuesto,
+  onRemoveRate,
+  canRemoveRate,
+}: {
+  index: number
+  control: Control<RetencionFormValues>
+  register: UseFormRegister<RetencionFormValues>
+  errors: FieldErrors<RetencionFormValues>
+  tasasImpuesto: TasaImpuesto[]
+  onRemoveRate: () => void
+  canRemoveRate: boolean
+}) {
+  const { fields: compFields, append: appendComp, remove: removeComp } = useFieldArray({
+    control,
+    name: `rates.${index}.componentes` as const,
+  })
+  const componentesValues = useWatch({ control, name: `rates.${index}.componentes` as const }) ?? []
+
+  // Preview visual con las tasas ya cargadas del catálogo — el backend recalcula el valor real al guardar.
+  const previewTasa = componentesValues.reduce((sum, c) => {
+    const base = tasasImpuesto.find((t) => t.id === c?.impuestoBaseId)
+    if (!base || base.tasa == null) return sum
+    return sum + (Number(c?.factor) || 100) / 100 * base.tasa
+  }, 0)
+
+  const rateErrors = errors.rates?.[index]
+
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Tramo {index + 1}</span>
+        <button
+          type="button"
+          className="btn btn-ghost btn-size-icon-sm"
+          style={{ color: 'var(--icon-muted)' }}
+          onClick={onRemoveRate}
+          disabled={!canRemoveRate}
+        >
+          <Trash2 size={13} />
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+        {compFields.map((cf, cIdx) => (
+          <div key={cf.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ flex: 1 }}>
+              <Controller
+                name={`rates.${index}.componentes.${cIdx}.impuestoBaseId` as const}
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange} placeholder="Seleccionar impuesto…">
+                    {tasasImpuesto.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.nombre}{t.tasa != null ? ` — ${t.tasa}%` : ''}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                )}
+              />
+            </div>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              placeholder="100"
+              className="ff-input"
+              style={{ width: 90 }}
+              {...register(`rates.${index}.componentes.${cIdx}.factor` as const)}
+            />
+            <button
+              type="button"
+              className="btn btn-ghost btn-size-icon-sm"
+              onClick={() => removeComp(cIdx)}
+              disabled={compFields.length <= 1}
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        ))}
+        {rateErrors?.componentes?.message && <p className="ff-error">{rateErrors.componentes.message}</p>}
+        <button
+          type="button"
+          className="btn btn-secondary btn-size-sm"
+          style={{ alignSelf: 'flex-start' }}
+          onClick={() => appendComp({ ...emptyComponente })}
+        >
+          <Plus size={13} /> Agregar impuesto
+        </button>
+      </div>
+
+      <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px' }}>
+        Tasa efectiva (preview): <strong>{previewTasa.toFixed(2)}%</strong> — el valor real lo calcula el servidor al guardar.
+      </p>
+
+      <div className="form-row">
+        <div className="ff-wrap" style={{ marginBottom: 0 }}>
+          <label className="ff-label">Desde</label>
+          <Controller
+            name={`rates.${index}.fromDate` as const}
+            control={control}
+            render={({ field }) => (
+              <DatePicker
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                className="ff-input"
+                clearable
+                placeholder="Sin límite inferior"
+                error={!!rateErrors?.fromDate}
+              />
+            )}
+          />
+        </div>
+        <div className="ff-wrap" style={{ marginBottom: 0 }}>
+          <label className="ff-label">Hasta</label>
+          <Controller
+            name={`rates.${index}.toDate` as const}
+            control={control}
+            render={({ field }) => (
+              <DatePicker
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                className="ff-input"
+                clearable
+                placeholder="Sin límite superior"
+                error={!!rateErrors?.toDate}
+              />
+            )}
+          />
+        </div>
+      </div>
+    </div>
   )
 }

@@ -16,6 +16,7 @@ const CustomerDetail  = lazy(() => import('@/features/customers/CustomerDetail')
 const CustomerForm    = lazy(() => import('@/features/customers/CustomerForm'))
 const CategoriesPage  = lazy(() => import('@/features/catalog/CategoriesPage'))
 const BrandsPage      = lazy(() => import('@/features/catalog/BrandsPage'))
+const CuentasPorPagarPage = lazy(() => import('@/features/catalog/CuentasPorPagarPage'))
 const ItemsPage       = lazy(() => import('@/features/catalog/ItemsPage'))
 const AttributesPage  = lazy(() => import('@/features/catalog/AttributesPage'))
 const ItemDetail      = lazy(() => import('@/features/catalog/ItemDetail'))
@@ -43,6 +44,9 @@ const RecepcionForm   = lazy(() => import('@/features/compras/RecepcionForm'))
 const GastosPage      = lazy(() => import('@/features/gastos/GastosPage'))
 const GastoDetail     = lazy(() => import('@/features/gastos/GastoDetail'))
 const GastoForm       = lazy(() => import('@/features/gastos/GastoForm'))
+const DevolucionesComprasPage = lazy(() => import('@/features/devoluciones-compras/DevolucionesPage'))
+const DevolucionCompraDetail  = lazy(() => import('@/features/devoluciones-compras/DevolucionDetail'))
+const DevolucionCompraForm    = lazy(() => import('@/features/devoluciones-compras/DevolucionForm'))
 const SuppliersPage   = lazy(() => import('@/features/suppliers/SuppliersPage'))
 const SupplierDetail  = lazy(() => import('@/features/suppliers/SupplierDetail'))
 const SupplierForm    = lazy(() => import('@/features/suppliers/SupplierForm'))
@@ -91,6 +95,7 @@ const NotificacionesPage   = lazy(() => import('@/features/config/Notificaciones
 const PermisosPage         = lazy(() => import('@/features/config/PermisosPage'))
 const RolesPage            = lazy(() => import('@/features/config/RolesPage'))
 const RoleDetailPage       = lazy(() => import('@/features/config/RoleDetailPage'))
+const InvoiceTemplateEditorPage = lazy(() => import('@/features/invoice-template-editor/InvoiceTemplateEditorPage'))
 const CostosImportacionPage = lazy(() => import('@/features/compras/CostosImportacionPage'))
 const CostoImportacionDetail = lazy(() => import('@/features/compras/CostoImportacionDetail'))
 const PorCobrarPage = lazy(() => import('@/features/caja/PorCobrarPage'))
@@ -135,6 +140,7 @@ export default function App() {
             {/* Catálogo */}
             <Route path="/catalogo/categorias" element={<Suspense fallback={<PageLoader />}><CategoriesPage /></Suspense>} />
             <Route path="/catalogo/marcas" element={<Suspense fallback={<PageLoader />}><BrandsPage /></Suspense>} />
+            <Route path="/catalogo/cuentas-por-pagar" element={<Suspense fallback={<PageLoader />}><CuentasPorPagarPage /></Suspense>} />
             <Route path="/catalogo/combos" element={<Suspense fallback={<PageLoader />}><BundlesPage /></Suspense>} />
             <Route path="/catalogo/descuentos" element={<Suspense fallback={<PageLoader />}><PricingRulesPage /></Suspense>} />
 
@@ -165,10 +171,14 @@ export default function App() {
             <Route path="/devoluciones/:id" element={<Suspense fallback={<PageLoader />}><DevolucionDetail /></Suspense>} />
 
             {/* Inventario */}
-             <Route path="/inventario/articulos" element={<Suspense fallback={<PageLoader />}><ItemsPage /></Suspense>} />
-            <Route path="/inventario/articulos/nuevo" element={<Suspense fallback={<PageLoader />}><ItemForm /></Suspense>} />
-            <Route path="/inventario/articulos/:id/editar" element={<Suspense fallback={<PageLoader />}><ItemForm /></Suspense>} />
-            <Route path="/inventario/articulos/:id" element={<Suspense fallback={<PageLoader />}><ItemDetail /></Suspense>} />
+             <Route path="/inventario/productos" element={<Suspense fallback={<PageLoader />}><ItemsPage /></Suspense>} />
+            <Route path="/inventario/productos/nuevo" element={<Suspense fallback={<PageLoader />}><ItemForm /></Suspense>} />
+            <Route path="/inventario/productos/:id/editar" element={<Suspense fallback={<PageLoader />}><ItemForm /></Suspense>} />
+            <Route path="/inventario/productos/:id" element={<Suspense fallback={<PageLoader />}><ItemDetail /></Suspense>} />
+            <Route path="/catalogo/servicios" element={<Suspense fallback={<PageLoader />}><ItemsPage /></Suspense>} />
+            <Route path="/catalogo/servicios/nuevo" element={<Suspense fallback={<PageLoader />}><ItemForm /></Suspense>} />
+            <Route path="/catalogo/servicios/:id/editar" element={<Suspense fallback={<PageLoader />}><ItemForm /></Suspense>} />
+            <Route path="/catalogo/servicios/:id" element={<Suspense fallback={<PageLoader />}><ItemDetail /></Suspense>} />
             <Route path="/catalogo/atributos" element={<Suspense fallback={<PageLoader />}><AttributesPage /></Suspense>} />
             <Route path="/inventario/stock" element={<Suspense fallback={<PageLoader />}><StockPage /></Suspense>} />
             <Route path="/inventario/historial" element={<Suspense fallback={<PageLoader />}><HistoryPage /></Suspense>} />
@@ -190,6 +200,12 @@ export default function App() {
             {/* Costos de Importación (Landed Cost) */}
             <Route path="/compras/costos-importacion" element={<Suspense fallback={<PageLoader />}><CostosImportacionPage /></Suspense>} />
             <Route path="/compras/costos-importacion/:id" element={<Suspense fallback={<PageLoader />}><CostoImportacionDetail /></Suspense>} />
+
+            {/* Devoluciones de Compras */}
+            <Route path="/devoluciones-compras" element={<Suspense fallback={<PageLoader />}><DevolucionesComprasPage /></Suspense>} />
+            <Route path="/devoluciones-compras/nueva" element={<Suspense fallback={<PageLoader />}><DevolucionCompraForm /></Suspense>} />
+            <Route path="/devoluciones-compras/:id/editar" element={<Suspense fallback={<PageLoader />}><DevolucionCompraForm /></Suspense>} />
+            <Route path="/devoluciones-compras/:id" element={<Suspense fallback={<PageLoader />}><DevolucionCompraDetail /></Suspense>} />
 
             {/* Gastos */}
             <Route path="/gastos" element={<Suspense fallback={<PageLoader />}><GastosPage /></Suspense>} />
@@ -253,6 +269,7 @@ export default function App() {
             {/* /config/ncf and /config/sucursales must be before /config/:seccion to avoid being caught as seccion */}
             <Route path="/config/ncf" element={<Suspense fallback={<PageLoader />}><NcfPage /></Suspense>} />
             <Route path="/config/sucursales" element={<Suspense fallback={<PageLoader />}><SucursalesPage /></Suspense>} />
+            <Route path="/config/plantillas-facturas" element={<Suspense fallback={<PageLoader />}><InvoiceTemplateEditorPage /></Suspense>} />
             <Route path="/config/cajas" element={<Suspense fallback={<PageLoader />}><CajasPage /></Suspense>} />
             <Route path="/config/centros-costo" element={<Suspense fallback={<PageLoader />}><CentrosCostoPage /></Suspense>} />
             <Route path="/config/bancos" element={<Suspense fallback={<PageLoader />}><BancosPage /></Suspense>} />

@@ -30,8 +30,11 @@ const ALL_ITEMS: SearchItem[] = [
   // ── Catálogo ───────────────────────────────────────────────────────────────
   { id: 'categorias',   label: 'Categorías',           group: 'Catálogo',     path: '/catalogo/categorias',            icon: <Package size={15} />, keywords: 'catalog categories grupos' },
   { id: 'marcas',       label: 'Marcas',               group: 'Catálogo',     path: '/catalogo/marcas',                icon: <Package size={15} />, keywords: 'brands marca' },
-  { id: 'articulos',    label: 'Artículos',            group: 'Catálogo',     path: '/inventario/articulos',             icon: <Package size={15} />, keywords: 'items productos servicios catalog' },
-  { id: 'articulo-nuevo', label: 'Nuevo Artículo',     group: 'Catálogo',     path: '/inventario/articulos',             icon: <Package size={15} />, keywords: 'crear item producto servicio' },
+  { id: 'productos',    label: 'Productos',            group: 'Catálogo',     path: '/inventario/productos',             icon: <Package size={15} />, keywords: 'items producto inventario catalog' },
+  { id: 'producto-nuevo', label: 'Nuevo Producto',     group: 'Catálogo',     path: '/inventario/productos/nuevo',       icon: <Package size={15} />, keywords: 'crear item producto' },
+  { id: 'servicios',    label: 'Servicios',            group: 'Catálogo',     path: '/catalogo/servicios',                icon: <Package size={15} />, keywords: 'items servicio catalog' },
+  { id: 'servicio-nuevo', label: 'Nuevo Servicio',     group: 'Catálogo',     path: '/catalogo/servicios/nuevo',         icon: <Package size={15} />, keywords: 'crear item servicio' },
+  { id: 'cuentas-por-pagar', label: 'Cuentas por Pagar', group: 'Catálogo',   path: '/catalogo/cuentas-por-pagar',        icon: <Package size={15} />, keywords: 'conceptos gasto cxp' },
 
   // ── Ventas ─────────────────────────────────────────────────────────────────
   { id: 'cotizaciones', label: 'Cotizaciones',         group: 'Ventas',       path: '/cotizaciones',                   icon: <FileText size={15} />, keywords: 'quotations cotizar presupuesto' },
@@ -51,6 +54,7 @@ const ALL_ITEMS: SearchItem[] = [
   // ── Compras & Gastos ───────────────────────────────────────────────────────
   { id: 'compras',      label: 'Compras',              group: 'Operaciones',  path: '/compras',                        icon: <ShoppingCart size={15} />, keywords: 'purchase compras proveedores 606' },
   { id: 'compra-nueva', label: 'Nueva Compra',         group: 'Operaciones',  path: '/compras/nueva',                  icon: <ShoppingCart size={15} />, keywords: 'crear compra purchase' },
+  { id: 'dev-compras',  label: 'Devoluciones de Compras', group: 'Operaciones', path: '/devoluciones-compras',          icon: <Receipt size={15} />, keywords: 'devoluciones return compras proveedores credito' },
   { id: 'gastos',       label: 'Gastos',               group: 'Operaciones',  path: '/gastos',                         icon: <CreditCard size={15} />, keywords: 'expenses gastos operativos 606' },
   { id: 'gasto-nuevo',  label: 'Nuevo Gasto',          group: 'Operaciones',  path: '/gastos/nuevo',                   icon: <CreditCard size={15} />, keywords: 'crear gasto expense' },
   { id: 'proveedores',  label: 'Proveedores',          group: 'Operaciones',  path: '/proveedores',                    icon: <Truck size={15} />, keywords: 'suppliers vendor proveedor' },

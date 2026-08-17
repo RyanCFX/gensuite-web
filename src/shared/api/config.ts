@@ -17,9 +17,10 @@ import type {
   CuentasEmpresa,
   UpdateCuentasEmpresaDto,
   TaxTemplate,
-  CreateTaxTemplateDto,
   ItemTaxTemplate,
-  CreateItemTaxTemplateDto,
+  TasaImpuesto,
+  CreateTasaImpuestoDto,
+  UpdateTasaImpuestoDto,
   FacturacionConfig,
   HabilitarPosDto,
   HabilitarPosResult,
@@ -266,49 +267,21 @@ export async function updateCuentasEmpresa(data: UpdateCuentasEmpresaDto) {
   return unwrap(res)
 }
 
-// ─── Tax Templates — Ventas ───────────────────────────────────────────────────
+// ─── Tax Templates — Ventas (solo lectura: ahora se gestionan desde tasas-impuesto) ─────
 
 export async function listImpuestosVentas(): Promise<TaxTemplate[]> {
   const res = await client.get<{ success: true; data: TaxTemplate[] }>(ENDPOINTS.config.impuestosVentas)
   return unwrap(res)
 }
 
-export async function createImpuestoVentas(data: CreateTaxTemplateDto): Promise<TaxTemplate> {
-  const res = await client.post<{ success: true; data: TaxTemplate }>(ENDPOINTS.config.impuestosVentas, data)
-  return unwrap(res)
-}
-
-export async function updateImpuestoVentas(id: string, data: Partial<CreateTaxTemplateDto>): Promise<TaxTemplate> {
-  const res = await client.put<{ success: true; data: TaxTemplate }>(ENDPOINTS.config.impuestosVentasById(id), data)
-  return unwrap(res)
-}
-
-export async function deleteImpuestoVentas(id: string): Promise<void> {
-  await client.delete(ENDPOINTS.config.impuestosVentasById(id))
-}
-
-// ─── Tax Templates — Compras ──────────────────────────────────────────────────
+// ─── Tax Templates — Compras (solo lectura: ahora se gestionan desde tasas-impuesto) ────
 
 export async function listImpuestosCompras(): Promise<TaxTemplate[]> {
   const res = await client.get<{ success: true; data: TaxTemplate[] }>(ENDPOINTS.config.impuestosCompras)
   return unwrap(res)
 }
 
-export async function createImpuestoCompras(data: CreateTaxTemplateDto): Promise<TaxTemplate> {
-  const res = await client.post<{ success: true; data: TaxTemplate }>(ENDPOINTS.config.impuestosCompras, data)
-  return unwrap(res)
-}
-
-export async function updateImpuestoCompras(id: string, data: Partial<CreateTaxTemplateDto>): Promise<TaxTemplate> {
-  const res = await client.put<{ success: true; data: TaxTemplate }>(ENDPOINTS.config.impuestosComprasById(id), data)
-  return unwrap(res)
-}
-
-export async function deleteImpuestoCompras(id: string): Promise<void> {
-  await client.delete(ENDPOINTS.config.impuestosComprasById(id))
-}
-
-// ─── Item Tax Templates ────────────────────────────────────────────────────────
+// ─── Item Tax Templates (solo lectura: ahora se gestionan desde tasas-impuesto) ─────────
 
 export async function listItemTaxTemplates(): Promise<ItemTaxTemplate[]> {
   const res = await client.get<{ success: true; data: ItemTaxTemplate[] }>(ENDPOINTS.config.itemTaxTemplates)
@@ -320,18 +293,30 @@ export async function getItemTaxTemplate(id: string): Promise<ItemTaxTemplate> {
   return unwrap(res)
 }
 
-export async function createItemTaxTemplate(data: CreateItemTaxTemplateDto): Promise<ItemTaxTemplate> {
-  const res = await client.post<{ success: true; data: ItemTaxTemplate }>(ENDPOINTS.config.itemTaxTemplates, data)
+// ─── Tasas de Impuesto (catálogo base + combos) ───────────────────────────────
+
+export async function listTasasImpuesto(): Promise<TasaImpuesto[]> {
+  const res = await client.get<{ success: true; data: TasaImpuesto[] }>(ENDPOINTS.config.tasasImpuesto)
   return unwrap(res)
 }
 
-export async function updateItemTaxTemplate(id: string, data: Partial<CreateItemTaxTemplateDto>): Promise<ItemTaxTemplate> {
-  const res = await client.put<{ success: true; data: ItemTaxTemplate }>(ENDPOINTS.config.itemTaxTemplatesById(id), data)
+export async function getTasaImpuesto(id: string): Promise<TasaImpuesto> {
+  const res = await client.get<{ success: true; data: TasaImpuesto }>(ENDPOINTS.config.tasasImpuestoById(id))
   return unwrap(res)
 }
 
-export async function deleteItemTaxTemplate(id: string): Promise<void> {
-  await client.delete(ENDPOINTS.config.itemTaxTemplatesById(id))
+export async function createTasaImpuesto(data: CreateTasaImpuestoDto): Promise<TasaImpuesto> {
+  const res = await client.post<{ success: true; data: TasaImpuesto }>(ENDPOINTS.config.tasasImpuesto, data)
+  return unwrap(res)
+}
+
+export async function updateTasaImpuesto(id: string, data: UpdateTasaImpuestoDto): Promise<TasaImpuesto> {
+  const res = await client.put<{ success: true; data: TasaImpuesto }>(ENDPOINTS.config.tasasImpuestoById(id), data)
+  return unwrap(res)
+}
+
+export async function deleteTasaImpuesto(id: string): Promise<void> {
+  await client.delete(ENDPOINTS.config.tasasImpuestoById(id))
 }
 
 // ─── Ajustes avanzados (Settings singletons) ──────────────────────────────────

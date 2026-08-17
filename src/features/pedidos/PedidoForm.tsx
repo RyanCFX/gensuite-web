@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { createPedido, updatePedido, getPedido, getPedidoDuplicateSource } from '@/shared/api/pedidos'
@@ -95,6 +95,15 @@ const [customerId, setCustomerId] = useState('')
    const [transactionDate, setTransactionDate] = useState(todayIso())
   const [deliveryDate, setDeliveryDate] = useState(defaultDelivery())
   const [items, setItems] = useState<LineItem[]>([])
+  const [highlightedRow, setHighlightedRow] = useState<number | null>(null)
+  const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
+  const flashRow = useCallback((index: number) => {
+    rowRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setTimeout(() => {
+      setHighlightedRow(index)
+      setTimeout(() => setHighlightedRow((cur) => (cur === index ? null : cur)), 2200)
+    }, 400)
+  }, [])
   const [notes, setNotes] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -129,11 +138,20 @@ const [customerId, setCustomerId] = useState('')
         toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
         return
       }
-      const res = await listItems({ barcode: code, limit: 1, validateStock: true, branch })
+      const res = await listItems({ barcode: code, limit: 1, branch })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
+      const existingIndex = items.findIndex((row) => row.itemCode === item.id)
+      if (existingIndex !== -1) {
+        flashRow(existingIndex)
+        return
+      }
+      const targetIndex = items.length
       addRow()
-      setTimeout(() => selectCatalogItem(items.length, item), 0)
+      setTimeout(() => {
+        selectCatalogItem(targetIndex, item, { autoAddRow: false })
+        addRow()
+      }, 0)
     },
   })
 
@@ -360,51 +378,62 @@ useEffect(() => {
       return updated
     }))
   }
-  function selectCatalogItem(index: number, catalogItem: Item) {
+  function selectCatalogItem(index: number, catalogItem: Item, opts?: { autoAddRow?: boolean }) {
+    const autoAddRow = opts?.autoAddRow ?? true
     const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
-    setItems((prev) => prev.map((row, i) => {
-      if (i !== index) return row
-      const rate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
-      return {
-        ...row,
-        itemCode: catalogItem.id,
-        itemLabel: catalogItem.itemName,
-        itemType: catalogItem.type,
-        description: catalogItem.internalDescription ?? catalogItem.itemName,
-        rate,
-        amount: calcAmount(row.qty, rate, row.discountPct),
-         uom: catalogItem.stockUom ?? row.uom,
-         conversionFactor: 1,
-         maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
-        _prices: catalogItem.prices,
-        warehouse: defaultWarehouse(),
-        _stockByWarehouse: catalogItem.stockByWarehouse,
-        stockError: undefined,
-      }
-    }))
+    let wasLastRow = false
+    setItems((prev) => {
+      wasLastRow = index === prev.length - 1
+      return prev.map((row, i) => {
+        if (i !== index) return row
+        const rate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
+        return {
+          ...row,
+          itemCode: catalogItem.id,
+          itemLabel: catalogItem.itemName,
+          itemType: catalogItem.type,
+          description: catalogItem.internalDescription ?? catalogItem.itemName,
+          rate,
+          amount: calcAmount(row.qty, rate, row.discountPct),
+           uom: catalogItem.stockUom ?? row.uom,
+           conversionFactor: 1,
+           maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
+          _prices: catalogItem.prices,
+          warehouse: defaultWarehouse(),
+          _stockByWarehouse: catalogItem.stockByWarehouse,
+          stockError: undefined,
+        }
+      })
+    })
+    if (autoAddRow && wasLastRow) addRow()
   }
   function selectBundle(index: number, bundle: Bundle) {
     const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
-    setItems((prev) => prev.map((row, i) => {
-      if (i !== index) return row
-      const rate = bundle.prices?.[tier] ?? 0
-      return {
-        ...row,
-        itemCode: bundle.id,
-        itemLabel: bundle.itemName,
-        itemType: 'combo',
-        description: bundle.itemName,
-        rate,
-        amount: calcAmount(row.qty, rate, row.discountPct),
-         uom: bundle.itemUom ?? '',
-         conversionFactor: 1,
-         maxDiscountPct: undefined,
-        _prices: bundle.prices,
-        warehouse: defaultWarehouse(),
-        _stockByWarehouse: undefined,
-        stockError: undefined,
-      }
-    }))
+    let wasLastRow = false
+    setItems((prev) => {
+      wasLastRow = index === prev.length - 1
+      return prev.map((row, i) => {
+        if (i !== index) return row
+        const rate = bundle.prices?.[tier] ?? 0
+        return {
+          ...row,
+          itemCode: bundle.id,
+          itemLabel: bundle.itemName,
+          itemType: 'combo',
+          description: bundle.itemName,
+          rate,
+          amount: calcAmount(row.qty, rate, row.discountPct),
+           uom: bundle.itemUom ?? '',
+           conversionFactor: 1,
+           maxDiscountPct: undefined,
+          _prices: bundle.prices,
+          warehouse: defaultWarehouse(),
+          _stockByWarehouse: undefined,
+          stockError: undefined,
+        }
+      })
+    })
+    if (wasLastRow) addRow()
   }
   function onVariantConfirm(selections: VariantSelection[]) {
     const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
@@ -671,7 +700,11 @@ try {
                   <tr><td colSpan={9} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>No hay artículos.</td></tr>
                 ) : (
                   items.map((item, index) => (
-                    <tr key={index}>
+                    <tr
+                      key={index}
+                      ref={(el) => { rowRefs.current[index] = el }}
+                      className={highlightedRow === index ? 'row-flash' : undefined}
+                    >
                       <td>
                         <ItemSelect value={item.itemCode} selectedLabel={item.itemLabel} onSelect={(ci) => selectCatalogItem(index, ci)} onSelectBundle={(b) => selectBundle(index, b)} includeBundles onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0 })} onVariantSelect={(t) => setVariantTemplate(t)} validateStock branch={branch || undefined} />
                       </td>

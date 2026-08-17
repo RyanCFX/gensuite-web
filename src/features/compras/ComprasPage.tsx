@@ -156,6 +156,7 @@ export default function ComprasPage() {
                   <SortableTh label="Proveedor" sortKey="supplierName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
                   <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
                   <th>NCF Proveedor</th>
+                  <th>N° Factura</th>
                   <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} align="right" />
                   <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
                   <th>Acciones</th>
@@ -165,7 +166,7 @@ export default function ComprasPage() {
                 {isLoading
                   ? Array.from({ length: 8 }).map((_, i) => (
                       <tr key={i}>
-                        {Array.from({ length: 7 }).map((__, j) => (
+                        {Array.from({ length: 8 }).map((__, j) => (
                           <td key={j}><span className="skeleton-box" style={{ height: 16, width: '100%', display: 'block' }} /></td>
                         ))}
                       </tr>
@@ -173,7 +174,7 @@ export default function ComprasPage() {
                   : isError
                     ? (
                         <tr>
-                          <td colSpan={7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
+                          <td colSpan={8} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
                             Error al cargar las compras
                           </td>
                         </tr>
@@ -181,7 +182,7 @@ export default function ComprasPage() {
                     : data?.items.length === 0
                       ? (
                           <tr>
-                            <td colSpan={7}>
+                            <td colSpan={8}>
                               <div className="empty-state">
                                 <div className="empty-icon">
                                   <Plus size={20} />
@@ -198,9 +199,19 @@ export default function ComprasPage() {
                       : data?.items.map((c) => (
                           <tr key={c.id} className="table-row-clickable" onClick={() => navigate(`/compras/${c.id}`)}>
                             <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{c.id}</td>
-                            <td style={{ fontWeight: 500 }}>{c.supplierName}</td>
+                            <td style={{ fontWeight: 500 }}>
+                              {c.esProveedorOcasional
+                                ? (
+                                    <span>
+                                      {c.proveedorOcasionalNombre ?? c.supplierName}
+                                      {' '}<span className="badge badge-warning">Ocasional</span>
+                                    </span>
+                                  )
+                                : c.supplierName}
+                            </td>
                             <td>{formatDate(c.postingDate)}</td>
                             <td className="td-muted" style={{ fontFamily: 'var(--font-mono)' }}>{c.ncfProveedor ?? '—'}</td>
+                            <td className="td-muted" style={{ fontFamily: 'var(--font-mono)' }}>{c.billNo ?? '—'}</td>
                             <td style={{ textAlign: 'right' }}>{formatDOP(c.grandTotal)}</td>
                             <td><StatusBadge status={c.status} /></td>
                             <td>

@@ -90,11 +90,6 @@ export async function deleteCompra(id: string) {
   return unwrap(res)
 }
 
-export async function returnCompra(id: string, items: { itemCode: string; qty: number }[]) {
-  const res = await client.post<{ success: true; data: Compra }>(ENDPOINTS.compras.return(id), { items })
-  return unwrap(res)
-}
-
 // ---- Gastos (update_stock=0) ----
 
 export interface ListGastosParams extends PaginationParams {

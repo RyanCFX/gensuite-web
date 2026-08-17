@@ -61,7 +61,7 @@ export function ActionsMenu({ children }: ActionsMenuProps) {
             position: style?.position ?? 'fixed',
             top: style?.top,
             // Align right edge of menu to right edge of trigger, extending leftward
-            right: style ? window.innerWidth - (style.left + style.width) : undefined,
+            right: style ? window.innerWidth - (Number(style.left) + Number(style.width)) : undefined,
             left: undefined,
             width: undefined,
             animation: 'none',

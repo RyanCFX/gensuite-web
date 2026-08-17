@@ -3,11 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getGasto, submitGasto, cancelGasto, amendGasto } from '@/shared/api/compras-gastos'
+import { listRetenciones } from '@/shared/api/retenciones'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { getCatalogosFiscales } from '@/shared/api/config'
-import { Send, X, RotateCcw, Info, FileText, AlertCircle } from 'lucide-react'
+import { getCatalogosFiscales, listImpuestosCompras } from '@/shared/api/config'
+import { Send, X, RotateCcw, Info, FileText, AlertCircle, BookOpen } from 'lucide-react'
 
 function apiErrorMessage(error: unknown, fallback: string) {
   const apiErr = error as { message?: string }
@@ -33,6 +34,20 @@ export default function GastoDetail() {
     queryFn: getCatalogosFiscales,
     staleTime: 60 * 60_000,
   })
+
+  const { data: retencionesData } = useQuery({
+    queryKey: ['retenciones-all'],
+    queryFn: () => listRetenciones({ limit: 100 }),
+    staleTime: 60 * 60_000,
+  })
+
+  const { data: impuestosCompras } = useQuery({
+    queryKey: ['impuestos-compras'],
+    queryFn: listImpuestosCompras,
+    staleTime: 60 * 60_000,
+  })
+  const impuestoTitulo = (templateId: string) =>
+    impuestosCompras?.find((t) => String(t.id) === templateId)?.title ?? templateId
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['gasto', id] })
@@ -105,7 +120,7 @@ export default function GastoDetail() {
 
       <PageHeader
         title={`Gasto ${gasto.id}`}
-        description={gasto.supplierName}
+        description={gasto.esProveedorOcasional ? (gasto.proveedorOcasionalNombre ?? gasto.supplierName) : gasto.supplierName}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {gasto.status === 'draft' && (
@@ -124,9 +139,23 @@ export default function GastoDetail() {
               </>
             )}
             {gasto.status === 'submitted' && (
-              <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmAction('cancel')}>
-                <X size={14} />Anular
-              </button>
+              <>
+                <button
+                  className="btn btn-secondary btn-size-sm"
+                  onClick={() => {
+                    const postingDate = gasto.postingDate.split('T')[0]
+                    navigate(
+                      `/contabilidad/libro-diario?voucherNo=${encodeURIComponent(gasto.id)}` +
+                      `&voucherType=Purchase+Invoice&fromDate=${postingDate}&toDate=${postingDate}`,
+                    )
+                  }}
+                >
+                  <BookOpen size={14} />Ver asientos
+                </button>
+                <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmAction('cancel')}>
+                  <X size={14} />Anular
+                </button>
+              </>
             )}
             {gasto.status === 'cancelled' && (
               <button className="btn btn-secondary btn-size-sm" onClick={() => setConfirmAction('amend')}>
@@ -166,8 +195,23 @@ export default function GastoDetail() {
           <div className="fields-grid fields-grid-3">
             <div className="detail-field">
               <span className="detail-label">Proveedor</span>
-              <span className="detail-value">{gasto.supplierName}</span>
+              <span className="detail-value">
+                {gasto.esProveedorOcasional ? (
+                  <span>
+                    {gasto.proveedorOcasionalNombre ?? gasto.supplierName}
+                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 6 }}>(ocasional)</span>
+                  </span>
+                ) : (
+                  gasto.supplierName
+                )}
+              </span>
             </div>
+            {gasto.esProveedorOcasional && gasto.proveedorOcasionalRnc && (
+              <div className="detail-field">
+                <span className="detail-label">RNC/Cédula</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{gasto.proveedorOcasionalRnc}</span>
+              </div>
+            )}
             <div className="detail-field">
               <span className="detail-label">Fecha</span>
               <span className="detail-value">{formatDate(gasto.postingDate)}</span>
@@ -176,6 +220,27 @@ export default function GastoDetail() {
               <span className="detail-label">Categoría</span>
               <span className="detail-value">{gasto.categoriaGasto ?? '—'}</span>
             </div>
+            {!!gasto.taxAmount && (
+              <div className="detail-field">
+                <span className="detail-label">Impuestos</span>
+                <span className="detail-value">{formatDOP(gasto.taxAmount)}</span>
+              </div>
+            )}
+            {gasto.retenciones && gasto.retenciones.length > 0 && (
+              <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+                <span className="detail-label">Retenciones</span>
+                <span className="detail-value">
+                  <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {gasto.retenciones.map((r) => {
+                      const opt = retencionesData?.items?.find((x) => x.id === r.id)
+                      return (
+                        <span key={r.id} className="badge badge-info">{opt?.categoryName ?? r.id} ({r.tasa}%)</span>
+                      )
+                    })}
+                  </span>
+                </span>
+              </div>
+            )}
             <div className="detail-field">
               <span className="detail-label">Total</span>
               <span className="detail-value" style={{ fontSize: 18, fontWeight: 700 }}>{formatDOP(gasto.grandTotal)}</span>
@@ -217,6 +282,10 @@ export default function GastoDetail() {
                   <td colSpan={4} style={{ textAlign: 'right' }}>Total</td>
                   <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatDOP(gasto.grandTotal)}</td>
                 </tr>
+                <tr style={{ background: 'var(--surface-sunken)', fontWeight: 600 }}>
+                  <td colSpan={4} style={{ textAlign: 'right' }}>Total</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatDOP(gasto.grandTotal)}</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -234,6 +303,10 @@ export default function GastoDetail() {
               <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{gasto.ncfProveedor ?? '—'}</span>
             </div>
             <div className="detail-field">
+              <span className="detail-label">N° Factura del Proveedor</span>
+              <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{gasto.billNo ?? '—'}</span>
+            </div>
+            <div className="detail-field">
               <span className="detail-label">Tipo Comprobante</span>
               <span className="detail-value">{gasto.tipoComprobante ?? '—'}</span>
             </div>
@@ -246,12 +319,49 @@ export default function GastoDetail() {
               <span className="detail-value">{getFormaPagoLabel(gasto.formaPago606)}</span>
             </div>
             <div className="detail-field">
-              <span className="detail-label">Retención ISR</span>
-              <span className="detail-value">{formatDOP(gasto.retencionIsr)}</span>
+              <span className="detail-label">Impuesto del Documento</span>
+              <span className="detail-value">
+                {gasto.taxesTemplate && gasto.taxesTemplate.length > 0
+                  ? (
+                    <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {gasto.taxesTemplate.map((t) => (
+                        <span key={t.id} className="badge badge-info">{impuestoTitulo(t.id)} ({t.tasa}%)</span>
+                      ))}
+                    </span>
+                  )
+                  : '—'}
+              </span>
             </div>
-            <div className="detail-field">
-              <span className="detail-label">Retención ITBIS</span>
-              <span className="detail-value">{formatDOP(gasto.retencionItbis)}</span>
+            <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+              <span className="detail-label">Impuestos</span>
+              <span className="detail-value">
+                {gasto.impuestos && gasto.impuestos.length > 0
+                  ? (
+                    <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {gasto.impuestos.map((imp, idx) => (
+                        <span key={`${imp.id}-${idx}`} className="badge badge-info">{imp.id} ({imp.tasa}%)</span>
+                      ))}
+                    </span>
+                  )
+                  : '—'}
+              </span>
+            </div>
+            <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+              <span className="detail-label">Retenciones</span>
+              <span className="detail-value">
+                {gasto.retenciones && gasto.retenciones.length > 0
+                  ? (
+                    <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {gasto.retenciones.map((r) => {
+                        const opt = retencionesData?.items?.find((x) => x.id === r.id)
+                        return (
+                          <span key={r.id} className="badge badge-info">{opt?.categoryName ?? r.id} ({r.tasa}%)</span>
+                        )
+                      })}
+                    </span>
+                  )
+                  : '—'}
+              </span>
             </div>
           </div>
         </div>

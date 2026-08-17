@@ -26,6 +26,7 @@ function defaultFacturarForm(): FacturarPurchaseReceiptDto {
   return {
     dueDate: '',
     ncfProveedor: '',
+    billNo: '',
     tipoBienes606: '',
     formaPago606: '',
     retencionItbis: 0,
@@ -168,6 +169,7 @@ export default function RecepcionDetail() {
     const dto: FacturarPurchaseReceiptDto = {
       dueDate: form.dueDate || undefined,
       ncfProveedor: form.ncfProveedor || undefined,
+      billNo: form.billNo || undefined,
       tipoBienes606: form.tipoBienes606 || undefined,
       formaPago606: form.formaPago606 || undefined,
       retencionItbis: form.retencionItbis || undefined,
@@ -390,6 +392,15 @@ export default function RecepcionDetail() {
                       placeholder="B01XXXXXXXXXX"
                       value={form.ncfProveedor ?? ''}
                       onChange={(e) => setForm((f) => ({ ...f, ncfProveedor: e.target.value.toUpperCase() }))}
+                    />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">N° Factura del Proveedor</label>
+                    <input
+                      className="ff-input"
+                      placeholder="N° de factura del vendedor"
+                      value={form.billNo ?? ''}
+                      onChange={(e) => setForm((f) => ({ ...f, billNo: e.target.value }))}
                     />
                   </div>
                   <div className="ff-wrap">

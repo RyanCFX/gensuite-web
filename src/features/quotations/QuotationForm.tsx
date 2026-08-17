@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -114,6 +114,15 @@ export default function QuotationForm() {
   const [date, setDate] = useState(todayIso())
   const [validTill, setValidTill] = useState(defaultValidTill())
   const [items, setItems] = useState<LineItem[]>([])
+  const [highlightedRow, setHighlightedRow] = useState<number | null>(null)
+  const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
+  const flashRow = useCallback((index: number) => {
+    rowRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setTimeout(() => {
+      setHighlightedRow(index)
+      setTimeout(() => setHighlightedRow((cur) => (cur === index ? null : cur)), 2200)
+    }, 400)
+  }, [])
   const [notes, setNotes] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
@@ -215,11 +224,20 @@ useEffect(() => {
         toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
         return
       }
-      const res = await listItems({ barcode: code, limit: 1, validateStock: true, branch })
+      const res = await listItems({ barcode: code, limit: 1, branch })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
+      const existingIndex = items.findIndex((row) => row.itemCode === item.id)
+      if (existingIndex !== -1) {
+        flashRow(existingIndex)
+        return
+      }
+      const targetIndex = items.length
       addRow()
-      setTimeout(() => selectCatalogItem(items.length, item), 0)
+      setTimeout(() => {
+        selectCatalogItem(targetIndex, item, { autoAddRow: false })
+        addRow()
+      }, 0)
     },
   })
 
@@ -477,10 +495,13 @@ function submitDto() {
     setVariantTemplate(null)
   }
 
-  function selectCatalogItem(index: number, catalogItem: Item) {
+  function selectCatalogItem(index: number, catalogItem: Item, opts?: { autoAddRow?: boolean }) {
+    const autoAddRow = opts?.autoAddRow ?? true
     const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
-    setItems((prev) =>
-      prev.map((row, i) => {
+    let wasLastRow = false
+    setItems((prev) => {
+      wasLastRow = index === prev.length - 1
+      return prev.map((row, i) => {
         if (i !== index) return row
         const rate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
         return {
@@ -503,14 +524,17 @@ function submitDto() {
           _stockByWarehouse: catalogItem.stockByWarehouse,
           stockError: undefined,
         }
-      }),
-    )
+      })
+    })
+    if (autoAddRow && wasLastRow) addRow()
   }
 
   function selectBundle(index: number, bundle: Bundle) {
     const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
-    setItems((prev) =>
-      prev.map((row, i) => {
+    let wasLastRow = false
+    setItems((prev) => {
+      wasLastRow = index === prev.length - 1
+      return prev.map((row, i) => {
         if (i !== index) return row
         const rate = bundle.prices?.[tier] ?? 0
         return {
@@ -530,8 +554,9 @@ function submitDto() {
           _stockByWarehouse: undefined,
           stockError: undefined,
         }
-      }),
-    )
+      })
+    })
+    if (wasLastRow) addRow()
   }
 
   function clearCatalogItem(index: number) {
@@ -806,7 +831,11 @@ if (esClienteOcasional) {
                   </tr>
                 ) : (
                   items.map((item, index) => (
-                    <tr key={index}>
+                    <tr
+                      key={index}
+                      ref={(el) => { rowRefs.current[index] = el }}
+                      className={highlightedRow === index ? 'row-flash' : undefined}
+                    >
                       {/* Artículo — SearchSelect por catálogo */}
                       <td style={{ minWidth: 200 }}>
                         <ItemSelect

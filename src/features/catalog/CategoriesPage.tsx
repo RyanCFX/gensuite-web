@@ -9,6 +9,7 @@ import type { Category, UpdateCategoryDto } from '@/shared/api/types'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightSmall, FolderOpen, Tag, Folder } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -24,6 +25,7 @@ const categorySchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   parentCategory: z.string().optional(),
   itemCodePrefix: z.string().max(5).optional(),
+  aplicaA: z.enum(['Ambas', 'Productos', 'Servicios']),
   incomeAccount: z.string().optional(),
   expenseAccount: z.string().optional(),
   defaultCogsAccount: z.string().optional(),
@@ -171,13 +173,15 @@ export default function CategoriesPage() {
     handleSubmit,
     reset,
     control,
+    watch,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
-    defaultValues: { name: '', parentCategory: '', itemCodePrefix: '', incomeAccount: '', expenseAccount: '', defaultCogsAccount: '' },
+    defaultValues: { name: '', parentCategory: '', itemCodePrefix: '', aplicaA: 'Ambas', incomeAccount: '', expenseAccount: '', defaultCogsAccount: '' },
   })
 
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, closeDialog)
+  const watchedAplicaA = watch('aplicaA')
 
   const createMutation = useMutation({
     mutationFn: createCategory,
@@ -217,7 +221,7 @@ export default function CategoriesPage() {
 
   function openCreate() {
     setEditTarget(null)
-    reset({ name: '', parentCategory: '', itemCodePrefix: '', incomeAccount: '', expenseAccount: '', defaultCogsAccount: '' })
+    reset({ name: '', parentCategory: '', itemCodePrefix: '', aplicaA: 'Ambas', incomeAccount: '', expenseAccount: '', defaultCogsAccount: '' })
     setDialogOpen(true)
   }
 
@@ -227,6 +231,7 @@ export default function CategoriesPage() {
       name: cat.name,
       parentCategory: cat.parentCategory ?? '',
       itemCodePrefix: (cat as any).itemCodePrefix ?? '',
+      aplicaA: cat.aplicaA ?? 'Ambas',
       incomeAccount: (cat as any).incomeAccount ?? '',
       expenseAccount: (cat as any).expenseAccount ?? '',
       defaultCogsAccount: (cat as any).defaultCogsAccount ?? '',
@@ -243,6 +248,7 @@ export default function CategoriesPage() {
         name: full.name,
         parentCategory: full.parentCategory ?? '',
         itemCodePrefix: (full as any).itemCodePrefix ?? '',
+        aplicaA: full.aplicaA ?? 'Ambas',
         incomeAccount: (full as any).incomeAccount ?? '',
         expenseAccount: (full as any).expenseAccount ?? '',
         defaultCogsAccount: (full as any).defaultCogsAccount ?? '',
@@ -269,9 +275,12 @@ export default function CategoriesPage() {
     if (values.itemCodePrefix) {
       basePayload.itemCodePrefix = values.itemCodePrefix
     }
+    basePayload.aplicaA = values.aplicaA
     basePayload.incomeAccount = values.incomeAccount || undefined
     basePayload.expenseAccount = values.expenseAccount || undefined
-    basePayload.defaultCogsAccount = values.defaultCogsAccount || undefined
+    // Un servicio nunca genera Costo de Mercancía Vendida (no hay movimiento de inventario que
+    // valuar) — se omite aunque el campo tuviera un valor cargado de antes.
+    basePayload.defaultCogsAccount = values.aplicaA === 'Servicios' ? undefined : (values.defaultCogsAccount || undefined)
     if (editTarget) {
       updateMutation.mutate({ id: editTarget.id, data: basePayload as UpdateCategoryDto })
     } else {
@@ -520,6 +529,24 @@ export default function CategoriesPage() {
                 </div>
 
                 <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="aplicaA">Aplica a</label>
+                  <Controller
+                    name="aplicaA"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectItem value="Ambas">Ambas</SelectItem>
+                        <SelectItem value="Productos">Productos</SelectItem>
+                        <SelectItem value="Servicios">Servicios</SelectItem>
+                      </Select>
+                    )}
+                  />
+                  <p className="ff-hint">
+                    Restringe en qué tipo de artículo se puede usar esta categoría/subcategoría.
+                  </p>
+                </div>
+
+                <div className="ff-wrap">
                   <label className="ff-label" htmlFor="incomeAccount">Cuenta de Ingreso</label>
                   <Controller
                     name="incomeAccount"
@@ -555,24 +582,26 @@ export default function CategoriesPage() {
                   />
                 </div>
 
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="defaultCogsAccount">Cuenta de Costo de Mercancía Vendida (COGS)</label>
-                  <Controller
-                    name="defaultCogsAccount"
-                    control={control}
-                    render={({ field }) => (
-                      <AccountSelect
-                        id="defaultCogsAccount"
-                        value={field.value ?? ''}
-                        onChange={field.onChange}
-                        accountType="Cost of Goods Sold"
-                        placeholder="Buscar cuenta de COGS…"
-                        disabled={detailLoading}
-                      />
-                    )}
-                  />
-                  <p className="ff-hint">Cuenta que controla el costo real en ventas — es el campo más importante de los tres.</p>
-                </div>
+                {watchedAplicaA !== 'Servicios' && (
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="defaultCogsAccount">Cuenta de Costo de Mercancía Vendida (COGS)</label>
+                    <Controller
+                      name="defaultCogsAccount"
+                      control={control}
+                      render={({ field }) => (
+                        <AccountSelect
+                          id="defaultCogsAccount"
+                          value={field.value ?? ''}
+                          onChange={field.onChange}
+                          accountType="Cost of Goods Sold"
+                          placeholder="Buscar cuenta de COGS…"
+                          disabled={detailLoading}
+                        />
+                      )}
+                    />
+                    <p className="ff-hint">Cuenta que controla el costo real en ventas — es el campo más importante de los tres.</p>
+                  </div>
+                )}
               </div>
               <div className="modal-foot">
                 <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, Fragment } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { createInvoice } from '@/shared/api/invoices'
@@ -205,6 +205,17 @@ export default function InvoiceForm() {
   const [dueDate, setDueDate] = useState(defaultDueDate())
   const [ncfType, setNcfType] = useState<NcfType>('B02')
   const [items, setItems] = useState<LineItem[]>([])
+  const [highlightedRow, setHighlightedRow] = useState<number | null>(null)
+  const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
+  const flashRow = useCallback((index: number) => {
+    rowRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // Se espera a que el scroll suave asiente antes de animar, para que el highlight
+    // no pase inadvertido mientras la vista todavía se está moviendo.
+    setTimeout(() => {
+      setHighlightedRow(index)
+      setTimeout(() => setHighlightedRow((cur) => (cur === index ? null : cur)), 2200)
+    }, 400)
+  }, [])
   const [notes, setNotes] = useState('')
   const [semaforo, setSemaforo] = useState<SemaforoEntry | null>(null)
   const [loadingSemaforo, setLoadingSemaforo] = useState(false)
@@ -248,11 +259,20 @@ export default function InvoiceForm() {
         toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
         return
       }
-      const res = await listItems({ barcode: code, limit: 1, validateStock: true, branch })
+      const res = await listItems({ barcode: code, limit: 1, branch })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
+      const existingIndex = items.findIndex((row) => row.itemCode === item.id)
+      if (existingIndex !== -1) {
+        flashRow(existingIndex)
+        return
+      }
+      const targetIndex = items.length
       addRow()
-      setTimeout(() => selectCatalogItem(items.length, item), 0)
+      setTimeout(() => {
+        selectCatalogItem(targetIndex, item, { autoAddRow: false })
+        addRow()
+      }, 0)
     },
   })
 
@@ -537,9 +557,12 @@ export default function InvoiceForm() {
     return row.componentTracking?.find((t) => t.itemCode === itemCode)
   }
 
-  async function selectCatalogItem(index: number, catalogItem: Item) {
-    setItems((prev) =>
-      prev.map((row, i) => {
+  async function selectCatalogItem(index: number, catalogItem: Item, opts?: { autoAddRow?: boolean }) {
+    const autoAddRow = opts?.autoAddRow ?? true
+    let wasLastRow = false
+    setItems((prev) => {
+      wasLastRow = index === prev.length - 1
+      return prev.map((row, i) => {
         if (i !== index) return row
         const tier = selectedCustomer?.priceTier ?? defaultPriceTier ?? 'B'
         const baseRate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
@@ -569,8 +592,9 @@ export default function InvoiceForm() {
           ubicacion: undefined,
           ubicacionError: undefined,
         }
-      }),
-    )
+      })
+    })
+    if (autoAddRow && wasLastRow) addRow()
   }
 
   function clearCatalogItem(index: number) {
@@ -578,8 +602,10 @@ export default function InvoiceForm() {
   }
 
   function selectBundle(index: number, bundle: Bundle) {
-    setItems((prev) =>
-      prev.map((row, i) => {
+    let wasLastRow = false
+    setItems((prev) => {
+      wasLastRow = index === prev.length - 1
+      return prev.map((row, i) => {
         if (i !== index) return row
         const tier = selectedCustomer?.priceTier ?? defaultPriceTier ?? 'B'
         const baseRate = bundle.prices?.[tier] ?? 0
@@ -606,8 +632,9 @@ export default function InvoiceForm() {
           ubicacion: undefined,
           ubicacionError: undefined,
         }
-      }),
-    )
+      })
+    })
+    if (wasLastRow) addRow()
 
     // Detecta componentes del combo con tracking de serial/lote — solo aplica a facturación directa.
     Promise.all(
@@ -1027,7 +1054,10 @@ const itemsDto = items.map((i) => ({
                 ) : (
                   items.map((item, index) => (
                     <Fragment key={index}>
-                    <tr>
+                    <tr
+                      ref={(el) => { rowRefs.current[index] = el }}
+                      className={highlightedRow === index ? 'row-flash' : undefined}
+                    >
                       <td style={{ minWidth: 200 }}>
                         <ItemSelect
                           value={item.itemCode}

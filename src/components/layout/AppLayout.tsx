@@ -37,6 +37,7 @@ import {
   DollarSign,
   Clock,
   ShieldCheck,
+  LayoutTemplate,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { CommandPalette } from "./CommandPalette";
@@ -59,13 +60,18 @@ interface NavGroup {
   label: string;
   icon: React.ReactNode;
   prefix: string;
-  children: NavItem[];
+  children: NavEntry[];
 }
 
 type NavEntry = NavItem | NavGroup;
 
 function isGroup(e: NavEntry): e is NavGroup {
   return "children" in e;
+}
+
+// Rutas de pantalla completa que colapsan el menú principal automáticamente al entrar.
+function isAutoCollapseRoute(pathname: string): boolean {
+  return pathname.startsWith("/reportes") || pathname.startsWith("/config/plantillas-facturas");
 }
 
 const NAV_MAIN: NavItem[] = [
@@ -92,6 +98,11 @@ const NAV_CATALOG: NavEntry = {
       path: "/catalogo/categorias",
     },
     { label: "Marcas", icon: <Shield size={14} />, path: "/catalogo/marcas" },
+    {
+      label: "Servicios",
+      icon: <ClipboardList size={14} />,
+      path: "/catalogo/servicios",
+    },
     { label: "Combos", icon: <Package size={14} />, path: "/catalogo/combos" },
     {
       label: "Atributos",
@@ -102,6 +113,11 @@ const NAV_CATALOG: NavEntry = {
       label: "Descuentos",
       icon: <Percent size={14} />,
       path: "/catalogo/descuentos",
+    },
+    {
+      label: "Cuentas por Pagar",
+      icon: <FileText size={14} />,
+      path: "/catalogo/cuentas-por-pagar",
     },
   ],
 };
@@ -142,8 +158,7 @@ const NAV_VENTAS: NavEntry[] = [
     icon: <BarChart3 size={16} aria-hidden="true" />,
     prefix: "/reportes/ventas|/reportes/607",
     children: [
-      { label: "Ventas", icon: <BarChart3 size={14} />, path: "/reportes/ventas" },
-      { label: "DGII 607", icon: <FileText size={14} />, path: "/reportes/607" },
+      { label: "Ventas", icon: <BarChart3 size={14} />, path: "/reportes/ventas" }
     ],
   },
 ];
@@ -155,9 +170,9 @@ const NAV_OPS: NavEntry[] = [
     prefix: "/inventario|/transferencias",
     children: [
       {
-        label: "Artículos",
+        label: "Productos",
         icon: <Package size={14} />,
-        path: "/inventario/articulos",
+        path: "/inventario/productos",
       },
       {
         label: "Stock Actual",
@@ -202,6 +217,7 @@ const NAV_OPS: NavEntry[] = [
     prefix: "/compras",
     children: [
       { label: "Compras", icon: <ShoppingCart size={14} />, path: "/compras" },
+      { label: "Devoluciones de Compras", icon: <Receipt size={14} />, path: "/devoluciones-compras" },
       {
         label: "Recepción de Mercancía",
         icon: <Truck size={14} />,
@@ -330,6 +346,12 @@ const NAV_REPORTES: NavEntry = {
   ],
 };
 
+// Prefix del grupo anidado "Impuestos" dentro de NAV_CONFIG — se usa para colapsarlo a un ítem
+// plano (solo "Tasas de Impuesto", renombrado a "Impuestos") cuando usaImpuestoDocumento está
+// desactivado, ya que en ese caso las plantillas de documento dejan de tener sentido en el menú.
+const IMPUESTOS_GROUP_PREFIX =
+  "/config/tasas-impuesto|/config/impuestos-ventas|/config/impuestos-compras|/config/impuestos-articulo";
+
 const NAV_CONFIG: NavEntry = {
   label: "Configuración",
   icon: <Settings size={16} aria-hidden="true" />,
@@ -377,6 +399,11 @@ const NAV_CONFIG: NavEntry = {
       path: "/config/facturacion",
     },
     {
+      label: "Plantillas de Facturas",
+      icon: <LayoutTemplate size={14} />,
+      path: "/config/plantillas-facturas",
+    },
+    {
       label: "Almacenes",
       icon: <Warehouse size={14} />,
       path: "/config/almacenes",
@@ -407,19 +434,31 @@ const NAV_CONFIG: NavEntry = {
       path: "/config/ncf",
     },
     {
-      label: "Impuestos Ventas",
+      label: "Impuestos",
       icon: <Percent size={14} />,
-      path: "/config/impuestos-ventas",
-    },
-    {
-      label: "Impuestos Compras",
-      icon: <Percent size={14} />,
-      path: "/config/impuestos-compras",
-    },
-    {
-      label: "Impuestos Artículo",
-      icon: <Percent size={14} />,
-      path: "/config/impuestos-articulo",
+      prefix: IMPUESTOS_GROUP_PREFIX,
+      children: [
+        {
+          label: "Tasas de Impuesto",
+          icon: <Percent size={14} />,
+          path: "/config/tasas-impuesto",
+        },
+        {
+          label: "Impuestos Ventas",
+          icon: <Percent size={14} />,
+          path: "/config/impuestos-ventas",
+        },
+        {
+          label: "Impuestos Compras",
+          icon: <Percent size={14} />,
+          path: "/config/impuestos-compras",
+        },
+        {
+          label: "Impuestos Artículo",
+          icon: <Percent size={14} />,
+          path: "/config/impuestos-articulo",
+        },
+      ],
     },
     {
       label: "Ejercicio Fiscal",
@@ -490,18 +529,46 @@ function NavItemBtn({
   );
 }
 
+function NavChildBtn({
+  child,
+  onNav,
+  pathname,
+  style,
+}: {
+  child: NavItem;
+  onNav: (p: string) => void;
+  pathname: string;
+  style?: React.CSSProperties;
+}) {
+  const active = pathname === child.path || pathname.startsWith(child.path + "/");
+  return (
+    <button
+      className={`nav-item nav-child${active ? " active" : ""}`}
+      aria-current={active ? "page" : undefined}
+      onClick={() => onNav(child.path)}
+      style={style}
+    >
+      {child.icon}
+      <span className="nav-label">{child.label}</span>
+    </button>
+  );
+}
+
 function NavGroupBtn({
   group,
   onNav,
   collapsed,
   onOpen,
   floatWhenCollapsed,
+  nested,
 }: {
   group: NavGroup;
   onNav: (p: string) => void;
   collapsed: boolean;
   onOpen?: () => void;
   floatWhenCollapsed?: boolean;
+  /** true cuando este grupo aparece dentro de la lista de hijos de otro grupo — usa el mismo estilo que sus hermanos (nav-child) en vez del de un ítem de nivel superior. */
+  nested?: boolean;
 }) {
   const { pathname } = useLocation();
   const groupActive = group.prefix
@@ -521,7 +588,7 @@ function NavGroupBtn({
   return (
     <div style={{ position: "relative" }}>
       <button
-        className={`nav-item${groupActive ? " active" : ""}`}
+        className={`nav-item${nested ? " nav-child" : ""}${groupActive ? " active" : ""}`}
         aria-expanded={open}
         onClick={handleClick}
         title={collapsed ? group.label : undefined}
@@ -538,21 +605,13 @@ function NavGroupBtn({
       {/* Inline children (sidebar expanded) */}
       {showInline && (
         <div className="nav-children" role="group" aria-label={group.label}>
-          {group.children.map((child) => {
-            const active =
-              pathname === child.path || pathname.startsWith(child.path + "/");
-            return (
-              <button
-                key={child.path}
-                className={`nav-item nav-child${active ? " active" : ""}`}
-                aria-current={active ? "page" : undefined}
-                onClick={() => onNav(child.path)}
-              >
-                {child.icon}
-                <span className="nav-label">{child.label}</span>
-              </button>
-            );
-          })}
+          {group.children.map((child) =>
+            isGroup(child) ? (
+              <NavGroupBtn key={child.prefix} group={child} onNav={onNav} collapsed={false} nested />
+            ) : (
+              <NavChildBtn key={child.path} child={child} onNav={onNav} pathname={pathname} />
+            ),
+          )}
         </div>
       )}
 
@@ -587,22 +646,13 @@ function NavGroupBtn({
           >
             {group.label}
           </div>
-          {group.children.map((child) => {
-            const active =
-              pathname === child.path || pathname.startsWith(child.path + "/");
-            return (
-              <button
-                key={child.path}
-                className={`nav-item nav-child${active ? " active" : ""}`}
-                aria-current={active ? "page" : undefined}
-                onClick={() => onNav(child.path)}
-                style={{ width: "100%" }}
-              >
-                {child.icon}
-                <span className="nav-label">{child.label}</span>
-              </button>
-            );
-          })}
+          {group.children.map((child) =>
+            isGroup(child) ? (
+              <NavGroupBtn key={child.prefix} group={child} onNav={onNav} collapsed={false} nested />
+            ) : (
+              <NavChildBtn key={child.path} child={child} onNav={onNav} pathname={pathname} style={{ width: "100%" }} />
+            ),
+          )}
         </div>
       )}
     </div>
@@ -776,14 +826,6 @@ function AppLayoutInner() {
   const keepAliveRef = useKeepAliveRef();
   const { user, logout } = useAuthStore();
   const isSystemManager = user?.roles?.includes("System Manager") ?? false;
-  const configNav: NavEntry = isSystemManager
-    ? NAV_CONFIG
-    : {
-        ...(NAV_CONFIG as NavGroup),
-        children: (NAV_CONFIG as NavGroup).children.filter(
-          (item) => !ADMIN_ONLY_PATHS.has(item.path),
-        ),
-      };
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ["facturacion-config"],
@@ -791,6 +833,29 @@ function AppLayoutInner() {
     staleTime: 5 * 60_000,
   });
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false;
+  const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true;
+
+  const configNavAdminFiltered: NavEntry = isSystemManager
+    ? NAV_CONFIG
+    : {
+        ...(NAV_CONFIG as NavGroup),
+        children: (NAV_CONFIG as NavGroup).children.filter(
+          (item) => isGroup(item) || !ADMIN_ONLY_PATHS.has(item.path),
+        ),
+      };
+
+  // Sin Impuesto de Documento, las plantillas de Ventas/Compras/Artículo dejan de tener sentido
+  // en el menú — colapsa el grupo "Impuestos" a un único ítem plano que va directo al catálogo.
+  const configNav: NavEntry = usaImpuestoDocumento
+    ? configNavAdminFiltered
+    : {
+        ...(configNavAdminFiltered as NavGroup),
+        children: (configNavAdminFiltered as NavGroup).children.map((item) =>
+          isGroup(item) && item.prefix === IMPUESTOS_GROUP_PREFIX
+            ? { label: "Impuestos", icon: <Percent size={14} />, path: "/config/tasas-impuesto" }
+            : item,
+        ),
+      };
   const financeNav: NavEntry[] = usaModuloPos
     ? NAV_FINANZAS
     : NAV_FINANZAS.filter(
@@ -802,16 +867,17 @@ function AppLayoutInner() {
   const outlet = useOutlet();
   const activeTabPath = location.pathname + (location.search || "");
 
-  // Auto-collapse sidebar al ENTRAR a reportes (transición desde fuera de /reportes) y
-  // auto-expand al SALIR, siempre que el colapso actual siga siendo el automático (el
-  // usuario no lo tocó a mano). Si el usuario expande manualmente mientras está en
-  // Reportes, `autoCollapsedRef` se limpia (ver toggle más abajo) y ya no se fuerza nada
-  // al salir. Si navega entre sub-opciones de Reportes, no se toca el estado.
+  // Auto-collapse sidebar al ENTRAR a una vista de pantalla completa (Reportes, Editor de
+  // Plantillas) — transición desde fuera de esas rutas — y auto-expand al SALIR, siempre que
+  // el colapso actual siga siendo el automático (el usuario no lo tocó a mano). Si el usuario
+  // expande manualmente mientras está en una de estas vistas, `autoCollapsedRef` se limpia (ver
+  // toggle más abajo) y ya no se fuerza nada al salir. Si navega entre sub-rutas de la misma
+  // vista, no se toca el estado.
   const prevPathRef = useRef(location.pathname);
   const autoCollapsedRef = useRef(false);
   useEffect(() => {
-    const prevWasReportes = prevPathRef.current.startsWith("/reportes");
-    const nowIsReportes = location.pathname.startsWith("/reportes");
+    const prevWasReportes = isAutoCollapseRoute(prevPathRef.current);
+    const nowIsReportes = isAutoCollapseRoute(location.pathname);
     if (nowIsReportes && !prevWasReportes) {
       setCollapsed(true);
       autoCollapsedRef.current = true;

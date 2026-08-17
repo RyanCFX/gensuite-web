@@ -12,9 +12,10 @@ import {
   listListasPrecio,
   getNcfSeries,
   getPerfil, updatePerfil,
-  listImpuestosVentas, createImpuestoVentas, updateImpuestoVentas, deleteImpuestoVentas,
-  listImpuestosCompras, createImpuestoCompras, updateImpuestoCompras, deleteImpuestoCompras,
-  listItemTaxTemplates, createItemTaxTemplate, updateItemTaxTemplate, deleteItemTaxTemplate,
+  listImpuestosVentas,
+  listImpuestosCompras,
+  listItemTaxTemplates,
+  listTasasImpuesto, createTasaImpuesto, updateTasaImpuesto, deleteTasaImpuesto,
   getFacturacionConfig, updateFacturacionConfig,
   listDenominaciones, createDenominacion, updateDenominacion,
   habilitarPos,
@@ -23,7 +24,7 @@ import { listSucursales } from '@/shared/api/sucursales'
 import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { listCustomerGroups, createCustomerGroup, deleteCustomerGroup } from '@/shared/api/customers'
 import { listRoles } from '@/shared/api/usuarios'
-import type { CobrosConfig, MetodoPago, TaxTemplate, TaxTemplateLine, TaxChargeType, TaxLineCategory, TaxLineAddDeduct, CreateTaxTemplateDto, ItemTaxTemplate, ItemTaxLine, CreateItemTaxTemplateDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError, UpdateAlmacenDto, FormatoImpresion } from '@/shared/api/types'
+import type { CobrosConfig, MetodoPago, TaxLineCategory, TasaImpuesto, TasaImpuestoComponente, CreateTasaImpuestoDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError, UpdateAlmacenDto, FormatoImpresion } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
@@ -1312,28 +1313,11 @@ function PerfilSection() {
   )
 }
 
-// ---- Tax Templates Section (shared for ventas/compras) ----
-const CHARGE_TYPE_OPTIONS: TaxChargeType[] = [
-  'On Net Total',
-  'Actual',
-  'On Previous Row Amount',
-  'On Previous Row Total',
-  'On Item Quantity',
-]
-
-function emptyTaxLine(): TaxTemplateLine {
-  return { chargeType: 'On Net Total', accountHead: '', rate: 18, description: '' }
-}
-
+// ---- Tax Templates Section (shared for ventas/compras, solo lectura) ----
 const TAX_CATEGORY_OPTIONS: { value: TaxLineCategory; label: string }[] = [
   { value: 'Total', label: 'Total' },
   { value: 'Valuation', label: 'Costo del artículo' },
   { value: 'Valuation and Total', label: 'Total y costo' },
-]
-
-const TAX_ADD_DEDUCT_OPTIONS: { value: TaxLineAddDeduct; label: string }[] = [
-  { value: 'Add', label: 'Sumar' },
-  { value: 'Deduct', label: 'Restar (retención)' },
 ]
 
 interface TaxTemplatesSectionProps {
@@ -1341,383 +1325,182 @@ interface TaxTemplatesSectionProps {
 }
 
 function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
-  const queryClient = useQueryClient()
   const queryKey = kind === 'ventas' ? 'impuestos-ventas' : 'impuestos-compras'
   const listFn = kind === 'ventas' ? listImpuestosVentas : listImpuestosCompras
-  const createFn = kind === 'ventas' ? createImpuestoVentas : createImpuestoCompras
-  const updateFn = kind === 'ventas' ? updateImpuestoVentas : updateImpuestoCompras
-  const deleteFn = kind === 'ventas' ? deleteImpuestoVentas : deleteImpuestoCompras
 
   const { data, isLoading } = useQuery({ queryKey: [queryKey], queryFn: listFn })
 
-  // ── Form state ────────────────────────────────────────────────────────────
-  const [showForm, setShowForm] = useState(false)
-  const [editTarget, setEditTarget] = useState<TaxTemplate | null>(null)
-  const [toDelete, setToDelete] = useState<TaxTemplate | null>(null)
-
-  const [formTitle, setFormTitle] = useState('')
-  const [formDefault, setFormDefault] = useState(false)
-  const [formTaxes, setFormTaxes] = useState<TaxTemplateLine[]>([emptyTaxLine()])
-
-  function openCreate() {
-    setEditTarget(null)
-    setFormTitle('')
-    setFormDefault(false)
-    setFormTaxes([emptyTaxLine()])
-    setShowForm(true)
-  }
-
-  function openEdit(t: TaxTemplate) {
-    setEditTarget(t)
-    setFormTitle(t.title)
-    setFormDefault(t.isDefault)
-    setFormTaxes(t.taxes.length > 0 ? t.taxes.map((l) => ({ ...l })) : [emptyTaxLine()])
-    setShowForm(true)
-  }
-
-  function closeForm() {
-    setShowForm(false)
-    setEditTarget(null)
-  }
-
-  const formIsDirty = useDirtyCheck({ formTitle, formDefault, formTaxes }, showForm)
-  const formClose = useConfirmClose(formIsDirty, closeForm)
-
-  function updateTaxLine(idx: number, patch: Partial<TaxTemplateLine>) {
-    setFormTaxes((prev) => prev.map((l, i) => i === idx ? { ...l, ...patch } : l))
-  }
-
-  const saveMutation = useMutation({
-    mutationFn: () => {
-      const dto: CreateTaxTemplateDto = {
-        title: formTitle,
-        isDefault: formDefault,
-        taxes: formTaxes,
-      }
-      return editTarget ? updateFn(editTarget.id, dto) : createFn(dto)
-    },
-    onSuccess: () => {
-      toast.success(editTarget ? 'Plantilla actualizada' : 'Plantilla creada')
-      queryClient.invalidateQueries({ queryKey: [queryKey] })
-      closeForm()
-    },
-    onError: () => toast.error('Error al guardar el template'),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteFn(id),
-    onSuccess: () => {
-      toast.success('Plantilla eliminada')
-      queryClient.invalidateQueries({ queryKey: [queryKey] })
-      setToDelete(null)
-    },
-    onError: () => toast.error('Error al eliminar el template'),
-  })
-
   const label = kind === 'ventas' ? 'Ventas' : 'Compras'
   const sectionDescription = kind === 'ventas'
-    ? 'Impuesto aplicado al TOTAL de cotizaciones y facturas de venta completas (ej. ITBIS 18% sobre el monto total del documento). No confundir con el impuesto por artículo, que se configura en "Impuestos por Artículo".'
-    : 'Impuesto aplicado al TOTAL de compras completas. Incluye campos adicionales para retenciones (ej. ITBIS/ISR retenido al proveedor, que se RESTA del monto a pagar) y afectación al costo del inventario (landed cost). No confundir con el impuesto por artículo, que se configura en "Impuestos por Artículo".'
+    ? 'Impuesto aplicado al TOTAL de cotizaciones y facturas de venta completas (ej. ITBIS 18% sobre el monto total del documento). Esta lista es solo de referencia — las plantillas se generan y gestionan automáticamente desde "Tasas de Impuesto".'
+    : 'Impuesto aplicado al TOTAL de compras completas. Incluye campos adicionales para retenciones y afectación al costo del inventario (landed cost). Esta lista es solo de referencia — las plantillas se generan y gestionan automáticamente desde "Tasas de Impuesto".'
 
   return (
-    <>
-      <div className="card">
-        <div className="card-header">
-          <span className="card-title">Plantillas de Impuesto — {label}</span>
-          <button className="btn btn-primary btn-size-sm" onClick={openCreate}>
-            <Plus size={14} /> Nuevo
-          </button>
-        </div>
-        <div className="card-body" style={{ paddingTop: 0, paddingBottom: 12 }}>
-          <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>{sectionDescription}</p>
-        </div>
-        <div>
-          {isLoading
-            ? <span className="skeleton-box" style={{ height: 128, display: 'block', margin: 16 }} />
-            : !data || data.length === 0
-              ? (
-                  <div className="card-body">
-                    <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                      No hay templates configurados. Crea uno con el botón <strong>Nuevo</strong>.
-                    </p>
-                  </div>
-                )
-              : (
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Título</th>
-                        <th>Líneas</th>
-                        <th>Por defecto</th>
-                        <th style={{ width: 80 }} />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.map((t) => (
-                        <tr key={t.id}>
-                          <td style={{ fontWeight: 500 }}>{t.title}</td>
-                          <td className="td-muted">
-                            {t.taxes.map((l, i) => (
-                              <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '2px 0' }}>
-                                {l.description || l.chargeType} — {l.rate}%
-                                {kind === 'compras' && l.category && (
-                                  <span className="badge badge-neutral" style={{ fontSize: 10 }}>{TAX_CATEGORY_OPTIONS.find((o) => o.value === l.category)?.label ?? l.category}</span>
-                                )}
-                                {kind === 'compras' && l.addDeductTax === 'Deduct' && (
-                                  <span className="badge badge-warning" style={{ fontSize: 10 }}>Retención</span>
-                                )}
-                              </span>
-                            ))}
-                          </td>
-                          <td>
-                            {t.isDefault
-                              ? <span className="badge badge-success">Sí</span>
-                              : <span className="badge badge-neutral">No</span>}
-                          </td>
-                          <td>
-                            <div style={{ display: 'flex', gap: 4 }}>
-                              <button className="btn btn-ghost btn-size-icon-sm" onClick={() => openEdit(t)}>
-                                <Pencil size={13} />
-                              </button>
-                              <button
-                                className="btn btn-ghost btn-size-icon-sm"
-                                style={{ color: 'var(--icon-muted)' }}
-                                onClick={() => setToDelete(t)}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-        </div>
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">Plantillas de Impuesto — {label}</span>
       </div>
-
-      {/* Create / Edit modal */}
-      {showForm && (
-        <div className="modal-overlay" onClick={formClose.requestClose}>
-          <div className="modal-box" style={{ maxWidth: 680 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <h2 className="modal-title">{editTarget ? 'Editar Plantilla' : 'Nueva Plantilla'} — {label}</h2>
-              <button className="modal-close" onClick={formClose.requestClose}><X size={16} /></button>
-            </div>
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'flex', gap: 16 }}>
-                <div className="ff-wrap" style={{ flex: 1 }}>
-                  <label className="ff-label ff-required">Título</label>
-                  <input
-                    className="ff-input"
-                    value={formTitle}
-                    onChange={(e) => setFormTitle(e.target.value)}
-                    placeholder="ITBIS 18%"
-                  />
+      <div className="card-body" style={{ paddingTop: 0, paddingBottom: 12 }}>
+        <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>{sectionDescription}</p>
+      </div>
+      <div>
+        {isLoading
+          ? <span className="skeleton-box" style={{ height: 128, display: 'block', margin: 16 }} />
+          : !data || data.length === 0
+            ? (
+                <div className="card-body">
+                  <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                    No hay plantillas generadas todavía. Se crean automáticamente al marcar "Aplica a — {label}" en una Tasa de Impuesto.
+                  </p>
                 </div>
-                <div className="ff-wrap" style={{ alignSelf: 'center', paddingTop: 20 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={formDefault}
-                      onChange={(e) => setFormDefault(e.target.checked)}
-                      style={{ width: 16, height: 16 }}
-                    />
-                    Plantilla por defecto
-                  </label>
-                </div>
-              </div>
-
-              {/* Tax lines table */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <label className="ff-label" style={{ marginBottom: 0 }}>Líneas de impuesto</label>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-size-sm"
-                    onClick={() => setFormTaxes((prev) => [...prev, emptyTaxLine()])}
-                  >
-                    <Plus size={14} /> Agregar línea
-                  </button>
-                </div>
-                <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: 'var(--surface-sunken)' }}>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Tipo de cargo</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Cuenta GL</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11, width: 80 }}>Tasa %</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Descripción *</th>
-                        {kind === 'compras' && (
-                          <>
-                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Afecta</th>
-                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Tipo</th>
-                          </>
-                        )}
-                        <th style={{ width: 36 }} />
+              )
+            : (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Título</th>
+                      <th>Líneas</th>
+                      <th>Por defecto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.map((t) => (
+                      <tr key={t.id}>
+                        <td style={{ fontWeight: 500 }}>{t.title}</td>
+                        <td className="td-muted">
+                          {t.taxes.map((l, i) => (
+                            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '2px 0' }}>
+                              {l.description || l.chargeType} — {l.rate}%
+                              {kind === 'compras' && l.category && (
+                                <span className="badge badge-neutral" style={{ fontSize: 10 }}>{TAX_CATEGORY_OPTIONS.find((o) => o.value === l.category)?.label ?? l.category}</span>
+                              )}
+                              {kind === 'compras' && l.addDeductTax === 'Deduct' && (
+                                <span className="badge badge-warning" style={{ fontSize: 10 }}>Retención</span>
+                              )}
+                            </span>
+                          ))}
+                        </td>
+                        <td>
+                          {t.isDefault
+                            ? <span className="badge badge-success">Sí</span>
+                            : <span className="badge badge-neutral">No</span>}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {formTaxes.map((line, idx) => (
-                        <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}>
-                          <td style={{ padding: '6px 8px', minWidth: 150 }}>
-                            <Select
-                              value={line.chargeType}
-                              onValueChange={(val) => updateTaxLine(idx, { chargeType: val as TaxChargeType })}
-                            >
-                              {CHARGE_TYPE_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                            </Select>
-                          </td>
-                          <td style={{ padding: '6px 8px', minWidth: 220 }}>
-                            <AccountSelect
-                              value={line.accountHead}
-                              onChange={(id) => updateTaxLine(idx, { accountHead: id })}
-                              placeholder="Buscar cuenta GL…"
-                              ledgerOnly
-                            />
-                          </td>
-                          <td style={{ padding: '6px 8px' }}>
-                            <input
-                              className="ff-input"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              style={{ fontSize: 12, padding: '4px 8px', textAlign: 'right' }}
-                              value={line.rate}
-                              onChange={(e) => updateTaxLine(idx, { rate: parseFloat(e.target.value) || 0 })}
-                            />
-                          </td>
-                          <td style={{ padding: '6px 8px' }}>
-                            <input
-                              className="ff-input"
-                              style={{ fontSize: 12, padding: '4px 8px' }}
-                              placeholder="Ej: ITBIS 18%"
-                              value={line.description ?? ''}
-                              onChange={(e) => updateTaxLine(idx, { description: e.target.value })}
-                            />
-                          </td>
-                          {kind === 'compras' && (
-                            <>
-                              <td style={{ padding: '6px 8px', minWidth: 130 }}>
-                                <Select
-                                  value={line.category ?? ''}
-                                  onValueChange={(val) => updateTaxLine(idx, { category: (val || undefined) as TaxLineCategory | undefined })}
-                                  placeholder="—"
-                                >
-                                  <SelectItem value="">—</SelectItem>
-                                  {TAX_CATEGORY_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                                </Select>
-                              </td>
-                              <td style={{ padding: '6px 8px', minWidth: 130 }}>
-                                <Select
-                                  value={line.addDeductTax ?? ''}
-                                  onValueChange={(val) => updateTaxLine(idx, { addDeductTax: (val || undefined) as TaxLineAddDeduct | undefined })}
-                                  placeholder="—"
-                                >
-                                  <SelectItem value="">—</SelectItem>
-                                  {TAX_ADD_DEDUCT_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                                </Select>
-                              </td>
-                            </>
-                          )}
-                          <td style={{ padding: '4px 6px', textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-size-icon-sm"
-                              style={{ color: 'var(--icon-muted)' }}
-                              onClick={() => setFormTaxes((prev) => prev.filter((_, i) => i !== idx))}
-                              disabled={formTaxes.length === 1}
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-            <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={formClose.requestClose}>Cancelar</button>
-              <button
-                className="btn btn-primary"
-                onClick={() => saveMutation.mutate()}
-                disabled={!formTitle || formTaxes.some((l) => !l.accountHead || !l.description?.trim()) || saveMutation.isPending}
-              >
-                {saveMutation.isPending ? 'Guardando…' : 'Guardar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      <ConfirmModal
-        open={formClose.confirming}
-        onClose={formClose.cancelDiscard}
-        onConfirm={formClose.confirmDiscard}
-        title="¿Descartar cambios?"
-        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
-        confirmLabel="Descartar cambios"
-        variant="danger"
-      />
-
-      {/* Delete confirm */}
-      {toDelete && (
-        <div className="modal-overlay" onClick={() => setToDelete(null)}>
-          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <h2 className="modal-title">¿Eliminar template?</h2>
-              <button className="modal-close" onClick={() => setToDelete(null)}><X size={16} /></button>
-            </div>
-            <div className="modal-body">
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                Se eliminará <strong>{toDelete.title}</strong>. Esta acción no se puede deshacer.
-              </p>
-            </div>
-            <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setToDelete(null)}>Cancelar</button>
-              <button
-                className="btn btn-danger"
-                onClick={() => deleteMutation.mutate(toDelete.id)}
-                disabled={deleteMutation.isPending}
-              >
-                Eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+      </div>
+    </div>
   )
 }
 
-// ---- Item Tax Templates Section (impuesto por artículo — distinto del de documento) ----
-function emptyItemTaxLine(): ItemTaxLine {
-  return { taxType: '', rate: 18, notApplicable: false }
-}
-
+// ---- Item Tax Templates Section (impuesto por artículo — solo lectura) ----
 function ItemTaxTemplatesSection() {
-  const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({ queryKey: ['item-tax-templates'], queryFn: listItemTaxTemplates })
 
-  const [showForm, setShowForm] = useState(false)
-  const [editTarget, setEditTarget] = useState<ItemTaxTemplate | null>(null)
-  const [toDelete, setToDelete] = useState<ItemTaxTemplate | null>(null)
+  return (
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">Impuestos por Artículo</span>
+      </div>
+      <div className="card-body" style={{ paddingTop: 0, paddingBottom: 12 }}>
+        <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>
+          Impuesto asociado a un artículo específico — se usa para excepciones donde un artículo individual
+          tiene una tasa distinta al general (ej. exento de ITBIS). Esta lista es solo de referencia — las
+          plantillas se generan y gestionan automáticamente desde "Tasas de Impuesto".
+        </p>
+      </div>
+      <div>
+        {isLoading
+          ? <span className="skeleton-box" style={{ height: 128, display: 'block', margin: 16 }} />
+          : !data || data.length === 0
+            ? (
+                <div className="card-body">
+                  <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                    No hay plantillas generadas todavía. Se crean automáticamente al crear una Tasa de Impuesto — todo impuesto aplica siempre a Artículos.
+                  </p>
+                </div>
+              )
+            : (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Título</th>
+                      <th>Tasas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.map((t) => (
+                      <tr key={t.id}>
+                        <td style={{ fontWeight: 500 }}>{t.title}</td>
+                        <td className="td-muted">
+                          {t.taxes.map((l, i) => (
+                            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '2px 0' }}>
+                              {l.taxType} — {l.notApplicable ? 'Exento' : `${l.rate}%`}
+                            </span>
+                          ))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+      </div>
+    </div>
+  )
+}
 
-  const [formTitle, setFormTitle] = useState('')
-  const [formTaxes, setFormTaxes] = useState<ItemTaxLine[]>([emptyItemTaxLine()])
+// ---- Tasas de Impuesto Section (catálogo de impuestos base + combos) ----
+function emptyComponente(): TasaImpuestoComponente {
+  return { impuestoBaseId: '', factor: 100 }
+}
+
+function TasasImpuestoSection() {
+  const queryClient = useQueryClient()
+  const { data, isLoading } = useQuery({ queryKey: ['tasas-impuesto'], queryFn: listTasasImpuesto })
+  const { data: facturacionConfig } = useQuery({ queryKey: ['facturacion-config'], queryFn: getFacturacionConfig })
+  const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
+
+  const [showForm, setShowForm] = useState(false)
+  const [editTarget, setEditTarget] = useState<TasaImpuesto | null>(null)
+  const [toDelete, setToDelete] = useState<TasaImpuesto | null>(null)
+
+  const [formNombre, setFormNombre] = useState('')
+  const [formAccount, setFormAccount] = useState('')
+  const [formAccountCompras, setFormAccountCompras] = useState('')
+  const [formEsCombo, setFormEsCombo] = useState(false)
+  const [formTasa, setFormTasa] = useState(18)
+  const [formComponentes, setFormComponentes] = useState<TasaImpuestoComponente[]>([emptyComponente()])
+  const [formDescripcion, setFormDescripcion] = useState('')
+  const [formAplicaVentas, setFormAplicaVentas] = useState(false)
+  const [formAplicaCompras, setFormAplicaCompras] = useState(false)
 
   function openCreate() {
     setEditTarget(null)
-    setFormTitle('')
-    setFormTaxes([emptyItemTaxLine()])
+    setFormNombre('')
+     setFormAccount('')
+    setFormAccountCompras('')
+    setFormEsCombo(false)
+    setFormTasa(18)
+    setFormComponentes([emptyComponente()])
+    setFormDescripcion('')
+    setFormAplicaVentas(false)
+    setFormAplicaCompras(false)
     setShowForm(true)
   }
 
-  function openEdit(t: ItemTaxTemplate) {
+  function openEdit(t: TasaImpuesto) {
     setEditTarget(t)
-    setFormTitle(t.title)
-    setFormTaxes(t.taxes.length > 0 ? t.taxes.map((l) => ({ ...l })) : [emptyItemTaxLine()])
+    setFormNombre(t.nombre)
+    setFormAccount(t.account)
+    setFormAccountCompras(t.accountCompras ?? '')
+    setFormEsCombo(t.esCombo)
+    setFormTasa(t.tasa ?? 0)
+    setFormComponentes(t.componentes && t.componentes.length > 0 ? t.componentes.map((c) => ({ ...c })) : [emptyComponente()])
+    setFormDescripcion(t.descripcion ?? '')
+    setFormAplicaVentas(!!t.aplicaVentas)
+    setFormAplicaCompras(!!t.aplicaCompras)
     setShowForm(true)
   }
 
@@ -1726,50 +1509,76 @@ function ItemTaxTemplatesSection() {
     setEditTarget(null)
   }
 
-  const formIsDirty = useDirtyCheck({ formTitle, formTaxes }, showForm)
+  const formIsDirty = useDirtyCheck({ formNombre, formAccount, formAccountCompras, formEsCombo, formTasa, formComponentes, formDescripcion, formAplicaVentas, formAplicaCompras }, showForm)
   const formClose = useConfirmClose(formIsDirty, closeForm)
 
-  function updateTaxLine(idx: number, patch: Partial<ItemTaxLine>) {
-    setFormTaxes((prev) => prev.map((l, i) => i === idx ? { ...l, ...patch } : l))
+  function updateComponente(idx: number, patch: Partial<TasaImpuestoComponente>) {
+    setFormComponentes((prev) => prev.map((c, i) => i === idx ? { ...c, ...patch } : c))
   }
+
+  // El impuesto que se está editando no puede ser su propio componente.
+  const baseOptions = (data ?? []).filter((t) => t.id !== editTarget?.id)
+
+  // Preview visual con las tasas ya cargadas en el listado — el backend recalcula el valor real al guardar.
+  const previewTasa = formComponentes.reduce((sum, c) => {
+    const base = (data ?? []).find((t) => t.id === c.impuestoBaseId)
+    if (!base || base.tasa == null) return sum
+    return sum + (c.factor ?? 100) / 100 * base.tasa
+  }, 0)
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      const dto: CreateItemTaxTemplateDto = { title: formTitle, taxes: formTaxes }
-      return editTarget ? updateItemTaxTemplate(editTarget.id, dto) : createItemTaxTemplate(dto)
+      const dto: CreateTasaImpuestoDto = {
+        nombre: formNombre,
+        account: formAccount,
+        accountCompras: formAccountCompras,
+        esCombo: formEsCombo,
+        ...(formEsCombo
+          ? { componentes: formComponentes.filter((c) => c.impuestoBaseId) }
+          : { tasa: formTasa }),
+        descripcion: formDescripcion || undefined,
+        aplicaArticulos: true,
+        aplicaVentas: formAplicaVentas,
+        aplicaCompras: formAplicaCompras,
+      }
+      return editTarget ? updateTasaImpuesto(editTarget.id, dto) : createTasaImpuesto(dto)
     },
     onSuccess: () => {
-      toast.success(editTarget ? 'Plantilla actualizada' : 'Plantilla creada')
-      queryClient.invalidateQueries({ queryKey: ['item-tax-templates'] })
+      toast.success(editTarget ? 'Tasa de impuesto actualizada' : 'Tasa de impuesto creada')
+      // Invalida todo el listado: el backend puede haber recalculado en cascada otros combos.
+      queryClient.invalidateQueries({ queryKey: ['tasas-impuesto'] })
       closeForm()
     },
-    onError: () => toast.error('Error al guardar el template'),
+    onError: (err: ApiError) => toast.error(err?.message ?? 'Error al guardar la tasa de impuesto'),
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteItemTaxTemplate(id),
+    mutationFn: (id: string) => deleteTasaImpuesto(id),
     onSuccess: () => {
-      toast.success('Plantilla eliminada')
-      queryClient.invalidateQueries({ queryKey: ['item-tax-templates'] })
+      toast.success('Tasa de impuesto eliminada')
+      queryClient.invalidateQueries({ queryKey: ['tasas-impuesto'] })
       setToDelete(null)
     },
-    onError: () => toast.error('Error al eliminar el template'),
+    onError: (err: ApiError) => toast.error(err?.message ?? 'Error al eliminar la tasa de impuesto'),
   })
+
+  const formValid = !!formNombre.trim() && !!formAccount
+    && (formEsCombo ? formComponentes.some((c) => c.impuestoBaseId) : true)
 
   return (
     <>
       <div className="card">
         <div className="card-header">
-          <span className="card-title">Impuestos por Artículo</span>
+          <span className="card-title">Tasas de Impuesto</span>
           <button className="btn btn-primary btn-size-sm" onClick={openCreate}>
             <Plus size={14} /> Nuevo
           </button>
         </div>
         <div className="card-body" style={{ paddingTop: 0, paddingBottom: 12 }}>
           <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>
-            Impuesto asociado a un artículo específico — se usa para excepciones donde un artículo individual
-            tiene una tasa distinta al general (ej. exento de ITBIS). Se asigna por artículo en "Impuesto de
-            Compra"/"Impuesto de Venta" dentro del formulario de cada artículo, NO aquí.
+            Catálogo central de impuestos base (ej. ITBIS, ISR) y combos (suma de otros impuestos del
+            catálogo). Al editar la tasa de un impuesto base, todos los combos que lo usan — y las
+            plantillas de impuestos donde estén asignados — se recalculan automáticamente en el servidor.
           </p>
         </div>
         <div>
@@ -1779,7 +1588,7 @@ function ItemTaxTemplatesSection() {
               ? (
                   <div className="card-body">
                     <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                      No hay templates configurados. Crea uno con el botón <strong>Nuevo</strong>.
+                      No hay tasas de impuesto configuradas. Crea una con el botón <strong>Nuevo</strong>.
                     </p>
                   </div>
                 )
@@ -1787,22 +1596,30 @@ function ItemTaxTemplatesSection() {
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Título</th>
-                        <th>Tasas</th>
+                        <th>Nombre</th>
+                        <th>Cuenta</th>
+                        <th>Tipo</th>
+                        <th>Tasa</th>
+                        <th>Descripción</th>
                         <th style={{ width: 80 }} />
                       </tr>
                     </thead>
                     <tbody>
                       {data.map((t) => (
                         <tr key={t.id}>
-                          <td style={{ fontWeight: 500 }}>{t.title}</td>
+                          <td style={{ fontWeight: 500 }}>{t.nombre}</td>
                           <td className="td-muted">
-                            {t.taxes.map((l, i) => (
-                              <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '2px 0' }}>
-                                {l.taxType} — {l.notApplicable ? 'Exento' : `${l.rate}%`}
-                              </span>
-                            ))}
+                            {t.accountCompras && t.accountCompras !== t.account
+                              ? `Ventas: ${t.account} · Compras: ${t.accountCompras}`
+                              : t.account}
                           </td>
+                          <td>
+                            <span className={`badge ${t.esCombo ? 'badge-info' : 'badge-default'}`}>
+                              {t.esCombo ? 'Combo' : 'Base'}
+                            </span>
+                          </td>
+                          <td>{t.tasa != null ? `${t.tasa}%` : '—'}</td>
+                          <td className="td-muted">{t.descripcion || '—'}</td>
                           <td>
                             <div style={{ display: 'flex', gap: 4 }}>
                               <button className="btn btn-ghost btn-size-icon-sm" onClick={() => openEdit(t)}>
@@ -1830,98 +1647,175 @@ function ItemTaxTemplatesSection() {
         <div className="modal-overlay" onClick={formClose.requestClose}>
           <div className="modal-box" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
-              <h2 className="modal-title">{editTarget ? 'Editar Plantilla' : 'Nueva Plantilla'} — Impuesto por Artículo</h2>
+              <h2 className="modal-title">{editTarget ? 'Editar' : 'Nueva'} Tasa de Impuesto</h2>
               <button className="modal-close" onClick={formClose.requestClose}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="form-row">
+                <div className="ff-wrap">
+                  <label className="ff-label ff-required">Nombre</label>
+                  <input
+                    className="ff-input"
+                    value={formNombre}
+                    onChange={(e) => setFormNombre(e.target.value)}
+                    placeholder="ITBIS, ISR, ITBIS+ISR…"
+                  />
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label ff-required">Cuenta Contable (Ventas)</label>
+                  <AccountSelect
+                    value={formAccount}
+                    onChange={setFormAccount}
+                    placeholder="Buscar cuenta…"
+                    ledgerOnly
+                    soloImpuesto
+                  />
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label">Cuenta Contable (Gastos)</label>
+                  <AccountSelect
+                    value={formAccountCompras}
+                    onChange={setFormAccountCompras}
+                    placeholder="Buscar cuenta…"
+                    ledgerOnly
+                  />
+                  <p className="ff-hint">Si se deja vacía, se usa la misma cuenta de Ventas/Artículos.</p>
+                </div>
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={formEsCombo}
+                  onChange={(e) => setFormEsCombo(e.target.checked)}
+                  style={{ width: 16, height: 16 }}
+                />
+                Es Combo (suma de otras tasas del catálogo)
+              </label>
+
+              {!formEsCombo && (
+                <div className="ff-wrap" style={{ maxWidth: 160 }}>
+                  <label className="ff-label ff-required">Tasa (%)</label>
+                  <input
+                    className="ff-input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formTasa}
+                    onChange={(e) => setFormTasa(parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+              )}
+
+              {formEsCombo && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <label className="ff-label" style={{ marginBottom: 0 }}>Componentes</label>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-size-sm"
+                      onClick={() => setFormComponentes((prev) => [...prev, emptyComponente()])}
+                    >
+                      <Plus size={14} /> Agregar componente
+                    </button>
+                  </div>
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: 'var(--surface-sunken)' }}>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Impuesto base</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11, width: 100 }}>Factor %</th>
+                          <th style={{ width: 36 }} />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {formComponentes.map((c, idx) => (
+                          <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}>
+                            <td style={{ padding: '6px 8px', minWidth: 200 }}>
+                              <Select value={c.impuestoBaseId} onValueChange={(v) => updateComponente(idx, { impuestoBaseId: v })}>
+                                {baseOptions.map((opt) => (
+                                  <SelectItem key={opt.id} value={opt.id}>{opt.nombre}</SelectItem>
+                                ))}
+                              </Select>
+                            </td>
+                            <td style={{ padding: '6px 8px' }}>
+                              <input
+                                className="ff-input"
+                                type="number"
+                                min="0"
+                                step="1"
+                                style={{ fontSize: 12, padding: '4px 8px', textAlign: 'right' }}
+                                value={c.factor ?? 100}
+                                onChange={(e) => updateComponente(idx, { factor: parseFloat(e.target.value) || 0 })}
+                              />
+                            </td>
+                            <td style={{ padding: '4px 6px', textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-size-icon-sm"
+                                style={{ color: 'var(--icon-muted)' }}
+                                onClick={() => setFormComponentes((prev) => prev.filter((_, i) => i !== idx))}
+                                disabled={formComponentes.length === 1}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>
+                    Tasa resultante (previsualización): <strong>{previewTasa.toFixed(2)}%</strong> — el valor real lo calcula el servidor al guardar.
+                  </p>
+                </div>
+              )}
+
               <div className="ff-wrap">
-                <label className="ff-label ff-required">Título</label>
+                <label className="ff-label">Descripción</label>
                 <input
                   className="ff-input"
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="ITBIS 18% Artículo"
+                  value={formDescripcion}
+                  onChange={(e) => setFormDescripcion(e.target.value)}
+                  placeholder="Impuesto al Valor Agregado"
                 />
               </div>
 
-              {/* Tax lines table */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <label className="ff-label" style={{ marginBottom: 0 }}>Tasas</label>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-size-sm"
-                    onClick={() => setFormTaxes((prev) => [...prev, emptyItemTaxLine()])}
-                  >
-                    <Plus size={14} /> Agregar tasa
-                  </button>
+              {usaImpuestoDocumento && (
+                <div className="ff-wrap">
+                  <label className="ff-label">Aplica a</label>
+                  <div style={{ display: 'flex', gap: 20 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={formAplicaVentas}
+                        onChange={(e) => setFormAplicaVentas(e.target.checked)}
+                        style={{ width: 16, height: 16 }}
+                      />
+                      Ventas
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={formAplicaCompras}
+                        onChange={(e) => setFormAplicaCompras(e.target.checked)}
+                        style={{ width: 16, height: 16 }}
+                      />
+                      Compras
+                    </label>
+                  </div>
+                  <p className="ff-hint">
+                    El servidor gestiona sola la plantilla correspondiente en cada documento — no es necesario configurarla manualmente.
+                  </p>
                 </div>
-                <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: 'var(--surface-sunken)' }}>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Cuenta GL</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11, width: 80 }}>Tasa %</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Exento</th>
-                        <th style={{ width: 36 }} />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {formTaxes.map((line, idx) => (
-                        <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}>
-                          <td style={{ padding: '6px 8px', minWidth: 220 }}>
-                            <AccountSelect
-                              value={line.taxType}
-                              onChange={(id) => updateTaxLine(idx, { taxType: id })}
-                              placeholder="Buscar cuenta GL…"
-                              ledgerOnly
-                            />
-                          </td>
-                          <td style={{ padding: '6px 8px' }}>
-                            <input
-                              className="ff-input"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              style={{ fontSize: 12, padding: '4px 8px', textAlign: 'right' }}
-                              value={line.rate}
-                              onChange={(e) => updateTaxLine(idx, { rate: parseFloat(e.target.value) || 0 })}
-                              disabled={line.notApplicable}
-                            />
-                          </td>
-                          <td style={{ padding: '6px 8px', textAlign: 'center' }}>
-                            <input
-                              type="checkbox"
-                              checked={!!line.notApplicable}
-                              onChange={(e) => updateTaxLine(idx, { notApplicable: e.target.checked })}
-                              style={{ width: 16, height: 16 }}
-                              title="Exento — el artículo queda excluido de este impuesto"
-                            />
-                          </td>
-                          <td style={{ padding: '4px 6px', textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-size-icon-sm"
-                              style={{ color: 'var(--icon-muted)' }}
-                              onClick={() => setFormTaxes((prev) => prev.filter((_, i) => i !== idx))}
-                              disabled={formTaxes.length === 1}
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              )}
             </div>
             <div className="modal-foot">
               <button className="btn btn-secondary" onClick={formClose.requestClose}>Cancelar</button>
               <button
                 className="btn btn-primary"
                 onClick={() => saveMutation.mutate()}
-                disabled={!formTitle || formTaxes.some((l) => !l.taxType) || saveMutation.isPending}
+                disabled={!formValid || saveMutation.isPending}
               >
                 {saveMutation.isPending ? 'Guardando…' : 'Guardar'}
               </button>
@@ -1944,12 +1838,12 @@ function ItemTaxTemplatesSection() {
         <div className="modal-overlay" onClick={() => setToDelete(null)}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
-              <h2 className="modal-title">¿Eliminar template?</h2>
+              <h2 className="modal-title">¿Eliminar tasa de impuesto?</h2>
               <button className="modal-close" onClick={() => setToDelete(null)}><X size={16} /></button>
             </div>
             <div className="modal-body">
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                Se eliminará <strong>{toDelete.title}</strong>. Esta acción no se puede deshacer.
+                Se eliminará <strong>{toDelete.nombre}</strong>. Esta acción no se puede deshacer.
               </p>
             </div>
             <div className="modal-foot">
@@ -2170,6 +2064,8 @@ function FacturacionConfigSection() {
    const { data: roles } = useQuery({ queryKey: ['roles'], queryFn: listRoles, staleTime: 5 * 60_000 })
    const { data: almacenes } = useQuery({ queryKey: ['almacenes-all'], queryFn: () => listAlmacenes(), staleTime: 5 * 60_000 })
    const { data: metodosPago } = useQuery({ queryKey: ['metodos-pago-config'], queryFn: listMetodosPago, staleTime: 5 * 60_000 })
+   const { data: plantillasVentas } = useQuery({ queryKey: ['impuestos-ventas'], queryFn: listImpuestosVentas, staleTime: 5 * 60_000 })
+   const { data: plantillasCompras } = useQuery({ queryKey: ['impuestos-compras'], queryFn: listImpuestosCompras, staleTime: 5 * 60_000 })
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [posWarehouseSearch, setPosWarehouseSearch] = useState('')
   const posWarehouseOptions: SearchSelectOption[] = (almacenes ?? [])
@@ -2185,6 +2081,8 @@ function FacturacionConfigSection() {
   const [requiereSerialLoteCompra, setRequiereSerialLoteCompra] = useState(false)
   const [usaDepartamentos, setUsaDepartamentos] = useState(true)
   const [usaImpuestoDocumento, setUsaImpuestoDocumento] = useState(true)
+  const [plantillaImpuestoVentasDefault, setPlantillaImpuestoVentasDefault] = useState('')
+  const [plantillaImpuestoComprasDefault, setPlantillaImpuestoComprasDefault] = useState('')
   const [showPosActivar, setShowPosActivar] = useState(false)
   const [posWarehouse, setPosWarehouse] = useState('')
    const [arqueoEfectivoRequerido, setArqueoEfectivoRequerido] = useState(false)
@@ -2204,6 +2102,8 @@ function FacturacionConfigSection() {
        setRequiereSerialLoteCompra(data.requiereSerialLoteCompra ?? false)
        setUsaDepartamentos(data.usaDepartamentos ?? true)
        setUsaImpuestoDocumento(data.usaImpuestoDocumento ?? true)
+       setPlantillaImpuestoVentasDefault(data.plantillaImpuestoVentasDefault ?? '')
+       setPlantillaImpuestoComprasDefault(data.plantillaImpuestoComprasDefault ?? '')
         setArqueoEfectivoRequerido(data.arqueoEfectivoRequerido ?? false)
         setFormatoImpresionDefault(data.formatoImpresionDefault ?? "a4")
         setFormatosPermitidos(data.formatosPermitidos && data.formatosPermitidos.length > 0 ? data.formatosPermitidos : ALL_FORMATOS_IMPRESION)
@@ -2214,6 +2114,24 @@ function FacturacionConfigSection() {
         setRolesCierreCajaAjena(data.rolesCierreCajaAjena ?? [])
       }
     }, [data])
+
+   // undefined = nunca se guardó explícitamente -> preseleccionar la plantilla que ya viene
+   // isDefault:true en ERPNext. null = el usuario la borró a propósito -> respetar "sin plantilla".
+   // No depende del estado local del selector para no pelear con un borrado que el usuario
+   // todavía no ha guardado.
+   useEffect(() => {
+     if (data && data.plantillaImpuestoVentasDefault === undefined) {
+       const actual = plantillasVentas?.find((t) => t.isDefault)
+       if (actual) setPlantillaImpuestoVentasDefault(actual.id)
+     }
+   }, [data, plantillasVentas])
+
+   useEffect(() => {
+     if (data && data.plantillaImpuestoComprasDefault === undefined) {
+       const actual = plantillasCompras?.find((t) => t.isDefault)
+       if (actual) setPlantillaImpuestoComprasDefault(actual.id)
+     }
+   }, [data, plantillasCompras])
 
    function toggleFormatoPermitido(formato: FormatoImpresion) {
      setFormatosPermitidos((prev) => {
@@ -2376,6 +2294,31 @@ function FacturacionConfigSection() {
             Si está desactivado, se oculta el selector de plantilla de Impuesto de Documento en Factura, Cotización
             y Compra. No afecta documentos ya guardados con una plantilla asignada.
           </p>
+        </div>
+
+        <div className="form-row">
+          <div className="ff-wrap">
+            <label className="ff-label">Plantilla de Impuesto — Ventas (default)</label>
+            <Select value={plantillaImpuestoVentasDefault} onValueChange={setPlantillaImpuestoVentasDefault} placeholder="Seleccionar…">
+              <SelectItem value="">Sin plantilla</SelectItem>
+              {(plantillasVentas ?? []).map((t) => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}
+            </Select>
+            <p className="ff-hint">
+              Plantilla que aplican Factura, Cotización y Pedido de Venta cuando no se especifica una explícitamente.
+              Se generan y gestionan desde "Tasas de Impuesto".
+            </p>
+          </div>
+          <div className="ff-wrap">
+            <label className="ff-label">Plantilla de Impuesto — Compras (default)</label>
+            <Select value={plantillaImpuestoComprasDefault} onValueChange={setPlantillaImpuestoComprasDefault} placeholder="Seleccionar…">
+              <SelectItem value="">Sin plantilla</SelectItem>
+              {(plantillasCompras ?? []).map((t) => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}
+            </Select>
+            <p className="ff-hint">
+              Plantilla que aplican Compra y Gasto cuando no se especifica una explícitamente.
+              Se generan y gestionan desde "Tasas de Impuesto".
+            </p>
+          </div>
         </div>
 
         <div className="ff-wrap" style={{ borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
@@ -2644,6 +2587,8 @@ function FacturacionConfigSection() {
                 requiereSerialLoteCompra,
                 usaDepartamentos,
                 usaImpuestoDocumento,
+                plantillaImpuestoVentasDefault: plantillaImpuestoVentasDefault || null,
+                plantillaImpuestoComprasDefault: plantillaImpuestoComprasDefault || null,
                 arqueoEfectivoRequerido,
                 formatoImpresionDefault,
                 formatosPermitidos,
@@ -2850,6 +2795,7 @@ const SECTION_TITLES: Record<string, string> = {
   'impuestos-ventas': 'Impuestos — Ventas',
   'impuestos-compras': 'Impuestos — Compras',
   'impuestos-articulo': 'Impuestos por Artículo',
+  'tasas-impuesto': 'Tasas de Impuesto',
   'ejercicio-fiscal': 'Ejercicio Fiscal',
   perfil: 'Mi Perfil',
   'grupos-clientes': 'Grupos de Clientes',
@@ -2871,6 +2817,7 @@ export default function ConfigPage() {
     'impuestos-ventas': <TaxTemplatesSection kind="ventas" />,
     'impuestos-compras': <TaxTemplatesSection kind="compras" />,
     'impuestos-articulo': <ItemTaxTemplatesSection />,
+    'tasas-impuesto': <TasasImpuestoSection />,
     'ejercicio-fiscal': <EjercicioFiscalSection />,
     perfil: <PerfilSection />,
     'grupos-clientes': <GruposClientesSection />,

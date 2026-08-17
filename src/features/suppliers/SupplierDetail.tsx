@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getSupplier, deleteSupplier, getSupplierPurchases } from '@/shared/api/suppliers'
 import { getHistorialPagos, getSaldoFavorProveedor } from '@/shared/api/pagos'
+import { listImpuestosCompras } from '@/shared/api/config'
+import { listRetenciones } from '@/shared/api/retenciones'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -159,6 +161,21 @@ export default function SupplierDetail() {
     enabled: Boolean(id),
   })
 
+  const { data: impuestosCompras } = useQuery({
+    queryKey: ['impuestos-compras'],
+    queryFn: listImpuestosCompras,
+    staleTime: 5 * 60_000,
+  })
+  const impuestoTitulo = (templateId: string) => impuestosCompras?.find((t) => String(t.id) === templateId)?.title ?? templateId
+
+  const { data: retencionesData } = useQuery({
+    queryKey: ['retenciones-all'],
+    queryFn: () => listRetenciones({ limit: 100 }),
+    staleTime: 5 * 60_000,
+  })
+  const retencionTitulo = (retencionId: string) =>
+    retencionesData?.items?.find((r) => r.id === retencionId)?.categoryName ?? retencionId
+
   const disableMutation = useMutation({
     mutationFn: () => deleteSupplier(id!),
     onSuccess: () => {
@@ -254,6 +271,42 @@ export default function SupplierDetail() {
             <div className="detail-field">
               <span className="detail-label">Cuenta CxP Alterna</span>
               <span className="detail-value">{supplier.cuentaCxpDefault ?? 'Sin configurar'}</span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">Impuestos por Defecto — Compras (bienes)</span>
+              {supplier.impuestoComprasDefault && supplier.impuestoComprasDefault.length > 0
+                ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                      {supplier.impuestoComprasDefault.map((t) => (
+                        <span key={t.id} className="badge badge-info">{impuestoTitulo(t.id)} ({t.tasa}%)</span>
+                      ))}
+                    </div>
+                  )
+                : <span className="detail-value">Sin configurar</span>}
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">Impuestos por Defecto — Gastos (servicios)</span>
+              {supplier.impuestoGastosDefault && supplier.impuestoGastosDefault.length > 0
+                ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                      {supplier.impuestoGastosDefault.map((t) => (
+                        <span key={t.id} className="badge badge-info">{impuestoTitulo(t.id)} ({t.tasa}%)</span>
+                      ))}
+                    </div>
+                  )
+                : <span className="detail-value">Sin configurar</span>}
+            </div>
+            <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+              <span className="detail-label">Retenciones por Defecto (solo Gastos)</span>
+              {supplier.retencionesDefault && supplier.retencionesDefault.length > 0
+                ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                      {supplier.retencionesDefault.map((r) => (
+                        <span key={r.id} className="badge badge-info">{retencionTitulo(r.id)} ({r.tasa}%)</span>
+                      ))}
+                    </div>
+                  )
+                : <span className="detail-value">Sin configurar</span>}
             </div>
           </div>
         </div>

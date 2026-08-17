@@ -43,8 +43,8 @@ export default function LibroDiarioPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
-  const [fromDate, setFromDate] = useState(firstOfMonth())
-  const [toDate, setToDate] = useState(today())
+  const [fromDate, setFromDate] = useState(searchParams.get('fromDate') ?? firstOfMonth())
+  const [toDate, setToDate] = useState(searchParams.get('toDate') ?? today())
   const [account, setAccount] = useState('')
   const [voucherType, setVoucherType] = useState(searchParams.get('voucherType') ?? '')
   const [voucherNo, setVoucherNo] = useState(searchParams.get('voucherNo') ?? '')

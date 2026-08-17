@@ -6,7 +6,7 @@ import { X, Package, MapPin, Percent, Tag } from 'lucide-react'
 
 /**
  * Modal de solo lectura con el detalle de un artículo — usa el mismo GET
- * que /inventario/articulos/:id, pero sin acciones de edición.
+ * que /inventario/productos/:id o /catalogo/servicios/:id, pero sin acciones de edición.
  * Pensado para consultarse rápido desde las líneas de Cotización/Pedido/Factura.
  */
 export function ItemDetailModal({ itemCode, onClose }: { itemCode: string; onClose: () => void }) {

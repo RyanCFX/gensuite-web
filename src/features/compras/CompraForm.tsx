@@ -491,6 +491,9 @@ export default function CompraForm() {
 
   const [supplierId, setSupplierId] = useState('')
   const [supplierName, setSupplierName] = useState('')
+  const [esProveedorOcasional, setEsProveedorOcasional] = useState(false)
+  const [proveedorOcasionalNombre, setProveedorOcasionalNombre] = useState('')
+  const [proveedorOcasionalRnc, setProveedorOcasionalRnc] = useState('')
   const [supplierQuery, setSupplierQuery] = useState('')
   const [showCreateSupplier, setShowCreateSupplier] = useState(false)
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0])
@@ -513,13 +516,17 @@ export default function CompraForm() {
   const requiereSerialLoteCompra = facturacionConfig?.requiereSerialLoteCompra ?? false
 
   const [ncfProveedor, setNcfProveedor] = useState('')
+  const [billNo, setBillNo] = useState('')
   const [tipoBienes606, setTipoBienes606] = useState('')
   const [formaPago606, setFormaPago606] = useState('')
   const [tipoPago, setTipoPago] = useState<'Contado' | 'Crédito'>('Contado')
   const [tipoBienes606Touched, setTipoBienes606Touched] = useState(false)
   const [formaPago606Touched, setFormaPago606Touched] = useState(false)
   const [tipoPagoTouched, setTipoPagoTouched] = useState(false)
-  const [retencionIsr, setRetencionIsr] = useState<number>(0)
+  // string, no number: '' significa "no tocado por el usuario" (deja que el backend calcule
+  // automáticamente según las retenciones por defecto del proveedor). '0' es un 0 explícito.
+  const [retencionIsr, setRetencionIsr] = useState('')
+  const [retencionItbis, setRetencionItbis] = useState('')
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
@@ -528,8 +535,12 @@ export default function CompraForm() {
       const res = await listItems({ barcode: code, limit: 1 })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
+      const targetIndex = items.length
       setItems((prev) => [...prev, emptyItem(defaultWh)])
-      setTimeout(() => selectCatalogItem(items.length, item), 0)
+      setTimeout(() => {
+        selectCatalogItem(targetIndex, item, { autoAddRow: false })
+        setItems((prev) => [...prev, emptyItem(defaultWh)])
+      }, 0)
     },
   })
 
@@ -650,6 +661,9 @@ export default function CompraForm() {
     if (!compraData) return
     setSupplierId(compraData.supplier)
     setSupplierName(compraData.supplierName ?? '')
+    setEsProveedorOcasional(compraData.esProveedorOcasional ?? false)
+    setProveedorOcasionalNombre(compraData.proveedorOcasionalNombre ?? '')
+    setProveedorOcasionalRnc(compraData.proveedorOcasionalRnc ?? '')
     setPostingDate(compraData.postingDate.split('T')[0])
     setDueDate(compraData.dueDate?.split('T')[0] ?? '')
     setItems(
@@ -671,10 +685,12 @@ export default function CompraForm() {
     setBranch(compraData.branch ?? '')
     setDepartment(compraData.department ?? '')
     setNcfProveedor(compraData.ncfProveedor ?? '')
+    setBillNo(compraData.billNo ?? '')
     setTipoBienes606(compraData.tipoBienes606 ?? '')
     setFormaPago606(compraData.formaPago606 ?? '')
     setTipoPago(compraData.tipoPago ?? 'Contado')
-    setRetencionIsr(compraData.retencionIsr ?? 0)
+    setRetencionIsr(compraData.retencionIsr != null ? String(compraData.retencionIsr) : '')
+    setRetencionItbis(compraData.retencionItbis != null ? String(compraData.retencionItbis) : '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compraData])
 
@@ -728,7 +744,12 @@ export default function CompraForm() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!supplierId) { toast.error('Selecciona un proveedor'); return }
+    if (esProveedorOcasional) {
+      if (!proveedorOcasionalNombre.trim()) { toast.error('Ingresa el nombre del proveedor ocasional'); return }
+    } else if (!supplierId) {
+      toast.error('Selecciona un proveedor')
+      return
+    }
     if (ncfProveedor && !NCF_REGEX.test(ncfProveedor)) { toast.error('NCF inválido (formato: B/E seguido de 10 dígitos)'); return }
 
     // Clear previous line errors
@@ -779,7 +800,12 @@ export default function CompraForm() {
     if (hasTrackingError) return
 
     const dto: CreateCompraDto = {
-      supplier: supplierId,
+      ...(esProveedorOcasional
+        ? {
+            proveedorOcasionalNombre: proveedorOcasionalNombre || undefined,
+            proveedorOcasionalRnc: proveedorOcasionalRnc || undefined,
+          }
+        : { supplier: supplierId }),
       postingDate,
       dueDate: dueDate || undefined,
       branch: branch || undefined,
@@ -793,13 +819,16 @@ export default function CompraForm() {
         uom: i.uom || undefined,
         ...(i.serials.length > 0 ? { serials: i.serials } : {}),
         ...(i.batches.length > 0 ? { batches: i.batches } : {}),
-        ...(i.componentTracking?.length > 0 ? { componentTracking: i.componentTracking } : {}),
+        ...(i.componentTracking && i.componentTracking.length > 0 ? { componentTracking: i.componentTracking } : {}),
       })),
       ncfProveedor: ncfProveedor || undefined,
+      billNo: billNo || undefined,
       tipoBienes606: tipoBienes606 || undefined,
       formaPago606: formaPago606 || undefined,
       tipoPago,
       taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
+      ...(retencionIsr !== '' ? { retencionIsr: Number(retencionIsr) } : {}),
+      ...(retencionItbis !== '' ? { retencionItbis: Number(retencionItbis) } : {}),
     }
     saveMutation.mutate(dto)
   }
@@ -808,54 +837,60 @@ export default function CompraForm() {
     setItems((prev) => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row))
   }, [])
 
-  const selectCatalogItem = useCallback((idx: number, catalogItem: Item) => {
-    setItems((prev) => prev.map((row, i) => {
-      if (i !== idx) return row
-      // Para compras usamos valuationRate (costo) si existe, si no standardRate
-      const baseRate = catalogItem.valuationRate ?? catalogItem.standardRate ?? 0
-      const trackingType = catalogItem.trackingType ?? 'none'
-      const newRow: ItemRow = {
-        ...row,
-        itemCode: catalogItem.id,
-        itemLabel: catalogItem.itemName,
-        description: catalogItem.internalDescription ?? catalogItem.itemName,
-        rate: baseRate,
-        baseRate,
-        uom: catalogItem.stockUom ?? row.uom,
-        trackingType,
-        serials: trackingType === 'serial' ? [] : [],
-        batches: trackingType === 'batch' ? [] : [],
-        purchaseTaxPct: catalogItem.purchaseTaxPct ?? 0,
-        purchaseTaxTemplate: catalogItem.purchaseTaxTemplate ?? '',
-      }
-      // Detecta componentes del combo con tracking de serial/lote
-      if (catalogItem.type === 'combo') {
-        Promise.all(
-          (catalogItem.components ?? []).map(async (c) => {
-            try {
-              const item = await getItem(c.itemCode)
-              if (item.trackingType === 'serial' || item.trackingType === 'batch') {
-                return { itemCode: c.itemCode, itemName: item.itemName, trackingType: item.trackingType, qtyPerCombo: c.qty }
+  const selectCatalogItem = useCallback((idx: number, catalogItem: Item, opts?: { autoAddRow?: boolean }) => {
+    const autoAddRow = opts?.autoAddRow ?? true
+    let wasLastRow = false
+    setItems((prev) => {
+      wasLastRow = idx === prev.length - 1
+      return prev.map((row, i) => {
+        if (i !== idx) return row
+        // Para compras usamos valuationRate (costo) si existe, si no standardRate
+        const baseRate = catalogItem.valuationRate ?? catalogItem.standardRate ?? 0
+        const trackingType = catalogItem.trackingType ?? 'none'
+        const newRow: ItemRow = {
+          ...row,
+          itemCode: catalogItem.id,
+          itemLabel: catalogItem.itemName,
+          description: catalogItem.internalDescription ?? catalogItem.itemName,
+          rate: baseRate,
+          baseRate,
+          uom: catalogItem.stockUom ?? row.uom,
+          trackingType,
+          serials: trackingType === 'serial' ? [] : [],
+          batches: trackingType === 'batch' ? [] : [],
+          purchaseTaxPct: catalogItem.purchaseTaxPct ?? 0,
+          purchaseTaxTemplate: catalogItem.purchaseTaxTemplate ?? '',
+        }
+        // Detecta componentes del combo con tracking de serial/lote
+        if (catalogItem.type === 'combo') {
+          Promise.all(
+            (catalogItem.components ?? []).map(async (c) => {
+              try {
+                const item = await getItem(c.itemCode)
+                if (item.trackingType === 'serial' || item.trackingType === 'batch') {
+                  return { itemCode: c.itemCode, itemName: item.itemName, trackingType: item.trackingType, qtyPerCombo: c.qty }
+                }
+              } catch {
+                // ignora — si falla la consulta del componente, no se bloquea la selección del combo
               }
-            } catch {
-              // ignora — si falla la consulta del componente, no se bloquea la selección del combo
-            }
-            return null
-          }),
-        ).then((results) => {
-          const tracked = results.filter((r): r is NonNullable<typeof r> => r != null)
-          if (tracked.length > 0) {
-            setItems((prev) =>
-              prev.map((row, i) =>
-                i === idx ? { ...row, _comboComponents: tracked } : row
+              return null
+            }),
+          ).then((results) => {
+            const tracked = results.filter((r): r is NonNullable<typeof r> => r != null)
+            if (tracked.length > 0) {
+              setItems((prev) =>
+                prev.map((row, i) =>
+                  i === idx ? { ...row, _comboComponents: tracked } : row
+                )
               )
-            )
-          }
-        })
-      }
-      return newRow
-    }))
-  }, [])
+            }
+          })
+        }
+        return newRow
+      })
+    })
+    if (autoAddRow && wasLastRow) setItems((prev) => [...prev, emptyItem(defaultWh)])
+  }, [defaultWh])
 
   const clearCatalogItem = useCallback((idx: number) => {
     setItems((prev) => prev.map((row, i) =>
@@ -900,39 +935,97 @@ export default function CompraForm() {
             <div className="card-body">
               <div className="form-row form-row-3">
                 <div className="ff-wrap">
-                  <label className="ff-label">Proveedor <span className="ff-required">*</span></label>
-                  <SearchSelect
-                    id="supplier"
-                    value={supplierId}
-                    selectedLabel={supplierName}
-                    disabled={isReturn}
-                    onChange={(id, opt) => {
-                      const resolvedId = id === '' ? '' : (opt?.value ?? id)
-                      setSupplierId(resolvedId)
-                      setSupplierName(opt?.label ?? '')
-                      const selected = suppliersData?.items.find((s) => s.id === resolvedId)
-                      if (selected) {
-                        if (!tipoBienes606Touched && selected.defaultTipoBienes606) setTipoBienes606(selected.defaultTipoBienes606)
-                        if (!formaPago606Touched && selected.defaultFormaPago606) setFormaPago606(selected.defaultFormaPago606)
-                        if (!tipoPagoTouched && selected.defaultTipoPagoProveedor) setTipoPago(selected.defaultTipoPagoProveedor)
+                  <label className="ff-label">
+                    {esProveedorOcasional ? 'Nombre del Vendedor' : <>Proveedor <span className="ff-required">*</span></>}
+                  </label>
+                  {esProveedorOcasional ? (
+                    <input
+                      className="ff-input"
+                      value={proveedorOcasionalNombre}
+                      onChange={(e) => setProveedorOcasionalNombre(e.target.value)}
+                      placeholder="Nombre del proveedor ocasional"
+                      disabled={isReturn}
+                    />
+                  ) : (
+                    <SearchSelect
+                      id="supplier"
+                      value={supplierId}
+                      selectedLabel={supplierName}
+                      disabled={isReturn}
+                      onChange={(id, opt) => {
+                        const resolvedId = id === '' ? '' : (opt?.value ?? id)
+                        setSupplierId(resolvedId)
+                        setSupplierName(opt?.label ?? '')
+                        const selected = suppliersData?.items.find((s) => s.id === resolvedId)
+                        if (selected) {
+                          if (!tipoBienes606Touched && selected.defaultTipoBienes606) setTipoBienes606(selected.defaultTipoBienes606)
+                          if (!formaPago606Touched && selected.defaultFormaPago606) setFormaPago606(selected.defaultFormaPago606)
+                          if (!tipoPagoTouched && selected.defaultTipoPagoProveedor) setTipoPago(selected.defaultTipoPagoProveedor)
+                          if (selected.diasCredito) {
+                            const base = new Date(postingDate || new Date().toISOString().split('T')[0])
+                            base.setDate(base.getDate() + selected.diasCredito)
+                            setDueDate(base.toISOString().split('T')[0])
+                          }
+                        }
+                      }}
+                      options={supplierOptions}
+                      onSearch={setSupplierQuery}
+                      loading={suppliersLoading}
+                      placeholder="Buscar proveedor…"
+                      error={!supplierId}
+                      headerContent={
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-size-sm"
+                          style={{ width: '100%', justifyContent: 'flex-start' }}
+                          onClick={() => setShowCreateSupplier(true)}
+                        >
+                          <UserPlus size={14} /> Agregar proveedor
+                        </button>
                       }
-                    }}
-                    options={supplierOptions}
-                    onSearch={setSupplierQuery}
-                    loading={suppliersLoading}
-                    placeholder="Buscar proveedor…"
-                    error={!supplierId}
-                    headerContent={
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-size-sm"
-                        style={{ width: '100%', justifyContent: 'flex-start' }}
-                        onClick={() => setShowCreateSupplier(true)}
-                      >
-                        <UserPlus size={14} /> Agregar proveedor
-                      </button>
-                    }
-                  />
+                    />
+                  )}
+                </div>
+
+                {esProveedorOcasional && (
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="proveedorOcasionalRnc">RNC/Cédula (opcional)</label>
+                    <input
+                      id="proveedorOcasionalRnc"
+                      className="ff-input"
+                      value={proveedorOcasionalRnc}
+                      onChange={(e) => setProveedorOcasionalRnc(e.target.value)}
+                      placeholder="RNC/Cédula del vendedor"
+                      disabled={isReturn}
+                    />
+                    <p className="ff-hint">Se recomienda llenarlo — alimenta el reporte fiscal 606.</p>
+                  </div>
+                )}
+
+                <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                    <input
+                      type="checkbox"
+                      checked={esProveedorOcasional}
+                      disabled={isReturn}
+                      onChange={(e) => {
+                        setEsProveedorOcasional(e.target.checked)
+                        if (e.target.checked) {
+                          setSupplierId('')
+                          setSupplierName('')
+                        } else {
+                          setProveedorOcasionalNombre('')
+                          setProveedorOcasionalRnc('')
+                        }
+                      }}
+                    />
+                    Proveedor ocasional (sin registrar)
+                  </label>
+                  {esProveedorOcasional && (
+                    <p className="ff-hint" style={{ marginTop: 4 }}>
+                      Compra a un vendedor sin cuenta registrada. No se requiere RNC/Cédula.
+                    </p>
+                  )}
                 </div>
 
                 <div className="ff-wrap">
@@ -1087,6 +1180,16 @@ export default function CompraForm() {
               </div>
 
               <div className="ff-wrap">
+                <label className="ff-label">N° Factura del Proveedor</label>
+                <input
+                  className="ff-input"
+                  placeholder="N° de factura del vendedor"
+                  value={billNo}
+                  onChange={(e) => setBillNo(e.target.value)}
+                />
+              </div>
+
+              <div className="ff-wrap">
                 <label className="ff-label">Tipo de Bienes 606</label>
                 <SearchSelect
                   value={tipoBienes606}
@@ -1128,8 +1231,22 @@ export default function CompraForm() {
                   min="0"
                   step="0.01"
                   className="ff-input"
+                  placeholder="0.00"
                   value={retencionIsr}
-                  onChange={(e) => setRetencionIsr(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => setRetencionIsr(e.target.value)}
+                />
+              </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label">Retención ITBIS (RD$)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="ff-input"
+                  placeholder="0.00"
+                  value={retencionItbis}
+                  onChange={(e) => setRetencionItbis(e.target.value)}
                 />
               </div>
             </div>

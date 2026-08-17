@@ -2,6 +2,8 @@ import { client, unwrap, unwrapPaginated } from './client'
 import { ENDPOINTS } from './endpoints'
 import type {
   Supplier,
+  CreateProveedorDto,
+  UpdateProveedorDto,
   PaginatedResponse,
   PaginationParams,
   Invoice,
@@ -32,12 +34,12 @@ export async function getSupplierPurchases(id: string, params?: PaginationParams
   return unwrapPaginated(res)
 }
 
-export async function createSupplier(data: Omit<Supplier, 'id' | 'balance' | 'disabled' | 'createdAt' | 'modifiedAt'>) {
+export async function createSupplier(data: CreateProveedorDto) {
   const res = await client.post<{ success: true; data: Supplier }>(ENDPOINTS.suppliers.list, data)
   return unwrap(res)
 }
 
-export async function updateSupplier(id: string, data: Partial<Supplier>) {
+export async function updateSupplier(id: string, data: UpdateProveedorDto) {
   const res = await client.put<{ success: true; data: Supplier }>(ENDPOINTS.suppliers.byId(id), data)
   return unwrap(res)
 }

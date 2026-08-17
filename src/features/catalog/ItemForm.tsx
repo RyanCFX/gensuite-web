@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
@@ -18,7 +18,7 @@ import { ArrowLeft, Plus, Trash2, HelpCircle } from 'lucide-react'
 const schema = z.object({
   itemName: z.string().min(1, 'El nombre es requerido'),
   type: z.enum(['product', 'service']),
-  category: z.string().min(1, 'La categoría es requerida'),
+  category: z.string().optional(),
   subcategory: z.string().optional(),
   brand: z.string().optional(),
   itemCode: z.string().optional(),
@@ -47,11 +47,6 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-const TYPE_OPTIONS_ALL = [
-  { value: 'product', label: 'Producto' },
-  { value: 'service', label: 'Servicio' },
-]
-
 const PRICE_MODE_OPTIONS_ALL = [
   { value: 'manual', label: 'Manual' },
   { value: 'cost_plus', label: 'Sobre costo' },
@@ -72,8 +67,17 @@ const BARCODE_TYPE_OPTIONS_ALL = [
 export default function ItemForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const location = useLocation()
   const { id } = useParams<{ id: string }>()
   const isEdit = Boolean(id)
+
+  // Productos y Servicios son módulos separados que comparten esta implementación — el tipo
+  // queda fijo según la ruta desde la que se entró, nunca es elegible por el usuario.
+  const fixedType: 'product' | 'service' = location.pathname.startsWith('/catalogo/servicios') ? 'service' : 'product'
+  const isProduct = fixedType === 'product'
+  const basePath = isProduct ? '/inventario/productos' : '/catalogo/servicios'
+  const moduleLabel = isProduct ? 'Producto' : 'Servicio'
+
   const [showVariants, setShowVariants] = useState(false)
   const [hasVariants, setHasVariants] = useState(false)
   const [selectedAttributes, setSelectedAttributes] = useState<string[]>([])
@@ -83,8 +87,10 @@ export default function ItemForm() {
   const [noSalesTax, setNoSalesTax] = useState(false)
 
   const { data: categoriesData } = useQuery({
-    queryKey: ['categories-tree'],
-    queryFn: () => listCategories({ tree: true }),
+    queryKey: ['categories-tree', fixedType],
+    // Solo trae categorías que aplican a este tipo de artículo (aplicaA = 'Ambas' o fixedType) —
+    // el usuario nunca ve ni puede elegir una categoría que no le corresponde.
+    queryFn: () => listCategories({ tree: true, type: fixedType }),
   })
 
   const { data: brandsData } = useQuery({
@@ -130,25 +136,27 @@ export default function ItemForm() {
   const createMutation = useMutation({
     mutationFn: (data: Parameters<typeof createItem>[0]) => createItem(data),
     onSuccess: (result) => {
-      toast.success(`Artículo creado con código ${result.id}`)
+      toast.success(`${moduleLabel} creado con código ${result.id}`)
       queryClient.invalidateQueries({ queryKey: ['items'] })
-      navigate('/inventario/articulos')
+      navigate(basePath)
     },
-    onError: () => {
-      toast.error('Error al crear el artículo')
+    onError: (err: { message?: string }) => {
+      // Ej. mismatch de categoría/tipo (400): "La categoría "X" solo aplica a Servicios,
+      // no se puede usar para un artículo de tipo Producto." — se muestra tal cual.
+      toast.error(err?.message ?? `Error al crear el ${moduleLabel.toLowerCase()}`)
     },
   })
 
   const updateMutation = useMutation({
     mutationFn: (data: Partial<CreateItemDto>) => updateItem(id!, data),
     onSuccess: () => {
-      toast.success('Artículo actualizado')
+      toast.success(`${moduleLabel} actualizado`)
       queryClient.invalidateQueries({ queryKey: ['items'] })
       queryClient.invalidateQueries({ queryKey: ['item', id] })
-      navigate(`/inventario/articulos/${id}`)
+      navigate(`${basePath}/${id}`)
     },
-    onError: () => {
-      toast.error('Error al actualizar el artículo')
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? `Error al actualizar el ${moduleLabel.toLowerCase()}`)
     },
   })
 
@@ -164,7 +172,7 @@ export default function ItemForm() {
     resolver: zodResolver(schema),
     defaultValues: {
       itemName: '',
-      type: 'product',
+      type: fixedType,
       category: '',
       subcategory: '',
       brand: '',
@@ -196,6 +204,13 @@ export default function ItemForm() {
   // Precarga el formulario al editar — se corre una sola vez cuando llega el artículo.
   useEffect(() => {
     if (!existingItem) return
+    // Defensivo: si alguien entra a la URL de edición de Productos/Servicios con el id de un
+    // artículo del otro tipo, redirige al módulo correcto en vez de mostrar campos que no aplican.
+    if (existingItem.type !== fixedType) {
+      const correctBase = existingItem.type === 'product' ? '/inventario/productos' : '/catalogo/servicios'
+      navigate(`${correctBase}/${existingItem.id}/editar`, { replace: true })
+      return
+    }
     reset({
       itemName: existingItem.itemName,
       type: existingItem.type,
@@ -229,9 +244,8 @@ export default function ItemForm() {
     setShowWarranty(!!existingItem.hasWarranty)
     setNoPurchaseTax(!existingItem.purchaseTaxTemplate)
     setNoSalesTax(!existingItem.salesTaxTemplate)
-  }, [existingItem, reset])
+  }, [existingItem, reset, fixedType, navigate])
 
-  const selectedType = watch('type')
   const watchedPriceMode = watch('priceMode')
   const watchedSalesTaxTemplate = watch('salesTaxTemplate')
   const watchedValuationRate = watch('valuationRate')
@@ -243,8 +257,16 @@ export default function ItemForm() {
   const watchedPriceC = watch('priceC')
 
   const onSubmit = (data: FormValues) => {
+    if (isProduct && !data.category) {
+      toast.error('Selecciona una categoría')
+      return
+    }
     if (subcategoryOptions.length > 0 && !data.subcategory) {
       toast.error('Selecciona una subcategoría')
+      return
+    }
+    if (data.priceMode === 'cost_plus' && !data.valuationRate) {
+      toast.error('Debes ingresar el Costo de Valoración para usar el modo "Sobre costo"')
       return
     }
     if (!noPurchaseTax && !data.purchaseTaxTemplate) {
@@ -258,7 +280,8 @@ export default function ItemForm() {
     const { description, itemCode, ...rest } = data
     const payload = {
       ...rest,
-      brand: data.brand || undefined,
+      category: data.category || undefined,
+      brand: isProduct ? (data.brand || undefined) : undefined,
       subcategory: data.subcategory || undefined,
       internalDescription: description || undefined,
       image: data.image || undefined,
@@ -328,7 +351,6 @@ export default function ItemForm() {
   const [uomSearch, setUomSearch] = useState('')
   const [purchaseTaxSearch, setPurchaseTaxSearch] = useState('')
   const [salesTaxSearch, setSalesTaxSearch] = useState('')
-  const [typeSearch, setTypeSearch] = useState('')
   const [priceModeSearch, setPriceModeSearch] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
   const [trackingSearch, setTrackingSearch] = useState('')
@@ -374,11 +396,6 @@ export default function ItemForm() {
       .filter((t) => !q || t.title.toLowerCase().includes(q))
       .map((t) => ({ value: String(t.id), label: t.title }))
   }, [itemTaxTemplates, salesTaxSearch])
-
-  const typeOptions: SearchSelectOption[] = useMemo(() => {
-    const q = typeSearch.toLowerCase()
-    return TYPE_OPTIONS_ALL.filter((o) => !q || o.label.toLowerCase().includes(q))
-  }, [typeSearch])
 
   const priceModeOptions: SearchSelectOption[] = useMemo(() => {
     const q = priceModeSearch.toLowerCase()
@@ -454,24 +471,24 @@ export default function ItemForm() {
     )
   }
 
-  const backTo = isEdit ? `/inventario/articulos/${id}` : '/inventario/articulos'
+  const backTo = isEdit ? `${basePath}/${id}` : basePath
   const isTemplate = isEdit && !!existingItem?.hasVariants
 
   return (
     <div className="page-container">
       <button className="page-back-link" onClick={() => navigate(backTo)}>
-        <ArrowLeft size={14} /> {isEdit ? 'Volver al artículo' : 'Artículos'}
+        <ArrowLeft size={14} /> {isEdit ? `Volver al ${moduleLabel.toLowerCase()}` : moduleLabel + 's'}
       </button>
 
       <PageHeader
-        title={isEdit ? `Editar ${existingItem?.itemName ?? 'Artículo'}` : 'Nuevo Artículo'}
-        description={isEdit ? 'Modifica los datos del artículo' : 'Registra un nuevo producto o servicio en el catálogo'}
-        overline="Catálogo"
+        title={isEdit ? `Editar ${existingItem?.itemName ?? moduleLabel}` : `Nuevo ${moduleLabel}`}
+        description={isEdit ? `Modifica los datos del ${moduleLabel.toLowerCase()}` : `Registra un nuevo ${moduleLabel.toLowerCase()} en el catálogo`}
+        overline={isProduct ? 'Inventario' : 'Catálogo'}
       />
 
       {isTemplate && (
         <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
-          Este artículo es un template con variantes — el tipo y las variantes no se pueden editar aquí. Usa la ficha del artículo para gestionar variantes.
+          Este artículo es un template con variantes — las variantes no se pueden editar aquí. Usa la ficha del artículo para gestionarlas.
         </div>
       )}
 
@@ -485,27 +502,7 @@ export default function ItemForm() {
             <div className="card-header"><h2 className="card-title">Información General</h2></div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-              <div className="form-row">
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="type">Tipo <span className="ff-required">*</span></label>
-                  <Controller
-                    name="type"
-                    control={control}
-                    render={({ field }) => (
-                      <SearchSelect
-                        id="type"
-                        value={field.value}
-                        onChange={(val) => field.onChange(val)}
-                        options={typeOptions}
-                        onSearch={setTypeSearch}
-                        selectedLabel={TYPE_OPTIONS_ALL.find((o) => o.value === field.value)?.label ?? ''}
-                        disabled={isTemplate}
-                      />
-                    )}
-                  />
-                </div>
-
-                <div className="ff-wrap">
+              <div className="ff-wrap">
                   <label className="ff-label" htmlFor="itemCode">
                     Código {!isEdit && !isAutoCode && <span className="ff-required">*</span>}
                   </label>
@@ -534,7 +531,6 @@ export default function ItemForm() {
                   )}
                   {isEdit && <p className="ff-hint">El código del artículo no se puede modificar.</p>}
                   {!isEdit && errors.itemCode && <span className="ff-error">{errors.itemCode.message}</span>}
-                </div>
               </div>
 
               <div className="ff-wrap">
@@ -589,7 +585,7 @@ export default function ItemForm() {
 
               <div className="form-row">
                 <div className="ff-wrap">
-                  <label className="ff-label ff-required" htmlFor="category">Categoría</label>
+                  <label className={`ff-label${isProduct ? ' ff-required' : ''}`} htmlFor="category">Categoría</label>
                   <Controller
                     name="category"
                     control={control}
@@ -614,7 +610,7 @@ export default function ItemForm() {
                   {errors.category && <span className="ff-error">{errors.category.message}</span>}
                 </div>
 
-                {selectedType === 'product' ? (
+                {isProduct && (
                   <div className="ff-wrap">
                     <label className="ff-label" htmlFor="brand">Marca</label>
                     <Controller
@@ -634,31 +630,10 @@ export default function ItemForm() {
                       )}
                     />
                   </div>
-                ) : subcategoryOptions.length > 0 ? (
-                  <div className="ff-wrap">
-                    <label className="ff-label ff-required" htmlFor="subcategory">Subcategoría</label>
-                    <Controller
-                      name="subcategory"
-                      control={control}
-                      render={({ field }) => (
-                        <SearchSelect
-                          id="subcategory"
-                          value={field.value ?? ''}
-                          onChange={(val) => field.onChange(val)}
-                          options={subcatFiltered}
-                          onSearch={setSubcatSearch}
-                          selectedLabel={subcategoryOptions.find((o) => o.value === field.value)?.label ?? ''}
-                          placeholder="Seleccionar subcategoría"
-                          error={!!errors.subcategory}
-                        />
-                      )}
-                    />
-                    {errors.subcategory && <span className="ff-error">{errors.subcategory.message}</span>}
-                  </div>
-                ) : null}
+                )}
               </div>
 
-              {selectedType === 'product' && subcategoryOptions.length > 0 && (
+              {subcategoryOptions.length > 0 && (
                 <div className="ff-wrap">
                   <label className="ff-label ff-required" htmlFor="subcategory">Subcategoría</label>
                   <Controller
@@ -684,7 +659,7 @@ export default function ItemForm() {
           </div>
 
           {/* ── Unidad de Medida ─────────────────────────────────────── */}
-          {selectedType === 'product' && (
+          {fixedType === 'product' && (
             <div className="card">
               <div className="card-header"><h2 className="card-title">Unidad de Medida</h2></div>
               <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -716,7 +691,7 @@ export default function ItemForm() {
 
           {/* ── Variantes (opcional) — solo al crear; editar variantes/atributos
                 de un template ya existente no está soportado por este formulario ── */}
-          {!isEdit && selectedType === 'product' && (
+          {!isEdit && fixedType === 'product' && (
             <>
               <button
                 type="button"
@@ -773,19 +748,20 @@ export default function ItemForm() {
           <div className="card">
             <div className="card-header"><h2 className="card-title">Compra</h2></div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {selectedType === 'product' && (
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="valuationRate">Costo de Valoración</label>
-                  <input
-                    id="valuationRate"
-                    type="number" step="0.01" min="0"
-                    className="ff-input"
-                    placeholder="0.00"
-                    {...register('valuationRate', { valueAsNumber: true })}
-                  />
-                  <p className="ff-hint">Costo unitario del artículo (base para calcular márgenes)</p>
-                </div>
-              )}
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="valuationRate">Costo de Valoración</label>
+                <input
+                  id="valuationRate"
+                  type="number" step="0.01" min="0"
+                  className="ff-input"
+                  placeholder="0.00"
+                  {...register('valuationRate', { valueAsNumber: true })}
+                />
+                <p className="ff-hint">
+                  Costo unitario del artículo (base para calcular márgenes). Opcional — requerido solo si
+                  usas el modo de precio "Sobre costo".
+                </p>
+              </div>
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="purchaseTaxTemplate">
                   Impuesto de Compra {!noPurchaseTax && <span className="ff-required">*</span>}
@@ -834,7 +810,13 @@ export default function ItemForm() {
                     <SearchSelect
                       id="priceMode"
                       value={field.value ?? ''}
-                      onChange={(val) => field.onChange(val)}
+                      onChange={(val) => {
+                        if (val === 'cost_plus' && !watchedValuationRate) {
+                          toast.error('Ingresa el Costo de Valoración para poder seleccionar "Sobre costo"')
+                          return
+                        }
+                        field.onChange(val)
+                      }}
                       options={priceModeOptions}
                       onSearch={setPriceModeSearch}
                       selectedLabel={PRICE_MODE_OPTIONS_ALL.find((o) => o.value === field.value)?.label ?? ''}
@@ -980,7 +962,7 @@ export default function ItemForm() {
                 </div>
               )}
 
-              {selectedType === 'product' && (
+              {fixedType === 'product' && (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span className="ff-label" style={{ margin: 0 }}>Códigos de barras</span>
@@ -1031,7 +1013,7 @@ export default function ItemForm() {
           </div>
 
           {/* ── Inventario / Seguimiento ────────────────────────────────── */}
-          {selectedType === 'product' && (
+          {fixedType === 'product' && (
             <div className="card">
               <div className="card-header"><h2 className="card-title">Inventario</h2></div>
               <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1088,7 +1070,7 @@ export default function ItemForm() {
           >
             {isEdit
               ? (updateMutation.isPending ? 'Guardando…' : 'Guardar Cambios')
-              : (createMutation.isPending ? 'Guardando…' : 'Crear Artículo')}
+              : (createMutation.isPending ? 'Guardando…' : `Crear ${moduleLabel}`)}
           </button>
         </div>
       </form>

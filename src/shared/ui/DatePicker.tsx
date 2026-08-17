@@ -60,6 +60,8 @@ export function DatePicker({
   const triggerRef = useRef<HTMLButtonElement>(null)
   const { open, style: dropdownStyle, openDropdown, close, portalRef } = useFloatingDropdown(
     triggerRef as React.RefObject<HTMLElement>,
+    undefined,
+    { align: 'center', matchWidth: false },
   )
 
   const selected = toDate(value)

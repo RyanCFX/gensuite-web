@@ -86,6 +86,7 @@ function getTitleForPath(pathname: string): string {
     [/^\/config\/empresa$/, 'Empresa'],
     [/^\/config\/ncf$/, 'Secuencias NCF'],
     [/^\/config\/sucursales$/, 'Sucursales'],
+    [/^\/config\/plantillas-facturas$/, 'Plantillas de Facturas'],
     [/^\/config\/(.+)$/, (m) => `Config: ${m[1]}`],
     [/^\/config$/, 'Configuración'],
   ]

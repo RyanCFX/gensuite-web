@@ -2,17 +2,21 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { addDays, format as formatDateFns } from 'date-fns'
 import { createGasto, updateGasto, getGasto } from '@/shared/api/compras-gastos'
-import { listSuppliers } from '@/shared/api/suppliers'
+import { listSuppliers, getSupplier } from '@/shared/api/suppliers'
 import type { CreateGastoDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
+import { getCatalogosFiscales, getFacturacionConfig, listImpuestosCompras } from '@/shared/api/config'
 import { CATEGORIA_GASTO } from '@/lib/constants'
+import { listRetenciones } from '@/shared/api/retenciones'
 import { Plus, Trash2, Info, AlertCircle, AlertTriangle } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { MultiSearchSelect } from '@/shared/ui/MultiSearchSelect'
+import type { MultiSearchSelectOption } from '@/shared/ui/MultiSearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
-import type { Item } from '@/shared/api/types'
+import type { Item, CuentaPorPagar } from '@/shared/api/types'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
@@ -26,7 +30,7 @@ const SYSTEM_MANAGER_ROLE = 'System Manager'
 interface ItemRow {
   itemCode: string
   itemLabel?: string
-  itemType?: 'product' | 'service'
+  itemType?: 'product' | 'service' | 'combo'
   description: string
   qty: number
   rate: number
@@ -39,6 +43,9 @@ function emptyItem(): ItemRow {
 
 const NCF_REGEX = /^[BE]\d{10}$/
 const B17_MAX = 50
+// CreateGastoDto.tipoComprobante solo acepta este subconjunto de tipos de NCF (según openapi.json),
+// aunque el catálogo ncfTypesCompra trae más — ver uso en tipoComprobanteOptions.
+const TIPO_COMPROBANTE_GASTO_VALUES = new Set(['B01', 'B13', 'B14', 'B15', 'B16', 'B17', 'E31'])
 
 export default function GastoForm() {
   const navigate = useNavigate()
@@ -48,19 +55,29 @@ export default function GastoForm() {
 
   const [supplierId, setSupplierId] = useState('')
   const [supplierLabel, setSupplierLabel] = useState('')
+  const [esProveedorOcasional, setEsProveedorOcasional] = useState(false)
+  const [proveedorOcasionalNombre, setProveedorOcasionalNombre] = useState('')
+  const [proveedorOcasionalRnc, setProveedorOcasionalRnc] = useState('')
   const [supplierQuery, setSupplierQuery] = useState('')
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0])
   const [dueDate, setDueDate] = useState('')
+  // Una vez que el usuario edita "Fecha Vencimiento" a mano dejamos de recalcularla
+  // automáticamente al cambiar de proveedor.
+  const [dueDateTouched, setDueDateTouched] = useState(false)
   const [items, setItems] = useState<ItemRow[]>([emptyItem()])
 
   const [ncfProveedor, setNcfProveedor] = useState('')
+  const [billNo, setBillNo] = useState('')
   const [tipoComprobante, setTipoComprobante] = useState<string>('')
   const [tipoBienes606, setTipoBienes606] = useState('')
   const [formaPago606, setFormaPago606] = useState('')
+  const [taxesTemplate, setTaxesTemplate] = useState<string[]>([])
   const [categoriaGasto, setCategoriaGasto] = useState<string>('')
   const [esDeducible, setEsDeducible] = useState(true)
-  const [retencionIsr, setRetencionIsr] = useState(0)
-  const [retencionItbis, setRetencionItbis] = useState(0)
+  // retenciones aplicadas al gasto (ids de config/retenciones). El BFF calcula el monto de cada
+  // una a partir de la tasa del proveedor / template; si se omite, se usan las retenciones por
+  // defecto del proveedor.
+  const [retenciones, setRetenciones] = useState<string[]>([])
   const [branch, setBranch] = useState('')
   const [branchSearch, setBranchSearch] = useState('')
   const [branchError, setBranchError] = useState(false)
@@ -139,8 +156,12 @@ export default function GastoForm() {
 
     setSupplierId(gastoData.supplier)
     setSupplierLabel(gastoData.supplierName)
+    setEsProveedorOcasional(gastoData.esProveedorOcasional ?? false)
+    setProveedorOcasionalNombre(gastoData.proveedorOcasionalNombre ?? '')
+    setProveedorOcasionalRnc(gastoData.proveedorOcasionalRnc ?? '')
     setPostingDate(gastoData.postingDate.split('T')[0])
     setDueDate(gastoData.dueDate ? gastoData.dueDate.split('T')[0] : '')
+    setDueDateTouched(true)
     setItems(
       gastoData.items.length > 0
         ? gastoData.items.map((i) => ({
@@ -154,13 +175,14 @@ export default function GastoForm() {
         : [emptyItem()],
     )
     setNcfProveedor(gastoData.ncfProveedor ?? '')
+    setBillNo(gastoData.billNo ?? '')
     setTipoComprobante(gastoData.tipoComprobante ?? '')
     setTipoBienes606(gastoData.tipoBienes606 ?? '')
     setFormaPago606(gastoData.formaPago606 ?? '')
+    setTaxesTemplate((gastoData.taxesTemplate ?? []).map((t) => t.id))
+    setRetenciones((gastoData.retenciones ?? []).map((r) => r.id))
     setCategoriaGasto(gastoData.categoriaGasto ?? '')
     setEsDeducible(gastoData.esDeducible ?? true)
-    setRetencionIsr(gastoData.retencionIsr ?? 0)
-    setRetencionItbis(gastoData.retencionItbis ?? 0)
     setBranch(gastoData.branch ?? '')
     setDepartment(gastoData.department ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -174,6 +196,7 @@ export default function GastoForm() {
   })
   const [tipoComprobanteSearch, setTipoComprobanteSearch] = useState('')
   const tipoComprobanteOptions: SearchSelectOption[] = (catalogos?.ncfTypesCompra ?? [])
+    .filter((t) => TIPO_COMPROBANTE_GASTO_VALUES.has(t.value))
     .filter((t) => !tipoComprobanteSearch || t.label.toLowerCase().includes(tipoComprobanteSearch.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
 
@@ -187,6 +210,13 @@ export default function GastoForm() {
     .filter((f) => !formaPago606Search || f.label.toLowerCase().includes(formaPago606Search.toLowerCase()))
     .map((f) => ({ value: f.value, label: f.label }))
 
+  // Impuesto del documento — mismo template/catálogo que usa Compras (config/impuestos-compras).
+  const { data: taxesTemplates } = useQuery({
+    queryKey: ['impuestos-compras'],
+    queryFn: listImpuestosCompras,
+    staleTime: 5 * 60_000,
+  })
+
   const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
     queryKey: ['supplierSearch', supplierQuery],
     queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
@@ -198,6 +228,79 @@ export default function GastoForm() {
     label: s.supplierName,
     sublabel: s.rnc ?? s.cedula,
   }))
+
+  const { data: supplierDetail } = useQuery({
+    queryKey: ['supplier', supplierId],
+    queryFn: () => getSupplier(supplierId),
+    enabled: !!supplierId && !esProveedorOcasional,
+  })
+
+  // ── Catálogos de impuestos y retenciones (multiselect) ────────────────────────
+  const { data: retencionesData } = useQuery({
+    queryKey: ['retenciones-all'],
+    queryFn: () => listRetenciones({ limit: 100 }),
+    staleTime: 5 * 60_000,
+  })
+  const retencionesOptions: MultiSearchSelectOption[] = useMemo(
+    () => (retencionesData?.items ?? []).map((r) => ({ id: r.id, label: r.categoryName })),
+    [retencionesData],
+  )
+  const impuestosOptions: MultiSearchSelectOption[] = useMemo(
+    () => (taxesTemplates ?? []).map((t) => ({ id: String(t.id), label: t.title })),
+    [taxesTemplates],
+  )
+  // Mapa id → etiqueta de retención, para el hint descriptivo.
+  const retencionLabelMap = useMemo(
+    () => new Map(retencionesOptions.map((r) => [r.id, r.label])),
+    [retencionesOptions],
+  )
+
+  // Al resolver el proveedor, pre-llenamos los campos 606 e impuestos/retenciones que trae.
+  // No sobre-escribimos valores que el usuario ya haya definido (ni en modo edición desde el
+  // draft). Cada vez que se cambie de proveedor, los defaults del nuevo proveedor se aplican.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const s = supplierDetail
+    if (!s || esProveedorOcasional) return
+
+    if (!tipoBienes606 && s.defaultTipoBienes606) setTipoBienes606(s.defaultTipoBienes606)
+    if (!formaPago606 && s.defaultFormaPago606) setFormaPago606(s.defaultFormaPago606)
+
+    setTaxesTemplate((prev) =>
+      prev.length === 0 ? (s.impuestoGastosDefault?.map((d) => d.id) ?? []) : prev,
+    )
+    setRetenciones((prev) =>
+      prev.length === 0 ? (s.retencionesDefault?.map((d) => d.id) ?? []) : prev,
+    )
+
+    if (!dueDateTouched && s.diasCredito) {
+      setDueDate(formatDateFns(addDays(new Date(), s.diasCredito), 'yyyy-MM-dd'))
+    }
+  }, [supplierDetail, esProveedorOcasional, tipoBienes606, formaPago606, dueDateTouched])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Hint: cuando el usuario no dejó ninguna retención pero el proveedor tiene defaults,
+  // mostramos cuáles se aplicarían (con su tasa) para que quede explícito.
+  const retencionesDefaultHint = supplierDetail?.retencionesDefault ?? []
+  const pendingRetencionesHint =
+    retenciones.length === 0 && retencionesDefaultHint.length > 0
+      ? `Los retenciones por defecto del proveedor${
+          retencionesDefaultHint.length > 0 ? `: ${retencionesDefaultHint
+            .map((d) => `${retencionLabelMap.get(d.id) ?? d.id} (${d.tasa}%)`)
+            .join(', ')}` : ''
+        }.`
+      : null
+
+  // Igual que arriba, pero para impuestos (taxesTemplate / impuestoGastosDefault del proveedor).
+  const impuestoGastosDefaultHint = supplierDetail?.impuestoGastosDefault ?? []
+  const pendingImpuestosHint =
+    taxesTemplate.length === 0 && impuestoGastosDefaultHint.length > 0
+      ? `Los impuestos por defecto del proveedor${
+          impuestoGastosDefaultHint.length > 0 ? `: ${impuestoGastosDefaultHint
+            .map((d) => `${impuestosOptions.find((o) => o.id === d.id)?.label ?? d.id} (${d.tasa}%)`)
+            .join(', ')}` : ''
+        }.`
+      : null
 
   const saveMutation = useMutation({
     mutationFn: (dto: CreateGastoDto) => (isEdit ? updateGasto(id!, dto) : createGasto(dto)),
@@ -219,30 +322,72 @@ export default function GastoForm() {
   })
 
   const subtotal = items.reduce((sum, i) => sum + i.qty * i.rate, 0)
-  const grandTotal = subtotal
+
+  // Vista previa de impuestos: suma de rates de las líneas de los templates seleccionados.
+  // El BFF recalcula exactamente al someter; aquí es solo una estimación para el usuario.
+  const impuestoRate = ((taxesTemplates ?? []).filter((t) => taxesTemplate.includes(String(t.id)))
+    .reduce((sum, t) => sum + (t.taxes?.reduce((s, l) => s + (l.rate ?? 0), 0) ?? 0), 0))
+  const impuestoAmount = (impuestoRate / 100) * subtotal
+
+  // Vista previa de retenciones: suma de las tasas del proveedor para las retenciones seleccionadas.
+  const retencionRate = retenciones
+    .reduce((sum, id) => sum + (supplierDetail?.retencionesDefault?.find((d) => d.id === id)?.tasa ?? 0), 0)
+  const retencionAmount = (retencionRate / 100) * subtotal
+
+  const grandTotal = subtotal + impuestoAmount - retencionAmount
   const ncfValid = !ncfProveedor || NCF_REGEX.test(ncfProveedor)
   const isB17 = tipoComprobante === 'B17'
   const b17Error = isB17 && grandTotal > B17_MAX
+
+  const currency = (v: number) => new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(v)
 
   const updateItem = useCallback((idx: number, field: keyof ItemRow, value: string | number) => {
     setItems((prev) => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row))
   }, [])
 
   const selectCatalogItem = useCallback((idx: number, catalogItem: Item) => {
-    setItems((prev) => prev.map((row, i) => {
-      if (i !== idx) return row
-      return {
-        ...row,
-        itemCode: catalogItem.id,
-        itemLabel: catalogItem.itemName,
-        itemType: catalogItem.type,
-        description: catalogItem.internalDescription ?? catalogItem.itemName,
-        rate: catalogItem.standardRate ?? 0,
-        // Los servicios no se venden por cantidad — se fija en 1.
-        qty: catalogItem.type === 'service' ? 1 : row.qty,
-      }
-    }))
+    let wasLastRow = false
+    setItems((prev) => {
+      wasLastRow = idx === prev.length - 1
+      return prev.map((row, i) => {
+        if (i !== idx) return row
+        return {
+          ...row,
+          itemCode: catalogItem.id,
+          itemLabel: catalogItem.itemName,
+          itemType: catalogItem.type,
+          description: catalogItem.internalDescription ?? catalogItem.itemName,
+          rate: catalogItem.standardRate ?? 0,
+          // Los servicios no se venden por cantidad — se fija en 1.
+          qty: catalogItem.type === 'service' ? 1 : row.qty,
+        }
+      })
+    })
+    if (wasLastRow) setItems((prev) => [...prev, emptyItem()])
   }, [])
+
+  // Un concepto de catalog/cuentas-por-pagar no tiene precio propio — se registra en $0 y el
+  // usuario captura el monto real, igual que hoy hace con cualquier renglón de gasto.
+  const selectCuentaPorPagar = useCallback((idx: number, concepto: CuentaPorPagar) => {
+    let wasLastRow = false
+    setItems((prev) => {
+      wasLastRow = idx === prev.length - 1
+      return prev.map((row, i) => {
+        if (i !== idx) return row
+        return {
+          ...row,
+          itemCode: concepto.id,
+          itemLabel: concepto.titulo,
+          itemType: 'service',
+          description: concepto.descripcion ?? concepto.titulo,
+          rate: 0,
+          qty: 1,
+        }
+      })
+    })
+    if (!tipoBienes606 && concepto.tipoBienes606) setTipoBienes606(concepto.tipoBienes606)
+    if (wasLastRow) setItems((prev) => [...prev, emptyItem()])
+  }, [tipoBienes606])
 
   const clearCatalogItem = useCallback((idx: number) => {
     setItems((prev) => prev.map((row, i) =>
@@ -252,16 +397,34 @@ export default function GastoForm() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!supplierId) { toast.error('Selecciona un proveedor'); return }
+    if (esProveedorOcasional) {
+      if (!proveedorOcasionalNombre.trim()) { toast.error('Ingresa el nombre del proveedor ocasional'); return }
+    } else if (!supplierId) {
+      toast.error('Selecciona un proveedor')
+      return
+    }
     if (ncfProveedor && !NCF_REGEX.test(ncfProveedor)) { toast.error('NCF inválido (formato: B/E seguido de 10 dígitos)'); return }
     // La regla B17 y los campos 606 requeridos se validan al Someter, no al
     // guardar el borrador — un Draft debe poder guardarse siempre.
 
+    // Filas sin itemCode (ej. una fila agregada y luego vaciada) se ignoran — mismo
+    // criterio que aplica el backend, para dar feedback inmediato sin esperar el POST.
+    const validItems = items.filter((i) => i.itemCode)
+    if (validItems.length === 0) {
+      toast.error('Agrega al menos un artículo con itemCode')
+      return
+    }
+
     const dto: CreateGastoDto = {
-      supplier: supplierId,
+      ...(esProveedorOcasional
+        ? {
+            proveedorOcasionalNombre: proveedorOcasionalNombre || undefined,
+            proveedorOcasionalRnc: proveedorOcasionalRnc || undefined,
+          }
+        : { supplier: supplierId }),
       postingDate,
       dueDate: dueDate || undefined,
-      items: items.map((i) => ({
+      items: validItems.map((i) => ({
         itemCode: i.itemCode,
         description: i.description,
         qty: i.qty,
@@ -269,15 +432,16 @@ export default function GastoForm() {
         uom: i.uom || undefined,
       })),
       ncfProveedor: ncfProveedor || undefined,
+      billNo: billNo || undefined,
       tipoComprobante: tipoComprobante as CreateGastoDto['tipoComprobante'] || undefined,
       tipoBienes606: tipoBienes606 || undefined,
       formaPago606: formaPago606 || undefined,
       categoriaGasto: categoriaGasto as CreateGastoDto['categoriaGasto'] || undefined,
       esDeducible,
-      retencionIsr: retencionIsr || undefined,
-      retencionItbis: retencionItbis || undefined,
+      retenciones: retenciones.length > 0 ? retenciones : undefined,
       branch: branch || undefined,
       department: usaDepartamentos ? (department || undefined) : undefined,
+      taxesTemplate: taxesTemplate.length > 0 ? taxesTemplate : undefined,
     }
     saveMutation.mutate(dto)
   }
@@ -313,18 +477,66 @@ export default function GastoForm() {
             <div className="card-body">
               <div className="form-row form-row-3">
                 <div className="ff-wrap">
-                  <label className="ff-label">Proveedor <span className="ff-required">*</span></label>
-                  <SearchSelect
-                    id="supplier"
-                    value={supplierId}
-                    selectedLabel={supplierLabel}
-                    onChange={(newId, opt) => { setSupplierId(newId === '' ? '' : (opt?.value ?? newId)); setSupplierLabel(opt?.label ?? '') }}
-                    options={supplierOptions}
-                    onSearch={setSupplierQuery}
-                    loading={suppliersLoading}
-                    placeholder="Buscar proveedor…"
-                    error={!supplierId}
-                  />
+                  <label className="ff-label">
+                    {esProveedorOcasional ? 'Nombre del Vendedor' : <>Proveedor <span className="ff-required">*</span></>}
+                  </label>
+                  {esProveedorOcasional ? (
+                    <input
+                      className="ff-input"
+                      value={proveedorOcasionalNombre}
+                      onChange={(e) => setProveedorOcasionalNombre(e.target.value)}
+                      placeholder="Nombre del proveedor ocasional"
+                    />
+                  ) : (
+                    <SearchSelect
+                      id="supplier"
+                      value={supplierId}
+                      selectedLabel={supplierLabel}
+                      onChange={(newId, opt) => { setSupplierId(newId === '' ? '' : (opt?.value ?? newId)); setSupplierLabel(opt?.label ?? '') }}
+                      options={supplierOptions}
+                      onSearch={setSupplierQuery}
+                      loading={suppliersLoading}
+                      placeholder="Buscar proveedor…"
+                      error={!supplierId}
+                    />
+                  )}
+                </div>
+                {esProveedorOcasional && (
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="proveedorOcasionalRnc">RNC/Cédula (opcional)</label>
+                    <input
+                      id="proveedorOcasionalRnc"
+                      className="ff-input"
+                      value={proveedorOcasionalRnc}
+                      onChange={(e) => setProveedorOcasionalRnc(e.target.value)}
+                      placeholder="RNC/Cédula del vendedor"
+                    />
+                    <p className="ff-hint">Se recomienda llenarlo — alimenta el reporte fiscal 606.</p>
+                  </div>
+                )}
+                <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                    <input
+                      type="checkbox"
+                      checked={esProveedorOcasional}
+                      onChange={(e) => {
+                        setEsProveedorOcasional(e.target.checked)
+                        if (e.target.checked) {
+                          setSupplierId('')
+                          setSupplierLabel('')
+                        } else {
+                          setProveedorOcasionalNombre('')
+                          setProveedorOcasionalRnc('')
+                        }
+                      }}
+                    />
+                    Proveedor ocasional (sin registrar)
+                  </label>
+                  {esProveedorOcasional && (
+                    <p className="ff-hint" style={{ marginTop: 4 }}>
+                      Gasto a un vendedor sin cuenta registrada. No se requiere RNC/Cédula.
+                    </p>
+                  )}
                 </div>
                 <div className="ff-wrap">
                   <label className="ff-label">Fecha <span className="ff-required">*</span></label>
@@ -332,7 +544,11 @@ export default function GastoForm() {
                 </div>
                 <div className="ff-wrap">
                   <label className="ff-label">Fecha Vencimiento</label>
-                  <DatePicker value={dueDate} onChange={setDueDate} clearable />
+                  <DatePicker
+                    value={dueDate}
+                    onChange={(v) => { setDueDate(v); setDueDateTouched(true) }}
+                    clearable
+                  />
                 </div>
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal <span className="ff-required">*</span></label>
@@ -388,7 +604,10 @@ export default function GastoForm() {
                             selectedLabel={item.itemLabel}
                             onSelect={(catalogItem) => selectCatalogItem(idx, catalogItem)}
                             onClear={() => clearCatalogItem(idx)}
-                            placeholder="Buscar concepto…"
+                            placeholder="Buscar concepto de gasto…"
+                            excludeItems
+                            includeCuentasPorPagar
+                            onSelectCuentaPorPagar={(concepto) => selectCuentaPorPagar(idx, concepto)}
                           />
                         </td>
                         <td>
@@ -426,11 +645,23 @@ export default function GastoForm() {
                 <div className="items-total-row">
                   <div className="items-total-line">
                     <span>Subtotal</span>
-                    <span>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(subtotal)}</span>
+                    <span>{currency(subtotal)}</span>
                   </div>
+                  {impuestoAmount > 0 && (
+                    <div className="items-total-line" style={{ color: 'var(--text-secondary)' }}>
+                      <span>Impuesto ({impuestoRate.toFixed(2)}%)</span>
+                      <span>+ {currency(impuestoAmount)}</span>
+                    </div>
+                  )}
+                  {retencionAmount > 0 && (
+                    <div className="items-total-line" style={{ color: 'var(--text-secondary)' }}>
+                      <span>Retenciones ({retencionRate.toFixed(2)}%)</span>
+                      <span>- {currency(retencionAmount)}</span>
+                    </div>
+                  )}
                   <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
                     <span>Total</span>
-                    <strong>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(grandTotal)}</strong>
+                    <strong>{currency(grandTotal)}</strong>
                   </div>
                 </div>
               </div>
@@ -443,6 +674,8 @@ export default function GastoForm() {
               <Info size={14} />
               Información DGII y Clasificación
             </div>
+
+            {/* ── Comprobante fiscal ── */}
             <div className="form-row form-row-3">
               <div className="ff-wrap">
                 <label className="ff-label">NCF Proveedor</label>
@@ -464,6 +697,16 @@ export default function GastoForm() {
               </div>
 
               <div className="ff-wrap">
+                <label className="ff-label">N° Factura del Proveedor</label>
+                <input
+                  className="ff-input"
+                  placeholder="N° de factura del vendedor"
+                  value={billNo}
+                  onChange={(e) => setBillNo(e.target.value)}
+                />
+              </div>
+
+              <div className="ff-wrap">
                 <label className="ff-label">Tipo Comprobante</label>
                 <SearchSelect
                   value={tipoComprobante}
@@ -475,7 +718,10 @@ export default function GastoForm() {
                   error={isB17 && b17Error}
                 />
               </div>
+            </div>
 
+            {/* ── Clasificación 606 ── */}
+            <div className="form-row form-row-3" style={{ borderTop: '1px solid var(--border-subtle)', marginTop: 16, paddingTop: 16 }}>
               <div className="ff-wrap">
                 <label className="ff-label">Tipo de Bienes 606</label>
                 <SearchSelect
@@ -506,15 +752,39 @@ export default function GastoForm() {
                   {CATEGORIA_GASTO.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                 </Select>
               </div>
+            </div>
 
+            {/* ── Impuestos y retenciones ── */}
+            <div className="form-row form-row-3" style={{ borderTop: '1px solid var(--border-subtle)', marginTop: 16, paddingTop: 16 }}>
               <div className="ff-wrap">
-                <label className="ff-label">Retención ISR (RD$)</label>
-                <input type="number" min="0" step="0.01" className="ff-input" value={retencionIsr} onChange={(e) => setRetencionIsr(parseFloat(e.target.value) || 0)} />
+                <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
+                <MultiSearchSelect
+                  id="taxesTemplate"
+                  value={taxesTemplate}
+                  onChange={setTaxesTemplate}
+                  options={impuestosOptions}
+                  placeholder="Buscar plantilla…"
+                  emptyLabel="No hay plantillas configuradas."
+                />
+                <p className="ff-hint">Si no eliges ninguno, se usa el template por defecto del proveedor o de la compañía.</p>
+                {pendingImpuestosHint && <p className="ff-hint">{pendingImpuestosHint}</p>}
               </div>
 
               <div className="ff-wrap">
-                <label className="ff-label">Retención ITBIS (RD$)</label>
-                <input type="number" min="0" step="0.01" className="ff-input" value={retencionItbis} onChange={(e) => setRetencionItbis(parseFloat(e.target.value) || 0)} />
+                <label className="ff-label" htmlFor="retenciones">Retenciones</label>
+                <MultiSearchSelect
+                  id="retenciones"
+                  value={retenciones}
+                  onChange={setRetenciones}
+                  options={retencionesOptions}
+                  placeholder="Buscar retención…"
+                  emptyLabel="No hay retenciones configuradas."
+                />
+                <p className="ff-hint">
+                  El BFF calcula el monto de cada una a partir de la tasa configurada; si dejas la lista
+                  vacía se usan las retenciones por defecto del proveedor.
+                </p>
+                {pendingRetencionesHint && <p className="ff-hint">{pendingRetencionesHint}</p>}
               </div>
 
               <div className="ff-wrap" style={{ justifyContent: 'flex-end' }}>

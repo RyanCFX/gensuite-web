@@ -19,6 +19,9 @@ import type {
   PricingRule,
   CreatePricingRuleDto,
   UpdatePricingRuleDto,
+  CuentaPorPagar,
+  CreateCuentaPorPagarDto,
+  UpdateCuentaPorPagarDto,
 } from './types'
 
 // ---- Items ----
@@ -96,6 +99,8 @@ export async function toggleItem(id: string) {
 
 export interface ListCategoriesParams extends PaginationParams {
   tree?: boolean
+  /** Solo categorías que aplican a este tipo de artículo (aplicaA = 'Ambas' o el tipo pedido) */
+  type?: 'product' | 'service'
 }
 
 export async function listCategories(params?: ListCategoriesParams) {
@@ -236,4 +241,31 @@ export async function updatePricingRule(id: string, data: UpdatePricingRuleDto) 
 export async function togglePricingRule(id: string) {
   const res = await client.post<{ success: true; data: PricingRule }>(ENDPOINTS.catalog.pricingRules.toggle(id))
   return unwrap(res)
+}
+
+// ─── Cuentas por Pagar (conceptos recurrentes de gasto) ───────────────────────
+
+export async function listCuentasPorPagar(params?: PaginationParams) {
+  const res = await client.get<PaginatedResponse<CuentaPorPagar>>(ENDPOINTS.catalog.cuentasPorPagar.list, { params })
+  return unwrapPaginated(res)
+}
+
+export async function getCuentaPorPagar(id: string) {
+  const res = await client.get<{ success: true; data: CuentaPorPagar }>(ENDPOINTS.catalog.cuentasPorPagar.byId(id))
+  return unwrap(res)
+}
+
+export async function createCuentaPorPagar(data: CreateCuentaPorPagarDto) {
+  const res = await client.post<{ success: true; data: CuentaPorPagar }>(ENDPOINTS.catalog.cuentasPorPagar.list, data)
+  return unwrap(res)
+}
+
+export async function updateCuentaPorPagar(id: string, data: UpdateCuentaPorPagarDto) {
+  const res = await client.put<{ success: true; data: CuentaPorPagar }>(ENDPOINTS.catalog.cuentasPorPagar.byId(id), data)
+  return unwrap(res)
+}
+
+/** Desactiva el concepto (disabled=1) — no hay eliminación real ni forma de reactivarlo desde la API. */
+export async function deleteCuentaPorPagar(id: string) {
+  await client.delete(ENDPOINTS.catalog.cuentasPorPagar.byId(id))
 }

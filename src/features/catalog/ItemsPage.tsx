@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { listItems, toggleItem, listCategories, listBrands } from '@/shared/api/catalog'
@@ -19,8 +19,6 @@ import { Select, SelectItem } from '@/components/ui/select'
 const PAGE_SIZE = 20
 
 function StockBadge({ item }: { item: Item }) {
-  if (item.type === 'service') return null
-
   const stock = item.currentStock ?? 0
   let status: 'in-stock' | 'low-stock' | 'out-stock'
   if (stock <= 0) status = 'out-stock'
@@ -58,9 +56,16 @@ function ItemTypeBadge({ item }: { item: Item }) {
 export default function ItemsPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const location = useLocation()
+
+  // Productos y Servicios son módulos separados que comparten esta implementación — el tipo
+  // queda fijo según la ruta desde la que se entró, nunca es elegible por el usuario.
+  const fixedType: 'product' | 'service' = location.pathname.startsWith('/catalogo/servicios') ? 'service' : 'product'
+  const isProduct = fixedType === 'product'
+  const basePath = isProduct ? '/inventario/productos' : '/catalogo/servicios'
+  const moduleLabel = isProduct ? 'Productos' : 'Servicios'
 
   const [search, setSearch] = useState('')
-  const [kindFilter, setKindFilter] = useState<'all' | 'product' | 'service'>('all')
   const [templateFilter, setTemplateFilter] = useState<'all' | 'template' | 'standalone'>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('')
   const [brandFilter, setBrandFilter] = useState<string>('')
@@ -86,7 +91,7 @@ export default function ItemsPage() {
     queryKey: [
       'items',
       {
-        search: debouncedSearch, kindFilter, templateFilter, categoryFilter, brandFilter, statusFilter, offset, orderBy,
+        search: debouncedSearch, fixedType, templateFilter, categoryFilter, brandFilter, statusFilter, offset, orderBy,
         stockUomFilter, hasWarrantyFilter, warrantyPeriodMin, warrantyPeriodMax,
         pricesMin, pricesMax, priceModeFilter, maxDiscountPctMin, maxDiscountPctMax, trackingTypeFilter,
       },
@@ -94,7 +99,7 @@ export default function ItemsPage() {
     queryFn: () =>
       listItems({
         search: debouncedSearch || undefined,
-        type: kindFilter === 'all' ? undefined : kindFilter,
+        type: fixedType,
         category: categoryFilter || undefined,
         brand: brandFilter || undefined,
         disabled: statusFilter === 'all' ? undefined : statusFilter === 'disabled' ? 'true' : 'false',
@@ -102,7 +107,7 @@ export default function ItemsPage() {
         limit: PAGE_SIZE,
         offset,
         orderBy: orderBy || undefined,
-        stockUom: stockUomFilter || undefined,
+        stockUom: isProduct ? (stockUomFilter || undefined) : undefined,
         hasWarranty: hasWarrantyFilter === 'all' ? undefined : hasWarrantyFilter === 'true',
         warrantyPeriodMin: warrantyPeriodMin ? Number(warrantyPeriodMin) : undefined,
         warrantyPeriodMax: warrantyPeriodMax ? Number(warrantyPeriodMax) : undefined,
@@ -111,7 +116,7 @@ export default function ItemsPage() {
         priceMode: priceModeFilter === 'all' ? undefined : priceModeFilter,
         maxDiscountPctMin: maxDiscountPctMin ? Number(maxDiscountPctMin) : undefined,
         maxDiscountPctMax: maxDiscountPctMax ? Number(maxDiscountPctMax) : undefined,
-        trackingType: trackingTypeFilter === 'all' ? undefined : trackingTypeFilter,
+        trackingType: isProduct ? (trackingTypeFilter === 'all' ? undefined : trackingTypeFilter) : undefined,
       }),
   })
 
@@ -167,12 +172,12 @@ export default function ItemsPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Artículos"
-        description={data ? `${data.meta.total} artículos` : undefined}
+        title={moduleLabel}
+        description={data ? `${data.meta.total} ${isProduct ? 'productos' : 'servicios'}` : undefined}
         action={
-          <button className="btn btn-primary" onClick={() => navigate('/inventario/articulos/nuevo')}>
+          <button className="btn btn-primary" onClick={() => navigate(`${basePath}/nuevo`)}>
             <Plus size={16} />
-            Nuevo Artículo
+            Nuevo {isProduct ? 'Producto' : 'Servicio'}
           </button>
         }
       />
@@ -188,14 +193,6 @@ export default function ItemsPage() {
               onChange={handleSearchChange}
             />
           </div>
-          <Select
-            value={kindFilter}
-            onValueChange={(val) => { setKindFilter(val as 'all' | 'product' | 'service'); setPage(1) }}
-          >
-            <SelectItem value="all">Todos los tipos</SelectItem>
-            <SelectItem value="product">Producto</SelectItem>
-            <SelectItem value="service">Servicio</SelectItem>
-          </Select>
           <div style={{ width: 200 }}>
             <SearchSelect
               value={categoryFilter}
@@ -245,16 +242,18 @@ export default function ItemsPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div style={{ width: 160 }}>
-            <SearchSelect
-              value={stockUomFilter}
-              onChange={(val) => { setStockUomFilter(val); setPage(1) }}
-              options={stockUomOptions}
-              onSearch={setStockUomSearch}
-              selectedLabel={stockUomFilter}
-              placeholder="Todas las UOM"
-            />
-          </div>
+          {isProduct && (
+            <div style={{ width: 160 }}>
+              <SearchSelect
+                value={stockUomFilter}
+                onChange={(val) => { setStockUomFilter(val); setPage(1) }}
+                options={stockUomOptions}
+                onSearch={setStockUomSearch}
+                selectedLabel={stockUomFilter}
+                placeholder="Todas las UOM"
+              />
+            </div>
+          )}
           <Select
             value={hasWarrantyFilter}
             onValueChange={(val) => { setHasWarrantyFilter(val as 'all' | 'true' | 'false'); setPage(1) }}
@@ -322,15 +321,17 @@ export default function ItemsPage() {
             value={maxDiscountPctMax}
             onChange={(e) => { setMaxDiscountPctMax(e.target.value); setPage(1) }}
           />
-          <Select
-            value={trackingTypeFilter}
-            onValueChange={(val) => { setTrackingTypeFilter(val as 'all' | 'none' | 'serial' | 'batch'); setPage(1) }}
-          >
-            <SelectItem value="all">Tracking: Todos</SelectItem>
-            <SelectItem value="none">Sin tracking</SelectItem>
-            <SelectItem value="serial">Serial</SelectItem>
-            <SelectItem value="batch">Lote</SelectItem>
-          </Select>
+          {isProduct && (
+            <Select
+              value={trackingTypeFilter}
+              onValueChange={(val) => { setTrackingTypeFilter(val as 'all' | 'none' | 'serial' | 'batch'); setPage(1) }}
+            >
+              <SelectItem value="all">Tracking: Todos</SelectItem>
+              <SelectItem value="none">Sin tracking</SelectItem>
+              <SelectItem value="serial">Serial</SelectItem>
+              <SelectItem value="batch">Lote</SelectItem>
+            </Select>
+          )}
         </div>
       </div>
 
@@ -341,12 +342,11 @@ export default function ItemsPage() {
             <tr>
               <SortableTh label="Código" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
               <SortableTh label="Nombre" sortKey="itemName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-              <th>Tipo</th>
-              <th>Rol</th>
+              {isProduct && <th>Rol</th>}
               <th>Categoría</th>
               <th>Marca</th>
               <SortableTh label="Precio" sortKey="standardRate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} align="right" />
-               <SortableTh label="Stock" sortKey="currentStock" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
+              {isProduct && <SortableTh label="Stock" sortKey="currentStock" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />}
                 <th>Estado</th>
                 <th>Descuento</th>
                 <th style={{ width: 48 }} />
@@ -356,7 +356,7 @@ export default function ItemsPage() {
             {isLoading
               ? Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 10 }).map((__, j) => (
+                    {Array.from({ length: isProduct ? 9 : 7 }).map((__, j) => (
                       <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                     ))}
                   </tr>
@@ -364,18 +364,18 @@ export default function ItemsPage() {
               : isError
                 ? (
                     <tr>
-                      <td colSpan={10} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
-                        Error al cargar los artículos
+                      <td colSpan={isProduct ? 9 : 7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
+                        Error al cargar {isProduct ? 'los productos' : 'los servicios'}
                       </td>
                     </tr>
                   )
                 : data?.items.length === 0
                   ? (
                       <tr>
-                        <td colSpan={10}>
+                        <td colSpan={isProduct ? 9 : 7}>
                           <div className="empty-state">
-                            <p className="empty-title">Sin artículos</p>
-                            <p className="empty-sub">No se encontraron artículos.</p>
+                            <p className="empty-title">{isProduct ? 'Sin productos' : 'Sin servicios'}</p>
+                            <p className="empty-sub">No se encontraron {isProduct ? 'productos' : 'servicios'}.</p>
                           </div>
                         </td>
                       </tr>
@@ -384,16 +384,11 @@ export default function ItemsPage() {
                       <tr
                         key={item.id}
                         className="table-row-clickable"
-                        onClick={() => navigate(`/inventario/articulos/${item.id}`)}
+                        onClick={() => navigate(`${basePath}/${item.id}`)}
                       >
                         <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.id}</td>
                         <td style={{ fontWeight: 500 }}>{item.itemName}</td>
-                        <td>
-                          <span className="badge badge-neutral">
-                            {item.type === 'product' ? 'Producto' : 'Servicio'}
-                          </span>
-                        </td>
-                        <td><ItemTypeBadge item={item} /></td>
+                        {isProduct && <td><ItemTypeBadge item={item} /></td>}
                         <td className="td-muted">
                           {item.subcategoryName
                             ? `${item.categoryName ?? item.category} > ${item.subcategoryName}`
@@ -405,7 +400,7 @@ export default function ItemsPage() {
               ? <span className="td-muted">—</span>
               : formatDOP(item.standardRate)}
           </td>
-          <td><StockBadge item={item} /></td>
+          {isProduct && <td><StockBadge item={item} /></td>}
           <td>
             <AutoDiscountBadge item={item} />
             {item.allowsDiscount === false
@@ -419,11 +414,11 @@ export default function ItemsPage() {
                         </td>
                         <td onClick={(e) => e.stopPropagation()} className="actions-cell">
                           <ActionsMenu>
-                            <ActionsMenuItem onClick={() => navigate(`/inventario/articulos/${item.id}`)}>
+                            <ActionsMenuItem onClick={() => navigate(`${basePath}/${item.id}`)}>
                               <Eye size={14} /> Ver detalle
                             </ActionsMenuItem>
                             {item.hasVariants && (
-                              <ActionsMenuItem onClick={() => navigate(`/inventario/articulos/${item.id}#variants`)}>
+                              <ActionsMenuItem onClick={() => navigate(`${basePath}/${item.id}#variants`)}>
                                 <Eye size={14} /> Ver variantes
                               </ActionsMenuItem>
                             )}

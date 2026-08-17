@@ -3,19 +3,16 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
-  getCompra, submitCompra, cancelCompra, amendCompra, returnCompra, deleteCompra, downloadCompraPdf, getCompraPdfBlobUrl,
+  getCompra, submitCompra, cancelCompra, amendCompra, deleteCompra, downloadCompraPdf, getCompraPdfBlobUrl,
 } from '@/shared/api/compras-gastos'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
-import { Send, X, RotateCcw, Undo2, Info, FileText, Trash2, Eye } from 'lucide-react'
+import { Send, X, RotateCcw, Undo2, Info, FileText, Trash2, Eye, BookOpen } from 'lucide-react'
 import { PdfFormatButton } from '@/components/shared/PdfFormatButton'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import type { FormatoImpresion } from '@/shared/api/types'
-import { ConfirmModal } from '@/shared/ui/Modal'
-import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
-import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | 'delete' | null
 
@@ -25,8 +22,6 @@ export default function CompraDetail() {
   const queryClient = useQueryClient()
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
-  const [showReturn, setShowReturn] = useState(false)
-  const [returnQtys, setReturnQtys] = useState<Record<string, number>>({})
 
   const { data: compra, isLoading, isError } = useQuery({
     queryKey: ['compra', id],
@@ -100,20 +95,6 @@ export default function CompraDetail() {
     },
   })
 
-  const returnMutation = useMutation({
-    mutationFn: () => {
-      const items = Object.entries(returnQtys)
-        .filter(([, qty]) => qty > 0)
-        .map(([itemCode, qty]) => ({ itemCode, qty }))
-      return returnCompra(id!, items)
-    },
-    onSuccess: () => { toast.success('Devolución registrada'); queryClient.invalidateQueries({ queryKey: ['compra', id] }); queryClient.invalidateQueries({ queryKey: ['compras'] }); setShowReturn(false) },
-    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al registrar la devolución'),
-  })
-
-  const returnIsDirty = useDirtyCheck(returnQtys, showReturn)
-  const returnClose = useConfirmClose(returnIsDirty, () => setShowReturn(false))
-
   function handleConfirm() {
     if (confirmAction === 'submit') submitMutation.mutate()
     else if (confirmAction === 'cancel') cancelMutation.mutate()
@@ -164,7 +145,7 @@ export default function CompraDetail() {
 
       <PageHeader
         title={`Compra ${compra.id}`}
-        description={compra.supplierName}
+        description={compra.esProveedorOcasional ? (compra.proveedorOcasionalNombre ?? compra.supplierName) : compra.supplierName}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {compra.status === 'draft' && (
@@ -201,8 +182,20 @@ export default function CompraDetail() {
                 <button className="btn btn-secondary btn-size-sm" onClick={() => setConfirmAction('amend')}>
                   <RotateCcw size={14} />Enmendar
                 </button>
-                <button className="btn btn-secondary btn-size-sm" onClick={() => { setReturnQtys({}); setShowReturn(true) }}>
+                <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/devoluciones-compras/nueva?originalInvoice=${encodeURIComponent(id!)}`)}>
                   <Undo2 size={14} />Devolución
+                </button>
+                <button
+                  className="btn btn-secondary btn-size-sm"
+                  onClick={() => {
+                    const postingDate = compra.postingDate.split('T')[0]
+                    navigate(
+                      `/contabilidad/libro-diario?voucherNo=${encodeURIComponent(compra.id)}` +
+                      `&voucherType=Purchase+Invoice&fromDate=${postingDate}&toDate=${postingDate}`,
+                    )
+                  }}
+                >
+                  <BookOpen size={14} />Ver asientos
                 </button>
               </>
             )}
@@ -225,8 +218,23 @@ export default function CompraDetail() {
           <div className="fields-grid fields-grid-3">
             <div className="detail-field">
               <span className="detail-label">Proveedor</span>
-              <span className="detail-value">{compra.supplierName}</span>
+              <span className="detail-value">
+                {compra.esProveedorOcasional ? (
+                  <span>
+                    {compra.proveedorOcasionalNombre ?? compra.supplierName}
+                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 6 }}>(ocasional)</span>
+                  </span>
+                ) : (
+                  compra.supplierName
+                )}
+              </span>
             </div>
+            {compra.esProveedorOcasional && compra.proveedorOcasionalRnc && (
+              <div className="detail-field">
+                <span className="detail-label">RNC/Cédula</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{compra.proveedorOcasionalRnc}</span>
+              </div>
+            )}
             <div className="detail-field">
               <span className="detail-label">Fecha</span>
               <span className="detail-value">{formatDate(compra.postingDate)}</span>
@@ -297,6 +305,10 @@ export default function CompraDetail() {
               <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{compra.ncfProveedor ?? '—'}</span>
             </div>
             <div className="detail-field">
+              <span className="detail-label">N° Factura del Proveedor</span>
+              <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{compra.billNo ?? '—'}</span>
+            </div>
+            <div className="detail-field">
               <span className="detail-label">Tipo de Bienes</span>
               <span className="detail-value">{getTipoBienesLabel(compra.tipoBienes606)}</span>
             </div>
@@ -311,6 +323,10 @@ export default function CompraDetail() {
             <div className="detail-field">
               <span className="detail-label">Retención ISR</span>
               <span className="detail-value">{formatDOP(compra.retencionIsr)}</span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">Retención ITBIS</span>
+              <span className="detail-value">{formatDOP(compra.retencionItbis)}</span>
             </div>
           </div>
         </div>
@@ -338,54 +354,6 @@ export default function CompraDetail() {
           </div>
         </div>
       )}
-
-      {/* Return Modal */}
-      {showReturn && (
-        <div className="modal-overlay" onClick={returnClose.requestClose}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <h2 className="modal-title">Registrar Devolución</h2>
-              <button className="modal-close" onClick={returnClose.requestClose}>×</button>
-            </div>
-            <div className="modal-body" style={{ maxHeight: 320 }}>
-              <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Selecciona los artículos y cantidades a devolver.</p>
-              {compra.items.map((item) => (
-                <div key={item.itemCode} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 500 }}>{item.itemCode}</p>
-                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{item.itemCode} — Qty: {item.qty}</p>
-                  </div>
-                  <input
-                    type="number"
-                    min="0"
-                    max={item.qty}
-                    step="1"
-                    className="ff-input"
-                    style={{ width: 96, textAlign: 'right' }}
-                    value={returnQtys[item.itemCode] ?? 0}
-                    onChange={(e) => setReturnQtys((prev) => ({ ...prev, [item.itemCode]: parseFloat(e.target.value) || 0 }))}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={returnClose.requestClose}>Cancelar</button>
-              <button className="btn btn-primary" onClick={() => returnMutation.mutate()} disabled={returnMutation.isPending}>
-                {returnMutation.isPending ? 'Procesando…' : 'Registrar Devolución'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      <ConfirmModal
-        open={returnClose.confirming}
-        onClose={returnClose.cancelDiscard}
-        onConfirm={returnClose.confirmDiscard}
-        title="¿Descartar cambios?"
-        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
-        confirmLabel="Descartar cambios"
-        variant="danger"
-      />
       <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
     </div>
   )

@@ -537,7 +537,7 @@ function VariantsPanel({ itemId, item }: { itemId: string; item: Item }) {
                     <tr
                       key={v.id}
                       className="table-row-clickable"
-                      onClick={() => navigate(`/inventario/articulos/${v.id}`)}
+                      onClick={() => navigate(`/inventario/productos/${v.id}`)}
                     >
                       <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{v.id}</td>
                       <td style={{ fontWeight: 500 }}>{v.itemName}</td>
@@ -1015,12 +1015,17 @@ export default function ItemDetail() {
     return (
       <div className="page-container">
         <p style={{ color: 'var(--color-error)' }}>Error al cargar el artículo</p>
-        <button className="btn btn-ghost" style={{ marginTop: 16 }} onClick={() => navigate('/inventario/articulos')}>
+        <button className="btn btn-ghost" style={{ marginTop: 16 }} onClick={() => navigate(-1)}>
           Volver
         </button>
       </div>
     )
   }
+
+  // Productos y Servicios son módulos separados — las rutas de vuelta/edición dependen del tipo
+  // real del artículo cargado, sin importar desde qué módulo se haya llegado a esta pantalla.
+  const basePath = item.type === 'product' ? '/inventario/productos' : '/catalogo/servicios'
+  const moduleLabel = item.type === 'product' ? 'Productos' : 'Servicios'
 
   const stock = item.currentStock ?? 0
   let stockStatus: 'in-stock' | 'low-stock' | 'out-stock'
@@ -1044,8 +1049,8 @@ export default function ItemDetail() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <a className="page-back-link" onClick={() => navigate('/inventario/articulos')}>
-            <ArrowLeft size={14} /> Artículos
+          <a className="page-back-link" onClick={() => navigate(basePath)}>
+            <ArrowLeft size={14} /> {moduleLabel}
           </a>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Package size={20} style={{ color: 'var(--text-secondary)' }} />
@@ -1060,7 +1065,7 @@ export default function ItemDetail() {
           <p className="page-sub" style={{ fontFamily: 'monospace' }}>{item.id}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={() => navigate(`/inventario/articulos/${item.id}/editar`)}>
+          <button className="btn btn-secondary" onClick={() => navigate(`${basePath}/${item.id}/editar`)}>
             <Pencil size={15} /> Editar
           </button>
           {!item.hasVariants && (
@@ -1086,7 +1091,7 @@ export default function ItemDetail() {
           Variante de:{' '}
           <a
             style={{ fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-            onClick={() => navigate(`/inventario/articulos/${item.variantOf}`)}
+            onClick={() => navigate(`/inventario/productos/${item.variantOf}`)}
           >
             {item.variantOf}
           </a>

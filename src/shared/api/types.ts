@@ -154,6 +154,14 @@ export type UpdateCustomerDto = Partial<
 // ─── Supplier ─────────────────────────────────────────────────────────────────
 // tipoIdentificacion IS required for suppliers.
 
+/** Enriquecimiento de findOne (`/suppliers/:id` only): un id junto con la tasa vigente
+ *  resuelta en vivo por el backend (retenciones: `tax_withholding_rate`;
+ *  impuestos: suma de `rate` del template). El listado paginado no enriquece. */
+export interface ProveedorIdTasa {
+  id: string;
+  tasa: number;
+}
+
 export interface Supplier {
   id: string;
   supplierName: string;
@@ -181,6 +189,15 @@ export interface Supplier {
   defaultFormaPago606?: string | null;
   defaultTipoPagoProveedor?: "Contado" | "Crédito" | null;
   cuentaCxpDefault?: string | null;
+  /** En findOne viene enriquecido como `{id, tasa}[]`; en listado no se enriquece. */
+  retencionesDefault?: ProveedorIdTasa[];
+  /** Purchase Taxes and Charges Templates (config/impuestos-compras) aplicados por defecto al crear
+   *  una Compra a este proveedor si no se especifica `taxesTemplate` explícito — el backend combina
+   *  las líneas de impuesto de todos los templates configurados en un solo documento.
+   *  En findOne viene enriquecido como `{id, tasa}[]`. */
+  impuestoComprasDefault?: ProveedorIdTasa[];
+  /** Igual que `impuestoComprasDefault` pero para Gastos (mismo catálogo de templates). */
+  impuestoGastosDefault?: ProveedorIdTasa[];
   createdAt: string;
   modifiedAt: string;
 }
@@ -209,6 +226,9 @@ export interface CreateProveedorDto {
   defaultFormaPago606?: string | null;
   defaultTipoPagoProveedor?: "Contado" | "Crédito" | null;
   cuentaCxpDefault?: string | null;
+  retencionesDefault?: string[];
+  impuestoComprasDefault?: string[];
+  impuestoGastosDefault?: string[];
 }
 
 export type UpdateProveedorDto = Partial<CreateProveedorDto>;
@@ -611,6 +631,112 @@ export interface DevolucionDetail {
   modifiedAt: string;
 }
 
+// ─── Devoluciones de Compras ──────────────────────────────────────────────────
+// Flujo independiente de Compras: nota de crédito de compra con ciclo de vida
+// Draft → Submitted → (Cancelled | Amended) y aplicación de saldo a CxP.
+
+export type DevolucionCompraStatus = 'draft' | 'submitted' | 'cancelled'
+
+export interface DevolucionCompraItemDto {
+  itemCode: string
+  /** Siempre positiva en el request; el backend la convierte a negativa. */
+  qty: number
+}
+
+export interface CreateDevolucionCompraDto {
+  /** Factura de compra (Purchase Invoice) original que se está devolviendo. */
+  originalInvoice: string
+  /** Cada itemCode debe existir en la factura original, o 400 del BFF. */
+  items: DevolucionCompraItemDto[]
+  /** Fecha contable. Opcional (default: hoy). Formato yyyy-mm-dd. */
+  postingDate?: string
+  /** Motivo (se guarda en `terms`). Opcional. */
+  reason?: string
+}
+
+export interface UpdateDevolucionCompraDto {
+  /** Reemplaza las líneas de la devolución en Draft. */
+  items?: DevolucionCompraItemDto[]
+  postingDate?: string
+  reason?: string
+}
+
+/** A dónde se aplicó (o a dónde está pendiente) el saldo de una devolución. */
+export interface DevolucionCompraAppliedTo {
+  invoiceId: string
+  amount: number
+  /** 'pending' = la CxP destino sigue en Draft (enlace sin efecto contable); 'reconciled' = sometida y conciliada. */
+  status: 'pending' | 'reconciled'
+  /** Journal Entry real de la reconciliación — solo cuando status === 'reconciled'. */
+  journalEntryId: string | null
+}
+
+/** Línea de artículo en el detalle de una devolución (qty negativa). */
+export interface DevolucionCompraItem {
+  itemCode: string
+  description?: string
+  qty: number
+  rate: number
+  amount: number
+  warehouse?: string
+  uom?: string
+}
+
+/** Entidad principal de Devoluciones de Compras (listado y detalle). */
+export interface DevolucionCompra {
+  id: string
+  supplier: string
+  supplierName: string
+  /** Factura de compra (Purchase Invoice) original que se está devolviendo. */
+  originalInvoice: string
+  originalInvoiceNcf?: string | null
+  postingDate: string
+  /** Se persiste en `terms`. */
+  reason?: string
+  status: DevolucionCompraStatus
+  amendedFrom?: string
+  /** NCF propio de la devolución (solo cuando está sometida). */
+  ncf?: string | null
+  ncfAfectado?: string | null
+  currency?: string
+  grandTotal: number
+  taxAmount?: number
+  items: DevolucionCompraItem[]
+  /** Presentes solo para devoluciones sometidas. */
+  appliedAmount?: number
+  availableAmount?: number
+  outstandingAmount?: number
+  appliedTo?: DevolucionCompraAppliedTo[]
+  createdAt?: string
+  modifiedAt?: string
+}
+
+export interface SaldoFavorDevolucionCompraEntry {
+  devolucionId: string
+  ncf?: string | null
+  postingDate: string
+  grandTotal: number
+  appliedAmount: number
+  availableAmount: number
+  appliedTo: DevolucionCompraAppliedTo[]
+}
+
+/** GET /devoluciones-compras/saldo-favor/{supplierId} */
+export interface SaldoFavorDevolucionCompraResult {
+  supplier: string
+  balance: number
+  entries: SaldoFavorDevolucionCompraEntry[]
+}
+
+/** Resultado de aplicar / desaplicar saldo a una CxP. */
+export interface AplicarCxpResult {
+  invoiceId: string
+  devolucionId: string
+  amount: number
+  status: 'pending' | 'reconciled'
+  journalEntryId: string | null
+}
+
 export interface DebitNote {
   id: string;
   status: "Draft" | "Submitted" | "Cancelled";
@@ -695,13 +821,14 @@ export interface ItemPrices {
 export interface Item {
   id: string;
   itemName: string;
-  category: string;
+  /** Requerida para Productos; no aplica a Servicios */
+  category?: string;
   categoryName?: string;
   subcategory?: string;
   subcategoryName?: string;
   brand?: string;
   brandName?: string;
-  type: "product" | "service";
+  type: "product" | "service" | "combo";
   standardRate: number;
   prices?: ItemPrices;
   valuationRate?: number;
@@ -736,6 +863,8 @@ export interface Item {
   purchasePriceDate?: string;
   salesPriceDate?: string;
   autoDiscount?: AutoDiscount;
+  /** Componentes del combo (cuando type === 'combo') */
+  components?: { itemCode: string; qty: number }[];
 }
 
 export interface AutoDiscount {
@@ -748,7 +877,8 @@ export interface AutoDiscount {
 export interface CreateItemDto {
   itemCode?: string; // optional, BFF can auto-generate
   itemName: string;
-  category: string;
+  /** Requerida para Productos; no aplica a Servicios */
+  category?: string;
   subcategory?: string;
   brand?: string;
   type: "product" | "service";
@@ -781,6 +911,43 @@ export interface CreateItemDto {
 }
 
 export type UpdateItemDto = Partial<CreateItemDto>;
+
+// ─── Cuentas por Pagar (catálogo de conceptos recurrentes de gasto) ───────────
+// Catálogo separado de Productos/Servicios — nunca se venden, solo sirven para
+// prellenar un Gasto (ej. "Alquiler de oficina", "Servicios de limpieza").
+
+export type TipoDocumentoCuentaPorPagar = "Factura" | "Pago" | "Nota de Crédito" | "Nota de Débito" | "Devolución";
+
+export interface CuentaPorPagar {
+  id: string;
+  titulo: string;
+  descripcion?: string;
+  tipoDocumento: TipoDocumentoCuentaPorPagar;
+  /** Cuenta contable default al registrar un Gasto con este concepto */
+  cuenta?: string;
+  /** Default para prellenar el 606 (ver GET /config/catalogos-fiscales → tipoBienes606) */
+  tipoBienes606?: string;
+  claseFiscal?: "Bienes" | "Servicios";
+  /** Item Tax Template aplicado por defecto */
+  impuesto?: string;
+  /** Tasa del `impuesto`, calculada por el servidor — solo lectura */
+  impuestoPct?: number;
+  disabled: boolean;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+export interface CreateCuentaPorPagarDto {
+  titulo: string;
+  descripcion?: string;
+  tipoDocumento: TipoDocumentoCuentaPorPagar;
+  cuenta?: string;
+  tipoBienes606?: string;
+  claseFiscal?: "Bienes" | "Servicios";
+  impuesto?: string;
+}
+
+export type UpdateCuentaPorPagarDto = Partial<CreateCuentaPorPagarDto>;
 
 // PUT /catalog/items/:id/precios — atajo para actualizar solo precios (y modo de precio/márgenes),
 // sin el payload completo de edición. Todos los campos opcionales; solo se actualiza lo que se
@@ -1012,6 +1179,8 @@ export interface VerifyPinResponse {
   canOverridePrice: boolean;
 }
 
+export type CategoriaAplicaA = "Ambas" | "Productos" | "Servicios";
+
 export interface Category {
   id: string;
   name: string;
@@ -1023,6 +1192,8 @@ export interface Category {
   /** El que realmente controla el Costo de Mercancía Vendida en facturas/notas de entrega */
   defaultCogsAccount?: string;
   itemCodePrefix?: string;
+  /** Restringe a qué tipo de artículo puede asignarse esta categoría/subcategoría. Default "Ambas" */
+  aplicaA?: CategoriaAplicaA;
   children?: Category[];
 }
 
@@ -1031,6 +1202,7 @@ export interface CreateCategoryDto {
   parentCategory?: string;
   isGroup?: boolean;
   image?: string;
+  aplicaA?: CategoriaAplicaA;
 }
 
 export interface UpdateCategoryDto {
@@ -1042,6 +1214,7 @@ export interface UpdateCategoryDto {
   expenseAccount?: string;
   defaultCogsAccount?: string;
   itemCodePrefix?: string;
+  aplicaA?: CategoriaAplicaA;
 }
 
 export interface Brand {
@@ -1428,6 +1601,12 @@ export interface Compra {
   id: string;
   supplier: string;
   supplierName: string;
+  /** Indica si la compra se registró a un proveedor ocasional (sin registrar). */
+  esProveedorOcasional?: boolean;
+  /** Nombre del vendedor ocasional (solo presente cuando esProveedorOcasional=true). */
+  proveedorOcasionalNombre?: string;
+  /** RNC/Cédula del vendedor ocasional (solo presente cuando esProveedorOcasional=true). */
+  proveedorOcasionalRnc?: string;
   postingDate: string;
   dueDate: string;
   branch?: string | null;
@@ -1439,15 +1618,25 @@ export interface Compra {
   /** Monto total de impuestos del documento (Purchase Taxes and Charges), si se aplicó un template */
   taxAmount?: number;
   ncfProveedor?: string;
+  /** N° de factura del proveedor (native field `bill_no` en ERPNext) */
+  billNo?: string | null;
   tipoBienes606?: string;
   formaPago606?: string;
+  retencionItbis?: number;
   retencionIsr?: number;
   tipoPago?: "Contado" | "Crédito";
   amendedFrom?: string;
+  /** Saldo pendiente de la factura de compra (para aplicar devoluciones/DP). */
+  outstandingAmount?: number;
 }
 
 export interface CreateCompraDto {
-  supplier: string;
+  /** Proveedor registrado. Exactamente uno de `supplier`/`proveedorOcasionalNombre` es requerido. */
+  supplier?: string;
+  /** Nombre del vendedor cuando la compra es a alguien sin registrar como proveedor. No enviar junto con `supplier`. */
+  proveedorOcasionalNombre?: string;
+  /** RNC/Cédula del vendedor ocasional (sin registrar como proveedor). Se usa en el reporte 606 en vez del RNC del Supplier genérico. */
+  proveedorOcasionalRnc?: string;
   postingDate: string;
   dueDate?: string;
   branch?: string;
@@ -1471,8 +1660,10 @@ export interface CreateCompraDto {
     // NO description
   }[];
   ncfProveedor?: string;
+  billNo?: string;
   tipoBienes606?: string;
   formaPago606?: string;
+  retencionItbis?: number;
   retencionIsr?: number;
   tipoPago?: "Contado" | "Crédito";
   /** ID de un Purchase Taxes and Charges Template (/config/impuestos-compras). Si se omite, se usa el default de la compañía si existe. */
@@ -1538,6 +1729,7 @@ export type UpdatePurchaseReceiptDto = Partial<CreatePurchaseReceiptDto>;
 export interface FacturarPurchaseReceiptDto {
   dueDate?: string;
   ncfProveedor?: string;
+  billNo?: string;
   tipoBienes606?: string;
   formaPago606?: string;
   retencionItbis?: number;
@@ -1563,6 +1755,12 @@ export interface Gasto {
   id: string;
   supplier: string;
   supplierName: string;
+  /** Indica si el gasto se registró a un proveedor ocasional (sin registrar). */
+  esProveedorOcasional?: boolean;
+  /** Nombre del vendedor ocasional (solo presente cuando esProveedorOcasional=true). */
+  proveedorOcasionalNombre?: string;
+  /** RNC/Cédula del vendedor ocasional (solo presente cuando esProveedorOcasional=true). */
+  proveedorOcasionalRnc?: string;
   postingDate: string;
   dueDate: string;
   branch?: string | null;
@@ -1572,13 +1770,25 @@ export interface Gasto {
   items: GastoItem[];
   total: number;
   grandTotal: number;
+  /** Monto total de impuestos del documento (Purchase Taxes and Charges), si se aplicó un template */
+  taxAmount?: number;
   outstandingAmount: number;
   ncfProveedor?: string;
+  /** N° de factura del proveedor (native field `bill_no` en ERPNext) */
+  billNo?: string | null;
   tipoComprobante?: "B01" | "B13" | "B14" | "B15" | "B16" | "B17" | "E31";
   tipoBienes606?: string;
   formaPago606?: string;
-  retencionItbis?: number;
-  retencionIsr?: number;
+  /** Retenciones aplicadas al gasto, enriquecidas con su tasa vigente (igual que
+   *  Supplier.retencionesDefault en el GET de detalle — no confundir con el `string[]` de ids
+   *  que se envía en CreateGastoDto). */
+  retenciones?: ProveedorIdTasa[];
+  /** Purchase Taxes and Charges Templates aplicados al documento, enriquecidos con su tasa
+   *  (igual que Supplier.impuestoGastosDefault en el GET de detalle). */
+  taxesTemplate?: ProveedorIdTasa[];
+  /** Líneas de impuesto ya resueltas por el BFF a partir de `taxesTemplate` (una por cada
+   *  Purchase Taxes and Charges Template/componente aplicado, con su tasa). Solo lectura. */
+  impuestos?: ProveedorIdTasa[];
   categoriaGasto?: "Operativo" | "Administrativo" | "Ventas" | "Financiero";
   esDeducible?: boolean;
   amendedFrom?: string;
@@ -1588,7 +1798,12 @@ export interface Gasto {
 }
 
 export interface CreateGastoDto {
-  supplier: string;
+  /** Proveedor registrado. Exactamente uno de `supplier`/`proveedorOcasionalNombre` es requerido. */
+  supplier?: string;
+  /** Nombre del vendedor cuando el gasto es a alguien sin registrar como proveedor. No enviar junto con `supplier`. */
+  proveedorOcasionalNombre?: string;
+  /** RNC/Cédula del vendedor ocasional (sin registrar como proveedor). Se usa en el reporte 606 en vez del RNC del Supplier genérico. */
+  proveedorOcasionalRnc?: string;
   postingDate: string;
   dueDate?: string;
   branch?: string;
@@ -1603,13 +1818,19 @@ export interface CreateGastoDto {
     description?: string; // allowed in GastoItemDto
   }[];
   ncfProveedor?: string;
+  billNo?: string;
   tipoComprobante?: "B01" | "B13" | "B14" | "B15" | "B16" | "B17" | "E31";
   tipoBienes606?: string;
   formaPago606?: string;
-  retencionItbis?: number;
-  retencionIsr?: number;
   categoriaGasto?: "Operativo" | "Administrativo" | "Ventas" | "Financiero";
   esDeducible?: boolean;
+  /** Ids de config/retenciones a aplicar (multiselect). Si se omite, el BFF aplica las retenciones
+   *  configuradas como default del proveedor. */
+  retenciones?: string[];
+  /** IDs de Purchase Taxes and Charges Templates (/config/impuestos-compras) a aplicar (multiselect).
+   *  Si se omite, se usan los `impuestoGastosDefault` del proveedor si existen, y si no el default
+   *  de la compañía. */
+  taxesTemplate?: string[];
 }
 
 export type UpdateGastoDto = Partial<CreateGastoDto>;
@@ -1784,16 +2005,11 @@ export interface TaxTemplateLine {
   addDeductTax?: TaxLineAddDeduct;
 }
 
+/** Solo lectura — generada y gestionada automáticamente desde config/tasas-impuesto */
 export interface TaxTemplate {
   id: string;
   title: string;
   isDefault: boolean;
-  taxes: TaxTemplateLine[];
-}
-
-export interface CreateTaxTemplateDto {
-  title: string;
-  isDefault?: boolean;
   taxes: TaxTemplateLine[];
 }
 
@@ -1807,16 +2023,57 @@ export interface ItemTaxLine {
   notApplicable?: boolean;
 }
 
+/** Solo lectura — generada y gestionada automáticamente desde config/tasas-impuesto */
 export interface ItemTaxTemplate {
   id: string;
   title: string;
   taxes: ItemTaxLine[];
 }
 
-export interface CreateItemTaxTemplateDto {
-  title: string;
-  taxes: ItemTaxLine[];
+// ─── Tasas de Impuesto (catálogo de impuestos base + combos) ──────────────────
+
+export interface TasaImpuestoComponente {
+  /** ID (name de ERPNext) del impuesto base que compone este combo */
+  impuestoBaseId: string;
+  /** 100 = suma completa de la tasa. Ej. 30 = "30% de este impuesto" (retenciones) */
+  factor?: number;
 }
+
+export interface TasaImpuesto {
+  id: string;
+  nombre: string;
+  /** Cuenta contable (Account) que representa este impuesto en los templates */
+  account: string;
+  /** Cuenta contable a usar específicamente en compras/gastos. Si se omite/"" se usa `account`. */
+  accountCompras?: string;
+  esCombo: boolean;
+  /** Tasa en porcentaje. Si esCombo=true, la calcula el backend */
+  tasa?: number;
+  componentes?: TasaImpuestoComponente[];
+  descripcion?: string;
+  /** El backend gestiona sola la plantilla interna correspondiente (Item Tax Template) */
+  aplicaArticulos?: boolean;
+  /** El backend gestiona sola la plantilla interna de Ventas y la deja como default de la compañía */
+  aplicaVentas?: boolean;
+  /** El backend gestiona sola la plantilla interna de Compras y la deja como default de la compañía */
+  aplicaCompras?: boolean;
+}
+
+export interface CreateTasaImpuestoDto {
+  nombre: string;
+  account: string;
+  /** Cuenta contable a usar específicamente en compras/gastos. Si se omite/"" se usa `account`. */
+  accountCompras?: string;
+  esCombo?: boolean;
+  tasa?: number;
+  componentes?: TasaImpuestoComponente[];
+  aplicaArticulos?: boolean;
+  aplicaVentas?: boolean;
+  aplicaCompras?: boolean;
+  descripcion?: string;
+}
+
+export type UpdateTasaImpuestoDto = Partial<CreateTasaImpuestoDto>;
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -1884,6 +2141,10 @@ export interface FacturacionConfig {
   usaDepartamentos?: boolean;
   /** Si está en false, oculta el selector de plantilla de Impuesto de Documento en Factura, Cotización y Compra. Puramente de presentación. Default true. */
   usaImpuestoDocumento?: boolean;
+  /** Name de la plantilla dedicada de Sales Taxes and Charges Template (generada desde config/tasas-impuesto) marcada como default de ventas para la compañía. null para quitar el default. */
+  plantillaImpuestoVentasDefault?: string | null;
+  /** Name de la plantilla dedicada de Purchase Taxes and Charges Template (generada desde config/tasas-impuesto) marcada como default de compras para la compañía. null para quitar el default. */
+  plantillaImpuestoComprasDefault?: string | null;
   /** true si el módulo POS (turnos de caja) está activo para este tenant. */
   usaModuloPos?: boolean;
   /** Nombre del POS Profile provisionado — solo informativo, no editable desde aquí. */
@@ -2986,13 +3247,39 @@ export type UpdateBuyingSettingsDto = Partial<BuyingSettings>;
 
 // ─── Retenciones (Tax Withholding Category) ───────────────────────────────────
 
+export interface RetencionComponente {
+  /** id (name de ERPNext) de un impuesto de config/tasas-impuesto */
+  impuestoBaseId: string;
+  /** 100 = tasa completa del impuesto referenciado, 30 = "30% de este impuesto". Default 100 */
+  factor?: number;
+}
+
+/** Tramo de retención tal como lo devuelve el backend (lectura) */
 export interface RetencionRate {
+  /** Calculado por ERPNext a partir de `componentes` — solo lectura, nunca se envía al guardar */
   taxWithholdingRate: number;
-  fromDate: string;
-  toDate: string;
+  componentes: RetencionComponente[];
+  /** undefined = sin límite inferior */
+  fromDate?: string;
+  /** undefined = sin límite superior */
+  toDate?: string;
   singleThreshold?: number | null;
   cumulativeThreshold?: number | null;
   taxWithholdingGroup?: string | null;
+}
+
+/** Tramo de retención al crear/editar — sin `taxWithholdingRate` (lo calcula el backend) */
+export interface CreateRetencionRateDto {
+  /** Mínimo 1 elemento */
+  componentes: RetencionComponente[];
+  /** Omitir la clave = sin límite inferior */
+  fromDate?: string;
+  /** Omitir la clave = sin límite superior */
+  toDate?: string;
+  singleThreshold?: number | null;
+  cumulativeThreshold?: number | null;
+  /** Nunca enviar string vacío — omitir la clave */
+  taxWithholdingGroup?: string;
 }
 
 export interface RetencionListItem {
@@ -3012,7 +3299,7 @@ export interface Retencion {
 export interface CreateRetencionDto {
   name: string;
   taxDeductionBasis?: string;
-  rates: RetencionRate[];
+  rates: CreateRetencionRateDto[];
   account?: string;
 }
 

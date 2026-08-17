@@ -1113,7 +1113,13 @@ export default function InvoiceDetail() {
             </button>
             <button
               className="btn btn-secondary btn-size-sm"
-              onClick={() => navigate(`/contabilidad/libro-diario?voucherNo=${encodeURIComponent(invoice.id)}&voucherType=Sales+Invoice`)}
+              onClick={() => {
+                const postingDate = invoice.postingDate.split('T')[0]
+                navigate(
+                  `/contabilidad/libro-diario?voucherNo=${encodeURIComponent(invoice.id)}` +
+                  `&voucherType=Sales+Invoice&fromDate=${postingDate}&toDate=${postingDate}`,
+                )
+              }}
             >
               <BookOpen size={14} /> Ver asientos
             </button>

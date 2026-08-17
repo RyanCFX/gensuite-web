@@ -5,15 +5,18 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { createSupplier, updateSupplier } from '@/shared/api/suppliers'
-import type { ApiError, Supplier } from '@/shared/api/types'
-import { listGruposProveedores, getCatalogosFiscales, listPaises, listBancos } from '@/shared/api/config'
+import { listRetenciones } from '@/shared/api/retenciones'
+import type { ApiError, Supplier, CreateProveedorDto, UpdateProveedorDto } from '@/shared/api/types'
+import { listGruposProveedores, getCatalogosFiscales, listPaises, listBancos, listImpuestosCompras } from '@/shared/api/config'
 import { validateRNCDetailed, validateCedulaDetailed, formatRNC, formatCedula } from '@/lib/validators/dgii'
 import { TIPO_IDENTIFICACION } from '@/lib/constants'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { MultiSelectChecklist } from '@/shared/ui/MultiSelectChecklist'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { CheckCircle2, XCircle } from 'lucide-react'
+
 
 const schema = z
   .object({
@@ -38,6 +41,9 @@ const schema = z
     defaultFormaPago606: z.string().optional(),
     defaultTipoPagoProveedor: z.string().optional(),
     cuentaCxpDefault: z.string().optional(),
+    retencionesDefault: z.array(z.string()).optional(),
+    impuestoComprasDefault: z.array(z.string()).optional(),
+    impuestoGastosDefault: z.array(z.string()).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.tipoIdentificacion === 'RNC' && data.rnc) {
@@ -113,6 +119,23 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
     queryFn: listBancos,
     staleTime: 60 * 60_000,
   })
+
+  const { data: retencionesData } = useQuery({
+    queryKey: ['retenciones-all'],
+    queryFn: () => listRetenciones({ limit: 100 }),
+    staleTime: 60_000,
+  })
+  const retencionesOptions = retencionesData?.items ?? []
+  const [retencionSearch, setRetencionSearch] = useState('')
+
+  // Mismo catálogo de templates para ambos selectores — cada campo guarda cuáles aplican según el contexto.
+  const { data: impuestosComprasData } = useQuery({
+    queryKey: ['impuestos-compras'],
+    queryFn: listImpuestosCompras,
+    staleTime: 5 * 60_000,
+  })
+  const [impuestoComprasSearch, setImpuestoComprasSearch] = useState('')
+  const [impuestoGastosSearch, setImpuestoGastosSearch] = useState('')
   const [bancoSearch, setBancoSearch] = useState('')
   const bancoOptions: SearchSelectOption[] = useMemo(() => {
     const q = bancoSearch.toLowerCase()
@@ -154,6 +177,9 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
       defaultFormaPago606: '',
       defaultTipoPagoProveedor: '',
       cuentaCxpDefault: '',
+      retencionesDefault: [],
+      impuestoComprasDefault: [],
+      impuestoGastosDefault: [],
     },
   })
 
@@ -181,6 +207,9 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
         defaultFormaPago606: supplier.defaultFormaPago606 ?? '',
         defaultTipoPagoProveedor: supplier.defaultTipoPagoProveedor ?? '',
         cuentaCxpDefault: supplier.cuentaCxpDefault ?? '',
+        retencionesDefault: (supplier.retencionesDefault ?? []).map((d) => d.id),
+        impuestoComprasDefault: (supplier.impuestoComprasDefault ?? []).map((d) => d.id),
+        impuestoGastosDefault: (supplier.impuestoGastosDefault ?? []).map((d) => d.id),
       })
     }
   }, [supplier, reset])
@@ -190,7 +219,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
       createSupplier({
         supplierName: data.supplierName,
         supplierType: data.supplierType,
-        tipoIdentificacion: data.tipoIdentificacion,
+        tipoIdentificacion: data.tipoIdentificacion as CreateProveedorDto['tipoIdentificacion'],
         rnc: data.rnc || undefined,
         cedula: data.cedula || undefined,
         esProveedorExterior: data.esProveedorExterior,
@@ -202,13 +231,16 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
         emailPagos: data.emailPagos || undefined,
         mobileNo: data.mobileNo || undefined,
         banco: data.banco || undefined,
-        tipoCuenta: data.tipoCuenta || undefined,
+        tipoCuenta: (data.tipoCuenta || undefined) as UpdateProveedorDto['tipoCuenta'],
         numeroCuenta: data.numeroCuenta || undefined,
         abaSwift: data.abaSwift || undefined,
         defaultTipoBienes606: data.defaultTipoBienes606 || undefined,
         defaultFormaPago606: data.defaultFormaPago606 || undefined,
         defaultTipoPagoProveedor: (data.defaultTipoPagoProveedor || undefined) as 'Contado' | 'Crédito' | undefined,
         cuentaCxpDefault: data.cuentaCxpDefault || undefined,
+        retencionesDefault: data.retencionesDefault && data.retencionesDefault.length > 0 ? data.retencionesDefault : undefined,
+        impuestoComprasDefault: data.impuestoComprasDefault ?? [],
+        impuestoGastosDefault: data.impuestoGastosDefault ?? [],
       }),
     onSuccess: (data) => {
       toast.success('Proveedor creado correctamente')
@@ -226,7 +258,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<FormValues>) => updateSupplier(supplier!.id, data as Partial<Supplier>),
+    mutationFn: (data: Partial<FormValues>) => updateSupplier(supplier!.id, data as unknown as UpdateProveedorDto),
     onSuccess: (data) => {
       toast.success('Proveedor actualizado correctamente')
       queryClient.invalidateQueries({ queryKey: ['suppliers'] })
@@ -265,7 +297,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
   const cedulaValid = cedulaDetail?.valid ?? null
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: 20, alignItems: 'start' }}>
+    <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* General info */}
         <div className="card">
@@ -415,10 +447,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
             </div>
           </div>
         </div>
-      </div>
 
-      {/* ════════════════ COLUMNA DERECHA ════════════════ */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* Proveedor Exterior */}
         <div className="card">
           <div className="card-header">
@@ -461,7 +490,6 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                       />
                     )}
                   />
-                  <p className="ff-hint">El país se guarda tal cual lo maneja ERPNext (en inglés).</p>
                 </div>
               )}
             </div>
@@ -475,92 +503,117 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
           </div>
           <div className="card-body">
             <div className="form-section">
-              <div className="ff-wrap">
-                <label className="ff-label">Banco</label>
-                <Controller
-                  name="banco"
-                  control={control}
-                  render={({ field }) => (
-                    <SearchSelect
-                      value={field.value ?? ''}
-                      onChange={(val) => field.onChange(val)}
-                      options={bancoOptions}
-                      onSearch={setBancoSearch}
-                      selectedLabel={field.value ?? ''}
-                      placeholder="Ej: Banco Popular"
-                    />
-                  )}
-                />
+              <div className="form-row">
+                <div className="ff-wrap">
+                  <label className="ff-label">Banco</label>
+                  <Controller
+                    name="banco"
+                    control={control}
+                    render={({ field }) => (
+                      <SearchSelect
+                        value={field.value ?? ''}
+                        onChange={(val) => field.onChange(val)}
+                        options={bancoOptions}
+                        onSearch={setBancoSearch}
+                        selectedLabel={field.value ?? ''}
+                        placeholder="Ej: Banco Popular"
+                      />
+                    )}
+                  />
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label">Tipo de Cuenta</label>
+                  <Controller
+                    name="tipoCuenta"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value ?? ''} onValueChange={field.onChange} placeholder="Seleccionar">
+                        <SelectItem value="Corriente">Corriente</SelectItem>
+                        <SelectItem value="Ahorros">Ahorros</SelectItem>
+                        <SelectItem value="Internacional">Internacional</SelectItem>
+                      </Select>
+                    )}
+                  />
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label">Número de Cuenta</label>
+                  <input className="ff-input" {...register('numeroCuenta')} />
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label">ABA / SWIFT</label>
+                  <input className="ff-input" {...register('abaSwift')} placeholder="Código ABA o SWIFT" />
+                </div>
               </div>
-              <div className="ff-wrap">
-                <label className="ff-label">Tipo de Cuenta</label>
-                <Controller
-                  name="tipoCuenta"
-                  control={control}
-                  render={({ field }) => (
-                    <Select value={field.value ?? ''} onValueChange={field.onChange} placeholder="Seleccionar">
-                      <SelectItem value="Corriente">Corriente</SelectItem>
-                      <SelectItem value="Ahorros">Ahorros</SelectItem>
-                      <SelectItem value="Internacional">Internacional</SelectItem>
-                    </Select>
-                  )}
-                />
-              </div>
-              <div className="ff-wrap">
-                <label className="ff-label">Número de Cuenta</label>
-                <input className="ff-input" {...register('numeroCuenta')} />
-              </div>
-              <div className="ff-wrap">
-                <label className="ff-label">ABA / SWIFT</label>
-                <input className="ff-input" {...register('abaSwift')} placeholder="Código ABA o SWIFT" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ════════════════ COLUMNA DERECHA ════════════════ */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* Clasificación fiscal 606 — compartida entre Compras y Gastos */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Clasificación Fiscal (606)</span>
+          </div>
+          <div className="card-body">
+            <p className="ff-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+              Prellenan el reporte 606 al registrar una Compra o un Gasto a este proveedor.
+            </p>
+            <div className="form-section">
+              <div className="form-row">
+                <div className="ff-wrap">
+                  <label className="ff-label">Tipo de Bienes/Servicios</label>
+                  <Controller
+                    name="defaultTipoBienes606"
+                    control={control}
+                    render={({ field }) => (
+                      <SearchSelect
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        options={defaultTipoBienes606Options}
+                        onSearch={setDefaultTipoBienes606Search}
+                        selectedLabel={catalogos?.tipoBienes606?.find((t) => t.value === field.value)?.label ?? ''}
+                        placeholder="Sin configurar"
+                      />
+                    )}
+                  />
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label">Forma de Pago</label>
+                  <Controller
+                    name="defaultFormaPago606"
+                    control={control}
+                    render={({ field }) => (
+                      <SearchSelect
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        options={defaultFormaPago606Options}
+                        onSearch={setDefaultFormaPago606Search}
+                        selectedLabel={catalogos?.formaPago606?.find((t) => t.value === field.value)?.label ?? ''}
+                        placeholder="Sin configurar"
+                      />
+                    )}
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Defaults de compra */}
+        {/* Defaults de Compras (bienes) */}
         <div className="card">
           <div className="card-header">
-            <span className="card-title">Valores por Defecto de Compra</span>
+            <span className="card-title">Compras (bienes)</span>
           </div>
           <div className="card-body">
+            <p className="ff-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+              Se aplican automáticamente al registrar una Compra a este proveedor, si el usuario no elige
+              un valor explícito en el formulario.
+            </p>
             <div className="form-section">
               <div className="ff-wrap">
-                <label className="ff-label">Tipo de Bienes/Servicios (606) por Defecto</label>
-                <Controller
-                  name="defaultTipoBienes606"
-                  control={control}
-                  render={({ field }) => (
-                    <SearchSelect
-                      value={field.value ?? ''}
-                      onChange={field.onChange}
-                      options={defaultTipoBienes606Options}
-                      onSearch={setDefaultTipoBienes606Search}
-                      selectedLabel={catalogos?.tipoBienes606?.find((t) => t.value === field.value)?.label ?? ''}
-                      placeholder="Sin configurar"
-                    />
-                  )}
-                />
-              </div>
-              <div className="ff-wrap">
-                <label className="ff-label">Forma de Pago (606) por Defecto</label>
-                <Controller
-                  name="defaultFormaPago606"
-                  control={control}
-                  render={({ field }) => (
-                    <SearchSelect
-                      value={field.value ?? ''}
-                      onChange={field.onChange}
-                      options={defaultFormaPago606Options}
-                      onSearch={setDefaultFormaPago606Search}
-                      selectedLabel={catalogos?.formaPago606?.find((t) => t.value === field.value)?.label ?? ''}
-                      placeholder="Sin configurar"
-                    />
-                  )}
-                />
-              </div>
-              <div className="ff-wrap">
-                <label className="ff-label">Tipo de Pago por Defecto</label>
+                <label className="ff-label">Tipo de Pago</label>
                 <Controller
                   name="defaultTipoPagoProveedor"
                   control={control}
@@ -589,6 +642,85 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                 <p className="ff-hint">
                   Si se configura, las compras a este proveedor afectan esta cuenta en vez de la cuenta CxP
                   default de la empresa. Dejar vacío para usar el default.
+                </p>
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Impuestos del Documento</label>
+                <Controller
+                  name="impuestoComprasDefault"
+                  control={control}
+                  render={({ field }) => (
+                    <MultiSelectChecklist
+                      value={field.value ?? []}
+                      onChange={field.onChange}
+                      options={(impuestosComprasData ?? []).map((t) => ({ id: String(t.id), label: t.title }))}
+                      search={impuestoComprasSearch}
+                      onSearchChange={setImpuestoComprasSearch}
+                      searchPlaceholder="Buscar plantilla…"
+                      emptyLabel="No hay plantillas configuradas."
+                    />
+                  )}
+                />
+                <p className="ff-hint">
+                  Purchase Taxes and Charges Templates aplicados al total de la compra si no se elige ninguno
+                  explícito — si eliges varios, sus líneas de impuesto se combinan en el mismo documento.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Defaults de Gastos (servicios) */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Gastos (servicios)</span>
+          </div>
+          <div className="card-body">
+            <p className="ff-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+              Se aplican automáticamente al registrar un Gasto a este proveedor, si el usuario no elige un
+              valor explícito en el formulario. No afectan a Compras.
+            </p>
+            <div className="form-section">
+              <div className="ff-wrap">
+                <label className="ff-label">Impuestos del Documento</label>
+                <Controller
+                  name="impuestoGastosDefault"
+                  control={control}
+                  render={({ field }) => (
+                    <MultiSelectChecklist
+                      value={field.value ?? []}
+                      onChange={field.onChange}
+                      options={(impuestosComprasData ?? []).map((t) => ({ id: String(t.id), label: t.title }))}
+                      search={impuestoGastosSearch}
+                      onSearchChange={setImpuestoGastosSearch}
+                      searchPlaceholder="Buscar plantilla…"
+                      emptyLabel="No hay plantillas configuradas."
+                    />
+                  )}
+                />
+                <p className="ff-hint">Mismo catálogo de templates que Compras, aplicado a Gastos en su lugar — puedes elegir varios.</p>
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Retenciones por Defecto</label>
+                <Controller
+                  name="retencionesDefault"
+                  control={control}
+                  render={({ field }) => (
+                    <MultiSelectChecklist
+                      value={field.value ?? []}
+                      onChange={field.onChange}
+                      options={retencionesOptions.map((r) => ({ id: r.id, label: r.categoryName }))}
+                      search={retencionSearch}
+                      onSearchChange={setRetencionSearch}
+                      searchPlaceholder="Buscar retención…"
+                      emptyLabel="No hay retenciones configuradas."
+                    />
+                  )}
+                />
+                <p className="ff-hint">
+                  Estas retenciones se aplican por defecto al registrar un Gasto a este proveedor (el BFF
+                  calcula el monto correspondiente a partir de la tasa de cada una). La retención no
+                  corresponde a compra de bienes según las reglas fiscales RD, por eso no aplica en Compras.
                 </p>
               </div>
             </div>

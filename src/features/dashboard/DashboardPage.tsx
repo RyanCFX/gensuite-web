@@ -418,7 +418,7 @@ export default function DashboardPage() {
                   </div>
                 </>
               )}
-              <Link to="/inventario/articulos" className="list-card-footer">
+              <Link to="/inventario/productos" className="list-card-footer">
                 Ver catálogo <ArrowRight size={13} />
               </Link>
             </div>

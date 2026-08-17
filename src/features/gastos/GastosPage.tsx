@@ -213,6 +213,7 @@ export default function GastosPage() {
                   <SortableTh label="Proveedor" sortKey="supplierName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
                   <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
                   <th>NCF</th>
+                  <th>N° Factura</th>
                   <th>Categoría</th>
                   <th>Deducible</th>
                   <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} align="right" />
@@ -223,7 +224,7 @@ export default function GastosPage() {
                 {isLoading
                   ? Array.from({ length: 8 }).map((_, i) => (
                       <tr key={i}>
-                        {Array.from({ length: 8 }).map((__, j) => (
+                        {Array.from({ length: 9 }).map((__, j) => (
                           <td key={j}><span className="skeleton-box" style={{ height: 16, width: '100%', display: 'block' }} /></td>
                         ))}
                       </tr>
@@ -231,7 +232,7 @@ export default function GastosPage() {
                   : isError
                     ? (
                         <tr>
-                          <td colSpan={8} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
+                          <td colSpan={9} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
                             Error al cargar los gastos
                           </td>
                         </tr>
@@ -239,7 +240,7 @@ export default function GastosPage() {
                     : data?.items.length === 0
                       ? (
                           <tr>
-                            <td colSpan={8}>
+                            <td colSpan={9}>
                               <div className="empty-state">
                                 <div className="empty-icon"><Plus size={20} /></div>
                                 <p className="empty-title">Sin gastos</p>
@@ -254,9 +255,19 @@ export default function GastosPage() {
                       : data?.items.map((g) => (
                           <tr key={g.id} className="table-row-clickable" onClick={() => navigate(`/gastos/${g.id}`)}>
                             <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{g.id}</td>
-                            <td style={{ fontWeight: 500 }}>{g.supplierName}</td>
+                            <td style={{ fontWeight: 500 }}>
+                              {g.esProveedorOcasional
+                                ? (
+                                    <span>
+                                      {g.proveedorOcasionalNombre ?? g.supplierName}
+                                      {' '}<span className="badge badge-warning">Ocasional</span>
+                                    </span>
+                                  )
+                                : g.supplierName}
+                            </td>
                             <td>{formatDate(g.postingDate)}</td>
                             <td className="td-muted" style={{ fontFamily: 'var(--font-mono)' }}>{g.ncfProveedor ?? '—'}</td>
+                            <td className="td-muted" style={{ fontFamily: 'var(--font-mono)' }}>{g.billNo ?? '—'}</td>
                             <td className="td-muted">{g.categoriaGasto ?? '—'}</td>
                             <td>
                               {g.esDeducible
