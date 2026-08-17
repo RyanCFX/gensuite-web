@@ -9,6 +9,10 @@ export const DOC_STATUS_LABELS: Record<string, string> = {
   draft: 'Borrador',
   submitted: 'Sometido',
   cancelled: 'Cancelado',
+  // Estados de devolución post-sometida (ruta devoluciones) que indican disponibilidad de saldo:
+  available: 'Disponible',
+  partially_used: 'Parcialmente usada',
+  fully_used: 'Agotada',
 }
 
 export const DOC_STATUS_COLOR: Record<string, string> = {

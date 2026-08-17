@@ -100,6 +100,12 @@ export interface JwtPayload {
 // API schema: CreateCustomerDto does NOT have tipoIdentificacion.
 // Identification type is inferred from rnc/cedula presence.
 
+export interface TelefonoCliente {
+  telefono: string;
+  /** Libre — solo para identificarlo en la UI (ej. "Oficina", "Celular", "WhatsApp"). No es un enum fijo. */
+  etiqueta?: string;
+}
+
 export interface Customer {
   id: string;
   customerName: string;
@@ -121,6 +127,18 @@ export interface Customer {
   isSystemManaged?: boolean;
   customerGroup?: string;
   priceTier?: "A" | "B" | "C";
+  /** Reemplaza conceptualmente a `phone` para múltiples teléfonos — solo viene poblado en GET /customers/:id. */
+  telefonos?: TelefonoCliente[];
+  /** Nombre del Branch — solo para filtrar/agrupar clientes en la UI, sin efecto contable. */
+  branch?: string;
+  /** Mode of Payment por defecto — prellena el método de pago al facturar a este cliente. */
+  formaPagoDefault?: string;
+  /** Cuenta contable (Account) alterna para la CxC de este cliente — si se omite, se usa el default de la compañía. */
+  cuentaCxcDefault?: string;
+  /** Email del usuario (User) responsable de la cobranza de este cliente. */
+  encargadoCxc?: string;
+  /** IDs de Sales Taxes and Charges Template — prellenan el impuesto al facturar a este cliente. Solo viene poblado en GET /customers/:id. */
+  impuestoVentasDefault?: string[];
   createdAt: string;
   modifiedAt: string;
 }
@@ -143,6 +161,12 @@ export interface CreateCustomerDto {
   birthday?: string;
   photo?: string;
   customerGroup?: string;
+  telefonos?: TelefonoCliente[];
+  branch?: string;
+  formaPagoDefault?: string;
+  cuentaCxcDefault?: string;
+  encargadoCxc?: string;
+  impuestoVentasDefault?: string[];
 }
 
 export type UpdateCustomerDto = Partial<
@@ -156,10 +180,14 @@ export type UpdateCustomerDto = Partial<
 
 /** Enriquecimiento de findOne (`/suppliers/:id` only): un id junto con la tasa vigente
  *  resuelta en vivo por el backend (retenciones: `tax_withholding_rate`;
- *  impuestos: suma de `rate` del template). El listado paginado no enriquece. */
+ *  impuestos: suma de `rate` del template). El listado paginado no enriquece.
+ *  En `GET /gastos/:id` cada item de `retenciones`/`impuestos` incluye además
+ *  `monto` con el valor exacto ya calculado de la retención/línea de impuesto. */
 export interface ProveedorIdTasa {
   id: string;
   tasa: number;
+  /** Monto exacto calculado de la retención/línea de impuesto (solo en GET /gastos/:id). */
+  monto?: number;
 }
 
 export interface Supplier {
@@ -669,6 +697,14 @@ export interface DevolucionCompraAppliedTo {
   status: 'pending' | 'reconciled'
   /** Journal Entry real de la reconciliación — solo cuando status === 'reconciled'. */
   journalEntryId: string | null
+  /** Datos de la factura destino (Purchase Invoice), enriquecidos por el BFF para no requerir un fetch aparte. */
+  ncfProveedor?: string | null
+  tipoComprobante?: string | null
+  billNo?: string | null
+  postingDate?: string
+  grandTotal?: number
+  outstandingAmount?: number
+  invoiceStatus?: 'draft' | 'submitted' | 'cancelled'
 }
 
 /** Línea de artículo en el detalle de una devolución (qty negativa). */
@@ -925,9 +961,10 @@ export interface CuentaPorPagar {
   tipoDocumento: TipoDocumentoCuentaPorPagar;
   /** Cuenta contable default al registrar un Gasto con este concepto */
   cuenta?: string;
-  /** Default para prellenar el 606 (ver GET /config/catalogos-fiscales → tipoBienes606) */
-  tipoBienes606?: string;
-  claseFiscal?: "Bienes" | "Servicios";
+  /** Tipo de gasto fiscal: Bienes o Servicios */
+  tipoBienes606?: "Bienes" | "Servicios";
+  /** Categoría 606 de la DGII (ej. "03 - Arrendamientos"). Default para prellenar el tipoBienes606 al registrar un Gasto con este concepto (ver GET /config/catalogos-fiscales → tipoBienes606). Se puede mandar el código corto o el string completo; el backend lo normaliza. */
+  claseFiscal?: string;
   /** Item Tax Template aplicado por defecto */
   impuesto?: string;
   /** Tasa del `impuesto`, calculada por el servidor — solo lectura */
@@ -942,8 +979,8 @@ export interface CreateCuentaPorPagarDto {
   descripcion?: string;
   tipoDocumento: TipoDocumentoCuentaPorPagar;
   cuenta?: string;
-  tipoBienes606?: string;
-  claseFiscal?: "Bienes" | "Servicios";
+  tipoBienes606?: "Bienes" | "Servicios";
+  claseFiscal?: string;
   impuesto?: string;
 }
 
@@ -1624,6 +1661,12 @@ export interface Compra {
   formaPago606?: string;
   retencionItbis?: number;
   retencionIsr?: number;
+  /** Retenciones aplicadas a la compra con su tasa vigente y monto exacto calculado (solo GET /compras/:id). */
+  retenciones?: ProveedorIdTasa[];
+  /** Líneas de impuesto ya resueltas por el BFF a partir de `taxesTemplate` (una por cada template/componente aplicado, con su tasa y monto exacto). */
+  impuestos?: ProveedorIdTasa[];
+  /** Purchase Taxes and Charges Templates aplicados al documento, enriquecidos con su tasa. */
+  taxesTemplate?: ProveedorIdTasa[];
   tipoPago?: "Contado" | "Crédito";
   amendedFrom?: string;
   /** Saldo pendiente de la factura de compra (para aplicar devoluciones/DP). */
@@ -1663,11 +1706,15 @@ export interface CreateCompraDto {
   billNo?: string;
   tipoBienes606?: string;
   formaPago606?: string;
-  retencionItbis?: number;
-  retencionIsr?: number;
   tipoPago?: "Contado" | "Crédito";
-  /** ID de un Purchase Taxes and Charges Template (/config/impuestos-compras). Si se omite, se usa el default de la compañía si existe. */
-  taxesTemplate?: string;
+  /** IDs de Purchase Taxes and Charges Templates (/config/impuestos-compras) a aplicar — admite varios,
+   *  las líneas de todos los templates se combinan en el documento. Si se omite, se usan los defaults
+   *  configurados en el proveedor o el default de la compañía si existe. */
+  taxesTemplate?: string[];
+  /** Retenciones (ids de Tax Withholding Category) que aplican a esta Compra — el monto retenido
+   *  lo calcula el backend (tasa × base) a partir de estas; nunca se manda un monto.
+   *  Si se omite, se usan las retenciones por defecto del proveedor. */
+  retenciones?: string[];
 }
 
 export type UpdateCompraDto = Partial<CreateCompraDto>;

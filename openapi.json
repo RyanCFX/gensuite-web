@@ -2794,6 +2794,15 @@
             "schema": {
               "type": "number"
             }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por sucursal (custom_branch)",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -20257,6 +20266,23 @@
           }
         }
       },
+      "TelefonoClienteDto": {
+        "type": "object",
+        "properties": {
+          "telefono": {
+            "type": "string",
+            "example": "809-555-0100"
+          },
+          "etiqueta": {
+            "type": "string",
+            "example": "Oficina",
+            "description": "Solo para identificarlo en la UI (ej. \"Oficina\", \"Celular\", \"WhatsApp\")."
+          }
+        },
+        "required": [
+          "telefono"
+        ]
+      },
       "CreateCustomerDto": {
         "type": "object",
         "properties": {
@@ -20323,6 +20349,42 @@
             "type": "string",
             "example": "Clientes Premium",
             "description": "Nombre del grupo de clientes en ERPNext"
+          },
+          "telefonos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelefonoClienteDto"
+            }
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Solo para filtrar/agrupar clientes — no afecta los asientos de las facturas."
+          },
+          "formaPagoDefault": {
+            "type": "string",
+            "example": "Tarjeta de Crédito",
+            "description": "Mode of Payment por defecto de este cliente — para prellenar el formulario de nueva factura/cotización (ver GET /config/metodos-pago). Editable por documento."
+          },
+          "cuentaCxcDefault": {
+            "type": "string",
+            "example": "112-01-002 - CxC Especial - JBC",
+            "description": "Cuenta contable por defecto al facturar a este cliente. Si se omite, ERPNext usa el default de la compañía (112-01 - CUENTAS POR COBRAR CLIENTES)."
+          },
+          "encargadoCxc": {
+            "type": "string",
+            "example": "cobros@empresa.com",
+            "description": "Email del usuario (User) responsable de la cobranza de este cliente."
+          },
+          "impuestoVentasDefault": {
+            "example": [
+              "ITBIS 18% - JB"
+            ],
+            "description": "IDs de template(s) de impuestos de venta (Sales Taxes and Charges Template) — admite varios, para prellenar el formulario de nueva factura/cotización a este cliente.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -20396,6 +20458,42 @@
             "type": "string",
             "example": "Clientes Premium",
             "description": "Nombre del grupo de clientes en ERPNext"
+          },
+          "telefonos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelefonoClienteDto"
+            }
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Solo para filtrar/agrupar clientes — no afecta los asientos de las facturas."
+          },
+          "formaPagoDefault": {
+            "type": "string",
+            "example": "Tarjeta de Crédito",
+            "description": "Mode of Payment por defecto de este cliente — para prellenar el formulario de nueva factura/cotización (ver GET /config/metodos-pago). Editable por documento."
+          },
+          "cuentaCxcDefault": {
+            "type": "string",
+            "example": "112-01-002 - CxC Especial - JBC",
+            "description": "Cuenta contable por defecto al facturar a este cliente. Si se omite, ERPNext usa el default de la compañía (112-01 - CUENTAS POR COBRAR CLIENTES)."
+          },
+          "encargadoCxc": {
+            "type": "string",
+            "example": "cobros@empresa.com",
+            "description": "Email del usuario (User) responsable de la cobranza de este cliente."
+          },
+          "impuestoVentasDefault": {
+            "example": [
+              "ITBIS 18% - JB"
+            ],
+            "description": "IDs de template(s) de impuestos de venta (Sales Taxes and Charges Template) — admite varios, para prellenar el formulario de nueva factura/cotización a este cliente.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -23139,17 +23237,18 @@
             "example": "61-01-002 - Alquileres - JBC",
             "description": "Cuenta contable por defecto al registrar un Gasto con este concepto. Si se omite, ERPNext usa el default de la compañía."
           },
-          "tipoBienes606": {
+          "claseFiscal": {
             "type": "string",
             "example": "03 - Arrendamientos",
             "description": "Default para prellenar Purchase Invoice.custom_tipo_bienes_606 al registrar un Gasto con este concepto (ver GET /config/catalogos-fiscales → tipoBienes606). Se puede mandar el código corto o el string completo."
           },
-          "claseFiscal": {
+          "tipoBienes606": {
             "type": "string",
             "enum": [
               "Bienes",
               "Servicios"
-            ]
+            ],
+            "description": "Tipo de gasto fiscal: si el concepto corresponde a un bien o a un servicio."
           }
         },
         "required": [
@@ -23184,17 +23283,18 @@
             "example": "61-01-002 - Alquileres - JBC",
             "description": "Cuenta contable por defecto al registrar un Gasto con este concepto. Si se omite, ERPNext usa el default de la compañía."
           },
-          "tipoBienes606": {
+          "claseFiscal": {
             "type": "string",
             "example": "03 - Arrendamientos",
             "description": "Default para prellenar Purchase Invoice.custom_tipo_bienes_606 al registrar un Gasto con este concepto (ver GET /config/catalogos-fiscales → tipoBienes606). Se puede mandar el código corto o el string completo."
           },
-          "claseFiscal": {
+          "tipoBienes606": {
             "type": "string",
             "enum": [
               "Bienes",
               "Servicios"
-            ]
+            ],
+            "description": "Tipo de gasto fiscal: si el concepto corresponde a un bien o a un servicio."
           }
         }
       },
@@ -23632,11 +23732,15 @@
             "type": "string",
             "description": "Forma de pago 606: 01=Efectivo, 02=Cheque, etc."
           },
-          "retencionItbis": {
-            "type": "number"
-          },
-          "retencionIsr": {
-            "type": "number"
+          "retenciones": {
+            "example": [
+              "Retención ISR Servicios 10%"
+            ],
+            "description": "Retenciones (ids de Tax Withholding Category) que aplican a esta Compra — el monto de custom_retencion_itbis/custom_retencion_isr se calcula a partir de estas (tasa × net_total o grand_total según cada categoría). Si se omite, se usan las retenciones por defecto del proveedor (Supplier.custom_retenciones_default). Nunca se acepta un monto/porcentaje manual.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "tipoPago": {
             "type": "string",
@@ -23656,9 +23760,14 @@
             "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
           },
           "taxesTemplate": {
-            "type": "string",
-            "example": "Dominican Republic Tax - JB",
-            "description": "ID del template de impuestos del documento (Purchase Taxes and Charges Template, ver /config/impuestos-compras). Si se omite, se usa el template marcado como default para la compañía, si existe."
+            "example": [
+              "Dominican Republic Tax - JB"
+            ],
+            "description": "IDs de template(s) de impuestos del documento (Purchase Taxes and Charges Template, ver /config/impuestos-compras) — admite varios, las líneas de todos se combinan en el documento. Si se omite, se usan los default configurados en el proveedor (Supplier.custom_impuesto_compras_default) o, en su ausencia, el template marcado como default para la compañía.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -23722,11 +23831,15 @@
             "type": "string",
             "description": "Forma de pago 606: 01=Efectivo, 02=Cheque, etc."
           },
-          "retencionItbis": {
-            "type": "number"
-          },
-          "retencionIsr": {
-            "type": "number"
+          "retenciones": {
+            "example": [
+              "Retención ISR Servicios 10%"
+            ],
+            "description": "Retenciones (ids de Tax Withholding Category) que aplican a esta Compra — el monto de custom_retencion_itbis/custom_retencion_isr se calcula a partir de estas (tasa × net_total o grand_total según cada categoría). Si se omite, se usan las retenciones por defecto del proveedor (Supplier.custom_retenciones_default). Nunca se acepta un monto/porcentaje manual.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "tipoPago": {
             "type": "string",
@@ -23746,9 +23859,14 @@
             "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
           },
           "taxesTemplate": {
-            "type": "string",
-            "example": "Dominican Republic Tax - JB",
-            "description": "ID del template de impuestos del documento (Purchase Taxes and Charges Template, ver /config/impuestos-compras). Si se omite, se usa el template marcado como default para la compañía, si existe."
+            "example": [
+              "Dominican Republic Tax - JB"
+            ],
+            "description": "IDs de template(s) de impuestos del documento (Purchase Taxes and Charges Template, ver /config/impuestos-compras) — admite varios, las líneas de todos se combinan en el documento. Si se omite, se usan los default configurados en el proveedor (Supplier.custom_impuesto_compras_default) o, en su ausencia, el template marcado como default para la compañía.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

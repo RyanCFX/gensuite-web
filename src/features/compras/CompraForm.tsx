@@ -3,9 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { createCompra, updateCompra, getCompra } from '@/shared/api/compras-gastos'
-import { listSuppliers } from '@/shared/api/suppliers'
+import { listSuppliers, getSupplier } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listAlmacenes, listImpuestosCompras, getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
+import { listRetenciones } from '@/shared/api/retenciones'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateCompraDto, Supplier } from '@/shared/api/types'
@@ -14,6 +15,8 @@ import { Plus, Trash2, Info, UserPlus } from 'lucide-react'
 import { SupplierQuickCreateModal } from '@/features/suppliers/SupplierQuickCreateModal'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { MultiSearchSelect } from '@/shared/ui/MultiSearchSelect'
+import type { MultiSearchSelectOption } from '@/shared/ui/MultiSearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import type { Item } from '@/shared/api/types'
@@ -502,8 +505,8 @@ export default function CompraForm() {
   const [branch, setBranch] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
-  const [taxesTemplate, setTaxesTemplate] = useState('')
-  const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
+  const [taxesTemplate, setTaxesTemplate] = useState<string[]>([])
+  const [retenciones, setRetenciones] = useState<string[]>([])
   const [warehouseSearch, setWarehouseSearch] = useState('')
 
   const { data: facturacionConfig } = useQuery({
@@ -523,10 +526,6 @@ export default function CompraForm() {
   const [tipoBienes606Touched, setTipoBienes606Touched] = useState(false)
   const [formaPago606Touched, setFormaPago606Touched] = useState(false)
   const [tipoPagoTouched, setTipoPagoTouched] = useState(false)
-  // string, no number: '' significa "no tocado por el usuario" (deja que el backend calcule
-  // automáticamente según las retenciones por defecto del proveedor). '0' es un 0 explícito.
-  const [retencionIsr, setRetencionIsr] = useState('')
-  const [retencionItbis, setRetencionItbis] = useState('')
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
@@ -647,9 +646,75 @@ export default function CompraForm() {
     queryFn: listImpuestosCompras,
     staleTime: 5 * 60_000,
   })
-  const taxesTemplateOptions: SearchSelectOption[] = (taxesTemplates ?? [])
-    .filter((t) => !taxesTemplateSearch || t.title.toLowerCase().includes(taxesTemplateSearch.toLowerCase()))
-    .map((t) => ({ value: String(t.id), label: t.title }))
+  const impuestosOptions: MultiSearchSelectOption[] = useMemo(
+    () => (taxesTemplates ?? []).map((t) => ({ id: String(t.id), label: t.title })),
+    [taxesTemplates],
+  )
+
+  // ── Catálogos de retenciones (multiselect) ─────────────────────────────────
+  const { data: retencionesData } = useQuery({
+    queryKey: ['retenciones-all'],
+    queryFn: () => listRetenciones({ limit: 100 }),
+    staleTime: 5 * 60_000,
+  })
+  const retencionesOptions: MultiSearchSelectOption[] = useMemo(
+    () => (retencionesData?.items ?? []).map((r) => ({ id: r.id, label: r.categoryName })),
+    [retencionesData],
+  )
+  // Mapa id → etiqueta de retención, para el hint descriptivo.
+  const retencionLabelMap = useMemo(
+    () => new Map(retencionesOptions.map((r) => [r.id, r.label])),
+    [retencionesOptions],
+  )
+
+  const { data: supplierDetail } = useQuery({
+    queryKey: ['supplier', supplierId],
+    queryFn: () => getSupplier(supplierId),
+    enabled: !!supplierId && !esProveedorOcasional,
+  })
+
+  // Al resolver el proveedor, pre-llenamos los campos 606 e impuestos/retenciones que trae.
+  // No sobre-escribimos valores que el usuario ya haya definido (ni en modo edición desde el
+  // draft). Cada vez que se cambie de proveedor, los defaults del nuevo proveedor se aplican.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const s = supplierDetail
+    if (!s || esProveedorOcasional) return
+
+    if (!tipoBienes606 && s.defaultTipoBienes606) setTipoBienes606(s.defaultTipoBienes606)
+    if (!formaPago606 && s.defaultFormaPago606) setFormaPago606(s.defaultFormaPago606)
+
+    setTaxesTemplate((prev) =>
+      prev.length === 0 ? (s.impuestoComprasDefault?.map((d) => d.id) ?? []) : prev,
+    )
+    setRetenciones((prev) =>
+      prev.length === 0 ? (s.retencionesDefault?.map((d) => d.id) ?? []) : prev,
+    )
+  }, [supplierDetail, esProveedorOcasional, tipoBienes606, formaPago606])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Hint: cuando el usuario no dejó ninguna retención pero el proveedor tiene defaults,
+  // mostramos cuáles se aplicarían (con su tasa) para que quede explícito.
+  const retencionesDefaultHint = supplierDetail?.retencionesDefault ?? []
+  const pendingRetencionesHint =
+    retenciones.length === 0 && retencionesDefaultHint.length > 0
+      ? `Los retenciones por defecto del proveedor${
+          retencionesDefaultHint.length > 0 ? `: ${retencionesDefaultHint
+            .map((d) => `${retencionLabelMap.get(d.id) ?? d.id} (${d.tasa}%)`)
+            .join(', ')}` : ''
+        }.`
+      : null
+
+  // Igual que arriba, pero para impuestos (taxesTemplate / impuestoComprasDefault del proveedor).
+  const impuestoComprasDefaultHint = supplierDetail?.impuestoComprasDefault ?? []
+  const pendingImpuestosHint =
+    taxesTemplate.length === 0 && impuestoComprasDefaultHint.length > 0
+      ? `Los impuestos por defecto del proveedor${
+          impuestoComprasDefaultHint.length > 0 ? `: ${impuestoComprasDefaultHint
+            .map((d) => `${impuestosOptions.find((o) => o.id === d.id)?.label ?? d.id} (${d.tasa}%)`)
+            .join(', ')}` : ''
+        }.`
+      : null
 
   const { data: compraData, isLoading: loadingEdit } = useQuery({
     queryKey: ['compra', id],
@@ -689,8 +754,8 @@ export default function CompraForm() {
     setTipoBienes606(compraData.tipoBienes606 ?? '')
     setFormaPago606(compraData.formaPago606 ?? '')
     setTipoPago(compraData.tipoPago ?? 'Contado')
-    setRetencionIsr(compraData.retencionIsr != null ? String(compraData.retencionIsr) : '')
-    setRetencionItbis(compraData.retencionItbis != null ? String(compraData.retencionItbis) : '')
+    setTaxesTemplate((compraData.taxesTemplate ?? compraData.impuestos ?? []).map((t) => t.id))
+    setRetenciones((compraData.retenciones ?? []).map((r) => r.id))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compraData])
 
@@ -826,9 +891,8 @@ export default function CompraForm() {
       tipoBienes606: tipoBienes606 || undefined,
       formaPago606: formaPago606 || undefined,
       tipoPago,
-      taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
-      ...(retencionIsr !== '' ? { retencionIsr: Number(retencionIsr) } : {}),
-      ...(retencionItbis !== '' ? { retencionItbis: Number(retencionItbis) } : {}),
+      taxesTemplate: usaImpuestoDocumento ? (taxesTemplate.length > 0 ? taxesTemplate : undefined) : undefined,
+      retenciones: retenciones.length > 0 ? retenciones : undefined,
     }
     saveMutation.mutate(dto)
   }
@@ -1070,22 +1134,44 @@ export default function CompraForm() {
                   </div>
                 )}
 
-                {usaImpuestoDocumento && (
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
-                    <SearchSelect
-                      id="taxesTemplate"
-                      value={taxesTemplate}
-                      disabled={isReturn}
-                      onChange={(val) => setTaxesTemplate(val)}
-                      options={taxesTemplateOptions}
-                      onSearch={setTaxesTemplateSearch}
-                      selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
-                      placeholder="Usar el default de la compañía"
-                    />
-                    <p className="ff-hint">Impuesto aplicado al total de la compra (ej. ITBIS 18%, retenciones). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
-                  </div>
-                )}
+                </div>
+            </div>
+
+            {/* ── Impuestos y retenciones ── */}
+            <div className="form-row form-row-3" style={{ borderTop: '1px solid var(--border-subtle)', marginTop: 16, paddingTop: 16 }}>
+              {usaImpuestoDocumento && (
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
+                  <MultiSearchSelect
+                    id="taxesTemplate"
+                    value={taxesTemplate}
+                    onChange={setTaxesTemplate}
+                    options={impuestosOptions}
+                    placeholder="Buscar plantilla…"
+                    emptyLabel="No hay plantillas configuradas."
+                    disabled={isReturn}
+                  />
+                  <p className="ff-hint">Si no eliges ninguno, se usa el template por defecto del proveedor o de la compañía.</p>
+                  {pendingImpuestosHint && <p className="ff-hint">{pendingImpuestosHint}</p>}
+                </div>
+              )}
+
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="retenciones">Retenciones</label>
+                <MultiSearchSelect
+                  id="retenciones"
+                  value={retenciones}
+                  onChange={setRetenciones}
+                  options={retencionesOptions}
+                  placeholder="Buscar retención…"
+                  emptyLabel="No hay retenciones configuradas."
+                  disabled={isReturn}
+                />
+                <p className="ff-hint">
+                  El BFF calcula el monto de cada una a partir de la tasa configurada; si dejas la lista
+                  vacía se usan las retenciones por defecto del proveedor.
+                </p>
+                {pendingRetencionesHint && <p className="ff-hint">{pendingRetencionesHint}</p>}
               </div>
             </div>
           </div>
@@ -1222,32 +1308,6 @@ export default function CompraForm() {
                   <SelectItem value="Contado">Contado</SelectItem>
                   <SelectItem value="Crédito">Crédito</SelectItem>
                 </Select>
-              </div>
-
-              <div className="ff-wrap">
-                <label className="ff-label">Retención ISR (RD$)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  className="ff-input"
-                  placeholder="0.00"
-                  value={retencionIsr}
-                  onChange={(e) => setRetencionIsr(e.target.value)}
-                />
-              </div>
-
-              <div className="ff-wrap">
-                <label className="ff-label">Retención ITBIS (RD$)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  className="ff-input"
-                  placeholder="0.00"
-                  value={retencionItbis}
-                  onChange={(e) => setRetencionItbis(e.target.value)}
-                />
               </div>
             </div>
           </div>

@@ -550,6 +550,45 @@ export default function CustomerDetail() {
               <span className="detail-label">Grupo de clientes</span>
               <span className="detail-value">{customer.customerGroup ?? '—'}</span>
             </div>
+            <div className="detail-field">
+              <span className="detail-label">Sucursal</span>
+              <span className="detail-value">{customer.branch ?? '—'}</span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">Forma de Pago por Defecto</span>
+              <span className="detail-value">{customer.formaPagoDefault ?? '—'}</span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">Cuenta CxC Alterna</span>
+              <span className="detail-value">{customer.cuentaCxcDefault ?? '—'}</span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">Encargado de Cobros</span>
+              <span className="detail-value">{customer.encargadoCxc ?? '—'}</span>
+            </div>
+            {customer.impuestoVentasDefault && customer.impuestoVentasDefault.length > 0 && (
+              <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+                <span className="detail-label">Impuesto(s) de Venta por Defecto</span>
+                <span className="detail-value" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {customer.impuestoVentasDefault.map((t) => (
+                    <span key={t} className="badge badge-info">{t}</span>
+                  ))}
+                </span>
+              </div>
+            )}
+            {customer.telefonos && customer.telefonos.length > 0 && (
+              <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+                <span className="detail-label">Teléfonos</span>
+                <span className="detail-value" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {customer.telefonos.map((t, i) => (
+                    <span key={i}>
+                      {t.telefono}
+                      {t.etiqueta && <span style={{ color: 'var(--text-tertiary)', marginLeft: 6 }}>({t.etiqueta})</span>}
+                    </span>
+                  ))}
+                </span>
+              </div>
+            )}
             {customer.priceTier && (
               <div className="detail-field">
                 <span className="detail-label">Nivel de precio</span>

@@ -245,7 +245,7 @@ export default function DevolucionDetail() {
           </div>
         </div>
 
-        {isSubmitted && appliedTo.length > 0 && (
+        {appliedTo.length > 0 && (
           <div className="card">
             <div className="card-header"><span className="card-title">Aplicado a Cuentas por Pagar</span></div>
             <div className="table-scroll">
@@ -253,7 +253,13 @@ export default function DevolucionDetail() {
                 <thead>
                   <tr>
                     <th>Factura (CxP)</th>
-                    <th style={{ textAlign: 'right' }}>Monto</th>
+                    <th>NCF/N° Factura Proveedor</th>
+                    <th>Tipo Comprobante</th>
+                    <th>Fecha</th>
+                    <th>Estado Factura</th>
+                    <th style={{ textAlign: 'right' }}>Total Factura</th>
+                    <th style={{ textAlign: 'right' }}>Pendiente Factura</th>
+                    <th style={{ textAlign: 'right' }}>Monto Aplicado</th>
                     <th>Estado</th>
                     <th>Asiento</th>
                     <th>Acciones</th>
@@ -261,11 +267,34 @@ export default function DevolucionDetail() {
                 </thead>
                 <tbody>
                   {appliedTo.map((a) => (
-                    <tr key={a.invoiceId} style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-                      <td>{a.invoiceId}</td>
-                      <td style={{ textAlign: 'right' }}>{formatDOP(a.amount)}</td>
+                    <tr key={a.invoiceId} style={{ fontSize: 13 }}>
+                      <td>
+                        <button
+                          className="btn btn-link btn-size-sm"
+                          style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}
+                          onClick={() => navigate(`/compras/${a.invoiceId}`)}
+                          title="Ver factura de compra"
+                        >
+                          {a.invoiceId}
+                        </button>
+                      </td>
+                      <td className="td-muted" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                        {a.ncfProveedor || a.billNo || '—'}
+                      </td>
+                      <td className="td-muted">{a.tipoComprobante || '—'}</td>
+                      <td className="td-muted">{a.postingDate ? formatDate(a.postingDate) : '—'}</td>
+                      <td>{a.invoiceStatus ? <StatusBadge status={a.invoiceStatus} /> : '—'}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
+                        {a.grandTotal != null ? formatDOP(a.grandTotal) : '—'}
+                      </td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
+                        {a.outstandingAmount != null ? formatDOP(a.outstandingAmount) : '—'}
+                      </td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatDOP(a.amount)}</td>
                       <td><StatusBadge status={a.status} /></td>
-                      <td className="td-muted">{a.status === 'reconciled' ? a.journalEntryId ?? '—' : '—'}</td>
+                      <td className="td-muted" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                        {a.status === 'reconciled' ? a.journalEntryId ?? '—' : '—'}
+                      </td>
                       <td>
                         {a.status === 'pending' ? (
                           <button

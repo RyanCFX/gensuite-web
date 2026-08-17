@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm, Controller } from 'react-hook-form'
+import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { createCustomer, updateCustomer, listCustomerGroups } from '@/shared/api/customers'
+import { listSucursales } from '@/shared/api/sucursales'
+import { listMetodosPago, listImpuestosVentas } from '@/shared/api/config'
+import { listUsuarios } from '@/shared/api/usuarios'
 import type { ApiError, Customer } from '@/shared/api/types'
 import { validateRNCDetailed, validateCedulaDetailed, formatRNC, formatCedula } from '@/lib/validators/dgii'
 import { SearchSelect, type SearchSelectOption } from '@/shared/ui/SearchSelect'
-import { CheckCircle2, XCircle, Info, HelpCircle } from 'lucide-react'
+import { MultiSelectChecklist } from '@/shared/ui/MultiSelectChecklist'
+import { AccountSelect } from '@/components/shared/AccountSelect'
+import { CheckCircle2, XCircle, Info, HelpCircle, Plus, Trash2 } from 'lucide-react'
 
 // NOTE: tipoIdentificacion does NOT exist in CreateCustomerDto/UpdateCustomerDto.
 // It is only used here as a local UI helper to decide which field to show.
@@ -33,6 +38,15 @@ const schema = z.object({
   emailInvoice: z.string().email('Email inválido').optional().or(z.literal('')),
   customerGroup: z.string().optional(),
   address: z.string().optional(),
+  telefonos: z.array(z.object({
+    telefono: z.string().min(1, 'Requerido'),
+    etiqueta: z.string().optional(),
+  })).optional(),
+  branch: z.string().optional(),
+  formaPagoDefault: z.string().optional(),
+  cuentaCxcDefault: z.string().optional(),
+  encargadoCxc: z.string().email('Email inválido').optional().or(z.literal('')),
+  impuestoVentasDefault: z.array(z.string()).optional(),
 }).superRefine((data, ctx) => {
   // Only validate if the user filled in the field
   if (data.rnc) {
@@ -70,6 +84,44 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
     queryFn: listCustomerGroups,
   })
 
+  const { data: sucursalesData } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+    staleTime: 60_000,
+  })
+  const [branchQuery, setBranchQuery] = useState('')
+  const branchOptions: SearchSelectOption[] = (sucursalesData?.items ?? [])
+    .filter((s) => !branchQuery || s.name.toLowerCase().includes(branchQuery.toLowerCase()))
+    .map((s) => ({ value: s.name, label: s.name }))
+
+  const { data: metodosPagoData } = useQuery({
+    queryKey: ['metodos-pago'],
+    queryFn: listMetodosPago,
+    staleTime: 60_000,
+  })
+  const [formaPagoQuery, setFormaPagoQuery] = useState('')
+  const formaPagoOptions: SearchSelectOption[] = (metodosPagoData ?? [])
+    .filter((m) => !m.disabled)
+    .filter((m) => !formaPagoQuery || m.name.toLowerCase().includes(formaPagoQuery.toLowerCase()))
+    .map((m) => ({ value: m.name, label: m.name }))
+
+  const { data: impuestosVentasData } = useQuery({
+    queryKey: ['impuestos-ventas'],
+    queryFn: listImpuestosVentas,
+    staleTime: 5 * 60_000,
+  })
+  const [impuestoVentasSearch, setImpuestoVentasSearch] = useState('')
+
+  const { data: usuariosData } = useQuery({
+    queryKey: ['usuarios-all'],
+    queryFn: () => listUsuarios({ limit: 100 }),
+    staleTime: 60_000,
+  })
+  const [encargadoQuery, setEncargadoQuery] = useState('')
+  const encargadoOptions: SearchSelectOption[] = (usuariosData?.items ?? [])
+    .filter((u) => !encargadoQuery || u.fullName.toLowerCase().includes(encargadoQuery.toLowerCase()) || u.email.toLowerCase().includes(encargadoQuery.toLowerCase()))
+    .map((u) => ({ value: u.email, label: u.fullName, sublabel: u.email }))
+
   const {
     register, control, handleSubmit, watch, setValue, setError,
     formState: { errors, isSubmitting }, reset,
@@ -87,7 +139,18 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
       emailInvoice: '',
       customerGroup: '',
       address: '',
+      telefonos: [],
+      branch: '',
+      formaPagoDefault: '',
+      cuentaCxcDefault: '',
+      encargadoCxc: '',
+      impuestoVentasDefault: [],
     },
+  })
+
+  const { fields: telefonoFields, append: appendTelefono, remove: removeTelefono } = useFieldArray({
+    control,
+    name: 'telefonos',
   })
 
   useEffect(() => {
@@ -107,6 +170,12 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
         emailInvoice: customer.emailInvoice ?? '',
         customerGroup: customer.customerGroup ?? '',
         address: customer.address ?? '',
+        telefonos: customer.telefonos ?? [],
+        branch: customer.branch ?? '',
+        formaPagoDefault: customer.formaPagoDefault ?? '',
+        cuentaCxcDefault: customer.cuentaCxcDefault ?? '',
+        encargadoCxc: customer.encargadoCxc ?? '',
+        impuestoVentasDefault: customer.impuestoVentasDefault ?? [],
       })
     }
   }, [customer, reset])
@@ -160,6 +229,13 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
       emailInvoice: values.emailInvoice || undefined,
       customerGroup: values.customerGroup || undefined,
       address: values.address || undefined,
+      // Se manda la lista completa siempre — no hay "agregar un teléfono" a nivel de API.
+      telefonos: values.telefonos && values.telefonos.length > 0 ? values.telefonos : undefined,
+      branch: values.branch || undefined,
+      formaPagoDefault: values.formaPagoDefault || undefined,
+      cuentaCxcDefault: values.cuentaCxcDefault || undefined,
+      encargadoCxc: values.encargadoCxc || undefined,
+      impuestoVentasDefault: values.impuestoVentasDefault ?? [],
     }
     if (isEdit) updateMutation.mutate(payload)
     else createMutation.mutate(payload)
@@ -193,14 +269,16 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
   const cedulaValid = cedulaClean.length === 11 ? (cedulaDetail?.valid ?? null) : null
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
       {isSystemManaged && (
-        <div className="inline-alert inline-alert-info">
+        <div className="inline-alert inline-alert-info" style={{ gridColumn: '1 / -1' }}>
           <Info size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
           Este cliente es gestionado por el sistema y no puede ser editado.
         </div>
       )}
 
+      {/* ════════════════ COLUMNA IZQUIERDA ════════════════ */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* ── Información general ── */}
       <div className="card">
         <div className="card-header">
@@ -386,6 +464,56 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
         </div>
       </div>
 
+      {/* ── Teléfonos ── */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title">Teléfonos</h2>
+        </div>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {telefonoFields.map((field, idx) => (
+            <div key={field.id} className="form-row" style={{ alignItems: 'flex-start' }}>
+              <div className="ff-wrap" style={{ flex: 2 }}>
+                <input
+                  className={`ff-input${errors.telefonos?.[idx]?.telefono ? ' ff-input-error' : ''}`}
+                  placeholder="Ej: 809-555-0100"
+                  {...register(`telefonos.${idx}.telefono` as const)}
+                />
+                {errors.telefonos?.[idx]?.telefono && (
+                  <p className="ff-error">{errors.telefonos[idx]?.telefono?.message}</p>
+                )}
+              </div>
+              <div className="ff-wrap" style={{ flex: 1 }}>
+                <input
+                  className="ff-input"
+                  placeholder="Etiqueta (ej: Oficina, Celular)"
+                  {...register(`telefonos.${idx}.etiqueta` as const)}
+                />
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-size-sm"
+                style={{ marginTop: 2 }}
+                onClick={() => removeTelefono(idx)}
+                title="Quitar teléfono"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="btn btn-secondary btn-size-sm"
+            style={{ alignSelf: 'flex-start' }}
+            onClick={() => appendTelefono({ telefono: '', etiqueta: '' })}
+          >
+            <Plus size={14} />Agregar teléfono
+          </button>
+        </div>
+      </div>
+      </div>
+
+      {/* ════════════════ COLUMNA DERECHA ════════════════ */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* ── Crédito y configuración ── */}
       <div className="card">
         <div className="card-header">
@@ -452,8 +580,118 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
         </div>
       </div>
 
+      {/* ── Configuración Adicional ── */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title">Configuración Adicional</h2>
+        </div>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="form-row">
+            <div className="ff-wrap">
+              <label className="ff-label" htmlFor="branch">Sucursal</label>
+              <Controller
+                name="branch"
+                control={control}
+                render={({ field }) => (
+                  <SearchSelect
+                    id="branch"
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    options={branchOptions}
+                    onSearch={setBranchQuery}
+                    placeholder="Buscar sucursal…"
+                  />
+                )}
+              />
+              <p className="ff-hint">Solo para filtrar/agrupar clientes — no afecta las facturas.</p>
+            </div>
+            <div className="ff-wrap">
+              <label className="ff-label" htmlFor="formaPagoDefault">Forma de Pago por Defecto</label>
+              <Controller
+                name="formaPagoDefault"
+                control={control}
+                render={({ field }) => (
+                  <SearchSelect
+                    id="formaPagoDefault"
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    options={formaPagoOptions}
+                    onSearch={setFormaPagoQuery}
+                    placeholder="Buscar método de pago…"
+                  />
+                )}
+              />
+              <p className="ff-hint">Prellena el método de pago al facturar a este cliente — editable por documento.</p>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="ff-wrap">
+              <label className="ff-label" htmlFor="cuentaCxcDefault">Cuenta CxC Alterna</label>
+              <Controller
+                name="cuentaCxcDefault"
+                control={control}
+                render={({ field }) => (
+                  <AccountSelect
+                    id="cuentaCxcDefault"
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    rootType="Asset"
+                    placeholder="Buscar cuenta…"
+                  />
+                )}
+              />
+              <p className="ff-hint">
+                Si se omite, se usa el default de la compañía (112-01 - CUENTAS POR COBRAR CLIENTES).
+              </p>
+            </div>
+            <div className="ff-wrap">
+              <label className="ff-label" htmlFor="encargadoCxc">Encargado de Cuentas por Cobrar</label>
+              <Controller
+                name="encargadoCxc"
+                control={control}
+                render={({ field }) => (
+                  <SearchSelect
+                    id="encargadoCxc"
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    options={encargadoOptions}
+                    onSearch={setEncargadoQuery}
+                    placeholder="Buscar usuario…"
+                  />
+                )}
+              />
+              {errors.encargadoCxc && <p className="ff-error">{errors.encargadoCxc.message}</p>}
+            </div>
+          </div>
+
+          <div className="ff-wrap">
+            <label className="ff-label">Impuesto(s) de Venta por Defecto</label>
+            <Controller
+              name="impuestoVentasDefault"
+              control={control}
+              render={({ field }) => (
+                <MultiSelectChecklist
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  options={(impuestosVentasData ?? []).map((t) => ({ id: t.id, label: t.title }))}
+                  search={impuestoVentasSearch}
+                  onSearchChange={setImpuestoVentasSearch}
+                  searchPlaceholder="Buscar plantilla…"
+                  emptyLabel="No hay plantillas configuradas."
+                />
+              )}
+            />
+            <p className="ff-hint">
+              Prellena el/los template(s) de impuesto al crear una factura/cotización a este cliente — puedes elegir varios.
+            </p>
+          </div>
+        </div>
+      </div>
+      </div>
+
       {/* ── Botones ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 12 }}>
         <button type="submit" className="btn btn-primary" disabled={isSubmitting || isSystemManaged}>
           {isSubmitting
             ? <><span className="spinner spinner-white spinner-sm" /> Guardando…</>

@@ -26,7 +26,6 @@ interface ReferenciaRow {
   outstandingAmount: number
   postingDate: string
   checked: boolean
-  allocatedAmount: number
 }
 
 export default function RegistrarPagoPage() {
@@ -47,6 +46,7 @@ export default function RegistrarPagoPage() {
   const [remarks, setRemarks] = useState('')
   const [postingDate, setPostingDate] = useState(new Date().toISOString().slice(0, 10))
   const [referencias, setReferencias] = useState<ReferenciaRow[]>([])
+  const [manualRefs, setManualRefs] = useState<Record<string, number>>({})
   const [advancePayment, setAdvancePayment] = useState(false)
   const [branch, setBranch] = useState('')
   const [branchSearch, setBranchSearch] = useState('')
@@ -134,7 +134,7 @@ export default function RegistrarPagoPage() {
   })
 
   useEffect(() => {
-    if (!supplierId || advancePayment) { setReferencias([]); return }
+    if (!supplierId || advancePayment) { setReferencias([]); setManualRefs({}); return }
     const facturas = pendientesData?.items ?? []
     setReferencias(
       facturas
@@ -145,9 +145,9 @@ export default function RegistrarPagoPage() {
           outstandingAmount: f.outstandingAmount,
           postingDate: f.postingDate,
           checked: f.id === preselectInvoice,
-          allocatedAmount: f.outstandingAmount,
         })),
     )
+    setManualRefs({})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplierId, pendientesData, advancePayment])
 
@@ -179,26 +179,59 @@ export default function RegistrarPagoPage() {
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   function toggleReferencia(invoiceId: string) {
+    setManualRefs((prev) => {
+      const next = { ...prev }
+      delete next[invoiceId]
+      return next
+    })
     setReferencias((prev) =>
       prev.map((r) => (r.invoiceId === invoiceId ? { ...r, checked: !r.checked } : r)),
     )
   }
 
   function setAllocated(invoiceId: string, value: number) {
-    setReferencias((prev) =>
-      prev.map((r) => (r.invoiceId === invoiceId ? { ...r, allocatedAmount: value } : r)),
-    )
+    setManualRefs((prev) => ({ ...prev, [invoiceId]: value }))
   }
 
   const checkedRefs = referencias.filter((r) => r.checked)
-  const totalAllocated = checkedRefs.reduce((s, r) => s + r.allocatedAmount, 0)
+
+  // Asignación automática del monto del pago sobre las facturas seleccionadas:
+  // la más antigua primero, con tope por pendiente, hasta agotar el monto.
+  // Las filas editadas a mano conservan su valor y el resto se reparte entre las demás.
+  const computedAllocation = useMemo(() => {
+    const result: Record<string, number> = {}
+    const checked = referencias
+      .filter((r) => r.checked)
+      .slice()
+      .sort((a, b) =>
+        a.postingDate < b.postingDate ? -1 : a.postingDate > b.postingDate ? 1 : a.invoiceId < b.invoiceId ? -1 : 1,
+      )
+    let remaining = Math.max(0, paidAmount || 0)
+    for (const r of checked) {
+      if (r.invoiceId in manualRefs) {
+        const v = manualRefs[r.invoiceId]
+        result[r.invoiceId] = v
+        remaining = Math.round((remaining - v) * 100) / 100
+      }
+    }
+    for (const r of checked) {
+      if (r.invoiceId in manualRefs) continue
+      const alloc = Math.round(Math.min(remaining, r.outstandingAmount) * 100) / 100
+      result[r.invoiceId] = alloc
+      remaining = Math.round((remaining - alloc) * 100) / 100
+    }
+    return result
+  }, [referencias, manualRefs, paidAmount])
+
+  const totalAllocated = checkedRefs.reduce((s, r) => s + (computedAllocation[r.invoiceId] ?? 0), 0)
   const diff = Math.round((paidAmount - totalAllocated) * 100) / 100
 
-  // Preseleccionar el monto del pago con el total asignado la primera vez que
-  // llegan las facturas marcadas (evita que el cajero tenga que calcularlo).
+  // Preseleccionar el monto del pago con el pendiente de la factura pre-marcada
+  // la primera vez que llegan las facturas (evita que el cajero tenga que calcularlo).
   useEffect(() => {
-    if (preselectInvoice && checkedRefs.length > 0 && paidAmount === 0) {
-      setPaidAmount(totalAllocated)
+    if (preselectInvoice && paidAmount === 0) {
+      const target = referencias.find((r) => r.invoiceId === preselectInvoice && r.checked)
+      if (target) setPaidAmount(target.outstandingAmount)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [referencias])
@@ -253,7 +286,7 @@ export default function RegistrarPagoPage() {
       remarks: remarks || undefined,
       referencias: advancePayment || checkedRefs.length === 0
         ? undefined
-        : checkedRefs.map((r) => ({ invoiceId: r.invoiceId, allocatedAmount: r.allocatedAmount })),
+        : checkedRefs.map((r) => ({ invoiceId: r.invoiceId, allocatedAmount: computedAllocation[r.invoiceId] ?? 0 })),
       branch: branch || undefined,
       department: usaDepartamentos ? (department || undefined) : undefined,
     })
@@ -268,202 +301,20 @@ export default function RegistrarPagoPage() {
         description="Registra un pago realizado a un proveedor"
       />
 
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: 20, alignItems: 'start' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-        {/* ════════════════ COLUMNA IZQUIERDA — facturas ════════════════ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title">Facturas Pendientes</span>
-              {checkedRefs.length > 0 && (
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                  {checkedRefs.length} seleccionada{checkedRefs.length !== 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
-
-            {advancePayment ? (
-              <div className="card-body" style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
-                Pago anticipado — no se aplicará a ninguna factura.
-              </div>
-            ) : !supplierId ? (
-              <div className="card-body" style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
-                Selecciona un proveedor para ver sus facturas pendientes
-              </div>
-            ) : pendientesLoading ? (
-              <div className="card-body" style={{ textAlign: 'center', padding: '24px 0' }}>
-                <span className="spinner spinner-brand spinner-sm" />
-              </div>
-            ) : referencias.length === 0 ? (
-              <div className="card-body" style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
-                Sin facturas pendientes para este proveedor
-              </div>
-            ) : (
-              <>
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="items-table">
-                    <thead>
-                      <tr>
-                        <th style={{ width: 36 }} />
-                        <th>Factura</th>
-                        <th style={{ textAlign: 'right' }}>Total</th>
-                        <th style={{ textAlign: 'right' }}>Pendiente</th>
-                        <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {referencias.map((ref) => (
-                        <tr key={ref.invoiceId} style={{ opacity: ref.checked ? 1 : 0.6 }}>
-                          <td style={{ textAlign: 'center' }}>
-                            <input
-                              type="checkbox"
-                              checked={ref.checked}
-                              onChange={() => toggleReferencia(ref.invoiceId)}
-                              style={{ cursor: 'pointer', accentColor: 'var(--color-brand)' }}
-                            />
-                          </td>
-                          <td>
-                            <span style={{ fontWeight: 500, fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-                              {ref.invoiceId}
-                            </span>
-                            <br />
-                            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{ref.postingDate}</span>
-                          </td>
-                          <td style={{ textAlign: 'right', fontSize: 13 }}>{formatDOP(ref.grandTotal)}</td>
-                          <td style={{ textAlign: 'right', fontSize: 13, fontWeight: 500, color: 'var(--error-text)' }}>
-                            {formatDOP(ref.outstandingAmount)}
-                          </td>
-                          <td>
-                            <input
-                              className="items-input"
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              style={{ textAlign: 'right' }}
-                              value={ref.allocatedAmount || ''}
-                              disabled={!ref.checked}
-                              onChange={(e) => setAllocated(ref.invoiceId, parseFloat(e.target.value) || 0)}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {checkedRefs.length > 0 && (
-                  <div style={{
-                    padding: '12px 16px',
-                    borderTop: '1px solid var(--border-default)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 4,
-                    alignItems: 'flex-end',
-                  }}>
-                    <div style={{ display: 'flex', gap: 32, fontSize: 13 }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Total asignado</span>
-                      <strong>{formatDOP(totalAllocated)}</strong>
-                    </div>
-                    <div style={{ display: 'flex', gap: 32, fontSize: 13 }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Monto del pago</span>
-                      <strong>{formatDOP(paidAmount)}</strong>
-                    </div>
-                    {diff !== 0 && (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontSize: 12,
-                        color: diff > 0 ? 'var(--warning-text, #b45309)' : 'var(--error-text)',
-                        marginTop: 2,
-                      }}>
-                        <AlertTriangle size={13} />
-                        {diff > 0
-                          ? `Quedan ${formatDOP(diff)} sin asignar`
-                          : `Asignación excede el pago en ${formatDOP(Math.abs(diff))}`}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
+        {/* ════════════════ INFORMACIÓN DEL PAGO ════════════════ */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <CheckCircle2 size={18} style={{ color: 'var(--success-text)' }} aria-hidden="true" />
+              Información del Pago
+            </span>
           </div>
-        </div>
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* ════════════════ COLUMNA DERECHA — información del pago ════════════════ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <CheckCircle2 size={18} style={{ color: 'var(--success-text)' }} aria-hidden="true" />
-                Información del Pago
-              </span>
-            </div>
-            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-              <div className="ff-wrap">
-                <label className="ff-label">
-                  Proveedor <span className="ff-required">*</span>
-                </label>
-                <SearchSelect
-                  id="supplier"
-                  value={supplierId}
-                  selectedLabel={supplierLabel}
-                  onChange={(id, opt) => { setSupplierId(id === '' ? '' : (opt?.value ?? id)); setSupplierLabel(opt?.label ?? '') }}
-                  options={supplierOptions}
-                  onSearch={setSupplierQuery}
-                  loading={suppliersLoading}
-                  placeholder="Buscar proveedor…"
-                  error={!supplierId}
-                />
-              </div>
-
-              <div className="ff-wrap">
-                <label className="ff-label ff-required" htmlFor="branch">Sucursal</label>
-                <SearchSelect
-                  id="branch"
-                  value={branch}
-                  selectedLabel={branch}
-                  error={!branch || branchError}
-                  onChange={(val) => { setBranch(val); setBranchError(false) }}
-                  options={branchSelectOptions}
-                  onSearch={setBranchSearch}
-                  placeholder="Sin especificar"
-                  className="ff-select"
-                  disabled={branchOptions.length === 1}
-                />
-                {branchError && <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal para continuar</p>}
-              </div>
-
-              {usaDepartamentos && (
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="department">Departamento</label>
-                  <DepartmentSelect id="department" value={department} onChange={setDepartment} />
-                </div>
-              )}
-
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
-                <input
-                  type="checkbox"
-                  checked={advancePayment}
-                  onChange={(e) => setAdvancePayment(e.target.checked)}
-                  style={{ marginTop: 2 }}
-                />
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Wallet size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-                  Pago anticipado — no aplicar a ninguna factura (queda como saldo a favor del proveedor)
-                </span>
-              </label>
-
-              <div className="ff-wrap">
-                <label className="ff-label">Fecha <span className="ff-required">*</span></label>
-                <DatePicker
-                  className="ff-input"
-                  value={postingDate}
-                  onChange={setPostingDate}
-                />
-              </div>
-
+            {/* Monto / Método de Pago / Cuenta Bancaria */}
+            <div className="form-row form-row-3">
               <div className="ff-wrap">
                 <label className="ff-label">Monto (RD$) <span className="ff-required">*</span></label>
                 <input
@@ -506,7 +357,10 @@ export default function RegistrarPagoPage() {
                   />
                 </div>
               )}
+            </div>
 
+            {/* Referencia / Fecha de Referencia / Fecha */}
+            <div className="form-row form-row-3">
               <div className="ff-wrap">
                 <label className="ff-label">No. de Referencia</label>
                 <input
@@ -525,31 +379,220 @@ export default function RegistrarPagoPage() {
                   clearable
                 />
               </div>
-
               <div className="ff-wrap">
-                <label className="ff-label">Notas</label>
-                <textarea
-                  className="ff-textarea"
-                  rows={2}
-                  placeholder="Observaciones opcionales…"
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
+                <label className="ff-label">Fecha <span className="ff-required">*</span></label>
+                <DatePicker
+                  className="ff-input"
+                  value={postingDate}
+                  onChange={setPostingDate}
+                />
+              </div>
+            </div>
+
+            {/* Notas */}
+            <div className="ff-wrap">
+              <label className="ff-label">Notas</label>
+              <textarea
+                className="ff-textarea"
+                rows={2}
+                placeholder="Observaciones opcionales…"
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+              />
+            </div>
+
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border-default)', margin: '4px 0' }} />
+
+            {/* Proveedor / Sucursal / Departamento */}
+            <div className="form-row form-row-3">
+              <div className="ff-wrap">
+                <label className="ff-label">
+                  Proveedor <span className="ff-required">*</span>
+                </label>
+                <SearchSelect
+                  id="supplier"
+                  value={supplierId}
+                  selectedLabel={supplierLabel}
+                  onChange={(id, opt) => { setSupplierId(id === '' ? '' : (opt?.value ?? id)); setSupplierLabel(opt?.label ?? '') }}
+                  options={supplierOptions}
+                  onSearch={setSupplierQuery}
+                  loading={suppliersLoading}
+                  placeholder="Buscar proveedor…"
+                  error={!supplierId}
                 />
               </div>
 
+              <div className="ff-wrap">
+                <label className="ff-label ff-required" htmlFor="branch">Sucursal</label>
+                <SearchSelect
+                  id="branch"
+                  value={branch}
+                  selectedLabel={branch}
+                  error={!branch || branchError}
+                  onChange={(val) => { setBranch(val); setBranchError(false) }}
+                  options={branchSelectOptions}
+                  onSearch={setBranchSearch}
+                  placeholder="Sin especificar"
+                  className="ff-select"
+                  disabled={branchOptions.length === 1}
+                />
+                {branchError && <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal para continuar</p>}
+              </div>
+
+              {usaDepartamentos && (
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="department">Departamento</label>
+                  <DepartmentSelect id="department" value={department} onChange={setDepartment} />
+                </div>
+              )}
             </div>
+
+            {/* Pago anticipado / sin aplicar a factura */}
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={advancePayment}
+                onChange={(e) => setAdvancePayment(e.target.checked)}
+                style={{ marginTop: 2 }}
+              />
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Wallet size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+                Pago anticipado — no aplicar a ninguna factura (queda como saldo a favor del proveedor)
+              </span>
+            </label>
+
+          </div>
+        </div>
+
+        {/* ════════════════ FACTURAS PENDIENTES ════════════════ */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Facturas Pendientes</span>
+            {checkedRefs.length > 0 && (
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                {checkedRefs.length} seleccionada{checkedRefs.length !== 1 ? 's' : ''}
+              </span>
+            )}
           </div>
 
-          <button
-            type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%' }}
-            disabled={pagoMutation.isPending}
-          >
-            {pagoMutation.isPending
-              ? <><span className="spinner spinner-white spinner-sm" /> Registrando…</>
-              : 'Registrar Pago'}
-          </button>
+          {advancePayment ? (
+            <div className="card-body" style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
+              Pago anticipado — no se aplicará a ninguna factura.
+            </div>
+          ) : !supplierId ? (
+            <div className="card-body" style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
+              Selecciona un proveedor para ver sus facturas pendientes
+            </div>
+          ) : pendientesLoading ? (
+            <div className="card-body" style={{ textAlign: 'center', padding: '24px 0' }}>
+              <span className="spinner spinner-brand spinner-sm" />
+            </div>
+          ) : referencias.length === 0 ? (
+            <div className="card-body" style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
+              Sin facturas pendientes para este proveedor
+            </div>
+          ) : (
+            <>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="items-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 36 }} />
+                      <th>Factura</th>
+                      <th style={{ textAlign: 'right' }}>Total</th>
+                      <th style={{ textAlign: 'right' }}>Pendiente</th>
+                      <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {referencias.map((ref) => (
+                      <tr key={ref.invoiceId} style={{ opacity: ref.checked ? 1 : 0.6 }}>
+                        <td style={{ textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={ref.checked}
+                            onChange={() => toggleReferencia(ref.invoiceId)}
+                            style={{ cursor: 'pointer', accentColor: 'var(--color-brand)' }}
+                          />
+                        </td>
+                        <td>
+                          <span style={{ fontWeight: 500, fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                            {ref.invoiceId}
+                          </span>
+                          <br />
+                          <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{ref.postingDate}</span>
+                        </td>
+                        <td style={{ textAlign: 'right', fontSize: 13 }}>{formatDOP(ref.grandTotal)}</td>
+                        <td style={{ textAlign: 'right', fontSize: 13, fontWeight: 500, color: 'var(--error-text)' }}>
+                          {formatDOP(ref.outstandingAmount)}
+                        </td>
+                        <td>
+                          <input
+                            className="items-input"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            style={{ textAlign: 'right' }}
+                            value={(computedAllocation[ref.invoiceId] ?? 0) || ''}
+                            disabled={!ref.checked}
+                            onChange={(e) => setAllocated(ref.invoiceId, parseFloat(e.target.value) || 0)}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Resumen de asignación */}
+              {checkedRefs.length > 0 && (
+                <div style={{
+                  padding: '12px 16px',
+                  borderTop: '1px solid var(--border-default)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                  alignItems: 'flex-end',
+                }}>
+                  <div style={{ display: 'flex', gap: 32, fontSize: 13 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Total asignado</span>
+                    <strong>{formatDOP(totalAllocated)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', gap: 32, fontSize: 13 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Monto del pago</span>
+                    <strong>{formatDOP(paidAmount)}</strong>
+                  </div>
+                  {diff !== 0 && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 12,
+                      color: diff > 0 ? 'var(--warning-text, #b45309)' : 'var(--error-text)',
+                      marginTop: 2,
+                    }}>
+                      <AlertTriangle size={13} />
+                      {diff > 0
+                        ? `Quedan ${formatDOP(diff)} sin asignar`
+                        : `Asignación excede el pago en ${formatDOP(Math.abs(diff))}`}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={pagoMutation.isPending}
+        >
+          {pagoMutation.isPending
+            ? <><span className="spinner spinner-white spinner-sm" /> Registrando…</>
+            : 'Registrar Pago'}
+        </button>
         </div>
 
       </form>

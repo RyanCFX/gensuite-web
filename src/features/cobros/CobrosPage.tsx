@@ -234,13 +234,9 @@ export default function CobrosPage() {
                       <td>{cobro.modeOfPayment}</td>
                       <td>
                         {cobro.isPosSale ? (
-                          <span className="badge badge-submitted" style={{ background: 'var(--color-info-bg, #e0f2fe)', color: 'var(--color-info-text, #0369a1)', border: '1px solid var(--color-info-border, #bae6fd)' }}>
-                            Venta al contado
-                          </span>
+                          <span className="badge badge-info">Venta al contado</span>
                         ) : (
-                          <span className="badge badge-draft" style={{ background: 'var(--color-neutral-bg, #f5f5f5)', color: 'var(--text-secondary)', border: '1px solid var(--border-default)' }}>
-                            Cobro factura
-                          </span>
+                          <span className="badge badge-neutral">Cobro factura</span>
                         )}
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(cobro.paidAmount)}</td>

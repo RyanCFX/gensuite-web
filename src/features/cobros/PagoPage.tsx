@@ -27,7 +27,6 @@ interface ReferenciaRow {
   outstandingAmount: number
   postingDate: string
   checked: boolean
-  allocatedAmount: number
 }
 
 interface PedidoReferenciaRow {
@@ -52,6 +51,7 @@ export default function PagoPage() {
   const [remarks, setRemarks] = useState('')
   const [postingDate, setPostingDate] = useState(new Date().toISOString().slice(0, 10))
   const [referencias, setReferencias] = useState<ReferenciaRow[]>([])
+  const [manualRefs, setManualRefs] = useState<Record<string, number>>({})
   const [advancePayment, setAdvancePayment] = useState(false)
   const [pedidoReferencias, setPedidoReferencias] = useState<PedidoReferenciaRow[]>([])
   const [branch, setBranch] = useState('')
@@ -139,7 +139,7 @@ export default function PagoPage() {
 
   // Sync invoice rows when customer or invoice data changes
   useEffect(() => {
-    if (!customerId || advancePayment) { setReferencias([]); return }
+    if (!customerId || advancePayment) { setReferencias([]); setManualRefs({}); return }
     const invoices = invoicesData?.items ?? []
     setReferencias(
       invoices
@@ -150,9 +150,9 @@ export default function PagoPage() {
           outstandingAmount: inv.outstandingAmount,
           postingDate: inv.postingDate,
           checked: false,
-          allocatedAmount: inv.outstandingAmount,
         })),
     )
+    setManualRefs({})
   }, [customerId, invoicesData, advancePayment])
 
   // ── Apartados (layaway) pendientes de anticipo ───────────────────────────
@@ -231,19 +231,51 @@ export default function PagoPage() {
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   function toggleReferencia(invoiceId: string) {
+    setManualRefs((prev) => {
+      const next = { ...prev }
+      delete next[invoiceId]
+      return next
+    })
     setReferencias((prev) =>
       prev.map((r) => (r.invoiceId === invoiceId ? { ...r, checked: !r.checked } : r)),
     )
   }
 
   function setAllocated(invoiceId: string, value: number) {
-    setReferencias((prev) =>
-      prev.map((r) => (r.invoiceId === invoiceId ? { ...r, allocatedAmount: value } : r)),
-    )
+    setManualRefs((prev) => ({ ...prev, [invoiceId]: value }))
   }
 
   const checkedRefs = referencias.filter((r) => r.checked)
-  const totalAllocated = checkedRefs.reduce((s, r) => s + r.allocatedAmount, 0)
+
+  // Asignación automática del monto del cobro sobre las facturas seleccionadas:
+  // la más antigua primero, con tope por pendiente, hasta agotar el monto.
+  // Las filas editadas a mano conservan su valor y el resto se reparte entre las demás.
+  const computedAllocation = useMemo(() => {
+    const result: Record<string, number> = {}
+    const checked = referencias
+      .filter((r) => r.checked)
+      .slice()
+      .sort((a, b) =>
+        a.postingDate < b.postingDate ? -1 : a.postingDate > b.postingDate ? 1 : a.invoiceId < b.invoiceId ? -1 : 1,
+      )
+    let remaining = Math.max(0, paidAmount || 0)
+    for (const r of checked) {
+      if (r.invoiceId in manualRefs) {
+        const v = manualRefs[r.invoiceId]
+        result[r.invoiceId] = v
+        remaining = Math.round((remaining - v) * 100) / 100
+      }
+    }
+    for (const r of checked) {
+      if (r.invoiceId in manualRefs) continue
+      const alloc = Math.round(Math.min(remaining, r.outstandingAmount) * 100) / 100
+      result[r.invoiceId] = alloc
+      remaining = Math.round((remaining - alloc) * 100) / 100
+    }
+    return result
+  }, [referencias, manualRefs, paidAmount])
+
+  const totalAllocated = checkedRefs.reduce((s, r) => s + (computedAllocation[r.invoiceId] ?? 0), 0)
     + checkedPedidoRefs.reduce((s, r) => s + r.allocatedAmount, 0)
   const diff = Math.round((paidAmount - totalAllocated) * 100) / 100
 
@@ -268,6 +300,7 @@ export default function PagoPage() {
       setRemarks('')
       setPostingDate(new Date().toISOString().slice(0, 10))
       setReferencias([])
+      setManualRefs({})
       setPedidoReferencias([])
       setAdvancePayment(false)
       setBranch('')
@@ -300,7 +333,7 @@ export default function PagoPage() {
     }
 
     const allReferencias = [
-      ...checkedRefs.map((r) => ({ invoiceId: r.invoiceId, allocatedAmount: r.allocatedAmount })),
+      ...checkedRefs.map((r) => ({ invoiceId: r.invoiceId, allocatedAmount: computedAllocation[r.invoiceId] ?? 0 })),
       ...checkedPedidoRefs.map((r) => ({
         invoiceId: r.pedidoId,
         allocatedAmount: r.allocatedAmount,
@@ -566,7 +599,7 @@ export default function PagoPage() {
                               min="0.01"
                               step="0.01"
                               style={{ textAlign: 'right' }}
-                              value={ref.allocatedAmount || ''}
+                              value={(computedAllocation[ref.invoiceId] ?? 0) || ''}
                               disabled={!ref.checked}
                               onChange={(e) => setAllocated(ref.invoiceId, parseFloat(e.target.value) || 0)}
                             />

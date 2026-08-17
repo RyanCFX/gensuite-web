@@ -191,10 +191,15 @@ export default function DevolucionesPage() {
                             </td>
                           </tr>
                         )
-                      : rows.map((d) => {
-                          const disponible = d.status === 'submitted' ? (d.availableAmount ?? 0) : 0
-                          const canApply = disponible > 0
-                          return (
+      : rows.map((d) => {
+          // "Disponible" mantiene la misma lógica que la ruta devoluciones: la disponibilidad
+          // de saldo se expresa con `availableAmount > 0` (equivalente al estado `available`/
+          // `partially_used` de devoluciones, que el backend de compras representa como status
+          // 'submitted' con availableAmount). No condicionamos al estado para que coincida con
+          // el concepto de disponibilidad de la ruta devoluciones.
+          const disponible = d.availableAmount ?? 0
+          const canApply = disponible > 0
+          return (
                             <tr key={d.id} className="table-row-clickable" onClick={() => navigate(`/devoluciones-compras/${d.id}`)}>
                               <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{d.id}</td>
                               <td style={{ fontWeight: 500 }}>{d.supplierName ?? '—'}</td>

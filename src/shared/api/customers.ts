@@ -21,6 +21,8 @@ export interface ListCustomersParams extends PaginationParams {
   creditLimitMax?: number
   creditDaysMin?: number
   creditDaysMax?: number
+  /** Filtra por sucursal (custom_branch) */
+  branch?: string
 }
 
 export async function listCustomers(params?: ListCustomersParams) {

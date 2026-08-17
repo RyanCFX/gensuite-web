@@ -9,9 +9,11 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
+import { listRetenciones } from '@/shared/api/retenciones'
 import { Send, X, RotateCcw, Undo2, Info, FileText, Trash2, Eye, BookOpen } from 'lucide-react'
 import { PdfFormatButton } from '@/components/shared/PdfFormatButton'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
+import { SaldoFavorCxpSection } from '@/features/devoluciones-compras/SaldoFavorCxpSection'
 import type { FormatoImpresion } from '@/shared/api/types'
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | 'delete' | null
@@ -32,6 +34,12 @@ export default function CompraDetail() {
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
     queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+
+  const { data: retencionesData } = useQuery({
+    queryKey: ['retenciones-all'],
+    queryFn: () => listRetenciones({ limit: 100 }),
     staleTime: 60 * 60_000,
   })
 
@@ -110,6 +118,7 @@ export default function CompraDetail() {
   function getFormaPagoLabel(value?: string) {
     return (catalogos?.formaPago606 ?? []).find((f) => f.value === value)?.label ?? value ?? '—'
   }
+  function fmtMonto(m?: number) { return m != null ? formatDOP(m) : '—' }
 
   if (isLoading) {
     return (
@@ -243,18 +252,71 @@ export default function CompraDetail() {
               <span className="detail-label">Vencimiento</span>
               <span className="detail-value">{formatDate(compra.dueDate)}</span>
             </div>
-            {!!compra.taxAmount && (
-              <div className="detail-field">
+            {((compra.impuestos?.length ?? 0) > 0 || !!compra.taxAmount) && (
+              <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
                 <span className="detail-label">Impuestos</span>
-                <span className="detail-value">{formatDOP(compra.taxAmount)}</span>
+                <span className="detail-value" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {(compra.impuestos ?? []).map((imp, idx) => (
+                    <span key={`${imp.id}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                      <span>{imp.id} ({imp.tasa}%)</span>
+                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{fmtMonto(imp.monto)}</strong>
+                    </span>
+                  ))}
+                  {compra.taxAmount != null && (
+                    <span style={{ display: 'flex', justifyContent: 'space-between', gap: 16, borderTop: '1px solid var(--border-default)', paddingTop: 4 }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Total impuestos</span>
+                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{formatDOP(compra.taxAmount)}</strong>
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
+            {(compra.retenciones?.length ?? 0) > 0 && (
+              <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+                <span className="detail-label">Retenciones</span>
+                <span className="detail-value" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {(compra.retenciones ?? []).map((r) => {
+                    const opt = retencionesData?.items?.find((x) => x.id === r.id)
+                    return (
+                      <span key={r.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                        <span>{opt?.categoryName ?? r.id} ({r.tasa}%)</span>
+                        <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{fmtMonto(r.monto)}</strong>
+                      </span>
+                    )
+                  })}
+                  <span style={{ display: 'flex', justifyContent: 'space-between', gap: 16, borderTop: '1px solid var(--border-default)', paddingTop: 4 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Total retenciones</span>
+                    <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                      {formatDOP((compra.retenciones ?? []).reduce((s, r) => s + (r.monto ?? 0), 0))}
+                    </strong>
+                  </span>
+                </span>
               </div>
             )}
             <div className="detail-field">
               <span className="detail-label">Total</span>
               <span className="detail-value" style={{ fontSize: 18, fontWeight: 700 }}>{formatDOP(compra.grandTotal)}</span>
             </div>
+            {compra.status === 'submitted' && (
+              <div className="detail-field">
+                <span className="detail-label">Pendiente</span>
+                <span className="detail-value">{formatDOP(compra.outstandingAmount ?? 0)}</span>
+              </div>
+            )}
           </div>
         </div>
+
+        {!compra.esProveedorOcasional && (
+          <SaldoFavorCxpSection
+            supplierId={compra.supplier}
+            supplierName={compra.supplierName}
+            invoiceId={compra.id}
+            invoiceStatus={compra.status}
+            invoiceGrandTotal={compra.grandTotal}
+            outstandingAmount={compra.outstandingAmount}
+            onChanged={() => queryClient.invalidateQueries({ queryKey: ['compra', id] })}
+          />
+        )}
 
         {/* Items */}
         <div className="card">

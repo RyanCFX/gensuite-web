@@ -9,6 +9,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { getCatalogosFiscales, listImpuestosCompras } from '@/shared/api/config'
 import { Send, X, RotateCcw, Info, FileText, AlertCircle, BookOpen } from 'lucide-react'
+import { SaldoFavorCxpSection } from '@/features/devoluciones-compras/SaldoFavorCxpSection'
 
 function apiErrorMessage(error: unknown, fallback: string) {
   const apiErr = error as { message?: string }
@@ -83,6 +84,7 @@ export default function GastoDetail() {
 
   function getTipoBienesLabel(v?: string) { return (catalogos?.tipoBienes606 ?? []).find((t) => t.value === v)?.label ?? v ?? '—' }
   function getFormaPagoLabel(v?: string) { return (catalogos?.formaPago606 ?? []).find((f) => f.value === v)?.label ?? v ?? '—' }
+  function fmtMonto(m?: number) { return m != null ? formatDOP(m) : '—' }
 
   const missing606 = !!gasto && (!gasto.tipoBienes606 || !gasto.formaPago606)
   const b17Violation = !!gasto && gasto.tipoComprobante === 'B17' && gasto.grandTotal > 50
@@ -220,23 +222,43 @@ export default function GastoDetail() {
               <span className="detail-label">Categoría</span>
               <span className="detail-value">{gasto.categoriaGasto ?? '—'}</span>
             </div>
-            {!!gasto.taxAmount && (
-              <div className="detail-field">
+            {((gasto.impuestos?.length ?? 0) > 0 || !!gasto.taxAmount) && (
+              <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
                 <span className="detail-label">Impuestos</span>
-                <span className="detail-value">{formatDOP(gasto.taxAmount)}</span>
+                <span className="detail-value" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {(gasto.impuestos ?? []).map((imp, idx) => (
+                    <span key={`${imp.id}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                      <span>{imp.id} ({imp.tasa}%)</span>
+                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{fmtMonto(imp.monto)}</strong>
+                    </span>
+                  ))}
+                  {gasto.taxAmount != null && (
+                    <span style={{ display: 'flex', justifyContent: 'space-between', gap: 16, borderTop: '1px solid var(--border-default)', paddingTop: 4 }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Total impuestos</span>
+                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{formatDOP(gasto.taxAmount)}</strong>
+                    </span>
+                  )}
+                </span>
               </div>
             )}
-            {gasto.retenciones && gasto.retenciones.length > 0 && (
+            {(gasto.retenciones?.length ?? 0) > 0 && (
               <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
                 <span className="detail-label">Retenciones</span>
-                <span className="detail-value">
-                  <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {gasto.retenciones.map((r) => {
-                      const opt = retencionesData?.items?.find((x) => x.id === r.id)
-                      return (
-                        <span key={r.id} className="badge badge-info">{opt?.categoryName ?? r.id} ({r.tasa}%)</span>
-                      )
-                    })}
+                <span className="detail-value" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {(gasto.retenciones ?? []).map((r) => {
+                    const opt = retencionesData?.items?.find((x) => x.id === r.id)
+                    return (
+                      <span key={r.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                        <span>{opt?.categoryName ?? r.id} ({r.tasa}%)</span>
+                        <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{fmtMonto(r.monto)}</strong>
+                      </span>
+                    )
+                  })}
+                  <span style={{ display: 'flex', justifyContent: 'space-between', gap: 16, borderTop: '1px solid var(--border-default)', paddingTop: 4 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Total retenciones</span>
+                    <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                      {formatDOP((gasto.retenciones ?? []).reduce((s, r) => s + (r.monto ?? 0), 0))}
+                    </strong>
                   </span>
                 </span>
               </div>
@@ -251,6 +273,18 @@ export default function GastoDetail() {
             </div>
           </div>
         </div>
+
+        {!gasto.esProveedorOcasional && (
+          <SaldoFavorCxpSection
+            supplierId={gasto.supplier}
+            supplierName={gasto.supplierName}
+            invoiceId={gasto.id}
+            invoiceStatus={gasto.status}
+            invoiceGrandTotal={gasto.grandTotal}
+            outstandingAmount={gasto.outstandingAmount}
+            onChanged={() => queryClient.invalidateQueries({ queryKey: ['gasto', id] })}
+          />
+        )}
 
         {/* Items */}
         <div className="card">
@@ -339,7 +373,7 @@ export default function GastoDetail() {
                   ? (
                     <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {gasto.impuestos.map((imp, idx) => (
-                        <span key={`${imp.id}-${idx}`} className="badge badge-info">{imp.id} ({imp.tasa}%)</span>
+                        <span key={`${imp.id}-${idx}`} className="badge badge-info">{imp.id} ({imp.tasa}%) · {fmtMonto(imp.monto)}</span>
                       ))}
                     </span>
                   )
@@ -355,7 +389,7 @@ export default function GastoDetail() {
                       {gasto.retenciones.map((r) => {
                         const opt = retencionesData?.items?.find((x) => x.id === r.id)
                         return (
-                          <span key={r.id} className="badge badge-info">{opt?.categoryName ?? r.id} ({r.tasa}%)</span>
+                          <span key={r.id} className="badge badge-info">{opt?.categoryName ?? r.id} ({r.tasa}%) · {fmtMonto(r.monto)}</span>
                         )
                       })}
                     </span>

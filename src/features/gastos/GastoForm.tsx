@@ -385,7 +385,7 @@ export default function GastoForm() {
         }
       })
     })
-    if (!tipoBienes606 && concepto.tipoBienes606) setTipoBienes606(concepto.tipoBienes606)
+    if (!tipoBienes606 && concepto.claseFiscal) setTipoBienes606(concepto.claseFiscal)
     if (wasLastRow) setItems((prev) => [...prev, emptyItem()])
   }, [tipoBienes606])
 

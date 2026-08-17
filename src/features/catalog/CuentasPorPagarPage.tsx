@@ -68,9 +68,9 @@ export default function CuentasPorPagarPage() {
     queryFn: getCatalogosFiscales,
     staleTime: 60 * 60_000,
   })
-  const [tipoBienes606Search, setTipoBienes606Search] = useState('')
-  const tipoBienes606Options: SearchSelectOption[] = (catalogos?.tipoBienes606 ?? [])
-    .filter((t) => !tipoBienes606Search || t.label.toLowerCase().includes(tipoBienes606Search.toLowerCase()))
+  const [claseFiscalSearch, setClaseFiscalSearch] = useState('')
+  const claseFiscalOptions: SearchSelectOption[] = (catalogos?.tipoBienes606 ?? [])
+    .filter((t) => !claseFiscalSearch || t.label.toLowerCase().includes(claseFiscalSearch.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
 
   const {
@@ -147,8 +147,8 @@ export default function CuentasPorPagarPage() {
       descripcion: values.descripcion || undefined,
       tipoDocumento: values.tipoDocumento,
       cuenta: values.cuenta || undefined,
-      tipoBienes606: values.tipoBienes606 || undefined,
-      claseFiscal: (values.claseFiscal || undefined) as 'Bienes' | 'Servicios' | undefined,
+      tipoBienes606: (values.tipoBienes606 || undefined) as 'Bienes' | 'Servicios' | undefined,
+      claseFiscal: values.claseFiscal || undefined,
     }
     if (editTarget) {
       updateMutation.mutate({ id: editTarget.id, data: payload })
@@ -195,9 +195,9 @@ export default function CuentasPorPagarPage() {
             <tr>
               <SortableTh label="Título" sortKey="titulo" orderBy={orderBy} onSort={sort} />
               <th>Tipo de Documento</th>
-              <th>Cuenta</th>
-              <th>Clase Fiscal</th>
-              <th>Estado</th>
+               <th>Cuenta</th>
+               <th>Tipo de Bienes/Servicios (606)</th>
+               <th>Estado</th>
               <th style={{ width: 80 }} />
             </tr>
           </thead>
@@ -304,17 +304,22 @@ export default function CuentasPorPagarPage() {
                     <p className="ff-hint">En qué tipo de documento se usa este concepto de gasto.</p>
                   </div>
                   <div className="ff-wrap">
-                    <label className="ff-label">Clase Fiscal</label>
+                    <label className="ff-label">Tipo de Bienes/Servicios (606)</label>
                     <Controller
                       name="claseFiscal"
                       control={control}
                       render={({ field }) => (
-                        <Select value={field.value ?? ''} onValueChange={field.onChange} placeholder="Sin especificar">
-                          <SelectItem value="Bienes">Bienes</SelectItem>
-                          <SelectItem value="Servicios">Servicios</SelectItem>
-                        </Select>
+                        <SearchSelect
+                          value={field.value ?? ''}
+                          onChange={field.onChange}
+                          options={claseFiscalOptions}
+                          onSearch={setClaseFiscalSearch}
+                          selectedLabel={catalogos?.tipoBienes606?.find((t) => t.value === field.value)?.label ?? field.value}
+                          placeholder="Sin configurar"
+                        />
                       )}
                     />
+                    <p className="ff-hint">Categoría 606 de la DGII (ej. Arrendamientos, Gastos de personal). El backend normaliza el código corto o el string completo.</p>
                   </div>
                 </div>
 
@@ -335,19 +340,15 @@ export default function CuentasPorPagarPage() {
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label">Tipo de Bienes/Servicios (606)</label>
+                  <label className="ff-label">Tipo de Gasto Fiscal</label>
                   <Controller
                     name="tipoBienes606"
                     control={control}
                     render={({ field }) => (
-                      <SearchSelect
-                        value={field.value ?? ''}
-                        onChange={field.onChange}
-                        options={tipoBienes606Options}
-                        onSearch={setTipoBienes606Search}
-                        selectedLabel={catalogos?.tipoBienes606?.find((t) => t.value === field.value)?.label ?? ''}
-                        placeholder="Sin configurar"
-                      />
+                      <Select value={field.value ?? ''} onValueChange={field.onChange} placeholder="Sin especificar">
+                        <SelectItem value="Bienes">Bienes</SelectItem>
+                        <SelectItem value="Servicios">Servicios</SelectItem>
+                      </Select>
                     )}
                   />
                 </div>
