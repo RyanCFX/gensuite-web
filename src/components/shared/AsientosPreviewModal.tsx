@@ -113,12 +113,12 @@ export function AsientosPreviewModal({ open, onClose, queryKey, queryFn, onRedis
                         <td className="td-muted">{formatDate(r.postingDate)}</td>
                         <td>
                           {r.account}
-                          {r.origen === 'impuesto' && (
+                          {/*{r.origen === 'impuesto' && (
                             <span className="badge badge-info" style={{ marginLeft: 6, fontSize: 10 }}>Impuesto</span>
                           )}
                           {r.origen === 'retencion' && (
                             <span className="badge badge-default" style={{ marginLeft: 6, fontSize: 10 }}>Retención</span>
-                          )}
+                          )}*/}
                           {r.party && (
                             <span style={{ display: 'block', fontSize: 11, color: 'var(--text-tertiary)' }}>
                               {r.partyType ?? 'Party'}: {r.party}
