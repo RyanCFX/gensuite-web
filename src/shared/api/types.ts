@@ -1786,16 +1786,63 @@ export interface FacturarPurchaseReceiptDto {
 }
 
 // ─── Gasto (Purchase Invoice — update_stock=0) ────────────────────────────────
-// GastoItemDto: itemCode, qty, rate, uom?, description? (description is allowed)
+// GastoItemDto: una línea puede ser de catálogo (itemCode) o "ad-hoc" (titulo, sin Item de
+// ERPNext) — ver GastoItemDto abajo. Exactamente uno de itemCode/titulo por línea.
 
+/** Línea de un Gasto en la respuesta de lectura (GET /gastos, GET /gastos/:id). Los campos
+ *  ad-hoc (cuentaAlterna, tipoBienes606, tipoGastoFiscal) vienen null/undefined en líneas de
+ *  catálogo. impuestos/retenciones de línea NO se devuelven aquí — el backend no los persiste
+ *  individualmente, solo su efecto en los totales del documento (ver GastoItemDto). */
 export interface GastoItem {
-  itemCode: string;
+  itemCode: string | null;
   itemName?: string;
+  /** Solo líneas ad-hoc — descripción larga de la línea. */
+  descripcion?: string;
   qty: number;
   rate: number;
   amount: number;
   uom?: string;
   description?: string;
+  /** Solo líneas ad-hoc — cuenta contable (Account) debitada por esta línea. */
+  cuentaAlterna?: string | null;
+  /** Solo líneas ad-hoc — Tipo de Bienes/Servicios (606) de esta línea. Informativo: el
+   *  reporte 606 solo usa el campo de cabecera del documento (Gasto.tipoBienes606), nunca
+   *  desglosa por línea. */
+  tipoBienes606?: string | null;
+  /** Solo líneas ad-hoc. */
+  tipoGastoFiscal?: "Bienes" | "Servicios" | null;
+}
+
+/** Línea de un Gasto en el request (POST/PUT /gastos). De catálogo: trae `itemCode`. Ad-hoc
+ *  (sin Item de ERPNext): trae `titulo` en su lugar, con su propia `cuentaAlterna` (requerida)
+ *  e impuestos/retenciones INDEPENDIENTES de los del documento — si se omiten, la línea no
+ *  lleva ninguno aunque el documento sí traiga `taxesTemplate`/`retenciones`. */
+export interface GastoItemDto {
+  /** Item del catálogo (ej. Cuentas por Pagar). Requerido salvo que se envíe `titulo`. */
+  itemCode?: string;
+  /** Título de un ítem SIN catálogo (ad-hoc) — activa este modo en vez de `itemCode`. */
+  titulo?: string;
+  /** Solo ítems ad-hoc — descripción larga de la línea. */
+  descripcion?: string;
+  /** Cantidad. Opcional en ad-hoc (default 1 en el backend); recomendado siempre en catálogo. */
+  qty?: number;
+  /** Precio unitario. Siempre requerido. */
+  rate: number;
+  uom?: string;
+  description?: string;
+  /** Solo ítems ad-hoc — mismo catálogo de 11 valores que el campo de cabecera. Ignorado en
+   *  ítems de catálogo. El reporte 606 no desglosa por línea — es solo informativo. */
+  tipoBienes606?: string;
+  /** Solo ítems ad-hoc. */
+  tipoGastoFiscal?: "Bienes" | "Servicios";
+  /** Requerida en ítems ad-hoc — cuenta contable (Account) a debitar. Ignorada en catálogo. */
+  cuentaAlterna?: string;
+  /** Solo ítems ad-hoc — ids de "Tasa Impuesto RD" que aplican a ESTA línea, independientes de
+   *  `taxesTemplate` del documento. */
+  impuestos?: string[];
+  /** Solo ítems ad-hoc — ids de Tax Withholding Category que aplican a ESTA línea,
+   *  independientes de `retenciones` del documento. Base: qty × rate de esta línea. */
+  retenciones?: string[];
 }
 
 export interface Gasto {
@@ -1857,13 +1904,7 @@ export interface CreateGastoDto {
   department?: string;
   currency?: string;
   conversionRate?: number;
-  items: {
-    itemCode: string;
-    qty: number;
-    rate: number;
-    uom?: string;
-    description?: string; // allowed in GastoItemDto
-  }[];
+  items: GastoItemDto[];
   ncfProveedor?: string;
   billNo?: string;
   tipoComprobante?: "B01" | "B13" | "B14" | "B15" | "B16" | "B17" | "E31";

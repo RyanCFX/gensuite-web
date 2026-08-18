@@ -23956,24 +23956,72 @@
         "type": "object",
         "properties": {
           "itemCode": {
-            "type": "string"
+            "type": "string",
+            "description": "Item del catálogo (ej. Cuentas por Pagar). Requerido salvo que se envíe `titulo` — un ítem sin catálogo (\"ad-hoc\") se identifica por traer `titulo` en vez de `itemCode`."
+          },
+          "titulo": {
+            "type": "string",
+            "example": "Reparación de aire acondicionado",
+            "description": "Título de un ítem SIN catálogo (ad-hoc) — activa este modo en vez de `itemCode`. La línea se crea sin Item de ERPNext, con `cuentaAlterna` como cuenta contable. Los impuestos/retenciones de este ítem son independientes de los del documento: si no se envían, esta línea no lleva ninguno aunque el documento sí traiga `taxesTemplate`/`retenciones`."
+          },
+          "descripcion": {
+            "type": "string",
+            "description": "Solo ítems ad-hoc — descripción larga de la línea."
           },
           "qty": {
-            "type": "number"
+            "type": "number",
+            "default": 1,
+            "description": "Cantidad. Opcional para ítems ad-hoc (default 1); recomendado siempre para ítems de catálogo."
           },
           "rate": {
-            "type": "number"
+            "type": "number",
+            "description": "Precio unitario."
           },
           "uom": {
             "type": "string"
           },
           "description": {
             "type": "string"
+          },
+          "tipoBienes606": {
+            "type": "string",
+            "description": "Solo ítems ad-hoc — Tipo de Bienes/Servicios (606) de ESTA línea (mismo catálogo de 11 valores que Purchase Invoice.custom_tipo_bienes_606). Ignorado en ítems de catálogo."
+          },
+          "tipoGastoFiscal": {
+            "type": "string",
+            "enum": [
+              "Bienes",
+              "Servicios"
+            ],
+            "description": "Solo ítems ad-hoc — si esta línea corresponde a un bien o a un servicio."
+          },
+          "cuentaAlterna": {
+            "type": "string",
+            "example": "60-05 - Reparaciones y Mantenimiento - JBC",
+            "description": "Requerida en ítems ad-hoc — cuenta contable (Account) a debitar por esta línea, en vez de una cuenta de gasto default (no hay Item del que derivarla). Ignorada en ítems de catálogo."
+          },
+          "impuestos": {
+            "example": [
+              "ITBIS 18%"
+            ],
+            "description": "Solo ítems ad-hoc — ids de \"Tasa Impuesto RD\" que aplican a ESTA línea, independientes de `taxesTemplate` del documento. Si se omite, esta línea no lleva ningún impuesto.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "retenciones": {
+            "example": [
+              "Retención ISR Servicios 10%"
+            ],
+            "description": "Solo ítems ad-hoc — ids de Tax Withholding Category que aplican a ESTA línea, independientes de `retenciones` del documento. Si se omite, esta línea no lleva ninguna retención. Base de cálculo: monto neto de esta línea (qty × rate) — no se distingue Net/Gross Total como sí ocurre a nivel de documento.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
-          "itemCode",
-          "qty",
           "rate"
         ]
       },

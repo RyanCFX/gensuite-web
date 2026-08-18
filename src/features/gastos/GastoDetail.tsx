@@ -305,17 +305,23 @@ export default function GastoDetail() {
               <tbody>
                 {gasto.items.map((item, i) => (
                   <tr key={i}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{item.itemCode}</td>
-                    <td>{item.description}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                      {item.itemCode ?? <span className="badge badge-info">Ad-hoc</span>}
+                    </td>
+                    <td>
+                      {item.itemName && <div style={{ fontWeight: 500 }}>{item.itemName}</div>}
+                      <div>{item.description ?? item.descripcion}</div>
+                      {!item.itemCode && (item.cuentaAlterna || item.tipoBienes606 || item.tipoGastoFiscal) && (
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                          {[item.cuentaAlterna, item.tipoBienes606, item.tipoGastoFiscal].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'right' }}>{item.qty}</td>
                     <td style={{ textAlign: 'right' }}>{formatDOP(item.rate)}</td>
                     <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
                   </tr>
                 ))}
-                <tr style={{ background: 'var(--surface-sunken)', fontWeight: 600 }}>
-                  <td colSpan={4} style={{ textAlign: 'right' }}>Total</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatDOP(gasto.grandTotal)}</td>
-                </tr>
                 <tr style={{ background: 'var(--surface-sunken)', fontWeight: 600 }}>
                   <td colSpan={4} style={{ textAlign: 'right' }}>Total</td>
                   <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatDOP(gasto.grandTotal)}</td>
@@ -347,6 +353,11 @@ export default function GastoDetail() {
             <div className="detail-field">
               <span className="detail-label">Tipo de Bienes</span>
               <span className="detail-value">{getTipoBienesLabel(gasto.tipoBienes606)}</span>
+              {gasto.items.some((it) => it.tipoBienes606 && it.tipoBienes606 !== gasto.tipoBienes606) && (
+                <p className="ff-hint" style={{ marginTop: 4 }}>
+                  Algunos ítems ad-hoc tienen una clasificación distinta, pero el reporte 606 solo usa esta clasificación de cabecera (no desglosa por línea).
+                </p>
+              )}
             </div>
             <div className="detail-field">
               <span className="detail-label">Forma de Pago</span>

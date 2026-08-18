@@ -10,7 +10,8 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { getCatalogosFiscales, getFacturacionConfig, listImpuestosCompras } from '@/shared/api/config'
 import { CATEGORIA_GASTO } from '@/lib/constants'
 import { listRetenciones } from '@/shared/api/retenciones'
-import { Plus, Trash2, Info, AlertCircle, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, Pencil, Info, AlertCircle, AlertTriangle } from 'lucide-react'
+import { Modal } from '@/shared/ui/Modal'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { MultiSearchSelect } from '@/shared/ui/MultiSearchSelect'
@@ -22,6 +23,7 @@ import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 
@@ -35,10 +37,35 @@ interface ItemRow {
   qty: number
   rate: number
   uom: string
+  // ── Ítem ad-hoc (sin catálogo) — ver GastoItemDto. Exactamente uno de itemCode/isAdHoc+titulo. ──
+  isAdHoc?: boolean
+  titulo?: string
+  cuentaAlterna?: string
+  tipoBienes606Linea?: string
+  tipoGastoFiscal?: 'Bienes' | 'Servicios' | ''
+  impuestosLinea?: string[]
+  retencionesLinea?: string[]
 }
 
 function emptyItem(): ItemRow {
   return { itemCode: '', description: '', qty: 1, rate: 0, uom: 'Nos' }
+}
+
+function emptyAdHocItem(): ItemRow {
+  return {
+    itemCode: '',
+    description: '',
+    qty: 1,
+    rate: 0,
+    uom: 'Nos',
+    isAdHoc: true,
+    titulo: '',
+    cuentaAlterna: '',
+    tipoBienes606Linea: '',
+    tipoGastoFiscal: '',
+    impuestosLinea: [],
+    retencionesLinea: [],
+  }
 }
 
 const NCF_REGEX = /^[BE]\d{10}$/
@@ -162,18 +189,35 @@ export default function GastoForm() {
     setPostingDate(gastoData.postingDate.split('T')[0])
     setDueDate(gastoData.dueDate ? gastoData.dueDate.split('T')[0] : '')
     setDueDateTouched(true)
+    const hasAdHocItems = gastoData.items.some((i) => !i.itemCode)
     setItems(
       gastoData.items.length > 0
-        ? gastoData.items.map((i) => ({
-            itemCode: i.itemCode,
-            itemLabel: i.itemName,
-            description: i.description ?? '',
-            qty: i.qty,
-            rate: i.rate,
-            uom: i.uom ?? 'Nos',
-          }))
+        ? gastoData.items.map((i) =>
+            i.itemCode
+              ? {
+                  itemCode: i.itemCode,
+                  itemLabel: i.itemName,
+                  description: i.description ?? '',
+                  qty: i.qty,
+                  rate: i.rate,
+                  uom: i.uom ?? 'Nos',
+                }
+              : {
+                  ...emptyAdHocItem(),
+                  titulo: i.itemName ?? '',
+                  description: i.descripcion ?? '',
+                  qty: i.qty,
+                  rate: i.rate,
+                  cuentaAlterna: i.cuentaAlterna ?? '',
+                  tipoBienes606Linea: i.tipoBienes606 ?? '',
+                  tipoGastoFiscal: i.tipoGastoFiscal ?? '',
+                },
+          )
         : [emptyItem()],
     )
+    if (hasAdHocItems) {
+      toast.info('Este gasto tiene ítems sin catálogo (ad-hoc). Sus impuestos/retenciones de línea no se guardan de forma individual — si necesitas conservarlos, vuelve a seleccionarlos antes de guardar.')
+    }
     setNcfProveedor(gastoData.ncfProveedor ?? '')
     setBillNo(gastoData.billNo ?? '')
     setTipoComprobante(gastoData.tipoComprobante ?? '')
@@ -302,6 +346,14 @@ export default function GastoForm() {
         }.`
       : null
 
+  // Un ítem ad-hoc con impuestos/retenciones propios + impuestos/retenciones de documento se
+  // suman por separado (el de documento se calcula sobre el total, que ya incluye la línea
+  // ad-hoc) — advertimos para evitar duplicar el cálculo sin querer.
+  const hasAdHocConItemLevelTax = items.some(
+    (i) => i.isAdHoc && ((i.impuestosLinea?.length ?? 0) > 0 || (i.retencionesLinea?.length ?? 0) > 0),
+  )
+  const showDuplicateTaxWarning = hasAdHocConItemLevelTax && (taxesTemplate.length > 0 || retenciones.length > 0)
+
   const saveMutation = useMutation({
     mutationFn: (dto: CreateGastoDto) => (isEdit ? updateGasto(id!, dto) : createGasto(dto)),
     onSuccess: (data) => {
@@ -343,6 +395,33 @@ export default function GastoForm() {
 
   const updateItem = useCallback((idx: number, field: keyof ItemRow, value: string | number) => {
     setItems((prev) => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row))
+  }, [])
+
+  // ── Modal de datos fiscales del ítem ad-hoc (cuenta, 606, impuestos/retenciones de línea) ──
+  // Título, descripción, qty y precio se editan en línea en la tabla, igual que un ítem de
+  // catálogo — el modal solo cubre los campos que no caben ahí.
+  const [adHocModal, setAdHocModal] = useState<{ idx: number; draft: ItemRow } | null>(null)
+
+  const openAdHocCreate = useCallback(() => {
+    setItems((prev) => {
+      const next = [...prev, emptyAdHocItem()]
+      setAdHocModal({ idx: next.length - 1, draft: next[next.length - 1] })
+      return next
+    })
+  }, [])
+  const openAdHocEdit = useCallback((idx: number) => setAdHocModal({ idx, draft: { ...items[idx] } }), [items])
+  const closeAdHocModal = useCallback(() => setAdHocModal(null), [])
+  const updateAdHocDraft = useCallback(<K extends keyof ItemRow>(field: K, value: ItemRow[K]) => {
+    setAdHocModal((prev) => prev ? { ...prev, draft: { ...prev.draft, [field]: value } } : prev)
+  }, [])
+  const saveAdHocModal = useCallback(() => {
+    setAdHocModal((prev) => {
+      if (!prev) return prev
+      const { idx, draft } = prev
+      if (!draft.cuentaAlterna) { toast.error('Selecciona una cuenta contable'); return prev }
+      setItems((rows) => rows.map((row, i) => (i === idx ? { ...row, ...draft } : row)))
+      return null
+    })
   }, [])
 
   const selectCatalogItem = useCallback((idx: number, catalogItem: Item) => {
@@ -407,11 +486,16 @@ export default function GastoForm() {
     // La regla B17 y los campos 606 requeridos se validan al Someter, no al
     // guardar el borrador — un Draft debe poder guardarse siempre.
 
-    // Filas sin itemCode (ej. una fila agregada y luego vaciada) se ignoran — mismo
+    // Filas sin itemCode ni título (ej. una fila agregada y luego vaciada) se ignoran — mismo
     // criterio que aplica el backend, para dar feedback inmediato sin esperar el POST.
-    const validItems = items.filter((i) => i.itemCode)
+    const validItems = items.filter((i) => i.itemCode || (i.isAdHoc && i.titulo?.trim()))
     if (validItems.length === 0) {
-      toast.error('Agrega al menos un artículo con itemCode')
+      toast.error('Agrega al menos un artículo con itemCode o un ítem sin catálogo con título')
+      return
+    }
+    const invalidAdHoc = validItems.find((i) => i.isAdHoc && !i.cuentaAlterna)
+    if (invalidAdHoc) {
+      toast.error('Todo ítem sin catálogo requiere una cuenta contable')
       return
     }
 
@@ -424,13 +508,27 @@ export default function GastoForm() {
         : { supplier: supplierId }),
       postingDate,
       dueDate: dueDate || undefined,
-      items: validItems.map((i) => ({
-        itemCode: i.itemCode,
-        description: i.description,
-        qty: i.qty,
-        rate: i.rate,
-        uom: i.uom || undefined,
-      })),
+      items: validItems.map((i) =>
+        i.isAdHoc
+          ? {
+              titulo: i.titulo!.trim(),
+              descripcion: i.description || undefined,
+              qty: i.qty > 0 ? i.qty : undefined,
+              rate: i.rate,
+              cuentaAlterna: i.cuentaAlterna!,
+              tipoBienes606: i.tipoBienes606Linea || undefined,
+              tipoGastoFiscal: (i.tipoGastoFiscal || undefined) as 'Bienes' | 'Servicios' | undefined,
+              impuestos: i.impuestosLinea && i.impuestosLinea.length > 0 ? i.impuestosLinea : undefined,
+              retenciones: i.retencionesLinea && i.retencionesLinea.length > 0 ? i.retencionesLinea : undefined,
+            }
+          : {
+              itemCode: i.itemCode,
+              description: i.description,
+              qty: i.qty,
+              rate: i.rate,
+              uom: i.uom || undefined,
+            },
+      ),
       ncfProveedor: ncfProveedor || undefined,
       billNo: billNo || undefined,
       tipoComprobante: tipoComprobante as CreateGastoDto['tipoComprobante'] || undefined,
@@ -579,9 +677,14 @@ export default function GastoForm() {
           <div className="card">
             <div className="card-header">
               <span className="card-title">Artículos / Conceptos</span>
-              <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setItems((prev) => [...prev, emptyItem()])}>
-                <Plus size={14} />Agregar
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className="btn btn-secondary btn-size-sm" onClick={openAdHocCreate}>
+                  <Plus size={14} />Ítem sin catálogo
+                </button>
+                <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setItems((prev) => [...prev, emptyItem()])}>
+                  <Plus size={14} />Agregar
+                </button>
+              </div>
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               <div className="items-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
@@ -592,29 +695,41 @@ export default function GastoForm() {
                       <th>Descripción</th>
                       <th style={{ width: '10%', textAlign: 'right' }}>Qty</th>
                       <th style={{ width: '12%', textAlign: 'right' }}>Precio</th>
-                      <th style={{ width: '40px' }} />
+                      <th style={{ width: '64px' }} />
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((item, idx) => (
                       <tr key={idx}>
                         <td style={{ minWidth: 180 }}>
-                          <ItemSelect
-                            value={item.itemCode}
-                            selectedLabel={item.itemLabel}
-                            onSelect={(catalogItem) => selectCatalogItem(idx, catalogItem)}
-                            onClear={() => clearCatalogItem(idx)}
-                            placeholder="Buscar concepto de gasto…"
-                            excludeItems
-                            includeCuentasPorPagar
-                            onSelectCuentaPorPagar={(concepto) => selectCuentaPorPagar(idx, concepto)}
-                          />
+                          {item.isAdHoc ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span className="badge badge-info" style={{ flexShrink: 0 }}>Sin catálogo</span>
+                              <input
+                                className="items-input"
+                                placeholder="Título del ítem…"
+                                value={item.titulo ?? ''}
+                                onChange={(e) => updateItem(idx, 'titulo', e.target.value)}
+                              />
+                            </div>
+                          ) : (
+                            <ItemSelect
+                              value={item.itemCode}
+                              selectedLabel={item.itemLabel}
+                              onSelect={(catalogItem) => selectCatalogItem(idx, catalogItem)}
+                              onClear={() => clearCatalogItem(idx)}
+                              placeholder="Buscar concepto de gasto…"
+                              excludeItems
+                              includeCuentasPorPagar
+                              onSelectCuentaPorPagar={(concepto) => selectCuentaPorPagar(idx, concepto)}
+                            />
+                          )}
                         </td>
                         <td>
                           <input className="items-input" placeholder="Descripción" value={item.description} onChange={(e) => updateItem(idx, 'description', e.target.value)} />
                         </td>
                         <td>
-                          {item.itemType === 'service' ? (
+                          {!item.isAdHoc && item.itemType === 'service' ? (
                             <span className="td-muted" style={{ display: 'block', textAlign: 'right' }}>—</span>
                           ) : (
                             <input className="items-input" type="number" min="0.001" step="0.001" style={{ textAlign: 'right' }} value={item.qty} onChange={(e) => updateItem(idx, 'qty', parseFloat(e.target.value) || 0)} />
@@ -623,10 +738,17 @@ export default function GastoForm() {
                         <td>
                           <input className="items-input" type="number" min="0" step="0.01" style={{ textAlign: 'right' }} value={item.rate} onChange={(e) => updateItem(idx, 'rate', parseFloat(e.target.value) || 0)} />
                         </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <button type="button" className="btn btn-ghost btn-size-icon-sm" style={{ color: 'var(--icon-muted)' }} onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))} disabled={items.length === 1}>
-                            <Trash2 size={14} />
-                          </button>
+                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                            {item.isAdHoc && (
+                              <button type="button" className="btn btn-ghost btn-size-icon-sm" style={{ color: 'var(--icon-muted)' }} onClick={() => openAdHocEdit(idx)}>
+                                <Pencil size={14} />
+                              </button>
+                            )}
+                            <button type="button" className="btn btn-ghost btn-size-icon-sm" style={{ color: 'var(--icon-muted)' }} onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))} disabled={items.length === 1}>
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -755,6 +877,13 @@ export default function GastoForm() {
             </div>
 
             {/* ── Impuestos y retenciones ── */}
+            {showDuplicateTaxWarning && (
+              <div className="inline-alert inline-alert-error" style={{ marginTop: 16 }}>
+                <AlertCircle size={16} />
+                Tienes un ítem sin catálogo con impuestos/retenciones propios Y además impuestos/retenciones a nivel de documento —
+                si son de la misma categoría, se aplican ambos por separado y el monto puede quedar duplicado. Evita repetirlos.
+              </div>
+            )}
             <div className="form-row form-row-3" style={{ borderTop: '1px solid var(--border-subtle)', marginTop: 16, paddingTop: 16 }}>
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
@@ -810,6 +939,84 @@ export default function GastoForm() {
         </div>
       </form>
       )}
+
+      <Modal
+        open={!!adHocModal}
+        onClose={closeAdHocModal}
+        title="Datos Fiscales del Ítem sin Catálogo"
+        subtitle="Cuenta contable, clasificación e impuestos/retenciones de esta línea — independientes del documento. Título, descripción, cantidad y precio se editan directamente en la tabla."
+        size="lg"
+        footer={
+          <>
+            <button type="button" className="btn btn-secondary" onClick={closeAdHocModal}>Cancelar</button>
+            <button type="button" className="btn btn-primary" onClick={saveAdHocModal}>Guardar</button>
+          </>
+        }
+      >
+        {adHocModal && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="form-row form-row-3">
+              <div className="ff-wrap">
+                <label className="ff-label">Cuenta Contable <span className="ff-required">*</span></label>
+                <AccountSelect
+                  value={adHocModal.draft.cuentaAlterna ?? ''}
+                  onChange={(val) => updateAdHocDraft('cuentaAlterna', val)}
+                  ledgerOnly
+                  error={!adHocModal.draft.cuentaAlterna}
+                />
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Tipo de Bienes 606 (línea)</label>
+                <SearchSelect
+                  value={adHocModal.draft.tipoBienes606Linea ?? ''}
+                  onChange={(val) => updateAdHocDraft('tipoBienes606Linea', val)}
+                  options={tipoBienes606Options}
+                  onSearch={setTipoBienes606Search}
+                  selectedLabel={catalogos?.tipoBienes606?.find((t) => t.value === adHocModal.draft.tipoBienes606Linea)?.label ?? adHocModal.draft.tipoBienes606Linea}
+                  placeholder="Seleccionar tipo"
+                />
+                <p className="ff-hint">Informativo — el reporte 606 solo usa la clasificación de cabecera del documento.</p>
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Tipo de Gasto Fiscal</label>
+                <Select
+                  value={adHocModal.draft.tipoGastoFiscal ?? ''}
+                  onValueChange={(val) => updateAdHocDraft('tipoGastoFiscal', val as 'Bienes' | 'Servicios' | '')}
+                  placeholder="Seleccionar"
+                >
+                  <SelectItem value="Bienes">Bienes</SelectItem>
+                  <SelectItem value="Servicios">Servicios</SelectItem>
+                </Select>
+              </div>
+            </div>
+
+            <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr', borderTop: '1px solid var(--border-subtle)', paddingTop: 16 }}>
+              <div className="ff-wrap">
+                <label className="ff-label">Impuestos de esta línea</label>
+                <MultiSearchSelect
+                  value={adHocModal.draft.impuestosLinea ?? []}
+                  onChange={(val) => updateAdHocDraft('impuestosLinea', val)}
+                  options={impuestosOptions}
+                  placeholder="Buscar plantilla…"
+                  emptyLabel="No hay plantillas configuradas."
+                />
+                <p className="ff-hint">Independiente del impuesto del documento — si lo dejas vacío, esta línea no lleva impuesto.</p>
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Retenciones de esta línea</label>
+                <MultiSearchSelect
+                  value={adHocModal.draft.retencionesLinea ?? []}
+                  onChange={(val) => updateAdHocDraft('retencionesLinea', val)}
+                  options={retencionesOptions}
+                  placeholder="Buscar retención…"
+                  emptyLabel="No hay retenciones configuradas."
+                />
+                <p className="ff-hint">Independiente de las retenciones del documento — si la dejas vacía, esta línea no lleva retención.</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
