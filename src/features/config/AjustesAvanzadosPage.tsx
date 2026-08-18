@@ -110,8 +110,8 @@ function CuentasTab() {
 
   const [overBillRoleSearch, setOverBillRoleSearch] = useState('')
   const overBillRoleOptions: SearchSelectOption[] = (rolesData ?? [])
-    .filter((r) => !overBillRoleSearch || r.toLowerCase().includes(overBillRoleSearch.toLowerCase()))
-    .map((r) => ({ value: r, label: r }))
+    .filter((r) => !overBillRoleSearch || r.label.toLowerCase().includes(overBillRoleSearch.toLowerCase()))
+    .map((r) => ({ value: r.id, label: r.label }))
 
   const saveMutation = useMutation({
     mutationFn: (dto: Partial<AccountsSettings>) => updateAccountsSettings(dto),
@@ -203,7 +203,7 @@ function CuentasTab() {
                   onChange={(val) => field.onChange(val)}
                   options={overBillRoleOptions}
                   onSearch={setOverBillRoleSearch}
-                  selectedLabel={field.value ?? ''}
+                  selectedLabel={rolesData?.find((r) => r.id === field.value)?.label ?? field.value ?? ''}
                   placeholder="Rol del sistema"
                 />
               )}

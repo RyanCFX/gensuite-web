@@ -10,7 +10,7 @@ import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCrea
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { UomSelect } from '@/shared/ui/UomSelect'
-import { formatDOP } from '@/lib/formatters'
+import { formatDOP, round2 } from '@/lib/formatters'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, PackageOpen, UserPlus } from 'lucide-react'
@@ -720,7 +720,7 @@ try {
                         )}
                       </td>
                       <td>
-                        <input className={`items-input${submitted && (!item.rate || item.rate <= 0) ? ' items-input-error' : ''}`} type="number" min="0" step="0.01" value={item.rate} disabled style={{ textAlign: 'right' }} />
+                        <input className={`items-input${submitted && (!item.rate || item.rate <= 0) ? ' items-input-error' : ''}`} type="number" min="0" step="0.01" value={round2(item.rate)} disabled style={{ textAlign: 'right' }} />
                       </td>
                       <td>
                         {(() => {
@@ -745,7 +745,7 @@ try {
                           )
                         })()}
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount, { trimZeros: true })}</td>
                       <td>
                         {item.itemType === 'service' || item.itemType === 'combo' ? (
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>

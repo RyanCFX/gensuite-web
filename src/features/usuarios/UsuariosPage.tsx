@@ -374,7 +374,7 @@ export default function UsuariosPage() {
                       style={{ fontSize: 12 }}
                       onClick={() =>
                         setSelectedRoles((prev) =>
-                          roles && prev.length === roles.length ? [] : (roles ?? []),
+                          roles && prev.length === roles.length ? [] : (roles ?? []).map((r) => r.id),
                         )
                       }
                     >
@@ -392,14 +392,14 @@ export default function UsuariosPage() {
                     padding: 12,
                   }}>
                     {roles?.map((r) => (
-                      <label key={r} className="ff-check-wrap">
+                      <label key={r.id} className="ff-check-wrap">
                         <input
                           type="checkbox"
                           className="ff-check"
-                          checked={selectedRoles.includes(r)}
-                          onChange={() => toggleRole(r)}
+                          checked={selectedRoles.includes(r.id)}
+                          onChange={() => toggleRole(r.id)}
                         />
-                        <span style={{ fontSize: 13 }}>{r}</span>
+                        <span style={{ fontSize: 13 }}>{r.label}</span>
                       </label>
                     ))}
                   </div>

@@ -336,7 +336,7 @@ export default function DevolucionForm() {
                 <tr key={it.itemCode} style={it.returnQty > 0 ? { background: 'var(--info-bg, var(--surface-sunken))' } : undefined}>
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{it.itemCode}</td>
                   <td style={{ textAlign: 'right' }}>{it.stockQty}</td>
-                  <td style={{ textAlign: 'right' }}>{formatDOP(it.rate)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatDOP(it.rate, { trimZeros: true })}</td>
                   <td style={{ textAlign: 'right' }}>
                     <input
                       type="number"
@@ -353,7 +353,7 @@ export default function DevolucionForm() {
                       }}
                     />
                   </td>
-                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(it.returnQty * it.rate)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(it.returnQty * it.rate, { trimZeros: true })}</td>
                 </tr>
               ))}
               <tr style={{ background: 'var(--surface-sunken)', fontWeight: 600 }}>

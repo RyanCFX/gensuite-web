@@ -1631,6 +1631,9 @@ export interface CompraItem {
   uom?: string;
   serials?: string[];
   batches?: { batchId: string; expiryDate?: string; qty: number }[];
+  /** Cuenta contable alterna de esta línea (Purchase Invoice Item.expense_account). Solo tiene
+   *  efecto real en líneas que no afectan valorización de inventario — ver CompraItemDto. */
+  cuentaContable?: string;
   // NOTE: no "description" in CompraItemDto per BFF schema
 }
 
@@ -1671,6 +1674,24 @@ export interface Compra {
   amendedFrom?: string;
   /** Saldo pendiente de la factura de compra (para aplicar devoluciones/DP). */
   outstandingAmount?: number;
+  /** Cuenta por Pagar (credit_to) alterna para este documento, si se sobreescribió con
+   *  cuentaCxpOverride. Una devolución solo puede aplicarse contra facturas con la misma cuenta CxP. */
+  cuentaCxpOverride?: string;
+}
+
+export interface DistribucionCuentaDto {
+  cuenta: string;
+  monto: number;
+}
+
+/** Redistribuye un impuesto ya calculado por ERPNext (de documento o de artículo) entre varias
+ *  cuentas — la suma de `distribucion` debe coincidir exactamente con lo que ERPNext ya calculó
+ *  para `cuentaOrigen` (el BFF nunca calcula impuestos, solo redistribuye). Se aplica DESPUÉS de
+ *  crear/actualizar el documento (necesita el monto real ya calculado, visible en el preview de
+ *  asientos). */
+export interface ImpuestoDistribucionDto {
+  cuentaOrigen: string;
+  distribucion: DistribucionCuentaDto[];
 }
 
 export interface CreateCompraDto {
@@ -1700,6 +1721,15 @@ export interface CreateCompraDto {
       serials?: string[];
       batches?: { batchId: string; expiryDate?: string; qty: number }[];
     }[];
+    /** Cuenta contable alterna para ESTA línea (expense_account). Solo tiene efecto real en líneas
+     *  que no afectan valorización de inventario (ej. flete/servicio, o inventario perpetuo
+     *  desactivado) — en una línea de stock normal, ERPNext sigue debitando la cuenta de
+     *  inventario sin importar este campo. Si se omite, usa el default del artículo. */
+    cuentaContable?: string;
+    /** Divide el monto de ESTA línea (qty × rate) entre varias cuentas contables — la suma debe
+     *  coincidir exactamente con el monto de la línea. Si se envía, `cuentaContable` de esta línea
+     *  se ignora. No se puede combinar con `serials`/`batches` en la misma línea. */
+    distribucionCuenta?: DistribucionCuentaDto[];
     // NO description
   }[];
   ncfProveedor?: string;
@@ -1715,6 +1745,14 @@ export interface CreateCompraDto {
    *  lo calcula el backend (tasa × base) a partir de estas; nunca se manda un monto.
    *  Si se omite, se usan las retenciones por defecto del proveedor. */
   retenciones?: string[];
+  /** Cuenta por Pagar (credit_to) alterna para ESTE documento puntual — gana sobre
+   *  Supplier.custom_cuenta_cxp_default. Úsese con cuidado: una devolución de compra solo puede
+   *  aplicarse/reconciliarse contra facturas que compartan la misma cuenta CxP. */
+  cuentaCxpOverride?: string;
+  /** Redistribuye un impuesto ya calculado (ITBIS de documento o de artículo) entre varias
+   *  cuentas — ver ImpuestoDistribucionDto. Solo tiene sentido en un PUT sobre un Draft existente
+   *  (necesita el monto real ya calculado, visible en el preview de asientos). */
+  impuestoDistribucion?: ImpuestoDistribucionDto[];
 }
 
 export type UpdateCompraDto = Partial<CreateCompraDto>;
@@ -1796,6 +1834,9 @@ export interface GastoItem {
   amount: number;
   uom?: string;
   description?: string;
+  /** Cuenta contable a debitar por esta línea. Opcional en ítems de catálogo (si se omite, usa
+   *  la cuenta de gasto default del Item); si se envía, la sobreescribe solo para esta línea. */
+  cuentaAlterna?: string;
 }
 
 export interface Gasto {
@@ -1842,6 +1883,9 @@ export interface Gasto {
   createdAt?: string;
   modifiedAt?: string;
   message?: string;
+  /** Cuenta por Pagar (credit_to) alterna para este documento, si se sobreescribió con
+   *  cuentaCxpOverride. Una devolución solo puede aplicarse contra facturas con la misma cuenta CxP. */
+  cuentaCxpOverride?: string;
 }
 
 export interface CreateGastoDto {
@@ -1863,6 +1907,13 @@ export interface CreateGastoDto {
     rate: number;
     uom?: string;
     description?: string; // allowed in GastoItemDto
+    /** Cuenta contable (Account) a debitar por esta línea. Requerida en ítems ad-hoc; opcional en
+     *  ítems de catálogo (si se omite, usa la cuenta de gasto default del Item). */
+    cuentaAlterna?: string;
+    /** Divide el monto de ESTA línea (qty × rate) entre varias cuentas contables — la suma debe
+     *  coincidir exactamente con el monto de la línea. Si se envía, `cuentaAlterna` de esta línea
+     *  se ignora. Funciona en ítems de catálogo y ad-hoc por igual. */
+    distribucionCuenta?: DistribucionCuentaDto[];
   }[];
   ncfProveedor?: string;
   billNo?: string;
@@ -1878,9 +1929,34 @@ export interface CreateGastoDto {
    *  Si se omite, se usan los `impuestoGastosDefault` del proveedor si existen, y si no el default
    *  de la compañía. */
   taxesTemplate?: string[];
+  /** Cuenta por Pagar (credit_to) alterna para ESTE documento puntual, en vez del default de la
+   *  compañía. Úsese con cuidado: una devolución de compra solo puede aplicarse/reconciliarse
+   *  contra facturas que compartan la misma cuenta CxP. */
+  cuentaCxpOverride?: string;
+  /** Redistribuye un impuesto ya calculado (ITBIS de documento o de artículo) entre varias
+   *  cuentas — ver ImpuestoDistribucionDto. Solo tiene sentido en un PUT sobre un Draft existente
+   *  (necesita el monto real ya calculado, visible en el preview de asientos). */
+  impuestoDistribucion?: ImpuestoDistribucionDto[];
 }
 
 export type UpdateGastoDto = Partial<CreateGastoDto>;
+
+/** Fila del preview de asientos contables (GL) que se generarían al someter una Compra/Gasto en
+ *  Draft — GET /compras/:id/preview-asientos y GET /gastos/:id/preview-asientos. Solo lectura. */
+export interface AsientoPreviewRow {
+  postingDate: string;
+  account: string;
+  debit: number;
+  credit: number;
+  against?: string;
+  partyType?: string;
+  party?: string;
+  costCenter?: string;
+  /** Solo las filas "impuesto" son válidas como `cuentaOrigen` en `impuestoDistribucion` — las
+   *  "retencion" se regeneran aparte (no redistribuibles) y las "costo" (inventario, CxP, la del
+   *  artículo) nunca aplican. */
+  origen: "impuesto" | "retencion" | "costo";
+}
 
 // ─── Usuario ──────────────────────────────────────────────────────────────────
 

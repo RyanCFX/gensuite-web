@@ -112,7 +112,7 @@ export default function RoleDetailPage() {
             <div>
               <h1 className="page-title">{data.roleName}</h1>
               <p className="page-sub">
-                {data.isCustom ? 'Rol personalizado' : 'Rol estándar de ERPNext'}
+                {data.isCustom ? 'Rol personalizado' : 'Rol estándar del sistema'}
               </p>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -138,7 +138,7 @@ export default function RoleDetailPage() {
           {!data.isCustom && (
             <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
               <Info size={14} aria-hidden="true" />
-              Este es un rol estándar de ERPNext — no se puede eliminar.
+              Este es un rol estándar del sistema — no se puede eliminar.
             </div>
           )}
 

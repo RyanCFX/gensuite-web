@@ -11289,6 +11289,44 @@
         ]
       }
     },
+    "/api/v1/compras/{id}/preview-asientos": {
+      "get": {
+        "description": "Solo funciona mientras la compra siga en Draft — no somete ni persiste nada, es 100% de lectura (misma lógica nativa que el botón \"Preview → Accounting Ledger\" del Desk de ERPNext). Útil para revisar a qué cuentas va a impactar antes de confirmar, y decidir si hace falta ajustar `cuentaContable`/`cuentaCxpOverride` primero. Cada fila trae `origen` (\"impuesto\" | \"retencion\" | \"costo\") — solo las de `origen: \"impuesto\"` son válidas como `cuentaOrigen` en `impuestoDistribucion`; las de \"retencion\" viven en la misma tabla interna pero se regeneran aparte y no son redistribuibles, y las de \"costo\" (inventario, CxP, la del artículo) nunca vienen de ahí.",
+        "operationId": "ComprasController_previewAsientos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Preview de los asientos contables (GL) que se generarían al someter esta compra",
+        "tags": [
+          "Compras"
+        ]
+      }
+    },
     "/api/v1/compras/{id}/pdf": {
       "get": {
         "description": "`formato`: \"a4\", \"carta\" o \"a6\" (página completa) o \"pos\" (ticket angosto 80mm). Si se omite, usa el default configurable del tenant (Facturacion Config.formato_impresion_default).",
@@ -12369,6 +12407,44 @@
           }
         ],
         "summary": "Actualizar gasto en Draft",
+        "tags": [
+          "Gastos"
+        ]
+      }
+    },
+    "/api/v1/gastos/{id}/preview-asientos": {
+      "get": {
+        "description": "Solo funciona mientras el gasto siga en Draft — no somete ni persiste nada, es 100% de lectura (misma lógica nativa que el botón \"Preview → Accounting Ledger\" del Desk de ERPNext). Útil para revisar a qué cuentas va a impactar antes de confirmar, y decidir si hace falta ajustar `cuentaAlterna`/`cuentaCxpOverride` primero. Cada fila trae `origen` (\"impuesto\" | \"retencion\" | \"costo\") — solo las de `origen: \"impuesto\"` son válidas como `cuentaOrigen` en `impuestoDistribucion`; las de \"retencion\" viven en la misma tabla interna pero se regeneran aparte y no son redistribuibles, y las de \"costo\" (inventario, CxP, la del artículo) nunca vienen de ahí.",
+        "operationId": "GastosController_previewAsientos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Preview de los asientos contables (GL) que se generarían al someter este gasto",
         "tags": [
           "Gastos"
         ]
@@ -23601,6 +23677,23 @@
           }
         }
       },
+      "DistribucionCuentaDto": {
+        "type": "object",
+        "properties": {
+          "cuenta": {
+            "type": "string",
+            "example": "61-05-003 - Fletes y Acarreos - JBC"
+          },
+          "monto": {
+            "type": "number",
+            "example": 2000
+          }
+        },
+        "required": [
+          "cuenta",
+          "monto"
+        ]
+      },
       "BatchLineDto": {
         "type": "object",
         "properties": {
@@ -23645,6 +23738,18 @@
           "uom": {
             "type": "string"
           },
+          "cuentaContable": {
+            "type": "string",
+            "example": "61-05-003 - Fletes y Acarreos - JBC",
+            "description": "Cuenta contable alterna para esta línea (Purchase Invoice Item.expense_account). Solo tiene efecto real en líneas que no afectan valorización de inventario (ej. servicios/fletes dentro de una compra, o cuando el inventario perpetuo está desactivado) — en una línea de stock normal, ERPNext sigue debitando la cuenta de inventario/\"Stock Received But Not Billed\" sin importar este campo. Si se omite, usa el default del artículo."
+          },
+          "distribucionCuenta": {
+            "description": "Divide el monto de ESTA línea (qty × rate) entre varias cuentas contables — la suma debe coincidir exactamente con el monto de la línea. Pensado para conceptos de servicio/costo (Gastos, o líneas no inventariables de una Compra), no para partir la cantidad de un artículo de inventario: la línea se expande en N líneas reales con qty=1 cada una. Si se envía, `cuentaContable` de esta línea se ignora (la cuenta la define cada entrada de la distribución).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DistribucionCuentaDto"
+            }
+          },
           "serials": {
             "example": [
               "SN-001",
@@ -23675,6 +23780,26 @@
           "itemCode",
           "qty",
           "rate"
+        ]
+      },
+      "ImpuestoDistribucionDto": {
+        "type": "object",
+        "properties": {
+          "cuentaOrigen": {
+            "type": "string",
+            "example": "ITBIS 18% - JB",
+            "description": "Cuenta de impuesto ya calculada por ERPNext (de documento o de artículo) que se va a redistribuir."
+          },
+          "distribucion": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DistribucionCuentaDto"
+            }
+          }
+        },
+        "required": [
+          "cuentaOrigen",
+          "distribucion"
         ]
       },
       "CreateCompraDto": {
@@ -23767,6 +23892,18 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "cuentaCxpOverride": {
+            "type": "string",
+            "example": "21-01-002 - CXP PROVEEDORES EXTERIOR - JBC",
+            "description": "Cuenta por Pagar (credit_to) alterna para ESTE documento puntual — gana sobre Supplier.custom_cuenta_cxp_default. Úsese con cuidado: una devolución solo puede aplicarse/reconciliarse contra facturas que compartan la misma cuenta CxP (ver POST /devoluciones-compras/:id/aplicar-a-cxp)."
+          },
+          "impuestoDistribucion": {
+            "description": "Redistribuye un impuesto ya calculado por ERPNext (de documento o de artículo) entre varias cuentas — cubre tanto ITBIS de documento (taxesTemplate) como ITBIS por artículo (Item Tax Template): ambos terminan como filas de la misma tabla de impuestos antes de guardar. La suma de cada `distribucion` debe coincidir exactamente con lo que ERPNext ya calculó para esa cuenta — el BFF nunca calcula impuestos, solo redistribuye el monto real. Se aplica DESPUÉS de crear/actualizar el documento (necesita el monto real ya calculado).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImpuestoDistribucionDto"
             }
           }
         },
@@ -23867,6 +24004,18 @@
             "items": {
               "type": "string"
             }
+          },
+          "cuentaCxpOverride": {
+            "type": "string",
+            "example": "21-01-002 - CXP PROVEEDORES EXTERIOR - JBC",
+            "description": "Cuenta por Pagar (credit_to) alterna para ESTE documento puntual — gana sobre Supplier.custom_cuenta_cxp_default. Úsese con cuidado: una devolución solo puede aplicarse/reconciliarse contra facturas que compartan la misma cuenta CxP (ver POST /devoluciones-compras/:id/aplicar-a-cxp)."
+          },
+          "impuestoDistribucion": {
+            "description": "Redistribuye un impuesto ya calculado por ERPNext (de documento o de artículo) entre varias cuentas — cubre tanto ITBIS de documento (taxesTemplate) como ITBIS por artículo (Item Tax Template): ambos terminan como filas de la misma tabla de impuestos antes de guardar. La suma de cada `distribucion` debe coincidir exactamente con lo que ERPNext ya calculó para esa cuenta — el BFF nunca calcula impuestos, solo redistribuye el monto real. Se aplica DESPUÉS de crear/actualizar el documento (necesita el monto real ya calculado).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImpuestoDistribucionDto"
+            }
           }
         }
       },
@@ -23956,24 +24105,79 @@
         "type": "object",
         "properties": {
           "itemCode": {
-            "type": "string"
+            "type": "string",
+            "description": "Item del catálogo (ej. Cuentas por Pagar). Requerido salvo que se envíe `titulo` — un ítem sin catálogo (\"ad-hoc\") se identifica por traer `titulo` en vez de `itemCode`."
+          },
+          "titulo": {
+            "type": "string",
+            "example": "Reparación de aire acondicionado",
+            "description": "Título de un ítem SIN catálogo (ad-hoc) — activa este modo en vez de `itemCode`. La línea se crea sin Item de ERPNext, con `cuentaAlterna` como cuenta contable. Los impuestos/retenciones de este ítem son independientes de los del documento: si no se envían, esta línea no lleva ninguno aunque el documento sí traiga `taxesTemplate`/`retenciones`."
+          },
+          "descripcion": {
+            "type": "string",
+            "description": "Solo ítems ad-hoc — descripción larga de la línea."
           },
           "qty": {
-            "type": "number"
+            "type": "number",
+            "default": 1,
+            "description": "Cantidad. Opcional para ítems ad-hoc (default 1); recomendado siempre para ítems de catálogo."
           },
           "rate": {
-            "type": "number"
+            "type": "number",
+            "description": "Precio unitario."
           },
           "uom": {
             "type": "string"
           },
           "description": {
             "type": "string"
+          },
+          "tipoBienes606": {
+            "type": "string",
+            "description": "Solo ítems ad-hoc — Tipo de Bienes/Servicios (606) de ESTA línea (mismo catálogo de 11 valores que Purchase Invoice.custom_tipo_bienes_606). Ignorado en ítems de catálogo."
+          },
+          "tipoGastoFiscal": {
+            "type": "string",
+            "enum": [
+              "Bienes",
+              "Servicios"
+            ],
+            "description": "Solo ítems ad-hoc — si esta línea corresponde a un bien o a un servicio."
+          },
+          "cuentaAlterna": {
+            "type": "string",
+            "example": "60-05 - Reparaciones y Mantenimiento - JBC",
+            "description": "Cuenta contable (Account) a debitar por esta línea. Requerida en ítems ad-hoc (no hay Item del que derivar una cuenta default). Opcional en ítems de catálogo — si se omite, usa la cuenta de gasto default del Item; si se envía, la sobreescribe solo para esta línea."
+          },
+          "distribucionCuenta": {
+            "description": "Divide el monto de ESTA línea (qty × rate) entre varias cuentas contables — la suma debe coincidir exactamente con el monto de la línea. La línea se expande en N líneas reales con qty=1 cada una. Si se envía, `cuentaAlterna` de esta línea se ignora (la cuenta la define cada entrada de la distribución). Funciona en ítems de catálogo y ad-hoc por igual.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DistribucionCuentaDto"
+            }
+          },
+          "impuestos": {
+            "example": [
+              "ITBIS 18%"
+            ],
+            "description": "Solo ítems ad-hoc — ids de \"Tasa Impuesto RD\" que aplican a ESTA línea, independientes de `taxesTemplate` del documento. Si se omite, esta línea no lleva ningún impuesto.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "retenciones": {
+            "example": [
+              "Retención ISR Servicios 10%"
+            ],
+            "description": "Solo ítems ad-hoc — ids de Tax Withholding Category que aplican a ESTA línea, independientes de `retenciones` del documento. Si se omite, esta línea no lleva ninguna retención. Base de cálculo: monto neto de esta línea (qty × rate) — no se distingue Net/Gross Total como sí ocurre a nivel de documento.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
-          "itemCode",
-          "qty",
           "rate"
         ]
       },
@@ -24085,6 +24289,18 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "cuentaCxpOverride": {
+            "type": "string",
+            "example": "21-01-002 - CXP PROVEEDORES EXTERIOR - JBC",
+            "description": "Cuenta por Pagar (credit_to) alterna para ESTE documento puntual, en vez del default de la compañía. Úsese con cuidado: una devolución solo puede aplicarse/reconciliarse contra facturas que compartan la misma cuenta CxP (ver POST /devoluciones-compras/:id/aplicar-a-cxp)."
+          },
+          "impuestoDistribucion": {
+            "description": "Redistribuye un impuesto ya calculado por ERPNext (de documento o de artículo) entre varias cuentas. La suma de cada `distribucion` debe coincidir exactamente con lo que ERPNext ya calculó para esa cuenta — el BFF nunca calcula impuestos, solo redistribuye el monto real. Se aplica DESPUÉS de crear/actualizar el documento.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImpuestoDistribucionDto"
             }
           }
         },
@@ -24201,6 +24417,18 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "cuentaCxpOverride": {
+            "type": "string",
+            "example": "21-01-002 - CXP PROVEEDORES EXTERIOR - JBC",
+            "description": "Cuenta por Pagar (credit_to) alterna para ESTE documento puntual, en vez del default de la compañía. Úsese con cuidado: una devolución solo puede aplicarse/reconciliarse contra facturas que compartan la misma cuenta CxP (ver POST /devoluciones-compras/:id/aplicar-a-cxp)."
+          },
+          "impuestoDistribucion": {
+            "description": "Redistribuye un impuesto ya calculado por ERPNext (de documento o de artículo) entre varias cuentas. La suma de cada `distribucion` debe coincidir exactamente con lo que ERPNext ya calculó para esa cuenta — el BFF nunca calcula impuestos, solo redistribuye el monto real. Se aplica DESPUÉS de crear/actualizar el documento.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImpuestoDistribucionDto"
             }
           }
         }

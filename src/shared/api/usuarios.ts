@@ -43,9 +43,8 @@ export async function resetPasswordUsuario(email: string) {
   await client.post(ENDPOINTS.usuarios.resetPassword(email))
 }
 
-// NOTE: /roles returns string[] (not Role[]) — e.g. ["Administrator", "Accounts User", ...]
-export async function listRoles(): Promise<string[]> {
-  const res = await client.get<{ success: true; data: string[] }>(ENDPOINTS.roles.list)
+export async function listRoles(): Promise<Array<{ id: string; label: string; }>> {
+  const res = await client.get<{ success: true; data: Array<{ id: string; label: string }> }>(ENDPOINTS.roles.list)
   return unwrap(res)
 }
 

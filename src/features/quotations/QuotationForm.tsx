@@ -10,7 +10,7 @@ import type { CreateQuotationDto, ItemPrices, Bundle, Customer } from '@/shared/
 import type { Item } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
-import { formatDOP, displayId } from '@/lib/formatters'
+import { formatDOP, displayId, round2 } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { toast } from 'sonner'
@@ -884,7 +884,7 @@ if (esClienteOcasional) {
                           type="number"
                           min="0"
                           step="0.01"
-                          value={item.rate}
+                          value={round2(item.rate)}
                           disabled
                           style={{ textAlign: 'right' }}
                         />
@@ -952,7 +952,7 @@ if (esClienteOcasional) {
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount, { trimZeros: true })}</td>
 
                       <td>
                         {item.itemType === 'service' || item.itemType === 'combo' ? (

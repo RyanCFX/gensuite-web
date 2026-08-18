@@ -2218,14 +2218,14 @@ function FacturacionConfigSection() {
               </p>
             ) : (
               (roles ?? []).map((role) => (
-                <label key={role} className="ff-check-wrap">
+                <label key={role.id} className="ff-check-wrap">
                   <input
                     type="checkbox"
                     className="ff-check"
-                    checked={selectedRoles.includes(role)}
-                    onChange={() => toggleRole(role)}
+                    checked={selectedRoles.includes(role.id)}
+                    onChange={() => toggleRole(role.id)}
                   />
-                  <span style={{ fontSize: 13 }}>{role}</span>
+                  <span style={{ fontSize: 13 }}>{role.label}</span>
                 </label>
               ))
             )}
@@ -2504,14 +2504,14 @@ function FacturacionConfigSection() {
                  </p>
                ) : (
                  (roles ?? []).map((role) => (
-                   <label key={role} className="ff-check-wrap">
+                   <label key={role.id} className="ff-check-wrap">
                      <input
                        type="checkbox"
                        className="ff-check"
-                       checked={rolesCierreCajaAjena.includes(role)}
-                       onChange={() => toggleCierreCajaAjenaRole(role)}
+                       checked={rolesCierreCajaAjena.includes(role.id)}
+                       onChange={() => toggleCierreCajaAjenaRole(role.id)}
                      />
-                     <span style={{ fontSize: 13 }}>{role}</span>
+                     <span style={{ fontSize: 13 }}>{role.label}</span>
                    </label>
                  ))
                )}

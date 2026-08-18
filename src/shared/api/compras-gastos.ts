@@ -8,6 +8,7 @@ import type {
   Gasto,
   CreateGastoDto,
   FormatoImpresion,
+  AsientoPreviewRow,
 } from './types'
 
 // ---- Compras (update_stock=1) ----
@@ -90,6 +91,13 @@ export async function deleteCompra(id: string) {
   return unwrap(res)
 }
 
+/** Preview de los asientos contables (GL) que se generarían al someter esta compra — solo
+ *  funciona mientras siga en Draft, no somete ni persiste nada. */
+export async function previewAsientosCompra(id: string) {
+  const res = await client.get<{ success: true; data: AsientoPreviewRow[] }>(ENDPOINTS.compras.previewAsientos(id))
+  return unwrap(res)
+}
+
 // ---- Gastos (update_stock=0) ----
 
 export interface ListGastosParams extends PaginationParams {
@@ -143,5 +151,12 @@ export async function cancelGasto(id: string) {
 
 export async function amendGasto(id: string) {
   const res = await client.post<{ success: true; data: Gasto }>(ENDPOINTS.gastos.amend(id))
+  return unwrap(res)
+}
+
+/** Preview de los asientos contables (GL) que se generarían al someter este gasto — solo
+ *  funciona mientras siga en Draft, no somete ni persiste nada. */
+export async function previewAsientosGasto(id: string) {
+  const res = await client.get<{ success: true; data: AsientoPreviewRow[] }>(ENDPOINTS.gastos.previewAsientos(id))
   return unwrap(res)
 }

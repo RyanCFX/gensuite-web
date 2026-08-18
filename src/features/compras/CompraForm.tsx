@@ -9,7 +9,7 @@ import { listAlmacenes, listImpuestosCompras, getCatalogosFiscales, getFacturaci
 import { listRetenciones } from '@/shared/api/retenciones'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
-import type { CreateCompraDto, Supplier } from '@/shared/api/types'
+import type { CreateCompraDto, Supplier, DistribucionCuentaDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Plus, Trash2, Info, UserPlus } from 'lucide-react'
 import { SupplierQuickCreateModal } from '@/features/suppliers/SupplierQuickCreateModal'
@@ -32,6 +32,8 @@ import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { AccountSelect } from '@/components/shared/AccountSelect'
+import { DistribucionCuentaEditor } from '@/components/shared/DistribucionCuentaEditor'
 
 interface ItemRow {
   itemCode: string
@@ -52,6 +54,12 @@ interface ItemRow {
   /** Componentes del combo con tracking de serial/lote activo (solo si el artículo es un combo) */
   _comboComponents?: { itemCode: string; itemName?: string; trackingType: 'serial' | 'batch'; qtyPerCombo: number }[]
   componentTracking?: ComponentTracking[]
+  /** Cuenta contable alterna de esta línea — solo tiene efecto real en líneas que no afectan
+   *  valorización de inventario (ver tooltip en la UI). Si se omite, usa el default del artículo. */
+  cuentaContable?: string
+  /** Si tiene entradas, divide el monto de la línea (qty × rate) entre varias cuentas — ignora
+   *  `cuentaContable` de esta misma línea. No se puede combinar con seriales/lotes. */
+  distribucionCuenta?: DistribucionCuentaDto[]
 }
 
 function emptyItem(defaultWh?: string): ItemRow {
@@ -299,6 +307,62 @@ function SerialBatchRow({
         </td>
       </tr>
 
+      {/* Cuenta contable alterna / dividir cuenta (opcional) */}
+      <tr className="tracking-row">
+        <td colSpan={8} style={{ padding: '4px 8px 8px' }}>
+          {item.distribucionCuenta && item.distribucionCuenta.length > 0 ? (
+            <div style={{ maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>
+                Dividir cuenta contable
+              </span>
+              <DistribucionCuentaEditor
+                rows={item.distribucionCuenta}
+                onChange={(rows) => setItems((prev) => prev.map((r, i) => (i === idx ? { ...r, distribucionCuenta: rows } : r)))}
+                targetAmount={item.qty * item.rate}
+                targetLabel="de la línea"
+              />
+              <button
+                type="button"
+                className="btn btn-ghost btn-size-xs"
+                style={{ alignSelf: 'flex-start' }}
+                onClick={() => setItems((prev) => prev.map((r, i) => (i === idx ? { ...r, distribucionCuenta: undefined } : r)))}
+              >
+                Usar una sola cuenta
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, maxWidth: 420 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                Cuenta contable
+              </span>
+              <div style={{ flex: 1 }}>
+                <AccountSelect
+                  value={item.cuentaContable ?? ''}
+                  onChange={(v) => updateItem(idx, 'cuentaContable', v)}
+                  placeholder="Usar la cuenta default del artículo"
+                />
+              </div>
+              <span
+                style={{ fontSize: 11, color: 'var(--text-tertiary)', cursor: 'help', flexShrink: 0 }}
+                title="Solo tiene efecto en líneas que no afectan valorización de inventario (ej. flete/servicio dentro de la compra, o si el inventario perpetuo está desactivado). En una línea de producto de stock normal, ERPNext sigue debitando la cuenta de inventario sin importar este campo. Lo mismo aplica si dividís la cuenta."
+              >
+                <Info size={12} />
+              </span>
+              {item.trackingType === 'none' && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-size-xs"
+                  style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                  onClick={() => setItems((prev) => prev.map((r, i) => (i === idx ? { ...r, distribucionCuenta: [{ cuenta: '', monto: r.qty * r.rate }] } : r)))}
+                >
+                  Dividir cuenta
+                </button>
+              )}
+            </div>
+          )}
+        </td>
+      </tr>
+
       {/* Tracking row */}
       {(item.trackingType === 'serial' || item.trackingType === 'batch' || (item._comboComponents && item._comboComponents.length > 0)) && (
         <tr className="tracking-row">
@@ -508,6 +572,7 @@ export default function CompraForm() {
   const [taxesTemplate, setTaxesTemplate] = useState<string[]>([])
   const [retenciones, setRetenciones] = useState<string[]>([])
   const [warehouseSearch, setWarehouseSearch] = useState('')
+  const [cuentaCxpOverride, setCuentaCxpOverride] = useState('')
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
@@ -745,6 +810,7 @@ export default function CompraForm() {
         batches: ci.batches ?? [],
         purchaseTaxPct: 0,
         purchaseTaxTemplate: '',
+        cuentaContable: ci.cuentaContable ?? '',
       })),
     )
     setBranch(compraData.branch ?? '')
@@ -756,6 +822,7 @@ export default function CompraForm() {
     setTipoPago(compraData.tipoPago ?? 'Contado')
     setTaxesTemplate((compraData.taxesTemplate ?? compraData.impuestos ?? []).map((t) => t.id))
     setRetenciones((compraData.retenciones ?? []).map((r) => r.id))
+    setCuentaCxpOverride(compraData.cuentaCxpOverride ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compraData])
 
@@ -885,6 +952,9 @@ export default function CompraForm() {
         ...(i.serials.length > 0 ? { serials: i.serials } : {}),
         ...(i.batches.length > 0 ? { batches: i.batches } : {}),
         ...(i.componentTracking && i.componentTracking.length > 0 ? { componentTracking: i.componentTracking } : {}),
+        ...((i.distribucionCuenta ?? []).filter((d) => d.cuenta).length > 0
+          ? { distribucionCuenta: i.distribucionCuenta!.filter((d) => d.cuenta) }
+          : { cuentaContable: i.cuentaContable || undefined }),
       })),
       ncfProveedor: ncfProveedor || undefined,
       billNo: billNo || undefined,
@@ -893,6 +963,7 @@ export default function CompraForm() {
       tipoPago,
       taxesTemplate: usaImpuestoDocumento ? (taxesTemplate.length > 0 ? taxesTemplate : undefined) : undefined,
       retenciones: retenciones.length > 0 ? retenciones : undefined,
+      cuentaCxpOverride: cuentaCxpOverride || undefined,
     }
     saveMutation.mutate(dto)
   }
@@ -924,6 +995,8 @@ export default function CompraForm() {
           batches: trackingType === 'batch' ? [] : [],
           purchaseTaxPct: catalogItem.purchaseTaxPct ?? 0,
           purchaseTaxTemplate: catalogItem.purchaseTaxTemplate ?? '',
+          // No se puede combinar distribucionCuenta con seriales/lotes.
+          distribucionCuenta: trackingType === 'none' ? row.distribucionCuenta : undefined,
         }
         // Detecta componentes del combo con tracking de serial/lote
         if (catalogItem.type === 'combo') {
@@ -1308,6 +1381,21 @@ export default function CompraForm() {
                   <SelectItem value="Contado">Contado</SelectItem>
                   <SelectItem value="Crédito">Crédito</SelectItem>
                 </Select>
+              </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label">Cuenta CxP (override)</label>
+                <AccountSelect
+                  value={cuentaCxpOverride}
+                  onChange={setCuentaCxpOverride}
+                  placeholder="Usar la cuenta CxP default del proveedor"
+                  rootType="Liability"
+                />
+                <p className="ff-hint">
+                  Solo si esta compra puntual debe ir a una cuenta CxP distinta a la default del
+                  proveedor. Una devolución de compra solo puede aplicarse/reconciliarse contra
+                  facturas que compartan la misma cuenta CxP.
+                </p>
               </div>
             </div>
           </div>

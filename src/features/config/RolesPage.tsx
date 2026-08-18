@@ -44,11 +44,11 @@ export default function RolesPage() {
   if (!isSystemManager) {
     return (
       <div className="page-container">
-        <PageHeader title="Roles" description="Roles de ERPNext y usuarios asignados" />
+        <PageHeader title="Roles" description="Roles del sistema y usuarios asignados" />
         <div className="empty-state">
           <span className="empty-icon"><ShieldOff size={20} /></span>
           <p className="empty-title">Acceso restringido</p>
-          <p className="empty-sub">Esta sección requiere el rol System Manager en ERPNext.</p>
+          <p className="empty-sub">Esta sección requiere el rol System Manager en el sistema.</p>
         </div>
       </div>
     )
@@ -60,7 +60,7 @@ export default function RolesPage() {
     <div className="page-container">
       <PageHeader
         title="Roles"
-        description="Roles de ERPNext y usuarios asignados"
+        description="Roles del sistema y usuarios asignados"
         action={
           <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
             <Plus size={16} /> Nuevo Rol
@@ -90,7 +90,7 @@ export default function RolesPage() {
                       <td colSpan={2}>
                         <div className="empty-state">
                           <p className="empty-title">Acceso restringido</p>
-                          <p className="empty-sub">Tu usuario no tiene el rol System Manager en ERPNext.</p>
+                          <p className="empty-sub">Tu usuario no tiene el rol System Manager en el sistema.</p>
                         </div>
                       </td>
                     </tr>
@@ -105,11 +105,11 @@ export default function RolesPage() {
                     )
                   : (data ?? []).map((role) => (
                       <tr
-                        key={role}
+                        key={role.id}
                         className="table-row-clickable"
-                        onClick={() => navigate(`/config/roles/${encodeURIComponent(role)}`)}
+                        onClick={() => navigate(`/config/roles/${encodeURIComponent(role.id)}`)}
                       >
-                        <td style={{ fontWeight: 500 }}>{role}</td>
+                        <td style={{ fontWeight: 500 }}>{role.label}</td>
                         <td className="td-muted" style={{ textAlign: 'center' }}>
                           <ChevronRight size={14} />
                         </td>
@@ -179,7 +179,7 @@ function CreateRoleModal({
                 checked={deskAccess}
                 onChange={(e) => setDeskAccess(e.target.checked)}
               />
-              Acceso al Desk de ERPNext
+              Acceso al Desk
             </label>
           </div>
           <div className="modal-foot">

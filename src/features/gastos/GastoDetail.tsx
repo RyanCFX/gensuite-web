@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { getGasto, submitGasto, cancelGasto, amendGasto } from '@/shared/api/compras-gastos'
+import { getGasto, submitGasto, cancelGasto, amendGasto, previewAsientosGasto, updateGasto } from '@/shared/api/compras-gastos'
 import { listRetenciones } from '@/shared/api/retenciones'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -10,6 +10,8 @@ import { formatDate, formatDOP } from '@/lib/formatters'
 import { getCatalogosFiscales, listImpuestosCompras } from '@/shared/api/config'
 import { Send, X, RotateCcw, Info, FileText, AlertCircle, BookOpen } from 'lucide-react'
 import { SaldoFavorCxpSection } from '@/features/devoluciones-compras/SaldoFavorCxpSection'
+import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
+import type { ImpuestoDistribucionDto } from '@/shared/api/types'
 
 function apiErrorMessage(error: unknown, fallback: string) {
   const apiErr = error as { message?: string }
@@ -23,6 +25,7 @@ export default function GastoDetail() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
+  const [showAsientosPreview, setShowAsientosPreview] = useState(false)
 
   const { data: gasto, isLoading, isError } = useQuery({
     queryKey: ['gasto', id],
@@ -129,6 +132,9 @@ export default function GastoDetail() {
               <>
                 <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/gastos/${id}/editar`)}>
                   <FileText size={14} />Editar
+                </button>
+                <button className="btn btn-secondary btn-size-sm" onClick={() => setShowAsientosPreview(true)}>
+                  <BookOpen size={14} />Impacto contable
                 </button>
                 <button
                   className="btn btn-primary btn-size-sm"
@@ -271,6 +277,12 @@ export default function GastoDetail() {
               <span className="detail-label">Pendiente</span>
               <span className="detail-value">{formatDOP(gasto.outstandingAmount ?? 0)}</span>
             </div>
+            {gasto.cuentaCxpOverride && (
+              <div className="detail-field">
+                <span className="detail-label">Cuenta CxP (override)</span>
+                <span className="detail-value">{gasto.cuentaCxpOverride}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -306,7 +318,14 @@ export default function GastoDetail() {
                 {gasto.items.map((item, i) => (
                   <tr key={i}>
                     <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{item.itemCode}</td>
-                    <td>{item.description}</td>
+                    <td>
+                      {item.description}
+                      {item.cuentaAlterna && (
+                        <span style={{ display: 'block', fontSize: 11, color: 'var(--text-tertiary)' }}>
+                          Cuenta: {item.cuentaAlterna}
+                        </span>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'right' }}>{item.qty}</td>
                     <td style={{ textAlign: 'right' }}>{formatDOP(item.rate)}</td>
                     <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
@@ -316,14 +335,11 @@ export default function GastoDetail() {
                   <td colSpan={4} style={{ textAlign: 'right' }}>Total</td>
                   <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatDOP(gasto.grandTotal)}</td>
                 </tr>
-                <tr style={{ background: 'var(--surface-sunken)', fontWeight: 600 }}>
-                  <td colSpan={4} style={{ textAlign: 'right' }}>Total</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatDOP(gasto.grandTotal)}</td>
-                </tr>
               </tbody>
             </table>
           </div>
         </div>
+
 
         {/* 606 Info */}
         <div className="dgii-section">
@@ -420,6 +436,16 @@ export default function GastoDetail() {
           </div>
         </div>
       )}
+      <AsientosPreviewModal
+        open={showAsientosPreview}
+        onClose={() => setShowAsientosPreview(false)}
+        queryKey={['gasto-preview-asientos', id]}
+        queryFn={() => previewAsientosGasto(id!)}
+        onRedistribuir={(payload: ImpuestoDistribucionDto) =>
+          updateGasto(id!, { impuestoDistribucion: [payload] }).then(() =>
+            queryClient.invalidateQueries({ queryKey: ['gasto', id] }))
+        }
+      />
     </div>
   )
 }

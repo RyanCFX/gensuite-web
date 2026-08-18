@@ -134,6 +134,7 @@ export const ENDPOINTS = {
     amend: (id: string) => `/compras/${id}/amend`,
     delete: (id: string) => `/compras/${id}`,
     pdf: (id: string) => `/compras/${id}/pdf`,
+    previewAsientos: (id: string) => `/compras/${id}/preview-asientos`,
   },
   purchaseReceipt: {
     list: '/compras/purchase-receipt',
@@ -162,6 +163,7 @@ export const ENDPOINTS = {
     submit: (id: string) => `/gastos/${id}/submit`,
     cancel: (id: string) => `/gastos/${id}/cancel`,
     amend: (id: string) => `/gastos/${id}/amend`,
+    previewAsientos: (id: string) => `/gastos/${id}/preview-asientos`,
   },
   devolucionesCompras: {
     list: '/devoluciones-compras',

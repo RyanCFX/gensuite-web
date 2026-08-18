@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   getCompra, submitCompra, cancelCompra, amendCompra, deleteCompra, downloadCompraPdf, getCompraPdfBlobUrl,
+  previewAsientosCompra, updateCompra,
 } from '@/shared/api/compras-gastos'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -14,7 +15,8 @@ import { Send, X, RotateCcw, Undo2, Info, FileText, Trash2, Eye, BookOpen } from
 import { PdfFormatButton } from '@/components/shared/PdfFormatButton'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import { SaldoFavorCxpSection } from '@/features/devoluciones-compras/SaldoFavorCxpSection'
-import type { FormatoImpresion } from '@/shared/api/types'
+import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
+import type { FormatoImpresion, ImpuestoDistribucionDto } from '@/shared/api/types'
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | 'delete' | null
 
@@ -24,6 +26,7 @@ export default function CompraDetail() {
   const queryClient = useQueryClient()
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
+  const [showAsientosPreview, setShowAsientosPreview] = useState(false)
 
   const { data: compra, isLoading, isError } = useQuery({
     queryKey: ['compra', id],
@@ -161,6 +164,9 @@ export default function CompraDetail() {
               <>
                 <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/compras/${id}/editar`)}>
                   <FileText size={14} />Editar
+                </button>
+                <button className="btn btn-secondary btn-size-sm" onClick={() => setShowAsientosPreview(true)}>
+                  <BookOpen size={14} />Impacto contable
                 </button>
                 <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmAction('submit')}>
                   <Send size={14} />Someter
@@ -303,6 +309,12 @@ export default function CompraDetail() {
                 <span className="detail-value">{formatDOP(compra.outstandingAmount ?? 0)}</span>
               </div>
             )}
+            {compra.cuentaCxpOverride && (
+              <div className="detail-field">
+                <span className="detail-label">Cuenta CxP (override)</span>
+                <span className="detail-value">{compra.cuentaCxpOverride}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -339,7 +351,14 @@ export default function CompraDetail() {
                 {compra.items.map((item, i) => (
                   <tr key={i}>
                     <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{item.itemCode}</td>
-                    <td>{item.itemCode}</td>
+                    <td>
+                      {item.itemCode}
+                      {item.cuentaContable && (
+                        <span style={{ display: 'block', fontSize: 11, color: 'var(--text-tertiary)' }}>
+                          Cuenta: {item.cuentaContable}
+                        </span>
+                      )}
+                    </td>
                     <td className="td-muted">{item.warehouse ?? '—'}</td>
                     <td style={{ textAlign: 'right' }}>{item.qty}</td>
                     <td style={{ textAlign: 'right' }}>{formatDOP(item.rate)}</td>
@@ -417,6 +436,16 @@ export default function CompraDetail() {
         </div>
       )}
       <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
+      <AsientosPreviewModal
+        open={showAsientosPreview}
+        onClose={() => setShowAsientosPreview(false)}
+        queryKey={['compra-preview-asientos', id]}
+        queryFn={() => previewAsientosCompra(id!)}
+        onRedistribuir={(payload: ImpuestoDistribucionDto) =>
+          updateCompra(id!, { impuestoDistribucion: [payload] }).then(() =>
+            queryClient.invalidateQueries({ queryKey: ['compra', id] }))
+        }
+      />
     </div>
   )
 }

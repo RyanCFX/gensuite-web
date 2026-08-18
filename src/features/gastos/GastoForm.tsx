@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { addDays, format as formatDateFns } from 'date-fns'
 import { createGasto, updateGasto, getGasto } from '@/shared/api/compras-gastos'
 import { listSuppliers, getSupplier } from '@/shared/api/suppliers'
-import type { CreateGastoDto } from '@/shared/api/types'
+import type { CreateGastoDto, DistribucionCuentaDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { getCatalogosFiscales, getFacturacionConfig, listImpuestosCompras } from '@/shared/api/config'
 import { CATEGORIA_GASTO } from '@/lib/constants'
@@ -24,6 +24,8 @@ import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { AccountSelect } from '@/components/shared/AccountSelect'
+import { DistribucionCuentaEditor } from '@/components/shared/DistribucionCuentaEditor'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -35,6 +37,11 @@ interface ItemRow {
   qty: number
   rate: number
   uom: string
+  /** Cuenta contable a debitar por esta línea — si se omite, usa la cuenta de gasto default del Item. */
+  cuentaAlterna?: string
+  /** Si tiene entradas, divide el monto de la línea (qty × rate) entre varias cuentas — ignora
+   *  `cuentaAlterna` de esta misma línea. */
+  distribucionCuenta?: DistribucionCuentaDto[]
 }
 
 function emptyItem(): ItemRow {
@@ -83,6 +90,7 @@ export default function GastoForm() {
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
   const [serverMessage, setServerMessage] = useState<string | null>(null)
+  const [cuentaCxpOverride, setCuentaCxpOverride] = useState('')
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
@@ -171,9 +179,11 @@ export default function GastoForm() {
             qty: i.qty,
             rate: i.rate,
             uom: i.uom ?? 'Nos',
+            cuentaAlterna: i.cuentaAlterna ?? '',
           }))
         : [emptyItem()],
     )
+    setCuentaCxpOverride(gastoData.cuentaCxpOverride ?? '')
     setNcfProveedor(gastoData.ncfProveedor ?? '')
     setBillNo(gastoData.billNo ?? '')
     setTipoComprobante(gastoData.tipoComprobante ?? '')
@@ -430,7 +440,11 @@ export default function GastoForm() {
         qty: i.qty,
         rate: i.rate,
         uom: i.uom || undefined,
+        ...((i.distribucionCuenta ?? []).filter((d) => d.cuenta).length > 0
+          ? { distribucionCuenta: i.distribucionCuenta!.filter((d) => d.cuenta) }
+          : { cuentaAlterna: i.cuentaAlterna || undefined }),
       })),
+      cuentaCxpOverride: cuentaCxpOverride || undefined,
       ncfProveedor: ncfProveedor || undefined,
       billNo: billNo || undefined,
       tipoComprobante: tipoComprobante as CreateGastoDto['tipoComprobante'] || undefined,
@@ -592,6 +606,7 @@ export default function GastoForm() {
                       <th>Descripción</th>
                       <th style={{ width: '10%', textAlign: 'right' }}>Qty</th>
                       <th style={{ width: '12%', textAlign: 'right' }}>Precio</th>
+                      <th style={{ width: '18%' }}>Cuenta contable</th>
                       <th style={{ width: '40px' }} />
                     </tr>
                   </thead>
@@ -622,6 +637,44 @@ export default function GastoForm() {
                         </td>
                         <td>
                           <input className="items-input" type="number" min="0" step="0.01" style={{ textAlign: 'right' }} value={item.rate} onChange={(e) => updateItem(idx, 'rate', parseFloat(e.target.value) || 0)} />
+                        </td>
+                        <td style={{ minWidth: 200 }}>
+                          {item.distribucionCuenta && item.distribucionCuenta.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              <DistribucionCuentaEditor
+                                rows={item.distribucionCuenta}
+                                onChange={(rows) => setItems((prev) => prev.map((r, i) => (i === idx ? { ...r, distribucionCuenta: rows } : r)))}
+                                targetAmount={item.qty * item.rate}
+                                targetLabel="de la línea"
+                              />
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-size-xs"
+                                style={{ alignSelf: 'flex-start' }}
+                                onClick={() => setItems((prev) => prev.map((r, i) => (i === idx ? { ...r, distribucionCuenta: undefined } : r)))}
+                              >
+                                Usar una sola cuenta
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <AccountSelect
+                                  value={item.cuentaAlterna ?? ''}
+                                  onChange={(v) => updateItem(idx, 'cuentaAlterna', v)}
+                                  placeholder="Cuenta default del artículo"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-size-xs"
+                                style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                                onClick={() => setItems((prev) => prev.map((r, i) => (i === idx ? { ...r, distribucionCuenta: [{ cuenta: '', monto: r.qty * r.rate }] } : r)))}
+                              >
+                                Dividir
+                              </button>
+                            </div>
+                          )}
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <button type="button" className="btn btn-ghost btn-size-icon-sm" style={{ color: 'var(--icon-muted)' }} onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))} disabled={items.length === 1}>
@@ -717,6 +770,21 @@ export default function GastoForm() {
                   placeholder="Seleccionar"
                   error={isB17 && b17Error}
                 />
+              </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label">Cuenta CxP (override)</label>
+                <AccountSelect
+                  value={cuentaCxpOverride}
+                  onChange={setCuentaCxpOverride}
+                  placeholder="Usar la cuenta CxP default del proveedor"
+                  rootType="Liability"
+                />
+                <p className="ff-hint">
+                  Solo si este gasto puntual debe ir a una cuenta CxP distinta a la default del
+                  proveedor. Una devolución de compra solo puede aplicarse/reconciliarse contra
+                  facturas que compartan la misma cuenta CxP.
+                </p>
               </div>
             </div>
 

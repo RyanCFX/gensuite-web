@@ -12,7 +12,7 @@ import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingMod
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
 import { ENDPOINTS } from '@/shared/api/endpoints'
-import { formatDOP } from '@/lib/formatters'
+import { formatDOP, round2 } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
@@ -1083,7 +1083,7 @@ const itemsDto = items.map((i) => ({
                         )}
                       </td>
                       <td>
-                        <input className="items-input" type="number" min="0" step="0.01" value={item.rate} disabled style={{ textAlign: 'right' }} />
+                        <input className="items-input" type="number" min="0" step="0.01" value={round2(item.rate)} disabled style={{ textAlign: 'right' }} />
                       </td>
                        <td>
                          {(() => {
@@ -1145,7 +1145,7 @@ const itemsDto = items.map((i) => ({
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount, { trimZeros: true })}</td>
                       <td>
                         {item.itemType === 'service' || item.itemType === 'combo' ? (
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>

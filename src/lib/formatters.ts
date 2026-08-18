@@ -19,13 +19,19 @@ export function formatDateTime(isoDate?: string | null): string {
   }
 }
 
-export function formatDOP(amount?: number | null): string {
-  if (amount == null) return 'RD$0.00'
+export function formatDOP(amount?: number | null, opts?: { trimZeros?: boolean }): string {
+  if (amount == null) return opts?.trimZeros ? 'RD$0' : 'RD$0.00'
   return new Intl.NumberFormat('es-DO', {
     style: 'currency',
     currency: 'DOP',
-    minimumFractionDigits: 2,
+    minimumFractionDigits: opts?.trimZeros ? 0 : 2,
+    maximumFractionDigits: 2,
   }).format(amount)
+}
+
+/** Redondea a 2 decimales — usar para mostrar precios crudos sin arrastrar residuos de punto flotante. */
+export function round2(n: number): number {
+  return Math.round(n * 100) / 100
 }
 
 export function formatNumber(n?: number | null): string {
