@@ -64,7 +64,7 @@ export function AsientosPreviewModal({ open, onClose, queryKey, queryFn, onRedis
     <div className="modal-overlay" onClick={closeAndReset}>
       <div
         className="modal-box"
-        style={{ width: '90vw', maxWidth: 900, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
+        style={{ width: '95vw', maxWidth: 1300, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-head">
