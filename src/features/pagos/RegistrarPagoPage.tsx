@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { createPago, getPagosPendientes } from '@/shared/api/pagos'
+import { SaldoFavorProveedorPagosSection } from './SaldoFavorProveedorPagosSection'
 import { listSuppliers } from '@/shared/api/suppliers'
 import { listMetodosPago, getFacturacionConfig } from '@/shared/api/config'
 import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
@@ -582,6 +583,16 @@ export default function RegistrarPagoPage() {
             </>
           )}
         </div>
+
+        {/* ════════════════ SALDO A FAVOR ════════════════ */}
+        {supplierId && (
+          <SaldoFavorProveedorPagosSection
+            supplierId={supplierId}
+            supplierName={supplierLabel}
+            invoices={referencias.map((r) => ({ invoiceId: r.invoiceId, outstandingAmount: r.outstandingAmount, postingDate: r.postingDate, checked: r.checked }))}
+            onApplied={() => queryClient.invalidateQueries({ queryKey: ['pagos-pendientes-form', supplierId] })}
+          />
+        )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button

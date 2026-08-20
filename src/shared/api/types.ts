@@ -213,6 +213,8 @@ export interface Supplier {
   address?: string;
   disabled: boolean;
   balance: number;
+  tieneSaldoAFavor: boolean;
+  saldoAFavor: number;
   defaultTipoBienes606?: string | null;
   defaultFormaPago606?: string | null;
   defaultTipoPagoProveedor?: "Contado" | "Crédito" | null;
@@ -3079,6 +3081,27 @@ export interface SaldoFavorProveedorResult {
   supplier: string;
   balance: number;
   entries: SaldoFavorProveedorEntry[];
+}
+
+export interface SaldoFavorAsignacionDto {
+  paymentEntryId: string;
+  amount: number;
+}
+
+export interface FacturaConSaldosFavorDto {
+  invoiceId: string;
+  saldos: SaldoFavorAsignacionDto[];
+}
+
+export interface AplicarSaldosFavorBulkDto {
+  facturas: FacturaConSaldosFavorDto[];
+}
+
+export interface AplicarSaldosFavorResultItem {
+  invoiceId: string;
+  paymentEntryId: string;
+  amount: number;
+  reconciled: boolean;
 }
 
 // ─── Reportes ─────────────────────────────────────────────────────────────────

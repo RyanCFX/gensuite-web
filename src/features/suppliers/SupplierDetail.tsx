@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getSupplier, deleteSupplier, getSupplierPurchases } from '@/shared/api/suppliers'
-import { getHistorialPagos, getSaldoFavorProveedor } from '@/shared/api/pagos'
+import { getHistorialPagos } from '@/shared/api/pagos'
 import { listImpuestosCompras } from '@/shared/api/config'
 import { listRetenciones } from '@/shared/api/retenciones'
 import { formatDate, formatDOP } from '@/lib/formatters'
@@ -22,21 +22,15 @@ const PAGO_STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelado',
 }
 
-function SaldoFavorProveedorIndicator({ supplierId }: { supplierId: string }) {
-  const { data: saldo } = useQuery({
-    queryKey: ['saldo-favor-proveedor', supplierId],
-    queryFn: () => getSaldoFavorProveedor(supplierId),
-    retry: false,
-  })
-
-  if (!saldo || saldo.balance <= 0) return null
+function SaldoFavorProveedorIndicator({ tieneSaldoAFavor, saldoAFavor }: { tieneSaldoAFavor: boolean; saldoAFavor: number }) {
+  if (!tieneSaldoAFavor || saldoAFavor <= 0) return null
 
   return (
-    <div className="card" style={{ marginBottom: 16 }}>
+    <div className="card">
       <div className="card-body">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Wallet size={16} style={{ color: 'var(--success-text)' }} />
-          <span style={{ fontWeight: 500 }}>Saldo a favor: {formatDOP(saldo.balance)}</span>
+          <span style={{ fontWeight: 500 }}>Saldo a favor: {formatDOP(saldoAFavor)}</span>
         </div>
       </div>
     </div>
@@ -248,167 +242,171 @@ export default function SupplierDetail() {
         }
       />
 
-      {id && <SaldoFavorProveedorIndicator supplierId={id} />}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <SaldoFavorProveedorIndicator tieneSaldoAFavor={supplier.tieneSaldoAFavor} saldoAFavor={supplier.saldoAFavor} />
 
-      <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 800 }}>
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Valores por Defecto de Compra</span>
-          </div>
-          <div className="fields-grid">
-            <div className="detail-field">
-              <span className="detail-label">Tipo de Bienes/Servicios (606)</span>
-              <span className="detail-value">{supplier.defaultTipoBienes606 ?? 'Sin configurar'}</span>
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">Forma de Pago (606)</span>
-              <span className="detail-value">{supplier.defaultFormaPago606 ?? 'Sin configurar'}</span>
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">Tipo de Pago</span>
-              <span className="detail-value">{supplier.defaultTipoPagoProveedor ?? 'Sin configurar'}</span>
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">Cuenta CxP Alterna</span>
-              <span className="detail-value">{supplier.cuentaCxpDefault ?? 'Sin configurar'}</span>
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">Impuestos por Defecto — Compras (bienes)</span>
-              {supplier.impuestoComprasDefault && supplier.impuestoComprasDefault.length > 0
-                ? (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                      {supplier.impuestoComprasDefault.map((t) => (
-                        <span key={t.id} className="badge badge-info">{impuestoTitulo(t.id)} ({t.tasa}%)</span>
-                      ))}
-                    </div>
-                  )
-                : <span className="detail-value">Sin configurar</span>}
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">Impuestos por Defecto — Gastos (servicios)</span>
-              {supplier.impuestoGastosDefault && supplier.impuestoGastosDefault.length > 0
-                ? (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                      {supplier.impuestoGastosDefault.map((t) => (
-                        <span key={t.id} className="badge badge-info">{impuestoTitulo(t.id)} ({t.tasa}%)</span>
-                      ))}
-                    </div>
-                  )
-                : <span className="detail-value">Sin configurar</span>}
-            </div>
-            <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
-              <span className="detail-label">Retenciones por Defecto (solo Gastos)</span>
-              {supplier.retencionesDefault && supplier.retencionesDefault.length > 0
-                ? (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                      {supplier.retencionesDefault.map((r) => (
-                        <span key={r.id} className="badge badge-info">{retencionTitulo(r.id)} ({r.tasa}%)</span>
-                      ))}
-                    </div>
-                  )
-                : <span className="detail-value">Sin configurar</span>}
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Información General</span>
-          </div>
-          <div className="fields-grid fields-grid-3">
-            <div className="detail-field">
-              <span className="detail-label">Tipo</span>
-              <span className="detail-value">{supplier.supplierType === 'Company' ? 'Empresa' : 'Individual'}</span>
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">Tipo Identificación</span>
-              <span className="detail-value">{supplier.tipoIdentificacion ?? '—'}</span>
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">RNC</span>
-              <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{supplier.rnc ?? '—'}</span>
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">Cédula</span>
-              <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{supplier.cedula ?? '—'}</span>
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">Email</span>
-              <span className="detail-value">{supplier.emailId ?? '—'}</span>
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">Email Pagos</span>
-              <span className="detail-value">{supplier.emailPagos ?? '—'}</span>
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">Teléfono</span>
-              <span className="detail-value">{supplier.mobileNo ?? '—'}</span>
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">País de Origen</span>
-              <span className="detail-value">{supplier.paisOrigen ?? '—'}</span>
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">Días de Crédito</span>
-              <span className="detail-value">{supplier.diasCredito} días</span>
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">Creado</span>
-              <span className="detail-value">{formatDate(supplier.createdAt)}</span>
-            </div>
-            <div className="detail-field">
-              <span className="detail-label">Modificado</span>
-              <span className="detail-value">{formatDate(supplier.modifiedAt)}</span>
-            </div>
-          </div>
-        </div>
-
-        {(supplier.banco || supplier.numeroCuenta) && (
           <div className="card">
             <div className="card-header">
-              <span className="card-title">Cuenta Bancaria</span>
+              <span className="card-title">Información General</span>
+            </div>
+            <div className="fields-grid fields-grid-3">
+              <div className="detail-field">
+                <span className="detail-label">Tipo</span>
+                <span className="detail-value">{supplier.supplierType === 'Company' ? 'Empresa' : 'Individual'}</span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">Tipo Identificación</span>
+                <span className="detail-value">{supplier.tipoIdentificacion ?? '—'}</span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">RNC</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{supplier.rnc ?? '—'}</span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">Cédula</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{supplier.cedula ?? '—'}</span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">Email</span>
+                <span className="detail-value">{supplier.emailId ?? '—'}</span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">Email Pagos</span>
+                <span className="detail-value">{supplier.emailPagos ?? '—'}</span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">Teléfono</span>
+                <span className="detail-value">{supplier.mobileNo ?? '—'}</span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">País de Origen</span>
+                <span className="detail-value">{supplier.paisOrigen ?? '—'}</span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">Días de Crédito</span>
+                <span className="detail-value">{supplier.diasCredito} días</span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">Creado</span>
+                <span className="detail-value">{formatDate(supplier.createdAt)}</span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">Modificado</span>
+                <span className="detail-value">{formatDate(supplier.modifiedAt)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Compras Recientes</span>
+            </div>
+            <div className="card-body">
+              {id && <RecentPurchases supplierId={id} />}
+            </div>
+          </div>
+
+          {(supplier.banco || supplier.numeroCuenta) && (
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title">Cuenta Bancaria</span>
+              </div>
+              <div className="fields-grid">
+                <div className="detail-field">
+                  <span className="detail-label">Banco</span>
+                  <span className="detail-value">{supplier.banco ?? '—'}</span>
+                </div>
+                <div className="detail-field">
+                  <span className="detail-label">Tipo de Cuenta</span>
+                  <span className="detail-value">{supplier.tipoCuenta ?? '—'}</span>
+                </div>
+                <div className="detail-field">
+                  <span className="detail-label">Número de Cuenta</span>
+                  <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{supplier.numeroCuenta ?? '—'}</span>
+                </div>
+                <div className="detail-field">
+                  <span className="detail-label">ABA / SWIFT</span>
+                  <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{supplier.abaSwift ?? '—'}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Valores por Defecto de Compra</span>
             </div>
             <div className="fields-grid">
               <div className="detail-field">
-                <span className="detail-label">Banco</span>
-                <span className="detail-value">{supplier.banco ?? '—'}</span>
+                <span className="detail-label">Tipo de Bienes/Servicios (606)</span>
+                <span className="detail-value">{supplier.defaultTipoBienes606 ?? 'Sin configurar'}</span>
               </div>
               <div className="detail-field">
-                <span className="detail-label">Tipo de Cuenta</span>
-                <span className="detail-value">{supplier.tipoCuenta ?? '—'}</span>
+                <span className="detail-label">Forma de Pago (606)</span>
+                <span className="detail-value">{supplier.defaultFormaPago606 ?? 'Sin configurar'}</span>
               </div>
               <div className="detail-field">
-                <span className="detail-label">Número de Cuenta</span>
-                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{supplier.numeroCuenta ?? '—'}</span>
+                <span className="detail-label">Tipo de Pago</span>
+                <span className="detail-value">{supplier.defaultTipoPagoProveedor ?? 'Sin configurar'}</span>
               </div>
               <div className="detail-field">
-                <span className="detail-label">ABA / SWIFT</span>
-                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{supplier.abaSwift ?? '—'}</span>
+                <span className="detail-label">Cuenta CxP Alterna</span>
+                <span className="detail-value">{supplier.cuentaCxpDefault ?? 'Sin configurar'}</span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">Impuestos por Defecto — Compras (bienes)</span>
+                {supplier.impuestoComprasDefault && supplier.impuestoComprasDefault.length > 0
+                  ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                        {supplier.impuestoComprasDefault.map((t) => (
+                          <span key={t.id} className="badge badge-info">{impuestoTitulo(t.id)} ({t.tasa}%)</span>
+                        ))}
+                      </div>
+                    )
+                  : <span className="detail-value">Sin configurar</span>}
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">Impuestos por Defecto — Gastos (servicios)</span>
+                {supplier.impuestoGastosDefault && supplier.impuestoGastosDefault.length > 0
+                  ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                        {supplier.impuestoGastosDefault.map((t) => (
+                          <span key={t.id} className="badge badge-info">{impuestoTitulo(t.id)} ({t.tasa}%)</span>
+                        ))}
+                      </div>
+                    )
+                  : <span className="detail-value">Sin configurar</span>}
+              </div>
+              <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+                <span className="detail-label">Retenciones por Defecto (solo Gastos)</span>
+                {supplier.retencionesDefault && supplier.retencionesDefault.length > 0
+                  ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                        {supplier.retencionesDefault.map((r) => (
+                          <span key={r.id} className="badge badge-info">{retencionTitulo(r.id)} ({r.tasa}%)</span>
+                        ))}
+                      </div>
+                    )
+                  : <span className="detail-value">Sin configurar</span>}
               </div>
             </div>
           </div>
-        )}
 
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Compras Recientes</span>
-          </div>
-          <div className="card-body">
-            {id && <RecentPurchases supplierId={id} />}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Historial de Pagos</span>
-            {id && (
-              <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/pagos/lista?supplier=${id}`)}>
-                Ver todos
-              </button>
-            )}
-          </div>
-          <div className="card-body">
-            {id && <HistorialPagos supplierId={id} />}
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Historial de Pagos</span>
+              {id && (
+                <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/pagos/lista?supplier=${id}`)}>
+                  Ver todos
+                </button>
+              )}
+            </div>
+            <div className="card-body">
+              {id && <HistorialPagos supplierId={id} />}
+            </div>
           </div>
         </div>
       </div>

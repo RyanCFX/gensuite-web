@@ -8,6 +8,8 @@ import type {
   AgingProveedorConfig,
   AgingProveedorResult,
   SaldoFavorProveedorResult,
+  AplicarSaldosFavorBulkDto,
+  AplicarSaldosFavorResultItem,
   PaginatedResponse,
   PaginationParams,
 } from './types'
@@ -93,6 +95,14 @@ export async function createPago(data: CreatePagoDto) {
 export async function getSaldoFavorProveedor(supplierId: string) {
   const res = await client.get<{ success: true; data: SaldoFavorProveedorResult }>(
     ENDPOINTS.pagos.saldoFavor(supplierId),
+  )
+  return unwrap(res)
+}
+
+export async function aplicarSaldosFavor(dto: AplicarSaldosFavorBulkDto) {
+  const res = await client.post<{ success: true; data: AplicarSaldosFavorResultItem[] }>(
+    ENDPOINTS.pagos.aplicarSaldoFavor,
+    dto,
   )
   return unwrap(res)
 }

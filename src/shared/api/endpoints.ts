@@ -308,6 +308,7 @@ export const ENDPOINTS = {
     submit: (id: string) => `/pagos/${id}/submit`,
     cancel: (id: string) => `/pagos/${id}/cancel`,
     saldoFavor: (supplierId: string) => `/pagos/saldo-favor/${encodeURIComponent(supplierId)}`,
+    aplicarSaldoFavor: '/pagos/aplicar-saldo-favor',
   },
   reportes: {
     ventas: '/reportes/ventas',
