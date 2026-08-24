@@ -103,6 +103,21 @@ const PorCobrarPage = lazy(() => import('@/features/caja/PorCobrarPage'))
 const TurnosPage = lazy(() => import('@/features/pos/TurnosPage'))
 const TurnoDetailPage = lazy(() => import('@/features/pos/TurnoDetailPage'))
 
+// Tesorería
+const TiposDocumentoPage = lazy(() => import('@/features/tesoreria/TiposDocumentoPage'))
+const EmisionesPage = lazy(() => import('@/features/tesoreria/EmisionesPage'))
+const EmisionForm = lazy(() => import('@/features/tesoreria/EmisionForm'))
+const EmisionDetail = lazy(() => import('@/features/tesoreria/EmisionDetail'))
+const DepositosPage = lazy(() => import('@/features/tesoreria/DepositosPage'))
+const DepositoForm = lazy(() => import('@/features/tesoreria/DepositoForm'))
+const DepositoDetail = lazy(() => import('@/features/tesoreria/DepositoDetail'))
+const TransferenciasInternasPage = lazy(() => import('@/features/tesoreria/TransferenciasInternasPage'))
+const TransferenciaInternaForm = lazy(() => import('@/features/tesoreria/TransferenciaInternaForm'))
+const TransferenciaInternaDetail = lazy(() => import('@/features/tesoreria/TransferenciaInternaDetail'))
+const MovimientosBancoPage = lazy(() => import('@/features/tesoreria/MovimientosBancoPage'))
+const PlantillasChequePage = lazy(() => import('@/features/tesoreria/PlantillasChequePage'))
+const PlantillaChequeForm = lazy(() => import('@/features/tesoreria/PlantillaChequeForm'))
+
 function PageLoader() {
   return (
     <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -239,6 +254,24 @@ export default function App() {
             <Route path="/pagos/aging" element={<Suspense fallback={<PageLoader />}><AgingProveedoresPage /></Suspense>} />
             <Route path="/pagos/:id" element={<Suspense fallback={<PageLoader />}><PagoDetail /></Suspense>} />
 
+            {/* Tesorería — Emisiones (egresos) */}
+            <Route path="/tesoreria/emisiones" element={<Suspense fallback={<PageLoader />}><EmisionesPage /></Suspense>} />
+            <Route path="/tesoreria/emisiones/nueva" element={<Suspense fallback={<PageLoader />}><EmisionForm /></Suspense>} />
+            <Route path="/tesoreria/emisiones/:id" element={<Suspense fallback={<PageLoader />}><EmisionDetail /></Suspense>} />
+
+            {/* Tesorería — Depósitos (ingresos) */}
+            <Route path="/tesoreria/depositos" element={<Suspense fallback={<PageLoader />}><DepositosPage /></Suspense>} />
+            <Route path="/tesoreria/depositos/nuevo" element={<Suspense fallback={<PageLoader />}><DepositoForm /></Suspense>} />
+            <Route path="/tesoreria/depositos/:id" element={<Suspense fallback={<PageLoader />}><DepositoDetail /></Suspense>} />
+
+            {/* Tesorería — Transferencias Internas */}
+            <Route path="/tesoreria/transferencias" element={<Suspense fallback={<PageLoader />}><TransferenciasInternasPage /></Suspense>} />
+            <Route path="/tesoreria/transferencias/nueva" element={<Suspense fallback={<PageLoader />}><TransferenciaInternaForm /></Suspense>} />
+            <Route path="/tesoreria/transferencias/:id" element={<Suspense fallback={<PageLoader />}><TransferenciaInternaDetail /></Suspense>} />
+
+            {/* Tesorería — Movimientos (libro de banco, solo lectura) */}
+            <Route path="/tesoreria/movimientos" element={<Suspense fallback={<PageLoader />}><MovimientosBancoPage /></Suspense>} />
+
             {/* Usuarios */}
             <Route path="/usuarios" element={<Suspense fallback={<PageLoader />}><UsuariosPage /></Suspense>} />
 
@@ -276,6 +309,10 @@ export default function App() {
             <Route path="/config/centros-costo" element={<Suspense fallback={<PageLoader />}><CentrosCostoPage /></Suspense>} />
             <Route path="/config/bancos" element={<Suspense fallback={<PageLoader />}><BancosPage /></Suspense>} />
             <Route path="/config/cuentas-bancarias" element={<Suspense fallback={<PageLoader />}><CuentasBancariasPage /></Suspense>} />
+            <Route path="/config/tesoreria/tipos-documento" element={<Suspense fallback={<PageLoader />}><TiposDocumentoPage /></Suspense>} />
+            <Route path="/config/tesoreria/plantillas-cheque" element={<Suspense fallback={<PageLoader />}><PlantillasChequePage /></Suspense>} />
+            <Route path="/config/tesoreria/plantillas-cheque/nueva" element={<Suspense fallback={<PageLoader />}><PlantillaChequeForm /></Suspense>} />
+            <Route path="/config/tesoreria/plantillas-cheque/:id" element={<Suspense fallback={<PageLoader />}><PlantillaChequeForm /></Suspense>} />
             <Route path="/config/departamentos" element={<Suspense fallback={<PageLoader />}><DepartamentosPage /></Suspense>} />
             <Route path="/config/retenciones" element={<Suspense fallback={<PageLoader />}><RetencionesPage /></Suspense>} />
             <Route path="/config/ajustes-avanzados" element={<Suspense fallback={<PageLoader />}><AjustesAvanzadosPage /></Suspense>} />

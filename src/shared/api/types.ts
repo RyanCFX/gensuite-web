@@ -2595,6 +2595,10 @@ export interface CuentaBancaria {
   /** "Cuenta de Ahorro" | "Cuenta Corriente" | "Cuenta de Nómina" — catálogo en GET /cuentas-bancarias/tipos.
    *  Opcional: cuentas creadas antes de este campo vienen sin valor. */
   tipoCuenta?: string;
+  /** Nombre de un Cheque Print Template (ver GET /tesoreria/cheque-print-templates) vinculado a esta
+   *  cuenta — determina qué plantilla usa el motor nativo de ERPNext al imprimir un cheque de Emisiones.
+   *  Opcional: sin plantilla, la impresión usa el comprobante genérico del BFF. */
+  chequePrintTemplate?: string;
   /** Solo presente cuando se solicita explícitamente (?withBalance=true o GET .../balance) */
   balance?: number;
 }
@@ -2611,6 +2615,7 @@ export interface CreateCuentaBancariaDto {
   isDefault?: boolean;
   balanceInicial?: number;
   tipoCuenta?: string;
+  chequePrintTemplate?: string;
 }
 
 export interface UpdateCuentaBancariaDto {
@@ -2626,6 +2631,7 @@ export interface UpdateCuentaBancariaDto {
   ultimoCheque?: number;
   ultimoDeposito?: number;
   tipoCuenta?: string;
+  chequePrintTemplate?: string;
 }
 
 export interface CuentaBancariaBalance {
@@ -2946,6 +2952,10 @@ export interface PaymentEntry {
   checkNumber?: string;
   cardNumber?: string;
   authorizationCode?: string;
+  /** Solo presente en `GET /cobros|pagos/historial/:id` (tarea 42 §3) — antes cada endpoint
+   *  filtraba internamente por su tipo nativo; ahora el historial de un tercero incluye ambos
+   *  movimientos (ej. un reembolso `Pay` a un cliente, o un cobro `Receive` a un proveedor). */
+  paymentType?: "Pay" | "Receive";
 }
 
 // CreateCobroDto — matches BFF's CreateCobroDto exactly
@@ -3083,6 +3093,9 @@ export interface Pago {
   referencias?: PagoReferenciaResumen[];
   createdAt: string;
   modifiedAt?: string;
+  /** Solo presente en `GET /pagos/historial/:supplierId` (tarea 42 §3) — el historial de un
+   *  proveedor ahora incluye ambos tipos de movimiento, no solo `Pay`. */
+  paymentType?: "Pay" | "Receive";
 }
 
 export interface PagoReferenciaDto {
@@ -3780,3 +3793,303 @@ export interface CreatePricingRuleDto {
 }
 
 export type UpdatePricingRuleDto = Partial<CreatePricingRuleDto>
+
+// ─── Tesorería — Tipos de Documento Bancario (Bank Document Type) ──────────────
+// Catálogo configurable de tipos de documento que puede usar Tesorería (Cheque, Depósito,
+// Transferencia, etc.). Pre-sembrado con 8 registros por tenant, pero editable/ampliable.
+// Campos en inglés porque así viaja el DTO real (ver CreateBankDocumentTypeDto en openapi.json) —
+// los docs de negocio usan nombres en español, pero eso es solo para las etiquetas de UI.
+
+export type TesoreriaNaturaleza =
+  | "Cheque"
+  | "Depósito"
+  | "Transferencia"
+  | "Transferencia interna"
+  | "Ajuste bancario"
+  | "Nota de débito"
+  | "Nota de crédito"
+  | "Otro";
+
+export type TesoreriaTipoTransaccion = "Débito" | "Crédito";
+
+export interface TipoDocumentoBancario {
+  id: string;
+  code: string;
+  description: string;
+  nature: TesoreriaNaturaleza;
+  transactionType: TesoreriaTipoTransaccion;
+  defaultOffsetAccount?: string;
+  requiresParty: boolean;
+  enabled: boolean;
+  requiresNcf: boolean;
+  ncfPrefix?: string;
+  requiresFiscalClass: boolean;
+  requiresRnc: boolean;
+  comment?: string;
+}
+
+export interface CreateBankDocumentTypeDto {
+  code: string;
+  description: string;
+  nature: TesoreriaNaturaleza;
+  transactionType: TesoreriaTipoTransaccion;
+  defaultOffsetAccount?: string;
+  requiresParty?: boolean;
+  enabled?: boolean;
+  requiresNcf?: boolean;
+  ncfPrefix?: string;
+  requiresFiscalClass?: boolean;
+  requiresRnc?: boolean;
+  comment?: string;
+}
+
+export type UpdateBankDocumentTypeDto = Partial<CreateBankDocumentTypeDto>;
+
+// ─── Tesorería — Transacciones (Emisiones / Depósitos / Transferencias) ────────
+// Shape normalizado COMPARTIDO por los 3 submódulos — el backend siempre responde con este
+// mismo formato sin importar si por dentro creó un Payment Entry o un Journal Entry.
+
+export type TesoreriaEstado = "draft" | "submitted" | "cancelled";
+
+export interface TesoreriaParty {
+  tipo: "Customer" | "Supplier";
+  id: string;
+  nombre?: string;
+}
+
+export interface TesoreriaReferencias {
+  numeroCheque?: string;
+  numeroReferencia?: string;
+  comprobante?: string;
+  ncf?: string;
+  claseFiscal?: string;
+  rnc?: string;
+}
+
+/** Línea de distribución/deducción — {@link EmisionLineaDto} en el backend. */
+export interface TesoreriaLinea {
+  cuenta: string;
+  monto: number;
+  descripcion?: string;
+}
+
+/** Liquidación de una factura pendiente — {@link EmisionLiquidacionDto} en el backend. */
+export interface TesoreriaLiquidacion {
+  facturaId: string;
+  montoAsignado: number;
+}
+
+/** Línea del asiento contable ya generado — solo informativa, para la vista de detalle. */
+export interface TesoreriaLineaAsiento {
+  cuenta: string;
+  debito: number;
+  credito: number;
+  esBanco: boolean;
+  facturaId?: string;
+  esAnticipo?: boolean;
+  descripcion?: string;
+}
+
+export interface TreasuryTransaction {
+  id: string;
+  documentoOrigen: { doctype: "Payment Entry" | "Journal Entry"; name: string };
+  fecha: string;
+  cuentaBancaria: string | null;
+  monto: number;
+  estado: TesoreriaEstado;
+  descripcion?: string;
+  /** Beneficiario (Emisiones) u origen normalizado (Depósitos) — mismo campo en la respuesta. */
+  beneficiario?: TesoreriaParty;
+  beneficiarioNombre?: string;
+  tipoDocumento?: string;
+  referencias: TesoreriaReferencias;
+  lineas: TesoreriaLineaAsiento[];
+  nota?: string;
+  branch?: string;
+  department?: string;
+  creation?: string;
+  modified?: string;
+}
+
+// ─── Tesorería — Emisiones (egresos) ───────────────────────────────────────────
+
+export interface CreateEmisionDto {
+  fecha: string;
+  tipoDocumento: string;
+  cuentaBancaria: string;
+  descripcion?: string;
+  monto: number;
+  /** Ausente → Journal Entry. Presente → Payment Entry (Pay). */
+  beneficiario?: { tipo: "Customer" | "Supplier"; id: string };
+  beneficiarioNombre?: string;
+  referencias?: TesoreriaReferencias;
+  /** Solo con beneficiario. No necesita sumar el monto exacto (el resto queda a favor). */
+  liquidaciones?: TesoreriaLiquidacion[];
+  /** Válido con o sin beneficiario. */
+  deducciones?: TesoreriaLinea[];
+  /** Solo SIN beneficiario. Debe sumar exactamente `monto`. */
+  distribucion?: TesoreriaLinea[];
+  nota?: string;
+  branch?: string;
+  department?: string;
+}
+
+/** PUT /tesoreria/emisiones/:id — solo cabecera de un borrador. */
+export interface UpdateEmisionDto {
+  descripcion?: string;
+  nota?: string;
+  referencias?: TesoreriaReferencias;
+  branch?: string;
+  department?: string;
+}
+
+// ─── Tesorería — Depósitos (ingresos) ──────────────────────────────────────────
+
+export interface CreateDepositoDto {
+  fecha: string;
+  tipoDocumento: string;
+  cuentaBancaria: string;
+  descripcion?: string;
+  monto: number;
+  /** Ausente → Journal Entry. Presente → Payment Entry (Receive). tipo puede ser Customer o Supplier. */
+  origen?: { tipo: "Customer" | "Supplier"; id: string };
+  origenNombre?: string;
+  referencias?: TesoreriaReferencias;
+  /** Solo con origen. Sales Invoice si origen.tipo=Customer, Purchase Invoice si Supplier. */
+  liquidaciones?: TesoreriaLiquidacion[];
+  /** Semántica INVERTIDA según haya o no origen — ver docs/tasks/38. */
+  deducciones?: TesoreriaLinea[];
+  /** Solo SIN origen. Debe sumar exactamente `monto`. */
+  distribucion?: TesoreriaLinea[];
+  nota?: string;
+  branch?: string;
+  department?: string;
+}
+
+/** PUT /tesoreria/depositos/:id — solo cabecera de un borrador. */
+export interface UpdateDepositoDto {
+  descripcion?: string;
+  nota?: string;
+  referencias?: TesoreriaReferencias;
+  branch?: string;
+  department?: string;
+}
+
+// ─── Tesorería — Transferencias Internas ───────────────────────────────────────
+// Siempre Journal Entry (dos cuentas bancarias propias) — nunca tiene party/beneficiario/origen,
+// ni liquidaciones ni distribución, ni branch/department.
+
+export interface CreateTransferenciaInternaDto {
+  fecha: string;
+  /** Opcional — a diferencia de Emisiones/Depósitos, nunca hay ambigüedad de contrapartida. */
+  tipoDocumento?: string;
+  cuentaOrigen: string;
+  cuentaDestino: string;
+  descripcion?: string;
+  monto: number;
+  referencias?: TesoreriaReferencias;
+  /** Comisiones interbancarias — reducen lo que llega a cuentaDestino respecto a lo que sale. */
+  deducciones?: TesoreriaLinea[];
+  nota?: string;
+}
+
+/** PUT /tesoreria/transferencias-internas/:id — solo cabecera de un borrador. */
+export interface UpdateTransferenciaInternaDto {
+  descripcion?: string;
+  nota?: string;
+  referencias?: TesoreriaReferencias;
+}
+
+// ─── Tesorería — Facturas pendientes (liquidaciones) ───────────────────────────
+// Shape no documentado en openapi.json (sin schema) — inferido de PendientePago existente,
+// con `facturaId` para calzar con TesoreriaLiquidacion. Verificar contra una respuesta real.
+
+export interface TesoreriaPendienteFactura {
+  facturaId: string;
+  postingDate: string;
+  dueDate: string;
+  grandTotal: number;
+  outstandingAmount: number;
+  isOverdue?: boolean;
+  daysOverdue?: number;
+}
+
+// ─── Tesorería — Movimientos (libro de banco / kardex) ─────────────────────────
+// Se alimenta de GL Entry filtrado por la cuenta contable de la cuenta bancaria — incluye
+// TODO lo que afecta esa cuenta, no solo lo creado desde Tesorería.
+
+export interface MovimientoBancario {
+  fecha: string;
+  voucherType: string;
+  voucherNo: string;
+  debito: number;
+  credito: number;
+  /** Saldo acumulado DESPUÉS de esta fila. */
+  saldoCorrido: number;
+  party?: string;
+  partyType?: string;
+  remarks?: string;
+  branch?: string;
+  department?: string;
+}
+
+export interface MovimientosMeta {
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+  cuentaBancaria: string;
+  /** Saldo justo ANTES de la primera fila devuelta — para la fila sintética de "Saldo inicial". */
+  saldoInicialDelRango: number;
+}
+
+export interface ResumenMovimientos {
+  cuentaBancaria: string;
+  cuentaBancariaNombre: string;
+  fromDate: string | null;
+  toDate: string | null;
+  saldoInicial: number;
+  entradas: number;
+  salidas: number;
+  saldoFinal: number;
+}
+
+// ─── Tesorería — Plantillas de Impresión de Cheque (Cheque Print Template) ─────
+// Doctype nativo de ERPNext — cada campo numérico es una coordenada en cm desde el borde
+// superior/izquierdo del papel pre-impreso del talonario.
+
+export type ChequePrintTemplateSize = "Regular" | "A4";
+
+export interface ChequePrintTemplate {
+  /** Nombre/identificador de la plantilla — inmutable tras crear (docname nativo de ERPNext). */
+  bankName: string;
+  chequeSize?: ChequePrintTemplateSize;
+  /** Solo relevante si chequeSize = "A4". */
+  startingPositionFromTopEdge?: number;
+  chequeWidth?: number;
+  chequeHeight?: number;
+  isAccountPayable?: boolean;
+  accPayDistFromTopEdge?: number;
+  accPayDistFromLeftEdge?: number;
+  messageToShow?: string;
+  dateDistFromTopEdge?: number;
+  dateDistFromLeftEdge?: number;
+  payerNameFromTopEdge?: number;
+  payerNameFromLeftEdge?: number;
+  amtInWordsFromTopEdge?: number;
+  amtInWordsFromLeftEdge?: number;
+  amtInWordWidth?: number;
+  amtInWordsLineSpacing?: number;
+  amtInFiguresFromTopEdge?: number;
+  amtInFiguresFromLeftEdge?: number;
+  accNoDistFromTopEdge?: number;
+  accNoDistFromLeftEdge?: number;
+  signatoryFromTopEdge?: number;
+  signatoryFromLeftEdge?: number;
+  /** Si ya existe un Print Format generado con las coordenadas ACTUALES. */
+  hasPrintFormat?: boolean;
+}
+
+export type CreateChequePrintTemplateDto = Omit<ChequePrintTemplate, "hasPrintFormat">;
+
+export type UpdateChequePrintTemplateDto = Partial<Omit<CreateChequePrintTemplateDto, "bankName">>;

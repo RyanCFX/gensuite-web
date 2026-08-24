@@ -357,6 +357,44 @@ export const ENDPOINTS = {
       byId: (id: string) => `/cuentas-bancarias/bancos/${encodeURIComponent(id)}`,
     },
   },
+  tesoreria: {
+    tiposDocumento: {
+      list: '/tesoreria/tipos-documento',
+      byId: (id: string) => `/tesoreria/tipos-documento/${encodeURIComponent(id)}`,
+      disable: (id: string) => `/tesoreria/tipos-documento/${encodeURIComponent(id)}/disable`,
+    },
+    emisiones: {
+      list: '/tesoreria/emisiones',
+      byId: (id: string) => `/tesoreria/emisiones/${encodeURIComponent(id)}`,
+      submit: (id: string) => `/tesoreria/emisiones/${encodeURIComponent(id)}/submit`,
+      cancel: (id: string) => `/tesoreria/emisiones/${encodeURIComponent(id)}/cancel`,
+      pendientes: (supplierId: string) => `/tesoreria/emisiones/pendientes/${encodeURIComponent(supplierId)}`,
+      siguienteCheque: '/tesoreria/emisiones/siguiente-cheque',
+      imprimir: (id: string) => `/tesoreria/emisiones/${encodeURIComponent(id)}/imprimir`,
+    },
+    depositos: {
+      list: '/tesoreria/depositos',
+      byId: (id: string) => `/tesoreria/depositos/${encodeURIComponent(id)}`,
+      submit: (id: string) => `/tesoreria/depositos/${encodeURIComponent(id)}/submit`,
+      cancel: (id: string) => `/tesoreria/depositos/${encodeURIComponent(id)}/cancel`,
+      pendientes: (partyId: string) => `/tesoreria/depositos/pendientes/${encodeURIComponent(partyId)}`,
+    },
+    transferenciasInternas: {
+      list: '/tesoreria/transferencias-internas',
+      byId: (id: string) => `/tesoreria/transferencias-internas/${encodeURIComponent(id)}`,
+      submit: (id: string) => `/tesoreria/transferencias-internas/${encodeURIComponent(id)}/submit`,
+      cancel: (id: string) => `/tesoreria/transferencias-internas/${encodeURIComponent(id)}/cancel`,
+    },
+    movimientos: {
+      list: '/tesoreria/movimientos',
+      resumen: '/tesoreria/movimientos/resumen',
+    },
+    chequePrintTemplates: {
+      list: '/tesoreria/cheque-print-templates',
+      byId: (id: string) => `/tesoreria/cheque-print-templates/${encodeURIComponent(id)}`,
+      regenerar: (id: string) => `/tesoreria/cheque-print-templates/${encodeURIComponent(id)}/regenerar`,
+    },
+  },
   departamentos: {
     list: '/departamentos',
     tree: '/departamentos/tree',

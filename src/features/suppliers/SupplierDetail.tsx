@@ -81,6 +81,13 @@ function HistorialPagos({ supplierId }: { supplierId: string }) {
             <span className={`badge ${PAGO_STATUS_BADGE[pago.status] ?? 'badge-draft'}`}>
               {PAGO_STATUS_LABEL[pago.status] ?? pago.status}
             </span>
+            {/* El historial ahora incluye Pay y Receive mezclados (tarea 42 §3) — un Receive acá
+                es información relevante: un cobro hecho al proveedor (ej. nota de crédito aplicada). */}
+            {pago.paymentType && (
+              <span className={`badge ${pago.paymentType === 'Receive' ? 'badge-warning' : 'badge-neutral'}`}>
+                {pago.paymentType === 'Receive' ? 'Cobro recibido' : 'Pago enviado'}
+              </span>
+            )}
             <span style={{ fontWeight: 500, fontFamily: 'var(--font-mono)' }}>{pago.id}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>

@@ -39,6 +39,9 @@ import {
   Clock,
   ShieldCheck,
   LayoutTemplate,
+  Landmark,
+  ArrowRightLeft,
+  Printer,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { CommandPalette } from "./CommandPalette";
@@ -295,6 +298,17 @@ const NAV_FINANZAS: NavEntry[] = [
       { label: "Corte de Caja del Día", icon: <BarChart3 size={14} />, path: "/reportes/corteCajaDia" },
     ],
   },
+  {
+    label: "Tesorería",
+    icon: <Landmark size={16} aria-hidden="true" />,
+    prefix: "/tesoreria",
+    children: [
+      { label: "Emisiones", icon: <Receipt size={14} />, path: "/tesoreria/emisiones" },
+      { label: "Depósitos", icon: <Wallet size={14} />, path: "/tesoreria/depositos" },
+      { label: "Transferencias Internas", icon: <ArrowRightLeft size={14} />, path: "/tesoreria/transferencias" },
+      { label: "Movimientos", icon: <BookOpen size={14} />, path: "/tesoreria/movimientos" },
+    ],
+  },
 ];
 
 const NAV_CONTABILIDAD: NavItem[] = [
@@ -387,6 +401,16 @@ const NAV_CONFIG: NavEntry = {
       label: "Cuentas Bancarias",
       icon: <CreditCard size={14} />,
       path: "/config/cuentas-bancarias",
+    },
+    {
+      label: "Tipos de Documento Bancario",
+      icon: <Receipt size={14} />,
+      path: "/config/tesoreria/tipos-documento",
+    },
+    {
+      label: "Plantillas de Cheque",
+      icon: <Printer size={14} />,
+      path: "/config/tesoreria/plantillas-cheque",
     },
     {
       label: "Departamentos",

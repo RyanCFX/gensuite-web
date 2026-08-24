@@ -65,6 +65,10 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'registrar-cobro', label: 'Registrar Cobro',   group: 'Finanzas',     path: '/cobros/pago',                    icon: <Wallet size={15} />, keywords: 'pago cobro payment' },
   { id: 'aging',        label: 'Antiguedad de saldos CxC', group: 'Finanzas', path: '/cobros/aging',                   icon: <Wallet size={15} />, keywords: 'antiguedad saldos cuentas cobrar vencidas' },
   { id: 'semaforo',     label: 'Semáforo de Crédito',  group: 'Finanzas',     path: '/cobros/semaforo',                icon: <Wallet size={15} />, keywords: 'credito limite semaforo verde rojo' },
+  { id: 'tes-emisiones', label: 'Emisiones (Tesorería)', group: 'Finanzas',   path: '/tesoreria/emisiones',            icon: <CreditCard size={15} />, keywords: 'cheque egreso pago proveedor banco tesoreria' },
+  { id: 'tes-depositos', label: 'Depósitos (Tesorería)', group: 'Finanzas',   path: '/tesoreria/depositos',            icon: <CreditCard size={15} />, keywords: 'ingreso cobro cardnet azul banco tesoreria' },
+  { id: 'tes-transferencias', label: 'Transferencias Internas', group: 'Finanzas', path: '/tesoreria/transferencias', icon: <CreditCard size={15} />, keywords: 'traspaso entre cuentas bancarias tesoreria' },
+  { id: 'tes-movimientos', label: 'Movimientos Bancarios', group: 'Finanzas', path: '/tesoreria/movimientos',         icon: <BarChart3 size={15} />, keywords: 'kardex banco estado de cuenta saldo corrido tesoreria' },
   { id: 'usuarios',     label: 'Usuarios',             group: 'Finanzas',     path: '/usuarios',                       icon: <UserCog size={15} />, keywords: 'users roles acceso' },
 
   // ── Contabilidad ───────────────────────────────────────────────────────────
@@ -94,6 +98,8 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'cfg-uom',      label: 'Unidades de Medida',   group: 'Configuración', path: '/config/uom',                  icon: <Settings size={15} />, keywords: 'uom units medida unidades' },
   { id: 'cfg-precios',  label: 'Listas de Precio',     group: 'Configuración', path: '/config/listas-precio',        icon: <Settings size={15} />, keywords: 'price list precios lista' },
   { id: 'cfg-ncf',      label: 'Secuencias NCF',       group: 'Configuración', path: '/config/ncf',                  icon: <Shield size={15} />, keywords: 'ncf comprobantes fiscales b01 b02 dgii secuencias' },
+  { id: 'cfg-tes-tipos-doc', label: 'Tipos de Documento Bancario', group: 'Configuración', path: '/config/tesoreria/tipos-documento', icon: <CreditCard size={15} />, keywords: 'tesoreria cheque deposito transferencia catalogo bank document type' },
+  { id: 'cfg-tes-plantillas', label: 'Plantillas de Cheque', group: 'Configuración', path: '/config/tesoreria/plantillas-cheque', icon: <CreditCard size={15} />, keywords: 'tesoreria cheque print template imprimir talonario' },
   { id: 'cfg-perfil',   label: 'Mi Perfil',            group: 'Configuración', path: '/config/perfil',               icon: <UserCog size={15} />, keywords: 'perfil usuario profile settings' },
 ]
 

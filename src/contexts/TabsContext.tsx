@@ -125,6 +125,22 @@ function getTitleForPath(pathname: string): string {
     [/^\/pagos\/aging$/, 'Antiguedad de saldos por Pagar'],
     [/^\/pagos\/(.+)$/, (m) => `Pago: ${m[1]}`],
 
+    // Tesorería
+    [/^\/tesoreria\/emisiones\/nueva$/, 'Nueva Emisión'],
+    [/^\/tesoreria\/emisiones\/(.+)$/, (m) => `Emisión: ${m[1]}`],
+    [/^\/tesoreria\/emisiones$/, 'Emisiones'],
+    [/^\/tesoreria\/depositos\/nuevo$/, 'Nuevo Depósito'],
+    [/^\/tesoreria\/depositos\/(.+)$/, (m) => `Depósito: ${m[1]}`],
+    [/^\/tesoreria\/depositos$/, 'Depósitos'],
+    [/^\/tesoreria\/transferencias\/nueva$/, 'Nueva Transferencia Interna'],
+    [/^\/tesoreria\/transferencias\/(.+)$/, (m) => `Transferencia: ${m[1]}`],
+    [/^\/tesoreria\/transferencias$/, 'Transferencias Internas'],
+    [/^\/tesoreria\/movimientos$/, 'Movimientos Bancarios'],
+    [/^\/config\/tesoreria\/tipos-documento$/, 'Tipos de Documento Bancario'],
+    [/^\/config\/tesoreria\/plantillas-cheque\/nueva$/, 'Nueva Plantilla de Cheque'],
+    [/^\/config\/tesoreria\/plantillas-cheque\/(.+)$/, (m) => `Plantilla de Cheque: ${m[1]}`],
+    [/^\/config\/tesoreria\/plantillas-cheque$/, 'Plantillas de Cheque'],
+
     // Caja / Turnos
     [/^\/caja\/pendientes$/, 'Caja'],
     [/^\/caja\/por-cobrar$/, 'Cobros Pendientes'],

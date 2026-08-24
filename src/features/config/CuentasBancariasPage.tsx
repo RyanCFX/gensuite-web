@@ -13,6 +13,7 @@ import {
   listBancosCatalogo,
   listTiposCuentaBancaria,
 } from '@/shared/api/cuentas-bancarias'
+import { listChequePrintTemplates } from '@/shared/api/tesoreria'
 import type { CuentaBancaria, CuentaBancariaEstado, ChequeFormat } from '@/shared/api/types'
 import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, Wallet } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
@@ -45,6 +46,7 @@ const cuentaBancariaSchema = z.object({
   ultimoCheque: z.number().min(0).optional(),
   ultimoDeposito: z.number().min(0).optional(),
   tipoCuenta: z.string().optional(),
+  chequePrintTemplate: z.string().optional(),
 })
 
 type CuentaBancariaFormValues = z.infer<typeof cuentaBancariaSchema>
@@ -63,6 +65,7 @@ const DEFAULT_VALUES: CuentaBancariaFormValues = {
   ultimoCheque: undefined,
   ultimoDeposito: undefined,
   tipoCuenta: '',
+  chequePrintTemplate: '',
 }
 
 export default function CuentasBancariasPage() {
@@ -101,6 +104,12 @@ export default function CuentasBancariasPage() {
     queryKey: ['tipos-cuenta-bancaria'],
     queryFn: listTiposCuentaBancaria,
     staleTime: 60 * 60_000,
+  })
+
+  const { data: chequePrintTemplates } = useQuery({
+    queryKey: ['tesoreria-cheque-print-templates-select'],
+    queryFn: () => listChequePrintTemplates({ limit: 100 }),
+    enabled: dialogOpen,
   })
   const [bankSearch, setBankSearch] = useState('')
   const bankOptions: SearchSelectOption[] = (bancos ?? [])
@@ -187,6 +196,7 @@ export default function CuentasBancariasPage() {
       ultimoCheque: c.ultimoCheque,
       ultimoDeposito: c.ultimoDeposito,
       tipoCuenta: c.tipoCuenta ?? '',
+      chequePrintTemplate: c.chequePrintTemplate ?? '',
     })
     setDialogOpen(true)
   }
@@ -214,6 +224,7 @@ export default function CuentasBancariasPage() {
           ultimoCheque: values.ultimoCheque,
           ultimoDeposito: values.ultimoDeposito,
           tipoCuenta: values.tipoCuenta || undefined,
+          chequePrintTemplate: values.chequePrintTemplate || undefined,
         },
       })
     } else {
@@ -229,6 +240,7 @@ export default function CuentasBancariasPage() {
         isDefault: values.isDefault,
         balanceInicial: values.balanceInicial ?? 0,
         tipoCuenta: values.tipoCuenta || undefined,
+        chequePrintTemplate: values.chequePrintTemplate || undefined,
       })
     }
   }
@@ -498,6 +510,25 @@ export default function CuentasBancariasPage() {
                         </Select>
                       )}
                     />
+                  </div>
+
+                  <div className="ff-wrap">
+                    <label className="ff-label">Plantilla de Impresión de Cheque</label>
+                    <Controller
+                      name="chequePrintTemplate"
+                      control={control}
+                      render={({ field }) => (
+                        <Select value={field.value ?? ''} onValueChange={field.onChange} placeholder="Sin plantilla (comprobante genérico)">
+                          {(chequePrintTemplates?.items ?? []).map((t) => (
+                            <SelectItem key={t.bankName} value={t.bankName}>{t.bankName}</SelectItem>
+                          ))}
+                        </Select>
+                      )}
+                    />
+                    <p className="ff-hint">
+                      Determina qué plantilla nativa de ERPNext se usa al imprimir un cheque de
+                      esta cuenta. Sin plantilla, se usa el comprobante genérico.
+                    </p>
                   </div>
 
                   {!editTarget && (

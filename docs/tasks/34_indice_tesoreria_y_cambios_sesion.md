@@ -1,113 +1,81 @@
-# Prompt para agente de frontend — Olvidé mi contraseña / Restablecer / Completar registro
+# Índice — Tesorería/Bancos y cambios relacionados (esta serie de prompts)
 
-> Este documento es un prompt autocontenido para un agente de IA de frontend. Da el contexto de
-> negocio y qué construir en la UI — **no** el shape exacto de cada endpoint. API base
-> `https://gensapi.ryancfx.click/api/v1` (o `http://localhost:4000/api/v1` en desarrollo).
+> Este archivo es un índice de lectura, no un prompt de implementación por sí mismo. Da el mapa
+> completo de lo que cambió/se agregó en el BFF en esta sesión de trabajo y en qué orden conviene
+> implementarlo en el frontend. Cada archivo listado abajo es autocontenido y puede pasarse solo a
+> un agente de frontend, pero el orden importa porque hay dependencias de datos entre módulos.
 
-> **Los shapes exactos de request/response NO están en este documento — están en `openapi.json`**
-> (regenerarlo/consultarlo desde `GET /api/docs-json` del BFF). Buscar el tag **"Auth"**.
+API base: `https://gensapi.ryancfx.click/api/v1` (prod) / `http://localhost:4000/api/v1` (dev).
+Todos los endpoints requieren `Authorization: Bearer <token>` + header `X-Tenant`, salvo que se
+indique lo contrario.
 
----
+**Fuente de verdad para shapes exactos de request/response**: el `openapi.json` que ya existe en
+el proyecto de frontend (regenerable desde `GET /api/docs-json` del BFF, o consultable en
+`https://gensapi.ryancfx.click/api/docs`). Los prompts de esta serie describen reglas de negocio,
+flujos de UX y nombres de campo — no repiten cada `@ApiProperty`; para el shape exacto, formato de
+error, y códigos HTTP, ir siempre al openapi.json.
 
-## Contexto — qué cambió en el backend
+## Orden recomendado de implementación
 
-Antes, estos flujos dependían de las páginas nativas de ERPNext (`/login`, `/update-password`) —
-el correo que mandaba ERPNext apuntaba a su propia UI, no a este frontend. Ahora el BFF maneja todo
-el ciclo completo con 3 endpoints nuevos, **todos públicos** (no requieren estar logueado, solo el
-header `X-Tenant`):
+1. **[35_cuentas_bancarias_tipo_y_plantilla_cheque.md](35_cuentas_bancarias_tipo_y_plantilla_cheque.md)**
+   — cambios en Cuentas Bancarias (`tipoCuenta`, `chequePrintTemplate`). Base para todo lo demás:
+   Tesorería referencia cuentas bancarias constantemente.
+2. **[36_tesoreria_tipos_documento.md](36_tesoreria_tipos_documento.md)** — catálogo `Bank Document
+   Type` (CRUD). Los demás submódulos de Tesorería dependen de este catálogo para saber qué tipo de
+   documento se está emitiendo/depositando.
+3. **[37_tesoreria_emisiones.md](37_tesoreria_emisiones.md)** — egresos (cheques, transferencias
+   salientes, pagos a proveedores).
+4. **[38_tesoreria_depositos.md](38_tesoreria_depositos.md)** — ingresos (depósitos, cobros de
+   clientes vía tesorería).
+5. **[39_tesoreria_transferencias_internas.md](39_tesoreria_transferencias_internas.md)** —
+   movimientos entre cuentas bancarias propias.
+6. **[40_tesoreria_movimientos.md](40_tesoreria_movimientos.md)** — libro de banco / kardex con
+   saldo corrido, agregando todo lo anterior en una sola vista de lectura.
+7. **[41_tesoreria_impresion_cheques.md](41_tesoreria_impresion_cheques.md)** — configurador de
+   `Cheque Print Template` nativo + botón de impresión. Depende de 35 y 37.
+8. **[42_historial_cxc_cxp_ampliado.md](42_historial_cxc_cxp_ampliado.md)** — cambios en aging de
+   CxC/CxP (filtros por cliente/proveedor, `groupBy`, historial ampliado a Pay+Receive). Módulo
+   independiente de Tesorería, se puede hacer en paralelo.
 
-```
-POST /auth/forgot-password        { email }
-POST /auth/reset-password         { email, key, newPassword }
-POST /auth/complete-registration  { email, key, newPassword }
-```
+## Resumen ejecutivo del modelo de datos (para orientarse antes de leer los prompts)
 
-`reset-password` y `complete-registration` son **mecánicamente idénticos** (mismo body, mismo
-resultado) — son dos rutas separadas solo para que la UI pueda distinguir el copy/contexto ("elige
-tu contraseña por primera vez" vs. "recupera tu contraseña"), no porque el backend los trate
-distinto.
+Tesorería introduce un **doctype nuevo de ERPNext**, `Bank Document Type` (catálogo configurable
+de tipos de documento bancario: Cheque, Depósito, Transferencia, Transferencia interna, Ajuste
+bancario, Nota de débito, Nota de crédito, Otro), y usa **dos doctypes nativos de ERPNext en
+paralelo** para registrar las transacciones según si tienen o no un beneficiario/origen (cliente o
+proveedor):
 
-### Cómo se conectan los 3 flujos
+- **Con beneficiario/origen** (ej. pagar a un proveedor, cobrar a un cliente) → se crea un
+  **Payment Entry** nativo. Esto habilita reconciliación automática con facturas, saldo a favor,
+  etc.
+- **Sin beneficiario/origen** (ej. una comisión bancaria, un ajuste, un traspaso entre cuentas
+  propias) → se crea un **Journal Entry** nativo, que permite distribuir el monto entre N cuentas
+  contables libremente (algo que Payment Entry no soporta).
 
-1. **Olvidé mi contraseña**: usuario pide un reset desde la pantalla de login →
-   `POST /auth/forgot-password` → siempre responde el mismo mensaje genérico (éxito), exista o no
-   el correo — **nunca uses esta respuesta para decirle al usuario si su correo existe o no en el
-   sistema**. Si el correo existe y tiene configurado el envío, le llega un correo con un link.
-2. **El correo trae un link** con esta forma (que tu frontend debe generar/consumir, ya que la
-   `FRONTEND_URL` configurada en el backend apunta a tu dominio):
-   ```
-   https://tu-frontend.com/reset-password?key=XXXXX&email=usuario@empresa.com
-   ```
-   El correo de bienvenida de un usuario nuevo (cuando un admin lo crea desde `POST /usuarios`)
-   trae la misma forma de link pero a otra ruta:
-   ```
-   https://tu-frontend.com/completar-registro?key=XXXXX&email=usuario@empresa.com
-   ```
-3. **La pantalla de destino** (una para cada ruta, o una sola pantalla reutilizada con copy
-   distinto) lee `key` y `email` de la URL, pide la nueva contraseña al usuario, y llama a
-   `POST /auth/reset-password` o `POST /auth/complete-registration` según corresponda.
-4. **La respuesta de ambos endpoints es un login completo** — mismo shape que `POST /auth/login`
-   (`access_token`, `tenant`, `user`, etc.). El frontend debe tratarlo exactamente como un login
-   exitoso: guardar el token y llevar al usuario directo a la app, **sin pedirle que inicie sesión
-   de nuevo**.
+**El frontend NO necesita saber esto para operar día a día** — cada endpoint de Tesorería
+(`/tesoreria/emisiones`, `/tesoreria/depositos`, `/tesoreria/transferencias-internas`) abstrae esa
+decisión: el BFF decide internamente si crea un Payment Entry o un Journal Entry según si el
+usuario mandó `beneficiario`/`origen` en el body, y siempre responde con el mismo shape
+normalizado (`TreasuryTransaction`, campo `origen: 'pe' | 'je'` informativo solamente). Esto se
+explica en detalle en los prompts 37–39 porque **sí afecta la UX**: ciertos campos solo aplican
+en un camino u otro (ver cada archivo).
 
-### Casos de error a manejar
+## Convención de nombres
 
-- Un `key` inválido, ya usado, o expirado → `400` con un mensaje ya en español listo para mostrar
-  tal cual (ej. "El enlace es inválido o ya expiró. Solicite uno nuevo.") — mostrar ese mensaje y
-  ofrecer un link para volver a pedir uno nuevo (volver a `forgot-password` para el caso de
-  recuperación; para completar-registro, el usuario tendría que pedirle a un admin que le reenvíe
-  la invitación).
-- Una contraseña que no cumple la política de seguridad de ERPNext también devuelve `400` con el
-  mensaje de esa validación — mostrarlo tal cual, no reinterpretarlo.
+Todos los campos expuestos por el BFF están en **camelCase**, aunque el doctype de ERPNext
+subyacente use snake_case (ej. `custom_bank_document_type` en ERPNext → `tipoDocumento` en la
+respuesta del BFF). No asumir nombres de campo por el nombre del doctype de ERPNext — usar siempre
+los nombres documentados en cada prompt / en openapi.json.
 
----
+## Estado de cada pieza (para que el frontend sepa qué está garantizado y qué no)
 
-## Qué debe hacer el frontend
-
-### 1. Pantalla de login — agregar "¿Olvidaste tu contraseña?"
-
-Si no existe ya, agregar el link/botón en la pantalla de login que lleve a una pantalla que pida
-solo el email y llame a `POST /auth/forgot-password`. Mostrar siempre el mismo mensaje de éxito
-genérico que devuelve el backend — no inventar un mensaje distinto según si el correo existe.
-
-### 2. Pantalla "Restablecer contraseña" (`/reset-password?key=...&email=...`)
-
-- Lee `key` y `email` de los query params de la URL (no le pidas el email al usuario si ya viene
-  en el link).
-- Pide la nueva contraseña (con confirmación).
-- Llama a `POST /auth/reset-password` con `{ email, key, newPassword }`.
-- Si responde éxito, guarda el `access_token` y navega directo a la app (ya quedó logueado).
-- Si responde 400, muestra el mensaje de error del backend y ofrece volver a "Olvidé mi
-  contraseña".
-
-### 3. Pantalla "Completar registro" (`/completar-registro?key=...&email=...`)
-
-Mismo comportamiento que el punto 2, pero llamando a `POST /auth/complete-registration` — y con
-copy apropiado para un usuario que está configurando su cuenta por primera vez (ej. "Bienvenido,
-elige tu contraseña para comenzar" en vez de "Restablece tu contraseña").
-
-### 4. Sin cambios en las pantallas de administración de usuarios
-
-`POST /usuarios` (crear usuario) y el botón de "reset password" que un admin usa sobre otro
-usuario ya disparan estos mismos correos automáticamente desde el backend — no hay que agregar
-nada ahí, solo confirmar que sigan funcionando (el usuario creado recibirá el correo de completar
-registro en vez del nativo de ERPNext).
-
----
-
-## Checklist de implementación
-
-- [ ] Consultar `openapi.json` (tag "Auth") para los nombres exactos de campos antes de tipar los
-      formularios.
-- [ ] Link "¿Olvidaste tu contraseña?" en el login → pantalla que llama a
-      `POST /auth/forgot-password`, con el mensaje genérico de éxito.
-- [ ] Pantalla `/reset-password` que lee `key`/`email` de la URL, pide nueva contraseña, llama a
-      `POST /auth/reset-password`, y auto-loguea con la respuesta.
-- [ ] Pantalla `/completar-registro` — mismo mecanismo, llamando a
-      `POST /auth/complete-registration`, con copy de bienvenida.
-- [ ] Manejo de error 400 (key inválida/expirada, contraseña débil) mostrando el mensaje del
-      backend tal cual.
-- [ ] Probar de punta a punta: pedir un "olvidé mi contraseña" real, confirmar que el correo llega
-      con el link correcto a `/reset-password`, completar el cambio, y confirmar que la sesión
-      queda iniciada sin pedir login de nuevo.
+- Todo lo descrito en 35–40 y 42 está **implementado, compilado, y verificado en vivo** contra el
+  tenant real `jbc.ryancfx.click` (creación, sometimiento, cancelación, cálculo de saldos —
+  incluyendo limpieza de los datos de prueba usados para verificar).
+- **41 (impresión nativa de cheques) tiene una salvedad**: la generación de PDF vía el motor
+  nativo de ERPNext (`Cheque Print Template` → `Print Format` → `download_pdf`) falló en el
+  entorno de pruebas del BFF por un problema de infraestructura (resolución de URLs de assets del
+  lado de ERPNext, no relacionado con el código del BFF ni del frontend) — **no se pudo confirmar
+  en vivo que el PDF nativo se genere correctamente en producción**. El prompt 41 documenta esto
+  explícitamente y pide al frontend implementar el flujo completo de todos modos (configurador +
+  botón), con manejo de error claro para el caso en que la generación falle del lado del servidor.

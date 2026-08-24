@@ -314,6 +314,35 @@ function AutoTable({ data }: { data: unknown }) {
   return <ReportTable data={rows} columns={columns} />
 }
 
+// Mismos labels de fallback que ya usan AgingPage.tsx (Cobros) y AgingProveedoresPage.tsx (Pagos)
+// cuando el backend no manda `config.rangos` — para que los 3 lugares se vean consistentes.
+const AGING_DEFAULT_LABELS = ['Corriente', '0–30 días', '31–60 días', '61–90 días', '+90 días']
+
+// Tarea 42 §2 — sin esto, AutoTable infiere los headers de Object.keys() y salen como "range1",
+// "range2", "totalOutstanding" en vez de las etiquetas legibles que sí usan las pantallas de
+// Cobros/Pagos (que consumen `config.rangos` del backend).
+function buildAgingColumns(groupBy: AgingGroupBy, partyField: 'customer' | 'supplier', partyLabel: string, rangos: string[] | undefined): ColumnDef[] {
+  const labels = rangos && rangos.length === 5 ? rangos : AGING_DEFAULT_LABELS
+  const nameField = partyField === 'customer' ? 'customerName' : 'supplierName'
+  const partyColumns: ColumnDef[] = [
+    { fieldname: partyField, label: partyLabel },
+    { fieldname: nameField, label: 'Nombre' },
+  ]
+  const invoiceColumns: ColumnDef[] = groupBy === 'invoice'
+    ? [{ fieldname: 'invoice', label: 'Factura' }, { fieldname: 'dueDate', label: 'Vencimiento' }]
+    : []
+  return [
+    ...partyColumns,
+    ...invoiceColumns,
+    { fieldname: 'totalOutstanding', label: 'Total' },
+    { fieldname: 'current', label: labels[0] },
+    { fieldname: 'range1', label: labels[1] },
+    { fieldname: 'range2', label: labels[2] },
+    { fieldname: 'range3', label: labels[3] },
+    { fieldname: 'range4', label: labels[4] },
+  ]
+}
+
 function FinancialReport({ tipo }: { tipo: 'balance' | 'pl' }) {
   const [fromDate, setFromDate] = useState(monthStart())
   const [toDate, setToDate] = useState(today())
@@ -484,6 +513,10 @@ function CxcAgingReport() {
     retry: false,
   })
 
+  const raw = data as { data?: Record<string, unknown>[]; config?: { rangos?: string[] } } | undefined
+  const rows = raw?.data ?? []
+  const columns = buildAgingColumns(groupBy, 'customer', 'Cliente', raw?.config?.rangos)
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
@@ -511,7 +544,7 @@ function CxcAgingReport() {
       <div className="card">
         {isLoading && <LoadingRows />}
         {error && <ErrorBanner err={error} />}
-        {!isLoading && !error && <AutoTable data={data} />}
+        {!isLoading && !error && <ReportTable data={rows} columns={columns} />}
       </div>
     </div>
   )
@@ -537,6 +570,10 @@ function CxpAgingReport() {
     queryFn: () => getCxpAging({ supplier: supplier || undefined, groupBy }),
     retry: false,
   })
+
+  const raw = data as { data?: Record<string, unknown>[]; config?: { rangos?: string[] } } | undefined
+  const rows = raw?.data ?? []
+  const columns = buildAgingColumns(groupBy, 'supplier', 'Proveedor', raw?.config?.rangos)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -565,7 +602,7 @@ function CxpAgingReport() {
       <div className="card">
         {isLoading && <LoadingRows />}
         {error && <ErrorBanner err={error} />}
-        {!isLoading && !error && <AutoTable data={data} />}
+        {!isLoading && !error && <ReportTable data={rows} columns={columns} />}
       </div>
     </div>
   )
