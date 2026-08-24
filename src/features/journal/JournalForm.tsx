@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { useTabs } from '@/contexts/TabsContext'
 import { createJournalEntry, submitJournalEntry } from '@/shared/api/journal-entry'
 import type { CreateJournalEntryDto, JournalEntryLine, ItemProps } from '@/shared/api/types'
 import { AccountSelect } from '@/components/shared/AccountSelect'
@@ -45,6 +46,7 @@ function defaultRows(): EntryRow[] {
 export default function JournalForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { multiTab, activeId, closeTab } = useTabs()
 
   const today = new Date().toISOString().slice(0, 10)
   const [postingDate, setPostingDate] = useState(today)
@@ -115,8 +117,12 @@ export default function JournalForm() {
     const payload = buildPayload()
     const entry = await createMutation.mutateAsync(payload)
     toast.success('Asiento guardado como borrador')
+    const formTabId = activeId
     queryClient.invalidateQueries({ queryKey: ['journal-entries'] })
     navigate(`/asientos/${encodeURIComponent(entry.id)}`)
+    // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+    // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+    if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
   }
 
   async function handleSaveAndSubmit() {
@@ -125,8 +131,10 @@ export default function JournalForm() {
     const entry = await createMutation.mutateAsync(payload)
     await submitMutation.mutateAsync(entry.id)
     toast.success('Asiento guardado y confirmado')
+    const formTabId = activeId
     queryClient.invalidateQueries({ queryKey: ['journal-entries'] })
     navigate(`/asientos/${encodeURIComponent(entry.id)}`)
+    if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
   }
 
   const updateRow = useCallback((id: number, changes: Partial<EntryRow>) => {

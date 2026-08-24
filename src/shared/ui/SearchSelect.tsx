@@ -20,6 +20,8 @@ export interface SearchSelectProps {
   options: SearchSelectOption[]
   /** Called with debounced search query when user types */
   onSearch: (query: string) => void
+  /** Se dispara cada vez que el dropdown se abre — útil para forzar un refetch de `options`. */
+  onOpen?: () => void
   /** Debounce delay in ms (default 300) */
   debounceMs?: number
   /** Loading state — shows spinner in dropdown */
@@ -49,6 +51,7 @@ export function SearchSelect({
   onChange,
   options,
   onSearch,
+  onOpen,
   debounceMs = 300,
   loading = false,
   placeholder = 'Buscar…',
@@ -105,6 +108,7 @@ export function SearchSelect({
 
   const handleFocus = () => {
     openDropdown()
+    onOpen?.()
     onSearch('')
     // Select all text so user can immediately type a new search
     inputRef.current?.select()
@@ -134,6 +138,7 @@ export function SearchSelect({
     if (!open) {
       if (e.key === 'Enter' || e.key === 'ArrowDown') {
         openDropdown()
+        onOpen?.()
         onSearch('')
       }
       return

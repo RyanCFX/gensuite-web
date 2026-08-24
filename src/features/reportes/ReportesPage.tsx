@@ -15,9 +15,11 @@ import {
   downloadInventarioValoracionPdf, downloadInventarioMovimientosPdf,
   downloadCxcAgingPdf, downloadCxpAgingPdf, downloadCajaCuadrePdf,
 } from '@/shared/api/reportes'
-import type { LibroDiarioByDimension, CuadreTurnoRow, CorteCajaDiaTurno } from '@/shared/api/types'
+import type { LibroDiarioByDimension, CuadreTurnoRow, CorteCajaDiaTurno, AgingGroupBy } from '@/shared/api/types'
 import { CorteCajaView } from '@/components/shared/CorteCajaView'
 import { listSucursales } from '@/shared/api/sucursales'
+import { listCustomers } from '@/shared/api/customers'
+import { listSuppliers } from '@/shared/api/suppliers'
 import { listUsuarios } from '@/shared/api/usuarios'
 import { getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -462,18 +464,48 @@ function InventarioReport({ tipo }: { tipo: 'stock' | 'movimientos' }) {
 }
 
 function CxcAgingReport() {
+  const [customer, setCustomer] = useState('')
+  const [customerLabel, setCustomerLabel] = useState('')
+  const [customerQuery, setCustomerQuery] = useState('')
+  const [groupBy, setGroupBy] = useState<AgingGroupBy>('party')
+
+  const { data: customersData, isLoading: customersLoading } = useQuery({
+    queryKey: ['customerSearch', customerQuery],
+    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
+  })
+  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
+    value: c.id,
+    label: c.customerName,
+  }))
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['reporte-cxc-aging'],
-    queryFn: getCxcAging,
+    queryKey: ['reporte-cxc-aging', customer, groupBy],
+    queryFn: () => getCxcAging({ customer: customer || undefined, groupBy }),
     retry: false,
   })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
-        <div className="filter-bar-left" />
+        <div className="filter-bar-left">
+          <div style={{ width: 240 }}>
+            <SearchSelect
+              value={customer}
+              selectedLabel={customerLabel}
+              onChange={(val, opt) => { setCustomer(val); setCustomerLabel(opt?.label ?? '') }}
+              options={customerOptions}
+              onSearch={setCustomerQuery}
+              loading={customersLoading}
+              placeholder="Todos los clientes"
+            />
+          </div>
+          <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
+            <SelectItem value="party">Agrupar por Cliente</SelectItem>
+            <SelectItem value="invoice">Agrupar por Factura</SelectItem>
+          </Select>
+        </div>
         <div className="filter-bar-right">
-          <DownloadPdfButton onDownload={downloadCxcAgingPdf} />
+          <DownloadPdfButton onDownload={() => downloadCxcAgingPdf({ customer: customer || undefined, groupBy })} />
         </div>
       </div>
       <div className="card">
@@ -486,18 +518,48 @@ function CxcAgingReport() {
 }
 
 function CxpAgingReport() {
+  const [supplier, setSupplier] = useState('')
+  const [supplierLabel, setSupplierLabel] = useState('')
+  const [supplierQuery, setSupplierQuery] = useState('')
+  const [groupBy, setGroupBy] = useState<AgingGroupBy>('party')
+
+  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
+    queryKey: ['supplierSearch', supplierQuery],
+    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
+  })
+  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
+    value: s.id,
+    label: s.supplierName,
+  }))
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['reporte-cxp-aging'],
-    queryFn: getCxpAging,
+    queryKey: ['reporte-cxp-aging', supplier, groupBy],
+    queryFn: () => getCxpAging({ supplier: supplier || undefined, groupBy }),
     retry: false,
   })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
-        <div className="filter-bar-left" />
+        <div className="filter-bar-left">
+          <div style={{ width: 240 }}>
+            <SearchSelect
+              value={supplier}
+              selectedLabel={supplierLabel}
+              onChange={(val, opt) => { setSupplier(val); setSupplierLabel(opt?.label ?? '') }}
+              options={supplierOptions}
+              onSearch={setSupplierQuery}
+              loading={suppliersLoading}
+              placeholder="Todos los proveedores"
+            />
+          </div>
+          <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
+            <SelectItem value="party">Agrupar por Proveedor</SelectItem>
+            <SelectItem value="invoice">Agrupar por Factura</SelectItem>
+          </Select>
+        </div>
         <div className="filter-bar-right">
-          <DownloadPdfButton onDownload={downloadCxpAgingPdf} />
+          <DownloadPdfButton onDownload={() => downloadCxpAgingPdf({ supplier: supplier || undefined, groupBy })} />
         </div>
       </div>
       <div className="card">

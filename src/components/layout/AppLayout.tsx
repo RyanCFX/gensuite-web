@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, Fragment } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useLocation, useOutlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getFacturacionConfig } from "@/shared/api/config";
@@ -43,7 +44,7 @@ import { useAuthStore } from "@/stores/auth.store";
 import { CommandPalette } from "./CommandPalette";
 import { Toaster } from "sonner";
 import { TabsProvider, useTabs } from "@/contexts/TabsContext";
-import { KeepAlive, useKeepAliveRef } from "keepalive-for-react";
+import { KeepAlive } from "keepalive-for-react";
 import { TurnoCajaIndicator } from "@/components/shared/TurnoCajaIndicator";
 
 import logo from "@/assets/logo.png";
@@ -686,13 +687,118 @@ function renderEntry(
   );
 }
 
+// ─── TabCloseButton ────────────────────────────────────────────────────────
+
+function TabCloseButton({
+  label,
+  onClose,
+}: {
+  label: string;
+  onClose: () => void;
+}) {
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const clearTimer = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  useEffect(() => clearTimer, []);
+
+  return (
+    <button
+      ref={btnRef}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 16,
+        height: 16,
+        borderRadius: 4,
+        border: "none",
+        background: "transparent",
+        cursor: "pointer",
+        color: "var(--text-tertiary)",
+        padding: 0,
+        flexShrink: 0,
+        opacity: 0.7,
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        clearTimer();
+        setTooltipPos(null);
+        onClose();
+      }}
+      onMouseEnter={() => {
+        clearTimer();
+        timerRef.current = setTimeout(() => {
+          const rect = btnRef.current?.getBoundingClientRect();
+          if (!rect) return;
+          setTooltipPos({ top: rect.bottom + 6, left: rect.left + rect.width / 2 });
+        }, 1000);
+      }}
+      onMouseLeave={() => {
+        clearTimer();
+        setTooltipPos(null);
+      }}
+      aria-label={label}
+      title=""
+    >
+      <X size={11} />
+      {tooltipPos &&
+        createPortal(
+          <span
+            role="tooltip"
+            style={{
+              position: "fixed",
+              top: tooltipPos.top,
+              left: tooltipPos.left,
+              transform: "translateX(-50%)",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              padding: "4px 7px",
+              borderRadius: 5,
+              border: "1px solid var(--border-default)",
+              background: "var(--surface-raised, var(--bg-surface))",
+              color: "var(--text-primary)",
+              fontSize: 11,
+              fontWeight: 400,
+              whiteSpace: "nowrap",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
+              zIndex: 1000,
+              pointerEvents: "none",
+            }}
+          >
+            Cerrar pestaña
+            <kbd
+              style={{
+                padding: "1px 4px",
+                borderRadius: 3,
+                border: "1px solid var(--border-default)",
+                background: "var(--surface-app)",
+                color: "var(--text-secondary)",
+                fontSize: 10,
+                fontFamily: "inherit",
+                lineHeight: 1.4,
+              }}
+            >
+              Shift+W
+            </kbd>
+          </span>,
+          document.body,
+        )}
+    </button>
+  );
+}
+
 // ─── TabBar ──────────────────────────────────────────────────────────────────
 
-function TabBar({
-  keepAliveRef,
-}: {
-  keepAliveRef: ReturnType<typeof useKeepAliveRef>;
-}) {
+function TabBar() {
   const { tabs, activeId, closeTab } = useTabs();
   const navigate = useNavigate();
 
@@ -768,24 +874,9 @@ function TabBar({
             >
               {tab.title}
             </span>
-            <button
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 16,
-                height: 16,
-                borderRadius: 4,
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-                color: "var(--text-tertiary)",
-                padding: 0,
-                flexShrink: 0,
-                opacity: 0.7,
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
+            <TabCloseButton
+              label={`Cerrar ${tab.title}`}
+              onClose={() => {
                 if (tab.isDirty) {
                   if (
                     !window.confirm(
@@ -795,12 +886,8 @@ function TabBar({
                     return;
                 }
                 closeTab(tab.id);
-                keepAliveRef.current?.destroy(tab.path);
               }}
-              aria-label={`Cerrar ${tab.title}`}
-            >
-              <X size={11} />
-            </button>
+            />
           </div>
         );
       })}
@@ -823,7 +910,6 @@ function AppLayoutInner() {
   });
   const [userOpen, setUserOpen] = useState(false);
   const userRef = useRef<HTMLDivElement>(null);
-  const keepAliveRef = useKeepAliveRef();
   const { user, logout } = useAuthStore();
   const isSystemManager = user?.roles?.includes("System Manager") ?? false;
 
@@ -861,7 +947,7 @@ function AppLayoutInner() {
     : NAV_FINANZAS.filter(
         (entry) => !POS_ONLY_NAV_KEYS.has(isGroup(entry) ? entry.prefix : entry.path),
       );
-  const { tabs, activeId, closeTab, multiTab } = useTabs();
+  const { tabs, activeId, closeTab, multiTab, keepAliveRef } = useTabs();
   const navigate = useNavigate();
   const location = useLocation();
   const outlet = useOutlet();
@@ -937,12 +1023,11 @@ function AppLayoutInner() {
         }
         e.preventDefault();
         closeTab(activeId);
-        keepAliveRef.current?.destroy(tab.path);
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [multiTab, activeId, tabs, closeTab, keepAliveRef]);
+  }, [multiTab, activeId, tabs, closeTab]);
 
   const handleLogout = () => {
     logout();
@@ -1201,7 +1286,7 @@ function AppLayoutInner() {
               .
             </div>
           )}*/}
-          {multiTab && <TabBar keepAliveRef={keepAliveRef} />}
+          {multiTab && <TabBar />}
           <div style={{ flex: 1, overflowY: "auto" }}>
             {multiTab ? (
               <KeepAlive

@@ -17,7 +17,7 @@ interface CostCenterSelectProps {
 export function CostCenterSelect({ value, onChange, placeholder = 'Buscar centro de costo…', error, disabled, id }: CostCenterSelectProps) {
   const [query, setQuery] = useState('')
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['cost-center-search', query],
     queryFn: () => listCentrosCosto({ search: query || undefined }),
     staleTime: 30_000,
@@ -45,6 +45,7 @@ export function CostCenterSelect({ value, onChange, placeholder = 'Buscar centro
       }}
       options={options}
       onSearch={setQuery}
+      onOpen={() => refetch()}
       loading={isLoading}
       placeholder={placeholder}
       error={error}

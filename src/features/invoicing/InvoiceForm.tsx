@@ -19,6 +19,7 @@ import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
+import { useTabs } from '@/contexts/TabsContext'
 
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -192,6 +193,7 @@ function LineUbicacionCell({
 export default function InvoiceForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { multiTab, activeId, closeTab } = useTabs()
 
   const [customerId, setCustomerId] = useState('')
   const [customerQuery, setCustomerQuery] = useState('')
@@ -473,9 +475,13 @@ export default function InvoiceForm() {
   const createMutation = useMutation({
     mutationFn: (dto: CreateInvoiceDto) => createInvoice(dto),
     onSuccess: (invoice) => {
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       toast.success('Factura creada como borrador')
       navigate(`/facturas/${invoice.id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string; code?: string }) => {
       const msg = err?.message ?? ''

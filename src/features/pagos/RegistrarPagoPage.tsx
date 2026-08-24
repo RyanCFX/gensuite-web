@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { useTabs } from '@/contexts/TabsContext'
 import { createPago, getPagosPendientes } from '@/shared/api/pagos'
 import { SaldoFavorProveedorPagosSection } from './SaldoFavorProveedorPagosSection'
 import { listSuppliers } from '@/shared/api/suppliers'
@@ -32,6 +33,7 @@ interface ReferenciaRow {
 export default function RegistrarPagoPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const { multiTab, activeId, closeTab } = useTabs()
   const [searchParams] = useSearchParams()
   const preselectSupplier = searchParams.get('supplier') ?? ''
   const preselectInvoice = searchParams.get('invoice') ?? ''
@@ -243,11 +245,15 @@ export default function RegistrarPagoPage() {
     mutationFn: createPago,
     onSuccess: (pago) => {
       toast.success('Pago registrado — queda en Borrador, revísalo y somételo para aplicarlo')
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['aging-proveedores'] })
       queryClient.invalidateQueries({ queryKey: ['pagos-pendientes'] })
       queryClient.invalidateQueries({ queryKey: ['pagos-pendientes-form', supplierId] })
       queryClient.invalidateQueries({ queryKey: ['pagos'] })
       navigate(`/pagos/${pago.id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string }) => {
       if (isApiErrorCode(err, ERROR_CODES.BRANCH_REQUIRED)) {

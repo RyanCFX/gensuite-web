@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffectOnActive } from 'keepalive-for-react'
 import { toast } from 'sonner'
+import { useTabs } from '@/contexts/TabsContext'
 import { listCompras, getCompra } from '@/shared/api/compras-gastos'
 import { listSuppliers } from '@/shared/api/suppliers'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -33,6 +35,7 @@ export default function DevolucionForm() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { multiTab, activeId, closeTab } = useTabs()
 
   const originalInvoiceParam = searchParams.get('originalInvoice') ?? ''
   const isEdit = !!id
@@ -50,6 +53,12 @@ export default function DevolucionForm() {
     enabled: !!id,
     staleTime: 60_000,
   })
+
+  // Con Multipestañas, esta pantalla queda montada (KeepAlive) al cambiar de pestaña — al volver
+  // a ella se re-consulta por si la devolución cambió en el servidor mientras el usuario estaba en otra.
+  useEffectOnActive(() => {
+    if (isEdit) queryClient.invalidateQueries({ queryKey: ['devolucion', id] })
+  }, [isEdit, id], true)
 
   const editOriginalInvoice = devolucion?.originalInvoice ?? ''
   const { data: editOriginalCompra, isLoading: loadingEditOriginal } = useQuery({
@@ -132,9 +141,13 @@ export default function DevolucionForm() {
         : createDevolucionCompra(payload),
     onSuccess: (result) => {
       toast.success(isEdit ? 'Devolución actualizada' : 'Devolución creada')
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['devoluciones-compras'] })
-      queryClient.invalidateQueries({ queryKey: ['devolucion', id] })
+      if (isEdit) queryClient.removeQueries({ queryKey: ['devolucion', id] })
       navigate(`/devoluciones-compras/${isEdit ? id : result.id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string; code?: string }) => {
       const code = (err as { code?: string })?.code

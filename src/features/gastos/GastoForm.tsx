@@ -1,8 +1,10 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffectOnActive } from 'keepalive-for-react'
 import { toast } from 'sonner'
 import { addDays, format as formatDateFns } from 'date-fns'
+import { useTabs } from '@/contexts/TabsContext'
 import { createGasto, updateGasto, getGasto } from '@/shared/api/compras-gastos'
 import { listSuppliers, getSupplier } from '@/shared/api/suppliers'
 import type { CreateGastoDto, DistribucionCuentaDto } from '@/shared/api/types'
@@ -84,6 +86,7 @@ export default function GastoForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { id } = useParams<{ id?: string }>()
+  const { multiTab, activeId, closeTab } = useTabs()
   const isEdit = !!id
 
   const [supplierId, setSupplierId] = useState('')
@@ -172,6 +175,12 @@ export default function GastoForm() {
     queryFn: () => getGasto(id!),
     enabled: isEdit,
   })
+
+  // Con Multipestañas, esta pantalla queda montada (KeepAlive) al cambiar de pestaña — al volver
+  // a ella se re-consulta por si el gasto cambió en el servidor mientras el usuario estaba en otra.
+  useEffectOnActive(() => {
+    if (isEdit) queryClient.invalidateQueries({ queryKey: ['gasto', id] })
+  }, [isEdit, id], true)
 
   // Precarga del formulario al editar un gasto en Draft.
   /* eslint-disable react-hooks/set-state-in-effect -- sincroniza el form local
@@ -367,9 +376,13 @@ export default function GastoForm() {
     mutationFn: (dto: CreateGastoDto) => (isEdit ? updateGasto(id!, dto) : createGasto(dto)),
     onSuccess: (data) => {
       toast.success(isEdit ? 'Gasto actualizado' : 'Gasto creado')
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['gastos'] })
-      queryClient.invalidateQueries({ queryKey: ['gasto', data.id] })
+      if (isEdit) queryClient.removeQueries({ queryKey: ['gasto', id] })
       navigate(`/gastos/${data.id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (error) => {
       if (isApiErrorCode(error, ERROR_CODES.BRANCH_REQUIRED)) {

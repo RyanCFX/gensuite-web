@@ -6,6 +6,7 @@ import NotFoundPage from '@/pages/NotFoundPage'
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import CompletarRegistroPage from '@/pages/CompletarRegistroPage'
+import StartPage from '@/pages/StartPage'
 
 // Lazy-loaded pages
 import { lazy, Suspense } from 'react'
@@ -130,6 +131,7 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Suspense fallback={<PageLoader />}><DashboardPage /></Suspense>} />
+            <Route path="/inicio" element={<StartPage />} />
 
             {/* Clientes */}
             <Route path="/clientes" element={<Suspense fallback={<PageLoader />}><CustomersPage /></Suspense>} />

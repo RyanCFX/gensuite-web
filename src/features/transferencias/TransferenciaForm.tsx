@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'sonner'
+import { useTabs } from '@/contexts/TabsContext'
 import { createTransferencia } from '@/shared/api/transferencias'
 import { listAlmacenes } from '@/shared/api/config'
 import { getUsuarioAlmacenesPermitidos } from '@/shared/api/usuarios'
@@ -21,6 +22,7 @@ interface LineItem {
 export default function TransferenciaForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { multiTab, activeId, closeTab } = useTabs()
   const currentUserEmail = getUser()?.email
 
   const [fromWarehouse, setFromWarehouse] = useState('')
@@ -69,8 +71,12 @@ export default function TransferenciaForm() {
     }),
     onSuccess: (t) => {
       toast.success('Transferencia creada — el stock está en tránsito')
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['transferencias'] })
       navigate(`/transferencias/${t.id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string }) => {
       const msg = err?.message ?? ''

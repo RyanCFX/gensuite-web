@@ -174,13 +174,20 @@ export async function downloadInventarioMovimientosPdf(params?: InventarioParams
 
 // ─── CXC / CAJA ──────────────────────────────────────────────────────────────
 
-export async function getCxcAging() {
-  const res = await client.get(ENDPOINTS.reportes.cxcAging)
+export interface CxcAgingParams {
+  /** Filtra el reporte a un solo cliente. Omitir trae todos. */
+  customer?: string
+  /** "party" (default, reporte nativo agrupado por cliente) | "invoice" (una fila por factura). */
+  groupBy?: 'party' | 'invoice'
+}
+
+export async function getCxcAging(params?: CxcAgingParams) {
+  const res = await client.get(ENDPOINTS.reportes.cxcAging, { params })
   return res.data
 }
 
-export async function downloadCxcAgingPdf() {
-  const res = await client.get<Blob>(ENDPOINTS.reportes.cxcAgingPdf, { responseType: 'blob' })
+export async function downloadCxcAgingPdf(params?: CxcAgingParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.cxcAgingPdf, { params, responseType: 'blob' })
   const url = URL.createObjectURL(res.data)
   const a = document.createElement('a')
   a.href = url
@@ -189,13 +196,20 @@ export async function downloadCxcAgingPdf() {
   URL.revokeObjectURL(url)
 }
 
-export async function getCxpAging() {
-  const res = await client.get(ENDPOINTS.reportes.cxpAging)
+export interface CxpAgingParams {
+  /** Filtra el reporte a un solo proveedor. Omitir trae todos. */
+  supplier?: string
+  /** "party" (default, reporte nativo agrupado por proveedor) | "invoice" (una fila por factura). */
+  groupBy?: 'party' | 'invoice'
+}
+
+export async function getCxpAging(params?: CxpAgingParams) {
+  const res = await client.get(ENDPOINTS.reportes.cxpAging, { params })
   return res.data
 }
 
-export async function downloadCxpAgingPdf() {
-  const res = await client.get<Blob>(ENDPOINTS.reportes.cxpAgingPdf, { responseType: 'blob' })
+export async function downloadCxpAgingPdf(params?: CxpAgingParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.cxpAgingPdf, { params, responseType: 'blob' })
   const url = URL.createObjectURL(res.data)
   const a = document.createElement('a')
   a.href = url

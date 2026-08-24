@@ -8,6 +8,7 @@ import type {
   CreateCuentaBancariaDto,
   UpdateCuentaBancariaDto,
   CuentaBancariaBalance,
+  TipoCuentaBancariaOption,
   PaginatedResponse,
   PaginationParams,
 } from './types'
@@ -33,11 +34,17 @@ export async function updateBancoCatalogo(id: string, data: UpdateBancoDto) {
 
 export interface ListCuentasBancariasParams extends PaginationParams {
   estado?: 'Activa' | 'Inactiva' | 'Cerrada'
+  tipoCuenta?: string
 }
 
 export async function listCuentasBancarias(params?: ListCuentasBancariasParams) {
   const res = await client.get<PaginatedResponse<CuentaBancaria>>(ENDPOINTS.cuentasBancarias.list, { params })
   return unwrapPaginated(res)
+}
+
+export async function listTiposCuentaBancaria() {
+  const res = await client.get<{ success: true; data: TipoCuentaBancariaOption[] }>(ENDPOINTS.cuentasBancarias.tipos)
+  return unwrap(res)
 }
 
 export async function getCuentaBancaria(id: string, withBalance = false) {

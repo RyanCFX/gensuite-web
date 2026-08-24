@@ -35,7 +35,7 @@ interface UomSelectProps {
 // ─── Modo simple: select nativo (usado en ItemForm) ───────────────────────────
 
 function SimpleUomSelect({ value, onChange, disabled, error }: Omit<UomSelectProps, 'itemCode' | 'className'>) {
-  const { data: uoms, isLoading } = useQuery({
+  const { data: uoms, isLoading, refetch } = useQuery({
     queryKey: ['uoms'],
     queryFn: listUOMs,
     staleTime: 5 * 60_000,
@@ -64,6 +64,7 @@ function SimpleUomSelect({ value, onChange, disabled, error }: Omit<UomSelectPro
       onChange={(val) => onChange(val, 1)}
       options={options}
       onSearch={setSearch}
+      onOpen={() => refetch()}
       selectedLabel={value}
       placeholder="—"
       disabled={disabled}
@@ -80,7 +81,7 @@ function ItemUomSelect({ value, onChange, itemCode, className = 'items-input', d
   const [showAll, setShowAll] = useState(false)
 
   // UOMs del artículo específico
-  const { data: itemData } = useQuery({
+  const { data: itemData, refetch: refetchItem } = useQuery({
     queryKey: ['item', itemCode],
     queryFn: () => getItem(itemCode),
     enabled: !!itemCode,
@@ -88,12 +89,21 @@ function ItemUomSelect({ value, onChange, itemCode, className = 'items-input', d
   })
 
   // Todas las UOMs de config — se cargan cuando el usuario pide "más opciones"
-  const { data: allUoms, isLoading: loadingAll } = useQuery({
+  const { data: allUoms, isLoading: loadingAll, refetch: refetchAllUoms } = useQuery({
     queryKey: ['uoms'],
     queryFn: listUOMs,
     enabled: showAll,
     staleTime: 5 * 60_000,
   })
+
+  const handleToggle = () => {
+    const wasOpen = open
+    toggle()
+    if (!wasOpen) {
+      refetchItem()
+      if (showAll) refetchAllUoms()
+    }
+  }
 
   // Combina stockUom + uoms del artículo en un Set sin duplicados
   const itemUoms = useMemo(() => {
@@ -136,7 +146,7 @@ function ItemUomSelect({ value, onChange, itemCode, className = 'items-input', d
         ref={triggerRef}
         type="button"
         className={`${className}${error ? ' items-input-error' : ''}`}
-        onClick={toggle}
+        onClick={handleToggle}
         disabled={disabled}
         style={{
           display: 'flex',

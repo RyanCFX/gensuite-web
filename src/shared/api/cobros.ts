@@ -2,8 +2,10 @@ import { client, unwrap, unwrapPaginated } from './client'
 import { ENDPOINTS } from './endpoints'
 import type {
   AgingEntry,
+  AgingInvoiceEntry,
   AgingConfig,
   AgingResult,
+  AgingGroupBy,
   SemaforoEntry,
   SemaforoResult,
   PaymentEntry,
@@ -71,17 +73,26 @@ export async function downloadCobroPdf(id: string, filename?: string, formato?: 
 }
 
 // ─── Aging ────────────────────────────────────────────────────────────────────
-// GET /cobros/aging responde { success, data: AgingEntry[], config, note? }
-// — config y note NO están anidados dentro de `data`, van al mismo nivel.
+// GET /cobros/aging responde { success, groupBy, data: AgingEntry[] | AgingInvoiceEntry[], config, note? }
+// — groupBy/config/note NO están anidados dentro de `data`, van al mismo nivel.
+// Sin `groupBy` en la request, el backend asume "party" (una fila por cliente).
 
-export async function getAging(): Promise<AgingResult> {
+export interface AgingParams {
+  /** Filtra el reporte a un solo cliente. Omitir trae todos. */
+  customer?: string
+  /** "party" (default, una fila por cliente) | "invoice" (una fila por factura pendiente). */
+  groupBy?: AgingGroupBy
+}
+
+export async function getAging(params?: AgingParams): Promise<AgingResult> {
   const res = await client.get<{
     success: true
-    data: AgingEntry[]
+    groupBy: AgingGroupBy
+    data: AgingEntry[] | AgingInvoiceEntry[]
     config: AgingConfig
     note?: string
-  }>(ENDPOINTS.cobros.aging)
-  return { rows: res.data.data, config: res.data.config, note: res.data.note }
+  }>(ENDPOINTS.cobros.aging, { params })
+  return { groupBy: res.data.groupBy ?? 'party', rows: res.data.data, config: res.data.config, note: res.data.note }
 }
 
 // ─── Semáforo ─────────────────────────────────────────────────────────────────

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffectOnActive } from 'keepalive-for-react'
 import { toast } from 'sonner'
+import { useTabs } from '@/contexts/TabsContext'
 import { getCuenta, createCuenta, updateCuenta } from '@/shared/api/cuentas'
 import type { CreateCuentaDto, UpdateCuentaDto } from '@/shared/api/types'
 import { AccountSelect } from '@/components/shared/AccountSelect'
@@ -67,6 +69,7 @@ export default function CuentaForm() {
   const isEdit = Boolean(id)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { multiTab, activeId, closeTab } = useTabs()
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
@@ -76,6 +79,12 @@ export default function CuentaForm() {
     queryFn: () => getCuenta(decodeURIComponent(id!)),
     enabled: isEdit,
   })
+
+  // Con Multipestañas, esta pantalla queda montada (KeepAlive) al cambiar de pestaña — al volver
+  // a ella se re-consulta por si la cuenta cambió en el servidor mientras el usuario estaba en otra.
+  useEffectOnActive(() => {
+    if (isEdit) queryClient.invalidateQueries({ queryKey: ['cuenta', id] })
+  }, [isEdit, id], true)
 
   // Detect if account has GL movements (locked fields)
   const hasMovements = isEdit && cuenta ? (cuenta.debit + cuenta.credit) > 0 : false
@@ -100,9 +109,13 @@ export default function CuentaForm() {
     mutationFn: (data: CreateCuentaDto) => createCuenta(data),
     onSuccess: (data) => {
       toast.success('Cuenta creada correctamente')
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['cuentas'] })
       queryClient.invalidateQueries({ queryKey: ['cuentas-tree'] })
       navigate(`/cuentas/${encodeURIComponent(data.id)}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string }) => {
       toast.error(err?.message ?? 'Error al crear la cuenta')
@@ -113,10 +126,12 @@ export default function CuentaForm() {
     mutationFn: (data: UpdateCuentaDto) => updateCuenta(decodeURIComponent(id!), data),
     onSuccess: () => {
       toast.success('Cuenta actualizada correctamente')
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['cuentas'] })
       queryClient.invalidateQueries({ queryKey: ['cuentas-tree'] })
-      queryClient.invalidateQueries({ queryKey: ['cuenta', id] })
+      queryClient.removeQueries({ queryKey: ['cuenta', id] })
       navigate(`/cuentas/${id}`)
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string }) => {
       toast.error(err?.message ?? 'Error al actualizar la cuenta')

@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffectOnActive } from 'keepalive-for-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useTabs } from '@/contexts/TabsContext'
 import { createPedido, updatePedido, getPedido, getPedidoDuplicateSource } from '@/shared/api/pedidos'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getQuotation } from '@/shared/api/quotations'
@@ -82,6 +84,7 @@ export default function PedidoForm() {
   const duplicateId = searchParams.get('duplicate')
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { multiTab, activeId, closeTab } = useTabs()
   const isEdit = !!id
 
 const [customerId, setCustomerId] = useState('')
@@ -208,6 +211,12 @@ const [customerId, setCustomerId] = useState('')
     queryFn: () => getPedido(id!),
     enabled: isEdit,
   })
+
+  // Con Multipestañas, esta pantalla queda montada (KeepAlive) al cambiar de pestaña — al volver
+  // a ella se re-consulta por si el pedido cambió en el servidor mientras el usuario estaba en otra.
+  useEffectOnActive(() => {
+    if (isEdit) queryClient.invalidateQueries({ queryKey: ['pedido', id] })
+  }, [isEdit, id], true)
 useEffect(() => {
      if (!existing || loaded) return
      setCustomerId(existing.customer)
@@ -349,12 +358,32 @@ useEffect(() => {
 
   const createMutation = useMutation({
     mutationFn: (dto: CreatePedidoDto) => createPedido(dto),
-    onSuccess: (p) => { setSubmitError(null); queryClient.invalidateQueries({ queryKey: ['pedidos'] }); toast.success('Pedido creado'); navigate(`/pedidos/${p.id}`) },
+    onSuccess: (p) => {
+      setSubmitError(null)
+      const formTabId = activeId
+      queryClient.invalidateQueries({ queryKey: ['pedidos'] })
+      toast.success('Pedido creado')
+      navigate(`/pedidos/${p.id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
+    },
     onError: (err) => handleError(err),
   })
   const updateMutation = useMutation({
     mutationFn: (dto: Partial<CreatePedidoDto>) => updatePedido(id!, dto),
-    onSuccess: (result) => { setSubmitError(null); queryClient.invalidateQueries({ queryKey: ['pedidos'] }); queryClient.invalidateQueries({ queryKey: ['pedido', id] }); toast.success('Pedido actualizado'); const newId = (result as any).id; navigate(newId && newId !== id ? `/pedidos/${newId}` : `/pedidos/${id}`) },
+    onSuccess: (result) => {
+      setSubmitError(null)
+      const formTabId = activeId
+      queryClient.invalidateQueries({ queryKey: ['pedidos'] })
+      queryClient.removeQueries({ queryKey: ['pedido', id] })
+      toast.success('Pedido actualizado')
+      const newId = (result as any).id
+      navigate(newId && newId !== id ? `/pedidos/${newId}` : `/pedidos/${id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
+    },
     onError: (err) => handleError(err),
   })
   const isPending = createMutation.isPending || updateMutation.isPending

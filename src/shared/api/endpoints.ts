@@ -351,6 +351,7 @@ export const ENDPOINTS = {
     list: '/cuentas-bancarias',
     byId: (id: string) => `/cuentas-bancarias/${encodeURIComponent(id)}`,
     balance: (id: string) => `/cuentas-bancarias/${encodeURIComponent(id)}/balance`,
+    tipos: '/cuentas-bancarias/tipos',
     bancos: {
       list: '/cuentas-bancarias/bancos',
       byId: (id: string) => `/cuentas-bancarias/bancos/${encodeURIComponent(id)}`,

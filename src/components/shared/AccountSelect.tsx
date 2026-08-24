@@ -23,7 +23,7 @@ interface AccountSelectProps {
 export function AccountSelect({ value, onChange, placeholder = 'Buscar cuenta…', error, disabled, id, accountType, rootType, ledgerOnly = true, soloImpuesto }: AccountSelectProps) {
   const [query, setQuery] = useState('')
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['accounts-search', query, accountType, rootType, soloImpuesto],
     queryFn: () => listCuentas({
       search: query || undefined,
@@ -49,6 +49,7 @@ export function AccountSelect({ value, onChange, placeholder = 'Buscar cuenta…
       onChange={(id) => onChange(id)}
       options={options}
       onSearch={setQuery}
+      onOpen={() => refetch()}
       loading={isLoading}
       placeholder={placeholder}
       error={error}

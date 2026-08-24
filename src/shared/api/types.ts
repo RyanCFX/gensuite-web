@@ -2592,6 +2592,9 @@ export interface CuentaBancaria {
   ultimoCheque?: number;
   ultimoDeposito?: number;
   balanceInicial: number;
+  /** "Cuenta de Ahorro" | "Cuenta Corriente" | "Cuenta de Nómina" — catálogo en GET /cuentas-bancarias/tipos.
+   *  Opcional: cuentas creadas antes de este campo vienen sin valor. */
+  tipoCuenta?: string;
   /** Solo presente cuando se solicita explícitamente (?withBalance=true o GET .../balance) */
   balance?: number;
 }
@@ -2607,6 +2610,7 @@ export interface CreateCuentaBancariaDto {
   chequesManuales?: boolean;
   isDefault?: boolean;
   balanceInicial?: number;
+  tipoCuenta?: string;
 }
 
 export interface UpdateCuentaBancariaDto {
@@ -2621,12 +2625,19 @@ export interface UpdateCuentaBancariaDto {
   isDefault?: boolean;
   ultimoCheque?: number;
   ultimoDeposito?: number;
+  tipoCuenta?: string;
 }
 
 export interface CuentaBancariaBalance {
   balance: number;
   balanceInicial: number;
   moneda: string;
+}
+
+/** GET /cuentas-bancarias/tipos — catálogo de valores válidos para `tipoCuenta`. */
+export interface TipoCuentaBancariaOption {
+  value: string;
+  label: string;
 }
 
 // GET/POST/PUT /config/denominaciones — catálogo de billetes/monedas para el desglose de vuelto
@@ -2845,9 +2856,25 @@ export interface NcfActionResult {
 
 // ─── Cobros ───────────────────────────────────────────────────────────────────
 
+export type AgingGroupBy = "party" | "invoice";
+
 export interface AgingEntry {
   customer: string;
   customerName: string;
+  totalOutstanding: number;
+  current: number;
+  range1: number;
+  range2: number;
+  range3: number;
+  range4: number;
+}
+
+/** Fila de aging en modo `groupBy=invoice` — una fila por factura pendiente. */
+export interface AgingInvoiceEntry {
+  customer: string;
+  customerName: string;
+  invoice: string;
+  dueDate: string;
   totalOutstanding: number;
   current: number;
   range1: number;
@@ -2861,7 +2888,8 @@ export interface AgingConfig {
 }
 
 export interface AgingResult {
-  rows: AgingEntry[];
+  groupBy: AgingGroupBy;
+  rows: AgingEntry[] | AgingInvoiceEntry[];
   config: AgingConfig;
   note?: string;
 }
@@ -3004,14 +3032,29 @@ export interface AgingProveedorEntry {
   range4: number;
 }
 
+/** Fila de aging en modo `groupBy=invoice` — una fila por factura pendiente. */
+export interface AgingProveedorInvoiceEntry {
+  supplier: string;
+  supplierName?: string;
+  invoice: string;
+  dueDate: string;
+  totalOutstanding: number;
+  current: number;
+  range1: number;
+  range2: number;
+  range3: number;
+  range4: number;
+}
+
 export interface AgingProveedorConfig {
   rangos: string[];
 }
 
-// GET /pagos/aging responde { success, data: AgingProveedorEntry[], config, note? }
+// GET /pagos/aging responde { success, groupBy, data: AgingProveedorEntry[], config, note? }
 // — config y note NO están anidados dentro de `data`, van al mismo nivel.
 export interface AgingProveedorResult {
-  rows: AgingProveedorEntry[];
+  groupBy: AgingGroupBy;
+  rows: AgingProveedorEntry[] | AgingProveedorInvoiceEntry[];
   config: AgingProveedorConfig;
   note?: string;
 }

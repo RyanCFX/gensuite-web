@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffectOnActive } from 'keepalive-for-react'
 import { toast } from 'sonner'
+import { useTabs } from '@/contexts/TabsContext'
 import { createCompra, updateCompra, getCompra } from '@/shared/api/compras-gastos'
 import { listSuppliers, getSupplier } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
@@ -552,6 +554,7 @@ export default function CompraForm() {
   const navigate = useNavigate()
   const { id } = useParams<{ id?: string }>()
   const queryClient = useQueryClient()
+  const { multiTab, activeId, closeTab } = useTabs()
   const isEdit = !!id
   const authUser = useAuthStore((s) => s.user)
   const defaultWh = authUser?.defaultWarehouse ?? ''
@@ -787,6 +790,12 @@ export default function CompraForm() {
     enabled: isEdit,
   })
 
+  // Con Multipestañas, esta pantalla queda montada (KeepAlive) al cambiar de pestaña — al volver
+  // a ella se re-consulta por si la compra cambió en el servidor mientras el usuario estaba en otra.
+  useEffectOnActive(() => {
+    if (isEdit) queryClient.invalidateQueries({ queryKey: ['compra', id] })
+  }, [isEdit, id], true)
+
   useEffect(() => {
     if (!compraData) return
     setSupplierId(compraData.supplier)
@@ -835,8 +844,13 @@ export default function CompraForm() {
       if (updatedPrices && updatedPrices > 0) {
         toast.info(`Se actualizaron los precios de ${updatedPrices} artículo(s) (modo sobre costo)`)
       }
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['compras'] })
+      if (isEdit) queryClient.removeQueries({ queryKey: ['compra', id] })
       navigate(`/compras/${data.id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (error) => {
       const apiErr = error as { code?: string; message?: string; statusCode?: number }

@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffectOnActive } from 'keepalive-for-react'
 import { toast } from 'sonner'
+import { useTabs } from '@/contexts/TabsContext'
 import { createPurchaseReceipt, updatePurchaseReceipt, getPurchaseReceipt } from '@/shared/api/purchase-receipt'
 import { listSuppliers } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
@@ -411,6 +413,7 @@ export default function RecepcionForm() {
   const navigate = useNavigate()
   const { id } = useParams<{ id?: string }>()
   const queryClient = useQueryClient()
+  const { multiTab, activeId, closeTab } = useTabs()
   const isEdit = !!id
   const authUser = useAuthStore((s) => s.user)
   const defaultWh = authUser?.defaultWarehouse ?? ''
@@ -523,6 +526,12 @@ export default function RecepcionForm() {
     enabled: isEdit,
   })
 
+  // Con Multipestañas, esta pantalla queda montada (KeepAlive) al cambiar de pestaña — al volver
+  // a ella se re-consulta por si la recepción cambió en el servidor mientras el usuario estaba en otra.
+  useEffectOnActive(() => {
+    if (isEdit) queryClient.invalidateQueries({ queryKey: ['purchase-receipt', id] })
+  }, [isEdit, id], true)
+
   useEffect(() => {
     if (!receiptData) return
     setSupplierId(receiptData.supplier)
@@ -556,8 +565,13 @@ export default function RecepcionForm() {
       isEdit ? updatePurchaseReceipt(id!, dto) : createPurchaseReceipt(dto),
     onSuccess: (data) => {
       toast.success(isEdit ? 'Recepción actualizada' : 'Recepción creada')
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['purchase-receipts'] })
+      if (isEdit) queryClient.removeQueries({ queryKey: ['purchase-receipt', id] })
       navigate(`/compras/recepciones/${data.id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (error) => {
       const apiErr = error as { code?: string; message?: string; statusCode?: number }

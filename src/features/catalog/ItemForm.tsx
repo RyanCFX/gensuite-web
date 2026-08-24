@@ -1,10 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffectOnActive } from 'keepalive-for-react'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
+import { useTabs } from '@/contexts/TabsContext'
 import { createItem, updateItem, getItem, listCategories, listBrands } from '@/shared/api/catalog'
 import type { CreateItemDto } from '@/shared/api/types'
 import { listWarehouses } from '@/shared/api/inventory'
@@ -70,6 +72,7 @@ export default function ItemForm() {
   const location = useLocation()
   const { id } = useParams<{ id: string }>()
   const isEdit = Boolean(id)
+  const { multiTab, activeId, closeTab } = useTabs()
 
   // Productos y Servicios son módulos separados que comparten esta implementación — el tipo
   // queda fijo según la ruta desde la que se entró, nunca es elegible por el usuario.
@@ -86,24 +89,24 @@ export default function ItemForm() {
   const [noPurchaseTax, setNoPurchaseTax] = useState(false)
   const [noSalesTax, setNoSalesTax] = useState(false)
 
-  const { data: categoriesData } = useQuery({
+  const { data: categoriesData, refetch: refetchCategories } = useQuery({
     queryKey: ['categories-tree', fixedType],
     // Solo trae categorías que aplican a este tipo de artículo (aplicaA = 'Ambas' o fixedType) —
     // el usuario nunca ve ni puede elegir una categoría que no le corresponde.
     queryFn: () => listCategories({ tree: true, type: fixedType }),
   })
 
-  const { data: brandsData } = useQuery({
+  const { data: brandsData, refetch: refetchBrands } = useQuery({
     queryKey: ['brands', {}],
     queryFn: () => listBrands(),
   })
 
-  const { data: warehousesData } = useQuery({
+  const { data: warehousesData, refetch: refetchWarehouses } = useQuery({
     queryKey: ['warehouses'],
     queryFn: () => listWarehouses(),
   })
 
-  const { data: uomsData } = useQuery({
+  const { data: uomsData, refetch: refetchUoms } = useQuery({
     queryKey: ['uoms'],
     queryFn: listUOMs,
     staleTime: 5 * 60_000,
@@ -118,7 +121,7 @@ export default function ItemForm() {
   // "Impuesto de Compra"/"Impuesto de Venta" del artículo son Item Tax Template — mismo
   // doctype para ambos campos, distinto de los templates de impuesto de documento
   // (impuestos-ventas/impuestos-compras) que aplican al total de cotizaciones/facturas/compras.
-  const { data: itemTaxTemplates } = useQuery({
+  const { data: itemTaxTemplates, refetch: refetchItemTaxTemplates } = useQuery({
     queryKey: ['item-tax-templates'],
     queryFn: listItemTaxTemplates,
     staleTime: 5 * 60_000,
@@ -133,12 +136,22 @@ export default function ItemForm() {
     enabled: isEdit,
   })
 
+  // Con Multipestañas, esta pantalla queda montada (KeepAlive) al cambiar de pestaña — al volver
+  // a ella se re-consulta por si el artículo cambió en el servidor mientras el usuario estaba en otra.
+  useEffectOnActive(() => {
+    if (isEdit) queryClient.invalidateQueries({ queryKey: ['item', id] })
+  }, [isEdit, id], true)
+
   const createMutation = useMutation({
     mutationFn: (data: Parameters<typeof createItem>[0]) => createItem(data),
     onSuccess: (result) => {
       toast.success(`${moduleLabel} creado con código ${result.id}`)
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['items'] })
       navigate(basePath)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string }) => {
       // Ej. mismatch de categoría/tipo (400): "La categoría "X" solo aplica a Servicios,
@@ -151,9 +164,13 @@ export default function ItemForm() {
     mutationFn: (data: Partial<CreateItemDto>) => updateItem(id!, data),
     onSuccess: () => {
       toast.success(`${moduleLabel} actualizado`)
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['items'] })
-      queryClient.invalidateQueries({ queryKey: ['item', id] })
+      queryClient.removeQueries({ queryKey: ['item', id] })
       navigate(`${basePath}/${id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string }) => {
       toast.error(err?.message ?? `Error al actualizar el ${moduleLabel.toLowerCase()}`)
@@ -601,6 +618,7 @@ export default function ItemForm() {
                         }}
                         options={categoryOptions}
                         onSearch={setCatSearch}
+                        onOpen={() => refetchCategories()}
                         selectedLabel={selectedCategoryLabel}
                         placeholder="Seleccionar categoría"
                         error={!!errors.category}
@@ -623,6 +641,7 @@ export default function ItemForm() {
                           onChange={(val) => field.onChange(val)}
                           options={brandOptions}
                           onSearch={setBrandSearch}
+                          onOpen={() => refetchBrands()}
                           selectedLabel={selectedBrandLabel}
                           placeholder="Seleccionar marca"
                           loading={false}
@@ -646,6 +665,7 @@ export default function ItemForm() {
                         onChange={(val) => field.onChange(val)}
                         options={subcatFiltered}
                         onSearch={setSubcatSearch}
+                        onOpen={() => refetchCategories()}
                         selectedLabel={subcategoryOptions.find((o) => o.value === field.value)?.label ?? ''}
                         placeholder="Seleccionar subcategoría"
                         error={!!errors.subcategory}
@@ -676,6 +696,7 @@ export default function ItemForm() {
                             onChange={(val) => field.onChange(val)}
                             options={uomOptions}
                             onSearch={setUomSearch}
+                            onOpen={() => refetchUoms()}
                             placeholder="Seleccionar UDM"
                           />
                       )}
@@ -776,6 +797,7 @@ export default function ItemForm() {
                       onChange={(val) => field.onChange(val)}
                       options={purchaseTaxOptions}
                       onSearch={setPurchaseTaxSearch}
+                      onOpen={() => refetchItemTaxTemplates()}
                       selectedLabel={itemTaxTemplates?.find((t) => String(t.id) === field.value)?.title ?? ''}
                       placeholder="Seleccionar impuesto"
                       disabled={noPurchaseTax}
@@ -890,6 +912,7 @@ export default function ItemForm() {
                         onChange={(val) => field.onChange(val)}
                         options={salesTaxOptions}
                         onSearch={setSalesTaxSearch}
+                        onOpen={() => refetchItemTaxTemplates()}
                         selectedLabel={itemTaxTemplates?.find((t) => String(t.id) === field.value)?.title ?? ''}
                         placeholder="Seleccionar impuesto"
                         disabled={noSalesTax}
@@ -1029,6 +1052,7 @@ export default function ItemForm() {
                         onChange={(val) => field.onChange(val)}
                         options={warehouseOptions}
                         onSearch={setWarehouseSearch}
+                        onOpen={() => refetchWarehouses()}
                         selectedLabel={warehouses.find((w) => w.id === field.value)?.name ?? ''}
                         placeholder="Sin asignar"
                       />

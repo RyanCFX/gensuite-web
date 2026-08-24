@@ -11,6 +11,7 @@ import {
   deleteCuentaBancaria,
   getCuentaBancariaBalance,
   listBancosCatalogo,
+  listTiposCuentaBancaria,
 } from '@/shared/api/cuentas-bancarias'
 import type { CuentaBancaria, CuentaBancariaEstado, ChequeFormat } from '@/shared/api/types'
 import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, Wallet } from 'lucide-react'
@@ -20,6 +21,7 @@ import { useDebounce } from '@/lib/useDebounce'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 import { formatDOP } from '@/lib/formatters'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
@@ -42,6 +44,7 @@ const cuentaBancariaSchema = z.object({
   balanceInicial: z.number().min(0).optional(),
   ultimoCheque: z.number().min(0).optional(),
   ultimoDeposito: z.number().min(0).optional(),
+  tipoCuenta: z.string().optional(),
 })
 
 type CuentaBancariaFormValues = z.infer<typeof cuentaBancariaSchema>
@@ -59,12 +62,14 @@ const DEFAULT_VALUES: CuentaBancariaFormValues = {
   balanceInicial: 0,
   ultimoCheque: undefined,
   ultimoDeposito: undefined,
+  tipoCuenta: '',
 }
 
 export default function CuentasBancariasPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [estadoFilter, setEstadoFilter] = useState<CuentaBancariaEstado | ''>('')
+  const [tipoCuentaFilter, setTipoCuentaFilter] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<CuentaBancaria | null>(null)
   const [toDelete, setToDelete] = useState<CuentaBancaria | null>(null)
@@ -75,10 +80,11 @@ export default function CuentasBancariasPage() {
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['cuentas-bancarias', { search: debouncedSearch, offset, estadoFilter }],
+    queryKey: ['cuentas-bancarias', { search: debouncedSearch, offset, estadoFilter, tipoCuentaFilter }],
     queryFn: () => listCuentasBancarias({
       search: debouncedSearch || undefined,
       estado: estadoFilter || undefined,
+      tipoCuenta: tipoCuentaFilter || undefined,
       limit: PAGE_SIZE,
       offset,
     }),
@@ -89,6 +95,12 @@ export default function CuentasBancariasPage() {
     queryFn: listBancosCatalogo,
     enabled: dialogOpen,
     staleTime: 5 * 60_000,
+  })
+
+  const { data: tiposCuenta } = useQuery({
+    queryKey: ['tipos-cuenta-bancaria'],
+    queryFn: listTiposCuentaBancaria,
+    staleTime: 60 * 60_000,
   })
   const [bankSearch, setBankSearch] = useState('')
   const bankOptions: SearchSelectOption[] = (bancos ?? [])
@@ -174,6 +186,7 @@ export default function CuentasBancariasPage() {
       balanceInicial: c.balanceInicial,
       ultimoCheque: c.ultimoCheque,
       ultimoDeposito: c.ultimoDeposito,
+      tipoCuenta: c.tipoCuenta ?? '',
     })
     setDialogOpen(true)
   }
@@ -200,6 +213,7 @@ export default function CuentasBancariasPage() {
           isDefault: values.isDefault,
           ultimoCheque: values.ultimoCheque,
           ultimoDeposito: values.ultimoDeposito,
+          tipoCuenta: values.tipoCuenta || undefined,
         },
       })
     } else {
@@ -214,6 +228,7 @@ export default function CuentasBancariasPage() {
         chequesManuales: values.chequesManuales,
         isDefault: values.isDefault,
         balanceInicial: values.balanceInicial ?? 0,
+        tipoCuenta: values.tipoCuenta || undefined,
       })
     }
   }
@@ -254,6 +269,15 @@ export default function CuentasBancariasPage() {
             <option value="">Todos los estados</option>
             {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
           </select>
+          <select
+            className="ff-select"
+            value={tipoCuentaFilter}
+            onChange={(e) => { setTipoCuentaFilter(e.target.value); setPage(1) }}
+            style={{ width: 200 }}
+          >
+            <option value="">Todos los tipos</option>
+            {(tiposCuenta ?? []).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
         </div>
       </div>
 
@@ -266,6 +290,7 @@ export default function CuentasBancariasPage() {
                 <th>Banco</th>
                 <th>Número de cuenta</th>
                 <th>Moneda</th>
+                <th>Tipo de Cuenta</th>
                 <th>Estado</th>
                 <th>Por defecto</th>
                 <th style={{ width: 48 }} />
@@ -275,7 +300,7 @@ export default function CuentasBancariasPage() {
               {isLoading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 7 }).map((__, j) => (
+                      {Array.from({ length: 8 }).map((__, j) => (
                         <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                       ))}
                     </tr>
@@ -283,7 +308,7 @@ export default function CuentasBancariasPage() {
                 : isError
                   ? (
                       <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
+                        <td colSpan={8} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
                           Error al cargar cuentas bancarias
                         </td>
                       </tr>
@@ -291,7 +316,7 @@ export default function CuentasBancariasPage() {
                   : cuentas.length === 0
                     ? (
                         <tr>
-                          <td colSpan={7}>
+                          <td colSpan={8}>
                             <div className="empty-state">
                               <p className="empty-title">Sin cuentas bancarias</p>
                               <p className="empty-sub">Crea la primera cuenta bancaria del negocio.</p>
@@ -305,6 +330,7 @@ export default function CuentasBancariasPage() {
                           <td className="td-muted">{c.bank}</td>
                           <td className="td-muted">{c.bankAccountNo ?? '—'}</td>
                           <td className="td-muted">{c.currency}</td>
+                          <td className="td-muted">{c.tipoCuenta ?? '—'}</td>
                           <td>
                             <span className={`badge ${c.estado === 'Activa' ? 'badge-success' : c.estado === 'Cerrada' ? 'badge-error' : 'badge-muted'}`}>
                               {c.estado}
@@ -434,19 +460,44 @@ export default function CuentasBancariasPage() {
                   </div>
 
                   <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="cbEstado">Estado</label>
-                    <select id="cbEstado" className="ff-select" {...register('estado')}>
-                      {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
-                    </select>
+                    <label className="ff-label">Estado</label>
+                    <Controller
+                      name="estado"
+                      control={control}
+                      render={({ field }) => (
+                        <Select value={field.value} onValueChange={field.onChange} clearable={false}>
+                          {ESTADOS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                        </Select>
+                      )}
+                    />
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="cbChequeFormat">Formato de cheques</label>
-                    <select id="cbChequeFormat" className="ff-select" {...register('chequeFormat')}>
-                      {CHEQUE_FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
-                    </select>
+                    <label className="ff-label">Formato de cheques</label>
+                    <Controller
+                      name="chequeFormat"
+                      control={control}
+                      render={({ field }) => (
+                        <Select value={field.value} onValueChange={field.onChange} clearable={false}>
+                          {CHEQUE_FORMATS.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                        </Select>
+                      )}
+                    />
+                  </div>
+
+                  <div className="ff-wrap">
+                    <label className="ff-label">Tipo de Cuenta</label>
+                    <Controller
+                      name="tipoCuenta"
+                      control={control}
+                      render={({ field }) => (
+                        <Select value={field.value ?? ''} onValueChange={field.onChange} placeholder="Sin especificar">
+                          {(tiposCuenta ?? []).map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                        </Select>
+                      )}
+                    />
                   </div>
 
                   {!editTarget && (
@@ -467,7 +518,7 @@ export default function CuentasBancariasPage() {
                 {editTarget && (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                     <div className="ff-wrap">
-                      <label className="ff-label" htmlFor="cbUltimoCheque">Monto último cheque</label>
+                      <label className="ff-label" htmlFor="cbUltimoCheque">Último cheque</label>
                       <input
                         id="cbUltimoCheque"
                         className="ff-input"
@@ -478,7 +529,7 @@ export default function CuentasBancariasPage() {
                       />
                     </div>
                     <div className="ff-wrap">
-                      <label className="ff-label" htmlFor="cbUltimoDeposito">Monto último depósito</label>
+                      <label className="ff-label" htmlFor="cbUltimoDeposito">Último depósito</label>
                       <input
                         id="cbUltimoDeposito"
                         className="ff-input"

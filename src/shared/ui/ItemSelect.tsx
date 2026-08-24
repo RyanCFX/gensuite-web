@@ -60,7 +60,7 @@ export function ItemSelect({
 }: ItemSelectProps) {
   const [query, setQuery] = useState('')
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['itemSearch', query, typeFilter, branch],
     // `branch` ya filtra a artículos con stock en almacenes de esa sucursal — combinarlo con
     // `validateStock` hace que el backend devuelva 0 resultados, así que se omite validateStock
@@ -79,7 +79,7 @@ export function ItemSelect({
     staleTime: 30_000,
   })
 
-  const { data: bundlesData, isLoading: bundlesLoading } = useQuery({
+  const { data: bundlesData, isLoading: bundlesLoading, refetch: refetchBundles } = useQuery({
     queryKey: ['bundleSearch', query],
     // El backend no soporta filtrar por `disabled` en la query — se filtra en el cliente abajo.
     queryFn: () => listBundles({ search: query || undefined, limit: 10 }),
@@ -88,7 +88,7 @@ export function ItemSelect({
   })
   const activeBundles = (bundlesData?.items ?? []).filter((b) => !b.disabled)
 
-  const { data: cuentasPorPagarData, isLoading: cuentasPorPagarLoading } = useQuery({
+  const { data: cuentasPorPagarData, isLoading: cuentasPorPagarLoading, refetch: refetchCuentasPorPagar } = useQuery({
     queryKey: ['cuentaPorPagarSearch', query],
     queryFn: () => listCuentasPorPagar({ search: query || undefined, limit: 10 }),
     enabled: !!includeCuentasPorPagar,
@@ -167,6 +167,11 @@ export function ItemSelect({
       }}
       options={options}
       onSearch={setQuery}
+      onOpen={() => {
+        refetch()
+        if (includeBundles) refetchBundles()
+        if (includeCuentasPorPagar) refetchCuentasPorPagar()
+      }}
       onEnterWithoutMatch={handleEnterWithoutMatch}
       loading={(!excludeItems && isLoading) || (!!includeBundles && bundlesLoading) || (!!includeCuentasPorPagar && cuentasPorPagarLoading)}
       placeholder={placeholder}

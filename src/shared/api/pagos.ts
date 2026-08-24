@@ -5,8 +5,10 @@ import type {
   CreatePagoDto,
   PendientePago,
   AgingProveedorEntry,
+  AgingProveedorInvoiceEntry,
   AgingProveedorConfig,
   AgingProveedorResult,
+  AgingGroupBy,
   SaldoFavorProveedorResult,
   AplicarSaldosFavorBulkDto,
   AplicarSaldosFavorResultItem,
@@ -50,18 +52,27 @@ export async function cancelPago(id: string) {
 }
 
 // ─── Aging ────────────────────────────────────────────────────────────────────
-// GET /pagos/aging responde { success, data: AgingProveedorEntry[], config, note? }
-// — config/note van al mismo nivel que data, no anidados — por eso no se usa
+// GET /pagos/aging responde { success, groupBy, data: AgingProveedorEntry[] | AgingProveedorInvoiceEntry[], config, note? }
+// — groupBy/config/note van al mismo nivel que data, no anidados — por eso no se usa
 // el helper `unwrap` genérico acá.
+// Sin `groupBy` en la request, el backend asume "party" (una fila por proveedor).
 
-export async function getAgingProveedores(): Promise<AgingProveedorResult> {
+export interface AgingProveedoresParams {
+  /** Filtra el reporte a un solo proveedor. Omitir trae todos. */
+  supplier?: string
+  /** "party" (default, una fila por proveedor) | "invoice" (una fila por factura pendiente). */
+  groupBy?: AgingGroupBy
+}
+
+export async function getAgingProveedores(params?: AgingProveedoresParams): Promise<AgingProveedorResult> {
   const res = await client.get<{
     success: true
-    data: AgingProveedorEntry[]
+    groupBy: AgingGroupBy
+    data: AgingProveedorEntry[] | AgingProveedorInvoiceEntry[]
     config: AgingProveedorConfig
     note?: string
-  }>(ENDPOINTS.pagos.aging)
-  return { rows: res.data.data, config: res.data.config, note: res.data.note }
+  }>(ENDPOINTS.pagos.aging, { params })
+  return { groupBy: res.data.groupBy ?? 'party', rows: res.data.data, config: res.data.config, note: res.data.note }
 }
 
 // ─── Pendientes ───────────────────────────────────────────────────────────────

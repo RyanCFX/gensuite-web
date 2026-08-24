@@ -17,6 +17,8 @@ export interface MultiSearchSelectProps {
   emptyLabel?: string
   disabled?: boolean
   id?: string
+  /** Se dispara cada vez que el dropdown se abre — útil para forzar un refetch de `options`. */
+  onOpen?: () => void
 }
 
 /**
@@ -31,6 +33,7 @@ export function MultiSearchSelect({
   emptyLabel = 'Sin opciones configuradas.',
   disabled = false,
   id,
+  onOpen,
 }: MultiSearchSelectProps) {
   const [query, setQuery] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -40,6 +43,12 @@ export function MultiSearchSelect({
     containerRef as React.RefObject<HTMLElement>,
     () => setQuery(''),
   )
+
+  const openAndNotify = () => {
+    const wasOpen = open
+    openDropdown()
+    if (!wasOpen) onOpen?.()
+  }
 
   const selected = useMemo(() => options.filter((o) => value.includes(o.id)), [options, value])
   const filtered = useMemo(() => {
@@ -72,7 +81,7 @@ export function MultiSearchSelect({
     <div className="search-select" ref={containerRef}>
       <div
         className={`multi-search-select-trigger${open ? ' open' : ''}${disabled ? ' disabled' : ''}`}
-        onClick={() => { if (!disabled) { openDropdown(); inputRef.current?.focus() } }}
+        onClick={() => { if (!disabled) { openAndNotify(); inputRef.current?.focus() } }}
       >
         {selected.map((o) => (
           <span key={o.id} className="badge badge-info multi-search-select-tag">
@@ -92,8 +101,8 @@ export function MultiSearchSelect({
           value={query}
           placeholder={selected.length === 0 ? placeholder : ''}
           disabled={disabled}
-          onChange={(e) => { setQuery(e.target.value); if (!open) openDropdown() }}
-          onFocus={() => openDropdown()}
+          onChange={(e) => { setQuery(e.target.value); if (!open) openAndNotify() }}
+          onFocus={openAndNotify}
           onKeyDown={handleKeyDown}
           autoComplete="off"
         />

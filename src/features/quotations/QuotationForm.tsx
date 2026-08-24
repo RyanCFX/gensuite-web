@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffectOnActive } from 'keepalive-for-react'
 
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useTabs } from '@/contexts/TabsContext'
 import { createQuotation, updateQuotation, getQuotation, getQuotationDuplicateSource } from '@/shared/api/quotations'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getDefaultPriceTier } from '@/shared/api/catalog'
@@ -100,6 +102,7 @@ export default function QuotationForm() {
   const isEdit = !!id
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { multiTab, activeId, closeTab } = useTabs()
   const [searchParams] = useSearchParams()
   const duplicateId = searchParams.get('duplicate')
 
@@ -148,6 +151,12 @@ export default function QuotationForm() {
     queryFn: () => getQuotation(id!),
     enabled: isEdit,
   })
+
+  // Con Multipestañas, esta pantalla queda montada (KeepAlive) al cambiar de pestaña — al volver
+  // a ella se re-consulta por si la cotización cambió en el servidor mientras el usuario estaba en otra.
+  useEffectOnActive(() => {
+    if (isEdit) queryClient.invalidateQueries({ queryKey: ['quotation', id] })
+  }, [isEdit, id], true)
 
 useEffect(() => {
      if (!existingQuotation || initialized) return
@@ -363,9 +372,13 @@ useEffect(() => {
   const createMutation = useMutation({
     mutationFn: (dto: CreateQuotationDto) => createQuotation(dto),
     onSuccess: (quotation) => {
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['quotations'] })
       toast.success('Cotización creada correctamente')
       navigate(`/cotizaciones/${quotation.id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string }) => {
       handleError(err)
@@ -375,8 +388,9 @@ useEffect(() => {
   const updateMutation = useMutation({
     mutationFn: (dto: Partial<CreateQuotationDto>) => updateQuotation(id!, dto),
     onSuccess: (quotation) => {
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['quotations'] })
-      queryClient.invalidateQueries({ queryKey: ['quotation', id] })
+      queryClient.removeQueries({ queryKey: ['quotation', id] })
       if (quotation.id !== id) {
         toast.success(`Nueva versión creada: ${displayId(quotation.id, quotation.sequence)}`)
         navigate(`/cotizaciones/${quotation.id}`)
@@ -384,6 +398,9 @@ useEffect(() => {
         toast.success(`Versión ${quotation.sequence} guardada como historial`)
         navigate(`/cotizaciones/${quotation.id}`, { replace: true })
       }
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string }) => {
       handleError(err)

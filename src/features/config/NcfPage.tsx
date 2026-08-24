@@ -5,6 +5,7 @@ import {
   getNcfSeries, getNcfSerie,
   createNcfSerie, updateNcfSerie,
   disableNcfSerie, enableNcfSerie,
+  getCatalogosFiscales,
 } from '@/shared/api/config'
 import type { NcfSerie, CreateNcfSerieDto, UpdateNcfSerieDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -21,11 +22,16 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const NCF_TYPE_INFO: Record<string, { label: string; description: string; color: string }> = {
-  B01: { label: 'B01', description: 'Crédito Fiscal (clientes con RNC)',   color: '#1a69ab' },
-  B02: { label: 'B02', description: 'Consumidor Final (sin RNC)',          color: '#16a34a' },
-  B14: { label: 'B14', description: 'Regímenes Especiales (zonas francas)', color: '#ca8a04' },
-  B15: { label: 'B15', description: 'Gubernamentales',                     color: '#7c3aed' },
+// Solo define el color del badge para los tipos más comunes — el listado real de tipos
+// disponibles para crear/editar una secuencia viene de GET /config/catalogos-fiscales (ncfTypes).
+// Un tipo sin entrada aquí simplemente cae al badge neutral (ver NcfTypeBadge).
+const NCF_TYPE_COLOR: Record<string, string> = {
+  B01: '#1a69ab',
+  B02: '#16a34a',
+  B03: '#0891b2',
+  B04: '#db2777',
+  B14: '#ca8a04',
+  B15: '#7c3aed',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -80,13 +86,13 @@ function ProgressBar({ used, total, color = 'var(--brand-primary)' }: { used: nu
 // ─── NCF Type Badge ───────────────────────────────────────────────────────────
 
 function NcfTypeBadge({ type }: { type: string }) {
-  const info = NCF_TYPE_INFO[type]
-  if (!info) return <span className="badge badge-neutral">{type}</span>
+  const color = NCF_TYPE_COLOR[type]
+  if (!color) return <span className="badge badge-neutral">{type}</span>
   return (
     <span className="badge" style={{
-      background: `${info.color}18`,
-      color: info.color,
-      borderColor: `${info.color}40`,
+      background: `${color}18`,
+      color,
+      borderColor: `${color}40`,
       fontWeight: 600,
       letterSpacing: '0.02em',
     }}>
@@ -130,11 +136,18 @@ function StatusBadgePill({ serie }: { serie: NcfSerie }) {
 // ─── Create Modal ─────────────────────────────────────────────────────────────
 
 function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [ncfType, setNcfType] = useState<'B01' | 'B02' | 'B14' | 'B15'>('B02')
+  const [ncfType, setNcfType] = useState('B02')
   const [start, setStart] = useState(1)
   const [end, setEnd] = useState(50000000)
   const [expiration, setExpiration] = useState('')
   const [error, setError] = useState('')
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+  const ncfTypeOptions = catalogos?.ncfTypes ?? []
 
   const qc = useQueryClient()
   const createMutation = useMutation({
@@ -151,6 +164,9 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
   const preview = formatNcfPreview(ncfType, start)
   const today = new Date().toISOString().slice(0, 10)
+  // La DGII suele emitir resoluciones con vigencia de hasta ~5 años — el calendario debe
+  // permitir navegar hasta ese límite en vez de quedar atado al año en curso.
+  const maxExpiration = new Date(new Date().setFullYear(new Date().getFullYear() + 5)).toISOString().slice(0, 10)
 
   const isDirty = useDirtyCheck({ ncfType, start, end, expiration }, true)
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
@@ -180,12 +196,11 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             {/* Tipo NCF */}
             <div className="ff-wrap">
               <label className="ff-label">Tipo de Comprobante <span className="ff-required">*</span></label>
-              <Select value={ncfType} onValueChange={(val) => setNcfType(val as typeof ncfType)}>
-                {Object.entries(NCF_TYPE_INFO).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>{k} — {v.description}</SelectItem>
+              <Select value={ncfType} onValueChange={setNcfType}>
+                {ncfTypeOptions.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                 ))}
               </Select>
-              <p className="ff-hint">{NCF_TYPE_INFO[ncfType]?.description}</p>
             </div>
 
             {/* Rango */}
@@ -214,7 +229,7 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             <div className="ff-wrap">
               <label className="ff-label">Fecha de vencimiento <span className="ff-required">*</span></label>
               <DatePicker
-                className="ff-input" min={today}
+                className="ff-input" min={today} max={maxExpiration}
                 value={expiration} onChange={setExpiration}
               />
               <p className="ff-hint">Fecha que aparece en la resolución de la DGII</p>
@@ -279,6 +294,16 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
   const [expiration, setExpiration] = useState(serie.expirationDate)
   const [warnings, setWarnings] = useState<string[]>([])
   const [formError, setFormError] = useState('')
+  // La DGII suele emitir resoluciones con vigencia de hasta ~5 años — el calendario debe
+  // permitir navegar hasta ese límite en vez de quedar atado al año en curso.
+  const maxExpiration = new Date(new Date().setFullYear(new Date().getFullYear() + 5)).toISOString().slice(0, 10)
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+  const ncfTypeOptions = catalogos?.ncfTypes ?? []
 
   const qc = useQueryClient()
   const updateMutation = useMutation({
@@ -363,11 +388,11 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
                 <label className="ff-label">Tipo de Comprobante</label>
                 <Select
                   value={ncfType}
-                  onValueChange={(val) => setNcfType(val as typeof ncfType)}
+                  onValueChange={setNcfType}
                   disabled={hasUsed}
                 >
-                  {Object.entries(NCF_TYPE_INFO).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{k} — {v.description}</SelectItem>
+                  {ncfTypeOptions.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                   ))}
                 </Select>
                 {hasUsed && (
@@ -393,6 +418,7 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
                 <label className="ff-label">Fecha de vencimiento</label>
                 <DatePicker
                   className="ff-input"
+                  max={maxExpiration}
                   value={expiration}
                   onChange={setExpiration}
                 />
@@ -441,6 +467,11 @@ function DetailDrawer({ serieId }: { serieId: number; onClose?: () => void }) {
     queryKey: ['ncf-serie', serieId],
     queryFn: () => getNcfSerie(serieId),
   })
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
 
   if (isLoading) {
     return (
@@ -470,11 +501,14 @@ function DetailDrawer({ serieId }: { serieId: number; onClose?: () => void }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <NcfTypeBadge type={data.ncfType} />
         <StatusBadgePill serie={data} />
-        {NCF_TYPE_INFO[data.ncfType] && (
-          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-            {NCF_TYPE_INFO[data.ncfType].description}
-          </span>
-        )}
+        {(() => {
+          const label = catalogos?.ncfTypes.find((t) => t.value === data.ncfType)?.label
+          return label && (
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              {label}
+            </span>
+          )
+        })()}
       </div>
 
       {/* KPI cards */}
