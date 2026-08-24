@@ -13,6 +13,7 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 
 const PAGE_SIZE = 20
 
@@ -152,13 +153,15 @@ export default function GastosPage() {
                 onChange={(e) => { setSupplier(e.target.value); setPage(1) }}
               />
             </div>
-            <Select value={status} onValueChange={(val) => { setStatus(val); setPage(1) }}>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="draft">Borrador</SelectItem>
-              <SelectItem value="submitted">Sometido</SelectItem>
-              <SelectItem value="cancelled">Anulado</SelectItem>
-            </Select>
-            <div style={{ width: 200 }}>
+            <FilterField label="Estado">
+              <Select value={status} onValueChange={(val) => { setStatus(val); setPage(1) }}>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="draft">Borrador</SelectItem>
+                <SelectItem value="submitted">Sometido</SelectItem>
+                <SelectItem value="cancelled">Anulado</SelectItem>
+              </Select>
+            </FilterField>
+            <FilterField label="Tipo NCF" style={{ width: 200 }}>
               <SearchSelect
                 value={tipoComprobante === 'all' ? '' : tipoComprobante}
                 onChange={(val) => { setTipoComprobante(val || 'all'); setPage(1) }}
@@ -167,14 +170,20 @@ export default function GastosPage() {
                 selectedLabel={catalogos?.ncfTypesCompra?.find((t) => t.value === tipoComprobante)?.label ?? ''}
                 placeholder="Todos los NCF"
               />
-            </div>
-            <Select value={esDeducible} onValueChange={(val) => { setEsDeducible(val); setPage(1) }}>
-              <SelectItem value="all">Deducible: Todos</SelectItem>
-              <SelectItem value="true">Deducibles</SelectItem>
-              <SelectItem value="false">No deducibles</SelectItem>
-            </Select>
-            <DatePicker className="filter-select" value={fromDate} onChange={(v) => { setFromDate(v); setPage(1) }} clearable />
-            <DatePicker className="filter-select" value={toDate} onChange={(v) => { setToDate(v); setPage(1) }} clearable />
+            </FilterField>
+            <FilterField label="Deducible">
+              <Select value={esDeducible} onValueChange={(val) => { setEsDeducible(val); setPage(1) }}>
+                <SelectItem value="all">Deducible: Todos</SelectItem>
+                <SelectItem value="true">Deducibles</SelectItem>
+                <SelectItem value="false">No deducibles</SelectItem>
+              </Select>
+            </FilterField>
+            <FilterField label="Desde">
+              <DatePicker className="filter-select" value={fromDate} onChange={(v) => { setFromDate(v); setPage(1) }} clearable />
+            </FilterField>
+            <FilterField label="Hasta">
+              <DatePicker className="filter-select" value={toDate} onChange={(v) => { setToDate(v); setPage(1) }} clearable />
+            </FilterField>
             <div className="search-input-wrap">
               <Search size={14} className="search-input-icon" />
               <input
@@ -184,23 +193,27 @@ export default function GastosPage() {
                 onChange={(e) => { setNcfProveedor(e.target.value); setPage(1) }}
               />
             </div>
-            <input
-              type="number"
-              className="ff-input ff-input-sm"
-              style={{ width: 100 }}
-              placeholder="Total min"
-              value={grandTotalMin}
-              onChange={(e) => { setGrandTotalMin(e.target.value); setPage(1) }}
-            />
-            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-            <input
-              type="number"
-              className="ff-input ff-input-sm"
-              style={{ width: 100 }}
-              placeholder="Total max"
-              value={grandTotalMax}
-              onChange={(e) => { setGrandTotalMax(e.target.value); setPage(1) }}
-            />
+            <FilterField label="Total">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="number"
+                  className="ff-input ff-input-sm"
+                  style={{ width: 100 }}
+                  placeholder="Total min"
+                  value={grandTotalMin}
+                  onChange={(e) => { setGrandTotalMin(e.target.value); setPage(1) }}
+                />
+                <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+                <input
+                  type="number"
+                  className="ff-input ff-input-sm"
+                  style={{ width: 100 }}
+                  placeholder="Total max"
+                  value={grandTotalMax}
+                  onChange={(e) => { setGrandTotalMax(e.target.value); setPage(1) }}
+                />
+              </div>
+            </FilterField>
           </div>
         </div>
 

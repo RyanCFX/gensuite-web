@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, Send, Ban, Pencil } from 'lucide-react'
-import { getDeposito, submitDeposito, cancelDeposito, updateDepositoCabecera } from '@/shared/api/tesoreria'
+import { ArrowLeft, Send, Ban, Pencil, BookOpen } from 'lucide-react'
+import { getDeposito, submitDeposito, cancelDeposito, updateDepositoCabecera, previewAsientosDeposito } from '@/shared/api/tesoreria'
+import { getCuentaBancaria } from '@/shared/api/cuentas-bancarias'
 import type { TesoreriaEstado, UpdateDepositoDto } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
+import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
+import { CuentaContableOverrideSection } from './components/CuentaContableOverrideSection'
+import { EditableAccountCell, findBancoYPartyRows } from './components/EditableAccountCell'
 
 const STATUS_BADGE: Record<TesoreriaEstado, string> = {
   draft: 'badge-draft',
@@ -26,6 +30,11 @@ export default function DepositoDetail() {
   const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+
+  const [pendingBancoOverride, setPendingBancoOverride] = useState('')
+  const [pendingPartyOverride, setPendingPartyOverride] = useState('')
+  const refetchPreviewRef = useRef<() => void>(() => {})
 
   const { data: deposito, isLoading, isError } = useQuery({
     queryKey: ['tesoreria-deposito', id],
@@ -38,6 +47,16 @@ export default function DepositoDetail() {
     queryClient.invalidateQueries({ queryKey: ['tesoreria-depositos'] })
     queryClient.invalidateQueries({ queryKey: ['tesoreria-movimientos'] })
   }
+
+  const overrideMutation = useMutation({
+    mutationFn: (dto: UpdateDepositoDto) => updateDepositoCabecera(id!, dto),
+    onSuccess: () => {
+      toast.success('Cuentas actualizadas')
+      refetchPreviewRef.current()
+      invalidateRelated()
+    },
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al actualizar'),
+  })
 
   const submitMutation = useMutation({
     mutationFn: () => submitDeposito(id!),
@@ -108,6 +127,9 @@ export default function DepositoDetail() {
               <button className="btn btn-ghost btn-size-sm" onClick={() => setEditOpen(true)}>
                 <Pencil size={14} /> Editar cabecera
               </button>
+              <button className="btn btn-ghost btn-size-sm" onClick={() => setPreviewOpen(true)}>
+                <BookOpen size={14} /> Ver asiento contable
+              </button>
               <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmSubmit(true)} disabled={submitMutation.isPending}>
                 <Send size={14} /> Someter
               </button>
@@ -147,6 +169,18 @@ export default function DepositoDetail() {
               <div className="detail-field">
                 <span className="detail-label">Documento Contable</span>
                 <span className="detail-value">{deposito.documentoOrigen.doctype} — {deposito.documentoOrigen.name}</span>
+              </div>
+            )}
+            {deposito.cuentaBancoOverride && (
+              <div className="detail-field">
+                <span className="detail-label">Cuenta del banco (reasignada)</span>
+                <span className="detail-value">{deposito.cuentaBancoOverride}</span>
+              </div>
+            )}
+            {deposito.cuentaPartyOverride && (
+              <div className="detail-field">
+                <span className="detail-label">Cuenta del origen (reasignada)</span>
+                <span className="detail-value">{deposito.cuentaPartyOverride}</span>
               </div>
             )}
           </div>
@@ -242,16 +276,53 @@ export default function DepositoDetail() {
       {editOpen && (
         <EditCabeceraModal
           depositoId={deposito.id}
+          cuentaBancariaId={deposito.cuentaBancaria}
+          hayOrigen={!!deposito.beneficiario}
           initial={{
             descripcion: deposito.descripcion ?? '',
             nota: deposito.nota ?? '',
             numeroReferencia: deposito.referencias?.numeroReferencia ?? '',
             comprobante: deposito.referencias?.comprobante ?? '',
+            cuentaBancoOverride: deposito.cuentaBancoOverride ?? '',
+            cuentaPartyOverride: deposito.cuentaPartyOverride ?? '',
           }}
           onClose={() => setEditOpen(false)}
           onSaved={() => { setEditOpen(false); invalidateRelated() }}
         />
       )}
+
+      <AsientosPreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        queryKey={['tesoreria-deposito-preview-asientos', id]}
+        queryFn={() => previewAsientosDeposito(id!)}
+        renderAccountCell={isDraft ? (row, _index, rows) => {
+          const { bancoRow, partyRow } = findBancoYPartyRows(rows)
+          if (row === bancoRow) {
+            return <EditableAccountCell row={row} rootType="Asset" onCommit={setPendingBancoOverride} />
+          }
+          if (row === partyRow) {
+            return <EditableAccountCell row={row} onCommit={setPendingPartyOverride} />
+          }
+          return undefined
+        } : undefined}
+        extraContent={isDraft ? (refetch) => {
+          refetchPreviewRef.current = refetch
+          return (
+            <button
+              type="button"
+              className="btn btn-primary btn-size-sm"
+              disabled={overrideMutation.isPending || (!pendingBancoOverride && !pendingPartyOverride)}
+              onClick={() => overrideMutation.mutate({
+                cuentaBancoOverride: pendingBancoOverride || undefined,
+                cuentaPartyOverride: pendingPartyOverride || undefined,
+              })}
+            >
+              {overrideMutation.isPending ? 'Guardando…' : 'Guardar cuentas'}
+            </button>
+          )
+        } : undefined}
+      />
     </div>
   )
 }
@@ -261,20 +332,33 @@ interface EditCabeceraValues {
   nota: string
   numeroReferencia: string
   comprobante: string
+  cuentaBancoOverride: string
+  cuentaPartyOverride: string
 }
 
 function EditCabeceraModal({
   depositoId,
+  cuentaBancariaId,
+  hayOrigen,
   initial,
   onClose,
   onSaved,
 }: {
   depositoId: string
+  cuentaBancariaId: string | null
+  hayOrigen: boolean
   initial: EditCabeceraValues
   onClose: () => void
   onSaved: () => void
 }) {
   const [values, setValues] = useState(initial)
+
+  const { data: cuentaBancariaDoc } = useQuery({
+    queryKey: ['tesoreria-cuenta-bancaria-heredada', cuentaBancariaId],
+    queryFn: () => getCuentaBancaria(cuentaBancariaId!),
+    enabled: !!cuentaBancariaId,
+    retry: false,
+  })
 
   const mutation = useMutation({
     mutationFn: (dto: UpdateDepositoDto) => updateDepositoCabecera(depositoId, dto),
@@ -291,6 +375,8 @@ function EditCabeceraModal({
         numeroReferencia: values.numeroReferencia || undefined,
         comprobante: values.comprobante || undefined,
       },
+      cuentaBancoOverride: values.cuentaBancoOverride || undefined,
+      cuentaPartyOverride: hayOrigen && values.cuentaPartyOverride ? values.cuentaPartyOverride : undefined,
     })
   }
 
@@ -319,6 +405,28 @@ function EditCabeceraModal({
               <label className="ff-label">Nota</label>
               <textarea className="ff-input" rows={3} value={values.nota} onChange={(e) => setValues((v) => ({ ...v, nota: e.target.value }))} />
             </div>
+
+            <CuentaContableOverrideSection
+              defaultOpen={!!(initial.cuentaBancoOverride || initial.cuentaPartyOverride)}
+              rows={[
+                {
+                  key: 'banco',
+                  label: 'Cuenta del banco',
+                  value: values.cuentaBancoOverride,
+                  onChange: (v) => setValues((s) => ({ ...s, cuentaBancoOverride: v })),
+                  cuentaHeredada: cuentaBancariaDoc?.account,
+                  rootType: 'Asset',
+                },
+                {
+                  key: 'party',
+                  label: 'Cuenta del origen',
+                  value: values.cuentaPartyOverride,
+                  onChange: (v) => setValues((s) => ({ ...s, cuentaPartyOverride: v })),
+                  disabled: !hayOrigen,
+                  disabledReason: !hayOrigen ? 'Este borrador no tiene origen (cliente o proveedor).' : undefined,
+                },
+              ]}
+            />
           </div>
           <div className="modal-foot">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>

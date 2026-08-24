@@ -13,14 +13,24 @@ interface AsientosPreviewModalProps {
   queryFn: () => Promise<AsientoPreviewRow[]>
   /** Si se pasa, habilita el botón "Redistribuir" en las filas que no son la de CxP (partyType/party). */
   onRedistribuir?: (payload: ImpuestoDistribucionDto) => Promise<unknown>
+  /** Contenido extra entre la tabla y el pie del modal — p.ej. un botón "Guardar" para los cambios
+   *  hechos con `renderAccountCell` (ver Tesorería). Recibe `refetch` para refrescar el preview en
+   *  cuanto ese contenido guarde un cambio. */
+  extraContent?: (refetch: () => void) => React.ReactNode
+  /** Si se pasa, reemplaza el contenido de la celda "Cuenta" de una fila (p.ej. por un selector de
+   *  cuenta editable in-place, ver Tesorería) — devolver `undefined` para esa fila deja el texto
+   *  de solo lectura de siempre. Recibe también el array completo de filas, para poder identificar
+   *  cuál fila es "la del banco" vs. "la del tercero" sin depender de un único campo. */
+  renderAccountCell?: (row: AsientoPreviewRow, index: number, rows: AsientoPreviewRow[]) => React.ReactNode | undefined
 }
 
-/** Modal con el preview de los asientos contables (GL) que se generarían al someter una
- *  Compra/Gasto en Draft. Reutilizado por CompraDetail y GastoDetail. Además del preview de solo
- *  lectura, permite redistribuir un impuesto ya calculado (fila sin partyType/party) entre varias
- *  cuentas — el backend rechaza con un mensaje explícito si la cuenta elegida no es de impuesto o
- *  la suma no cuadra; ese mensaje se muestra tal cual, sin reformular. */
-export function AsientosPreviewModal({ open, onClose, queryKey, queryFn, onRedistribuir }: AsientosPreviewModalProps) {
+/** Modal con el preview de los asientos contables (GL) que se generarían al someter un documento
+ *  en Draft (Compras, Gastos, Tesorería). Además del preview de solo lectura, permite: redistribuir
+ *  un impuesto ya calculado (fila sin partyType/party, vía `onRedistribuir`) entre varias cuentas
+ *  — el backend rechaza con un mensaje explícito si la cuenta elegida no es de impuesto o la suma
+ *  no cuadra, y ese mensaje se muestra tal cual, sin reformular; o renderizar `extraContent` (p.ej.
+ *  el formulario de override de cuentas de Tesorería) para editar sin cerrar el modal. */
+export function AsientosPreviewModal({ open, onClose, queryKey, queryFn, onRedistribuir, extraContent, renderAccountCell }: AsientosPreviewModalProps) {
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey,
     queryFn,
@@ -107,22 +117,22 @@ export function AsientosPreviewModal({ open, onClose, queryKey, queryFn, onRedis
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r, i) => (
+                  {rows.map((r, i) => {
+                    const accountCell = renderAccountCell?.(r, i, rows)
+                    return (
                     <Fragment key={i}>
                       <tr>
                         <td className="td-muted">{formatDate(r.postingDate)}</td>
-                        <td>
-                          {r.account}
-                          {/*{r.origen === 'impuesto' && (
-                            <span className="badge badge-info" style={{ marginLeft: 6, fontSize: 10 }}>Impuesto</span>
-                          )}
-                          {r.origen === 'retencion' && (
-                            <span className="badge badge-default" style={{ marginLeft: 6, fontSize: 10 }}>Retención</span>
-                          )}*/}
-                          {r.party && (
-                            <span style={{ display: 'block', fontSize: 11, color: 'var(--text-tertiary)' }}>
-                              {r.partyType ?? 'Party'}: {r.party}
-                            </span>
+                        <td style={accountCell ? { minWidth: 220 } : undefined}>
+                          {accountCell ?? (
+                            <>
+                              {r.account}
+                              {r.party && (
+                                <span style={{ display: 'block', fontSize: 11, color: 'var(--text-tertiary)' }}>
+                                  {r.partyType ?? 'Party'}: {r.party}
+                                </span>
+                              )}
+                            </>
                           )}
                         </td>
                         <td style={{ textAlign: 'right' }}>{r.debit > 0 ? formatDOP(r.debit) : '—'}</td>
@@ -183,7 +193,8 @@ export function AsientosPreviewModal({ open, onClose, queryKey, queryFn, onRedis
                         </tr>
                       )}
                     </Fragment>
-                  ))}
+                    )
+                  })}
                   <tr style={{ background: 'var(--surface-sunken)', fontWeight: 600 }}>
                     <td colSpan={2} style={{ textAlign: 'right' }}>Total</td>
                     <td style={{ textAlign: 'right' }}>{formatDOP(totalDebit)}</td>
@@ -195,10 +206,16 @@ export function AsientosPreviewModal({ open, onClose, queryKey, queryFn, onRedis
             </div>
           )}
         </div>
+        {extraContent && (
+          <div style={{ flexShrink: 0, borderTop: '1px solid var(--border-default)', padding: 16 }}>
+            {extraContent(refetch)}
+          </div>
+        )}
         <div className="modal-foot" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <p className="ff-hint" style={{ margin: 0 }}>
-            Solo lectura salvo "Redistribuir". Si una cuenta no es la esperada, edita el documento
-            (cuenta contable por línea y/o cuenta CxP), guarda y refresca.
+            {extraContent
+              ? 'Reasigna cuentas abajo y guarda para ver el impacto al instante.'
+              : 'Solo lectura salvo "Redistribuir". Si una cuenta no es la esperada, edita el documento (cuenta contable por línea y/o cuenta CxP), guarda y refresca.'}
           </p>
           <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw size={14} />{isFetching ? 'Actualizando…' : 'Refrescar'}

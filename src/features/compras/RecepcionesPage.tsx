@@ -14,6 +14,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 
 const PAGE_SIZE = 20
 
@@ -90,24 +91,28 @@ export default function RecepcionesPage() {
                 onChange={(e) => { setSupplier(e.target.value); setPage(1) }}
               />
             </div>
-            <Select
-              value={billingStatus}
-              onValueChange={(val) => { setBillingStatus(val); setPage(1) }}
-            >
-              <SelectItem value="all">Todas</SelectItem>
-              <SelectItem value="pending">Pendientes de facturar</SelectItem>
-              <SelectItem value="billed">Facturadas</SelectItem>
-            </Select>
-            <Select
-              value={status}
-              onValueChange={(val) => { setStatus(val); setPage(1) }}
-            >
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="draft">Borrador</SelectItem>
-              <SelectItem value="submitted">Sometido</SelectItem>
-              <SelectItem value="cancelled">Anulado</SelectItem>
-            </Select>
-            <div style={{ width: 200 }}>
+            <FilterField label="Facturación">
+              <Select
+                value={billingStatus}
+                onValueChange={(val) => { setBillingStatus(val); setPage(1) }}
+              >
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="pending">Pendientes de facturar</SelectItem>
+                <SelectItem value="billed">Facturadas</SelectItem>
+              </Select>
+            </FilterField>
+            <FilterField label="Estado">
+              <Select
+                value={status}
+                onValueChange={(val) => { setStatus(val); setPage(1) }}
+              >
+                <SelectItem value="all">Todos los estados</SelectItem>
+                <SelectItem value="draft">Borrador</SelectItem>
+                <SelectItem value="submitted">Sometido</SelectItem>
+                <SelectItem value="cancelled">Anulado</SelectItem>
+              </Select>
+            </FilterField>
+            <FilterField label="Sucursal" style={{ width: 200 }}>
               <SearchSelect
                 value={branch}
                 onChange={(val) => { setBranch(val); setPage(1) }}
@@ -116,19 +121,23 @@ export default function RecepcionesPage() {
                 selectedLabel={branch}
                 placeholder="Todas las sucursales"
               />
-            </div>
-            <DatePicker
-              className="filter-select"
-              value={fromDate}
-              onChange={(v) => { setFromDate(v); setPage(1) }}
-              clearable
-            />
-            <DatePicker
-              className="filter-select"
-              value={toDate}
-              onChange={(v) => { setToDate(v); setPage(1) }}
-              clearable
-            />
+            </FilterField>
+            <FilterField label="Desde">
+              <DatePicker
+                className="filter-select"
+                value={fromDate}
+                onChange={(v) => { setFromDate(v); setPage(1) }}
+                clearable
+              />
+            </FilterField>
+            <FilterField label="Hasta">
+              <DatePicker
+                className="filter-select"
+                value={toDate}
+                onChange={(v) => { setToDate(v); setPage(1) }}
+                clearable
+              />
+            </FilterField>
           </div>
         </div>
 

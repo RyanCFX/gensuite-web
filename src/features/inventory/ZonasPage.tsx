@@ -17,6 +17,7 @@ import { Plus, Pencil, Trash2, X, MapPin, Info } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 
 // ─── Banner "doctype no instalado" ─────────────────────────────────────────
 
@@ -804,8 +805,12 @@ function HistorialMovimientosSection({ warehouse }: { warehouse: string }) {
             disabled={!warehouse}
           />
         </div>
-        <DatePicker className="ff-input" style={{ maxWidth: 160 }} value={fromDate} onChange={setFromDate} clearable />
-        <DatePicker className="ff-input" style={{ maxWidth: 160 }} value={toDate} onChange={setToDate} clearable />
+        <FilterField label="Desde" style={{ maxWidth: 160 }}>
+          <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} clearable />
+        </FilterField>
+        <FilterField label="Hasta" style={{ maxWidth: 160 }}>
+          <DatePicker className="ff-input" value={toDate} onChange={setToDate} clearable />
+        </FilterField>
       </div>
       <div className="card-body" style={{ paddingTop: 0, padding: 0 }}>
         <NoteBanner note={data?.note} />

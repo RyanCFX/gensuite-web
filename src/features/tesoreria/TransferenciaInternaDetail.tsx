@@ -1,16 +1,20 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, Send, Ban, Pencil } from 'lucide-react'
+import { ArrowLeft, Send, Ban, Pencil, BookOpen } from 'lucide-react'
 import {
   getTransferenciaInterna,
   submitTransferenciaInterna,
   cancelTransferenciaInterna,
   updateTransferenciaInternaCabecera,
+  previewAsientosTransferenciaInterna,
 } from '@/shared/api/tesoreria'
 import type { TesoreriaEstado, UpdateTransferenciaInternaDto } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
+import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
+import { CuentaContableOverrideSection } from './components/CuentaContableOverrideSection'
+import { EditableAccountCell, findOrigenYDestinoRows } from './components/EditableAccountCell'
 
 const STATUS_BADGE: Record<TesoreriaEstado, string> = {
   draft: 'badge-draft',
@@ -31,6 +35,11 @@ export default function TransferenciaInternaDetail() {
   const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+
+  const [pendingOrigenOverride, setPendingOrigenOverride] = useState('')
+  const [pendingDestinoOverride, setPendingDestinoOverride] = useState('')
+  const refetchPreviewRef = useRef<() => void>(() => {})
 
   const { data: transferencia, isLoading, isError } = useQuery({
     queryKey: ['tesoreria-transferencia-interna', id],
@@ -43,6 +52,16 @@ export default function TransferenciaInternaDetail() {
     queryClient.invalidateQueries({ queryKey: ['tesoreria-transferencias-internas'] })
     queryClient.invalidateQueries({ queryKey: ['tesoreria-movimientos'] })
   }
+
+  const overrideMutation = useMutation({
+    mutationFn: (dto: UpdateTransferenciaInternaDto) => updateTransferenciaInternaCabecera(id!, dto),
+    onSuccess: () => {
+      toast.success('Cuentas actualizadas')
+      refetchPreviewRef.current()
+      invalidateRelated()
+    },
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al actualizar'),
+  })
 
   const submitMutation = useMutation({
     mutationFn: () => submitTransferenciaInterna(id!),
@@ -113,6 +132,9 @@ export default function TransferenciaInternaDetail() {
               <button className="btn btn-ghost btn-size-sm" onClick={() => setEditOpen(true)}>
                 <Pencil size={14} /> Editar cabecera
               </button>
+              <button className="btn btn-ghost btn-size-sm" onClick={() => setPreviewOpen(true)}>
+                <BookOpen size={14} /> Ver asiento contable
+              </button>
               <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmSubmit(true)} disabled={submitMutation.isPending}>
                 <Send size={14} /> Someter
               </button>
@@ -148,6 +170,18 @@ export default function TransferenciaInternaDetail() {
               <div className="detail-field">
                 <span className="detail-label">Referencia</span>
                 <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{transferencia.referencias.numeroReferencia}</span>
+              </div>
+            )}
+            {transferencia.cuentaBancoOrigenOverride && (
+              <div className="detail-field">
+                <span className="detail-label">Cuenta origen (reasignada)</span>
+                <span className="detail-value">{transferencia.cuentaBancoOrigenOverride}</span>
+              </div>
+            )}
+            {transferencia.cuentaBancoDestinoOverride && (
+              <div className="detail-field">
+                <span className="detail-label">Cuenta destino (reasignada)</span>
+                <span className="detail-value">{transferencia.cuentaBancoDestinoOverride}</span>
               </div>
             )}
           </div>
@@ -247,11 +281,53 @@ export default function TransferenciaInternaDetail() {
             descripcion: transferencia.descripcion ?? '',
             nota: transferencia.nota ?? '',
             numeroReferencia: transferencia.referencias?.numeroReferencia ?? '',
+            cuentaBancoOrigenOverride: transferencia.cuentaBancoOrigenOverride ?? '',
+            cuentaBancoDestinoOverride: transferencia.cuentaBancoDestinoOverride ?? '',
           }}
           onClose={() => setEditOpen(false)}
           onSaved={() => { setEditOpen(false); invalidateRelated() }}
         />
       )}
+
+      <AsientosPreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        queryKey={['tesoreria-transferencia-preview-asientos', id]}
+        queryFn={() => previewAsientosTransferenciaInterna(id!)}
+        renderAccountCell={isDraft ? (row, _index, rows) => {
+          const { origenRow, destinoRow } = findOrigenYDestinoRows(rows)
+          if (row === origenRow) {
+            return <EditableAccountCell row={row} rootType="Asset" onCommit={setPendingOrigenOverride} />
+          }
+          if (row === destinoRow) {
+            return <EditableAccountCell row={row} rootType="Asset" onCommit={setPendingDestinoOverride} />
+          }
+          return undefined
+        } : undefined}
+        extraContent={isDraft ? (refetch) => {
+          refetchPreviewRef.current = refetch
+          function handleSave() {
+            if (pendingOrigenOverride && pendingOrigenOverride === pendingDestinoOverride) {
+              toast.error('La cuenta de origen y la de destino no pueden quedar iguales')
+              return
+            }
+            overrideMutation.mutate({
+              cuentaBancoOrigenOverride: pendingOrigenOverride || undefined,
+              cuentaBancoDestinoOverride: pendingDestinoOverride || undefined,
+            })
+          }
+          return (
+            <button
+              type="button"
+              className="btn btn-primary btn-size-sm"
+              disabled={overrideMutation.isPending || (!pendingOrigenOverride && !pendingDestinoOverride)}
+              onClick={handleSave}
+            >
+              {overrideMutation.isPending ? 'Guardando…' : 'Guardar cuentas'}
+            </button>
+          )
+        } : undefined}
+      />
     </div>
   )
 }
@@ -260,6 +336,8 @@ interface EditCabeceraValues {
   descripcion: string
   nota: string
   numeroReferencia: string
+  cuentaBancoOrigenOverride: string
+  cuentaBancoDestinoOverride: string
 }
 
 function EditCabeceraModal({
@@ -283,10 +361,16 @@ function EditCabeceraModal({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (values.cuentaBancoOrigenOverride && values.cuentaBancoOrigenOverride === values.cuentaBancoDestinoOverride) {
+      toast.error('La cuenta de origen y la de destino no pueden quedar iguales')
+      return
+    }
     mutation.mutate({
       descripcion: values.descripcion || undefined,
       nota: values.nota || undefined,
       referencias: values.numeroReferencia ? { numeroReferencia: values.numeroReferencia } : undefined,
+      cuentaBancoOrigenOverride: values.cuentaBancoOrigenOverride || undefined,
+      cuentaBancoDestinoOverride: values.cuentaBancoDestinoOverride || undefined,
     })
   }
 
@@ -315,6 +399,26 @@ function EditCabeceraModal({
               <label className="ff-label">Nota</label>
               <textarea className="ff-input" rows={3} value={values.nota} onChange={(e) => setValues((v) => ({ ...v, nota: e.target.value }))} />
             </div>
+
+            <CuentaContableOverrideSection
+              defaultOpen={!!(initial.cuentaBancoOrigenOverride || initial.cuentaBancoDestinoOverride)}
+              rows={[
+                {
+                  key: 'origen',
+                  label: 'Cuenta de la pata origen',
+                  value: values.cuentaBancoOrigenOverride,
+                  onChange: (v) => setValues((s) => ({ ...s, cuentaBancoOrigenOverride: v })),
+                  rootType: 'Asset',
+                },
+                {
+                  key: 'destino',
+                  label: 'Cuenta de la pata destino',
+                  value: values.cuentaBancoDestinoOverride,
+                  onChange: (v) => setValues((s) => ({ ...s, cuentaBancoDestinoOverride: v })),
+                  rootType: 'Asset',
+                },
+              ]}
+            />
           </div>
           <div className="modal-foot">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>

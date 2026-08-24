@@ -371,6 +371,7 @@ export const ENDPOINTS = {
       pendientes: (supplierId: string) => `/tesoreria/emisiones/pendientes/${encodeURIComponent(supplierId)}`,
       siguienteCheque: '/tesoreria/emisiones/siguiente-cheque',
       imprimir: (id: string) => `/tesoreria/emisiones/${encodeURIComponent(id)}/imprimir`,
+      previewAsientos: (id: string) => `/tesoreria/emisiones/${encodeURIComponent(id)}/preview-asientos`,
     },
     depositos: {
       list: '/tesoreria/depositos',
@@ -378,12 +379,14 @@ export const ENDPOINTS = {
       submit: (id: string) => `/tesoreria/depositos/${encodeURIComponent(id)}/submit`,
       cancel: (id: string) => `/tesoreria/depositos/${encodeURIComponent(id)}/cancel`,
       pendientes: (partyId: string) => `/tesoreria/depositos/pendientes/${encodeURIComponent(partyId)}`,
+      previewAsientos: (id: string) => `/tesoreria/depositos/${encodeURIComponent(id)}/preview-asientos`,
     },
     transferenciasInternas: {
       list: '/tesoreria/transferencias-internas',
       byId: (id: string) => `/tesoreria/transferencias-internas/${encodeURIComponent(id)}`,
       submit: (id: string) => `/tesoreria/transferencias-internas/${encodeURIComponent(id)}/submit`,
       cancel: (id: string) => `/tesoreria/transferencias-internas/${encodeURIComponent(id)}/cancel`,
+      previewAsientos: (id: string) => `/tesoreria/transferencias-internas/${encodeURIComponent(id)}/preview-asientos`,
     },
     movimientos: {
       list: '/tesoreria/movimientos',
@@ -416,6 +419,7 @@ export const ENDPOINTS = {
     stock: '/config/stock-settings',
     selling: '/config/selling-settings',
     buying: '/config/buying-settings',
+    seguridad: '/config/seguridad',
   },
   notificaciones: {
     tipos: '/notificaciones/tipos',

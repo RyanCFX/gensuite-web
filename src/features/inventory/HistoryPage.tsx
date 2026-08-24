@@ -11,6 +11,7 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 
 const PAGE_SIZE = 30
 
@@ -78,7 +79,7 @@ export default function HistoryPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div style={{ width: 200 }}>
+          <FilterField label="Almacén" style={{ width: 200 }}>
             <SearchSelect
               value={warehouse === 'all' ? '' : warehouse}
               onChange={(val) => { setWarehouse(val || 'all'); setPage(1); if (val) setBranch('') }}
@@ -87,10 +88,10 @@ export default function HistoryPage() {
               selectedLabel={warehouse === 'all' ? '' : warehouse}
               placeholder="Todos los almacenes"
             />
-          </div>
+          </FilterField>
 
           {warehouse === 'all' && (
-            <div style={{ width: 200 }}>
+            <FilterField label="Sucursal" style={{ width: 200 }}>
               <SearchSelect
                 value={branch}
                 onChange={(val) => { setBranch(val); setPage(1) }}
@@ -99,29 +100,34 @@ export default function HistoryPage() {
                 selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
                 placeholder="Todas las sucursales"
               />
-            </div>
+            </FilterField>
           )}
 
-          <Select value={voucherType} onValueChange={(val) => { setVoucherType(val); setPage(1) }}>
-            <SelectItem value="all">Todos los tipos</SelectItem>
-            {VOUCHER_TYPES.map((t) => (
-              <SelectItem key={t} value={t}>{t}</SelectItem>
-            ))}
-          </Select>
+          <FilterField label="Tipo de documento">
+            <Select value={voucherType} onValueChange={(val) => { setVoucherType(val); setPage(1) }}>
+              <SelectItem value="all">Todos los tipos</SelectItem>
+              {VOUCHER_TYPES.map((t) => (
+                <SelectItem key={t} value={t}>{t}</SelectItem>
+              ))}
+            </Select>
+          </FilterField>
 
-          <DatePicker
-            className="filter-select"
-            value={fromDate}
-            onChange={(v) => { setFromDate(v); setPage(1) }}
-            clearable
-          />
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-          <DatePicker
-            className="filter-select"
-            value={toDate}
-            onChange={(v) => { setToDate(v); setPage(1) }}
-            clearable
-          />
+          <FilterField label="Desde">
+            <DatePicker
+              className="filter-select"
+              value={fromDate}
+              onChange={(v) => { setFromDate(v); setPage(1) }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker
+              className="filter-select"
+              value={toDate}
+              onChange={(v) => { setToDate(v); setPage(1) }}
+              clearable
+            />
+          </FilterField>
         </div>
       </div>
 

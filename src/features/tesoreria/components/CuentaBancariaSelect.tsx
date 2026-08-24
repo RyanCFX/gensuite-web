@@ -3,10 +3,14 @@ import { useQuery } from '@tanstack/react-query'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
+import type { CuentaBancaria } from '@/shared/api/types'
 
 interface CuentaBancariaSelectProps {
   value: string
-  onChange: (id: string) => void
+  /** `cuenta` es el registro completo de la cuenta bancaria seleccionada (incluye `.account`, la
+   *  cuenta contable que tiene configurada) — útil para mostrar "cuenta heredada" en overrides sin
+   *  tener que volver a pedirla. Viene `undefined` al limpiar la selección. */
+  onChange: (id: string, cuenta?: CuentaBancaria) => void
   placeholder?: string
   error?: boolean
   disabled?: boolean
@@ -24,19 +28,18 @@ export function CuentaBancariaSelect({ value, onChange, placeholder = 'Buscar cu
     staleTime: 30_000,
   })
 
-  const options: SearchSelectOption[] = (data?.items ?? [])
-    .filter((c) => c.id !== excludeId)
-    .map((c) => ({
-      value: c.id,
-      label: c.accountName,
-      sublabel: [c.bank, c.bankAccountNo].filter(Boolean).join(' · '),
-    }))
+  const items = (data?.items ?? []).filter((c) => c.id !== excludeId)
+  const options: SearchSelectOption[] = items.map((c) => ({
+    value: c.id,
+    label: c.accountName,
+    sublabel: [c.bank, c.bankAccountNo].filter(Boolean).join(' · '),
+  }))
 
   return (
     <SearchSelect
       id={id}
       value={value}
-      onChange={(v) => onChange(v)}
+      onChange={(v) => onChange(v, items.find((c) => c.id === v))}
       options={options}
       onSearch={setQuery}
       onOpen={() => refetch()}

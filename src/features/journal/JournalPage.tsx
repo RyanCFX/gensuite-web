@@ -12,6 +12,7 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { FilterField } from '@/shared/ui/FilterField'
 
 const PAGE_SIZE = 25
 
@@ -89,7 +90,7 @@ export default function JournalPage() {
               onChange={handleSearchChange}
             />
           </div>
-          <div style={{ width: 200 }}>
+          <FilterField label="Sucursal" style={{ width: 200 }}>
             <SearchSelect
               value={branch}
               onChange={(val) => { setBranch(val); setPage(1) }}
@@ -98,8 +99,8 @@ export default function JournalPage() {
               selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
               placeholder="Todas las sucursales"
             />
-          </div>
-          <div style={{ width: 200 }}>
+          </FilterField>
+          <FilterField label="Departamento" style={{ width: 200 }}>
             <SearchSelect
               value={department}
               onChange={(val) => { setDepartment(val); setPage(1) }}
@@ -108,7 +109,7 @@ export default function JournalPage() {
               selectedLabel={departamentos?.items.find((d) => d.id === department)?.name ?? ''}
               placeholder="Todos los departamentos"
             />
-          </div>
+          </FilterField>
         </div>
       </div>
 

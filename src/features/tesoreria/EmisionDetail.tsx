@@ -1,17 +1,22 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, Send, Ban, Printer, Pencil } from 'lucide-react'
+import { ArrowLeft, Send, Ban, Printer, Pencil, BookOpen } from 'lucide-react'
 import {
   getEmision,
   submitEmision,
   cancelEmision,
   updateEmisionCabecera,
   getEmisionPdfBlobUrl,
+  previewAsientosEmision,
 } from '@/shared/api/tesoreria'
+import { getCuentaBancaria } from '@/shared/api/cuentas-bancarias'
 import type { TesoreriaEstado, UpdateEmisionDto } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
+import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
+import { CuentaContableOverrideSection } from './components/CuentaContableOverrideSection'
+import { EditableAccountCell, findBancoYPartyRows } from './components/EditableAccountCell'
 
 const STATUS_BADGE: Record<TesoreriaEstado, string> = {
   draft: 'badge-draft',
@@ -32,7 +37,16 @@ export default function EmisionDetail() {
   const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [printError, setPrintError] = useState<string | null>(null)
+
+  // Overrides pendientes de guardar, editados in-place desde las celdas de "Cuenta" del preview
+  // de asientos — vacíos mientras el usuario no toque nada (se manda `undefined`, sin efecto).
+  const [pendingBancoOverride, setPendingBancoOverride] = useState('')
+  const [pendingPartyOverride, setPendingPartyOverride] = useState('')
+  // El preview solo expone `refetch` dentro del callback de `extraContent` — se guarda acá para
+  // poder llamarlo desde `onSuccess` de la mutación, que vive fuera de ese callback.
+  const refetchPreviewRef = useRef<() => void>(() => {})
 
   const { data: emision, isLoading, isError } = useQuery({
     queryKey: ['tesoreria-emision', id],
@@ -45,6 +59,16 @@ export default function EmisionDetail() {
     queryClient.invalidateQueries({ queryKey: ['tesoreria-emisiones'] })
     queryClient.invalidateQueries({ queryKey: ['tesoreria-movimientos'] })
   }
+
+  const overrideMutation = useMutation({
+    mutationFn: (dto: UpdateEmisionDto) => updateEmisionCabecera(id!, dto),
+    onSuccess: () => {
+      toast.success('Cuentas actualizadas')
+      refetchPreviewRef.current()
+      invalidateRelated()
+    },
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al actualizar'),
+  })
 
   const submitMutation = useMutation({
     mutationFn: () => submitEmision(id!),
@@ -139,6 +163,9 @@ export default function EmisionDetail() {
             <button className="btn btn-ghost btn-size-sm" onClick={() => setEditOpen(true)}>
               <Pencil size={14} /> Editar cabecera
             </button>
+            <button className="btn btn-ghost btn-size-sm" onClick={() => setPreviewOpen(true)}>
+              <BookOpen size={14} /> Ver asiento contable
+            </button>
             <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmSubmit(true)} disabled={submitMutation.isPending}>
               <Send size={14} /> Someter
             </button>
@@ -201,6 +228,18 @@ export default function EmisionDetail() {
               <div className="detail-field">
                 <span className="detail-label">Documento Contable</span>
                 <span className="detail-value">{emision.documentoOrigen.doctype} — {emision.documentoOrigen.name}</span>
+              </div>
+            )}
+            {emision.cuentaBancoOverride && (
+              <div className="detail-field">
+                <span className="detail-label">Cuenta del banco (reasignada)</span>
+                <span className="detail-value">{emision.cuentaBancoOverride}</span>
+              </div>
+            )}
+            {emision.cuentaPartyOverride && (
+              <div className="detail-field">
+                <span className="detail-label">Cuenta del beneficiario (reasignada)</span>
+                <span className="detail-value">{emision.cuentaPartyOverride}</span>
               </div>
             )}
           </div>
@@ -299,6 +338,8 @@ export default function EmisionDetail() {
       {editOpen && (
         <EditCabeceraModal
           emisionId={emision.id}
+          cuentaBancariaId={emision.cuentaBancaria}
+          hayBeneficiario={!!emision.beneficiario}
           initial={{
             descripcion: emision.descripcion ?? '',
             nota: emision.nota ?? '',
@@ -307,11 +348,46 @@ export default function EmisionDetail() {
             comprobante: emision.referencias?.comprobante ?? '',
             branch: emision.branch ?? '',
             department: emision.department ?? '',
+            cuentaBancoOverride: emision.cuentaBancoOverride ?? '',
+            cuentaPartyOverride: emision.cuentaPartyOverride ?? '',
           }}
           onClose={() => setEditOpen(false)}
           onSaved={() => { setEditOpen(false); invalidateRelated() }}
         />
       )}
+
+      <AsientosPreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        queryKey={['tesoreria-emision-preview-asientos', id]}
+        queryFn={() => previewAsientosEmision(id!)}
+        renderAccountCell={isDraft ? (row, _index, rows) => {
+          const { bancoRow, partyRow } = findBancoYPartyRows(rows)
+          if (row === bancoRow) {
+            return <EditableAccountCell row={row} rootType="Asset" onCommit={setPendingBancoOverride} />
+          }
+          if (row === partyRow) {
+            return <EditableAccountCell row={row} onCommit={setPendingPartyOverride} />
+          }
+          return undefined
+        } : undefined}
+        extraContent={isDraft ? (refetch) => {
+          refetchPreviewRef.current = refetch
+          return (
+            <button
+              type="button"
+              className="btn btn-primary btn-size-sm"
+              disabled={overrideMutation.isPending || (!pendingBancoOverride && !pendingPartyOverride)}
+              onClick={() => overrideMutation.mutate({
+                cuentaBancoOverride: pendingBancoOverride || undefined,
+                cuentaPartyOverride: pendingPartyOverride || undefined,
+              })}
+            >
+              {overrideMutation.isPending ? 'Guardando…' : 'Guardar cuentas'}
+            </button>
+          )
+        } : undefined}
+      />
     </div>
   )
 }
@@ -324,6 +400,8 @@ interface EditCabeceraValues {
   comprobante: string
   branch: string
   department: string
+  cuentaBancoOverride: string
+  cuentaPartyOverride: string
 }
 
 /**
@@ -333,16 +411,30 @@ interface EditCabeceraValues {
  */
 function EditCabeceraModal({
   emisionId,
+  cuentaBancariaId,
+  hayBeneficiario,
   initial,
   onClose,
   onSaved,
 }: {
   emisionId: string
+  cuentaBancariaId: string | null
+  hayBeneficiario: boolean
   initial: EditCabeceraValues
   onClose: () => void
   onSaved: () => void
 }) {
   const [values, setValues] = useState(initial)
+
+  // Cuenta contable heredada de la cuenta bancaria del documento — solo para mostrarla de
+  // referencia junto al override; si no se puede resolver (id no calza, error de red) el campo
+  // simplemente no muestra la pista y sigue funcionando igual.
+  const { data: cuentaBancariaDoc } = useQuery({
+    queryKey: ['tesoreria-cuenta-bancaria-heredada', cuentaBancariaId],
+    queryFn: () => getCuentaBancaria(cuentaBancariaId!),
+    enabled: !!cuentaBancariaId,
+    retry: false,
+  })
 
   const mutation = useMutation({
     mutationFn: (dto: UpdateEmisionDto) => updateEmisionCabecera(emisionId, dto),
@@ -365,6 +457,8 @@ function EditCabeceraModal({
       },
       branch: values.branch || undefined,
       department: values.department || undefined,
+      cuentaBancoOverride: values.cuentaBancoOverride || undefined,
+      cuentaPartyOverride: hayBeneficiario && values.cuentaPartyOverride ? values.cuentaPartyOverride : undefined,
     })
   }
 
@@ -398,6 +492,28 @@ function EditCabeceraModal({
               <label className="ff-label">Nota</label>
               <textarea className="ff-input" rows={3} value={values.nota} onChange={(e) => setValues((v) => ({ ...v, nota: e.target.value }))} />
             </div>
+
+            <CuentaContableOverrideSection
+              defaultOpen={!!(initial.cuentaBancoOverride || initial.cuentaPartyOverride)}
+              rows={[
+                {
+                  key: 'banco',
+                  label: 'Cuenta del banco',
+                  value: values.cuentaBancoOverride,
+                  onChange: (v) => setValues((s) => ({ ...s, cuentaBancoOverride: v })),
+                  cuentaHeredada: cuentaBancariaDoc?.account,
+                  rootType: 'Asset',
+                },
+                {
+                  key: 'party',
+                  label: 'Cuenta del beneficiario',
+                  value: values.cuentaPartyOverride,
+                  onChange: (v) => setValues((s) => ({ ...s, cuentaPartyOverride: v })),
+                  disabled: !hayBeneficiario,
+                  disabledReason: !hayBeneficiario ? 'Este borrador no tiene beneficiario.' : undefined,
+                },
+              ]}
+            />
           </div>
           <div className="modal-foot">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>

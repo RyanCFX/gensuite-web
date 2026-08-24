@@ -22,6 +22,7 @@ import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 
 interface NoteItem {
   itemCode: string
@@ -231,7 +232,7 @@ export default function DebitNotesPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div style={{ width: 200 }}>
+          <FilterField label="Sucursal" style={{ width: 200 }}>
             <SearchSelect
               value={filterBranch}
               onChange={setFilterBranch}
@@ -240,83 +241,97 @@ export default function DebitNotesPage() {
               selectedLabel={filterBranch}
               placeholder="Todas las sucursales"
             />
-          </div>
-          <div style={{ minWidth: 220 }}>
+          </FilterField>
+          <FilterField label="Departamento" style={{ minWidth: 220 }}>
             <DepartmentSelect value={filterDepartment} onChange={setFilterDepartment} placeholder="Todos los departamentos" />
-          </div>
-        </div>
-        <div className="filter-bar-left" style={{ marginTop: 8 }}>
-          <input
-            className="ff-input ff-input-sm"
-            style={{ width: 160 }}
-            placeholder="Buscar NCF…"
-            value={ncf}
-            onChange={(e) => setNcf(e.target.value)}
-          />
-          <DatePicker
-            className="ff-input ff-input-sm"
-            value={createdAtFrom}
-            onChange={setCreatedAtFrom}
-            style={{ width: 144 }}
-            clearable
-          />
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-          <DatePicker
-            className="ff-input ff-input-sm"
-            value={createdAtTo}
-            onChange={setCreatedAtTo}
-            style={{ width: 144 }}
-            clearable
-          />
-          <DatePicker
-            className="ff-input ff-input-sm"
-            value={postingDateFrom}
-            onChange={setPostingDateFrom}
-            style={{ width: 144 }}
-            clearable
-          />
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-          <DatePicker
-            className="ff-input ff-input-sm"
-            value={postingDateTo}
-            onChange={setPostingDateTo}
-            style={{ width: 144 }}
-            clearable
-          />
-          <input
-            type="number"
-            className="ff-input ff-input-sm"
-            style={{ width: 100 }}
-            placeholder="Total mín."
-            value={grandTotalMin}
-            onChange={(e) => setGrandTotalMin(e.target.value)}
-          />
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-          <input
-            type="number"
-            className="ff-input ff-input-sm"
-            style={{ width: 100 }}
-            placeholder="Total máx."
-            value={grandTotalMax}
-            onChange={(e) => setGrandTotalMax(e.target.value)}
-          />
-          <input
-            type="number"
-            className="ff-input ff-input-sm"
-            style={{ width: 100 }}
-            placeholder="Reemb. mín."
-            value={refundedAmountMin}
-            onChange={(e) => setRefundedAmountMin(e.target.value)}
-          />
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-          <input
-            type="number"
-            className="ff-input ff-input-sm"
-            style={{ width: 100 }}
-            placeholder="Reemb. máx."
-            value={refundedAmountMax}
-            onChange={(e) => setRefundedAmountMax(e.target.value)}
-          />
+          </FilterField>
+          <FilterField label="NCF">
+            <input
+              className="ff-input ff-input-sm"
+              style={{ width: 160 }}
+              placeholder="Buscar NCF…"
+              value={ncf}
+              onChange={(e) => setNcf(e.target.value)}
+            />
+          </FilterField>
+          <FilterField label="Creada desde">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={createdAtFrom}
+              onChange={setCreatedAtFrom}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Creada hasta">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={createdAtTo}
+              onChange={setCreatedAtTo}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Fecha desde">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={postingDateFrom}
+              onChange={setPostingDateFrom}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Fecha hasta">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={postingDateTo}
+              onChange={setPostingDateTo}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Total">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Total mín."
+                value={grandTotalMin}
+                onChange={(e) => setGrandTotalMin(e.target.value)}
+              />
+              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Total máx."
+                value={grandTotalMax}
+                onChange={(e) => setGrandTotalMax(e.target.value)}
+              />
+            </div>
+          </FilterField>
+          <FilterField label="Monto reembolsado">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Reemb. mín."
+                value={refundedAmountMin}
+                onChange={(e) => setRefundedAmountMin(e.target.value)}
+              />
+              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Reemb. máx."
+                value={refundedAmountMax}
+                onChange={(e) => setRefundedAmountMax(e.target.value)}
+              />
+            </div>
+          </FilterField>
         </div>
       </div>
 

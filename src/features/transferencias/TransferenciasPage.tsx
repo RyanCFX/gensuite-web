@@ -15,6 +15,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { FilterField } from '@/shared/ui/FilterField'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-neutral',
@@ -134,14 +135,16 @@ export default function TransferenciasPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <Select value={status} onValueChange={setStatus}>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            <SelectItem value="draft">Borrador</SelectItem>
-            <SelectItem value="in_transit">En tránsito</SelectItem>
-            <SelectItem value="completed">Completada</SelectItem>
-            <SelectItem value="cancelled">Cancelada</SelectItem>
-          </Select>
-          <div style={{ width: 200 }}>
+          <FilterField label="Estado">
+            <Select value={status} onValueChange={setStatus}>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="draft">Borrador</SelectItem>
+              <SelectItem value="in_transit">En tránsito</SelectItem>
+              <SelectItem value="completed">Completada</SelectItem>
+              <SelectItem value="cancelled">Cancelada</SelectItem>
+            </Select>
+          </FilterField>
+          <FilterField label="Almacén" style={{ width: 200 }}>
             <SearchSelect
               value={warehouse}
               onChange={setWarehouse}
@@ -150,8 +153,8 @@ export default function TransferenciasPage() {
               selectedLabel={warehouse}
               placeholder="Todos los almacenes"
             />
-          </div>
-          <div style={{ width: 200 }}>
+          </FilterField>
+          <FilterField label="Sucursal" style={{ width: 200 }}>
             <SearchSelect
               value={branch}
               onChange={setBranch}
@@ -160,7 +163,7 @@ export default function TransferenciasPage() {
               selectedLabel={sucursales.find((s) => s.id === branch)?.name ?? ''}
               placeholder="Todas las sucursales"
             />
-          </div>
+          </FilterField>
         </div>
       </div>
 

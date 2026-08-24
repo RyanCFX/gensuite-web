@@ -12,6 +12,7 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 import { TIPO_IDENTIFICACION } from '@/lib/constants'
 
 const PAGE_SIZE = 20
@@ -112,44 +113,44 @@ export default function CustomersPage() {
 
       <div className="filter-bar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
         <div className="filter-bar-left">
-          <div style={{ width: 200 }}>
+          <FilterField label="Cliente" style={{ width: 200 }}>
             <input
               className="ff-input ff-input-sm"
               placeholder="Nombre del cliente…"
               value={customerName}
               onChange={(e) => { setCustomerName(e.target.value); setPage(1) }}
             />
-          </div>
-          <div style={{ width: 160 }}>
+          </FilterField>
+          <FilterField label="Tipo" style={{ width: 160 }}>
             <Select value={customerType} onValueChange={(val) => { setCustomerType(val); setPage(1) }}>
               <SelectItem value="all">Todos los tipos</SelectItem>
               <SelectItem value="Company">Empresa</SelectItem>
               <SelectItem value="Individual">Individual</SelectItem>
             </Select>
-          </div>
-          <div style={{ width: 180 }}>
+          </FilterField>
+          <FilterField label="Identificación" style={{ width: 180 }}>
             <Select value={tipoIdentificacion} onValueChange={(val) => { setTipoIdentificacion(val); setPage(1) }}>
               <SelectItem value="all">Todas las identificaciones</SelectItem>
               {TIPO_IDENTIFICACION.map((t) => (
                 <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
               ))}
             </Select>
-          </div>
-          <div style={{ width: 180 }}>
+          </FilterField>
+          <FilterField label="RNC/Cédula" style={{ width: 180 }}>
             <input
               className="ff-input ff-input-sm"
               placeholder="RNC o Cédula…"
               value={identificacion}
               onChange={(e) => { setIdentificacion(e.target.value); setPage(1) }}
             />
-          </div>
-          <div style={{ width: 160 }}>
+          </FilterField>
+          <FilterField label="Crédito" style={{ width: 160 }}>
             <Select value={hasCredit} onValueChange={(val) => { setHasCredit(val); setPage(1) }}>
               <SelectItem value="all">Crédito: Todos</SelectItem>
               <SelectItem value="true">Con crédito</SelectItem>
               <SelectItem value="false">Sin crédito</SelectItem>
             </Select>
-          </div>
+          </FilterField>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
             <input
               type="checkbox"

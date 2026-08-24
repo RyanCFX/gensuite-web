@@ -10,6 +10,7 @@ import { formatDate, formatDOP } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 
@@ -65,17 +66,23 @@ export default function TransferenciasInternasPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
-          <div style={{ width: 220 }}>
-            <CuentaBancariaSelect value={cuentaBancaria} onChange={setCuentaBancaria} placeholder="Todas las cuentas (filtra por origen)" />
-          </div>
-          <Select value={estado} onValueChange={(v) => setEstado(v as EstadoFilter)} clearable={false}>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            <SelectItem value="draft">Borrador</SelectItem>
-            <SelectItem value="submitted">Sometido</SelectItem>
-            <SelectItem value="cancelled">Cancelado</SelectItem>
-          </Select>
-          <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} placeholder="Desde" clearable />
-          <DatePicker className="ff-input" value={toDate} onChange={setToDate} placeholder="Hasta" clearable />
+          <FilterField label="Cuenta bancaria (origen)" style={{ width: 220 }}>
+            <CuentaBancariaSelect value={cuentaBancaria} onChange={setCuentaBancaria} placeholder="Todas las cuentas" />
+          </FilterField>
+          <FilterField label="Estado">
+            <Select value={estado} onValueChange={(v) => setEstado(v as EstadoFilter)} clearable={false}>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="draft">Borrador</SelectItem>
+              <SelectItem value="submitted">Sometido</SelectItem>
+              <SelectItem value="cancelled">Cancelado</SelectItem>
+            </Select>
+          </FilterField>
+          <FilterField label="Desde">
+            <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} clearable />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="ff-input" value={toDate} onChange={setToDate} clearable />
+          </FilterField>
         </div>
       </div>
 

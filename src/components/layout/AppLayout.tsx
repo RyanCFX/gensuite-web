@@ -75,7 +75,12 @@ function isGroup(e: NavEntry): e is NavGroup {
 
 // Rutas de pantalla completa que colapsan el menú principal automáticamente al entrar.
 function isAutoCollapseRoute(pathname: string): boolean {
-  return pathname.startsWith("/reportes") || pathname.startsWith("/config/plantillas-facturas");
+  return (
+    pathname.startsWith("/reportes") ||
+    pathname.startsWith("/config/plantillas-facturas") ||
+    // Editor visual de plantillas de cheque (nueva o edición) — full-bleed igual que el de facturas.
+    /^\/config\/tesoreria\/plantillas-cheque\/[^/]+$/.test(pathname)
+  );
 }
 
 const NAV_MAIN: NavItem[] = [

@@ -7,6 +7,7 @@ import { listUsuarios } from '@/shared/api/usuarios'
 import { formatDateTime, formatDOP } from '@/lib/formatters'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { CerrarTurnoModal } from '@/components/shared/CerrarTurnoModal'
@@ -84,7 +85,7 @@ export default function TurnosPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div style={{ width: 240 }}>
+          <FilterField label="Cajero" style={{ width: 240 }}>
             <SearchSelect
               value={cajero}
               selectedLabel={cajeroLabel}
@@ -94,24 +95,30 @@ export default function TurnosPage() {
               loading={usuariosLoading}
               placeholder="Filtrar por cajero…"
             />
-          </div>
-          <Select value={status} onValueChange={(val) => { setStatus(val as StatusFilter); setPage(1) }}>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            <SelectItem value="Open">Abiertos</SelectItem>
-            <SelectItem value="Closed">Cerrados</SelectItem>
-          </Select>
-          <DatePicker
-            className="filter-select"
-            value={fromDate}
-            onChange={(v) => { setFromDate(v); setPage(1) }}
-            clearable
-          />
-          <DatePicker
-            className="filter-select"
-            value={toDate}
-            onChange={(v) => { setToDate(v); setPage(1) }}
-            clearable
-          />
+          </FilterField>
+          <FilterField label="Estado">
+            <Select value={status} onValueChange={(val) => { setStatus(val as StatusFilter); setPage(1) }}>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="Open">Abiertos</SelectItem>
+              <SelectItem value="Closed">Cerrados</SelectItem>
+            </Select>
+          </FilterField>
+          <FilterField label="Desde">
+            <DatePicker
+              className="filter-select"
+              value={fromDate}
+              onChange={(v) => { setFromDate(v); setPage(1) }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker
+              className="filter-select"
+              value={toDate}
+              onChange={(v) => { setToDate(v); setPage(1) }}
+              clearable
+            />
+          </FilterField>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input
               type="number"

@@ -16,6 +16,7 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 
 type StatusFilter = 'draft' | 'submitted' | 'ordered' | 'lost' | 'cancelled' | 'all'
 
@@ -106,7 +107,7 @@ export default function QuotationsPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div style={{ width: 260 }}>
+          <FilterField label="Cliente" style={{ width: 260 }}>
             <SearchSelect
               value={customerId}
               selectedLabel={customerLabel}
@@ -116,16 +117,18 @@ export default function QuotationsPage() {
               loading={customersLoading}
               placeholder="Filtrar por cliente…"
             />
-          </div>
-          <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            <SelectItem value="draft">Borrador</SelectItem>
-            <SelectItem value="submitted">Sometido</SelectItem>
-            <SelectItem value="ordered">Ordenado</SelectItem>
-            <SelectItem value="lost">Perdido</SelectItem>
-            <SelectItem value="cancelled">Cancelado</SelectItem>
-          </Select>
-          <div style={{ width: 200 }}>
+          </FilterField>
+          <FilterField label="Estado">
+            <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="draft">Borrador</SelectItem>
+              <SelectItem value="submitted">Sometido</SelectItem>
+              <SelectItem value="ordered">Ordenado</SelectItem>
+              <SelectItem value="lost">Perdido</SelectItem>
+              <SelectItem value="cancelled">Cancelado</SelectItem>
+            </Select>
+          </FilterField>
+          <FilterField label="Sucursal" style={{ width: 200 }}>
             <SearchSelect
               value={branch}
               onChange={setBranch}
@@ -134,22 +137,25 @@ export default function QuotationsPage() {
               selectedLabel={branch}
               placeholder="Todas las sucursales"
             />
-          </div>
-          <DatePicker
-            className="ff-input ff-input-sm"
-            value={fromDate}
-            onChange={setFromDate}
-            style={{ width: 144 }}
-            clearable
-          />
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-          <DatePicker
-            className="ff-input ff-input-sm"
-            value={toDate}
-            onChange={setToDate}
-            style={{ width: 144 }}
-            clearable
-          />
+          </FilterField>
+          <FilterField label="Desde">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={fromDate}
+              onChange={setFromDate}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={toDate}
+              onChange={setToDate}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
         </div>
       </div>
 

@@ -4,11 +4,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { AlertTriangle, ArrowLeft } from 'lucide-react'
 import { createDeposito, getDepositosPendientes, listTiposDocumento } from '@/shared/api/tesoreria'
-import type { CreateDepositoDto, TesoreriaLinea, TesoreriaLiquidacion } from '@/shared/api/types'
+import type { CreateDepositoDto, CuentaBancaria, TesoreriaLinea, TesoreriaLiquidacion } from '@/shared/api/types'
 import { CuentaBancariaSelect } from './components/CuentaBancariaSelect'
 import { PartySelect } from './components/PartySelect'
 import { DistribucionCuentasEditor, sumaCoincide } from './components/DistribucionCuentasEditor'
 import { LiquidacionFacturasTable } from './components/LiquidacionFacturasTable'
+import { CuentaContableOverrideSection } from './components/CuentaContableOverrideSection'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { DatePicker } from '@/shared/ui/DatePicker'
@@ -30,8 +31,12 @@ export default function DepositoForm() {
   const [fecha, setFecha] = useState(today())
   const [tipoDocumentoCode, setTipoDocumentoCode] = useState('')
   const [cuentaBancaria, setCuentaBancaria] = useState('')
+  const [cuentaBancariaObj, setCuentaBancariaObj] = useState<CuentaBancaria | undefined>()
   const [descripcion, setDescripcion] = useState('')
   const [monto, setMonto] = useState<number>(0)
+
+  const [cuentaBancoOverride, setCuentaBancoOverride] = useState('')
+  const [cuentaPartyOverride, setCuentaPartyOverride] = useState('')
 
   const [tieneOrigen, setTieneOrigen] = useState(false)
   const [origenTipo, setOrigenTipo] = useState<'Customer' | 'Supplier' | ''>('')
@@ -72,9 +77,17 @@ export default function DepositoForm() {
       setOrigenId('')
       setOrigenNombreAuto('')
       setLiquidaciones([])
+      setCuentaPartyOverride('')
     } else {
       setDistribucion([])
     }
+  }
+
+  // Reasignar la cuenta del origen deja de tener sentido en cuanto hay facturas marcadas para
+  // liquidar — ERPNext exige que sea idéntica a la cuenta con la que se contabilizó cada factura.
+  function handleLiquidacionesChange(next: TesoreriaLiquidacion[]) {
+    setLiquidaciones(next)
+    if (next.length > 0) setCuentaPartyOverride('')
   }
 
   // Al cambiar el tipo de tercero, resetear cualquier selección de origen ya hecha.
@@ -153,6 +166,8 @@ export default function DepositoForm() {
       nota: nota || undefined,
       branch: branch || undefined,
       department: department || undefined,
+      cuentaBancoOverride: cuentaBancoOverride || undefined,
+      cuentaPartyOverride: tieneOrigen && cuentaPartyOverride ? cuentaPartyOverride : undefined,
     }
 
     createMutation.mutate(dto)
@@ -187,7 +202,7 @@ export default function DepositoForm() {
               </div>
               <div className="ff-wrap" style={{ flex: 1, minWidth: 200 }}>
                 <label className="ff-label ff-required">Cuenta Bancaria</label>
-                <CuentaBancariaSelect value={cuentaBancaria} onChange={setCuentaBancaria} />
+                <CuentaBancariaSelect value={cuentaBancaria} onChange={(id, cuenta) => { setCuentaBancaria(id); setCuentaBancariaObj(cuenta) }} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -214,8 +229,8 @@ export default function DepositoForm() {
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 className="card-title">Origen</h2>
-            <label className="ff-check" style={{ margin: 0 }}>
-              <input type="checkbox" checked={tieneOrigen} onChange={(e) => handleToggleOrigen(e.target.checked)} />
+            <label className="ff-check-wrap" style={{ margin: 0, whiteSpace: 'nowrap' }}>
+              <input type="checkbox" className="ff-check" checked={tieneOrigen} onChange={(e) => handleToggleOrigen(e.target.checked)} />
               ¿Tiene origen (cliente o proveedor)?
             </label>
           </div>
@@ -244,7 +259,7 @@ export default function DepositoForm() {
                     pendientes={pendientes ?? []}
                     isLoading={pendientesLoading}
                     monto={monto}
-                    onChange={setLiquidaciones}
+                    onChange={handleLiquidacionesChange}
                     permiteExceder
                     disabledMessage={!origenId ? 'Selecciona un cliente o proveedor para ver sus facturas pendientes' : undefined}
                     emptyMessage="Sin facturas pendientes"
@@ -338,6 +353,32 @@ export default function DepositoForm() {
             )}
           </div>
         </div>
+
+        <CuentaContableOverrideSection
+          rows={[
+            {
+              key: 'banco',
+              label: 'Cuenta del banco',
+              value: cuentaBancoOverride,
+              onChange: setCuentaBancoOverride,
+              cuentaHeredada: cuentaBancariaObj?.account,
+              rootType: 'Asset',
+            },
+            {
+              key: 'party',
+              label: 'Cuenta del origen',
+              value: cuentaPartyOverride,
+              onChange: setCuentaPartyOverride,
+              rootType: origenTipo === 'Supplier' ? 'Liability' : origenTipo === 'Customer' ? 'Asset' : undefined,
+              disabled: !tieneOrigen || liquidaciones.length > 0,
+              disabledReason: !tieneOrigen
+                ? 'Selecciona un origen (cliente o proveedor) para poder reasignar su cuenta.'
+                : liquidaciones.length > 0
+                  ? 'No se puede reasignar mientras haya facturas marcadas para liquidar — la cuenta debe coincidir con la de cada factura liquidada.'
+                  : undefined,
+            },
+          ]}
+        />
 
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header"><h2 className="card-title">Otros</h2></div>

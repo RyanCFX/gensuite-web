@@ -15,6 +15,7 @@ import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
+import { FilterField } from '@/shared/ui/FilterField'
 
 const PAGE_SIZE = 20
 
@@ -193,7 +194,7 @@ export default function ItemsPage() {
               onChange={handleSearchChange}
             />
           </div>
-          <div style={{ width: 200 }}>
+          <FilterField label="Categoría" style={{ width: 200 }}>
             <SearchSelect
               value={categoryFilter}
               onChange={(val) => { setCategoryFilter(val); setPage(1) }}
@@ -202,8 +203,8 @@ export default function ItemsPage() {
               selectedLabel={categoriesData?.items.find((c) => c.id === categoryFilter)?.name ?? ''}
               placeholder="Todas las categorías"
             />
-          </div>
-          <div style={{ width: 200 }}>
+          </FilterField>
+          <FilterField label="Marca" style={{ width: 200 }}>
             <SearchSelect
               value={brandFilter}
               onChange={(val) => { setBrandFilter(val); setPage(1) }}
@@ -212,15 +213,17 @@ export default function ItemsPage() {
               selectedLabel={brandsData?.items.find((b) => b.id === brandFilter)?.name ?? ''}
               placeholder="Todas las marcas"
             />
-          </div>
-          <Select
-            value={statusFilter}
-            onValueChange={(val) => { setStatusFilter(val as 'all' | 'active' | 'disabled'); setPage(1) }}
-          >
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="active">Activos</SelectItem>
-            <SelectItem value="disabled">Inactivos</SelectItem>
-          </Select>
+          </FilterField>
+          <FilterField label="Estado">
+            <Select
+              value={statusFilter}
+              onValueChange={(val) => { setStatusFilter(val as 'all' | 'active' | 'disabled'); setPage(1) }}
+            >
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="active">Activos</SelectItem>
+              <SelectItem value="disabled">Inactivos</SelectItem>
+            </Select>
+          </FilterField>
         </div>
         {/* Template / standalone toggle */}
         <div style={{ display: 'flex', gap: 4 }}>

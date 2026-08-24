@@ -26,7 +26,7 @@ function round2(n: number): number {
  * activo, muestra en tiempo real el diferencial contra `monto` (validación de "distribucion" en
  * los 3 submódulos); cuando no, es una lista libre de comisiones/retenciones sin validación de suma.
  */
-export function DistribucionCuentasEditor({ value, onChange, monto, sumaExacta = false, label, helpText, addLabel = '+ Agregar línea', disabled }: DistribucionCuentasEditorProps) {
+export function DistribucionCuentasEditor({ value, onChange, monto, sumaExacta = false, label, helpText, addLabel = 'Agregar línea', disabled }: DistribucionCuentasEditorProps) {
   function addLinea() {
     onChange([...value, { cuenta: '', monto: 0, descripcion: '' }])
   }

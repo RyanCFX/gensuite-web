@@ -24,6 +24,7 @@ import { useDebounce } from '@/lib/useDebounce'
 import { formatDOP } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 
@@ -401,23 +402,27 @@ export default function PricingRulesPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <Select
-            value={applyOnFilter || '_all'}
-            onValueChange={(val) => { setApplyOnFilter(val === '_all' ? '' : val); setPage(1) }}
-          >
-            <SelectItem value="_all">Todos los tipos de aplicación</SelectItem>
-            {applyOnOptions.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-            ))}
-          </Select>
-          <Select
-            value={disabledFilter || '_all'}
-            onValueChange={(val) => { setDisabledFilter(val === '_all' ? '' : val); setPage(1) }}
-          >
-            <SelectItem value="_all">Todos los estados</SelectItem>
-            <SelectItem value="false">Activas</SelectItem>
-            <SelectItem value="true">Desactivadas</SelectItem>
-          </Select>
+          <FilterField label="Aplica a">
+            <Select
+              value={applyOnFilter || '_all'}
+              onValueChange={(val) => { setApplyOnFilter(val === '_all' ? '' : val); setPage(1) }}
+            >
+              <SelectItem value="_all">Todos los tipos de aplicación</SelectItem>
+              {applyOnOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </Select>
+          </FilterField>
+          <FilterField label="Estado">
+            <Select
+              value={disabledFilter || '_all'}
+              onValueChange={(val) => { setDisabledFilter(val === '_all' ? '' : val); setPage(1) }}
+            >
+              <SelectItem value="_all">Todos los estados</SelectItem>
+              <SelectItem value="false">Activas</SelectItem>
+              <SelectItem value="true">Desactivadas</SelectItem>
+            </Select>
+          </FilterField>
           <div className="search-input-wrap">
             <Search size={14} className="search-input-icon" />
             <input className="search-input" placeholder="Buscar por título…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />

@@ -29,6 +29,7 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 
 // ─── Branch / Department filter ──────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ function BranchDepartmentFilters({
 
   return (
     <>
-      <div style={{ width: 200 }}>
+      <FilterField label="Sucursal" style={{ width: 200 }}>
         <SearchSelect
           value={branch}
           onChange={onBranchChange}
@@ -69,7 +70,7 @@ function BranchDepartmentFilters({
           selectedLabel={branch}
           placeholder="Todas las sucursales"
         />
-      </div>
+      </FilterField>
     </>
   )
 }
@@ -364,13 +365,19 @@ function FinancialReport({ tipo }: { tipo: 'balance' | 'pl' }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
-          <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
-          <Select value={periodicity} onValueChange={(val) => setPeriodicity(val as typeof periodicity)}>
-            <SelectItem value="monthly">Mensual</SelectItem>
-            <SelectItem value="quarterly">Trimestral</SelectItem>
-            <SelectItem value="yearly">Anual</SelectItem>
-          </Select>
+          <FilterField label="Desde">
+            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+          </FilterField>
+          <FilterField label="Periodicidad">
+            <Select value={periodicity} onValueChange={(val) => setPeriodicity(val as typeof periodicity)}>
+              <SelectItem value="monthly">Mensual</SelectItem>
+              <SelectItem value="quarterly">Trimestral</SelectItem>
+              <SelectItem value="yearly">Anual</SelectItem>
+            </Select>
+          </FilterField>
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
             department={department} onDepartmentChange={setDepartment}
@@ -417,13 +424,19 @@ function VentasReport() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
-          <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
-          <Select value={groupBy} onValueChange={(val) => setGroupBy(val as typeof groupBy)}>
-            <SelectItem value="day">Por día</SelectItem>
-            <SelectItem value="week">Por semana</SelectItem>
-            <SelectItem value="month">Por mes</SelectItem>
-          </Select>
+          <FilterField label="Desde">
+            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+          </FilterField>
+          <FilterField label="Agrupar por">
+            <Select value={groupBy} onValueChange={(val) => setGroupBy(val as typeof groupBy)}>
+              <SelectItem value="day">Por día</SelectItem>
+              <SelectItem value="week">Por semana</SelectItem>
+              <SelectItem value="month">Por mes</SelectItem>
+            </Select>
+          </FilterField>
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
             department={department} onDepartmentChange={setDepartment}
@@ -464,8 +477,12 @@ function InventarioReport({ tipo }: { tipo: 'stock' | 'movimientos' }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
-          <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+          <FilterField label="Desde">
+            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+          </FilterField>
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
             department={department} onDepartmentChange={setDepartment}
@@ -521,7 +538,7 @@ function CxcAgingReport() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div style={{ width: 240 }}>
+          <FilterField label="Cliente" style={{ width: 240 }}>
             <SearchSelect
               value={customer}
               selectedLabel={customerLabel}
@@ -531,11 +548,13 @@ function CxcAgingReport() {
               loading={customersLoading}
               placeholder="Todos los clientes"
             />
-          </div>
-          <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
-            <SelectItem value="party">Agrupar por Cliente</SelectItem>
-            <SelectItem value="invoice">Agrupar por Factura</SelectItem>
-          </Select>
+          </FilterField>
+          <FilterField label="Agrupar por">
+            <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
+              <SelectItem value="party">Agrupar por Cliente</SelectItem>
+              <SelectItem value="invoice">Agrupar por Factura</SelectItem>
+            </Select>
+          </FilterField>
         </div>
         <div className="filter-bar-right">
           <DownloadPdfButton onDownload={() => downloadCxcAgingPdf({ customer: customer || undefined, groupBy })} />
@@ -579,7 +598,7 @@ function CxpAgingReport() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div style={{ width: 240 }}>
+          <FilterField label="Proveedor" style={{ width: 240 }}>
             <SearchSelect
               value={supplier}
               selectedLabel={supplierLabel}
@@ -589,11 +608,13 @@ function CxpAgingReport() {
               loading={suppliersLoading}
               placeholder="Todos los proveedores"
             />
-          </div>
-          <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
-            <SelectItem value="party">Agrupar por Proveedor</SelectItem>
-            <SelectItem value="invoice">Agrupar por Factura</SelectItem>
-          </Select>
+          </FilterField>
+          <FilterField label="Agrupar por">
+            <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
+              <SelectItem value="party">Agrupar por Proveedor</SelectItem>
+              <SelectItem value="invoice">Agrupar por Factura</SelectItem>
+            </Select>
+          </FilterField>
         </div>
         <div className="filter-bar-right">
           <DownloadPdfButton onDownload={() => downloadCxpAgingPdf({ supplier: supplier || undefined, groupBy })} />
@@ -636,9 +657,9 @@ function CajaCuadreReport() {
       {/* Filtro */}
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-            Fecha: <DatePicker className="filter-select" clearable value={date} onChange={setDate} />
-          </label>
+          <FilterField label="Fecha">
+            <DatePicker className="filter-select" clearable value={date} onChange={setDate} />
+          </FilterField>
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
             department={department} onDepartmentChange={setDepartment}
@@ -780,9 +801,13 @@ function CuadreTurnoReport() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
-          <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
-          <div style={{ width: 200 }}>
+          <FilterField label="Desde">
+            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+          </FilterField>
+          <FilterField label="Cajero" style={{ width: 200 }}>
             <SearchSelect
               value={cajero}
               onChange={setCajero}
@@ -791,7 +816,7 @@ function CuadreTurnoReport() {
               selectedLabel={cajeros.find((u) => u.email === cajero)?.fullName ?? ''}
               placeholder="Todos los cajeros"
             />
-          </div>
+          </FilterField>
         </div>
         <div className="filter-bar-right">
           <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadExcel} disabled={downloadingExcel}>
@@ -921,8 +946,10 @@ function CorteCajaDiaReport() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <DatePicker className="filter-select" value={date} onChange={setDate} />
-          <div style={{ width: 200 }}>
+          <FilterField label="Fecha">
+            <DatePicker className="filter-select" value={date} onChange={setDate} />
+          </FilterField>
+          <FilterField label="Cajero" style={{ width: 200 }}>
             <SearchSelect
               value={cajero}
               onChange={setCajero}
@@ -931,7 +958,7 @@ function CorteCajaDiaReport() {
               selectedLabel={cajeros.find((u) => u.email === cajero)?.fullName ?? ''}
               placeholder="Todos los cajeros"
             />
-          </div>
+          </FilterField>
         </div>
         <div className="filter-bar-right">
           <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadPdf} disabled={downloadingPdf || !date}>
@@ -1050,15 +1077,21 @@ function LibroDiarioReport() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
-          <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
-          <Select value={groupBy} onValueChange={(val) => setGroupBy(val as typeof groupBy)}>
-            <SelectItem value="Group by Voucher">Agrupar por Voucher</SelectItem>
-            <SelectItem value="Group by Voucher (Consolidated)">Agrupar por Voucher (Consolidado)</SelectItem>
-            <SelectItem value="Group by Account">Agrupar por Cuenta</SelectItem>
-            <SelectItem value="Group by Sucursal">Agrupar por Sucursal</SelectItem>
-            <SelectItem value="Group by Departamento">Agrupar por Departamento</SelectItem>
-          </Select>
+          <FilterField label="Desde">
+            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+          </FilterField>
+          <FilterField label="Agrupar por">
+            <Select value={groupBy} onValueChange={(val) => setGroupBy(val as typeof groupBy)}>
+              <SelectItem value="Group by Voucher">Agrupar por Voucher</SelectItem>
+              <SelectItem value="Group by Voucher (Consolidated)">Agrupar por Voucher (Consolidado)</SelectItem>
+              <SelectItem value="Group by Account">Agrupar por Cuenta</SelectItem>
+              <SelectItem value="Group by Sucursal">Agrupar por Sucursal</SelectItem>
+              <SelectItem value="Group by Departamento">Agrupar por Departamento</SelectItem>
+            </Select>
+          </FilterField>
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
             department={department} onDepartmentChange={setDepartment}
@@ -1100,8 +1133,12 @@ function LibroMayorReport() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
-          <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+          <FilterField label="Desde">
+            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+          </FilterField>
           <BranchDepartmentFilters
             branch={branch} onBranchChange={setBranch}
             department={department} onDepartmentChange={setDepartment}

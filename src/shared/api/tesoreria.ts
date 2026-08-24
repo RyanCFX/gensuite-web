@@ -22,6 +22,7 @@ import type {
   ChequePrintTemplate,
   CreateChequePrintTemplateDto,
   UpdateChequePrintTemplateDto,
+  AsientoPreviewRow,
   PaginatedResponse,
   PaginationParams,
 } from './types'
@@ -129,6 +130,15 @@ export async function cancelEmision(id: string) {
   const res = await client.post<{ success: true; data: TreasuryTransaction }>(
     ENDPOINTS.tesoreria.emisiones.cancel(id),
     {},
+  )
+  return unwrap(res)
+}
+
+/** Preview de los asientos contables (GL) que se generarían al someter esta emisión — solo
+ *  funciona mientras siga en Draft, no somete ni persiste nada. */
+export async function previewAsientosEmision(id: string) {
+  const res = await client.get<{ success: true; data: AsientoPreviewRow[] }>(
+    ENDPOINTS.tesoreria.emisiones.previewAsientos(id),
   )
   return unwrap(res)
 }
@@ -250,6 +260,15 @@ export async function cancelDeposito(id: string) {
   return unwrap(res)
 }
 
+/** Preview de los asientos contables (GL) que se generarían al someter este depósito — solo
+ *  funciona mientras siga en Draft, no somete ni persiste nada. */
+export async function previewAsientosDeposito(id: string) {
+  const res = await client.get<{ success: true; data: AsientoPreviewRow[] }>(
+    ENDPOINTS.tesoreria.depositos.previewAsientos(id),
+  )
+  return unwrap(res)
+}
+
 /** partyId puede ser un Customer o un Supplier — `tipo` desambigua contra qué doctype liquidar. */
 export async function getDepositosPendientes(partyId: string, tipo: 'Customer' | 'Supplier') {
   const res = await client.get<{ success: true; data: TesoreriaPendienteFactura[] }>(
@@ -313,6 +332,15 @@ export async function cancelTransferenciaInterna(id: string) {
   const res = await client.post<{ success: true; data: TreasuryTransaction }>(
     ENDPOINTS.tesoreria.transferenciasInternas.cancel(id),
     {},
+  )
+  return unwrap(res)
+}
+
+/** Preview de los asientos contables (GL) que se generarían al someter esta transferencia — solo
+ *  funciona mientras siga en Draft, no somete ni persiste nada. */
+export async function previewAsientosTransferenciaInterna(id: string) {
+  const res = await client.get<{ success: true; data: AsientoPreviewRow[] }>(
+    ENDPOINTS.tesoreria.transferenciasInternas.previewAsientos(id),
   )
   return unwrap(res)
 }

@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { FilterField } from '@/shared/ui/FilterField'
 
 export default function StockPage() {
   const authUser = useAuthStore((s) => s.user)
@@ -131,7 +132,7 @@ export default function StockPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div style={{ width: 200 }}>
+          <FilterField label="Almacén" style={{ width: 200 }}>
             <SearchSelect
               value={warehouse === 'all' ? '' : warehouse}
               onChange={(val) => { setWarehouse(val || 'all'); if (val) setBranch('') }}
@@ -140,9 +141,9 @@ export default function StockPage() {
               selectedLabel={warehouse === 'all' ? '' : warehouse}
               placeholder="Todos los almacenes"
             />
-          </div>
+          </FilterField>
           {warehouse === 'all' && (
-            <div style={{ width: 200 }}>
+            <FilterField label="Sucursal" style={{ width: 200 }}>
               <SearchSelect
                 value={branch}
                 onChange={setBranch}
@@ -151,7 +152,7 @@ export default function StockPage() {
                 selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
                 placeholder="Todas las sucursales"
               />
-            </div>
+            </FilterField>
           )}
           <input
             className="ff-input ff-input-sm"
@@ -167,11 +168,13 @@ export default function StockPage() {
             onChange={(e) => setBrand(e.target.value)}
             style={{ width: 160 }}
           />
-          <Select value={stockFilter} onValueChange={setStockFilter}>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            <SelectItem value="in_stock">En stock</SelectItem>
-            <SelectItem value="out_of_stock">Sin stock</SelectItem>
-          </Select>
+          <FilterField label="Estado">
+            <Select value={stockFilter} onValueChange={setStockFilter}>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="in_stock">En stock</SelectItem>
+              <SelectItem value="out_of_stock">Sin stock</SelectItem>
+            </Select>
+          </FilterField>
         </div>
       </div>
 

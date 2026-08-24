@@ -6,6 +6,7 @@ import { getMovimientos, getResumenMovimientos } from '@/shared/api/tesoreria'
 import { CuentaBancariaSelect } from './components/CuentaBancariaSelect'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 import { PageHeader } from '@/components/shared/PageHeader'
 
 const PAGE_SIZE = 30
@@ -73,15 +74,19 @@ export default function MovimientosBancoPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
-          <div style={{ minWidth: 260 }}>
+          <FilterField label="Cuenta bancaria" style={{ minWidth: 260 }}>
             <CuentaBancariaSelect
               value={cuentaBancaria}
               onChange={(id) => { setCuentaBancaria(id); setPage(1) }}
               placeholder="Selecciona una cuenta bancaria…"
             />
-          </div>
-          <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} clearable />
-          <DatePicker className="ff-input" value={toDate} onChange={setToDate} clearable />
+          </FilterField>
+          <FilterField label="Desde">
+            <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} clearable />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="ff-input" value={toDate} onChange={setToDate} clearable />
+          </FilterField>
           <button className="btn btn-primary btn-size-sm" onClick={handleBuscar} disabled={!cuentaBancaria}>
             <Search size={13} /> Buscar
           </button>

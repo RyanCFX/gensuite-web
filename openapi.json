@@ -2788,7 +2788,7 @@
             "name": "overdueOnly",
             "required": false,
             "in": "query",
-            "description": "Solo facturas vencidas (due_date \u003C hoy)",
+            "description": "Solo facturas vencidas (due_date < hoy)",
             "schema": {
               "type": "boolean"
             }
@@ -3196,7 +3196,7 @@
             "bearer": []
           }
         ],
-        "summary": "Saldo a favor disponible del cliente (Payment Entries con unallocated_amount \u003E 0, ej. anticipos sin aplicar a ninguna factura). Sin expiración.",
+        "summary": "Saldo a favor disponible del cliente (Payment Entries con unallocated_amount > 0, ej. anticipos sin aplicar a ninguna factura). Sin expiración.",
         "tags": [
           "Cuentas por Cobrar"
         ]
@@ -3615,7 +3615,7 @@
             "name": "overdueOnly",
             "required": false,
             "in": "query",
-            "description": "Solo facturas vencidas (due_date \u003C hoy)",
+            "description": "Solo facturas vencidas (due_date < hoy)",
             "schema": {
               "type": "boolean"
             }
@@ -3883,7 +3883,7 @@
             "bearer": []
           }
         ],
-        "summary": "Saldo a favor disponible con el proveedor (Payment Entries con unallocated_amount \u003E 0, ej. anticipos pagados sin aplicar a ninguna factura). Sin expiración.",
+        "summary": "Saldo a favor disponible con el proveedor (Payment Entries con unallocated_amount > 0, ej. anticipos pagados sin aplicar a ninguna factura). Sin expiración.",
         "tags": [
           "Cuentas por Pagar"
         ]
@@ -7871,6 +7871,73 @@
         ]
       }
     },
+    "/api/v1/config/seguridad": {
+      "get": {
+        "description": "Un solo valor gobierna ambos casos: \"olvidé mi contraseña\" y \"crear contraseña\" de un usuario nuevo son el mismo mecanismo en ERPNext (mismo reset_password_key). Es configuración de nivel site — un valor por tenant.",
+        "operationId": "ConfigController_getSeguridadSettings",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vigencia del link de restablecer/crear contraseña por primera vez",
+        "tags": [
+          "Configuración"
+        ]
+      },
+      "put": {
+        "operationId": "ConfigController_updateSeguridadSettings",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSeguridadSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar vigencia del link de contraseña",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
     "/api/v1/config/retenciones": {
       "get": {
         "operationId": "ConfigController_getRetenciones",
@@ -9999,7 +10066,7 @@
             "name": "from",
             "required": false,
             "in": "query",
-            "description": "Fecha/hora mínima de apertura (period_start_date \u003E=)",
+            "description": "Fecha/hora mínima de apertura (period_start_date >=)",
             "schema": {
               "type": "string"
             }
@@ -10008,7 +10075,7 @@
             "name": "to",
             "required": false,
             "in": "query",
-            "description": "Fecha/hora máxima de apertura (period_start_date \u003C=)",
+            "description": "Fecha/hora máxima de apertura (period_start_date <=)",
             "schema": {
               "type": "string"
             }
@@ -10017,7 +10084,7 @@
             "name": "grandTotalMin",
             "required": false,
             "in": "query",
-            "description": "Solo turnos cerrados (Closed) con grand_total de cierre \u003E= este valor",
+            "description": "Solo turnos cerrados (Closed) con grand_total de cierre >= este valor",
             "schema": {
               "type": "number"
             }
@@ -10026,7 +10093,7 @@
             "name": "grandTotalMax",
             "required": false,
             "in": "query",
-            "description": "Solo turnos cerrados (Closed) con grand_total de cierre \u003C= este valor",
+            "description": "Solo turnos cerrados (Closed) con grand_total de cierre <= este valor",
             "schema": {
               "type": "number"
             }
@@ -10841,7 +10908,7 @@
             "name": "validateStock",
             "required": false,
             "in": "query",
-            "description": "true = solo devolver artículos con stock disponible (\u003E 0) en algún almacén. Solo aplica a productos.",
+            "description": "true = solo devolver artículos con stock disponible (> 0) en algún almacén. Solo aplica a productos.",
             "schema": {
               "default": false,
               "type": "boolean"
@@ -10869,7 +10936,7 @@
             "name": "hasWarranty",
             "required": false,
             "in": "query",
-            "description": "true = solo artículos con garantía (warranty_period \u003E 0). false = sin garantía.",
+            "description": "true = solo artículos con garantía (warranty_period > 0). false = sin garantía.",
             "schema": {
               "type": "boolean"
             }
@@ -19344,7 +19411,7 @@
             "name": "billingStatus",
             "required": false,
             "in": "query",
-            "description": "pending = per_billed \u003C 100 (aún falta facturar total o parcialmente). billed = per_billed = 100.",
+            "description": "pending = per_billed < 100 (aún falta facturar total o parcialmente). billed = per_billed = 100.",
             "schema": {
               "type": "string",
               "enum": [
@@ -20959,6 +21026,44 @@
         ]
       }
     },
+    "/api/v1/tesoreria/emisiones/{id}/preview-asientos": {
+      "get": {
+        "description": "Solo funciona mientras la emisión siga en Draft — no somete ni persiste nada, es 100% de lectura (misma lógica nativa que el botón \"Preview → Accounting Ledger\" del Desk de ERPNext). Útil para confirmar a qué cuentas va a impactar y decidir si hace falta ajustar `cuentaBancoOverride`/`cuentaPartyOverride` antes de someter.",
+        "operationId": "EmisionesController_previewAsientos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Preview de los asientos contables (GL) que se generarían al someter esta emisión",
+        "tags": [
+          "Tesorería — Emisiones"
+        ]
+      }
+    },
     "/api/v1/tesoreria/emisiones/{id}/imprimir": {
       "get": {
         "description": "Comprobante autocontenido en papel normal (no calza sobre un talonario pre-impreso — ver docstring de renderChequePdf).",
@@ -21362,6 +21467,44 @@
         ]
       }
     },
+    "/api/v1/tesoreria/depositos/{id}/preview-asientos": {
+      "get": {
+        "description": "Solo funciona mientras el depósito siga en Draft — no somete ni persiste nada, es 100% de lectura (misma lógica nativa que el botón \"Preview → Accounting Ledger\" del Desk de ERPNext). Útil para confirmar a qué cuentas va a impactar y decidir si hace falta ajustar `cuentaBancoOverride`/`cuentaPartyOverride` antes de someter.",
+        "operationId": "DepositosController_previewAsientos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Preview de los asientos contables (GL) que se generarían al someter este depósito",
+        "tags": [
+          "Tesorería — Depósitos"
+        ]
+      }
+    },
     "/api/v1/tesoreria/depositos/{id}/submit": {
       "post": {
         "operationId": "DepositosController_submit",
@@ -21653,6 +21796,44 @@
           }
         ],
         "summary": "Actualizar campos de cabecera de un borrador",
+        "tags": [
+          "Tesorería — Transferencias Internas"
+        ]
+      }
+    },
+    "/api/v1/tesoreria/transferencias-internas/{id}/preview-asientos": {
+      "get": {
+        "description": "Solo funciona mientras la transferencia siga en Draft — no somete ni persiste nada, es 100% de lectura (misma lógica nativa que el botón \"Preview → Accounting Ledger\" del Desk de ERPNext). Útil para confirmar a qué cuentas va a impactar y decidir si hace falta ajustar `cuentaBancoOrigenOverride`/`cuentaBancoDestinoOverride` antes de someter.",
+        "operationId": "TransferenciasInternasController_previewAsientos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Preview de los asientos contables (GL) que se generarían al someter esta transferencia",
         "tags": [
           "Tesorería — Transferencias Internas"
         ]
@@ -22103,9 +22284,7 @@
     "title": "ERP RD API",
     "description": "Backend API del ERP localizado para República Dominicana",
     "version": "1.0",
-    "contact": {
-
-    }
+    "contact": {}
   },
   "tags": [],
   "servers": [
@@ -22369,7 +22548,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del cobro. Si se omite, se toma de las facturas/pedidos referenciados (si todos coinciden en una sola) o se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente)."
+            "description": "Sucursal del cobro. Si se omite, se toma de las facturas/pedidos referenciados (si todos coinciden en una sola) o se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente)."
           },
           "department": {
             "type": "string",
@@ -22379,7 +22558,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) a la que se acredita este cobro. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) a la que se acredita este cobro. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
           }
         },
         "required": [
@@ -22395,7 +22574,7 @@
           "paymentEntryId": {
             "type": "string",
             "example": "ACC-PAY-2026-00003",
-            "description": "Payment Entry con saldo a favor (unallocated_amount \u003E 0) del mismo proveedor de la factura"
+            "description": "Payment Entry con saldo a favor (unallocated_amount > 0) del mismo proveedor de la factura"
           },
           "amount": {
             "type": "number",
@@ -22500,7 +22679,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del pago. Si se omite, se toma de las facturas referenciadas (si todas coinciden en una sola) o se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente)."
+            "description": "Sucursal del pago. Si se omite, se toma de las facturas referenciadas (si todas coinciden en una sola) o se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente)."
           },
           "department": {
             "type": "string",
@@ -22510,7 +22689,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) desde la que se hace este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) desde la que se hace este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
           }
         },
         "required": [
@@ -22935,7 +23114,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -23042,7 +23221,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) a la que se acredita este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) a la que se acredita este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
           }
         },
         "required": [
@@ -24124,6 +24303,16 @@
           },
           "allowMultiplePricingRules": {
             "type": "boolean"
+          }
+        }
+      },
+      "UpdateSeguridadSettingsDto": {
+        "type": "object",
+        "properties": {
+          "resetPasswordLinkExpiryMinutes": {
+            "type": "number",
+            "example": 10,
+            "description": "Minutos de vigencia del link para restablecer contraseña y para crear la contraseña la primera vez (usuario nuevo) — es EL MISMO mecanismo en ERPNext, así que un solo valor gobierna ambos casos. `0` desactiva la expiración (el link nunca vence) — úsese con cuidado, no se recomienda en producción."
           }
         }
       },
@@ -26064,7 +26253,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -26175,7 +26364,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -26461,7 +26650,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -26589,7 +26778,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -26955,7 +27144,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) involucrada en el reembolso. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) involucrada en el reembolso. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
           }
         },
         "required": [
@@ -27002,7 +27191,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal de la nota de débito. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal de la nota de débito. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -27230,7 +27419,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal por defecto para las líneas que no especifiquen la suya. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente)."
+            "description": "Sucursal por defecto para las líneas que no especifiquen la suya. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente)."
           },
           "department": {
             "type": "string",
@@ -27365,7 +27554,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -27533,7 +27722,7 @@
           "label": {
             "type": "string",
             "example": "Caja 1",
-            "description": "Nombre/etiqueta de la caja. El documento en ERPNext se crea como \"POS \u003Clabel\u003E\"."
+            "description": "Nombre/etiqueta de la caja. El documento en ERPNext se crea como \"POS <label>\"."
           },
           "warehouse": {
             "type": "string",
@@ -28572,6 +28761,16 @@
               "$ref": "#/components/schemas/EmisionLineaDto"
             }
           },
+          "cuentaBancoOverride": {
+            "type": "string",
+            "example": "111-03 - EFECTIVO EN TRÁNSITO - JBC",
+            "description": "Cuenta contable alterna para el LADO BANCO de este asiento puntual, en vez de la que tiene configurada la cuenta bancaria (Bank Account.account). Equivale a lo que hace \"cuentaCxpOverride\" en compras/gastos, pero del lado del banco."
+          },
+          "cuentaPartyOverride": {
+            "type": "string",
+            "example": "21-01-002 - CXP PROVEEDORES EXTERIOR - JBC",
+            "description": "Cuenta contable alterna para el LADO DEL BENEFICIARIO (su CxP/CxC), en vez de la que ERPNext resuelve sola desde el Supplier/Customer. Solo válida CON \"beneficiario\". Ojo: si además se envían \"liquidaciones\", ERPNext exige que esta cuenta sea idéntica al `credit_to`/`debit_to` de cada factura liquidada — se valida antes de enviar."
+          },
           "nota": {
             "type": "string"
           },
@@ -28602,6 +28801,14 @@
           },
           "referencias": {
             "$ref": "#/components/schemas/EmisionReferenciasDto"
+          },
+          "cuentaBancoOverride": {
+            "type": "string",
+            "description": "Reasigna el lado banco del asiento del borrador. Ver CreateEmisionDto.cuentaBancoOverride."
+          },
+          "cuentaPartyOverride": {
+            "type": "string",
+            "description": "Reasigna el lado del beneficiario del asiento del borrador. Solo aplica a borradores que tengan beneficiario. Ver CreateEmisionDto.cuentaPartyOverride."
           },
           "branch": {
             "type": "string"
@@ -28689,6 +28896,16 @@
               "$ref": "#/components/schemas/EmisionLineaDto"
             }
           },
+          "cuentaBancoOverride": {
+            "type": "string",
+            "example": "111-03 - EFECTIVO EN TRÁNSITO - JBC",
+            "description": "Cuenta contable alterna para el LADO BANCO de este asiento puntual, en vez de la que tiene configurada la cuenta bancaria (Bank Account.account)."
+          },
+          "cuentaPartyOverride": {
+            "type": "string",
+            "example": "11-02-002 - CXC CLIENTES EXTERIOR - JBC",
+            "description": "Cuenta contable alterna para el LADO DEL ORIGEN (su CxC si es Customer, su CxP si es Supplier), en vez de la que ERPNext resuelve sola. Solo válida CON \"origen\". Ojo: si además se envían \"liquidaciones\", ERPNext exige que esta cuenta sea idéntica al `debit_to`/`credit_to` de cada factura liquidada — se valida antes de enviar."
+          },
           "nota": {
             "type": "string"
           },
@@ -28717,6 +28934,14 @@
           },
           "referencias": {
             "$ref": "#/components/schemas/EmisionReferenciasDto"
+          },
+          "cuentaBancoOverride": {
+            "type": "string",
+            "description": "Reasigna el lado banco del asiento del borrador. Ver CreateDepositoDto.cuentaBancoOverride."
+          },
+          "cuentaPartyOverride": {
+            "type": "string",
+            "description": "Reasigna el lado del origen del asiento del borrador. Solo aplica a borradores que tengan origen. Ver CreateDepositoDto.cuentaPartyOverride."
           },
           "branch": {
             "type": "string"
@@ -28763,6 +28988,16 @@
               "$ref": "#/components/schemas/EmisionLineaDto"
             }
           },
+          "cuentaBancoOrigenOverride": {
+            "type": "string",
+            "example": "111-03 - EFECTIVO EN TRÁNSITO - JBC",
+            "description": "Cuenta contable alterna para la pata de ORIGEN del asiento, en vez de la que tiene configurada la cuenta bancaria de origen (Bank Account.account)."
+          },
+          "cuentaBancoDestinoOverride": {
+            "type": "string",
+            "example": "111-04 - EFECTIVO EN TRÁNSITO INTERBANCARIO - JBC",
+            "description": "Cuenta contable alterna para la pata de DESTINO del asiento. No puede terminar siendo la misma cuenta contable que la pata de origen."
+          },
           "nota": {
             "type": "string"
           }
@@ -28785,6 +29020,14 @@
           },
           "referencias": {
             "$ref": "#/components/schemas/EmisionReferenciasDto"
+          },
+          "cuentaBancoOrigenOverride": {
+            "type": "string",
+            "description": "Reasigna la pata de origen del asiento del borrador. Ver CreateTransferenciaInternaDto.cuentaBancoOrigenOverride."
+          },
+          "cuentaBancoDestinoOverride": {
+            "type": "string",
+            "description": "Reasigna la pata de destino del asiento del borrador. Ver CreateTransferenciaInternaDto.cuentaBancoDestinoOverride."
           }
         }
       },

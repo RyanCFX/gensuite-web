@@ -16,6 +16,7 @@ import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
+import { FilterField } from '@/shared/ui/FilterField'
 import { useDebounce } from '@/lib/useDebounce'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -244,20 +245,24 @@ export default function TiposDocumentoPage() {
               onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             />
           </div>
-          <Select value={natureFilter} onValueChange={(v) => { setNatureFilter(v); setPage(1) }} placeholder="Todas las naturalezas">
-            {NATURALEZAS.map((n) => (
-              <SelectItem key={n} value={n}>{n}</SelectItem>
-            ))}
-          </Select>
-          <Select
-            value={enabledFilter}
-            onValueChange={(v) => { setEnabledFilter(v as typeof enabledFilter); setPage(1) }}
-            clearable={false}
-          >
-            <SelectItem value="all">Todos los estados</SelectItem>
-            <SelectItem value="enabled">Habilitados</SelectItem>
-            <SelectItem value="disabled">Deshabilitados</SelectItem>
-          </Select>
+          <FilterField label="Naturaleza">
+            <Select value={natureFilter} onValueChange={(v) => { setNatureFilter(v); setPage(1) }} placeholder="Todas las naturalezas">
+              {NATURALEZAS.map((n) => (
+                <SelectItem key={n} value={n}>{n}</SelectItem>
+              ))}
+            </Select>
+          </FilterField>
+          <FilterField label="Estado">
+            <Select
+              value={enabledFilter}
+              onValueChange={(v) => { setEnabledFilter(v as typeof enabledFilter); setPage(1) }}
+              clearable={false}
+            >
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="enabled">Habilitados</SelectItem>
+              <SelectItem value="disabled">Deshabilitados</SelectItem>
+            </Select>
+          </FilterField>
         </div>
       </div>
 
@@ -442,12 +447,12 @@ export default function TiposDocumentoPage() {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <label className="ff-check">
-                    <input type="checkbox" {...register('requiresParty')} />
+                  <label className="ff-check-wrap">
+                    <input type="checkbox" className="ff-check" {...register('requiresParty')} />
                     Requiere beneficiario/origen (Payment Entry obligatorio)
                   </label>
-                  <label className="ff-check">
-                    <input type="checkbox" {...register('requiresNcf')} />
+                  <label className="ff-check-wrap">
+                    <input type="checkbox" className="ff-check" {...register('requiresNcf')} />
                     Requiere NCF de terceros
                   </label>
                   {requiresNcf && (
@@ -456,17 +461,17 @@ export default function TiposDocumentoPage() {
                       <input id="tdNcfPrefix" className="ff-input" placeholder="Ej: B01" {...register('ncfPrefix')} />
                     </div>
                   )}
-                  <label className="ff-check">
-                    <input type="checkbox" {...register('requiresFiscalClass')} />
+                  <label className="ff-check-wrap">
+                    <input type="checkbox" className="ff-check" {...register('requiresFiscalClass')} />
                     Requiere clasificación fiscal 606
                   </label>
-                  <label className="ff-check">
-                    <input type="checkbox" {...register('requiresRnc')} />
+                  <label className="ff-check-wrap">
+                    <input type="checkbox" className="ff-check" {...register('requiresRnc')} />
                     Requiere RNC del tercero
                   </label>
                   {editTarget && (
-                    <label className="ff-check">
-                      <input type="checkbox" {...register('enabled')} />
+                    <label className="ff-check-wrap">
+                      <input type="checkbox" className="ff-check" {...register('enabled')} />
                       Habilitado (visible en los selectores de Emisiones/Depósitos/Transferencias)
                     </label>
                   )}

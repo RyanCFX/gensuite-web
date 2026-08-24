@@ -1332,7 +1332,10 @@ button {
 
 .filter-bar-left {
   display: flex;
-  align-items: center;
+  /* flex-end en vez de center: con `FilterField` cada control lleva su label encima, así que
+     alinear por la base hace que inputs y botones sin label queden a la misma altura que el
+     campo del input de los que sí lo tienen, en vez de quedar descentrados verticalmente. */
+  align-items: flex-end;
   gap: 8px;
   flex: 1;
   min-width: 0;
@@ -3637,4 +3640,202 @@ tbody .badge {
     transform-origin: top left;
     background: #ffffff;
   }
+}
+
+/* ─── Editor visual de plantillas de cheque ─────────────────────────────
+   Mismo patrón de layout full-bleed que el editor de plantillas de factura
+   (bloque .tpl-* arriba), pero sin paleta ni panel izquierdo: los 7
+   elementos del cheque son fijos y ya están dibujados en el canvas — el
+   usuario solo los reubica. Coordenadas en centímetros (PX_PER_CM). */
+
+.chq-editor-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--navbar-height));
+  max-height: calc(100vh - var(--navbar-height));
+  overflow: hidden;
+  padding: 20px 28px;
+}
+
+.chq-editor-header { flex-shrink: 0; margin-bottom: 12px; }
+
+.chq-editor-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.chq-canvas-area {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  /* Punteado sutil en vez de un fondo plano — en modo oscuro `--surface-sunken` es negro puro
+     (#000), y sin esta textura el área alrededor del cheque queda como un vacío sin referencia
+     visual. Mismo tratamiento que `.tpl-canvas-area` en el editor de facturas. */
+  background:
+    radial-gradient(circle, var(--border-strong) 1px, transparent 1px) 0 0 / 18px 18px,
+    var(--surface-sunken);
+  overflow: hidden;
+}
+
+.chq-canvas-scroll {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 48px 32px 90px;
+}
+
+.chq-canvas-inner {
+  position: relative;
+  transform-origin: top center;
+  padding: 20px 0 0 20px;
+}
+
+.chq-ruler {
+  position: absolute;
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-family: var(--font-mono);
+  pointer-events: none;
+}
+.chq-ruler-h { top: 0; left: 20px; height: 18px; border-bottom: 1px solid var(--border-strong); }
+.chq-ruler-v { top: 20px; left: 0; width: 18px; border-right: 1px solid var(--border-strong); }
+.chq-ruler-mark { position: absolute; }
+.chq-ruler-h .chq-ruler-mark { transform: translateX(-50%); bottom: 1px; }
+.chq-ruler-v .chq-ruler-mark { transform: translateY(-50%); right: 3px; }
+
+.chq-sheet {
+  position: relative;
+  background:
+    radial-gradient(circle, var(--border-strong) 1px, transparent 1px) 0 0 / 18px 18px,
+    var(--surface-sunken);
+}
+
+.chq-cheque {
+  position: absolute;
+  left: 0;
+  background: #ffffff;
+  box-shadow: var(--shadow-lg);
+  outline: 1px solid #d4d4d4;
+  overflow: hidden;
+}
+.chq-cheque-a4-inset { outline: 1px dashed #9ca3af; }
+
+.chq-bg-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.chq-el {
+  box-sizing: border-box;
+  cursor: move;
+  border: 1px dashed transparent;
+}
+.chq-el:hover { border-color: var(--border-default); }
+.chq-el-selected { outline: 1.5px solid var(--brand-primary); outline-offset: 1px; border-color: transparent; }
+
+.chq-el-text {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  font-family: var(--font-mono);
+}
+.chq-el-text-multiline { flex-direction: column; align-items: flex-start; justify-content: center; white-space: normal; }
+
+/* ─── Toolbar flotante del canvas (reutiliza .tpl-toolbar-*) ───────────── */
+
+.chq-toolbar {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  background: var(--surface-page);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  z-index: 5;
+}
+
+.chq-toolbar-group { display: flex; align-items: center; gap: 2px; }
+.chq-toolbar-sep { width: 1px; height: 20px; background: var(--border-default); }
+
+.chq-toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.chq-toolbar-btn:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-primary); }
+.chq-toolbar-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.chq-toolbar-btn.active { background: var(--brand-primary-subtle); color: var(--brand-primary); }
+.chq-toolbar-btn-primary { background: var(--brand-primary); color: #fff; }
+.chq-toolbar-btn-primary:hover:not(:disabled) { background: var(--brand-primary-hover); color: #fff; }
+.chq-toolbar-btn-warn { background: var(--warning-bg); color: var(--warning-text); }
+.chq-toolbar-btn-warn:hover:not(:disabled) { background: var(--warning-bg); opacity: 0.85; }
+.chq-toolbar-zoom { font-size: 12px; font-weight: 600; color: var(--text-secondary); min-width: 40px; text-align: center; }
+.chq-toolbar-range { width: 70px; accent-color: var(--brand-primary); }
+
+/* ─── Panel derecho de propiedades ──────────────────────────────────── */
+
+.chq-right-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-page);
+  overflow: hidden;
+}
+
+.chq-right-panel-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+.chq-right-panel-divider { border: none; border-top: 1px solid var(--border-subtle); margin: 0; }
+.chq-right-panel-empty {
+  padding: 24px 4px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 12.5px;
+}
+
+.chq-right-section { display: flex; flex-direction: column; gap: 12px; }
+.chq-right-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  .chq-editor-body { grid-template-columns: 1fr 260px; }
 }

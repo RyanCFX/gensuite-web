@@ -13,21 +13,23 @@ import {
   updateSellingSettings,
   getBuyingSettings,
   updateBuyingSettings,
+  getSeguridadSettings,
+  updateSeguridadSettings,
   listGruposProveedores,
   listPaises,
 } from '@/shared/api/config'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listCustomerGroups } from '@/shared/api/customers'
 import { listUsuarios, listRoles } from '@/shared/api/usuarios'
-import type { AccountsSettings, StockSettings, SellingSettings, BuyingSettings } from '@/shared/api/types'
+import type { AccountsSettings, StockSettings, SellingSettings, BuyingSettings, SeguridadSettings } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { TagInput } from '@/shared/ui/TagInput'
 import { Select, SelectItem } from '@/components/ui/select'
-import { Save, Settings2 } from 'lucide-react'
+import { Save, Settings2, ShieldCheck } from 'lucide-react'
 
-type TabKey = 'cuentas' | 'inventario' | 'ventas' | 'compras'
+type TabKey = 'cuentas' | 'inventario' | 'ventas' | 'compras' | 'seguridad'
 
 export default function AjustesAvanzadosPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('cuentas')
@@ -68,12 +70,20 @@ export default function AjustesAvanzadosPage() {
         >
           Compras
         </button>
+        <button
+          type="button"
+          className={`tab-btn${activeTab === 'seguridad' ? ' on' : ''}`}
+          onClick={() => setActiveTab('seguridad')}
+        >
+          Seguridad
+        </button>
       </div>
 
       {activeTab === 'cuentas' && <CuentasTab />}
       {activeTab === 'inventario' && <InventarioTab />}
       {activeTab === 'ventas' && <VentasTab />}
       {activeTab === 'compras' && <ComprasTab />}
+      {activeTab === 'seguridad' && <SeguridadTab />}
     </div>
   )
 }
@@ -630,6 +640,127 @@ function ComprasTab() {
               <input type="checkbox" className="ff-check" {...register('allowMultiplePricingRules')} />
               Permitir Múltiples Reglas de Precios
             </label>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button type="submit" className="btn btn-primary" disabled={saveMutation.isPending}>
+          <Save size={16} />
+          {saveMutation.isPending ? 'Guardando…' : 'Guardar Cambios'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ─── Seguridad ─────────────────────────────────────────────────────────────
+// "Restablecer contraseña" y "crear contraseña la primera vez" (usuario nuevo) usan
+// mecánicamente el mismo link en ERPNext (mismo reset_password_key) — por eso hay un solo campo
+// acá, no uno por flujo. Ver docs/tasks/33_flujo_contrasenas.md para el flujo que consume esto.
+
+/** Traduce los minutos a una nota legible (horas/días) para que el admin no tenga que hacer la
+ *  cuenta mental con valores grandes — null si no aporta nada (0 o menos de una hora). */
+function formatMinutesHint(minutes: number | undefined): string | null {
+  if (minutes === undefined || minutes === null || minutes <= 0 || minutes < 60) return null
+  const hours = minutes / 60
+  if (Number.isInteger(hours) && hours < 24) {
+    return `${minutes} min = ${hours} ${hours === 1 ? 'hora' : 'horas'}`
+  }
+  const days = minutes / 1440
+  if (Number.isInteger(days)) {
+    return `${minutes} min = ${days} ${days === 1 ? 'día' : 'días'}`
+  }
+  return `${minutes} min ≈ ${(minutes / 60).toFixed(1)} horas`
+}
+
+function SeguridadTab() {
+  const queryClient = useQueryClient()
+  const { data, isLoading } = useQuery({
+    queryKey: ['seguridad-settings'],
+    queryFn: getSeguridadSettings,
+  })
+
+  const { control, handleSubmit, reset, watch } = useForm<SeguridadSettings>({
+    defaultValues: {},
+  })
+  const resetPasswordLinkExpiryMinutes = watch('resetPasswordLinkExpiryMinutes')
+
+  useEffect(() => {
+    if (data) reset(data)
+  }, [data, reset])
+
+  const saveMutation = useMutation({
+    mutationFn: (dto: Partial<SeguridadSettings>) => updateSeguridadSettings(dto),
+    onSuccess: () => {
+      toast.success('Ajustes de Seguridad actualizados')
+      queryClient.invalidateQueries({ queryKey: ['seguridad-settings'] })
+    },
+    onError: (err: any) => toast.error(err?.message || 'Error al guardar los ajustes de Seguridad'),
+  })
+
+  function onSubmit(values: SeguridadSettings) {
+    if (values.resetPasswordLinkExpiryMinutes === 0) {
+      const confirmed = window.confirm(
+        'Vas a desactivar la expiración del link de contraseña — cualquier link enviado quedará ' +
+        'utilizable indefinidamente. ¿Confirmas?'
+      )
+      if (!confirmed) return
+    }
+    saveMutation.mutate(values)
+  }
+
+  if (isLoading) {
+    return <div className="skeleton-box" style={{ height: 200, maxWidth: 720 }} />
+  }
+
+  const minutesHint = formatMinutesHint(resetPasswordLinkExpiryMinutes)
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ShieldCheck size={16} />
+            Ajustes de Seguridad
+          </span>
+        </div>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="ff-wrap">
+            <label className="ff-label" htmlFor="resetPasswordLinkExpiryMinutes">Vigencia del link de contraseña (minutos)</label>
+            <Controller
+              name="resetPasswordLinkExpiryMinutes"
+              control={control}
+              render={({ field }) => (
+                <input
+                  id="resetPasswordLinkExpiryMinutes"
+                  type="number"
+                  min={0}
+                  step={1}
+                  className="ff-input"
+                  value={field.value ?? ''}
+                  onChange={(e) => {
+                    const raw = e.target.value
+                    if (raw === '') { field.onChange(undefined); return }
+                    // Solo enteros >= 0 — un valor negativo o con decimales no tiene sentido acá.
+                    field.onChange(Math.max(0, Math.floor(Number(raw))))
+                  }}
+                />
+              )}
+            />
+            <p className="ff-hint">
+              Tiempo que un usuario tiene para usar el link de correo antes de que caduque — aplica
+              tanto a "olvidé mi contraseña" como al link que recibe un usuario nuevo para crear su
+              contraseña por primera vez (son el mismo mecanismo, un solo valor cubre ambos casos).
+            </p>
+            {minutesHint && <p className="ff-hint">{minutesHint}</p>}
+            {resetPasswordLinkExpiryMinutes === 0 && (
+              <div className="inline-alert inline-alert-warn" style={{ marginTop: 4 }}>
+                ⚠️ En 0, el link nunca expira — cualquier link de contraseña enviado queda utilizable
+                indefinidamente. Es una configuración válida, pero de riesgo; se pedirá confirmación
+                al guardar.
+              </div>
+            )}
           </div>
         </div>
       </div>

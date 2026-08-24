@@ -4,9 +4,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { createTransferenciaInterna, listTiposDocumento } from '@/shared/api/tesoreria'
-import type { CreateTransferenciaInternaDto, TesoreriaLinea } from '@/shared/api/types'
+import type { CreateTransferenciaInternaDto, CuentaBancaria, TesoreriaLinea } from '@/shared/api/types'
 import { CuentaBancariaSelect } from './components/CuentaBancariaSelect'
 import { DistribucionCuentasEditor } from './components/DistribucionCuentasEditor'
+import { CuentaContableOverrideSection } from './components/CuentaContableOverrideSection'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -24,12 +25,17 @@ export default function TransferenciaInternaForm() {
   const [fecha, setFecha] = useState(today())
   const [tipoDocumentoCode, setTipoDocumentoCode] = useState('')
   const [cuentaOrigen, setCuentaOrigen] = useState('')
+  const [cuentaOrigenObj, setCuentaOrigenObj] = useState<CuentaBancaria | undefined>()
   const [cuentaDestino, setCuentaDestino] = useState('')
+  const [cuentaDestinoObj, setCuentaDestinoObj] = useState<CuentaBancaria | undefined>()
   const [descripcion, setDescripcion] = useState('')
   const [monto, setMonto] = useState<number>(0)
   const [numeroReferencia, setNumeroReferencia] = useState('')
   const [deducciones, setDeducciones] = useState<TesoreriaLinea[]>([])
   const [nota, setNota] = useState('')
+
+  const [cuentaBancoOrigenOverride, setCuentaBancoOrigenOverride] = useState('')
+  const [cuentaBancoDestinoOverride, setCuentaBancoDestinoOverride] = useState('')
 
   // tipoDocumento es opcional acá — nunca hay ambigüedad de contrapartida, solo categoriza el listado.
   const { data: tiposData } = useQuery({
@@ -61,6 +67,15 @@ export default function TransferenciaInternaForm() {
       toast.error('La cuenta origen y la cuenta destino deben ser diferentes')
       return
     }
+    // Distinto de la validación anterior: dos cuentas BANCARIAS distintas pueden terminar
+    // apuntando a la misma cuenta CONTABLE (ya sea la heredada o una reasignada), y ese asiento
+    // no significaría nada — débito y crédito se cancelarían en la misma cuenta.
+    const cuentaContableOrigenEfectiva = cuentaBancoOrigenOverride || cuentaOrigenObj?.account
+    const cuentaContableDestinoEfectiva = cuentaBancoDestinoOverride || cuentaDestinoObj?.account
+    if (cuentaContableOrigenEfectiva && cuentaContableDestinoEfectiva && cuentaContableOrigenEfectiva === cuentaContableDestinoEfectiva) {
+      toast.error('La cuenta contable de origen y la de destino quedarían iguales — ese asiento no significaría nada. Reasigna una de las dos.')
+      return
+    }
 
     const dto: CreateTransferenciaInternaDto = {
       fecha,
@@ -72,6 +87,8 @@ export default function TransferenciaInternaForm() {
       referencias: numeroReferencia ? { numeroReferencia } : undefined,
       deducciones: deducciones.length > 0 ? deducciones : undefined,
       nota: nota || undefined,
+      cuentaBancoOrigenOverride: cuentaBancoOrigenOverride || undefined,
+      cuentaBancoDestinoOverride: cuentaBancoDestinoOverride || undefined,
     }
 
     createMutation.mutate(dto)
@@ -109,12 +126,20 @@ export default function TransferenciaInternaForm() {
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
               <div className="ff-wrap" style={{ flex: 1, minWidth: 220 }}>
                 <label className="ff-label ff-required">Cuenta Origen</label>
-                <CuentaBancariaSelect value={cuentaOrigen} onChange={setCuentaOrigen} excludeId={cuentaDestino || undefined} />
+                <CuentaBancariaSelect
+                  value={cuentaOrigen}
+                  onChange={(id, cuenta) => { setCuentaOrigen(id); setCuentaOrigenObj(cuenta) }}
+                  excludeId={cuentaDestino || undefined}
+                />
               </div>
               <ArrowRight size={18} style={{ marginBottom: 10, color: 'var(--text-tertiary)' }} />
               <div className="ff-wrap" style={{ flex: 1, minWidth: 220 }}>
                 <label className="ff-label ff-required">Cuenta Destino</label>
-                <CuentaBancariaSelect value={cuentaDestino} onChange={setCuentaDestino} excludeId={cuentaOrigen || undefined} />
+                <CuentaBancariaSelect
+                  value={cuentaDestino}
+                  onChange={(id, cuenta) => { setCuentaDestino(id); setCuentaDestinoObj(cuenta) }}
+                  excludeId={cuentaOrigen || undefined}
+                />
               </div>
             </div>
 
@@ -159,6 +184,27 @@ export default function TransferenciaInternaForm() {
             )}
           </div>
         </div>
+
+        <CuentaContableOverrideSection
+          rows={[
+            {
+              key: 'origen',
+              label: 'Cuenta de la pata origen',
+              value: cuentaBancoOrigenOverride,
+              onChange: setCuentaBancoOrigenOverride,
+              cuentaHeredada: cuentaOrigenObj?.account,
+              rootType: 'Asset',
+            },
+            {
+              key: 'destino',
+              label: 'Cuenta de la pata destino',
+              value: cuentaBancoDestinoOverride,
+              onChange: setCuentaBancoDestinoOverride,
+              cuentaHeredada: cuentaDestinoObj?.account,
+              rootType: 'Asset',
+            },
+          ]}
+        />
 
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header"><h2 className="card-title">Otros</h2></div>

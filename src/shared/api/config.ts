@@ -41,6 +41,8 @@ import type {
   UpdateSellingSettingsDto,
   BuyingSettings,
   UpdateBuyingSettingsDto,
+  SeguridadSettings,
+  UpdateSeguridadSettingsDto,
 } from './types'
 
 export async function getEmpresa() {
@@ -358,6 +360,16 @@ export async function getBuyingSettings() {
 
 export async function updateBuyingSettings(data: UpdateBuyingSettingsDto) {
   const res = await client.put<{ success: true; data: BuyingSettings }>(ENDPOINTS.settings.buying, data)
+  return unwrap(res)
+}
+
+export async function getSeguridadSettings() {
+  const res = await client.get<{ success: true; data: SeguridadSettings }>(ENDPOINTS.settings.seguridad)
+  return unwrap(res)
+}
+
+export async function updateSeguridadSettings(data: UpdateSeguridadSettingsDto) {
+  const res = await client.put<{ success: true; data: SeguridadSettings }>(ENDPOINTS.settings.seguridad, data)
   return unwrap(res)
 }
 

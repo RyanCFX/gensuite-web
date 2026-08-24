@@ -23,6 +23,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
+import { FilterField } from '@/shared/ui/FilterField'
 import { formatDOP } from '@/lib/formatters'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
@@ -272,24 +273,28 @@ export default function CuentasBancariasPage() {
               onChange={handleSearchChange}
             />
           </div>
-          <select
-            className="ff-select"
-            value={estadoFilter}
-            onChange={(e) => { setEstadoFilter(e.target.value as CuentaBancariaEstado | ''); setPage(1) }}
-            style={{ width: 160 }}
-          >
-            <option value="">Todos los estados</option>
-            {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
-          </select>
-          <select
-            className="ff-select"
-            value={tipoCuentaFilter}
-            onChange={(e) => { setTipoCuentaFilter(e.target.value); setPage(1) }}
-            style={{ width: 200 }}
-          >
-            <option value="">Todos los tipos</option>
-            {(tiposCuenta ?? []).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
+          <FilterField label="Estado">
+            <select
+              className="ff-select"
+              value={estadoFilter}
+              onChange={(e) => { setEstadoFilter(e.target.value as CuentaBancariaEstado | ''); setPage(1) }}
+              style={{ width: 160 }}
+            >
+              <option value="">Todos los estados</option>
+              {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
+            </select>
+          </FilterField>
+          <FilterField label="Tipo de cuenta">
+            <select
+              className="ff-select"
+              value={tipoCuentaFilter}
+              onChange={(e) => { setTipoCuentaFilter(e.target.value); setPage(1) }}
+              style={{ width: 200 }}
+            >
+              <option value="">Todos los tipos</option>
+              {(tiposCuenta ?? []).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </FilterField>
         </div>
       </div>
 
@@ -525,15 +530,11 @@ export default function CuentasBancariasPage() {
                         </Select>
                       )}
                     />
-                    <p className="ff-hint">
-                      Determina qué plantilla nativa de ERPNext se usa al imprimir un cheque de
-                      esta cuenta. Sin plantilla, se usa el comprobante genérico.
-                    </p>
                   </div>
 
                   {!editTarget && (
                     <div className="ff-wrap">
-                      <label className="ff-label" htmlFor="cbBalanceInicial">Balance inicial (conciliado)</label>
+                      <label className="ff-label" htmlFor="cbBalanceInicial">Balance inicial</label>
                       <input
                         id="cbBalanceInicial"
                         className="ff-input"

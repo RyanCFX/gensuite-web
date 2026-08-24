@@ -14,6 +14,7 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { FilterField } from '@/shared/ui/FilterField'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -104,7 +105,7 @@ export default function PagosPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div style={{ width: 260 }}>
+          <FilterField label="Proveedor" style={{ width: 260 }}>
             <SearchSelect
               value={supplierId}
               selectedLabel={supplierLabel}
@@ -114,29 +115,35 @@ export default function PagosPage() {
               loading={suppliersLoading}
               placeholder="Filtrar por proveedor…"
             />
-          </div>
+          </FilterField>
 
-          <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            <SelectItem value="draft">Borrador</SelectItem>
-            <SelectItem value="submitted">Sometido</SelectItem>
-            <SelectItem value="cancelled">Cancelado</SelectItem>
-          </Select>
+          <FilterField label="Estado">
+            <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="draft">Borrador</SelectItem>
+              <SelectItem value="submitted">Sometido</SelectItem>
+              <SelectItem value="cancelled">Cancelado</SelectItem>
+            </Select>
+          </FilterField>
 
-          <DatePicker
-            className="filter-select"
-            value={fromDate}
-            onChange={setFromDate}
-            clearable
-          />
-          <DatePicker
-            className="filter-select"
-            value={toDate}
-            onChange={setToDate}
-            clearable
-          />
+          <FilterField label="Desde">
+            <DatePicker
+              className="filter-select"
+              value={fromDate}
+              onChange={setFromDate}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker
+              className="filter-select"
+              value={toDate}
+              onChange={setToDate}
+              clearable
+            />
+          </FilterField>
 
-          <div style={{ width: 200 }}>
+          <FilterField label="Método de pago" style={{ width: 200 }}>
             <SearchSelect
               value={modeOfPayment}
               onChange={(val) => setModeOfPayment(val)}
@@ -144,9 +151,9 @@ export default function PagosPage() {
               onSearch={setModeOfPaymentSearch}
               placeholder="Todos los métodos de pago"
             />
-          </div>
+          </FilterField>
 
-          <div style={{ width: 200 }}>
+          <FilterField label="Sucursal" style={{ width: 200 }}>
             <SearchSelect
               value={branch}
               onChange={(val) => setBranch(val)}
@@ -155,35 +162,39 @@ export default function PagosPage() {
               selectedLabel={branch}
               placeholder="Todas las sucursales"
             />
-          </div>
+          </FilterField>
 
-          <input
-            className="ff-input ff-input-sm"
-            style={{ width: 180 }}
-            placeholder="Número de referencia…"
-            value={referenceNo}
-            onChange={(e) => setReferenceNo(e.target.value)}
-          />
+          <FilterField label="Referencia">
+            <input
+              className="ff-input ff-input-sm"
+              style={{ width: 180 }}
+              placeholder="Número de referencia…"
+              value={referenceNo}
+              onChange={(e) => setReferenceNo(e.target.value)}
+            />
+          </FilterField>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input
-              type="number"
-              className="ff-input ff-input-sm"
-              style={{ width: 100 }}
-              placeholder="Mín."
-              value={paidAmountMin}
-              onChange={(e) => setPaidAmountMin(e.target.value)}
-            />
-            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-            <input
-              type="number"
-              className="ff-input ff-input-sm"
-              style={{ width: 100 }}
-              placeholder="Máx."
-              value={paidAmountMax}
-              onChange={(e) => setPaidAmountMax(e.target.value)}
-            />
-          </div>
+          <FilterField label="Monto pagado">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Mín."
+                value={paidAmountMin}
+                onChange={(e) => setPaidAmountMin(e.target.value)}
+              />
+              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Máx."
+                value={paidAmountMax}
+                onChange={(e) => setPaidAmountMax(e.target.value)}
+              />
+            </div>
+          </FilterField>
         </div>
       </div>
 

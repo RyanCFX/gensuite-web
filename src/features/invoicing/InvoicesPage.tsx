@@ -13,6 +13,7 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 
 type StatusFilter = 'draft' | 'submitted' | 'cancelled' | 'all'
 type PaymentFilter = 'paid' | 'unpaid' | 'partly_paid' | 'all'
@@ -144,19 +145,23 @@ export default function InvoicesPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="draft">Borrador</SelectItem>
-            <SelectItem value="submitted">Sometido</SelectItem>
-            <SelectItem value="cancelled">Cancelado</SelectItem>
-          </Select>
-          <Select value={paymentStatus} onValueChange={(val) => setPaymentStatus(val as PaymentFilter)}>
-            <SelectItem value="all">Todo estado pago</SelectItem>
-            <SelectItem value="unpaid">Pendiente</SelectItem>
-            <SelectItem value="partly_paid">Parcial</SelectItem>
-            <SelectItem value="paid">Pagado</SelectItem>
-          </Select>
-          <div style={{ width: 200 }}>
+          <FilterField label="Estado">
+            <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="draft">Borrador</SelectItem>
+              <SelectItem value="submitted">Sometido</SelectItem>
+              <SelectItem value="cancelled">Cancelado</SelectItem>
+            </Select>
+          </FilterField>
+          <FilterField label="Estado de pago">
+            <Select value={paymentStatus} onValueChange={(val) => setPaymentStatus(val as PaymentFilter)}>
+              <SelectItem value="all">Todo estado pago</SelectItem>
+              <SelectItem value="unpaid">Pendiente</SelectItem>
+              <SelectItem value="partly_paid">Parcial</SelectItem>
+              <SelectItem value="paid">Pagado</SelectItem>
+            </Select>
+          </FilterField>
+          <FilterField label="Tipo NCF" style={{ width: 200 }}>
             <SearchSelect
               value={ncfType}
               onChange={setNcfType}
@@ -165,8 +170,8 @@ export default function InvoicesPage() {
               selectedLabel={catalogos?.ncfTypes?.find((t) => t.value === ncfType)?.label ?? ''}
               placeholder="Todos los tipos NCF"
             />
-          </div>
-          <div style={{ width: 200 }}>
+          </FilterField>
+          <FilterField label="Sucursal" style={{ width: 200 }}>
             <SearchSelect
               value={branch}
               onChange={setBranch}
@@ -175,45 +180,54 @@ export default function InvoicesPage() {
               selectedLabel={branch}
               placeholder="Todas las sucursales"
             />
-          </div>
-          <DatePicker
-            className="ff-input ff-input-sm"
-            value={fromDate}
-            onChange={setFromDate}
-            style={{ width: 144 }}
-            clearable
-          />
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-          <DatePicker
-            className="ff-input ff-input-sm"
-            value={toDate}
-            onChange={setToDate}
-            style={{ width: 144 }}
-            clearable
-          />
-          <input
-            className="ff-input ff-input-sm"
-            placeholder="Buscar NCF…"
-            value={ncf}
-            onChange={(e) => setNcf(e.target.value)}
-          />
-          <input
-            type="number"
-            className="ff-input ff-input-sm"
-            style={{ width: 100 }}
-            placeholder="Total mín."
-            value={grandTotalMin}
-            onChange={(e) => setGrandTotalMin(e.target.value)}
-          />
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-          <input
-            type="number"
-            className="ff-input ff-input-sm"
-            style={{ width: 100 }}
-            placeholder="Total máx."
-            value={grandTotalMax}
-            onChange={(e) => setGrandTotalMax(e.target.value)}
-          />
+          </FilterField>
+          <FilterField label="Desde">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={fromDate}
+              onChange={setFromDate}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={toDate}
+              onChange={setToDate}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="NCF">
+            <input
+              className="ff-input ff-input-sm"
+              placeholder="Buscar NCF…"
+              value={ncf}
+              onChange={(e) => setNcf(e.target.value)}
+            />
+          </FilterField>
+          <FilterField label="Total">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Total mín."
+                value={grandTotalMin}
+                onChange={(e) => setGrandTotalMin(e.target.value)}
+              />
+              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Total máx."
+                value={grandTotalMax}
+                onChange={(e) => setGrandTotalMax(e.target.value)}
+              />
+            </div>
+          </FilterField>
         </div>
       </div>
 

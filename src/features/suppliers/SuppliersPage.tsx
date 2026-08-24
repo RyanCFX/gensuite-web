@@ -12,6 +12,7 @@ import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
+import { FilterField } from '@/shared/ui/FilterField'
 
 const PAGE_SIZE = 20
 
@@ -117,28 +118,34 @@ export default function SuppliersPage() {
                 onChange={(e) => { setRnc(e.target.value); setPage(1) }}
               />
             </div>
-            <Select value={supplierType} onValueChange={(val) => { setSupplierType(val); setPage(1) }}>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="Company">Empresa</SelectItem>
-              <SelectItem value="Individual">Individual</SelectItem>
-            </Select>
-            <input
-              type="number"
-              className="ff-input ff-input-sm"
-              style={{ width: 100 }}
-              placeholder="Días crédito min"
-              value={diasCreditoMin}
-              onChange={(e) => { setDiasCreditoMin(e.target.value); setPage(1) }}
-            />
-            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-            <input
-              type="number"
-              className="ff-input ff-input-sm"
-              style={{ width: 100 }}
-              placeholder="Días crédito max"
-              value={diasCreditoMax}
-              onChange={(e) => { setDiasCreditoMax(e.target.value); setPage(1) }}
-            />
+            <FilterField label="Tipo">
+              <Select value={supplierType} onValueChange={(val) => { setSupplierType(val); setPage(1) }}>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="Company">Empresa</SelectItem>
+                <SelectItem value="Individual">Individual</SelectItem>
+              </Select>
+            </FilterField>
+            <FilterField label="Días de crédito">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="number"
+                  className="ff-input ff-input-sm"
+                  style={{ width: 100 }}
+                  placeholder="Días crédito min"
+                  value={diasCreditoMin}
+                  onChange={(e) => { setDiasCreditoMin(e.target.value); setPage(1) }}
+                />
+                <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+                <input
+                  type="number"
+                  className="ff-input ff-input-sm"
+                  style={{ width: 100 }}
+                  placeholder="Días crédito max"
+                  value={diasCreditoMax}
+                  onChange={(e) => { setDiasCreditoMax(e.target.value); setPage(1) }}
+                />
+              </div>
+            </FilterField>
           </div>
         </div>
 

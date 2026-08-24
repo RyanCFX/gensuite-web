@@ -2,16 +2,26 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import {
   getChequePrintTemplate,
   createChequePrintTemplate,
   updateChequePrintTemplate,
   regenerarChequePrintTemplate,
 } from '@/shared/api/tesoreria'
-import type { ChequePrintTemplateSize, CreateChequePrintTemplateDto } from '@/shared/api/types'
+import type { CreateChequePrintTemplateDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { Select, SelectItem } from '@/components/ui/select'
+import { ChequeCanvas } from './cheque-template-editor/ChequeCanvas'
+import { ChequeEditorToolbar } from './cheque-template-editor/ChequeEditorToolbar'
+import { ChequePropertiesPanel } from './cheque-template-editor/ChequePropertiesPanel'
+import { CHEQUE_ELEMENTS, DEFAULT_ZOOM, ZOOM_LEVELS, type ChequeElementId } from './cheque-template-editor/constants'
+import {
+  clearBackgroundImage,
+  getBackgroundImage,
+  readFileAsDataUrl,
+  setBackgroundImage,
+  type ChequeBackgroundImage,
+} from './cheque-template-editor/backgroundImage'
 
 type FormValues = Omit<CreateChequePrintTemplateDto, 'bankName'> & { bankName: string }
 
@@ -41,26 +51,6 @@ const EMPTY: FormValues = {
   signatoryFromLeftEdge: undefined,
 }
 
-function NumberField({ label, value, onChange, disabled }: { label: string; value: number | undefined; onChange: (v: number | undefined) => void; disabled?: boolean }) {
-  return (
-    <div className="ff-wrap">
-      <label className="ff-label">{label}</label>
-      <div style={{ position: 'relative' }}>
-        <input
-          className="ff-input"
-          type="number"
-          step="0.1"
-          disabled={disabled}
-          value={value ?? ''}
-          onChange={(e) => onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
-          style={{ paddingRight: 32 }}
-        />
-        <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'var(--text-tertiary)' }}>cm</span>
-      </div>
-    </div>
-  )
-}
-
 export default function PlantillaChequeForm() {
   const { id } = useParams<{ id: string }>()
   const isEdit = !!id
@@ -69,6 +59,15 @@ export default function PlantillaChequeForm() {
 
   const [values, setValues] = useState<FormValues>(EMPTY)
   const [pendienteRegenerar, setPendienteRegenerar] = useState(false)
+  const [selectedId, setSelectedId] = useState<ChequeElementId | null>(null)
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM)
+  const [showGrid, setShowGrid] = useState(true)
+  const [showRulers, setShowRulers] = useState(true)
+  const [snapEnabled, setSnapEnabled] = useState(true)
+  const [background, setBackground] = useState<ChequeBackgroundImage | null>(null)
+  const [history, setHistory] = useState<{ past: FormValues[]; future: FormValues[] }>({ past: [], future: [] })
+
+  const backgroundKey = id ?? 'nueva'
 
   const { data: existing, isLoading } = useQuery({
     queryKey: ['tesoreria-cheque-print-template', id],
@@ -80,14 +79,82 @@ export default function PlantillaChequeForm() {
     if (existing) setValues(existing)
   }, [existing])
 
-  function set<K extends keyof FormValues>(key: K, val: FormValues[K]) {
-    setValues((v) => ({ ...v, [key]: val }))
+  useEffect(() => {
+    setBackground(getBackgroundImage(backgroundKey))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backgroundKey])
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement
+      const isEditableTarget = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable
+      if (isEditableTarget) return
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) redo()
+        else undo()
+        return
+      }
+      if (e.key === 'Escape') { setSelectedId(null); return }
+
+      if (selectedId && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault()
+        moveSelected(e.key, e.shiftKey)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, values])
+
+  function moveSelected(key: string, shift: boolean) {
+    const def = CHEQUE_ELEMENTS.find((d) => d.id === selectedId)
+    if (!def) return
+    const step = shift ? 1 : 0.1
+    const dx = key === 'ArrowLeft' ? -step : key === 'ArrowRight' ? step : 0
+    const dy = key === 'ArrowUp' ? -step : key === 'ArrowDown' ? step : 0
+    if (dx === 0 && dy === 0) return
+    beginTransaction()
+    const top = (values[def.topKey] as number | undefined) ?? def.defaultTopCm
+    const left = (values[def.leftKey] as number | undefined) ?? def.defaultLeftCm
+    setValues((v) => ({
+      ...v,
+      [def.topKey]: Math.round(Math.max(0, top + dy) * 100) / 100,
+      [def.leftKey]: Math.round(Math.max(0, left + dx) * 100) / 100,
+    }))
+  }
+
+  function beginTransaction() {
+    setHistory((h) => ({ past: [...h.past, values], future: [] }))
+  }
+
+  function undo() {
+    setHistory((h) => {
+      if (h.past.length === 0) return h
+      const prev = h.past[h.past.length - 1]
+      setValues(prev)
+      return { past: h.past.slice(0, -1), future: [values, ...h.future] }
+    })
+  }
+
+  function redo() {
+    setHistory((h) => {
+      if (h.future.length === 0) return h
+      const next = h.future[0]
+      setValues(next)
+      return { past: [...h.past, values], future: h.future.slice(1) }
+    })
+  }
+
+  function handleChange(patch: Partial<FormValues>) {
+    setValues((v) => ({ ...v, ...patch }))
   }
 
   const createMutation = useMutation({
     mutationFn: (dto: CreateChequePrintTemplateDto) => createChequePrintTemplate(dto),
     onSuccess: (t) => {
-      toast.success('Plantilla creada — ajusta las coordenadas y regenera cuando estén listas')
+      toast.success('Plantilla creada — ajusta las posiciones y regenera cuando estén listas')
       queryClient.invalidateQueries({ queryKey: ['tesoreria-cheque-print-templates'] })
       navigate(`/config/tesoreria/plantillas-cheque/${encodeURIComponent(t.bankName)}`)
     },
@@ -97,7 +164,7 @@ export default function PlantillaChequeForm() {
   const updateMutation = useMutation({
     mutationFn: (dto: Parameters<typeof updateChequePrintTemplate>[1]) => updateChequePrintTemplate(id!, dto),
     onSuccess: () => {
-      toast.success('Coordenadas actualizadas')
+      toast.success('Posiciones actualizadas')
       queryClient.invalidateQueries({ queryKey: ['tesoreria-cheque-print-template', id] })
       queryClient.invalidateQueries({ queryKey: ['tesoreria-cheque-print-templates'] })
       // No confiar en hasPrintFormat de la respuesta del PUT — el doc 41 advierte que puede no
@@ -118,8 +185,7 @@ export default function PlantillaChequeForm() {
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al regenerar la plantilla'),
   })
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  function handleSave() {
     if (!values.bankName) {
       toast.error('El nombre de la plantilla es requerido')
       return
@@ -133,6 +199,39 @@ export default function PlantillaChequeForm() {
     }
   }
 
+  async function handleUploadBackground(file: File) {
+    const dataUrl = await readFileAsDataUrl(file)
+    const next: ChequeBackgroundImage = { dataUrl, opacity: background?.opacity ?? 0.5, visible: true }
+    const error = setBackgroundImage(backgroundKey, next)
+    if (error) {
+      toast.error(error)
+      return
+    }
+    setBackground(next)
+  }
+
+  function handleClearBackground() {
+    clearBackgroundImage(backgroundKey)
+    setBackground(null)
+  }
+
+  function handleBackgroundOpacityChange(opacity: number) {
+    if (!background) return
+    const next = { ...background, opacity }
+    setBackgroundImage(backgroundKey, next)
+    setBackground(next)
+  }
+
+  function zoomByFactor(factor: number) {
+    setZoom((z) => Math.min(2, Math.max(0.5, Math.round(z * factor * 100) / 100)))
+  }
+
+  function zoomStep(dir: 1 | -1) {
+    const idx = ZOOM_LEVELS.findIndex((z) => z >= zoom)
+    const nextIdx = dir === 1 ? Math.min(ZOOM_LEVELS.length - 1, idx + 1) : Math.max(0, idx - 1)
+    setZoom(ZOOM_LEVELS[nextIdx] ?? DEFAULT_ZOOM)
+  }
+
   if (isEdit && isLoading) {
     return (
       <div className="page-container">
@@ -143,141 +242,66 @@ export default function PlantillaChequeForm() {
   }
 
   return (
-    <div className="page-container">
-      <a className="page-back-link" onClick={() => navigate('/config/tesoreria/plantillas-cheque')}>
-        <ArrowLeft size={14} /> Plantillas de Cheque
-      </a>
+    <div className="chq-editor-page">
+      <div className="chq-editor-header">
+        <a className="page-back-link" onClick={() => navigate('/config/tesoreria/plantillas-cheque')}>
+          <ArrowLeft size={14} /> Plantillas de Cheque
+        </a>
+        <PageHeader
+          title={isEdit ? `Editar Plantilla: ${id}` : 'Nueva Plantilla de Cheque'}
+          description="Arrastra cada elemento sobre el cheque para posicionarlo, o ajusta las coordenadas exactas en el panel derecho"
+        />
+      </div>
 
-      <PageHeader
-        title={isEdit ? `Editar Plantilla: ${id}` : 'Nueva Plantilla de Cheque'}
-        description="Coordenadas en centímetros desde el borde superior/izquierdo del papel pre-impreso"
-      />
-
-      {pendienteRegenerar && (
-        <div className="inline-alert inline-alert-warn" style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 13 }}>Coordenadas actualizadas — debe regenerar la plantilla para que se reflejen en la impresión.</span>
-          <button type="button" className="btn btn-primary btn-size-sm" onClick={() => regenerarMutation.mutate()} disabled={regenerarMutation.isPending}>
-            <RefreshCw size={13} /> {regenerarMutation.isPending ? 'Regenerando…' : 'Regenerar plantilla'}
-          </button>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit}>
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Identificación</h2></div>
-          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <div className="ff-wrap" style={{ flex: 1, minWidth: 200 }}>
-                <label className="ff-label ff-required">Nombre de la plantilla</label>
-                {isEdit ? (
-                  <>
-                    <input className="ff-input" value={values.bankName} disabled />
-                    <p className="ff-hint">No editable — para renombrar, crea una plantilla nueva.</p>
-                  </>
-                ) : (
-                  <input className="ff-input" placeholder="Ej: Popular Estandar" value={values.bankName} onChange={(e) => set('bankName', e.target.value)} />
-                )}
-              </div>
-              <div className="ff-wrap" style={{ flex: 1, minWidth: 160 }}>
-                <label className="ff-label">Tamaño de cheque</label>
-                <Select value={values.chequeSize ?? 'Regular'} onValueChange={(v) => set('chequeSize', v as ChequePrintTemplateSize)} clearable={false}>
-                  <SelectItem value="Regular">Regular</SelectItem>
-                  <SelectItem value="A4">A4</SelectItem>
-                </Select>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <NumberField label="Ancho del cheque" value={values.chequeWidth} onChange={(v) => set('chequeWidth', v)} />
-              <NumberField label="Alto del cheque" value={values.chequeHeight} onChange={(v) => set('chequeHeight', v)} />
-              <NumberField
-                label="Posición desde borde superior (solo A4)"
-                value={values.startingPositionFromTopEdge}
-                onChange={(v) => set('startingPositionFromTopEdge', v)}
-                disabled={values.chequeSize !== 'A4'}
-              />
-            </div>
-          </div>
+      <div className="chq-editor-body">
+        <div className="chq-canvas-area">
+          <ChequeCanvas
+            values={values}
+            zoom={zoom}
+            selectedId={selectedId}
+            onSelectId={setSelectedId}
+            onBeginTransaction={beginTransaction}
+            onUpdateValues={handleChange}
+            showGrid={showGrid}
+            showRulers={showRulers}
+            snapEnabled={snapEnabled}
+            background={background}
+            onZoomByFactor={zoomByFactor}
+          />
+          <ChequeEditorToolbar
+            zoom={zoom}
+            canUndo={history.past.length > 0}
+            canRedo={history.future.length > 0}
+            saving={createMutation.isPending || updateMutation.isPending}
+            showGrid={showGrid}
+            showRulers={showRulers}
+            snapEnabled={snapEnabled}
+            hasBackground={!!background}
+            backgroundOpacity={background?.opacity ?? 0.5}
+            pendienteRegenerar={pendienteRegenerar}
+            regenerando={regenerarMutation.isPending}
+            onZoomIn={() => zoomStep(1)}
+            onZoomOut={() => zoomStep(-1)}
+            onUndo={undo}
+            onRedo={redo}
+            onSave={handleSave}
+            onToggleGrid={() => setShowGrid((v) => !v)}
+            onToggleRulers={() => setShowRulers((v) => !v)}
+            onToggleSnap={() => setSnapEnabled((v) => !v)}
+            onUploadBackground={handleUploadBackground}
+            onClearBackground={handleClearBackground}
+            onBackgroundOpacityChange={handleBackgroundOpacityChange}
+            onRegenerar={() => regenerarMutation.mutate()}
+          />
         </div>
 
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Fecha</h2></div>
-          <div className="card-body" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <NumberField label="Desde borde superior" value={values.dateDistFromTopEdge} onChange={(v) => set('dateDistFromTopEdge', v)} />
-            <NumberField label="Desde borde izquierdo" value={values.dateDistFromLeftEdge} onChange={(v) => set('dateDistFromLeftEdge', v)} />
-          </div>
-        </div>
-
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Beneficiario</h2></div>
-          <div className="card-body" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <NumberField label="Desde borde superior" value={values.payerNameFromTopEdge} onChange={(v) => set('payerNameFromTopEdge', v)} />
-            <NumberField label="Desde borde izquierdo" value={values.payerNameFromLeftEdge} onChange={(v) => set('payerNameFromLeftEdge', v)} />
-          </div>
-        </div>
-
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Monto en Letras</h2></div>
-          <div className="card-body" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <NumberField label="Desde borde superior" value={values.amtInWordsFromTopEdge} onChange={(v) => set('amtInWordsFromTopEdge', v)} />
-            <NumberField label="Desde borde izquierdo" value={values.amtInWordsFromLeftEdge} onChange={(v) => set('amtInWordsFromLeftEdge', v)} />
-            <NumberField label="Ancho" value={values.amtInWordWidth} onChange={(v) => set('amtInWordWidth', v)} />
-            <NumberField label="Espaciado entre líneas" value={values.amtInWordsLineSpacing} onChange={(v) => set('amtInWordsLineSpacing', v)} />
-          </div>
-        </div>
-
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Monto en Números</h2></div>
-          <div className="card-body" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <NumberField label="Desde borde superior" value={values.amtInFiguresFromTopEdge} onChange={(v) => set('amtInFiguresFromTopEdge', v)} />
-            <NumberField label="Desde borde izquierdo" value={values.amtInFiguresFromLeftEdge} onChange={(v) => set('amtInFiguresFromLeftEdge', v)} />
-          </div>
-        </div>
-
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Cuenta</h2></div>
-          <div className="card-body" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <NumberField label="Desde borde superior" value={values.accNoDistFromTopEdge} onChange={(v) => set('accNoDistFromTopEdge', v)} />
-            <NumberField label="Desde borde izquierdo" value={values.accNoDistFromLeftEdge} onChange={(v) => set('accNoDistFromLeftEdge', v)} />
-          </div>
-        </div>
-
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Firma</h2></div>
-          <div className="card-body" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <NumberField label="Desde borde superior" value={values.signatoryFromTopEdge} onChange={(v) => set('signatoryFromTopEdge', v)} />
-            <NumberField label="Desde borde izquierdo" value={values.signatoryFromLeftEdge} onChange={(v) => set('signatoryFromLeftEdge', v)} />
-          </div>
-        </div>
-
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 className="card-title">Leyenda "Account Pay Only"</h2>
-            <label className="ff-check" style={{ margin: 0 }}>
-              <input type="checkbox" checked={!!values.isAccountPayable} onChange={(e) => set('isAccountPayable', e.target.checked)} />
-              Incluir leyenda
-            </label>
-          </div>
-          {values.isAccountPayable && (
-            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div className="ff-wrap">
-                <label className="ff-label">Texto de la leyenda</label>
-                <input className="ff-input" placeholder="Account Pay Only" value={values.messageToShow ?? ''} onChange={(e) => set('messageToShow', e.target.value)} />
-              </div>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <NumberField label="Desde borde superior" value={values.accPayDistFromTopEdge} onChange={(v) => set('accPayDistFromTopEdge', v)} />
-                <NumberField label="Desde borde izquierdo" value={values.accPayDistFromLeftEdge} onChange={(v) => set('accPayDistFromLeftEdge', v)} />
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="doc-actions-bar">
-          <button type="button" className="btn btn-ghost" onClick={() => navigate('/config/tesoreria/plantillas-cheque')}>Cancelar</button>
-          <button type="submit" className="btn btn-primary" disabled={createMutation.isPending || updateMutation.isPending}>
-            {createMutation.isPending || updateMutation.isPending ? 'Guardando…' : isEdit ? 'Guardar' : 'Crear Plantilla'}
-          </button>
-        </div>
-      </form>
+        <ChequePropertiesPanel
+          values={values}
+          isEdit={isEdit}
+          selectedId={selectedId}
+          onChange={handleChange}
+        />
+      </div>
     </div>
   )
 }

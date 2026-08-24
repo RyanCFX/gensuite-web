@@ -11,6 +11,7 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import {
   listNotificacionTipos,
@@ -726,7 +727,7 @@ function HistorialTab() {
       {/* ── Filtros ─────────────────────────────────────────────────────── */}
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div style={{ width: 200 }}>
+          <FilterField label="Tipo" style={{ width: 200 }}>
             <SearchSelect
               value={filtroTipo}
               onChange={(val) => { setFiltroTipo(val); resetPage() }}
@@ -735,26 +736,32 @@ function HistorialTab() {
               selectedLabel={tiposData?.find((t) => t.codigo === filtroTipo)?.nombre ?? ''}
               placeholder="Todos los tipos"
             />
-          </div>
+          </FilterField>
 
-          <Select value={filtroEstado} onValueChange={(val) => { setFiltroEstado(val); resetPage() }}>
-            {ESTADOS.map((e) => (
-              <SelectItem key={e} value={e}>{e === 'Todos' ? 'Todos los estados' : e}</SelectItem>
-            ))}
-          </Select>
+          <FilterField label="Estado">
+            <Select value={filtroEstado} onValueChange={(val) => { setFiltroEstado(val); resetPage() }}>
+              {ESTADOS.map((e) => (
+                <SelectItem key={e} value={e}>{e === 'Todos' ? 'Todos los estados' : e}</SelectItem>
+              ))}
+            </Select>
+          </FilterField>
 
-          <DatePicker
-            className="filter-select"
-            value={filtroDesde}
-            onChange={(v) => { setFiltroDesde(v); resetPage() }}
-            clearable
-          />
-          <DatePicker
-            className="filter-select"
-            value={filtroHasta}
-            onChange={(v) => { setFiltroHasta(v); resetPage() }}
-            clearable
-          />
+          <FilterField label="Desde">
+            <DatePicker
+              className="filter-select"
+              value={filtroDesde}
+              onChange={(v) => { setFiltroDesde(v); resetPage() }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker
+              className="filter-select"
+              value={filtroHasta}
+              onChange={(v) => { setFiltroHasta(v); resetPage() }}
+              clearable
+            />
+          </FilterField>
         </div>
       </div>
 

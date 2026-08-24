@@ -3485,6 +3485,15 @@ export interface BuyingSettings {
 }
 export type UpdateBuyingSettingsDto = Partial<BuyingSettings>;
 
+export interface SeguridadSettings {
+  /** Minutos de vigencia del link para restablecer contraseña y para crear la contraseña la
+   *  primera vez (usuario nuevo) — es EL MISMO mecanismo en ERPNext (mismo reset_password_key),
+   *  un solo valor gobierna ambos casos. `0` desactiva la expiración (el link nunca vence). */
+  resetPasswordLinkExpiryMinutes?: number;
+  [key: string]: unknown;
+}
+export type UpdateSeguridadSettingsDto = Partial<SeguridadSettings>;
+
 // ─── Retenciones (Tax Withholding Category) ───────────────────────────────────
 
 export interface RetencionComponente {
@@ -3909,6 +3918,16 @@ export interface TreasuryTransaction {
   department?: string;
   creation?: string;
   modified?: string;
+  /** Cuenta contable alterna para el lado banco de este documento puntual — ver CreateEmisionDto/
+   *  CreateDepositoDto.cuentaBancoOverride. Presente solo si se reasignó. */
+  cuentaBancoOverride?: string;
+  /** Cuenta contable alterna para el lado del beneficiario/origen — ver CreateEmisionDto/
+   *  CreateDepositoDto.cuentaPartyOverride. Presente solo si se reasignó. */
+  cuentaPartyOverride?: string;
+  /** Solo Transferencias Internas — cuenta contable alterna de la pata de origen. */
+  cuentaBancoOrigenOverride?: string;
+  /** Solo Transferencias Internas — cuenta contable alterna de la pata de destino. */
+  cuentaBancoDestinoOverride?: string;
 }
 
 // ─── Tesorería — Emisiones (egresos) ───────────────────────────────────────────
@@ -3932,6 +3951,15 @@ export interface CreateEmisionDto {
   nota?: string;
   branch?: string;
   department?: string;
+  /** Cuenta contable alterna para el LADO BANCO de este asiento puntual, en vez de la que tiene
+   *  configurada la cuenta bancaria (Bank Account.account). Excepción, no un campo de todos los
+   *  días — úsese solo cuando el movimiento debe desviarse de la cuenta habitual. */
+  cuentaBancoOverride?: string;
+  /** Cuenta contable alterna para el LADO DEL BENEFICIARIO (su CxP/CxC), en vez de la que
+   *  ERPNext resuelve sola desde el Supplier/Customer. Solo válida CON "beneficiario". Si además
+   *  se envían "liquidaciones", debe ser idéntica a la cuenta con la que quedó contabilizada cada
+   *  factura liquidada — el backend rechaza con un mensaje explícito si no calzan. */
+  cuentaPartyOverride?: string;
 }
 
 /** PUT /tesoreria/emisiones/:id — solo cabecera de un borrador. */
@@ -3941,6 +3969,11 @@ export interface UpdateEmisionDto {
   referencias?: TesoreriaReferencias;
   branch?: string;
   department?: string;
+  /** Reasigna el lado banco del asiento del borrador. Ver CreateEmisionDto.cuentaBancoOverride. */
+  cuentaBancoOverride?: string;
+  /** Reasigna el lado del beneficiario del asiento del borrador. Solo aplica a borradores que
+   *  tengan beneficiario. Ver CreateEmisionDto.cuentaPartyOverride. */
+  cuentaPartyOverride?: string;
 }
 
 // ─── Tesorería — Depósitos (ingresos) ──────────────────────────────────────────
@@ -3964,6 +3997,14 @@ export interface CreateDepositoDto {
   nota?: string;
   branch?: string;
   department?: string;
+  /** Cuenta contable alterna para el LADO BANCO de este asiento puntual, en vez de la que tiene
+   *  configurada la cuenta bancaria (Bank Account.account). */
+  cuentaBancoOverride?: string;
+  /** Cuenta contable alterna para el LADO DEL ORIGEN (su CxC si es Customer, su CxP si es
+   *  Supplier), en vez de la que ERPNext resuelve sola. Solo válida CON "origen". Si además se
+   *  envían "liquidaciones", debe ser idéntica a la cuenta con la que quedó contabilizada cada
+   *  factura liquidada. */
+  cuentaPartyOverride?: string;
 }
 
 /** PUT /tesoreria/depositos/:id — solo cabecera de un borrador. */
@@ -3973,6 +4014,11 @@ export interface UpdateDepositoDto {
   referencias?: TesoreriaReferencias;
   branch?: string;
   department?: string;
+  /** Reasigna el lado banco del asiento del borrador. Ver CreateDepositoDto.cuentaBancoOverride. */
+  cuentaBancoOverride?: string;
+  /** Reasigna el lado del origen del asiento del borrador. Solo aplica a borradores que tengan
+   *  origen. Ver CreateDepositoDto.cuentaPartyOverride. */
+  cuentaPartyOverride?: string;
 }
 
 // ─── Tesorería — Transferencias Internas ───────────────────────────────────────
@@ -3991,6 +4037,12 @@ export interface CreateTransferenciaInternaDto {
   /** Comisiones interbancarias — reducen lo que llega a cuentaDestino respecto a lo que sale. */
   deducciones?: TesoreriaLinea[];
   nota?: string;
+  /** Cuenta contable alterna para la pata de ORIGEN del asiento, en vez de la que tiene
+   *  configurada la cuenta bancaria de origen (Bank Account.account). */
+  cuentaBancoOrigenOverride?: string;
+  /** Cuenta contable alterna para la pata de DESTINO del asiento. No puede terminar siendo la
+   *  misma cuenta contable que la pata de origen. */
+  cuentaBancoDestinoOverride?: string;
 }
 
 /** PUT /tesoreria/transferencias-internas/:id — solo cabecera de un borrador. */
@@ -3998,6 +4050,12 @@ export interface UpdateTransferenciaInternaDto {
   descripcion?: string;
   nota?: string;
   referencias?: TesoreriaReferencias;
+  /** Reasigna la pata de origen del asiento del borrador. Ver
+   *  CreateTransferenciaInternaDto.cuentaBancoOrigenOverride. */
+  cuentaBancoOrigenOverride?: string;
+  /** Reasigna la pata de destino del asiento del borrador. Ver
+   *  CreateTransferenciaInternaDto.cuentaBancoDestinoOverride. */
+  cuentaBancoDestinoOverride?: string;
 }
 
 // ─── Tesorería — Facturas pendientes (liquidaciones) ───────────────────────────
