@@ -111,7 +111,7 @@ export default function CustomersPage() {
         </button>
       </div>
 
-      <div className="filter-bar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+      <div className="filter-bar">
         <div className="filter-bar-left">
           <FilterField label="Cliente" style={{ width: 200 }}>
             <input
@@ -121,14 +121,14 @@ export default function CustomersPage() {
               onChange={(e) => { setCustomerName(e.target.value); setPage(1) }}
             />
           </FilterField>
-          <FilterField label="Tipo" style={{ width: 160 }}>
+          <FilterField label="Tipo">
             <Select value={customerType} onValueChange={(val) => { setCustomerType(val); setPage(1) }}>
               <SelectItem value="all">Todos los tipos</SelectItem>
               <SelectItem value="Company">Empresa</SelectItem>
               <SelectItem value="Individual">Individual</SelectItem>
             </Select>
           </FilterField>
-          <FilterField label="Identificación" style={{ width: 180 }}>
+          <FilterField label="Identificación">
             <Select value={tipoIdentificacion} onValueChange={(val) => { setTipoIdentificacion(val); setPage(1) }}>
               <SelectItem value="all">Todas las identificaciones</SelectItem>
               {TIPO_IDENTIFICACION.map((t) => (
@@ -144,7 +144,7 @@ export default function CustomersPage() {
               onChange={(e) => { setIdentificacion(e.target.value); setPage(1) }}
             />
           </FilterField>
-          <FilterField label="Crédito" style={{ width: 160 }}>
+          <FilterField label="Crédito">
             <Select value={hasCredit} onValueChange={(val) => { setHasCredit(val); setPage(1) }}>
               <SelectItem value="all">Crédito: Todos</SelectItem>
               <SelectItem value="true">Con crédito</SelectItem>
@@ -163,7 +163,9 @@ export default function CustomersPage() {
             Mostrar desactivados
           </label>
         </div>
+      </div>
 
+      <div className="filter-bar">
         <div className="filter-bar-left">
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span className="td-muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>Fecha creación</span>
