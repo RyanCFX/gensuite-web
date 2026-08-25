@@ -9,7 +9,8 @@ import { createGasto, updateGasto, getGasto } from '@/shared/api/compras-gastos'
 import { listSuppliers, getSupplier } from '@/shared/api/suppliers'
 import type { CreateGastoDto, DistribucionCuentaDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { getCatalogosFiscales, getFacturacionConfig, listImpuestosCompras } from '@/shared/api/config'
+import { getCatalogosFiscales, getFacturacionConfig, getCuentasEmpresa, listImpuestosCompras } from '@/shared/api/config'
+import { getCuenta } from '@/shared/api/cuentas'
 import { CATEGORIA_GASTO } from '@/lib/constants'
 import { listRetenciones } from '@/shared/api/retenciones'
 import { Plus, Trash2, Pencil, Info, AlertCircle, AlertTriangle } from 'lucide-react'
@@ -46,6 +47,9 @@ interface ItemRow {
   /** Cuenta contable a debitar por esta línea — si se omite, usa la cuenta de gasto default del
    *  Item (ítems de catálogo) o es requerida (ítems ad-hoc). Ignorada si `distribucionCuenta` trae entradas. */
   cuentaAlterna?: string
+  /** Cuenta contable configurada en el concepto de Cuentas por Pagar seleccionado — ausente en
+   *  ítems ad-hoc. Se usa para mostrar (solo lectura) qué cuenta aplicará a la línea. */
+  cuentaConcepto?: string
   tipoBienes606Linea?: string
   tipoGastoFiscal?: 'Bienes' | 'Servicios' | ''
   impuestosLinea?: string[]
@@ -81,6 +85,31 @@ const B17_MAX = 50
 // CreateGastoDto.tipoComprobante solo acepta este subconjunto de tipos de NCF (según openapi.json),
 // aunque el catálogo ncfTypesCompra trae más — ver uso en tipoComprobanteOptions.
 const TIPO_COMPROBANTE_GASTO_VALUES = new Set(['B01', 'B13', 'B14', 'B15', 'B16', 'B17', 'E31'])
+
+/** Muestra (solo lectura) la cuenta contable que aplicará a una línea de concepto de Cuentas
+ *  por Pagar: la cuenta configurada en el concepto o, si no tiene una, la cuenta de gastos por
+ *  defecto de la Empresa. Ya no es editable por línea — para desviarse de esta cuenta hay que
+ *  usar "Dividir" y repartir el monto entre las cuentas deseadas. */
+function ItemCuentaContableText({ accountId }: { accountId?: string }) {
+  const { data: cuenta, isLoading: loadingCuenta } = useQuery({
+    queryKey: ['cuenta', accountId],
+    queryFn: () => getCuenta(accountId!),
+    enabled: !!accountId,
+    staleTime: 5 * 60_000,
+  })
+
+  if (loadingCuenta) {
+    return <span className="td-muted" style={{ fontSize: 12 }}>Cargando…</span>
+  }
+  if (!cuenta) {
+    return <span className="td-muted" style={{ fontSize: 12 }}>Sin cuenta configurada</span>
+  }
+  return (
+    <span style={{ fontSize: 12 }}>
+      {cuenta.accountNumber ? `${cuenta.accountNumber} - ` : ''}{cuenta.accountName}
+    </span>
+  )
+}
 
 export default function GastoForm() {
   const navigate = useNavigate()
@@ -127,6 +156,12 @@ export default function GastoForm() {
     staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
+
+  const { data: cuentasEmpresa } = useQuery({
+    queryKey: ['cuentas-empresa'],
+    queryFn: getCuentasEmpresa,
+    staleTime: 5 * 60_000,
+  })
 
   const currentUserEmail = getUser()?.email
   const { data: currentUser } = useQuery({
@@ -483,6 +518,7 @@ export default function GastoForm() {
           description: concepto.descripcion ?? concepto.titulo,
           rate: 0,
           qty: 1,
+          cuentaConcepto: concepto.cuenta,
         }
       })
     })
@@ -492,7 +528,9 @@ export default function GastoForm() {
 
   const clearCatalogItem = useCallback((idx: number) => {
     setItems((prev) => prev.map((row, i) =>
-      i === idx ? { ...row, itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, qty: 1 } : row,
+      i === idx
+        ? { ...row, itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, qty: 1, cuentaConcepto: undefined }
+        : row,
     ))
   }, [])
 
@@ -794,11 +832,7 @@ export default function GastoForm() {
                           ) : (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <AccountSelect
-                                  value={item.cuentaAlterna ?? ''}
-                                  onChange={(v) => updateItem(idx, 'cuentaAlterna', v)}
-                                  placeholder="Cuenta default del artículo"
-                                />
+                                <ItemCuentaContableText accountId={item.cuentaConcepto || cuentasEmpresa?.defaultExpenseAccount} />
                               </div>
                               <button
                                 type="button"

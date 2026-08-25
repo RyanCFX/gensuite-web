@@ -30,15 +30,44 @@ const PAGE_SIZE = 20
 
 const TAX_DEDUCTION_BASIS_OPTIONS = ['Gross Total', 'Net Total'] as const
 
+// impuestoBaseId no se exige aquí (a nivel de item) porque en modo "fijo" el tramo conserva un
+// array `componentes` de relleno sin usar — la exigencia real solo aplica en modo "catalogo" y
+// se valida en el superRefine de abajo, item por item, para poder marcar el input exacto.
 const componenteSchema = z.object({
-  impuestoBaseId: z.string().min(1, 'Selecciona un impuesto'),
+  impuestoBaseId: z.string().optional(),
   factor: z.coerce.number().min(0, 'Debe ser >= 0').optional(),
 })
 
+// Convierte '' (input vacío) en undefined en vez de NaN, para poder distinguir "no capturado"
+// de "capturó 0" al validar el modo % fijo.
+const numberOrUndefined = z.preprocess(
+  (v) => (v === '' || v === null || v === undefined ? undefined : Number(v)),
+  z.number().optional(),
+)
+
+// Cada tramo usa un modo u otro, nunca ambos — "catalogo" liga impuestos del catálogo
+// (componentes), "fijo" es un % fijo con descripción libre opcional.
 const rateSchema = z.object({
-  componentes: z.array(componenteSchema).min(1, 'Agrega al menos un impuesto'),
+  mode: z.enum(['catalogo', 'fijo']),
+  componentes: z.array(componenteSchema).optional(),
+  valorFijo: numberOrUndefined,
+  descripcion: z.string().optional(),
   fromDate: z.string().optional(),
   toDate: z.string().optional(),
+}).superRefine((val, ctx) => {
+  if (val.mode === 'catalogo') {
+    const comps = val.componentes ?? []
+    if (comps.length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Agrega al menos un impuesto', path: ['componentes'] })
+    }
+    comps.forEach((c, i) => {
+      if (!c.impuestoBaseId) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Selecciona un impuesto', path: ['componentes', i, 'impuestoBaseId'] })
+      }
+    })
+  } else if (val.valorFijo === undefined || Number.isNaN(val.valorFijo)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Ingresa el % fijo del tramo', path: ['valorFijo'] })
+  }
 })
 
 const retencionSchema = z.object({
@@ -49,9 +78,17 @@ const retencionSchema = z.object({
 })
 
 type RetencionFormValues = z.infer<typeof retencionSchema>
+type RateMode = RetencionFormValues['rates'][number]['mode']
 
 const emptyComponente = { impuestoBaseId: '', factor: 100 }
-const emptyRate = { componentes: [{ ...emptyComponente }], fromDate: '', toDate: '' }
+const emptyRate: RetencionFormValues['rates'][number] = {
+  mode: 'catalogo',
+  componentes: [{ ...emptyComponente }],
+  valorFijo: undefined,
+  descripcion: '',
+  fromDate: '',
+  toDate: '',
+}
 
 export default function RetencionesPage() {
   const queryClient = useQueryClient()
@@ -110,13 +147,19 @@ export default function RetencionesPage() {
         taxDeductionBasis: editDetail.taxDeductionBasis ?? '',
         account: editDetail.accounts?.[0]?.account ?? '',
         rates: (editDetail.rates ?? []).length > 0
-          ? (editDetail.rates ?? []).map((r) => ({
-              componentes: r.componentes.length > 0
-                ? r.componentes.map((c) => ({ impuestoBaseId: c.impuestoBaseId, factor: c.factor ?? 100 }))
-                : [{ ...emptyComponente }],
-              fromDate: r.fromDate?.slice(0, 10) ?? '',
-              toDate: r.toDate?.slice(0, 10) ?? '',
-            }))
+          ? (editDetail.rates ?? []).map((r) => {
+              const isFijo = !r.componentes || r.componentes.length === 0
+              return {
+                mode: (isFijo ? 'fijo' : 'catalogo') as RateMode,
+                componentes: isFijo
+                  ? [{ ...emptyComponente }]
+                  : r.componentes.map((c) => ({ impuestoBaseId: c.impuestoBaseId, factor: c.factor ?? 100 })),
+                valorFijo: isFijo ? (r.valorFijo ?? r.taxWithholdingRate) : undefined,
+                descripcion: r.descripcion ?? '',
+                fromDate: r.fromDate?.slice(0, 10) ?? '',
+                toDate: r.toDate?.slice(0, 10) ?? '',
+              }
+            })
           : [emptyRate],
       })
     }
@@ -176,10 +219,17 @@ export default function RetencionesPage() {
       taxDeductionBasis: values.taxDeductionBasis || undefined,
       account: values.account || undefined,
       rates: values.rates.map((r) => ({
-        componentes: r.componentes.map((c) => ({
-          impuestoBaseId: c.impuestoBaseId,
-          factor: c.factor || 100,
-        })),
+        ...(r.mode === 'catalogo'
+          ? {
+              componentes: (r.componentes ?? []).map((c) => ({
+                impuestoBaseId: c.impuestoBaseId,
+                factor: c.factor || 100,
+              })),
+            }
+          : {
+              valorFijo: r.valorFijo,
+              ...(r.descripcion ? { descripcion: r.descripcion } : {}),
+            }),
         ...(r.fromDate ? { fromDate: r.fromDate } : {}),
         ...(r.toDate ? { toDate: r.toDate } : {}),
       })),
@@ -459,6 +509,8 @@ function RateRow({
     name: `rates.${index}.componentes` as const,
   })
   const componentesValues = useWatch({ control, name: `rates.${index}.componentes` as const }) ?? []
+  const mode = useWatch({ control, name: `rates.${index}.mode` as const })
+  const descripcionValue = useWatch({ control, name: `rates.${index}.descripcion` as const })
 
   // Preview visual con las tasas ya cargadas del catálogo — el backend recalcula el valor real al guardar.
   const previewTasa = componentesValues.reduce((sum, c) => {
@@ -472,7 +524,10 @@ function RateRow({
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Tramo {index + 1}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Tramo {index + 1}</span>
+          {mode === 'fijo' && <span className="badge badge-info">% Fijo</span>}
+        </div>
         <button
           type="button"
           className="btn btn-ghost btn-size-icon-sm"
@@ -484,57 +539,121 @@ function RateRow({
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-        {compFields.map((cf, cIdx) => (
-          <div key={cf.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <div style={{ flex: 1 }}>
-              <Controller
-                name={`rates.${index}.componentes.${cIdx}.impuestoBaseId` as const}
-                control={control}
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange} placeholder="Seleccionar impuesto…">
-                    {tasasImpuesto.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.nombre}{t.tasa != null ? ` — ${t.tasa}%` : ''}
-                      </SelectItem>
-                    ))}
-                  </Select>
-                )}
-              />
+      <div className="ff-wrap" style={{ marginBottom: 8 }}>
+        <label className="ff-label">Modo</label>
+        <Controller
+          name={`rates.${index}.mode` as const}
+          control={control}
+          render={({ field }) => (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                className={`btn btn-size-sm ${field.value === 'catalogo' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => field.onChange('catalogo')}
+              >
+                Por impuestos del catálogo
+              </button>
+              <button
+                type="button"
+                className={`btn btn-size-sm ${field.value === 'fijo' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => field.onChange('fijo')}
+              >
+                % Fijo
+              </button>
             </div>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              placeholder="100"
-              className="ff-input"
-              style={{ width: 90 }}
-              {...register(`rates.${index}.componentes.${cIdx}.factor` as const)}
-            />
-            <button
-              type="button"
-              className="btn btn-ghost btn-size-icon-sm"
-              onClick={() => removeComp(cIdx)}
-              disabled={compFields.length <= 1}
-            >
-              <Trash2 size={13} />
-            </button>
-          </div>
-        ))}
-        {rateErrors?.componentes?.message && <p className="ff-error">{rateErrors.componentes.message}</p>}
-        <button
-          type="button"
-          className="btn btn-secondary btn-size-sm"
-          style={{ alignSelf: 'flex-start' }}
-          onClick={() => appendComp({ ...emptyComponente })}
-        >
-          <Plus size={13} /> Agregar impuesto
-        </button>
+          )}
+        />
       </div>
 
-      <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px' }}>
-        Tasa efectiva (preview): <strong>{previewTasa.toFixed(2)}%</strong> — el valor real lo calcula el servidor al guardar.
-      </p>
+      {mode === 'catalogo' ? (
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+            {compFields.map((cf, cIdx) => (
+              <div key={cf.id}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <Controller
+                      name={`rates.${index}.componentes.${cIdx}.impuestoBaseId` as const}
+                      control={control}
+                      render={({ field }) => (
+                        <Select value={field.value} onValueChange={field.onChange} placeholder="Seleccionar impuesto…">
+                          {tasasImpuesto.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.nombre}{t.tasa != null ? ` — ${t.tasa}%` : ''}
+                            </SelectItem>
+                          ))}
+                        </Select>
+                      )}
+                    />
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="100"
+                    className="ff-input"
+                    style={{ width: 90 }}
+                    {...register(`rates.${index}.componentes.${cIdx}.factor` as const)}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-size-icon-sm"
+                    onClick={() => removeComp(cIdx)}
+                    disabled={compFields.length <= 1}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+                {rateErrors?.componentes?.[cIdx]?.impuestoBaseId?.message && (
+                  <p className="ff-error">{rateErrors.componentes[cIdx]?.impuestoBaseId?.message}</p>
+                )}
+              </div>
+            ))}
+            {rateErrors?.componentes?.message && <p className="ff-error">{rateErrors.componentes.message}</p>}
+            <button
+              type="button"
+              className="btn btn-secondary btn-size-sm"
+              style={{ alignSelf: 'flex-start' }}
+              onClick={() => appendComp({ ...emptyComponente })}
+            >
+              <Plus size={13} /> Agregar impuesto
+            </button>
+          </div>
+
+          <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px' }}>
+            Tasa efectiva (preview): <strong>{previewTasa.toFixed(2)}%</strong> — el valor real lo calcula el servidor al guardar.
+          </p>
+        </>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+          <div className="form-row">
+            <div className="ff-wrap" style={{ marginBottom: 0 }}>
+              <label className="ff-label ff-required">% Fijo</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Ej: 10"
+                className={`ff-input${rateErrors?.valorFijo ? ' ff-input-error' : ''}`}
+                {...register(`rates.${index}.valorFijo` as const)}
+              />
+              {rateErrors?.valorFijo?.message && <p className="ff-error">{rateErrors.valorFijo.message}</p>}
+            </div>
+            <div className="ff-wrap" style={{ marginBottom: 0 }}>
+              <label className="ff-label">Descripción</label>
+              <input
+                type="text"
+                placeholder="Descripción del tramo (opcional)"
+                className="ff-input"
+                {...register(`rates.${index}.descripcion` as const)}
+              />
+            </div>
+          </div>
+          {descripcionValue && (
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>{descripcionValue}</p>
+          )}
+        </div>
+      )}
 
       <div className="form-row">
         <div className="ff-wrap" style={{ marginBottom: 0 }}>

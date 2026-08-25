@@ -3503,11 +3503,18 @@ export interface RetencionComponente {
   factor?: number;
 }
 
-/** Tramo de retención tal como lo devuelve el backend (lectura) */
+/** Tramo de retención tal como lo devuelve el backend (lectura). Un tramo trae `componentes`
+ *  no vacío (modo catálogo) O `valorFijo` (modo % fijo) — cuando es % fijo, `componentes` viene
+ *  como array vacío. */
 export interface RetencionRate {
-  /** Calculado por ERPNext a partir de `componentes` — solo lectura, nunca se envía al guardar */
+  /** Calculado por ERPNext a partir de `componentes`, o igual a `valorFijo` en modo % fijo —
+   *  solo lectura, nunca se envía al guardar */
   taxWithholdingRate: number;
   componentes: RetencionComponente[];
+  /** % fijo del tramo cuando NO está ligado a `componentes` (modo % fijo) */
+  valorFijo?: number;
+  /** Descripción libre del tramo — aplica sobre todo al modo % fijo */
+  descripcion?: string;
   /** undefined = sin límite inferior */
   fromDate?: string;
   /** undefined = sin límite superior */
@@ -3517,10 +3524,15 @@ export interface RetencionRate {
   taxWithholdingGroup?: string | null;
 }
 
-/** Tramo de retención al crear/editar — sin `taxWithholdingRate` (lo calcula el backend) */
+/** Tramo de retención al crear/editar — sin `taxWithholdingRate` (lo calcula el backend). Debe
+ *  traer `componentes` (no vacío) O `valorFijo`, nunca ambos. */
 export interface CreateRetencionRateDto {
-  /** Mínimo 1 elemento */
-  componentes: RetencionComponente[];
+  /** Alternativa a `valorFijo` — impuestos del catálogo que componen la tasa */
+  componentes?: RetencionComponente[];
+  /** Alternativa a `componentes` — % fijo del tramo, sin ligar a ningún impuesto del catálogo */
+  valorFijo?: number;
+  /** Descripción opcional del tramo (aplica a cualquier modo, típicamente junto a `valorFijo`) */
+  descripcion?: string;
   /** Omitir la clave = sin límite inferior */
   fromDate?: string;
   /** Omitir la clave = sin límite superior */
