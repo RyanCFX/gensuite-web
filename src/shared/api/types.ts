@@ -2614,6 +2614,8 @@ export interface CreateCuentaBancariaDto {
   chequesManuales?: boolean;
   isDefault?: boolean;
   balanceInicial?: number;
+  /** Requerido si chequesManuales es false (numeración automática) — punto de partida del contador. */
+  ultimoCheque?: number;
   tipoCuenta?: string;
   chequePrintTemplate?: string;
 }
@@ -3107,6 +3109,10 @@ export interface Pago {
   /** Solo presente en `GET /pagos/historial/:supplierId` (tarea 42 §3) — el historial de un
    *  proveedor ahora incluye ambos tipos de movimiento, no solo `Pay`. */
   paymentType?: "Pay" | "Receive";
+  /** true si este pago se registró como cheque — participa de la numeración por cuenta bancaria
+   *  y aparece en GET /tesoreria/cheques. */
+  esCheque?: boolean;
+  bankAccount?: string;
 }
 
 export interface PagoReferenciaDto {
@@ -3125,8 +3131,13 @@ export interface CreatePagoDto {
   referencias?: PagoReferenciaDto[];
   branch?: string;
   department?: string;
-  /** Cuenta bancaria (id de CuentaBancaria) — requerida si el método de pago tiene requiresBankAccount=true y no tiene defaultBankAccount. */
+  /** Cuenta bancaria (id de CuentaBancaria) — requerida si el método de pago tiene requiresBankAccount=true y no tiene defaultBankAccount, o si esCheque=true. */
   bankAccount?: string;
+  /** Marca este pago como cheque — activa la numeración por cuenta bancaria (manual o automática
+   *  según chequesManuales de la cuenta) y lo registra en /tesoreria/cheques. Requiere bankAccount.
+   *  En cuenta manual, referenceNo es el número de cheque (requerido); en automática, referenceNo
+   *  debe omitirse — el backend lo asigna y responde 400 si se envía. */
+  esCheque?: boolean;
 }
 
 export interface SaldoFavorProveedorAppliedTo {
@@ -3951,6 +3962,43 @@ export interface TreasuryTransaction {
   cuentaBancoOrigenOverride?: string;
   /** Solo Transferencias Internas — cuenta contable alterna de la pata de destino. */
   cuentaBancoDestinoOverride?: string;
+}
+
+// ─── Tesorería — Cheques (historial) ───────────────────────────────────────────
+// Registro de primera clase de cada número de cheque emitido a un tercero (CxP), creado desde
+// POST /tesoreria/emisiones o POST /pagos (esCheque: true). Nunca cubre cheques recibidos (CxC).
+
+export type ChequeEstado = "Reservado" | "Emitido" | "Anulado" | "Cobrado";
+
+export interface Cheque {
+  id: string;
+  chequeNo: string;
+  cuentaBancaria: string;
+  cuentaBancariaNombre?: string;
+  estado: ChequeEstado;
+  beneficiario?: TesoreriaParty;
+  beneficiarioNombre?: string;
+  monto: number;
+  fecha: string;
+  impreso: boolean;
+  vecesImpreso?: number;
+  documentoOrigen: { doctype: "Payment Entry" | "Journal Entry"; name: string };
+  motivo?: string;
+  creation?: string;
+  modified?: string;
+}
+
+export interface ChequeFactura {
+  invoiceId: string;
+  allocatedAmount: number;
+}
+
+export interface ChequeDetalle extends Cheque {
+  facturas: ChequeFactura[];
+}
+
+export interface AnularChequeDto {
+  motivo?: string;
 }
 
 // ─── Tesorería — Emisiones (egresos) ───────────────────────────────────────────

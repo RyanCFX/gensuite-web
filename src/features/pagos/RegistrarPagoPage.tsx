@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { createPago, getPagosPendientes } from '@/shared/api/pagos'
+import { getSiguienteChequeCuenta } from '@/shared/api/tesoreria'
 import { SaldoFavorProveedorPagosSection } from './SaldoFavorProveedorPagosSection'
 import { listSuppliers } from '@/shared/api/suppliers'
 import { listMetodosPago, getFacturacionConfig } from '@/shared/api/config'
@@ -44,7 +45,9 @@ export default function RegistrarPagoPage() {
   const [paidAmount, setPaidAmount] = useState<number>(0)
   const [modeOfPayment, setModeOfPayment] = useState('')
   const [bankAccount, setBankAccount] = useState('')
+  const [esCheque, setEsCheque] = useState(false)
   const [referenceNo, setReferenceNo] = useState('')
+  const referenceNoTocado = useRef(false)
   const [referenceDate, setReferenceDate] = useState('')
   const [remarks, setRemarks] = useState('')
   const [postingDate, setPostingDate] = useState(new Date().toISOString().slice(0, 10))
@@ -167,7 +170,7 @@ export default function RegistrarPagoPage() {
     .map((m) => ({ value: m.name, label: m.name }))
 
   const metodoSeleccionado = (metodos ?? []).find((m) => m.name === modeOfPayment)
-  const requiresBankAccount = metodoSeleccionado?.requiresBankAccount && !metodoSeleccionado.defaultBankAccount
+  const requiresBankAccount = (metodoSeleccionado?.requiresBankAccount && !metodoSeleccionado.defaultBankAccount) || esCheque
 
   const { data: cuentasBancarias } = useQuery({
     queryKey: ['cuentas-bancarias-activas'],
@@ -178,6 +181,30 @@ export default function RegistrarPagoPage() {
   const bankAccountOptions: SearchSelectOption[] = (cuentasBancarias?.items ?? [])
     .filter((c) => !bankAccountSearch || c.accountName.toLowerCase().includes(bankAccountSearch.toLowerCase()))
     .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))
+
+  // ── Cheque: numeración por cuenta bancaria (ver docs/tasks/45, 47) ────────
+
+  const cuentaSeleccionada = cuentasBancarias?.items.find((c) => c.id === bankAccount)
+  const cuentaChequesManuales = cuentaSeleccionada?.chequesManuales ?? true
+
+  const { data: siguienteCheque } = useQuery({
+    queryKey: ['tesoreria-siguiente-cheque-cuenta', bankAccount],
+    queryFn: () => getSiguienteChequeCuenta(bankAccount),
+    enabled: esCheque && !!bankAccount,
+  })
+
+  useEffect(() => {
+    if (esCheque && cuentaChequesManuales && siguienteCheque?.siguienteSugerido && !referenceNoTocado.current && !referenceNo) {
+      setReferenceNo(siguienteCheque.siguienteSugerido)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esCheque, cuentaChequesManuales, siguienteCheque])
+
+  function handleEsChequeChange(checked: boolean) {
+    setEsCheque(checked)
+    referenceNoTocado.current = false
+    if (!checked) setReferenceNo('')
+  }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -273,6 +300,7 @@ export default function RegistrarPagoPage() {
     if (!paidAmount || paidAmount <= 0) { toast.error('Ingresa un monto válido'); return }
     if (!modeOfPayment) { toast.error('Selecciona un método de pago'); return }
     if (requiresBankAccount && !bankAccount) { toast.error('Selecciona una cuenta bancaria'); return }
+    if (esCheque && cuentaChequesManuales && !referenceNo) { toast.error('Ingresa el número de cheque'); return }
     if (!advancePayment && diff !== 0) {
       toast.error(
         diff > 0
@@ -288,7 +316,7 @@ export default function RegistrarPagoPage() {
       paidAmount,
       modeOfPayment,
       bankAccount: bankAccount || undefined,
-      referenceNo: referenceNo || undefined,
+      referenceNo: esCheque && !cuentaChequesManuales ? undefined : (referenceNo || undefined),
       referenceDate: referenceDate || undefined,
       remarks: remarks || undefined,
       referencias: advancePayment || checkedRefs.length === 0
@@ -296,6 +324,7 @@ export default function RegistrarPagoPage() {
         : checkedRefs.map((r) => ({ invoiceId: r.invoiceId, allocatedAmount: computedAllocation[r.invoiceId] ?? 0 })),
       branch: branch || undefined,
       department: usaDepartamentos ? (department || undefined) : undefined,
+      esCheque: esCheque || undefined,
     })
   }
 
@@ -348,34 +377,65 @@ export default function RegistrarPagoPage() {
                 />
               </div>
 
-              {metodoSeleccionado?.requiresBankAccount && (
+              {(metodoSeleccionado?.requiresBankAccount || esCheque) && (
                 <div className="ff-wrap">
                   <label className="ff-label">
                     Cuenta Bancaria {requiresBankAccount && <span className="ff-required">*</span>}
                   </label>
                   <SearchSelect
                     value={bankAccount}
-                    onChange={setBankAccount}
+                    onChange={(val) => {
+                      setBankAccount(val)
+                      if (esCheque) { referenceNoTocado.current = false; setReferenceNo('') }
+                    }}
                     options={bankAccountOptions}
                     onSearch={setBankAccountSearch}
                     selectedLabel={cuentasBancarias?.items.find((c) => c.id === bankAccount)?.accountName ?? ''}
-                    placeholder={metodoSeleccionado.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
+                    placeholder={metodoSeleccionado?.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
                     error={requiresBankAccount && !bankAccount}
                   />
                 </div>
               )}
             </div>
 
+            {/* Pagar con cheque */}
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={esCheque}
+                onChange={(e) => handleEsChequeChange(e.target.checked)}
+                style={{ marginTop: 2 }}
+              />
+              <span>
+                Pagar con cheque — participa de la numeración por cuenta bancaria y queda en el
+                historial de Cheques (Tesorería)
+              </span>
+            </label>
+
             {/* Referencia / Fecha de Referencia / Fecha */}
             <div className="form-row form-row-3">
               <div className="ff-wrap">
-                <label className="ff-label">No. de Referencia</label>
-                <input
-                  className="ff-input"
-                  placeholder="# cheque, transferencia…"
-                  value={referenceNo}
-                  onChange={(e) => setReferenceNo(e.target.value)}
-                />
+                <label className="ff-label">
+                  {esCheque ? 'Número de Cheque' : 'No. de Referencia'}
+                  {esCheque && cuentaChequesManuales && <span className="ff-required">*</span>}
+                </label>
+                {esCheque && !cuentaChequesManuales ? (
+                  <p className="ff-hint" style={{ margin: 0 }}>
+                    {bankAccount
+                      ? `Se asignará el nº ${siguienteCheque?.siguienteSugerido ?? '—'} al guardar (numeración automática).`
+                      : 'Selecciona la cuenta bancaria para ver el número que se asignará.'}
+                  </p>
+                ) : (
+                  <input
+                    className="ff-input"
+                    placeholder={esCheque ? 'Número de cheque…' : '# cheque, transferencia…'}
+                    value={referenceNo}
+                    onChange={(e) => { referenceNoTocado.current = true; setReferenceNo(e.target.value) }}
+                  />
+                )}
+                {esCheque && cuentaChequesManuales && siguienteCheque?.ultimoCheque && (
+                  <p className="ff-hint">Último usado: {siguienteCheque.ultimoCheque} — sugerencia editable.</p>
+                )}
               </div>
               <div className="ff-wrap">
                 <label className="ff-label">Fecha de Referencia</label>

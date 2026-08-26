@@ -69,6 +69,7 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'tes-depositos', label: 'Depósitos (Tesorería)', group: 'Finanzas',   path: '/tesoreria/depositos',            icon: <CreditCard size={15} />, keywords: 'ingreso cobro cardnet azul banco tesoreria' },
   { id: 'tes-transferencias', label: 'Transferencias Internas', group: 'Finanzas', path: '/tesoreria/transferencias', icon: <CreditCard size={15} />, keywords: 'traspaso entre cuentas bancarias tesoreria' },
   { id: 'tes-movimientos', label: 'Movimientos Bancarios', group: 'Finanzas', path: '/tesoreria/movimientos',         icon: <BarChart3 size={15} />, keywords: 'kardex banco estado de cuenta saldo corrido tesoreria' },
+  { id: 'tes-cheques',   label: 'Cheques (Tesorería)',  group: 'Finanzas',     path: '/tesoreria/cheques',              icon: <CreditCard size={15} />, keywords: 'cheque historial anular imprimir numeracion tesoreria' },
   { id: 'usuarios',     label: 'Usuarios',             group: 'Finanzas',     path: '/usuarios',                       icon: <UserCog size={15} />, keywords: 'users roles acceso' },
 
   // ── Contabilidad ───────────────────────────────────────────────────────────

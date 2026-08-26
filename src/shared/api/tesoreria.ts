@@ -25,6 +25,10 @@ import type {
   AsientoPreviewRow,
   PaginatedResponse,
   PaginationParams,
+  Cheque,
+  ChequeDetalle,
+  ChequeEstado,
+  AnularChequeDto,
 } from './types'
 
 // ─── Tipos de Documento Bancario ────────────────────────────────────────────
@@ -184,7 +188,7 @@ export async function getEmisionPdfBlobUrl(id: string): Promise<string> {
   }
 }
 
-async function normalizeBlobError(err: unknown): Promise<ApiError> {
+export async function normalizeBlobError(err: unknown): Promise<ApiError> {
   if (err instanceof Blob) {
     try {
       const text = await err.text()
@@ -411,4 +415,60 @@ export async function regenerarChequePrintTemplate(id: string) {
     {},
   )
   return unwrap(res)
+}
+
+// ─── Cheques (historial de cheques emitidos a terceros) ────────────────────
+
+export interface ListChequesParams extends PaginationParams {
+  cuentaBancaria?: string
+  estado?: ChequeEstado
+  chequeNo?: string
+  fromDate?: string
+  toDate?: string
+  beneficiario?: string
+  impreso?: boolean
+}
+
+export async function listCheques(params?: ListChequesParams) {
+  const res = await client.get<PaginatedResponse<Cheque>>(
+    ENDPOINTS.tesoreria.cheques.list,
+    { params },
+  )
+  return unwrapPaginated(res)
+}
+
+export async function getCheque(id: string) {
+  const res = await client.get<{ success: true; data: ChequeDetalle }>(
+    ENDPOINTS.tesoreria.cheques.byId(id),
+  )
+  return unwrap(res)
+}
+
+/** Mismo shape que getSiguienteCheque (emisiones), pero contra /tesoreria/cheques/siguiente —
+ *  descubrible también desde la pantalla de Cheques y usada desde el formulario de Pagos. */
+export async function getSiguienteChequeCuenta(cuentaBancaria: string) {
+  const res = await client.get<{ success: true; data: SiguienteChequeResult }>(
+    ENDPOINTS.tesoreria.cheques.siguiente,
+    { params: { cuentaBancaria } },
+  )
+  return unwrap(res)
+}
+
+export async function anularCheque(id: string, data?: AnularChequeDto) {
+  const res = await client.post<{ success: true; data: ChequeDetalle }>(
+    ENDPOINTS.tesoreria.cheques.anular(id),
+    data ?? {},
+  )
+  return unwrap(res)
+}
+
+export async function getChequePdfBlobUrl(id: string): Promise<string> {
+  try {
+    const res = await client.get<Blob>(ENDPOINTS.tesoreria.cheques.imprimir(id), {
+      responseType: 'blob',
+    })
+    return URL.createObjectURL(res.data)
+  } catch (err) {
+    throw await normalizeBlobError(err)
+  }
 }

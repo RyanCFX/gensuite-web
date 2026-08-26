@@ -141,11 +141,18 @@ export default function CuentasBancariasPage() {
     control,
     handleSubmit,
     reset,
+    watch,
+    setError,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<CuentaBancariaFormValues>({
     resolver: zodResolver(cuentaBancariaSchema),
     defaultValues: DEFAULT_VALUES,
   })
+
+  const chequesManualesValue = watch('chequesManuales')
+  // Requerido cuando pasa a automático y no hay ya un ultimoCheque guardado en la cuenta (creación,
+  // o edición cambiando de manual a automático sin contador previo). Ver docs/tasks/45.
+  const ultimoChequeRequerido = !chequesManualesValue && !editTarget?.ultimoCheque
 
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, closeDialog)
 
@@ -217,6 +224,12 @@ export default function CuentasBancariasPage() {
   }
 
   function onSubmit(values: CuentaBancariaFormValues) {
+    if (!values.chequesManuales && !editTarget?.ultimoCheque && !values.ultimoCheque) {
+      setError('ultimoCheque', {
+        message: 'Requerido: es el punto de partida del contador para la numeración automática de cheques.',
+      })
+      return
+    }
     if (editTarget) {
       updateMutation.mutate({
         id: editTarget.id,
@@ -564,15 +577,16 @@ export default function CuentasBancariasPage() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="cbUltimoCheque">Último cheque</label>
+                    <label className={`ff-label${ultimoChequeRequerido ? ' ff-required' : ''}`} htmlFor="cbUltimoCheque">Último cheque</label>
                     <input
                       id="cbUltimoCheque"
-                      className="ff-input"
+                      className={`ff-input${errors.ultimoCheque ? ' ff-input-error' : ''}`}
                       type="number"
                       min="0"
                       step="0.01"
                       {...register('ultimoCheque', { valueAsNumber: true })}
                     />
+                    {errors.ultimoCheque && <p className="ff-error">{errors.ultimoCheque.message}</p>}
                   </div>
                   <div className="ff-wrap">
                     <label className="ff-label" htmlFor="cbUltimoDeposito">Último depósito</label>
@@ -593,6 +607,11 @@ export default function CuentasBancariasPage() {
                     Cheques manuales
                   </label>
                 </div>
+                <p className="ff-hint" style={{ marginTop: -8 }}>
+                  {chequesManualesValue
+                    ? 'Manual: usted digita el número en cada pago/emisión — el sistema solo valida que no se repita en esta cuenta.'
+                    : 'Automático: el sistema asigna el número de cheque solo, a partir del último usado en esta cuenta.'}
+                </p>
 
                 <div className="ff-wrap" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <input id="cbIsDefault" type="checkbox" {...register('isDefault')} />

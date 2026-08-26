@@ -310,6 +310,7 @@ export const ENDPOINTS = {
     cancel: (id: string) => `/pagos/${id}/cancel`,
     saldoFavor: (supplierId: string) => `/pagos/saldo-favor/${encodeURIComponent(supplierId)}`,
     aplicarSaldoFavor: '/pagos/aplicar-saldo-favor',
+    imprimir: (id: string) => `/pagos/${encodeURIComponent(id)}/imprimir`,
   },
   reportes: {
     ventas: '/reportes/ventas',
@@ -397,6 +398,13 @@ export const ENDPOINTS = {
       list: '/tesoreria/cheque-print-templates',
       byId: (id: string) => `/tesoreria/cheque-print-templates/${encodeURIComponent(id)}`,
       regenerar: (id: string) => `/tesoreria/cheque-print-templates/${encodeURIComponent(id)}/regenerar`,
+    },
+    cheques: {
+      list: '/tesoreria/cheques',
+      siguiente: '/tesoreria/cheques/siguiente',
+      byId: (id: string) => `/tesoreria/cheques/${encodeURIComponent(id)}`,
+      anular: (id: string) => `/tesoreria/cheques/${encodeURIComponent(id)}/anular`,
+      imprimir: (id: string) => `/tesoreria/cheques/${encodeURIComponent(id)}/imprimir`,
     },
   },
   departamentos: {

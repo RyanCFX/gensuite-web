@@ -115,6 +115,8 @@ const TransferenciasInternasPage = lazy(() => import('@/features/tesoreria/Trans
 const TransferenciaInternaForm = lazy(() => import('@/features/tesoreria/TransferenciaInternaForm'))
 const TransferenciaInternaDetail = lazy(() => import('@/features/tesoreria/TransferenciaInternaDetail'))
 const MovimientosBancoPage = lazy(() => import('@/features/tesoreria/MovimientosBancoPage'))
+const ChequesPage = lazy(() => import('@/features/tesoreria/ChequesPage'))
+const ChequeDetail = lazy(() => import('@/features/tesoreria/ChequeDetail'))
 const PlantillasChequePage = lazy(() => import('@/features/tesoreria/PlantillasChequePage'))
 const PlantillaChequeForm = lazy(() => import('@/features/tesoreria/PlantillaChequeForm'))
 
@@ -271,6 +273,8 @@ export default function App() {
 
             {/* Tesorería — Movimientos (libro de banco, solo lectura) */}
             <Route path="/tesoreria/movimientos" element={<Suspense fallback={<PageLoader />}><MovimientosBancoPage /></Suspense>} />
+            <Route path="/tesoreria/cheques" element={<Suspense fallback={<PageLoader />}><ChequesPage /></Suspense>} />
+            <Route path="/tesoreria/cheques/:id" element={<Suspense fallback={<PageLoader />}><ChequeDetail /></Suspense>} />
 
             {/* Usuarios */}
             <Route path="/usuarios" element={<Suspense fallback={<PageLoader />}><UsuariosPage /></Suspense>} />

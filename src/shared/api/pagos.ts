@@ -1,5 +1,6 @@
 import { client, unwrap, unwrapPaginated } from './client'
 import { ENDPOINTS } from './endpoints'
+import { normalizeBlobError } from './tesoreria'
 import type {
   Pago,
   CreatePagoDto,
@@ -99,6 +100,16 @@ export async function getHistorialPagos(supplierId: string, params?: PaginationP
 export async function createPago(data: CreatePagoDto) {
   const res = await client.post<{ success: true; data: Pago }>(ENDPOINTS.pagos.list, data)
   return unwrap(res)
+}
+
+/** PDF del cheque de este pago — solo tiene sentido si se registró con esCheque=true. */
+export async function getPagoPdfBlobUrl(id: string): Promise<string> {
+  try {
+    const res = await client.get<Blob>(ENDPOINTS.pagos.imprimir(id), { responseType: 'blob' })
+    return URL.createObjectURL(res.data)
+  } catch (err) {
+    throw await normalizeBlobError(err)
+  }
 }
 
 // ─── Saldo a favor ────────────────────────────────────────────────────────────

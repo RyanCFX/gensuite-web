@@ -312,6 +312,7 @@ const NAV_FINANZAS: NavEntry[] = [
       { label: "Depósitos", icon: <Wallet size={14} />, path: "/tesoreria/depositos" },
       { label: "Transferencias Internas", icon: <ArrowRightLeft size={14} />, path: "/tesoreria/transferencias" },
       { label: "Movimientos", icon: <BookOpen size={14} />, path: "/tesoreria/movimientos" },
+      { label: "Cheques", icon: <Printer size={14} />, path: "/tesoreria/cheques" },
     ],
   },
 ];

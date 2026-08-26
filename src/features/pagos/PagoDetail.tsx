@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { getPago, submitPago, cancelPago } from '@/shared/api/pagos'
+import { getPago, submitPago, cancelPago, getPagoPdfBlobUrl } from '@/shared/api/pagos'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { ArrowLeft, Send, Ban } from 'lucide-react'
+import { ArrowLeft, Send, Ban, Printer } from 'lucide-react'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -24,6 +24,7 @@ export default function PagoDetail() {
 
   const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const [printError, setPrintError] = useState<string | null>(null)
 
   const { data: pago, isLoading, isError } = useQuery({
     queryKey: ['pago', id],
@@ -61,6 +62,17 @@ export default function PagoDetail() {
     onError: (err: { message?: string }) => {
       toast.error(err?.message ?? 'Error al cancelar el pago')
       setConfirmCancel(false)
+    },
+  })
+
+  const printMutation = useMutation({
+    mutationFn: () => getPagoPdfBlobUrl(id!),
+    onSuccess: (url) => {
+      setPrintError(null)
+      window.open(url, '_blank')
+    },
+    onError: (err: { message?: string }) => {
+      setPrintError(err?.message ?? 'No se pudo generar el PDF')
     },
   })
 
@@ -129,14 +141,31 @@ export default function PagoDetail() {
             </button>
           )}
           {isSubmitted && (
-            <button
-              className="btn btn-danger btn-size-sm"
-              onClick={() => setConfirmCancel(true)}
-              disabled={cancelMutation.isPending}
-            >
-              <Ban size={14} /> Cancelar
-            </button>
+            <>
+              {pago.esCheque && (
+                <button
+                  className="btn btn-ghost btn-size-sm"
+                  onClick={() => printMutation.mutate()}
+                  disabled={printMutation.isPending}
+                >
+                  <Printer size={14} /> {printMutation.isPending ? 'Generando…' : 'Imprimir'}
+                </button>
+              )}
+              <button
+                className="btn btn-danger btn-size-sm"
+                onClick={() => setConfirmCancel(true)}
+                disabled={cancelMutation.isPending}
+              >
+                <Ban size={14} /> Cancelar
+              </button>
+            </>
           )}
+        </div>
+      )}
+
+      {printError && (
+        <div className="inline-alert inline-alert-error" style={{ marginBottom: 16 }}>
+          <p style={{ margin: 0, fontWeight: 500 }}>{printError}</p>
         </div>
       )}
 
@@ -169,8 +198,11 @@ export default function PagoDetail() {
 
             {pago.referenceNo && (
               <div className="detail-field">
-                <span className="detail-label">No. de Referencia</span>
-                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{pago.referenceNo}</span>
+                <span className="detail-label">{pago.esCheque ? 'Número de Cheque' : 'No. de Referencia'}</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>
+                  {pago.referenceNo}
+                  {pago.esCheque && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>Cheque</span>}
+                </span>
               </div>
             )}
 
