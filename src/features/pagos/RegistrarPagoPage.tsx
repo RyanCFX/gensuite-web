@@ -174,7 +174,7 @@ export default function RegistrarPagoPage() {
   const { data: cuentasBancarias } = useQuery({
     queryKey: ['cuentas-bancarias-activas'],
     queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
-    enabled: !!requiresBankAccount,
+    enabled: !!metodoSeleccionado?.requiresBankAccount,
   })
   const [bankAccountSearch, setBankAccountSearch] = useState('')
   const bankAccountOptions: SearchSelectOption[] = (cuentasBancarias?.items ?? [])
@@ -182,10 +182,11 @@ export default function RegistrarPagoPage() {
     .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))
 
   // ── Cheque: se infiere de la cuenta bancaria elegida, no de un toggle manual —
-  // una cuenta de tipo "Cuenta Corriente" es, por definición, una chequera (ver docs/tasks/45, 47).
+  // toda cuenta bancaria trae su propia numeración (chequesManuales/ultimoCheque), sin
+  // depender de su tipoCuenta (campo opcional y de catálogo libre, no confiable para esto).
 
   const cuentaSeleccionada = cuentasBancarias?.items.find((c) => c.id === bankAccount)
-  const esCheque = !!bankAccount && cuentaSeleccionada?.tipoCuenta === 'Cuenta Corriente'
+  const esCheque = !!bankAccount && !!cuentaSeleccionada
   const cuentaChequesManuales = cuentaSeleccionada?.chequesManuales ?? true
 
   const { data: siguienteCheque } = useQuery({
@@ -195,7 +196,15 @@ export default function RegistrarPagoPage() {
   })
 
   useEffect(() => {
-    if (esCheque && cuentaChequesManuales && siguienteCheque?.siguienteSugerido && !referenceNoTocado.current && !referenceNo) {
+    if (!esCheque || !siguienteCheque?.siguienteSugerido) return
+    // Numeración automática: el campo queda deshabilitado y siempre refleja el número que
+    // asignará el backend, sin importar lo que el usuario haya escrito antes.
+    if (!cuentaChequesManuales) {
+      setReferenceNo(siguienteCheque.siguienteSugerido)
+      return
+    }
+    // Numeración manual: solo se sugiere una vez, como punto de partida editable.
+    if (!referenceNoTocado.current && !referenceNo) {
       setReferenceNo(siguienteCheque.siguienteSugerido)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -381,8 +390,8 @@ export default function RegistrarPagoPage() {
                     value={bankAccount}
                     onChange={(val) => {
                       setBankAccount(val)
-                      const nextEsCheque = cuentasBancarias?.items.find((c) => c.id === val)?.tipoCuenta === 'Cuenta Corriente'
-                      if (nextEsCheque) { referenceNoTocado.current = false; setReferenceNo('') }
+                      referenceNoTocado.current = false
+                      setReferenceNo('')
                     }}
                     options={bankAccountOptions}
                     onSearch={setBankAccountSearch}
@@ -392,7 +401,7 @@ export default function RegistrarPagoPage() {
                   />
                   {esCheque && (
                     <p className="ff-hint">
-                      Esta cuenta es una Cuenta Corriente — el pago participa de la numeración de cheques.
+                      Esta cuenta participa de la numeración de cheques.
                     </p>
                   )}
                 </div>
@@ -406,19 +415,19 @@ export default function RegistrarPagoPage() {
                   {esCheque ? 'Número de Cheque' : 'No. de Referencia'}
                   {esCheque && cuentaChequesManuales && <span className="ff-required">*</span>}
                 </label>
-                {esCheque && !cuentaChequesManuales ? (
+                <input
+                  className="ff-input"
+                  placeholder={esCheque ? 'Número de cheque…' : '# cheque, transferencia…'}
+                  value={referenceNo}
+                  disabled={esCheque && !cuentaChequesManuales}
+                  onChange={(e) => { referenceNoTocado.current = true; setReferenceNo(e.target.value) }}
+                />
+                {esCheque && !cuentaChequesManuales && (
                   <p className="ff-hint" style={{ margin: 0 }}>
                     {bankAccount
-                      ? `Se asignará el nº ${siguienteCheque?.siguienteSugerido ?? '—'} al guardar (numeración automática).`
+                      ? 'Numeración automática — se asigna al guardar.'
                       : 'Selecciona la cuenta bancaria para ver el número que se asignará.'}
                   </p>
-                ) : (
-                  <input
-                    className="ff-input"
-                    placeholder={esCheque ? 'Número de cheque…' : '# cheque, transferencia…'}
-                    value={referenceNo}
-                    onChange={(e) => { referenceNoTocado.current = true; setReferenceNo(e.target.value) }}
-                  />
                 )}
                 {esCheque && cuentaChequesManuales && siguienteCheque?.ultimoCheque && (
                   <p className="ff-hint">Último usado: {siguienteCheque.ultimoCheque} — sugerencia editable.</p>
