@@ -26,6 +26,8 @@ import { useAuthStore } from '@/stores/auth.store'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 interface ItemRow {
   itemCode: string
@@ -559,6 +561,16 @@ export default function RecepcionForm() {
     setDepartment(receiptData.department ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receiptData])
+
+  const isDirty = useDirtyCheck({
+    supplierId,
+    postingDate,
+    supplierDeliveryNote,
+    items,
+    branch,
+    department,
+  }, !isEdit || !loadingEdit)
+  useBeforeUnloadWarning(isDirty)
 
   const saveMutation = useMutation({
     mutationFn: (dto: CreatePurchaseReceiptDto) =>

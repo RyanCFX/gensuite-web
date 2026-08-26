@@ -31,6 +31,8 @@ import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -608,6 +610,20 @@ function submitDto() {
   const totalDiscount = grossTotal - subtotal
   const taxTotal = items.reduce((s, i) => s + (i.amount * i.salesTaxPct / 100), 0)
   const total = subtotal + taxTotal
+
+  const isDirty = useDirtyCheck({
+    customerId,
+    esClienteOcasional,
+    clienteOcasionalNombre,
+    clienteOcasionalDireccion,
+    date,
+    validTill,
+    items,
+    notes,
+    branch,
+    taxesTemplate,
+  }, isEdit || duplicateId ? initialized : true)
+  useBeforeUnloadWarning(isDirty)
 
   // ── Submit ────────────────────────────────────────────────────────────────
 

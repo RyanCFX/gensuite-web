@@ -12,6 +12,8 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import type { Item } from '@/shared/api/types'
 import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 interface LineItem {
   itemCode: string
@@ -93,6 +95,9 @@ export default function TransferenciaForm() {
   }
   function addRow() { setItems((prev) => [...prev, { itemCode: '', qty: 1 }]) }
   function removeRow(index: number) { setItems((prev) => prev.filter((_, i) => i !== index)) }
+
+  const isDirty = useDirtyCheck({ fromWarehouse, toWarehouse, items, notes }, true)
+  useBeforeUnloadWarning(isDirty)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

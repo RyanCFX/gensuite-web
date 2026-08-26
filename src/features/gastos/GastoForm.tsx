@@ -30,6 +30,8 @@ import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { DistribucionCuentaEditor } from '@/components/shared/DistribucionCuentaEditor'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -447,6 +449,30 @@ export default function GastoForm() {
   const ncfValid = !ncfProveedor || NCF_REGEX.test(ncfProveedor)
   const isB17 = tipoComprobante === 'B17'
   const b17Error = isB17 && grandTotal > B17_MAX
+
+  const isDirty = useDirtyCheck({
+    supplierId,
+    supplierLabel,
+    esProveedorOcasional,
+    proveedorOcasionalNombre,
+    proveedorOcasionalRnc,
+    postingDate,
+    dueDate,
+    items,
+    ncfProveedor,
+    billNo,
+    tipoComprobante,
+    tipoBienes606,
+    formaPago606,
+    taxesTemplate,
+    categoriaGasto,
+    esDeducible,
+    retenciones,
+    branch,
+    department,
+    cuentaCxpOverride,
+  }, !loadingEdit)
+  useBeforeUnloadWarning(isDirty)
 
   const currency = (v: number) => new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(v)
 

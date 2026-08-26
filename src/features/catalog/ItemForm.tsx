@@ -16,6 +16,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { AttributeSelect } from '@/components/shared/AttributeSelect'
 import { ArrowLeft, Plus, Trash2, HelpCircle } from 'lucide-react'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 const schema = z.object({
   itemName: z.string().min(1, 'El nombre es requerido'),
@@ -184,7 +185,7 @@ export default function ItemForm() {
     control,
     setValue,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -217,6 +218,8 @@ export default function ItemForm() {
       salesTaxTemplate: '',
     },
   })
+
+  useBeforeUnloadWarning(isDirty)
 
   // Precarga el formulario al editar — se corre una sola vez cuando llega el artículo.
   useEffect(() => {

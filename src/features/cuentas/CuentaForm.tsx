@@ -9,6 +9,8 @@ import type { CreateCuentaDto, UpdateCuentaDto } from '@/shared/api/types'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { Select, SelectItem } from '@/components/ui/select'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 const ACCOUNT_TYPES = [
   'Bank',
@@ -104,6 +106,9 @@ export default function CuentaForm() {
       })
     }
   }, [cuenta])
+
+  const isDirty = useDirtyCheck(form, !isEdit || !isLoading)
+  useBeforeUnloadWarning(isDirty)
 
   const createMutation = useMutation({
     mutationFn: (data: CreateCuentaDto) => createCuenta(data),

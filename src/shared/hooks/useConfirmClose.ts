@@ -1,12 +1,18 @@
 import { useState, useCallback } from 'react'
+import { useBeforeUnloadWarning } from './useBeforeUnloadWarning'
 
 /**
  * Envuelve el cierre de un modal de formulario para pedir confirmación cuando
  * hay cambios sin guardar. Reemplaza el `onClick` de overlay/X/Cancelar por
  * `requestClose` — si `isDirty` es true abre un `ConfirmModal` en vez de cerrar
  * directo; si no hay cambios, cierra inmediatamente igual que antes.
+ *
+ * También registra el aviso nativo del navegador (useBeforeUnloadWarning) mientras
+ * `isDirty` es true, para cubrir cerrar/recargar la pestaña — no solo la navegación
+ * dentro de la SPA.
  */
 export function useConfirmClose(isDirty: boolean, close: () => void) {
+  useBeforeUnloadWarning(isDirty)
   const [confirming, setConfirming] = useState(false)
 
   const requestClose = useCallback(() => {

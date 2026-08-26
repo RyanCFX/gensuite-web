@@ -2806,6 +2806,17 @@ export interface Grupo {
   parentGroup?: string;
 }
 
+// GET /config/currencies — catálogo de monedas habilitadas en ERPNext (Currency), para
+// poblar el select de "Moneda" en vez de texto libre (ej. en cuentas bancarias).
+// `id`/`name` son el código ISO (ej. "CHF") — usar `id` como value enviado al backend.
+export interface CurrencyOption {
+  id: string;
+  name: string;
+  symbol?: string;
+  fraction?: string;
+  fractionUnits?: number;
+}
+
 // GET /config/paises — catálogo de países tal cual existen en ERPNext (Country).
 // `name` es el nombre exacto del documento en ERPNext (inglés). paisOrigen debe
 // enviar siempre `name`, nunca una traducción.

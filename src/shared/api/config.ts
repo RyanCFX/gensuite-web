@@ -29,6 +29,7 @@ import type {
   CreateAlmacenDto,
   UpdateAlmacenDto,
   PaisCatalogo,
+  CurrencyOption,
   Banco,
   Denominacion,
   CreateDenominacionDto,
@@ -392,5 +393,10 @@ export async function getCatalogosFiscales() {
 
 export async function listPaises(): Promise<PaisCatalogo[]> {
   const res = await client.get<{ success: true; data: PaisCatalogo[] }>(ENDPOINTS.config.paises)
+  return unwrap(res)
+}
+
+export async function listCurrencies(): Promise<CurrencyOption[]> {
+  const res = await client.get<{ success: true; data: CurrencyOption[] }>(ENDPOINTS.config.currencies)
   return unwrap(res)
 }

@@ -16,6 +16,8 @@ import { getCuenta } from '@/shared/api/cuentas'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { formatDOP } from '@/lib/formatters'
 import { ArrowLeft, Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 interface EntryRow {
   id: number
@@ -170,6 +172,16 @@ export default function JournalForm() {
   }
 
   const isPending = createMutation.isPending || submitMutation.isPending
+
+  const isDirty = useDirtyCheck({
+    postingDate,
+    remarks,
+    rows,
+    defaultBranch,
+    defaultDepartment,
+    defaultCostCenter,
+  }, true)
+  useBeforeUnloadWarning(isDirty)
 
   return (
     <div className="page-container">

@@ -22,6 +22,8 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { listSucursales } from '@/shared/api/sucursales'
 import { validateRNCDetailed, formatRNC } from '@/lib/validators/dgii'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 function today(): string {
   const d = new Date()
@@ -127,6 +129,36 @@ export default function EmisionForm() {
     .map((s) => ({ value: s.name, label: s.name }))
 
   const rncDetail = useMemo(() => (rnc ? validateRNCDetailed(rnc) : null), [rnc])
+
+  const isDirty = useDirtyCheck(
+    {
+      fecha,
+      tipoDocumentoCode,
+      cuentaBancaria,
+      descripcion,
+      monto,
+      cuentaBancoOverride,
+      cuentaPartyOverride,
+      tieneBeneficiario,
+      beneficiarioTipo,
+      beneficiarioId,
+      beneficiarioNombre,
+      numeroCheque,
+      numeroReferencia,
+      comprobante,
+      ncf,
+      claseFiscal,
+      rnc,
+      liquidaciones,
+      deducciones,
+      distribucion,
+      nota,
+      branch,
+      department,
+    },
+    true,
+  )
+  useBeforeUnloadWarning(isDirty)
 
   const createMutation = useMutation({
     mutationFn: createEmision,

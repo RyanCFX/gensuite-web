@@ -30,6 +30,8 @@ import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -541,6 +543,21 @@ function submitDto() {
      if (isEdit) updateMutation.mutate(baseDto)
      else createMutation.mutate(baseDto)
    }
+
+  const isDirty = useDirtyCheck({
+    customerId,
+    esClienteOcasional,
+    clienteOcasionalNombre,
+    clienteOcasionalDireccion,
+    transactionDate,
+    deliveryDate,
+    items,
+    notes,
+    isLayaway,
+    branch,
+    department,
+  }, isEdit || quotationId || duplicateId ? loaded : true)
+  useBeforeUnloadWarning(isDirty)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

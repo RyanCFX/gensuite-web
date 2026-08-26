@@ -123,6 +123,32 @@ export default function DepositoForm() {
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al crear el depósito'),
   })
 
+  const isDirty = useDirtyCheck({
+    fecha,
+    tipoDocumentoCode,
+    cuentaBancaria,
+    descripcion,
+    monto,
+    cuentaBancoOverride,
+    cuentaPartyOverride,
+    tieneOrigen,
+    origenTipo,
+    origenId,
+    origenNombre,
+    numeroReferencia,
+    comprobante,
+    ncf,
+    claseFiscal,
+    rnc,
+    liquidaciones,
+    deducciones,
+    distribucion,
+    nota,
+    branch,
+    department,
+  }, true)
+  useBeforeUnloadWarning(isDirty)
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 

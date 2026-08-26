@@ -14,6 +14,7 @@ import {
   listTiposCuentaBancaria,
 } from '@/shared/api/cuentas-bancarias'
 import { listChequePrintTemplates } from '@/shared/api/tesoreria'
+import { listCurrencies } from '@/shared/api/config'
 import type { CuentaBancaria, CuentaBancariaEstado, ChequeFormat } from '@/shared/api/types'
 import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, Wallet } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
@@ -111,6 +112,13 @@ export default function CuentasBancariasPage() {
     queryKey: ['tesoreria-cheque-print-templates-select'],
     queryFn: () => listChequePrintTemplates({ limit: 100 }),
     enabled: dialogOpen,
+  })
+
+  const { data: currencies } = useQuery({
+    queryKey: ['currencies'],
+    queryFn: listCurrencies,
+    enabled: dialogOpen,
+    staleTime: 60 * 60_000,
   })
   const [bankSearch, setBankSearch] = useState('')
   const bankOptions: SearchSelectOption[] = (bancos ?? [])
@@ -240,6 +248,8 @@ export default function CuentasBancariasPage() {
         chequesManuales: values.chequesManuales,
         isDefault: values.isDefault,
         balanceInicial: values.balanceInicial ?? 0,
+        ultimoCheque: values.ultimoCheque,
+        ultimoDeposito: values.ultimoDeposito,
         tipoCuenta: values.tipoCuenta || undefined,
         chequePrintTemplate: values.chequePrintTemplate || undefined,
       })
@@ -467,11 +477,16 @@ export default function CuentasBancariasPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="ff-wrap">
                     <label className="ff-label ff-required" htmlFor="cbCurrency">Moneda</label>
-                    <input
-                      id="cbCurrency"
-                      className={`ff-input${errors.currency ? ' ff-input-error' : ''}`}
-                      placeholder="DOP"
-                      {...register('currency')}
+                    <Controller
+                      name="currency"
+                      control={control}
+                      render={({ field }) => (
+                        <Select value={field.value} onValueChange={field.onChange} placeholder="Seleccionar moneda" clearable={false}>
+                          {(currencies ?? []).map((c) => (
+                            <SelectItem key={c.id} value={c.id}>{c.symbol ? `${c.name} (${c.symbol})` : c.name}</SelectItem>
+                          ))}
+                        </Select>
+                      )}
                     />
                     {errors.currency && <p className="ff-error">{errors.currency.message}</p>}
                   </div>
@@ -547,32 +562,30 @@ export default function CuentasBancariasPage() {
                   )}
                 </div>
 
-                {editTarget && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                    <div className="ff-wrap">
-                      <label className="ff-label" htmlFor="cbUltimoCheque">Último cheque</label>
-                      <input
-                        id="cbUltimoCheque"
-                        className="ff-input"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        {...register('ultimoCheque', { valueAsNumber: true })}
-                      />
-                    </div>
-                    <div className="ff-wrap">
-                      <label className="ff-label" htmlFor="cbUltimoDeposito">Último depósito</label>
-                      <input
-                        id="cbUltimoDeposito"
-                        className="ff-input"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        {...register('ultimoDeposito', { valueAsNumber: true })}
-                      />
-                    </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="cbUltimoCheque">Último cheque</label>
+                    <input
+                      id="cbUltimoCheque"
+                      className="ff-input"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      {...register('ultimoCheque', { valueAsNumber: true })}
+                    />
                   </div>
-                )}
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="cbUltimoDeposito">Último depósito</label>
+                    <input
+                      id="cbUltimoDeposito"
+                      className="ff-input"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      {...register('ultimoDeposito', { valueAsNumber: true })}
+                    />
+                  </div>
+                </div>
 
                 <div className="ff-wrap" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <input id="cbChequesManuales" type="checkbox" {...register('chequesManuales')} />

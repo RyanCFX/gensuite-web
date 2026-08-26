@@ -35,6 +35,8 @@ import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -511,6 +513,23 @@ export default function InvoiceForm() {
   })
 
   const isSaving = createMutation.isPending
+
+  const isDirty = useDirtyCheck({
+    customerId,
+    esClienteOcasional,
+    clienteOcasionalNombre,
+    clienteOcasionalRnc,
+    clienteOcasionalDireccion,
+    postingDate,
+    dueDate,
+    ncfType,
+    items,
+    notes,
+    branch,
+    department,
+    taxesTemplate,
+  }, true)
+  useBeforeUnloadWarning(isDirty)
 
   // ── Line item helpers ─────────────────────────────────────────────────────
    function updateItem(index: number, patch: Partial<LineItem>) {

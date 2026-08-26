@@ -11,6 +11,8 @@ import {
 } from '@/shared/api/tesoreria'
 import type { CreateChequePrintTemplateDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { ChequeCanvas } from './cheque-template-editor/ChequeCanvas'
 import { ChequeEditorToolbar } from './cheque-template-editor/ChequeEditorToolbar'
 import { ChequePropertiesPanel } from './cheque-template-editor/ChequePropertiesPanel'
@@ -150,6 +152,9 @@ export default function PlantillaChequeForm() {
   function handleChange(patch: Partial<FormValues>) {
     setValues((v) => ({ ...v, ...patch }))
   }
+
+  const isDirty = useDirtyCheck({ values }, !isEdit || !isLoading)
+  useBeforeUnloadWarning(isDirty)
 
   const createMutation = useMutation({
     mutationFn: (dto: CreateChequePrintTemplateDto) => createChequePrintTemplate(dto),

@@ -12,6 +12,8 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { formatDOP } from '@/lib/formatters'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 function today(): string {
   const d = new Date()
@@ -46,6 +48,24 @@ export default function TransferenciaInternaForm() {
 
   const totalDeducciones = deducciones.reduce((s, l) => s + (l.monto || 0), 0)
   const montoLlega = Math.round((monto - totalDeducciones) * 100) / 100
+
+  const isDirty = useDirtyCheck(
+    {
+      fecha,
+      tipoDocumentoCode,
+      cuentaOrigen,
+      cuentaDestino,
+      descripcion,
+      monto,
+      numeroReferencia,
+      deducciones,
+      nota,
+      cuentaBancoOrigenOverride,
+      cuentaBancoDestinoOverride,
+    },
+    true,
+  )
+  useBeforeUnloadWarning(isDirty)
 
   const createMutation = useMutation({
     mutationFn: createTransferenciaInterna,

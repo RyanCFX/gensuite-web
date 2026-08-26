@@ -2788,7 +2788,7 @@
             "name": "overdueOnly",
             "required": false,
             "in": "query",
-            "description": "Solo facturas vencidas (due_date < hoy)",
+            "description": "Solo facturas vencidas (due_date \u003C hoy)",
             "schema": {
               "type": "boolean"
             }
@@ -3196,7 +3196,7 @@
             "bearer": []
           }
         ],
-        "summary": "Saldo a favor disponible del cliente (Payment Entries con unallocated_amount > 0, ej. anticipos sin aplicar a ninguna factura). Sin expiración.",
+        "summary": "Saldo a favor disponible del cliente (Payment Entries con unallocated_amount \u003E 0, ej. anticipos sin aplicar a ninguna factura). Sin expiración.",
         "tags": [
           "Cuentas por Cobrar"
         ]
@@ -3615,7 +3615,7 @@
             "name": "overdueOnly",
             "required": false,
             "in": "query",
-            "description": "Solo facturas vencidas (due_date < hoy)",
+            "description": "Solo facturas vencidas (due_date \u003C hoy)",
             "schema": {
               "type": "boolean"
             }
@@ -3883,7 +3883,7 @@
             "bearer": []
           }
         ],
-        "summary": "Saldo a favor disponible con el proveedor (Payment Entries con unallocated_amount > 0, ej. anticipos pagados sin aplicar a ninguna factura). Sin expiración.",
+        "summary": "Saldo a favor disponible con el proveedor (Payment Entries con unallocated_amount \u003E 0, ej. anticipos pagados sin aplicar a ninguna factura). Sin expiración.",
         "tags": [
           "Cuentas por Pagar"
         ]
@@ -4224,6 +4224,43 @@
           }
         ],
         "summary": "Cancelar pago sometido",
+        "tags": [
+          "Cuentas por Pagar"
+        ]
+      }
+    },
+    "/api/v1/pagos/{id}/imprimir": {
+      "get": {
+        "operationId": "PagosController_imprimir",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF del cheque de este pago (solo tiene sentido si se registró con esCheque=true)",
         "tags": [
           "Cuentas por Pagar"
         ]
@@ -6031,6 +6068,36 @@
           }
         ],
         "summary": "Listar países (Country) tal cual existen en ERPNext",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/currencies": {
+      "get": {
+        "description": "El campo `currency` de Compras/Gastos/Facturación es texto libre validado solo por ERPNext al guardar — usar este catálogo para poblar un select en vez de digitarlo a mano.",
+        "operationId": "ConfigController_getCurrencies",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar monedas (Currency) habilitadas en ERPNext",
         "tags": [
           "Configuración"
         ]
@@ -10066,7 +10133,7 @@
             "name": "from",
             "required": false,
             "in": "query",
-            "description": "Fecha/hora mínima de apertura (period_start_date >=)",
+            "description": "Fecha/hora mínima de apertura (period_start_date \u003E=)",
             "schema": {
               "type": "string"
             }
@@ -10075,7 +10142,7 @@
             "name": "to",
             "required": false,
             "in": "query",
-            "description": "Fecha/hora máxima de apertura (period_start_date <=)",
+            "description": "Fecha/hora máxima de apertura (period_start_date \u003C=)",
             "schema": {
               "type": "string"
             }
@@ -10084,7 +10151,7 @@
             "name": "grandTotalMin",
             "required": false,
             "in": "query",
-            "description": "Solo turnos cerrados (Closed) con grand_total de cierre >= este valor",
+            "description": "Solo turnos cerrados (Closed) con grand_total de cierre \u003E= este valor",
             "schema": {
               "type": "number"
             }
@@ -10093,7 +10160,7 @@
             "name": "grandTotalMax",
             "required": false,
             "in": "query",
-            "description": "Solo turnos cerrados (Closed) con grand_total de cierre <= este valor",
+            "description": "Solo turnos cerrados (Closed) con grand_total de cierre \u003C= este valor",
             "schema": {
               "type": "number"
             }
@@ -10908,7 +10975,7 @@
             "name": "validateStock",
             "required": false,
             "in": "query",
-            "description": "true = solo devolver artículos con stock disponible (> 0) en algún almacén. Solo aplica a productos.",
+            "description": "true = solo devolver artículos con stock disponible (\u003E 0) en algún almacén. Solo aplica a productos.",
             "schema": {
               "default": false,
               "type": "boolean"
@@ -10936,7 +11003,7 @@
             "name": "hasWarranty",
             "required": false,
             "in": "query",
-            "description": "true = solo artículos con garantía (warranty_period > 0). false = sin garantía.",
+            "description": "true = solo artículos con garantía (warranty_period \u003E 0). false = sin garantía.",
             "schema": {
               "type": "boolean"
             }
@@ -19411,7 +19478,7 @@
             "name": "billingStatus",
             "required": false,
             "in": "query",
-            "description": "pending = per_billed < 100 (aún falta facturar total o parcialmente). billed = per_billed = 100.",
+            "description": "pending = per_billed \u003C 100 (aún falta facturar total o parcialmente). billed = per_billed = 100.",
             "schema": {
               "type": "string",
               "enum": [
@@ -22278,13 +22345,308 @@
           "Tesorería — Plantillas de Impresión de Cheque"
         ]
       }
+    },
+    "/api/v1/tesoreria/cheques": {
+      "get": {
+        "description": "Cubre los cheques emitidos vía /tesoreria/emisiones y /pagos. Nunca cheques de cobro (CxC) — esos son recibidos, no emitidos.",
+        "operationId": "ChequesController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cuentaBancaria",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por cuenta bancaria (Bank Account)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Reservado",
+                "Emitido",
+                "Anulado",
+                "Cobrado"
+              ]
+            }
+          },
+          {
+            "name": "chequeNo",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda aproximada por número de cheque",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Fecha del cheque, desde (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Fecha del cheque, hasta (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "beneficiario",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por id de beneficiario (Supplier/Employee/Customer)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "impreso",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por si ya se imprimió",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Historial de cheques emitidos (CxP) — todas las cuentas bancarias",
+        "tags": [
+          "Tesorería — Cheques"
+        ]
+      }
+    },
+    "/api/v1/tesoreria/cheques/siguiente": {
+      "get": {
+        "description": "La secuencia es siempre por cuenta bancaria (nunca por tenant/compañía) — dos cuentas pueden usar el mismo número sin conflicto. En modo manual es solo una sugerencia editable; en modo automático es el número que efectivamente se asignará.",
+        "operationId": "ChequesController_getSiguiente",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cuentaBancaria",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Siguiente número de cheque para una cuenta bancaria",
+        "tags": [
+          "Tesorería — Cheques"
+        ]
+      }
+    },
+    "/api/v1/tesoreria/cheques/{id}": {
+      "get": {
+        "operationId": "ChequesController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un cheque, incluyendo el documento y facturas donde se usó",
+        "tags": [
+          "Tesorería — Cheques"
+        ]
+      }
+    },
+    "/api/v1/tesoreria/cheques/{id}/imprimir": {
+      "get": {
+        "operationId": "ChequesController_imprimir",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF del cheque",
+        "tags": [
+          "Tesorería — Cheques"
+        ]
+      }
+    },
+    "/api/v1/tesoreria/cheques/{id}/anular": {
+      "post": {
+        "description": "Si el documento asociado (Payment Entry/Journal Entry) ya está sometido, lo cancela primero (ERPNext revierte los asientos y la factura liquidada vuelve a pendiente). El registro nunca se borra — queda \"Anulado\" en el historial, ligado a la factura, y su número queda quemado para siempre (nunca se reutiliza).",
+        "operationId": "ChequesController_anular",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnularChequeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Anula el cheque",
+        "tags": [
+          "Tesorería — Cheques"
+        ]
+      }
     }
   },
   "info": {
     "title": "ERP RD API",
     "description": "Backend API del ERP localizado para República Dominicana",
     "version": "1.0",
-    "contact": {}
+    "contact": {
+
+    }
   },
   "tags": [],
   "servers": [
@@ -22548,7 +22910,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del cobro. Si se omite, se toma de las facturas/pedidos referenciados (si todos coinciden en una sola) o se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente)."
+            "description": "Sucursal del cobro. Si se omite, se toma de las facturas/pedidos referenciados (si todos coinciden en una sola) o se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente)."
           },
           "department": {
             "type": "string",
@@ -22558,7 +22920,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) a la que se acredita este cobro. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) a la que se acredita este cobro. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
           }
         },
         "required": [
@@ -22574,7 +22936,7 @@
           "paymentEntryId": {
             "type": "string",
             "example": "ACC-PAY-2026-00003",
-            "description": "Payment Entry con saldo a favor (unallocated_amount > 0) del mismo proveedor de la factura"
+            "description": "Payment Entry con saldo a favor (unallocated_amount \u003E 0) del mismo proveedor de la factura"
           },
           "amount": {
             "type": "number",
@@ -22663,6 +23025,11 @@
             "type": "string",
             "description": "Número de cheque, transferencia, etc."
           },
+          "esCheque": {
+            "type": "boolean",
+            "default": false,
+            "description": "Marca este pago como cheque — activa la numeración por cuenta bancaria (manual o automática según \"Cheques Manuales\" de la cuenta) y lo registra en el historial de cheques (/tesoreria/cheques). Con la cuenta en modo manual, \"referenceNo\" es el número de cheque (requerido); en modo automático, \"referenceNo\" debe omitirse — el sistema lo asigna. Requiere \"bankAccount\"."
+          },
           "referenceDate": {
             "type": "string"
           },
@@ -22679,7 +23046,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del pago. Si se omite, se toma de las facturas referenciadas (si todas coinciden en una sola) o se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente)."
+            "description": "Sucursal del pago. Si se omite, se toma de las facturas referenciadas (si todas coinciden en una sola) o se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente)."
           },
           "department": {
             "type": "string",
@@ -22689,7 +23056,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) desde la que se hace este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) desde la que se hace este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
           }
         },
         "required": [
@@ -23114,7 +23481,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -23221,7 +23588,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) a la que se acredita este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) a la que se acredita este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
           }
         },
         "required": [
@@ -24320,11 +24687,20 @@
         "type": "object",
         "properties": {
           "componentes": {
-            "description": "Impuestos del catálogo (config/tasas-impuestos) que componen esta tasa de retención — mismo mecanismo que un \"combo\" de Tasa Impuesto RD. tax_withholding_rate ya no se fija a mano: se calcula en ERPNext como suma de factor/100 x tasa de cada impuesto referenciado.",
+            "description": "Impuestos del catálogo (config/tasas-impuestos) que componen esta tasa de retención — mismo mecanismo que un \"combo\" de Tasa Impuesto RD. Si se envía, tax_withholding_rate se calcula en ERPNext como suma de factor/100 x tasa de cada impuesto referenciado. Alternativa a \"valorFijo\" — un tramo trae uno de los dos, nunca ambos.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/TasaImpuestoComponenteDto"
             }
+          },
+          "valorFijo": {
+            "type": "number",
+            "example": 10,
+            "description": "Alternativa a \"componentes\": % fijo del tramo, sin ligar a ningún impuesto del catálogo. Un tramo trae \"componentes\" O \"valorFijo\", nunca ambos."
+          },
+          "descripcion": {
+            "type": "string",
+            "description": "Descripción opcional del tramo (aplica a cualquier modo, típicamente usada junto a \"valorFijo\")"
           },
           "fromDate": {
             "type": "string",
@@ -24348,10 +24724,7 @@
             "type": "string",
             "description": "Omitir la clave por completo si no aplica — NUNCA enviar string vacío"
           }
-        },
-        "required": [
-          "componentes"
-        ]
+        }
       },
       "CreateRetencionDto": {
         "type": "object",
@@ -26253,7 +26626,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -26364,7 +26737,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -26650,7 +27023,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -26778,7 +27151,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -27144,7 +27517,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) involucrada en el reembolso. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) involucrada en el reembolso. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
           }
         },
         "required": [
@@ -27191,7 +27564,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal de la nota de débito. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal de la nota de débito. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -27419,7 +27792,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal por defecto para las líneas que no especifiquen la suya. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente)."
+            "description": "Sucursal por defecto para las líneas que no especifiquen la suya. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente)."
           },
           "department": {
             "type": "string",
@@ -27554,7 +27927,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -27722,7 +28095,7 @@
           "label": {
             "type": "string",
             "example": "Caja 1",
-            "description": "Nombre/etiqueta de la caja. El documento en ERPNext se crea como \"POS <label>\"."
+            "description": "Nombre/etiqueta de la caja. El documento en ERPNext se crea como \"POS \u003Clabel\u003E\"."
           },
           "warehouse": {
             "type": "string",
@@ -28346,7 +28719,12 @@
           },
           "chequesManuales": {
             "type": "boolean",
-            "default": false
+            "default": true,
+            "description": "Gobierna la numeración de cheques de esta cuenta (independiente de las demás cuentas): true (default) = el usuario digita el número en cada pago/emisión, solo se valida unicidad y se sugiere el siguiente. false = el sistema lo asigna automáticamente a partir de \"ultimoCheque\" — requerido en ese caso."
+          },
+          "ultimoCheque": {
+            "type": "string",
+            "description": "Último número de cheque usado del talonario físico de esta cuenta. Requerido si \"chequesManuales\" es false (numeración automática) — punto de partida para el siguiente número. Opcional en modo manual (solo sirve como sugerencia)."
           },
           "isDefault": {
             "type": "boolean",
@@ -28425,7 +28803,12 @@
           },
           "chequesManuales": {
             "type": "boolean",
-            "default": false
+            "default": true,
+            "description": "Gobierna la numeración de cheques de esta cuenta (independiente de las demás cuentas): true (default) = el usuario digita el número en cada pago/emisión, solo se valida unicidad y se sugiere el siguiente. false = el sistema lo asigna automáticamente a partir de \"ultimoCheque\" — requerido en ese caso."
+          },
+          "ultimoCheque": {
+            "type": "string",
+            "description": "Número del último cheque emitido"
           },
           "isDefault": {
             "type": "boolean",
@@ -28440,10 +28823,6 @@
             "type": "string",
             "example": "Popular Estandar",
             "description": "ID de la plantilla nativa de ERPNext (ver GET /tesoreria/cheque-print-templates) usada para imprimir los cheques emitidos desde esta cuenta. Sin esto, la impresión usa un comprobante genérico no alineado a un talonario físico."
-          },
-          "ultimoCheque": {
-            "type": "string",
-            "description": "Número del último cheque emitido"
           },
           "ultimoDeposito": {
             "type": "string",
@@ -29195,6 +29574,15 @@
           },
           "signatoryFromLeftEdge": {
             "type": "number"
+          }
+        }
+      },
+      "AnularChequeDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "description": "Motivo de la anulación (informativo)."
           }
         }
       }

@@ -36,6 +36,8 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { DistribucionCuentaEditor } from '@/components/shared/DistribucionCuentaEditor'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 interface ItemRow {
   itemCode: string
@@ -834,6 +836,27 @@ export default function CompraForm() {
     setCuentaCxpOverride(compraData.cuentaCxpOverride ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compraData])
+
+  const isDirty = useDirtyCheck({
+    supplierId,
+    esProveedorOcasional,
+    proveedorOcasionalNombre,
+    proveedorOcasionalRnc,
+    postingDate,
+    dueDate,
+    items,
+    branch,
+    department,
+    taxesTemplate,
+    retenciones,
+    cuentaCxpOverride,
+    ncfProveedor,
+    billNo,
+    tipoBienes606,
+    formaPago606,
+    tipoPago,
+  }, !isEdit || !loadingEdit)
+  useBeforeUnloadWarning(isDirty)
 
   const saveMutation = useMutation({
     mutationFn: (dto: CreateCompraDto) =>

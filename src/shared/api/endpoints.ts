@@ -254,6 +254,7 @@ export const ENDPOINTS = {
     denominacionesById: (id: string) => `/config/denominaciones/${encodeURIComponent(id)}`,
     catalogosFiscales: '/config/catalogos-fiscales',
     paises: '/config/paises',
+    currencies: '/config/currencies',
     posHabilitar: '/config/pos/habilitar',
   },
   pos: {

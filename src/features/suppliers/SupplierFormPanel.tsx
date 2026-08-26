@@ -16,6 +16,7 @@ import { MultiSelectChecklist } from '@/shared/ui/MultiSelectChecklist'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { CheckCircle2, XCircle } from 'lucide-react'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 
 const schema = z
@@ -151,7 +152,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
     watch,
     setValue,
     setError,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
     reset,
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -182,6 +183,8 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
       impuestoGastosDefault: [],
     },
   })
+
+  useBeforeUnloadWarning(isDirty)
 
   useEffect(() => {
     if (supplier) {

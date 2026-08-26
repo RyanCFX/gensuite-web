@@ -14,6 +14,7 @@ import { SearchSelect, type SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { MultiSelectChecklist } from '@/shared/ui/MultiSelectChecklist'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { CheckCircle2, XCircle, Info, HelpCircle, Plus, Trash2 } from 'lucide-react'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 // NOTE: tipoIdentificacion does NOT exist in CreateCustomerDto/UpdateCustomerDto.
 // It is only used here as a local UI helper to decide which field to show.
@@ -124,7 +125,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
 
   const {
     register, control, handleSubmit, watch, setValue, setError,
-    formState: { errors, isSubmitting }, reset,
+    formState: { errors, isSubmitting, isDirty }, reset,
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -152,6 +153,8 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
     control,
     name: 'telefonos',
   })
+
+  useBeforeUnloadWarning(isDirty)
 
   useEffect(() => {
     if (customer) {
