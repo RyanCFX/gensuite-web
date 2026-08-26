@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, Ban, Printer } from 'lucide-react'
-import { getCheque, anularCheque, getChequePdfBlobUrl } from '@/shared/api/tesoreria'
+import { ArrowLeft, Ban, Printer, ExternalLink } from 'lucide-react'
+import { getCheque, anularCheque, getChequePdfBlobUrl, getEmision } from '@/shared/api/tesoreria'
+import { getPago } from '@/shared/api/pagos'
 import type { ChequeEstado } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
 
@@ -58,6 +59,27 @@ export default function ChequeDetail() {
     },
   })
 
+  // El cheque solo trae { doctype, name } del documento origen — no dice si vino de Emisiones o de
+  // Pagos (ambos módulos generan un Payment Entry). Un Journal Entry solo puede venir de Emisiones;
+  // para un Payment Entry, se intenta primero Emisiones y si no existe ahí, se asume Pago.
+  const abrirDocumentoOrigenMutation = useMutation({
+    mutationFn: async () => {
+      const name = cheque!.documentoOrigen.name
+      if (cheque!.documentoOrigen.doctype === 'Journal Entry') {
+        return `/tesoreria/emisiones/${encodeURIComponent(name)}`
+      }
+      try {
+        await getEmision(name)
+        return `/tesoreria/emisiones/${encodeURIComponent(name)}`
+      } catch {
+        await getPago(name)
+        return `/pagos/${encodeURIComponent(name)}`
+      }
+    },
+    onSuccess: (path) => navigate(path),
+    onError: () => toast.error('No se pudo abrir el documento origen'),
+  })
+
   if (isLoading) {
     return (
       <div className="page-container">
@@ -102,7 +124,7 @@ export default function ChequeDetail() {
             <span className={`badge ${STATUS_BADGE[cheque.estado]}`}>{cheque.estado}</span>
           </h1>
           <p className="page-sub">
-            {cheque.beneficiario?.nombre ?? cheque.beneficiarioNombre ?? 'Sin beneficiario'} · {formatDate(cheque.fecha)}
+            {cheque.beneficiario?.id ?? 'Sin beneficiario'} · {formatDate(cheque.fecha)}
           </p>
         </div>
       </div>
@@ -137,7 +159,7 @@ export default function ChequeDetail() {
           <div className="fields-grid">
             <div className="detail-field">
               <span className="detail-label">Cuenta Bancaria</span>
-              <span className="detail-value">{cheque.cuentaBancariaNombre ?? cheque.cuentaBancaria}</span>
+              <span className="detail-value">{cheque.cuentaBancaria}</span>
             </div>
             <div className="detail-field">
               <span className="detail-label">Fecha</span>
@@ -147,16 +169,35 @@ export default function ChequeDetail() {
               <span className="detail-label">Impreso</span>
               <span className="detail-value">{cheque.impreso ? `Sí${cheque.vecesImpreso ? ` (×${cheque.vecesImpreso})` : ''}` : 'No'}</span>
             </div>
+            {cheque.fechaCompensacion && (
+              <div className="detail-field">
+                <span className="detail-label">Fecha de compensación</span>
+                <span className="detail-value">{formatDate(cheque.fechaCompensacion)}</span>
+              </div>
+            )}
             {cheque.documentoOrigen?.doctype && (
               <div className="detail-field">
                 <span className="detail-label">Documento Contable</span>
-                <span className="detail-value">{cheque.documentoOrigen.doctype} — {cheque.documentoOrigen.name}</span>
+                <button
+                  type="button"
+                  className="detail-value"
+                  onClick={() => abrirDocumentoOrigenMutation.mutate()}
+                  disabled={abrirDocumentoOrigenMutation.isPending}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                    color: 'var(--color-brand)', textDecoration: 'underline', fontSize: 'inherit',
+                  }}
+                >
+                  {cheque.documentoOrigen.doctype} — {cheque.documentoOrigen.name}
+                  {abrirDocumentoOrigenMutation.isPending ? <span className="spinner" /> : <ExternalLink size={12} />}
+                </button>
               </div>
             )}
-            {cheque.motivo && (
+            {cheque.motivoAnulacion && (
               <div className="detail-field">
                 <span className="detail-label">Motivo de anulación</span>
-                <span className="detail-value">{cheque.motivo}</span>
+                <span className="detail-value">{cheque.motivoAnulacion}</span>
               </div>
             )}
           </div>
@@ -183,8 +224,8 @@ export default function ChequeDetail() {
               </thead>
               <tbody>
                 {cheque.facturas.map((f, i) => (
-                  <tr key={i}>
-                    <td>{f.invoiceId}</td>
+                  <tr key={i} className="data-table-row-link" onClick={() => navigate(`/compras/${encodeURIComponent(f.invoiceId)}`)}>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{f.invoiceId}</td>
                     <td style={{ textAlign: 'right' }}>{formatDOP(f.allocatedAmount)}</td>
                   </tr>
                 ))}

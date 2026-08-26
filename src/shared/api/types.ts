@@ -3973,19 +3973,27 @@ export type ChequeEstado = "Reservado" | "Emitido" | "Anulado" | "Cobrado";
 export interface Cheque {
   id: string;
   chequeNo: string;
+  /** Ya viene como texto descriptivo (nombre de la cuenta bancaria), no como código interno. */
   cuentaBancaria: string;
-  cuentaBancariaNombre?: string;
+  company?: string;
   estado: ChequeEstado;
-  beneficiario?: TesoreriaParty;
-  beneficiarioNombre?: string;
+  modoAsignacion?: "Manual" | "Automático";
+  /** Sin `nombre` — el backend solo trae tipo + id del tercero. */
+  beneficiario?: { tipo: "Customer" | "Supplier"; id: string };
   monto: number;
   fecha: string;
   impreso: boolean;
   vecesImpreso?: number;
+  impresoEl?: string | null;
+  impresoPor?: string | null;
+  /** Presente cuando el banco ya compensó el cheque (estado "Cobrado"). */
+  fechaCompensacion?: string | null;
   documentoOrigen: { doctype: "Payment Entry" | "Journal Entry"; name: string };
-  motivo?: string;
-  creation?: string;
-  modified?: string;
+  anuladoEl?: string | null;
+  anuladoPor?: string | null;
+  motivoAnulacion?: string | null;
+  createdAt?: string;
+  modifiedAt?: string;
 }
 
 export interface ChequeFactura {

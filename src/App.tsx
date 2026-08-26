@@ -32,6 +32,7 @@ const CreditNotesPage = lazy(() => import('@/features/invoicing/CreditNotesPage'
 const DebitNotesPage  = lazy(() => import('@/features/invoicing/DebitNotesPage'))
 const DevolucionesPage = lazy(() => import('@/features/invoicing/DevolucionesPage'))
 const DevolucionDetail = lazy(() => import('@/features/invoicing/DevolucionDetail'))
+const DevolucionForm   = lazy(() => import('@/features/invoicing/DevolucionForm'))
 const StockPage       = lazy(() => import('@/features/inventory/StockPage'))
 const HistoryPage     = lazy(() => import('@/features/inventory/HistoryPage'))
 const CountsPage      = lazy(() => import('@/features/inventory/CountsPage'))
@@ -187,6 +188,7 @@ export default function App() {
             <Route path="/notas-credito" element={<Suspense fallback={<PageLoader />}><CreditNotesPage /></Suspense>} />
             <Route path="/notas-debito" element={<Suspense fallback={<PageLoader />}><DebitNotesPage /></Suspense>} />
             <Route path="/devoluciones" element={<Suspense fallback={<PageLoader />}><DevolucionesPage /></Suspense>} />
+            <Route path="/devoluciones/nueva" element={<Suspense fallback={<PageLoader />}><DevolucionForm /></Suspense>} />
             <Route path="/devoluciones/:id" element={<Suspense fallback={<PageLoader />}><DevolucionDetail /></Suspense>} />
 
             {/* Inventario */}

@@ -45,7 +45,6 @@ export default function RegistrarPagoPage() {
   const [paidAmount, setPaidAmount] = useState<number>(0)
   const [modeOfPayment, setModeOfPayment] = useState('')
   const [bankAccount, setBankAccount] = useState('')
-  const [esCheque, setEsCheque] = useState(false)
   const [referenceNo, setReferenceNo] = useState('')
   const referenceNoTocado = useRef(false)
   const [referenceDate, setReferenceDate] = useState('')
@@ -170,7 +169,7 @@ export default function RegistrarPagoPage() {
     .map((m) => ({ value: m.name, label: m.name }))
 
   const metodoSeleccionado = (metodos ?? []).find((m) => m.name === modeOfPayment)
-  const requiresBankAccount = (metodoSeleccionado?.requiresBankAccount && !metodoSeleccionado.defaultBankAccount) || esCheque
+  const requiresBankAccount = metodoSeleccionado?.requiresBankAccount && !metodoSeleccionado.defaultBankAccount
 
   const { data: cuentasBancarias } = useQuery({
     queryKey: ['cuentas-bancarias-activas'],
@@ -182,9 +181,11 @@ export default function RegistrarPagoPage() {
     .filter((c) => !bankAccountSearch || c.accountName.toLowerCase().includes(bankAccountSearch.toLowerCase()))
     .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))
 
-  // ── Cheque: numeración por cuenta bancaria (ver docs/tasks/45, 47) ────────
+  // ── Cheque: se infiere de la cuenta bancaria elegida, no de un toggle manual —
+  // una cuenta de tipo "Cuenta Corriente" es, por definición, una chequera (ver docs/tasks/45, 47).
 
   const cuentaSeleccionada = cuentasBancarias?.items.find((c) => c.id === bankAccount)
+  const esCheque = !!bankAccount && cuentaSeleccionada?.tipoCuenta === 'Cuenta Corriente'
   const cuentaChequesManuales = cuentaSeleccionada?.chequesManuales ?? true
 
   const { data: siguienteCheque } = useQuery({
@@ -199,12 +200,6 @@ export default function RegistrarPagoPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [esCheque, cuentaChequesManuales, siguienteCheque])
-
-  function handleEsChequeChange(checked: boolean) {
-    setEsCheque(checked)
-    referenceNoTocado.current = false
-    if (!checked) setReferenceNo('')
-  }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -377,7 +372,7 @@ export default function RegistrarPagoPage() {
                 />
               </div>
 
-              {(metodoSeleccionado?.requiresBankAccount || esCheque) && (
+              {metodoSeleccionado?.requiresBankAccount && (
                 <div className="ff-wrap">
                   <label className="ff-label">
                     Cuenta Bancaria {requiresBankAccount && <span className="ff-required">*</span>}
@@ -386,31 +381,23 @@ export default function RegistrarPagoPage() {
                     value={bankAccount}
                     onChange={(val) => {
                       setBankAccount(val)
-                      if (esCheque) { referenceNoTocado.current = false; setReferenceNo('') }
+                      const nextEsCheque = cuentasBancarias?.items.find((c) => c.id === val)?.tipoCuenta === 'Cuenta Corriente'
+                      if (nextEsCheque) { referenceNoTocado.current = false; setReferenceNo('') }
                     }}
                     options={bankAccountOptions}
                     onSearch={setBankAccountSearch}
                     selectedLabel={cuentasBancarias?.items.find((c) => c.id === bankAccount)?.accountName ?? ''}
-                    placeholder={metodoSeleccionado?.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
+                    placeholder={metodoSeleccionado.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
                     error={requiresBankAccount && !bankAccount}
                   />
+                  {esCheque && (
+                    <p className="ff-hint">
+                      Esta cuenta es una Cuenta Corriente — el pago participa de la numeración de cheques.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
-
-            {/* Pagar con cheque */}
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
-              <input
-                type="checkbox"
-                checked={esCheque}
-                onChange={(e) => handleEsChequeChange(e.target.checked)}
-                style={{ marginTop: 2 }}
-              />
-              <span>
-                Pagar con cheque — participa de la numeración por cuenta bancaria y queda en el
-                historial de Cheques (Tesorería)
-              </span>
-            </label>
 
             {/* Referencia / Fecha de Referencia / Fecha */}
             <div className="form-row form-row-3">

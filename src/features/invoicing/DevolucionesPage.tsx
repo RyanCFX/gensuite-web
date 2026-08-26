@@ -7,7 +7,7 @@ import { listDepartamentos } from '@/shared/api/departamentos'
 import { listCustomers } from '@/shared/api/customers'
 import { getCatalogosFiscales } from '@/shared/api/config'
 import { useDebounce } from '@/lib/useDebounce'
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, Plus } from 'lucide-react'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -166,6 +166,10 @@ export default function DevolucionesPage() {
           <h1 className="page-title">Devoluciones</h1>
           {data && <p className="page-sub">{data.meta.total} devoluciones en total</p>}
         </div>
+        <button className="btn btn-primary" onClick={() => navigate('/devoluciones/nueva')}>
+          <Plus size={16} />
+          Nueva Devolución
+        </button>
       </div>
 
       <div className="filter-bar">

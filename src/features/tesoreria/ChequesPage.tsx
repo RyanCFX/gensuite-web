@@ -163,8 +163,8 @@ export default function ChequesPage() {
                       <tr key={c.id} className="data-table-row-link" onClick={() => navigate(`/tesoreria/cheques/${c.id}`)}>
                         <td className="td-muted">{formatDate(c.fecha)}</td>
                         <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{c.chequeNo}</td>
-                        <td className="td-muted">{c.cuentaBancariaNombre ?? c.cuentaBancaria}</td>
-                        <td>{c.beneficiario?.nombre ?? c.beneficiarioNombre ?? '—'}</td>
+                        <td className="td-muted">{c.cuentaBancaria}</td>
+                        <td>{c.beneficiario?.id ?? '—'}</td>
                         <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatDOP(c.monto)}</td>
                         <td>
                           <span className={`badge ${STATUS_BADGE[c.estado]}`}>{c.estado}</span>
