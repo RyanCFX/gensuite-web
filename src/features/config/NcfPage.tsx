@@ -5,6 +5,7 @@ import {
   getNcfSeries, getNcfSerie,
   createNcfSerie, updateNcfSerie,
   disableNcfSerie, enableNcfSerie,
+  getCatalogosFiscales,
 } from '@/shared/api/config'
 import type { NcfSerie, CreateNcfSerieDto, UpdateNcfSerieDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -13,14 +14,24 @@ import {
   AlertTriangle, AlertCircle, Plus, Eye, Pencil,
   XCircle, RefreshCw, ChevronRight,
 } from 'lucide-react'
+import { Select, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const NCF_TYPE_INFO: Record<string, { label: string; description: string; color: string }> = {
-  B01: { label: 'B01', description: 'Crédito Fiscal (clientes con RNC)',   color: '#1a69ab' },
-  B02: { label: 'B02', description: 'Consumidor Final (sin RNC)',          color: '#16a34a' },
-  B14: { label: 'B14', description: 'Regímenes Especiales (zonas francas)', color: '#ca8a04' },
-  B15: { label: 'B15', description: 'Gubernamentales',                     color: '#7c3aed' },
+// Solo define el color del badge para los tipos más comunes — el listado real de tipos
+// disponibles para crear/editar una secuencia viene de GET /config/catalogos-fiscales (ncfTypes).
+// Un tipo sin entrada aquí simplemente cae al badge neutral (ver NcfTypeBadge).
+const NCF_TYPE_COLOR: Record<string, string> = {
+  B01: '#1a69ab',
+  B02: '#16a34a',
+  B03: '#0891b2',
+  B04: '#db2777',
+  B14: '#ca8a04',
+  B15: '#7c3aed',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -75,13 +86,13 @@ function ProgressBar({ used, total, color = 'var(--brand-primary)' }: { used: nu
 // ─── NCF Type Badge ───────────────────────────────────────────────────────────
 
 function NcfTypeBadge({ type }: { type: string }) {
-  const info = NCF_TYPE_INFO[type]
-  if (!info) return <span className="badge badge-neutral">{type}</span>
+  const color = NCF_TYPE_COLOR[type]
+  if (!color) return <span className="badge badge-neutral">{type}</span>
   return (
     <span className="badge" style={{
-      background: `${info.color}18`,
-      color: info.color,
-      borderColor: `${info.color}40`,
+      background: `${color}18`,
+      color,
+      borderColor: `${color}40`,
       fontWeight: 600,
       letterSpacing: '0.02em',
     }}>
@@ -108,6 +119,13 @@ function StatusBadgePill({ serie }: { serie: NcfSerie }) {
       </span>
     )
   }
+  if (serie.alertaActiva) {
+    return (
+      <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <AlertTriangle size={11} aria-hidden="true" /> Por agotarse
+      </span>
+    )
+  }
   return (
     <span className="badge badge-success">
       Activa
@@ -118,11 +136,18 @@ function StatusBadgePill({ serie }: { serie: NcfSerie }) {
 // ─── Create Modal ─────────────────────────────────────────────────────────────
 
 function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [ncfType, setNcfType] = useState<'B01' | 'B02' | 'B14' | 'B15'>('B02')
+  const [ncfType, setNcfType] = useState('B02')
   const [start, setStart] = useState(1)
   const [end, setEnd] = useState(50000000)
   const [expiration, setExpiration] = useState('')
   const [error, setError] = useState('')
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+  const ncfTypeOptions = catalogos?.ncfTypes ?? []
 
   const qc = useQueryClient()
   const createMutation = useMutation({
@@ -139,6 +164,12 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
   const preview = formatNcfPreview(ncfType, start)
   const today = new Date().toISOString().slice(0, 10)
+  // La DGII suele emitir resoluciones con vigencia de hasta ~5 años — el calendario debe
+  // permitir navegar hasta ese límite en vez de quedar atado al año en curso.
+  const maxExpiration = new Date(new Date().setFullYear(new Date().getFullYear() + 5)).toISOString().slice(0, 10)
+
+  const isDirty = useDirtyCheck({ ncfType, start, end, expiration }, true)
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -150,14 +181,14 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <div>
             <div className="modal-title">Nueva Secuencia NCF</div>
             <div className="modal-sub">DGII — República Dominicana</div>
           </div>
-          <button className="modal-close" onClick={onClose} aria-label="Cerrar"><XCircle size={16} /></button>
+          <button className="modal-close" onClick={requestClose} aria-label="Cerrar"><XCircle size={16} /></button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -165,12 +196,11 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             {/* Tipo NCF */}
             <div className="ff-wrap">
               <label className="ff-label">Tipo de Comprobante <span className="ff-required">*</span></label>
-              <select className="ff-select" value={ncfType} onChange={(e) => setNcfType(e.target.value as typeof ncfType)}>
-                {Object.entries(NCF_TYPE_INFO).map(([k, v]) => (
-                  <option key={k} value={k}>{k} — {v.description}</option>
+              <Select value={ncfType} onValueChange={setNcfType}>
+                {ncfTypeOptions.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                 ))}
-              </select>
-              <p className="ff-hint">{NCF_TYPE_INFO[ncfType]?.description}</p>
+              </Select>
             </div>
 
             {/* Rango */}
@@ -198,9 +228,9 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             {/* Vencimiento */}
             <div className="ff-wrap">
               <label className="ff-label">Fecha de vencimiento <span className="ff-required">*</span></label>
-              <input
-                type="date" className="ff-input" min={today}
-                value={expiration} onChange={(e) => setExpiration(e.target.value)}
+              <DatePicker
+                className="ff-input" min={today} max={maxExpiration}
+                value={expiration} onChange={setExpiration}
               />
               <p className="ff-hint">Fecha que aparece en la resolución de la DGII</p>
             </div>
@@ -232,7 +262,7 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
           </div>
 
           <div className="modal-foot">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+            <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>
             <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
               {createMutation.isPending
                 ? <><span className="spinner spinner-white spinner-sm" /> Creando…</>
@@ -241,6 +271,16 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
           </div>
         </form>
       </div>
+
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }
@@ -254,6 +294,16 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
   const [expiration, setExpiration] = useState(serie.expirationDate)
   const [warnings, setWarnings] = useState<string[]>([])
   const [formError, setFormError] = useState('')
+  // La DGII suele emitir resoluciones con vigencia de hasta ~5 años — el calendario debe
+  // permitir navegar hasta ese límite en vez de quedar atado al año en curso.
+  const maxExpiration = new Date(new Date().setFullYear(new Date().getFullYear() + 5)).toISOString().slice(0, 10)
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+  const ncfTypeOptions = catalogos?.ncfTypes ?? []
 
   const qc = useQueryClient()
   const updateMutation = useMutation({
@@ -290,15 +340,18 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
     onClose()
   }
 
+  const isDirty = useDirtyCheck({ ncfType, end, expiration }, true)
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <div>
             <div className="modal-title">Editar Secuencia #{serie.id}</div>
             <div className="modal-sub"><NcfTypeBadge type={serie.ncfType} /> Rango: {serie.start.toLocaleString()} — {serie.end.toLocaleString()}</div>
           </div>
-          <button className="modal-close" onClick={onClose} aria-label="Cerrar"><XCircle size={16} /></button>
+          <button className="modal-close" onClick={requestClose} aria-label="Cerrar"><XCircle size={16} /></button>
         </div>
 
         {warnings.length > 0 ? (
@@ -333,17 +386,15 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
               {/* Tipo NCF — disabled if has movements */}
               <div className="ff-wrap">
                 <label className="ff-label">Tipo de Comprobante</label>
-                <select
-                  className="ff-select"
+                <Select
                   value={ncfType}
-                  onChange={(e) => setNcfType(e.target.value as typeof ncfType)}
+                  onValueChange={setNcfType}
                   disabled={hasUsed}
-                  title={hasUsed ? `El tipo no puede cambiarse porque ya se emitieron ${serie.used} comprobantes` : undefined}
                 >
-                  {Object.entries(NCF_TYPE_INFO).map(([k, v]) => (
-                    <option key={k} value={k}>{k} — {v.description}</option>
+                  {ncfTypeOptions.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                   ))}
-                </select>
+                </Select>
                 {hasUsed && (
                   <p className="ff-hint">🔒 No editable — ya se emitieron {(serie.used ?? 0).toLocaleString('es-DO')} comprobantes</p>
                 )}
@@ -365,11 +416,11 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
               {/* Expiration date */}
               <div className="ff-wrap">
                 <label className="ff-label">Fecha de vencimiento</label>
-                <input
-                  type="date"
+                <DatePicker
                   className="ff-input"
+                  max={maxExpiration}
                   value={expiration}
-                  onChange={(e) => setExpiration(e.target.value)}
+                  onChange={setExpiration}
                 />
                 {isExpired(expiration) && (
                   <p className="ff-error">⚠ Esta fecha está en el pasado. La DGII podría rechazar comprobantes emitidos después del vencimiento.</p>
@@ -385,7 +436,7 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
             </div>
 
             <div className="modal-foot">
-              <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+              <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>
               <button type="submit" className="btn btn-primary" disabled={updateMutation.isPending}>
                 {updateMutation.isPending
                   ? <><span className="spinner spinner-white spinner-sm" /> Guardando…</>
@@ -395,6 +446,16 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
           </form>
         )}
       </div>
+
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }
@@ -405,6 +466,11 @@ function DetailDrawer({ serieId }: { serieId: number; onClose?: () => void }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['ncf-serie', serieId],
     queryFn: () => getNcfSerie(serieId),
+  })
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
   })
 
   if (isLoading) {
@@ -435,18 +501,21 @@ function DetailDrawer({ serieId }: { serieId: number; onClose?: () => void }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <NcfTypeBadge type={data.ncfType} />
         <StatusBadgePill serie={data} />
-        {NCF_TYPE_INFO[data.ncfType] && (
-          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-            {NCF_TYPE_INFO[data.ncfType].description}
-          </span>
-        )}
+        {(() => {
+          const label = catalogos?.ncfTypes.find((t) => t.value === data.ncfType)?.label
+          return label && (
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              {label}
+            </span>
+          )
+        })()}
       </div>
 
       {/* KPI cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
         {[
           { label: 'Emitidos', value: (data.used ?? 0).toLocaleString('es-DO'), color: 'var(--text-primary)' },
-          { label: 'Disponibles', value: data.nextNcf === -1 ? 'Agotada' : data.remaining.toLocaleString('es-DO'), color: data.remaining < 1000 ? 'var(--error-text)' : 'var(--success-text)' },
+          { label: 'Disponibles', value: data.nextNcf === -1 ? 'Agotada' : data.remaining.toLocaleString('es-DO'), color: data.alertaActiva ? 'var(--warning-text)' : 'var(--success-text)' },
           { label: '% Usado', value: `${usedPct.toFixed(2)}%`, color: usedPct > 90 ? 'var(--error-text)' : usedPct > 70 ? 'var(--warning-text)' : 'var(--text-primary)' },
         ].map((kpi) => (
           <div key={kpi.label} className="stat-card" style={{ padding: '12px 14px', gap: 4 }}>
@@ -654,9 +723,7 @@ export default function NcfPage() {
 
   // ── Proactive alerts ───────────────────────────────────────────────────────
   const today = new Date().toISOString().slice(0, 10)
-  const lowAlerts = (series ?? []).filter(
-    (s) => getSerieStatus(s) === 'active' && s.remaining < 1000 && s.remaining >= 0
-  )
+  const lowAlerts = (series ?? []).filter((s) => s.alertaActiva)
 
   const expiredActive = (series ?? []).filter(
     (s) => getSerieStatus(s) === 'active' && s.expirationDate < today
@@ -682,7 +749,7 @@ export default function NcfPage() {
           <div key={s.id} className="inline-alert inline-alert-warn">
             <AlertTriangle size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
             <span>
-              La secuencia NCF tipo <strong>{s.ncfType}</strong> tiene menos de 1,000 comprobantes disponibles
+              La secuencia NCF tipo <strong>{s.ncfType}</strong> está por agotarse
               ({s.remaining.toLocaleString('es-DO')} restantes). Considera crear una nueva secuencia antes de que se agote.
             </span>
           </div>
@@ -784,7 +851,7 @@ export default function NcfPage() {
                                   ? <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                                   : (
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                        <span style={{ fontSize: 12, fontWeight: 600, color: s.remaining < 1000 ? 'var(--error-text)' : 'var(--text-primary)' }}>
+                                        <span style={{ fontSize: 12, fontWeight: 600, color: s.alertaActiva ? 'var(--warning-text)' : 'var(--text-primary)' }}>
                                           {s.remaining.toLocaleString('es-DO')}
                                         </span>
                                         <ProgressBar used={usedCount} total={total} />

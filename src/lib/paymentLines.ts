@@ -9,6 +9,7 @@ export interface PaymentLineDraft {
   authorizationCode: string
   bank: string
   checkNumber: string
+  bankAccount: string
   showDetails: boolean
 }
 
@@ -32,6 +33,7 @@ export function emptyPaymentLine(): PaymentLineDraft {
     authorizationCode: '',
     bank: '',
     checkNumber: '',
+    bankAccount: '',
     showDetails: false,
   }
 }
@@ -70,6 +72,10 @@ export function isPaymentLinesValid(
   const validPayments = value.payments.filter((p) => p.modeOfPayment && Number(p.amount) > 0)
   if (validPayments.length === 0) return false
   if (validPayments.length !== value.payments.length) return false
+  for (const p of validPayments) {
+    const metodo = metodos.find((m) => m.name === p.modeOfPayment)
+    if (metodo?.requiresBankAccount && !metodo.defaultBankAccount && !p.bankAccount) return false
+  }
   const sum = sumPayments(value.payments)
   if (Math.abs(amountDue - sum) > PAYMENT_LINES_TOLERANCE) return false
 
@@ -98,6 +104,7 @@ export function buildSubmitPayload(
       ...(p.authorizationCode ? { authorizationCode: p.authorizationCode } : {}),
       ...(p.bank ? { bank: p.bank } : {}),
       ...(p.checkNumber ? { checkNumber: p.checkNumber } : {}),
+      ...(p.bankAccount ? { bankAccount: p.bankAccount } : {}),
     }))
 
   if (!value.vueltoEnabled) return { payments }

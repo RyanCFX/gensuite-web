@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useKeepAliveRef, type KeepAliveRef } from 'keepalive-for-react'
 
 export interface Tab {
   id: string
@@ -8,32 +9,63 @@ export interface Tab {
   isDirty: boolean
 }
 
+interface CloseTabOptions {
+  /** No navegar aunque la pestaña cerrada sea la activa (usar cuando ya se navegó a otra ruta). */
+  skipNavigate?: boolean
+}
+
 interface TabsContextValue {
   tabs: Tab[]
   activeId: string | null
-  closeTab: (id: string) => void
+  closeTab: (id: string, options?: CloseTabOptions) => void
   setTabDirty: (pathname: string, dirty: boolean) => void
   updateTabTitle: (pathname: string, title: string) => void
   multiTab: boolean
   toggleMultiTab: () => void
+  keepAliveRef: React.RefObject<KeepAliveRef | null>
 }
 
 const TabsContext = createContext<TabsContextValue | null>(null)
 
+/** "impuestos-ventas" → "Impuestos Ventas" — fallback para secciones de /config/:seccion sin regla propia. */
+function titleize(slug: string): string {
+  return slug.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+}
+
 function getTitleForPath(pathname: string): string {
   const rules: Array<[RegExp, string | ((m: RegExpMatchArray) => string)]> = [
     [/^\/dashboard$/, 'Dashboard'],
+    [/^\/inicio$/, 'Inicio'],
+
+    // Clientes
     [/^\/clientes\/nuevo$/, 'Nuevo Cliente'],
     [/^\/clientes\/(.+)\/editar$/, 'Editar Cliente'],
     [/^\/clientes\/(.+)$/, (m) => `Cliente: ${m[1]}`],
     [/^\/clientes$/, 'Clientes'],
+
+    // Catálogo
     [/^\/catalogo\/categorias$/, 'Categorías'],
     [/^\/catalogo\/marcas$/, 'Marcas'],
     [/^\/catalogo\/combos$/, 'Combos'],
     [/^\/catalogo\/atributos$/, 'Atributos'],
-    [/^\/catalogo\/articulos\/nuevo$/, 'Nuevo Artículo'],
-    [/^\/catalogo\/articulos\/(.+)$/, (m) => `Artículo: ${m[1]}`],
-    [/^\/catalogo\/articulos$/, 'Artículos'],
+    [/^\/catalogo\/cuentas-por-pagar$/, 'Cuentas por Pagar'],
+    [/^\/catalogo\/descuentos$/, 'Descuentos por Producto'],
+    [/^\/catalogo\/servicios\/nuevo$/, 'Nuevo Servicio'],
+    [/^\/catalogo\/servicios\/(.+)\/editar$/, 'Editar Servicio'],
+    [/^\/catalogo\/servicios\/(.+)$/, (m) => `Servicio: ${m[1]}`],
+    [/^\/catalogo\/servicios$/, 'Servicios'],
+
+    // Inventario / Productos
+    [/^\/inventario\/productos\/nuevo$/, 'Nuevo Producto'],
+    [/^\/inventario\/productos\/(.+)\/editar$/, 'Editar Producto'],
+    [/^\/inventario\/productos\/(.+)$/, (m) => `Producto: ${m[1]}`],
+    [/^\/inventario\/productos$/, 'Productos'],
+    [/^\/inventario\/stock$/, 'Stock Actual'],
+    [/^\/inventario\/historial$/, 'Historial'],
+    [/^\/inventario\/conteos$/, 'Conteos'],
+    [/^\/inventario\/zonas$/, 'Zonas y Ubicaciones'],
+
+    // Cotizaciones / Pedidos / Transferencias / Facturas
     [/^\/cotizaciones\/nueva$/, 'Nueva Cotización'],
     [/^\/cotizaciones\/(.+)$/, (m) => `Cotización: ${m[1]}`],
     [/^\/cotizaciones$/, 'Cotizaciones'],
@@ -52,27 +84,73 @@ function getTitleForPath(pathname: string): string {
     [/^\/notas-debito$/, 'Notas de Débito'],
     [/^\/devoluciones\/(.+)$/, (m) => `Devolución: ${m[1]}`],
     [/^\/devoluciones$/, 'Devoluciones'],
-    [/^\/inventario\/stock$/, 'Stock Actual'],
-    [/^\/inventario\/historial$/, 'Historial'],
-    [/^\/inventario\/conteos$/, 'Conteos'],
+
+    // Compras
+    [/^\/compras\/recepciones\/nueva$/, 'Nueva Recepción de Mercancía'],
+    [/^\/compras\/recepciones\/(.+)\/editar$/, 'Editar Recepción'],
+    [/^\/compras\/recepciones\/(.+)$/, (m) => `Recepción: ${m[1]}`],
+    [/^\/compras\/recepciones$/, 'Recepción de Mercancía'],
+    [/^\/compras\/costos-importacion\/(.+)$/, (m) => `Costo de Importación ${m[1]}`],
+    [/^\/compras\/costos-importacion$/, 'Costos de Importación'],
     [/^\/compras\/nueva$/, 'Nueva Compra'],
+    [/^\/compras\/(.+)\/editar$/, (m) => `Editar Compra: ${m[1]}`],
     [/^\/compras\/(.+)$/, (m) => `Compra: ${m[1]}`],
     [/^\/compras$/, 'Compras'],
+    [/^\/devoluciones-compras\/nueva$/, 'Nueva Devolución'],
+    [/^\/devoluciones-compras\/(.+)\/editar$/, 'Editar Devolución'],
+    [/^\/devoluciones-compras\/(.+)$/, (m) => `Devolución: ${m[1]}`],
+    [/^\/devoluciones-compras$/, 'Devoluciones de Compras'],
+
+    // Gastos / Proveedores
     [/^\/gastos\/nuevo$/, 'Nuevo Gasto'],
+    [/^\/gastos\/(.+)\/editar$/, (m) => `Editar Gasto: ${m[1]}`],
     [/^\/gastos\/(.+)$/, (m) => `Gasto: ${m[1]}`],
     [/^\/gastos$/, 'Gastos'],
     [/^\/proveedores\/nuevo$/, 'Nuevo Proveedor'],
     [/^\/proveedores\/(.+)\/editar$/, 'Editar Proveedor'],
     [/^\/proveedores\/(.+)$/, (m) => `Proveedor: ${m[1]}`],
     [/^\/proveedores$/, 'Proveedores'],
+
+    // Cobros (a clientes)
     [/^\/cobros\/pago$/, 'Registrar Cobro'],
-    [/^\/cobros\/aging$/, 'Aging CxC'],
+    [/^\/cobros\/aging$/, 'Antiguedad de saldos CxC'],
     [/^\/cobros\/semaforo$/, 'Semáforo'],
     [/^\/cobros\/lista$/, 'Cobros'],
     [/^\/cobros\/(.+)$/, (m) => `Cobro: ${m[1]}`],
-    [/^\/caja$/, 'Caja'],
+
+    // Pagos (a proveedores)
+    [/^\/pagos\/lista$/, 'Pagos'],
+    [/^\/pagos\/pendientes$/, 'Facturas Pendientes de Pago'],
+    [/^\/pagos\/nuevo$/, 'Registrar Pago'],
+    [/^\/pagos\/aging$/, 'Antiguedad de saldos por Pagar'],
+    [/^\/pagos\/(.+)$/, (m) => `Pago: ${m[1]}`],
+
+    // Tesorería
+    [/^\/tesoreria\/emisiones\/nueva$/, 'Nueva Emisión'],
+    [/^\/tesoreria\/emisiones\/(.+)$/, (m) => `Emisión: ${m[1]}`],
+    [/^\/tesoreria\/emisiones$/, 'Emisiones'],
+    [/^\/tesoreria\/depositos\/nuevo$/, 'Nuevo Depósito'],
+    [/^\/tesoreria\/depositos\/(.+)$/, (m) => `Depósito: ${m[1]}`],
+    [/^\/tesoreria\/depositos$/, 'Depósitos'],
+    [/^\/tesoreria\/transferencias\/nueva$/, 'Nueva Transferencia Interna'],
+    [/^\/tesoreria\/transferencias\/(.+)$/, (m) => `Transferencia: ${m[1]}`],
+    [/^\/tesoreria\/transferencias$/, 'Transferencias Internas'],
+    [/^\/tesoreria\/movimientos$/, 'Movimientos Bancarios'],
+    [/^\/config\/tesoreria\/tipos-documento$/, 'Tipos de Documento Bancario'],
+    [/^\/config\/tesoreria\/plantillas-cheque\/nueva$/, 'Nueva Plantilla de Cheque'],
+    [/^\/config\/tesoreria\/plantillas-cheque\/(.+)$/, (m) => `Plantilla de Cheque: ${m[1]}`],
+    [/^\/config\/tesoreria\/plantillas-cheque$/, 'Plantillas de Cheque'],
+
+    // Caja / Turnos
+    [/^\/caja\/pendientes$/, 'Caja'],
+    [/^\/caja\/por-cobrar$/, 'Cobros Pendientes'],
+    [/^\/turnos\/(.+)$/, (m) => `Turno: ${m[1]}`],
+    [/^\/turnos$/, 'Turnos de Caja'],
+
     [/^\/usuarios$/, 'Usuarios'],
     [/^\/reportes\/(.+)$/, (m) => `Reporte ${m[1].toUpperCase()}`],
+
+    // Contabilidad
     [/^\/cuentas\/nueva$/, 'Nueva Cuenta'],
     [/^\/cuentas\/(.+)\/editar$/, 'Editar Cuenta'],
     [/^\/cuentas\/(.+)$/, (m) => `Cuenta: ${m[1]}`],
@@ -83,10 +161,24 @@ function getTitleForPath(pathname: string): string {
     [/^\/contabilidad\/cierre-periodo$/, 'Cierre de Período'],
     [/^\/contabilidad\/libro-diario$/, 'Libro Diario'],
     [/^\/contabilidad\/libro-mayor$/, 'Libro Mayor'],
+
+    // Configuración
     [/^\/config\/empresa$/, 'Empresa'],
     [/^\/config\/ncf$/, 'Secuencias NCF'],
     [/^\/config\/sucursales$/, 'Sucursales'],
-    [/^\/config\/(.+)$/, (m) => `Config: ${m[1]}`],
+    [/^\/config\/plantillas-facturas$/, 'Plantillas de Facturas'],
+    [/^\/config\/cajas$/, 'Cajas'],
+    [/^\/config\/centros-costo$/, 'Centros de Costo'],
+    [/^\/config\/bancos$/, 'Bancos'],
+    [/^\/config\/cuentas-bancarias$/, 'Cuentas Bancarias'],
+    [/^\/config\/departamentos$/, 'Departamentos'],
+    [/^\/config\/retenciones$/, 'Retenciones'],
+    [/^\/config\/ajustes-avanzados$/, 'Ajustes Avanzados'],
+    [/^\/config\/notificaciones$/, 'Notificaciones'],
+    [/^\/config\/permisos$/, 'Permisos'],
+    [/^\/config\/roles\/(.+)$/, (m) => `Rol: ${m[1]}`],
+    [/^\/config\/roles$/, 'Roles'],
+    [/^\/config\/(.+)$/, (m) => titleize(m[1])],
     [/^\/config$/, 'Configuración'],
   ]
 
@@ -107,6 +199,8 @@ function getTitleForPath(pathname: string): string {
 }
 
 const STORAGE_KEY = 'gensuite-tabs'
+/** Destino al cerrar la última pestaña — pantalla de bienvenida, no una pestaña más. */
+const EMPTY_STATE_PATH = '/inicio'
 
 function loadTabs(): Tab[] {
   try {
@@ -129,6 +223,7 @@ function makeId(): string {
 function TabsProviderInner({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
+  const keepAliveRef = useKeepAliveRef()
 
   const [tabs, setTabsRaw] = useState<Tab[]>(() => loadTabs())
   const [activeId, setActiveId] = useState<string | null>(() => {
@@ -154,6 +249,12 @@ function TabsProviderInner({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!multiTab) return
     const pathname = location.pathname
+    if (pathname === EMPTY_STATE_PATH) {
+      // Pantalla de "sin pestañas" — no es una pestaña en sí, solo el destino cuando se cierra
+      // la última. Si se convirtiera en pestaña, el usuario nunca vería la barra vacía.
+      setActiveId(null)
+      return
+    }
     const fullPath = pathname + (location.search || '')
 
     setTabs((prev) => {
@@ -170,19 +271,21 @@ function TabsProviderInner({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, location.search, multiTab])
 
-  const closeTab = (id: string) => {
+  const closeTab = (id: string, options?: CloseTabOptions) => {
     setTabs((prev) => {
       const idx = prev.findIndex((t) => t.id === id)
       if (idx === -1) return prev
+      const closed = prev[idx]
       const next = prev.filter((t) => t.id !== id)
+      keepAliveRef.current?.destroy(closed.path)
 
-      if (id === activeId) {
+      if (!options?.skipNavigate && id === activeId) {
         const target = next[idx] ?? next[idx - 1] ?? next[0]
         if (target) {
           navigate(target.path, { replace: true })
           setActiveId(target.id)
         } else {
-          navigate('/dashboard', { replace: true })
+          navigate(EMPTY_STATE_PATH, { replace: true })
           setActiveId(null)
         }
       }
@@ -200,7 +303,7 @@ function TabsProviderInner({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <TabsContext.Provider value={{ tabs, activeId, closeTab, setTabDirty, updateTabTitle, multiTab, toggleMultiTab }}>
+    <TabsContext.Provider value={{ tabs, activeId, closeTab, setTabDirty, updateTabTitle, multiTab, toggleMultiTab, keepAliveRef }}>
       {children}
     </TabsContext.Provider>
   )

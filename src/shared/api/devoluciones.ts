@@ -18,7 +18,22 @@ export async function createDevolucion(data: DevolucionDto) {
   return unwrap(res)
 }
 
-export type ListDevolucionesParams = PaginationParams
+export interface ListDevolucionesParams extends PaginationParams {
+  branch?: string
+  department?: string
+  customer?: string
+  status?: string
+  createdAtFrom?: string
+  createdAtTo?: string
+  postingDateFrom?: string
+  postingDateTo?: string
+  ncf?: string
+  ncfType?: string
+  grandTotalMin?: number
+  grandTotalMax?: number
+  refundedAmountMin?: number
+  refundedAmountMax?: number
+}
 
 // GET /devoluciones — listado paginado
 export async function listDevoluciones(params?: ListDevolucionesParams) {

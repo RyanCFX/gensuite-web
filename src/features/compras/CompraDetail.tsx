@@ -3,13 +3,20 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
-  getCompra, submitCompra, cancelCompra, amendCompra, returnCompra, deleteCompra,
+  getCompra, submitCompra, cancelCompra, amendCompra, deleteCompra, downloadCompraPdf, getCompraPdfBlobUrl,
+  previewAsientosCompra, updateCompra,
 } from '@/shared/api/compras-gastos'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { TIPO_BIENES_606, FORMA_PAGO_606 } from '@/lib/constants'
-import { Send, X, RotateCcw, Undo2, Info, FileText, Trash2 } from 'lucide-react'
+import { getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
+import { listRetenciones } from '@/shared/api/retenciones'
+import { Send, X, RotateCcw, Undo2, Info, FileText, Trash2, Eye, BookOpen } from 'lucide-react'
+import { PdfFormatButton } from '@/components/shared/PdfFormatButton'
+import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
+import { SaldoFavorCxpSection } from '@/features/devoluciones-compras/SaldoFavorCxpSection'
+import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
+import type { FormatoImpresion, ImpuestoDistribucionDto } from '@/shared/api/types'
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | 'delete' | null
 
@@ -19,13 +26,44 @@ export default function CompraDetail() {
   const queryClient = useQueryClient()
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
-  const [showReturn, setShowReturn] = useState(false)
-  const [returnQtys, setReturnQtys] = useState<Record<string, number>>({})
+  const [showAsientosPreview, setShowAsientosPreview] = useState(false)
 
   const { data: compra, isLoading, isError } = useQuery({
     queryKey: ['compra', id],
     queryFn: () => getCompra(id!),
     enabled: !!id,
+  })
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+
+  const { data: retencionesData } = useQuery({
+    queryKey: ['retenciones-all'],
+    queryFn: () => listRetenciones({ limit: 100 }),
+    staleTime: 60 * 60_000,
+  })
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const formatoImpresionDefault = facturacionConfig?.formatoImpresionDefault ?? 'a4'
+  const formatosPermitidos = facturacionConfig?.formatosPermitidos
+
+  const downloadMutation = useMutation({
+    mutationFn: (formato?: FormatoImpresion) => downloadCompraPdf(id!, `compra-${id}.pdf`, formato ?? formatoImpresionDefault),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo descargar el PDF'),
+  })
+
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const previewMutation = useMutation({
+    mutationFn: (formato?: FormatoImpresion) => getCompraPdfBlobUrl(id!, formato ?? formatoImpresionDefault),
+    onSuccess: (url) => setPreviewUrl(url),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo generar la vista previa del PDF'),
   })
 
   const submitMutation = useMutation({
@@ -68,17 +106,6 @@ export default function CompraDetail() {
     },
   })
 
-  const returnMutation = useMutation({
-    mutationFn: () => {
-      const items = Object.entries(returnQtys)
-        .filter(([, qty]) => qty > 0)
-        .map(([itemCode, qty]) => ({ itemCode, qty }))
-      return returnCompra(id!, items)
-    },
-    onSuccess: () => { toast.success('Devolución registrada'); queryClient.invalidateQueries({ queryKey: ['compra', id] }); queryClient.invalidateQueries({ queryKey: ['compras'] }); setShowReturn(false) },
-    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al registrar la devolución'),
-  })
-
   function handleConfirm() {
     if (confirmAction === 'submit') submitMutation.mutate()
     else if (confirmAction === 'cancel') cancelMutation.mutate()
@@ -89,11 +116,12 @@ export default function CompraDetail() {
   const isPending = submitMutation.isPending || cancelMutation.isPending || amendMutation.isPending || deleteMutation.isPending
 
   function getTipoBienesLabel(value?: string) {
-    return TIPO_BIENES_606.find((t) => t.value === value)?.label ?? value ?? '—'
+    return (catalogos?.tipoBienes606 ?? []).find((t) => t.value === value)?.label ?? value ?? '—'
   }
   function getFormaPagoLabel(value?: string) {
-    return FORMA_PAGO_606.find((f) => f.value === value)?.label ?? value ?? '—'
+    return (catalogos?.formaPago606 ?? []).find((f) => f.value === value)?.label ?? value ?? '—'
   }
+  function fmtMonto(m?: number) { return m != null ? formatDOP(m) : '—' }
 
   if (isLoading) {
     return (
@@ -129,13 +157,16 @@ export default function CompraDetail() {
 
       <PageHeader
         title={`Compra ${compra.id}`}
-        description={compra.supplierName}
+        description={compra.esProveedorOcasional ? (compra.proveedorOcasionalNombre ?? compra.supplierName) : compra.supplierName}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {compra.status === 'draft' && (
               <>
                 <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/compras/${id}/editar`)}>
                   <FileText size={14} />Editar
+                </button>
+                <button className="btn btn-secondary btn-size-sm" onClick={() => setShowAsientosPreview(true)}>
+                  <BookOpen size={14} />Impacto contable
                 </button>
                 <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmAction('submit')}>
                   <Send size={14} />Someter
@@ -147,14 +178,39 @@ export default function CompraDetail() {
             )}
             {compra.status === 'submitted' && (
               <>
+                <PdfFormatButton
+                  onSelect={(formato) => previewMutation.mutate(formato)}
+                  loading={previewMutation.isPending}
+                  label="Ver PDF"
+                  loadingLabel="Generando…"
+                  icon={<Eye size={14} />}
+                  formatosPermitidos={formatosPermitidos}
+                />
+                <PdfFormatButton
+                  onSelect={(formato) => downloadMutation.mutate(formato)}
+                  loading={downloadMutation.isPending}
+                  formatosPermitidos={formatosPermitidos}
+                />
                 <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmAction('cancel')}>
                   <X size={14} />Anular
                 </button>
                 <button className="btn btn-secondary btn-size-sm" onClick={() => setConfirmAction('amend')}>
                   <RotateCcw size={14} />Enmendar
                 </button>
-                <button className="btn btn-secondary btn-size-sm" onClick={() => { setReturnQtys({}); setShowReturn(true) }}>
+                <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/devoluciones-compras/nueva?originalInvoice=${encodeURIComponent(id!)}`)}>
                   <Undo2 size={14} />Devolución
+                </button>
+                <button
+                  className="btn btn-secondary btn-size-sm"
+                  onClick={() => {
+                    const postingDate = compra.postingDate.split('T')[0]
+                    navigate(
+                      `/contabilidad/libro-diario?voucherNo=${encodeURIComponent(compra.id)}` +
+                      `&voucherType=Purchase+Invoice&fromDate=${postingDate}&toDate=${postingDate}`,
+                    )
+                  }}
+                >
+                  <BookOpen size={14} />Ver asientos
                 </button>
               </>
             )}
@@ -177,8 +233,23 @@ export default function CompraDetail() {
           <div className="fields-grid fields-grid-3">
             <div className="detail-field">
               <span className="detail-label">Proveedor</span>
-              <span className="detail-value">{compra.supplierName}</span>
+              <span className="detail-value">
+                {compra.esProveedorOcasional ? (
+                  <span>
+                    {compra.proveedorOcasionalNombre ?? compra.supplierName}
+                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 6 }}>(ocasional)</span>
+                  </span>
+                ) : (
+                  compra.supplierName
+                )}
+              </span>
             </div>
+            {compra.esProveedorOcasional && compra.proveedorOcasionalRnc && (
+              <div className="detail-field">
+                <span className="detail-label">RNC/Cédula</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{compra.proveedorOcasionalRnc}</span>
+              </div>
+            )}
             <div className="detail-field">
               <span className="detail-label">Fecha</span>
               <span className="detail-value">{formatDate(compra.postingDate)}</span>
@@ -187,18 +258,77 @@ export default function CompraDetail() {
               <span className="detail-label">Vencimiento</span>
               <span className="detail-value">{formatDate(compra.dueDate)}</span>
             </div>
-            {!!compra.taxAmount && (
-              <div className="detail-field">
+            {((compra.impuestos?.length ?? 0) > 0 || !!compra.taxAmount) && (
+              <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
                 <span className="detail-label">Impuestos</span>
-                <span className="detail-value">{formatDOP(compra.taxAmount)}</span>
+                <span className="detail-value" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {(compra.impuestos ?? []).map((imp, idx) => (
+                    <span key={`${imp.id}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                      <span>{imp.id} ({imp.tasa}%)</span>
+                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{fmtMonto(imp.monto)}</strong>
+                    </span>
+                  ))}
+                  {compra.taxAmount != null && (
+                    <span style={{ display: 'flex', justifyContent: 'space-between', gap: 16, borderTop: '1px solid var(--border-default)', paddingTop: 4 }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Total impuestos</span>
+                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{formatDOP(compra.taxAmount)}</strong>
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
+            {(compra.retenciones?.length ?? 0) > 0 && (
+              <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+                <span className="detail-label">Retenciones</span>
+                <span className="detail-value" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {(compra.retenciones ?? []).map((r) => {
+                    const opt = retencionesData?.items?.find((x) => x.id === r.id)
+                    return (
+                      <span key={r.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                        <span>{opt?.categoryName ?? r.id} ({r.tasa}%)</span>
+                        <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{fmtMonto(r.monto)}</strong>
+                      </span>
+                    )
+                  })}
+                  <span style={{ display: 'flex', justifyContent: 'space-between', gap: 16, borderTop: '1px solid var(--border-default)', paddingTop: 4 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Total retenciones</span>
+                    <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                      {formatDOP((compra.retenciones ?? []).reduce((s, r) => s + (r.monto ?? 0), 0))}
+                    </strong>
+                  </span>
+                </span>
               </div>
             )}
             <div className="detail-field">
               <span className="detail-label">Total</span>
               <span className="detail-value" style={{ fontSize: 18, fontWeight: 700 }}>{formatDOP(compra.grandTotal)}</span>
             </div>
+            {compra.status === 'submitted' && (
+              <div className="detail-field">
+                <span className="detail-label">Pendiente</span>
+                <span className="detail-value">{formatDOP(compra.outstandingAmount ?? 0)}</span>
+              </div>
+            )}
+            {compra.cuentaCxpOverride && (
+              <div className="detail-field">
+                <span className="detail-label">Cuenta CxP (override)</span>
+                <span className="detail-value">{compra.cuentaCxpOverride}</span>
+              </div>
+            )}
           </div>
         </div>
+
+        {!compra.esProveedorOcasional && (
+          <SaldoFavorCxpSection
+            supplierId={compra.supplier}
+            supplierName={compra.supplierName}
+            invoiceId={compra.id}
+            invoiceStatus={compra.status}
+            invoiceGrandTotal={compra.grandTotal}
+            outstandingAmount={compra.outstandingAmount}
+            onChanged={() => queryClient.invalidateQueries({ queryKey: ['compra', id] })}
+          />
+        )}
 
         {/* Items */}
         <div className="card">
@@ -221,7 +351,14 @@ export default function CompraDetail() {
                 {compra.items.map((item, i) => (
                   <tr key={i}>
                     <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{item.itemCode}</td>
-                    <td>{item.itemCode}</td>
+                    <td>
+                      {item.itemCode}
+                      {item.cuentaContable && (
+                        <span style={{ display: 'block', fontSize: 11, color: 'var(--text-tertiary)' }}>
+                          Cuenta: {item.cuentaContable}
+                        </span>
+                      )}
+                    </td>
                     <td className="td-muted">{item.warehouse ?? '—'}</td>
                     <td style={{ textAlign: 'right' }}>{item.qty}</td>
                     <td style={{ textAlign: 'right' }}>{formatDOP(item.rate)}</td>
@@ -249,6 +386,10 @@ export default function CompraDetail() {
               <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{compra.ncfProveedor ?? '—'}</span>
             </div>
             <div className="detail-field">
+              <span className="detail-label">N° Factura del Proveedor</span>
+              <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{compra.billNo ?? '—'}</span>
+            </div>
+            <div className="detail-field">
               <span className="detail-label">Tipo de Bienes</span>
               <span className="detail-value">{getTipoBienesLabel(compra.tipoBienes606)}</span>
             </div>
@@ -263,6 +404,10 @@ export default function CompraDetail() {
             <div className="detail-field">
               <span className="detail-label">Retención ISR</span>
               <span className="detail-value">{formatDOP(compra.retencionIsr)}</span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">Retención ITBIS</span>
+              <span className="detail-value">{formatDOP(compra.retencionItbis)}</span>
             </div>
           </div>
         </div>
@@ -290,45 +435,17 @@ export default function CompraDetail() {
           </div>
         </div>
       )}
-
-      {/* Return Modal */}
-      {showReturn && (
-        <div className="modal-overlay" onClick={() => setShowReturn(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <h2 className="modal-title">Registrar Devolución</h2>
-              <button className="modal-close" onClick={() => setShowReturn(false)}>×</button>
-            </div>
-            <div className="modal-body" style={{ maxHeight: 320 }}>
-              <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Selecciona los artículos y cantidades a devolver.</p>
-              {compra.items.map((item) => (
-                <div key={item.itemCode} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 500 }}>{item.itemCode}</p>
-                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{item.itemCode} — Qty: {item.qty}</p>
-                  </div>
-                  <input
-                    type="number"
-                    min="0"
-                    max={item.qty}
-                    step="1"
-                    className="ff-input"
-                    style={{ width: 96, textAlign: 'right' }}
-                    value={returnQtys[item.itemCode] ?? 0}
-                    onChange={(e) => setReturnQtys((prev) => ({ ...prev, [item.itemCode]: parseFloat(e.target.value) || 0 }))}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setShowReturn(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={() => returnMutation.mutate()} disabled={returnMutation.isPending}>
-                {returnMutation.isPending ? 'Procesando…' : 'Registrar Devolución'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
+      <AsientosPreviewModal
+        open={showAsientosPreview}
+        onClose={() => setShowAsientosPreview(false)}
+        queryKey={['compra-preview-asientos', id]}
+        queryFn={() => previewAsientosCompra(id!)}
+        onRedistribuir={(payload: ImpuestoDistribucionDto) =>
+          updateCompra(id!, { impuestoDistribucion: [payload] }).then(() =>
+            queryClient.invalidateQueries({ queryKey: ['compra', id] }))
+        }
+      />
     </div>
   )
 }

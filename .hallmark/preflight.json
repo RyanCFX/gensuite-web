@@ -1,0 +1,10 @@
+{
+  "design_md": false,
+  "font_stack": "DM Sans + Geist Mono (CSS custom properties, src/index.css L47–L48)",
+  "palette": "Hex custom properties in :root (not OKLCH, src/index.css L2–L76)",
+  "motion": "motion-cut (no framer-motion / gsap / motion library)",
+  "spacing": "CSS custom properties (border-radius, shadows), no Tailwind spacing extend",
+  "framework": "Vite 8 + React 19 + Tailwind CSS v4 (@tailwindcss/vite plugin)",
+  "scanned_at": "2026-07-29",
+  "mtimes_fresh": true
+}

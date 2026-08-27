@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notificación — Tabla de datos</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #fafafa;
+      font-family: 'DM Sans', 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #171717;
+      -webkit-font-smoothing: antialiased;
+    }
+    .email-wrapper {
+      width: 100%;
+      table-layout: fixed;
+      background-color: #fafafa;
+      padding: 32px 0;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      border: 1px solid #e5e5e5;
+      overflow: hidden;
+    }
+    .email-header {
+      background-color: #ff4538;
+      padding: 24px 32px;
+      text-align: center;
+    }
+    .email-header h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.3px;
+    }
+    .email-header .logo-placeholder {
+      display: inline-block;
+      width: 36px;
+      height: 36px;
+      background-color: rgba(255,255,255,0.2);
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    .email-body {
+      padding: 28px 32px 24px;
+    }
+    .email-body h2 {
+      margin: 0 0 6px;
+      font-size: 20px;
+      font-weight: 600;
+      color: #171717;
+      letter-spacing: -0.4px;
+    }
+    .email-body .subtitle {
+      margin: 0 0 20px;
+      font-size: 13px;
+      color: #a3a3a3;
+      font-weight: 400;
+    }
+    .email-body .divider {
+      height: 1px;
+      background-color: #efefef;
+      margin: 20px 0;
+    }
+    .email-body p {
+      margin: 0 0 16px;
+      font-size: 14px;
+      color: #525252;
+      line-height: 1.6;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 8px;
+      font-size: 13px;
+    }
+    .data-table thead th {
+      background-color: #f5f5f5;
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #525252;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      text-align: left;
+      border-bottom: 1px solid #e5e5e5;
+    }
+    .data-table thead th:first-child {
+      border-radius: 4px 0 0 0;
+    }
+    .data-table thead th:last-child {
+      border-radius: 0 4px 0 0;
+    }
+    .data-table tbody td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #efefef;
+      color: #171717;
+      vertical-align: middle;
+    }
+    .data-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .data-table tbody tr:hover {
+      background-color: #fafafa;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      font-size: 11px;
+      font-weight: 500;
+      border-radius: 4px;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+    .badge-success {
+      background-color: #f0fdf4;
+      color: #16a34a;
+      border: 1px solid #bbf7d0;
+    }
+    .badge-warning {
+      background-color: #fefce8;
+      color: #ca8a04;
+      border: 1px solid #fef08a;
+    }
+    .badge-error {
+      background-color: #fff1f0;
+      color: #c41e13;
+      border: 1px solid #ffc6c2;
+    }
+    .badge-info {
+      background-color: #f0f7ff;
+      color: #1a69ab;
+      border: 1px solid #b3daff;
+    }
+    .badge-draft {
+      background-color: #f5f5f5;
+      color: #525252;
+      border: 1px solid #e5e5e5;
+    }
+    .summary-row {
+      background-color: #fafafa;
+      border-top: 2px solid #e5e5e5;
+    }
+    .summary-row td {
+      padding: 12px 14px;
+      font-weight: 600;
+      font-size: 13px;
+      color: #171717;
+    }
+    .summary-row td:last-child {
+      text-align: right;
+    }
+    .amount {
+      font-family: 'JetBrains Mono', 'Geist Mono', monospace;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .btn {
+      display: inline-block;
+      padding: 10px 24px;
+      font-size: 13px;
+      font-weight: 500;
+      text-decoration: none;
+      border-radius: 6px;
+      background-color: #ff4538;
+      color: #ffffff;
+      text-align: center;
+    }
+    .btn:hover {
+      background-color: #e82e21;
+    }
+    .email-footer {
+      padding: 16px 32px 20px;
+      background-color: #fafafa;
+      border-top: 1px solid #efefef;
+    }
+    .email-footer p {
+      margin: 0 0 4px;
+      font-size: 12px;
+      color: #a3a3a3;
+      line-height: 1.5;
+    }
+    .email-footer p:last-child {
+      margin-bottom: 0;
+    }
+    .email-footer a {
+      color: #1a69ab;
+      text-decoration: none;
+    }
+    .email-footer a:hover {
+      text-decoration: underline;
+    }
+    @media only screen and (max-width: 480px) {
+      .email-body { padding: 20px 18px 18px; }
+      .email-header { padding: 18px 18px; }
+      .email-footer { padding: 14px 18px 16px; }
+      .data-table { font-size: 12px; }
+      .data-table thead th,
+      .data-table tbody td { padding: 8px 10px; }
+    }
+  </style>
+</head>
+<body>
+  <table class="email-wrapper" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+    <tr>
+      <td align="center" style="padding: 32px 12px; background-color: #fafafa;">
+        <table class="email-container" role="presentation" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; border: 1px solid #e5e5e5;">
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #ff4538; padding: 24px 32px; text-align: center;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
+                <tr>
+                  <td style="padding-bottom: 10px;">
+                    <div style="display: inline-block; width: 36px; height: 36px; background-color: rgba(255,255,255,0.2); border-radius: 8px; vertical-align: middle;"></div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <h1 style="margin: 0; font-size: 18px; font-weight: 700; color: #ffffff; letter-spacing: -0.3px; font-family: 'DM Sans', Arial, sans-serif;">GenSuite</h1>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding: 28px 32px 24px;">
+              <h2 style="margin: 0 0 6px; font-size: 20px; font-weight: 600; color: #171717; letter-spacing: -0.4px;">Resumen de facturación</h2>
+              <p style="margin: 0 0 20px; font-size: 13px; color: #a3a3a3; font-weight: 400;">
+                Período: julio 2026 &middot; <span id="fecha-ejemplo">14 de julio, 2026</span>
+              </p>
+
+              <p style="margin: 0 0 4px; font-size: 14px; color: #525252; line-height: 1.6;">Hola <strong>[Nombre del usuario]</strong>,</p>
+              <p style="margin: 0 0 16px; font-size: 14px; color: #525252; line-height: 1.6;">A continuación se detallan los movimientos registrados en su cuenta durante el período indicado.</p>
+
+              <!-- Data Table -->
+              <table class="data-table" role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; margin: 16px 0 8px; font-size: 13px; font-family: 'DM Sans', Arial, sans-serif;">
+                <thead>
+                  <tr>
+                    <th style="background-color: #f5f5f5; padding: 10px 14px; font-size: 11px; font-weight: 600; color: #525252; text-transform: uppercase; letter-spacing: 0.4px; text-align: left; border-bottom: 1px solid #e5e5e5;">Factura</th>
+                    <th style="background-color: #f5f5f5; padding: 10px 14px; font-size: 11px; font-weight: 600; color: #525252; text-transform: uppercase; letter-spacing: 0.4px; text-align: left; border-bottom: 1px solid #e5e5e5;">Fecha</th>
+                    <th style="background-color: #f5f5f5; padding: 10px 14px; font-size: 11px; font-weight: 600; color: #525252; text-transform: uppercase; letter-spacing: 0.4px; text-align: left; border-bottom: 1px solid #e5e5e5;">Estado</th>
+                    <th style="background-color: #f5f5f5; padding: 10px 14px; font-size: 11px; font-weight: 600; color: #525252; text-transform: uppercase; letter-spacing: 0.4px; text-align: right; border-bottom: 1px solid #e5e5e5;">Monto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #171717; font-weight: 500;">FACT-001</td>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #525252;">01 jul 2026</td>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #171717;">
+                      <span class="badge badge-success" style="display: inline-block; padding: 2px 7px; font-size: 11px; font-weight: 500; border-radius: 4px; line-height: 1.4; white-space: nowrap; background-color: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0;">Pagada</span>
+                    </td>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #171717; text-align: right; font-family: 'JetBrains Mono', 'Geist Mono', monospace; font-size: 13px; font-weight: 500;">RD$ 15,200.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #171717; font-weight: 500;">FACT-002</td>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #525252;">07 jul 2026</td>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #171717;">
+                      <span class="badge badge-warning" style="display: inline-block; padding: 2px 7px; font-size: 11px; font-weight: 500; border-radius: 4px; line-height: 1.4; white-space: nowrap; background-color: #fefce8; color: #ca8a04; border: 1px solid #fef08a;">Pendiente</span>
+                    </td>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #171717; text-align: right; font-family: 'JetBrains Mono', 'Geist Mono', monospace; font-size: 13px; font-weight: 500;">RD$ 8,450.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #171717; font-weight: 500;">FACT-003</td>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #525252;">10 jul 2026</td>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #171717;">
+                      <span class="badge badge-error" style="display: inline-block; padding: 2px 7px; font-size: 11px; font-weight: 500; border-radius: 4px; line-height: 1.4; white-space: nowrap; background-color: #fff1f0; color: #c41e13; border: 1px solid #ffc6c2;">Vencida</span>
+                    </td>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #171717; text-align: right; font-family: 'JetBrains Mono', 'Geist Mono', monospace; font-size: 13px; font-weight: 500;">RD$ 3,200.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #171717; font-weight: 500;">FACT-004</td>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #525252;">13 jul 2026</td>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #171717;">
+                      <span class="badge badge-info" style="display: inline-block; padding: 2px 7px; font-size: 11px; font-weight: 500; border-radius: 4px; line-height: 1.4; white-space: nowrap; background-color: #f0f7ff; color: #1a69ab; border: 1px solid #b3daff;">En proceso</span>
+                    </td>
+                    <td style="padding: 10px 14px; border-bottom: 1px solid #efefef; color: #171717; text-align: right; font-family: 'JetBrains Mono', 'Geist Mono', monospace; font-size: 13px; font-weight: 500;">RD$ 22,100.00</td>
+                  </tr>
+                </tbody>
+                <!-- Summary -->
+                <tbody>
+                  <tr class="summary-row">
+                    <td colspan="3" style="padding: 12px 14px; font-weight: 600; font-size: 13px; color: #171717; border-top: 2px solid #e5e5e5; background-color: #fafafa;">Total</td>
+                    <td style="padding: 12px 14px; font-weight: 600; font-size: 13px; color: #171717; text-align: right; border-top: 2px solid #e5e5e5; background-color: #fafafa; font-family: 'JetBrains Mono', 'Geist Mono', monospace;">RD$ 48,950.00</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p style="margin: 16px 0 0; font-size: 12px; color: #a3a3a3; line-height: 1.5;">
+                * Los montos están expresados en pesos dominicanos (RD$) con ITBIS incluido.
+              </p>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin: 24px 0 0;">
+                <tr>
+                  <td>
+                    <a href="#" class="btn" style="display: inline-block; padding: 10px 24px; font-size: 13px; font-weight: 500; text-decoration: none; border-radius: 6px; background-color: #ff4538; color: #ffffff; text-align: center; font-family: 'DM Sans', Arial, sans-serif;">Ver detalle completo</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 16px 32px 20px; background-color: #fafafa; border-top: 1px solid #efefef;">
+              <p style="margin: 0 0 4px; font-size: 12px; color: #a3a3a3; line-height: 1.5; font-family: 'DM Sans', Arial, sans-serif;">
+                GenSuite &mdash; Sistema de Gestión Empresarial
+              </p>
+              <p style="margin: 0 0 4px; font-size: 12px; color: #a3a3a3; line-height: 1.5; font-family: 'DM Sans', Arial, sans-serif;">
+                Santo Domingo, República Dominicana
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #a3a3a3; line-height: 1.5; font-family: 'DM Sans', Arial, sans-serif;">
+                <a href="#" style="color: #1a69ab; text-decoration: none;">Preferencias de notificación</a>
+                &nbsp;&middot;&nbsp;
+                <a href="#" style="color: #1a69ab; text-decoration: none;">Cancelar suscripción</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+        <!-- Footnote -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; width: 100%; margin-top: 12px;">
+          <tr>
+            <td align="center" style="padding: 0 12px;">
+              <p style="margin: 0; font-size: 11px; color: #a3a3a3; font-family: 'DM Sans', Arial, sans-serif;">
+                Este es un mensaje automático, por favor no responda a este correo.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -7,6 +7,7 @@ import {
   cancelInvoice,
   amendInvoice,
   downloadInvoicePdf,
+  getInvoicePdfBlobUrl,
   aplicarSaldoFavor,
   removerSaldoFavor,
   asignarTrackingFactura,
@@ -18,25 +19,37 @@ import {
   aplicarCreditNoteAFactura,
   removerCreditNoteAplicada,
 } from "@/shared/api/notes";
-import { listMetodosPago } from "@/shared/api/config";
+import { listMetodosPago, getFacturacionConfig, getCatalogosFiscales } from "@/shared/api/config";
 import { createDevolucion } from "@/shared/api/devoluciones";
 import { getItem } from "@/shared/api/catalog";
 import { getBundle } from "@/shared/api/bundles";
-import type { ApiError, SubmitInvoiceDto, ComponentTracking } from "@/shared/api/types";
+import { getTurnoActual, abrirTurno } from "@/shared/api/pos";
+import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion } from "@/shared/api/types";
+import { MOTIVOS_ANULACION_DGII } from "@/lib/constants";
+import { ConfirmModal } from "@/shared/ui/Modal";
+import { useConfirmClose } from "@/shared/hooks/useConfirmClose";
+import { useDirtyCheck } from "@/shared/hooks/useDirtyCheck";
+import { PaymentLinesEditor } from "@/components/shared/PaymentLinesEditor";
+import {
+  EMPTY_PAYMENT_LINES_VALUE,
+  buildSubmitPayload,
+  sumPayments,
+  emptyPaymentLine,
+} from "@/lib/paymentLines";
 import {
   ArrowLeft,
   Send,
   XCircle,
   FileEdit,
-  Download,
   AlertTriangle,
   Ban,
   Wallet,
   RotateCcw,
   Receipt,
   Loader2,
-  Banknote,
-  CreditCard,
+  Clock,
+  BookOpen,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -45,9 +58,12 @@ import {
   formatDOP,
   displayId,
 } from "@/lib/formatters";
-import { NCF_TYPES } from "@/lib/constants";
+
 import { DocumentHistoryCard } from "@/components/shared/DocumentHistoryCard";
+import { PdfFormatButton } from "@/components/shared/PdfFormatButton";
+import { PdfPreviewModal } from "@/components/shared/PdfPreviewModal";
 import { SearchSelect } from "@/shared/ui/SearchSelect";
+import { Select, SelectItem } from "@/components/ui/select";
 import type { SearchSelectOption } from "@/shared/ui/SearchSelect";
 import { ComponentTrackingModal } from "@/components/shared/ComponentTrackingModal";
 import type { TrackedComponent } from "@/components/shared/ComponentTrackingModal";
@@ -73,18 +89,23 @@ export default function InvoiceDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [paymentMethodModalOpen, setPaymentMethodModalOpen] = useState(false);
-  const [paymentConfirmModalOpen, setPaymentConfirmModalOpen] = useState(false);
-  const [chosenPaymentMethod, setChosenPaymentMethod] = useState<
-    "contado" | "credito" | null
-  >(null);
+  // Bloque opcional (u obligatorio si el cliente no tiene crédito) de "¿Cómo se cobra?"
+  // al someter — ver escenarios en handleSubmitClick. La forma del bloque depende de
+  // flujoCobro: "directo" = un solo método + monto, sin vuelto; "caja" = PaymentLinesEditor
+  // completo (varias líneas + vuelto), igual que en CajaPage.tsx/PorCobrarPage.tsx.
+  const [payments, setPayments] = useState(EMPTY_PAYMENT_LINES_VALUE);
+  const [directoMop, setDirectoMop] = useState("");
+  const [directoMopSearch, setDirectoMopSearch] = useState("");
+  const [directoAmount, setDirectoAmount] = useState("");
   const [creditErrorOpen, setCreditErrorOpen] = useState(false);
   const [creditErrorMsg, setCreditErrorMsg] = useState("");
   const [lastSubmitBody, setLastSubmitBody] = useState<SubmitInvoiceDto | undefined>(undefined);
+  const [submitResult, setSubmitResult] = useState<{ outstandingAmount: number; invoiceId: string } | null>(null);
   const [trackingRecovery, setTrackingRecovery] = useState<TrackedComponent | null>(null);
   const [trackingRecoveryLoading, setTrackingRecoveryLoading] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelMotivo, setCancelMotivo] = useState("");
   const [cancelForbiddenMsg, setCancelForbiddenMsg] = useState("");
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [returnFullInvoice, setReturnFullInvoice] = useState(true);
@@ -103,9 +124,46 @@ export default function InvoiceDetail() {
   const [returnModeOfPayment, setReturnModeOfPayment] = useState("");
   const [returnReason, setReturnReason] = useState("");
 
+  const [turnoModalOpen, setTurnoModalOpen] = useState(false);
+  const [turnoOpeningAmount, setTurnoOpeningAmount] = useState(0);
+
   const [returnResolutionSearch, setReturnResolutionSearch] = useState("");
   const [returnModeOfPaymentSearch, setReturnModeOfPaymentSearch] =
     useState("");
+
+  // El modal de "crédito excedido" ya no captura ningún dato de pago (el cobro
+  // se hace después en Caja) — no hay nada que pueda quedar sin guardar.
+  const creditErrorIsDirty = useDirtyCheck({}, creditErrorOpen);
+  const creditErrorClose = useConfirmClose(creditErrorIsDirty, () =>
+    setCreditErrorOpen(false),
+  );
+
+  const cancelIsDirty = useDirtyCheck(
+    { cancelReason, cancelMotivo },
+    cancelModalOpen,
+  );
+  const cancelClose = useConfirmClose(cancelIsDirty, () =>
+    setCancelModalOpen(false),
+  );
+
+  const returnIsDirty = useDirtyCheck(
+    {
+      returnFullInvoice,
+      returnRows,
+      returnResolution,
+      returnModeOfPayment,
+      returnReason,
+    },
+    returnModalOpen,
+  );
+  const returnClose = useConfirmClose(returnIsDirty, () =>
+    setReturnModalOpen(false),
+  );
+
+  const turnoIsDirty = useDirtyCheck({ turnoOpeningAmount }, turnoModalOpen);
+  const turnoClose = useConfirmClose(turnoIsDirty, () =>
+    setTurnoModalOpen(false),
+  );
 
   const { data: invoice, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -119,13 +177,52 @@ export default function InvoiceDetail() {
     enabled: !!invoice?.customer && invoice.status === "draft",
   });
 
-  // Solo se usa para el selector de método de pago del reembolso en el modal de Devolución —
-  // el cobro de la factura ya no ocurre aquí (ver módulo Caja).
+  // Usado por el selector de método de pago del reembolso en el modal de Devolución,
+  // y por el bloque de "¿Cómo se cobra?" al someter (validación de requiresBankAccount).
   const { data: metodos } = useQuery({
     queryKey: ["metodos-pago"],
     queryFn: listMetodosPago,
-    enabled: invoice?.status === "submitted",
+    enabled: invoice?.status === "draft" || invoice?.status === "submitted",
     staleTime: 5 * 60_000,
+  });
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ["facturacion-config"],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  });
+  const usaModuloPos = facturacionConfig?.usaModuloPos ?? false;
+  const flujoCobro = facturacionConfig?.flujoCobro ?? "directo";
+  const formatoImpresionDefault = facturacionConfig?.formatoImpresionDefault ?? "a4";
+  const formatosPermitidos = facturacionConfig?.formatosPermitidos;
+
+  const { data: turno } = useQuery({
+    queryKey: ['turno-actual'],
+    queryFn: getTurnoActual,
+    enabled: !!invoice && invoice.status === "draft" && usaModuloPos,
+    staleTime: 30_000,
+  });
+
+  const abrirTurnoMutation = useMutation({
+    mutationFn: () =>
+      abrirTurno({
+        openingAmount: turnoOpeningAmount,
+      }),
+    onSuccess: (turnoCaja) => {
+      queryClient.setQueryData(['turno-actual'], turnoCaja);
+      setTurnoModalOpen(false);
+      setTurnoOpeningAmount(0);
+      toast.success(`Turno abierto — ${turnoCaja.posProfile}`);
+    },
+    onError: (err: ApiError) => {
+      toast.error(err?.message ?? 'Error al abrir el turno');
+    },
+  });
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
   });
 
   const returnModeOptions: SearchSelectOption[] = useMemo(() => {
@@ -283,19 +380,104 @@ export default function InvoiceDetail() {
     creditoAplicado > 0 &&
     pendingAmount <= 0.01;
 
+  // Escenario 3: tenant con módulo POS + cliente "de consumo" (sin crédito fiscal) —
+  // el backend ignora `payments` por completo y siempre manda la factura a Caja
+  // (custom_enviada_a_caja=1, sin NCF). No tiene sentido mostrar el bloque de pago.
+  const posCliente = usaModuloPos && noCredit;
+  // Escenarios 1 y 2: se muestra el bloque "¿Cómo se cobra?" — opcional en general,
+  // obligatorio si el cliente no tiene crédito (limitación temporal del backend: si se
+  // somete a crédito sin payments, la factura queda en CxC igual aunque no debería).
+  const showPaymentBlock =
+    invoice?.status === "draft" && !paidByCreditNote && !posCliente;
+  const paymentRequired = showPaymentBlock && noCredit;
+
+  const metodosActivos = (metodos ?? []).filter((m) => !m.disabled);
+  const directoMopOptions: SearchSelectOption[] = metodosActivos
+    .filter((m) => !directoMopSearch || m.name.toLowerCase().includes(directoMopSearch.toLowerCase()))
+    .map((m) => ({ value: m.name, label: m.name }));
+  const paymentsFilled =
+    flujoCobro === "directo"
+      ? !!directoMop && Number(directoAmount) > 0
+      : payments.payments.some((p) => p.modeOfPayment && Number(p.amount) > 0);
+
+  // Igual que en Caja: si el cliente no tiene crédito y el tenant no usa el módulo
+  // POS, el bloque de pago es obligatorio — se precarga el monto total (el cajero
+  // solo tiene que elegir el método), una sola vez por factura.
+  const [paymentsSeededFor, setPaymentsSeededFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!invoice || paymentsSeededFor === invoice.id) return;
+    if (paymentRequired && !usaModuloPos && pendingAmount > 0) {
+      if (flujoCobro === "directo") {
+        setDirectoAmount(String(pendingAmount));
+      } else {
+        setPayments({
+          ...EMPTY_PAYMENT_LINES_VALUE,
+          payments: [{ ...emptyPaymentLine(), amount: String(pendingAmount) }],
+        });
+      }
+      setPaymentsSeededFor(invoice.id);
+    }
+  }, [invoice, paymentRequired, usaModuloPos, pendingAmount, flujoCobro, paymentsSeededFor]);
+
+  function paymentsAreValid(): boolean {
+    if (flujoCobro === "directo") {
+      if (!directoMop) return false;
+      const metodo = metodosActivos.find((m) => m.name === directoMop);
+      if (metodo?.requiresBankAccount && !metodo.defaultBankAccount) return false;
+      const amount = Number(directoAmount);
+      return amount > 0 && amount <= pendingAmount + 0.01;
+    }
+    const filled = payments.payments.filter(
+      (p) => p.modeOfPayment && Number(p.amount) > 0,
+    );
+    if (filled.length !== payments.payments.length) return false;
+    for (const p of filled) {
+      const metodo = metodosActivos.find((m) => m.name === p.modeOfPayment);
+      if (metodo?.requiresBankAccount && !metodo.defaultBankAccount && !p.bankAccount) {
+        return false;
+      }
+    }
+    const sum = sumPayments(payments.payments);
+    return sum > 0 && sum <= pendingAmount + 0.01;
+  }
+
   const submitMutation = useMutation({
     mutationFn: (body?: SubmitInvoiceDto) => submitInvoice(id!, body),
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      queryClient.invalidateQueries({ queryKey: ["turno-actual"] });
       setCreditErrorOpen(false);
-      setPaymentConfirmModalOpen(false);
-      setChosenPaymentMethod(null);
-      toast.success(
-        updated.paymentStatus === "paid"
-          ? "Factura sometida y saldada"
-          : "Factura sometida — NCF asignado. Queda pendiente de cobro en Caja.",
-      );
+      setSubmitResult(null);
+      setPayments(EMPTY_PAYMENT_LINES_VALUE);
+      setDirectoMop("");
+      setDirectoAmount("");
+
+      // Nuevo flujo POS: la factura va a "por cobrar" sin NCF — redirigir a Caja
+      if ("status" in updated && updated.status === "pendiente_cobro") {
+        toast.success(updated.message);
+        navigate(`/caja/por-cobrar?invoiceId=${updated.invoiceId}`);
+        return;
+      }
+
+      if (updated.cobro?.fullyPaid) {
+        toast.success("Factura sometida y cobrada");
+      } else if (updated.isPos && updated.outstandingAmount > 0) {
+        toast.success(
+          `Factura sometida con pago parcial — saldo pendiente: ${formatDOP(updated.outstandingAmount)}`,
+        );
+        setSubmitResult({ outstandingAmount: updated.outstandingAmount, invoiceId: updated.id });
+      } else if (updated.cobro && !updated.cobro.fullyPaid) {
+        toast.success(
+          `Factura sometida con pago parcial — saldo pendiente: ${formatDOP(updated.outstandingAmount)}`,
+        );
+        setSubmitResult({ outstandingAmount: updated.outstandingAmount, invoiceId: updated.id });
+      } else if (updated.paymentStatus === "paid") {
+        toast.success("Factura sometida y cobrada al contado");
+      } else {
+        toast.success("Factura sometida — NCF asignado");
+      }
+      downloadInvoicePdf(id!, `factura-${id}.pdf`, formatoImpresionDefault);
     },
     onError: (err: { message?: string }) => {
       const msg = err?.message ?? "";
@@ -306,6 +488,15 @@ export default function InvoiceDetail() {
       }
       if (/serial\s*no|batch\s*no/i.test(msg) && /mandatory/i.test(msg)) {
         resolveTrackingError(msg);
+        return;
+      }
+      if (/ubicac/i.test(msg)) {
+        toast.error(msg || "Error al someter la factura", {
+          action: {
+            label: "Ver pendientes",
+            onClick: () => navigate("/inventario/zonas?tab=pendientes"),
+          },
+        });
         return;
       }
       toast.error(msg || "Error al someter la factura");
@@ -407,24 +598,32 @@ export default function InvoiceDetail() {
       submitMutation.mutate(undefined);
       return;
     }
-    // Cliente sin crédito habilitado — se salta la pregunta y va directo a confirmar "al contado".
-    if (noCredit) {
-      setChosenPaymentMethod("contado");
-      setPaymentConfirmModalOpen(true);
+    // Escenario 3 (usaModuloPos + cliente de consumo) — el backend ignora payments y
+    // siempre manda a Caja; no hace falta armar ni validar nada de pago.
+    if (posCliente) {
+      setLastSubmitBody(undefined);
+      submitMutation.mutate(undefined);
       return;
     }
-    setPaymentMethodModalOpen(true);
-  }
-
-  function selectPaymentMethod(method: "contado" | "credito") {
-    setChosenPaymentMethod(method);
-    setPaymentMethodModalOpen(false);
-    setPaymentConfirmModalOpen(true);
-  }
-
-  function confirmSubmitWithPaymentMethod() {
-    const body: SubmitInvoiceDto | undefined =
-      chosenPaymentMethod === "contado" ? { payCash: true } : undefined;
+    // Cliente sin crédito — el bloque de pago es obligatorio (limitación temporal del
+    // backend, ver comentario en `paymentRequired`).
+    if (paymentRequired && !paymentsFilled) {
+      toast.error(
+        "Este cliente no tiene crédito habilitado — indica el método de pago antes de someter.",
+      );
+      return;
+    }
+    if (paymentsFilled && !paymentsAreValid()) {
+      toast.error(
+        "Verifica las líneas de pago: falta información o el monto supera el total pendiente.",
+      );
+      return;
+    }
+    const body: SubmitInvoiceDto | undefined = !paymentsFilled
+      ? undefined
+      : flujoCobro === "directo"
+        ? { payments: [{ modeOfPayment: directoMop, amount: Number(directoAmount) }] }
+        : buildSubmitPayload(payments);
     setLastSubmitBody(body);
     submitMutation.mutate(body);
   }
@@ -438,13 +637,15 @@ export default function InvoiceDetail() {
   }
 
   const cancelMutation = useMutation({
-    mutationFn: (reason: string) => cancelInvoice(id!, { reason }),
+    mutationFn: (vars: { reason: string; motivoAnulacion?: string }) =>
+      cancelInvoice(id!, vars),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["invoice", id] });
       toast.success("Factura cancelada");
       setCancelModalOpen(false);
       setCancelReason("");
+      setCancelMotivo("");
       setCancelForbiddenMsg("");
     },
     onError: (err: ApiError) => {
@@ -466,12 +667,16 @@ export default function InvoiceDetail() {
 
   function openCancelModal() {
     setCancelReason("");
+    setCancelMotivo("");
     setCancelForbiddenMsg("");
     setCancelModalOpen(true);
   }
 
+  const cancelMotivoRequired = Boolean(invoice?.ncf);
   const cancelReasonValid =
-    cancelReason.trim().length >= 10 && cancelReason.trim().length <= 500;
+    cancelReason.trim().length >= 10 &&
+    cancelReason.trim().length <= 500 &&
+    (!cancelMotivoRequired || Boolean(cancelMotivo));
 
   function openReturnModal() {
     setReturnFullInvoice(true);
@@ -564,8 +769,15 @@ export default function InvoiceDetail() {
     amendMutation.isPending;
 
   const downloadMutation = useMutation({
-    mutationFn: () => downloadInvoicePdf(id!, `factura-${id}.pdf`),
-    onError: () => toast.error("No se pudo descargar el PDF"),
+    mutationFn: (formato?: FormatoImpresion) => downloadInvoicePdf(id!, `factura-${id}.pdf`, formato ?? formatoImpresionDefault),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? "No se pudo descargar el PDF"),
+  });
+
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewMutation = useMutation({
+    mutationFn: (formato?: FormatoImpresion) => getInvoicePdfBlobUrl(id!, formato ?? formatoImpresionDefault),
+    onSuccess: (url) => setPreviewUrl(url),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? "No se pudo generar la vista previa del PDF"),
   });
 
   if (isLoading) {
@@ -612,7 +824,7 @@ export default function InvoiceDetail() {
     );
   }
 
-  const ncfLabel = NCF_TYPES.find((t) => t.value === invoice.ncfType)?.label;
+  const ncfLabel = catalogos?.ncfTypes.find((t) => t.value === invoice.ncfType)?.label;
   const ps = invoice.paymentStatus;
 
   const outstandingColor =
@@ -713,16 +925,37 @@ export default function InvoiceDetail() {
                 <Ban size={14} /> Cancelar
               </button>
 
-              <button
-                className="btn btn-primary btn-size-sm"
-                onClick={handleSubmitClick}
-                disabled={isActionsLoading}
-              >
-                <Send size={14} /> Someter
-              </button>
+              {turno && (
+                <span
+                  style={{
+                    fontSize: 12,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "2px 8px",
+                    borderRadius: "var(--radius-sm)",
+                    background: "var(--color-success-bg, #e6f7e6)",
+                    color: "var(--color-success, #2e7d32)",
+                    fontWeight: 500,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <Clock size={13} /> Turno abierto — {turno.posProfile}
+                </span>
+              )}
+
+              {!showPaymentBlock && (
+                <button
+                  className="btn btn-primary btn-size-sm"
+                  onClick={handleSubmitClick}
+                  disabled={isActionsLoading}
+                >
+                  <Send size={14} /> Someter
+                </button>
+              )}
             </div>
 
-            {noCredit && !paidByCreditNote && (
+            {posCliente && (
               <p
                 style={{
                   fontSize: 12,
@@ -733,10 +966,12 @@ export default function InvoiceDetail() {
                   margin: 0,
                 }}
               >
-                <AlertTriangle size={12} /> Este cliente no tiene crédito
-                habilitado — se someterá al contado.
+                <Clock size={12} /> Cliente de consumo — al someter, la
+                factura se enviará a Caja para completar el cobro (ahí se
+                asigna el NCF).
               </p>
             )}
+
             {paidByCreditNote && (
               <p
                 style={{
@@ -752,31 +987,141 @@ export default function InvoiceDetail() {
                 de crédito aplicada.
               </p>
             )}
+
+            {showPaymentBlock && (
+              <div
+                style={{
+                  border: "1px solid var(--border-default)",
+                  borderRadius: "var(--radius-md)",
+                  padding: 14,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  width: "100%",
+                }}
+              >
+                <div>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      margin: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    ¿Cómo se cobra?
+                    {!paymentRequired && (
+                      <span
+                        style={{ fontWeight: 400, color: "var(--text-tertiary)" }}
+                      >
+                        (opcional)
+                      </span>
+                    )}
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-tertiary)",
+                      margin: "2px 0 0",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    {paymentRequired ? (
+                      <>
+                        <AlertTriangle size={12} /> Este cliente no tiene
+                        crédito habilitado — indica el método de pago para
+                        poder someter.
+                      </>
+                    ) : flujoCobro === "directo" ? (
+                      "Si indicas un método de pago, la factura se somete cobrada. Si lo dejas vacío, se somete a crédito para cobrarse después en Caja."
+                    ) : (
+                      "Si llenas las líneas de pago, la factura se somete cobrada. Si las dejas vacías, se somete a crédito para cobrarse después en Caja."
+                    )}
+                  </p>
+                </div>
+
+                {flujoCobro === "directo" ? (
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <div className="ff-wrap" style={{ minWidth: 220, flex: 1 }}>
+                      <label className="ff-label">Método de pago</label>
+                      <SearchSelect
+                        value={directoMop}
+                        selectedLabel={directoMop}
+                        onChange={setDirectoMop}
+                        options={directoMopOptions}
+                        onSearch={setDirectoMopSearch}
+                        placeholder="Seleccionar…"
+                      />
+                    </div>
+                    <div className="ff-wrap" style={{ width: 160 }}>
+                      <label className="ff-label">Monto</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="ff-input"
+                        value={directoAmount}
+                        onChange={(e) => setDirectoAmount(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <PaymentLinesEditor
+                    amountDue={pendingAmount}
+                    value={payments}
+                    onChange={setPayments}
+                  />
+                )}
+
+                <button
+                  className="btn btn-primary btn-size-sm"
+                  style={{ alignSelf: "flex-start" }}
+                  onClick={handleSubmitClick}
+                  disabled={isActionsLoading}
+                >
+                  <Send size={14} /> Someter
+                </button>
+              </div>
+            )}
           </div>
         )}
         {invoice.status === "submitted" && (
           <>
-            <button
-              className="btn btn-secondary btn-size-sm"
-              onClick={() => downloadMutation.mutate()}
-              disabled={downloadMutation.isPending}
-            >
-              {downloadMutation.isPending ? (
-                <>
-                  <span className="spinner" /> Descargando…
-                </>
-              ) : (
-                <>
-                  <Download size={14} /> Descargar PDF
-                </>
-              )}
-            </button>
+            <PdfFormatButton
+              onSelect={(formato) => previewMutation.mutate(formato)}
+              loading={previewMutation.isPending}
+              label="Ver PDF"
+              loadingLabel="Generando…"
+              icon={<Eye size={14} />}
+              formatosPermitidos={formatosPermitidos}
+            />
+            <PdfFormatButton
+              onSelect={(formato) => downloadMutation.mutate(formato)}
+              loading={downloadMutation.isPending}
+              formatosPermitidos={formatosPermitidos}
+            />
             <button
               className="btn btn-secondary btn-size-sm"
               onClick={openReturnModal}
               disabled={isActionsLoading}
             >
               <RotateCcw size={14} /> Devolver producto(s)
+            </button>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => {
+                const postingDate = invoice.postingDate.split('T')[0]
+                navigate(
+                  `/contabilidad/libro-diario?voucherNo=${encodeURIComponent(invoice.id)}` +
+                  `&voucherType=Sales+Invoice&fromDate=${postingDate}&toDate=${postingDate}`,
+                )
+              }}
+            >
+              <BookOpen size={14} /> Ver asientos
             </button>
             <button
               className="btn btn-danger btn-size-sm"
@@ -798,6 +1143,31 @@ export default function InvoiceDetail() {
         )}
       </div>
 
+      {submitResult && (
+        <div
+          className="inline-alert"
+          style={{
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          <AlertTriangle size={16} />
+          <span style={{ fontSize: 13, flex: 1 }}>
+            Esta factura tiene un saldo pendiente de {formatDOP(submitResult.outstandingAmount)} — puedes
+            completar el cobro desde la cola de Caja.
+          </span>
+          <button
+            className="btn btn-primary btn-size-sm"
+            onClick={() => navigate("/caja/pendientes")}
+          >
+            Ir a Caja
+          </button>
+        </div>
+      )}
+
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
           <h2 className="card-title">Información de la Factura</h2>
@@ -809,8 +1179,31 @@ export default function InvoiceDetail() {
           <div className="fields-grid">
             <div className="detail-field">
               <span className="detail-label">Cliente</span>
-              <span className="detail-value">{invoice.customerName}</span>
+              <span className="detail-value">
+                {invoice.esClienteOcasional ? (
+                  <span>
+                    {invoice.clienteOcasionalNombre ?? invoice.customerName}
+                    {invoice.esClienteOcasional && (
+                      <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 6 }}>(ocasional)</span>
+                    )}
+                  </span>
+                ) : (
+                  invoice.customerName
+                )}
+              </span>
             </div>
+            {invoice.esClienteOcasional && invoice.clienteOcasionalRnc && (
+              <div className="detail-field">
+                <span className="detail-label">RNC</span>
+                <span className="detail-value" style={{ fontFamily: 'monospace' }}>{invoice.clienteOcasionalRnc}</span>
+              </div>
+            )}
+            {invoice.esClienteOcasional && invoice.clienteOcasionalDireccion && (
+              <div className="detail-field">
+                <span className="detail-label">Dirección</span>
+                <span className="detail-value">{invoice.clienteOcasionalDireccion}</span>
+              </div>
+            )}
             <div className="detail-field">
               <span className="detail-label">Fecha</span>
               <span className="detail-value">
@@ -895,15 +1288,21 @@ export default function InvoiceDetail() {
                   {formatDOP(invoice.outstandingAmount)}
                 </span>
               </div>
-              {ps && (
+              {(ps || invoice.isPos) && (
                 <div className="detail-field">
                   <span className="detail-label">Estado de Pago</span>
                   <span className="detail-value">
-                    <span
-                      className={`badge ${PAYMENT_BADGE[ps] ?? "badge-neutral"}`}
-                    >
-                      {PAYMENT_LABEL[ps] ?? ps}
-                    </span>
+                    {/* isPos ya no implica pago completo (módulo POS permite turno + pago
+                        parcial) — "Contado" solo cuando ps confirma que no queda saldo pendiente. */}
+                    {invoice.isPos && ps === "paid" ? (
+                      <span className="badge badge-pos">Contado</span>
+                    ) : (
+                      <span
+                        className={`badge ${PAYMENT_BADGE[ps!] ?? "badge-neutral"}`}
+                      >
+                        {PAYMENT_LABEL[ps!] ?? ps}
+                      </span>
+                    )}
                   </span>
                 </div>
               )}
@@ -1687,116 +2086,11 @@ export default function InvoiceDetail() {
         />
       )}
 
-      {/* Modal: elegir forma de pago al someter */}
-      {paymentMethodModalOpen && (
-        <div
-          className="modal-overlay"
-          onClick={() => setPaymentMethodModalOpen(false)}
-        >
-          <div
-            className="modal-box modal-box-sm"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-head">
-              <h2
-                className="modal-title"
-                style={{ display: "flex", alignItems: "center", gap: 6 }}
-              >
-                <Send size={16} /> Forma de pago
-              </h2>
-              <button
-                className="modal-close"
-                onClick={() => setPaymentMethodModalOpen(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div
-              className="modal-body"
-              style={{ display: "flex", flexDirection: "column", gap: 12 }}
-            >
-              <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
-                ¿Cómo se pagará esta factura?
-              </p>
-              <button
-                className="btn btn-secondary"
-                style={{ justifyContent: "flex-start", gap: 8 }}
-                onClick={() => selectPaymentMethod("contado")}
-              >
-                <Banknote size={16} /> Al contado
-              </button>
-              <button
-                className="btn btn-secondary"
-                style={{ justifyContent: "flex-start", gap: 8 }}
-                onClick={() => selectPaymentMethod("credito")}
-              >
-                <CreditCard size={16} /> A crédito
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: confirmar someter con la forma de pago elegida */}
-      {paymentConfirmModalOpen && (
-        <div
-          className="modal-overlay"
-          onClick={() => setPaymentConfirmModalOpen(false)}
-        >
-          <div
-            className="modal-box modal-box-sm"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-head">
-              <h2
-                className="modal-title"
-                style={{ display: "flex", alignItems: "center", gap: 6 }}
-              >
-                <Send size={16} /> Confirmar sometimiento
-              </h2>
-              <button
-                className="modal-close"
-                onClick={() => setPaymentConfirmModalOpen(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div
-              className="modal-body"
-              style={{ display: "flex", flexDirection: "column", gap: 8 }}
-            >
-              <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
-                La factura se someterá con forma de pago{" "}
-                <strong style={{ color: "var(--text-primary)" }}>
-                  {chosenPaymentMethod === "contado" ? "al contado" : "a crédito"}
-                </strong>
-                .
-              </p>
-            </div>
-            <div className="modal-foot">
-              <button
-                className="btn btn-secondary"
-                onClick={() => setPaymentConfirmModalOpen(false)}
-              >
-                Volver
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={confirmSubmitWithPaymentMethod}
-                disabled={submitMutation.isPending}
-              >
-                <Send size={14} /> Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Modal: crédito excedido al someter */}
       {creditErrorOpen && (
         <div
           className="modal-overlay"
-          onClick={() => setCreditErrorOpen(false)}
+          onClick={creditErrorClose.requestClose}
         >
           <div
             className="modal-box modal-box-sm"
@@ -1815,7 +2109,7 @@ export default function InvoiceDetail() {
               </h2>
               <button
                 className="modal-close"
-                onClick={() => setCreditErrorOpen(false)}
+                onClick={creditErrorClose.requestClose}
               >
                 ×
               </button>
@@ -1835,7 +2129,7 @@ export default function InvoiceDetail() {
             <div className="modal-foot">
               <button
                 className="btn btn-secondary"
-                onClick={() => setCreditErrorOpen(false)}
+                onClick={creditErrorClose.requestClose}
               >
                 Volver
               </button>
@@ -1850,12 +2144,21 @@ export default function InvoiceDetail() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={creditErrorClose.confirming}
+        onClose={creditErrorClose.cancelDiscard}
+        onConfirm={creditErrorClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {/* Modal: cancelar factura con motivo obligatorio */}
       {cancelModalOpen && (
         <div
           className="modal-overlay"
-          onClick={() => setCancelModalOpen(false)}
+          onClick={cancelClose.requestClose}
         >
           <div
             className="modal-box modal-box-sm"
@@ -1871,7 +2174,7 @@ export default function InvoiceDetail() {
               </h2>
               <button
                 className="modal-close"
-                onClick={() => setCancelModalOpen(false)}
+                onClick={cancelClose.requestClose}
               >
                 ×
               </button>
@@ -1903,17 +2206,46 @@ export default function InvoiceDetail() {
                   {cancelReason.trim().length}/500 caracteres (mínimo 10)
                 </p>
               </div>
+              <div className="ff-wrap">
+                <label
+                  className={`ff-label${cancelMotivoRequired ? " ff-required" : ""}`}
+                  htmlFor="cancelMotivo"
+                >
+                  Motivo de anulación (DGII)
+                </label>
+                <Select
+                  value={cancelMotivo}
+                  onValueChange={setCancelMotivo}
+                  placeholder="Seleccionar motivo"
+                >
+                  {MOTIVOS_ANULACION_DGII.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </Select>
+                <p className="ff-hint">
+                  {cancelMotivoRequired
+                    ? "Obligatorio: esta factura tiene NCF asignado (Formato 608 DGII)."
+                    : "Opcional: esta factura aún no tiene NCF asignado."}
+                </p>
+              </div>
             </div>
             <div className="modal-foot">
               <button
                 className="btn btn-secondary"
-                onClick={() => setCancelModalOpen(false)}
+                onClick={cancelClose.requestClose}
               >
                 Volver
               </button>
               <button
                 className="btn btn-danger"
-                onClick={() => cancelMutation.mutate(cancelReason.trim())}
+                onClick={() =>
+                  cancelMutation.mutate({
+                    reason: cancelReason.trim(),
+                    motivoAnulacion: cancelMotivo || undefined,
+                  })
+                }
                 disabled={!cancelReasonValid || cancelMutation.isPending}
               >
                 <Ban size={14} /> Confirmar cancelación
@@ -1922,12 +2254,21 @@ export default function InvoiceDetail() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={cancelClose.confirming}
+        onClose={cancelClose.cancelDiscard}
+        onConfirm={cancelClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {/* Modal: devolver producto(s) */}
       {returnModalOpen && (
         <div
           className="modal-overlay"
-          onClick={() => setReturnModalOpen(false)}
+          onClick={returnClose.requestClose}
         >
           <div
             className="modal-box modal-box-lg"
@@ -1943,7 +2284,7 @@ export default function InvoiceDetail() {
               </h2>
               <button
                 className="modal-close"
-                onClick={() => setReturnModalOpen(false)}
+                onClick={returnClose.requestClose}
               >
                 ×
               </button>
@@ -2122,7 +2463,7 @@ export default function InvoiceDetail() {
             <div className="modal-foot">
               <button
                 className="btn btn-secondary"
-                onClick={() => setReturnModalOpen(false)}
+                onClick={returnClose.requestClose}
               >
                 Volver
               </button>
@@ -2138,6 +2479,67 @@ export default function InvoiceDetail() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={returnClose.confirming}
+        onClose={returnClose.cancelDiscard}
+        onConfirm={returnClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
+
+      {/* Modal: abrir turno */}
+      {turnoModalOpen && (
+        <div className="modal-overlay" onClick={turnoClose.requestClose}>
+          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Clock size={16} /> Abrir turno de caja
+              </h2>
+              <button className="modal-close" onClick={turnoClose.requestClose}>×</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="ff-wrap">
+                <label className="ff-label">Monto de efectivo de apertura</label>
+                <p className="ff-hint" style={{ marginTop: 4 }}>
+                  Efectivo físico con el que se abre el turno. Se asociará automáticamente al método de pago de Caja configurado.
+                </p>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  className="ff-input"
+                  value={turnoOpeningAmount}
+                  onChange={(e) => setTurnoOpeningAmount(Number(e.target.value) || 0)}
+                />
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={turnoClose.requestClose}>
+                Cancelar
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => abrirTurnoMutation.mutate()}
+                disabled={turnoOpeningAmount <= 0 || abrirTurnoMutation.isPending}
+              >
+                {abrirTurnoMutation.isPending ? 'Abriendo…' : 'Abrir turno'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <ConfirmModal
+        open={turnoClose.confirming}
+        onClose={turnoClose.cancelDiscard}
+        onConfirm={turnoClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
+      <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
     </div>
   );
 }

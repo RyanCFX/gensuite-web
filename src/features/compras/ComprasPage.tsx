@@ -9,6 +9,11 @@ import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { Select, SelectItem } from '@/components/ui/select'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 
 const PAGE_SIZE = 20
 
@@ -19,6 +24,9 @@ export default function ComprasPage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [branch, setBranch] = useState('')
+  const [ncf, setNcf] = useState('')
+  const [grandTotalMin, setGrandTotalMin] = useState('')
+  const [grandTotalMax, setGrandTotalMax] = useState('')
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
 
@@ -30,8 +38,13 @@ export default function ComprasPage() {
   })
   const sucursales = sucursalesData?.items ?? []
 
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchOptions: SearchSelectOption[] = sucursales
+    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((s) => ({ value: s.name, label: s.name }))
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['compras', { supplier, status, fromDate, toDate, branch, offset, orderBy }],
+    queryKey: ['compras', { supplier, status, fromDate, toDate, branch, ncf, grandTotalMin, grandTotalMax, offset, orderBy }],
     queryFn: () =>
       listCompras({
         supplier: supplier || undefined,
@@ -39,6 +52,9 @@ export default function ComprasPage() {
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
         branch: branch || undefined,
+        ncf: ncf || undefined,
+        grandTotalMin: grandTotalMin ? Number(grandTotalMin) : undefined,
+        grandTotalMax: grandTotalMax ? Number(grandTotalMax) : undefined,
         orderBy: orderBy || undefined,
         limit: PAGE_SIZE,
         offset,
@@ -72,38 +88,73 @@ export default function ComprasPage() {
                 onChange={(e) => { setSupplier(e.target.value); setPage(1) }}
               />
             </div>
-            <select
-              className="filter-select"
-              value={status}
-              onChange={(e) => { setStatus(e.target.value); setPage(1) }}
-            >
-              <option value="all">Todos</option>
-              <option value="Draft">Borrador</option>
-              <option value="Submitted">Sometido</option>
-              <option value="Cancelled">Anulado</option>
-            </select>
-            <select
-              className="filter-select"
-              value={branch}
-              onChange={(e) => { setBranch(e.target.value); setPage(1) }}
-            >
-              <option value="">Todas las sucursales</option>
-              {sucursales.map((s) => (
-                <option key={s.id} value={s.name}>{s.name}</option>
-              ))}
-            </select>
-            <input
-              type="date"
-              className="filter-select"
-              value={fromDate}
-              onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
-            />
-            <input
-              type="date"
-              className="filter-select"
-              value={toDate}
-              onChange={(e) => { setToDate(e.target.value); setPage(1) }}
-            />
+            <FilterField label="Estado">
+              <Select
+                value={status}
+                onValueChange={(val) => { setStatus(val); setPage(1) }}
+              >
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="Draft">Borrador</SelectItem>
+                <SelectItem value="Submitted">Sometido</SelectItem>
+                <SelectItem value="Cancelled">Anulado</SelectItem>
+              </Select>
+            </FilterField>
+            <FilterField label="Sucursal" style={{ width: 200 }}>
+              <SearchSelect
+                value={branch}
+                onChange={(val) => { setBranch(val); setPage(1) }}
+                options={branchOptions}
+                onSearch={setBranchSearch}
+                selectedLabel={branch}
+                placeholder="Todas las sucursales"
+              />
+            </FilterField>
+            <FilterField label="Desde">
+              <DatePicker
+                className="filter-select"
+                value={fromDate}
+                onChange={(v) => { setFromDate(v); setPage(1) }}
+                clearable
+              />
+            </FilterField>
+            <FilterField label="Hasta">
+              <DatePicker
+                className="filter-select"
+                value={toDate}
+                onChange={(v) => { setToDate(v); setPage(1) }}
+                clearable
+              />
+            </FilterField>
+            <div className="search-input-wrap">
+              <Search size={14} className="search-input-icon" />
+              <input
+                className="search-input"
+                placeholder="Buscar NCF…"
+                value={ncf}
+                onChange={(e) => { setNcf(e.target.value); setPage(1) }}
+              />
+            </div>
+            <FilterField label="Total">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="number"
+                  className="ff-input ff-input-sm"
+                  style={{ width: 100 }}
+                  placeholder="Total min"
+                  value={grandTotalMin}
+                  onChange={(e) => { setGrandTotalMin(e.target.value); setPage(1) }}
+                />
+                <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+                <input
+                  type="number"
+                  className="ff-input ff-input-sm"
+                  style={{ width: 100 }}
+                  placeholder="Total max"
+                  value={grandTotalMax}
+                  onChange={(e) => { setGrandTotalMax(e.target.value); setPage(1) }}
+                />
+              </div>
+            </FilterField>
           </div>
         </div>
 
@@ -116,6 +167,7 @@ export default function ComprasPage() {
                   <SortableTh label="Proveedor" sortKey="supplierName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
                   <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
                   <th>NCF Proveedor</th>
+                  <th>N° Factura</th>
                   <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} align="right" />
                   <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
                   <th>Acciones</th>
@@ -125,7 +177,7 @@ export default function ComprasPage() {
                 {isLoading
                   ? Array.from({ length: 8 }).map((_, i) => (
                       <tr key={i}>
-                        {Array.from({ length: 7 }).map((__, j) => (
+                        {Array.from({ length: 8 }).map((__, j) => (
                           <td key={j}><span className="skeleton-box" style={{ height: 16, width: '100%', display: 'block' }} /></td>
                         ))}
                       </tr>
@@ -133,7 +185,7 @@ export default function ComprasPage() {
                   : isError
                     ? (
                         <tr>
-                          <td colSpan={7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
+                          <td colSpan={8} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
                             Error al cargar las compras
                           </td>
                         </tr>
@@ -141,7 +193,7 @@ export default function ComprasPage() {
                     : data?.items.length === 0
                       ? (
                           <tr>
-                            <td colSpan={7}>
+                            <td colSpan={8}>
                               <div className="empty-state">
                                 <div className="empty-icon">
                                   <Plus size={20} />
@@ -158,9 +210,19 @@ export default function ComprasPage() {
                       : data?.items.map((c) => (
                           <tr key={c.id} className="table-row-clickable" onClick={() => navigate(`/compras/${c.id}`)}>
                             <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{c.id}</td>
-                            <td style={{ fontWeight: 500 }}>{c.supplierName}</td>
+                            <td style={{ fontWeight: 500 }}>
+                              {c.esProveedorOcasional
+                                ? (
+                                    <span>
+                                      {c.proveedorOcasionalNombre ?? c.supplierName}
+                                      {' '}<span className="badge badge-warning">Ocasional</span>
+                                    </span>
+                                  )
+                                : c.supplierName}
+                            </td>
                             <td>{formatDate(c.postingDate)}</td>
                             <td className="td-muted" style={{ fontFamily: 'var(--font-mono)' }}>{c.ncfProveedor ?? '—'}</td>
+                            <td className="td-muted" style={{ fontFamily: 'var(--font-mono)' }}>{c.billNo ?? '—'}</td>
                             <td style={{ textAlign: 'right' }}>{formatDOP(c.grandTotal)}</td>
                             <td><StatusBadge status={c.status} /></td>
                             <td>

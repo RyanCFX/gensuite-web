@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { getFacturacionConfig } from '@/shared/api/config'
 import {
   LayoutDashboard, Users, Package, FileText, Receipt, Warehouse,
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
@@ -28,8 +30,11 @@ const ALL_ITEMS: SearchItem[] = [
   // ── Catálogo ───────────────────────────────────────────────────────────────
   { id: 'categorias',   label: 'Categorías',           group: 'Catálogo',     path: '/catalogo/categorias',            icon: <Package size={15} />, keywords: 'catalog categories grupos' },
   { id: 'marcas',       label: 'Marcas',               group: 'Catálogo',     path: '/catalogo/marcas',                icon: <Package size={15} />, keywords: 'brands marca' },
-  { id: 'articulos',    label: 'Artículos',            group: 'Catálogo',     path: '/inventario/articulos',             icon: <Package size={15} />, keywords: 'items productos servicios catalog' },
-  { id: 'articulo-nuevo', label: 'Nuevo Artículo',     group: 'Catálogo',     path: '/inventario/articulos',             icon: <Package size={15} />, keywords: 'crear item producto servicio' },
+  { id: 'productos',    label: 'Productos',            group: 'Catálogo',     path: '/inventario/productos',             icon: <Package size={15} />, keywords: 'items producto inventario catalog' },
+  { id: 'producto-nuevo', label: 'Nuevo Producto',     group: 'Catálogo',     path: '/inventario/productos/nuevo',       icon: <Package size={15} />, keywords: 'crear item producto' },
+  { id: 'servicios',    label: 'Servicios',            group: 'Catálogo',     path: '/catalogo/servicios',                icon: <Package size={15} />, keywords: 'items servicio catalog' },
+  { id: 'servicio-nuevo', label: 'Nuevo Servicio',     group: 'Catálogo',     path: '/catalogo/servicios/nuevo',         icon: <Package size={15} />, keywords: 'crear item servicio' },
+  { id: 'cuentas-por-pagar', label: 'Cuentas por Pagar', group: 'Catálogo',   path: '/catalogo/cuentas-por-pagar',        icon: <Package size={15} />, keywords: 'conceptos gasto cxp' },
 
   // ── Ventas ─────────────────────────────────────────────────────────────────
   { id: 'cotizaciones', label: 'Cotizaciones',         group: 'Ventas',       path: '/cotizaciones',                   icon: <FileText size={15} />, keywords: 'quotations cotizar presupuesto' },
@@ -49,6 +54,7 @@ const ALL_ITEMS: SearchItem[] = [
   // ── Compras & Gastos ───────────────────────────────────────────────────────
   { id: 'compras',      label: 'Compras',              group: 'Operaciones',  path: '/compras',                        icon: <ShoppingCart size={15} />, keywords: 'purchase compras proveedores 606' },
   { id: 'compra-nueva', label: 'Nueva Compra',         group: 'Operaciones',  path: '/compras/nueva',                  icon: <ShoppingCart size={15} />, keywords: 'crear compra purchase' },
+  { id: 'dev-compras',  label: 'Devoluciones de Compras', group: 'Operaciones', path: '/devoluciones-compras',          icon: <Receipt size={15} />, keywords: 'devoluciones return compras proveedores credito' },
   { id: 'gastos',       label: 'Gastos',               group: 'Operaciones',  path: '/gastos',                         icon: <CreditCard size={15} />, keywords: 'expenses gastos operativos 606' },
   { id: 'gasto-nuevo',  label: 'Nuevo Gasto',          group: 'Operaciones',  path: '/gastos/nuevo',                   icon: <CreditCard size={15} />, keywords: 'crear gasto expense' },
   { id: 'proveedores',  label: 'Proveedores',          group: 'Operaciones',  path: '/proveedores',                    icon: <Truck size={15} />, keywords: 'suppliers vendor proveedor' },
@@ -57,8 +63,13 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'caja',         label: 'Caja',                 group: 'Finanzas',     path: '/caja',                           icon: <Wallet size={15} />, keywords: 'cobrar pago vuelto contado caja factura pendiente' },
   { id: 'cobros',       label: 'Cobros',               group: 'Finanzas',     path: '/cobros',                         icon: <Wallet size={15} />, keywords: 'pagos cuentas cobrar aging' },
   { id: 'registrar-cobro', label: 'Registrar Cobro',   group: 'Finanzas',     path: '/cobros/pago',                    icon: <Wallet size={15} />, keywords: 'pago cobro payment' },
-  { id: 'aging',        label: 'Aging CxC',            group: 'Finanzas',     path: '/cobros/aging',                   icon: <Wallet size={15} />, keywords: 'aging cuentas cobrar vencidas' },
+  { id: 'aging',        label: 'Antiguedad de saldos CxC', group: 'Finanzas', path: '/cobros/aging',                   icon: <Wallet size={15} />, keywords: 'antiguedad saldos cuentas cobrar vencidas' },
   { id: 'semaforo',     label: 'Semáforo de Crédito',  group: 'Finanzas',     path: '/cobros/semaforo',                icon: <Wallet size={15} />, keywords: 'credito limite semaforo verde rojo' },
+  { id: 'tes-emisiones', label: 'Emisiones (Tesorería)', group: 'Finanzas',   path: '/tesoreria/emisiones',            icon: <CreditCard size={15} />, keywords: 'cheque egreso pago proveedor banco tesoreria' },
+  { id: 'tes-depositos', label: 'Depósitos (Tesorería)', group: 'Finanzas',   path: '/tesoreria/depositos',            icon: <CreditCard size={15} />, keywords: 'ingreso cobro cardnet azul banco tesoreria' },
+  { id: 'tes-transferencias', label: 'Transferencias Internas', group: 'Finanzas', path: '/tesoreria/transferencias', icon: <CreditCard size={15} />, keywords: 'traspaso entre cuentas bancarias tesoreria' },
+  { id: 'tes-movimientos', label: 'Movimientos Bancarios', group: 'Finanzas', path: '/tesoreria/movimientos',         icon: <BarChart3 size={15} />, keywords: 'kardex banco estado de cuenta saldo corrido tesoreria' },
+  { id: 'tes-cheques',   label: 'Cheques (Tesorería)',  group: 'Finanzas',     path: '/tesoreria/cheques',              icon: <CreditCard size={15} />, keywords: 'cheque historial anular imprimir numeracion tesoreria' },
   { id: 'usuarios',     label: 'Usuarios',             group: 'Finanzas',     path: '/usuarios',                       icon: <UserCog size={15} />, keywords: 'users roles acceso' },
 
   // ── Contabilidad ───────────────────────────────────────────────────────────
@@ -76,7 +87,7 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'r-pl',         label: 'Estado de Resultados', group: 'Reportes',     path: '/reportes/pl',                    icon: <BarChart3 size={15} />, keywords: 'pl ingresos egresos resultados' },
   { id: 'r-stock',      label: 'Valoración de Stock',  group: 'Reportes',     path: '/reportes/stock',                 icon: <BarChart3 size={15} />, keywords: 'stock inventario valoracion' },
   { id: 'r-movs',       label: 'Movimientos de Stock', group: 'Reportes',     path: '/reportes/movimientos',           icon: <BarChart3 size={15} />, keywords: 'movimientos inventario stock' },
-  { id: 'r-cxc',        label: 'Aging CxC (Reporte)',  group: 'Reportes',     path: '/reportes/cxcaging',              icon: <BarChart3 size={15} />, keywords: 'aging cxc cuentas cobrar' },
+  { id: 'r-cxc',        label: 'Antiguedad de saldos CxC (Reporte)', group: 'Reportes', path: '/reportes/cxcaging', icon: <BarChart3 size={15} />, keywords: 'antiguedad saldos cxc cuentas cobrar' },
   { id: 'r-caja',       label: 'Cuadre de Caja',       group: 'Reportes',     path: '/reportes/caja',                  icon: <BarChart3 size={15} />, keywords: 'caja cuadre efectivo' },
 
   // ── Configuración ──────────────────────────────────────────────────────────
@@ -88,6 +99,8 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'cfg-uom',      label: 'Unidades de Medida',   group: 'Configuración', path: '/config/uom',                  icon: <Settings size={15} />, keywords: 'uom units medida unidades' },
   { id: 'cfg-precios',  label: 'Listas de Precio',     group: 'Configuración', path: '/config/listas-precio',        icon: <Settings size={15} />, keywords: 'price list precios lista' },
   { id: 'cfg-ncf',      label: 'Secuencias NCF',       group: 'Configuración', path: '/config/ncf',                  icon: <Shield size={15} />, keywords: 'ncf comprobantes fiscales b01 b02 dgii secuencias' },
+  { id: 'cfg-tes-tipos-doc', label: 'Tipos de Documento Bancario', group: 'Configuración', path: '/config/tesoreria/tipos-documento', icon: <CreditCard size={15} />, keywords: 'tesoreria cheque deposito transferencia catalogo bank document type' },
+  { id: 'cfg-tes-plantillas', label: 'Plantillas de Cheque', group: 'Configuración', path: '/config/tesoreria/plantillas-cheque', icon: <CreditCard size={15} />, keywords: 'tesoreria cheque print template imprimir talonario' },
   { id: 'cfg-perfil',   label: 'Mi Perfil',            group: 'Configuración', path: '/config/perfil',               icon: <UserCog size={15} />, keywords: 'perfil usuario profile settings' },
 ]
 
@@ -107,9 +120,13 @@ function score(item: SearchItem, q: string): number {
   return 0
 }
 
-function filterItems(q: string): SearchItem[] {
-  if (!q.trim()) return ALL_ITEMS
-  return ALL_ITEMS
+// Entradas que solo tienen sentido con el módulo POS habilitado (Facturacion Config.usaModuloPos).
+const POS_ONLY_IDS = new Set(['caja', 'r-caja'])
+
+function filterItems(q: string, usaModuloPos: boolean): SearchItem[] {
+  const base = usaModuloPos ? ALL_ITEMS : ALL_ITEMS.filter((item) => !POS_ONLY_IDS.has(item.id))
+  if (!q.trim()) return base
+  return base
     .map((item) => ({ item, s: score(item, q) }))
     .filter(({ s }) => s > 0)
     .sort((a, b) => b.s - a.s)
@@ -130,7 +147,14 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const results = useMemo(() => filterItems(query), [query])
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const usaModuloPos = facturacionConfig?.usaModuloPos ?? false
+
+  const results = useMemo(() => filterItems(query, usaModuloPos), [query, usaModuloPos])
 
   // Reset on open
   useEffect(() => {

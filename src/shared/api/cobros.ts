@@ -2,6 +2,10 @@ import { client, unwrap, unwrapPaginated } from './client'
 import { ENDPOINTS } from './endpoints'
 import type {
   AgingEntry,
+  AgingInvoiceEntry,
+  AgingConfig,
+  AgingResult,
+  AgingGroupBy,
   SemaforoEntry,
   SemaforoResult,
   PaymentEntry,
@@ -9,6 +13,8 @@ import type {
   SaldoFavorResult,
   PaginatedResponse,
   PaginationParams,
+  EstadoCuentaResponse,
+  FormatoImpresion,
 } from './types'
 
 // ─── List Cobros ──────────────────────────────────────────────────────────────
@@ -18,6 +24,10 @@ export interface ListCobrosParams extends PaginationParams {
   customer?: string
   fromDate?: string
   toDate?: string
+  modeOfPayment?: string
+  bankAccount?: string
+  paidAmountMin?: number
+  paidAmountMax?: number
 }
 
 export async function listCobros(params?: ListCobrosParams) {
@@ -35,11 +45,54 @@ export async function submitCobro(id: string) {
   return unwrap(res)
 }
 
-// ─── Aging ────────────────────────────────────────────────────────────────────
+export async function getCobroPdfBlobUrl(id: string, formato?: FormatoImpresion): Promise<string> {
+  const params = new URLSearchParams()
+  if (formato) params.set('formato', formato)
+  const qs = params.toString()
+  const url = qs ? `${ENDPOINTS.cobros.pdf(id)}?${qs}` : ENDPOINTS.cobros.pdf(id)
+  const res = await client.get<Blob>(url, {
+    responseType: 'blob',
+  })
+  return URL.createObjectURL(res.data)
+}
 
-export async function getAging() {
-  const res = await client.get<{ success: true; data: AgingEntry[] }>(ENDPOINTS.cobros.aging)
-  return unwrap(res)
+export async function downloadCobroPdf(id: string, filename?: string, formato?: FormatoImpresion): Promise<void> {
+  const params = new URLSearchParams()
+  if (formato) params.set('formato', formato)
+  const qs = params.toString()
+  const url = qs ? `${ENDPOINTS.cobros.pdf(id)}?${qs}` : ENDPOINTS.cobros.pdf(id)
+  const res = await client.get<Blob>(url, {
+    responseType: 'blob',
+  })
+  const blobUrl = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = filename ?? `cobro-${id}.pdf`
+  a.click()
+  URL.revokeObjectURL(blobUrl)
+}
+
+// ─── Aging ────────────────────────────────────────────────────────────────────
+// GET /cobros/aging responde { success, groupBy, data: AgingEntry[] | AgingInvoiceEntry[], config, note? }
+// — groupBy/config/note NO están anidados dentro de `data`, van al mismo nivel.
+// Sin `groupBy` en la request, el backend asume "party" (una fila por cliente).
+
+export interface AgingParams {
+  /** Filtra el reporte a un solo cliente. Omitir trae todos. */
+  customer?: string
+  /** "party" (default, una fila por cliente) | "invoice" (una fila por factura pendiente). */
+  groupBy?: AgingGroupBy
+}
+
+export async function getAging(params?: AgingParams): Promise<AgingResult> {
+  const res = await client.get<{
+    success: true
+    groupBy: AgingGroupBy
+    data: AgingEntry[] | AgingInvoiceEntry[]
+    config: AgingConfig
+    note?: string
+  }>(ENDPOINTS.cobros.aging, { params })
+  return { groupBy: res.data.groupBy ?? 'party', rows: res.data.data, config: res.data.config, note: res.data.note }
 }
 
 // ─── Semáforo ─────────────────────────────────────────────────────────────────
@@ -96,4 +149,30 @@ export async function getSaldoFavor(customerId: string) {
     ENDPOINTS.cobros.saldoFavor(customerId),
   )
   return unwrap(res)
+}
+
+// ─── Estado de Cuenta ──────────────────────────────────────────
+// GET /cobros/estado-cuenta/:customerId — JSON preview
+// GET /cobros/estado-cuenta/:customerId/pdf — PDF download
+
+export async function getEstadoCuenta(customerId: string) {
+  const res = await client.get<{ success: true; data: EstadoCuentaResponse }>(
+    ENDPOINTS.cobros.estadoCuenta(customerId),
+  )
+  return unwrap(res)
+}
+
+export async function downloadEstadoCuentaPdf(
+  customerId: string,
+  filename?: string,
+): Promise<void> {
+  const res = await client.get<Blob>(ENDPOINTS.cobros.estadoCuentaPdf(customerId), {
+    responseType: 'blob',
+  })
+  const blobUrl = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = filename ?? `estado-cuenta-${customerId}.pdf`
+  a.click()
+  URL.revokeObjectURL(blobUrl)
 }

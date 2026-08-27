@@ -4,16 +4,20 @@ import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { listCategories, createCategory, updateCategory, deleteCategory } from '@/shared/api/catalog'
+import { listCategories, getCategory, createCategory, updateCategory, deleteCategory } from '@/shared/api/catalog'
 import type { Category, UpdateCategoryDto } from '@/shared/api/types'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { AccountSelect } from '@/components/shared/AccountSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightSmall, FolderOpen, Tag, Folder } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { useDebounce } from '@/lib/useDebounce'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 
 const PAGE_SIZE = 20
 
@@ -21,6 +25,10 @@ const categorySchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   parentCategory: z.string().optional(),
   itemCodePrefix: z.string().max(5).optional(),
+  aplicaA: z.enum(['Ambas', 'Productos', 'Servicios']),
+  incomeAccount: z.string().optional(),
+  expenseAccount: z.string().optional(),
+  defaultCogsAccount: z.string().optional(),
 })
 
 type CategoryFormValues = z.infer<typeof categorySchema>
@@ -165,11 +173,15 @@ export default function CategoriesPage() {
     handleSubmit,
     reset,
     control,
-    formState: { errors, isSubmitting },
+    watch,
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
-    defaultValues: { name: '', parentCategory: '', itemCodePrefix: '' },
+    defaultValues: { name: '', parentCategory: '', itemCodePrefix: '', aplicaA: 'Ambas', incomeAccount: '', expenseAccount: '', defaultCogsAccount: '' },
   })
+
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, closeDialog)
+  const watchedAplicaA = watch('aplicaA')
 
   const createMutation = useMutation({
     mutationFn: createCategory,
@@ -205,20 +217,47 @@ export default function CategoriesPage() {
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al eliminar'),
   })
 
+  const [detailLoading, setDetailLoading] = useState(false)
+
   function openCreate() {
     setEditTarget(null)
-    reset({ name: '', parentCategory: '', itemCodePrefix: '' })
+    reset({ name: '', parentCategory: '', itemCodePrefix: '', aplicaA: 'Ambas', incomeAccount: '', expenseAccount: '', defaultCogsAccount: '' })
     setDialogOpen(true)
   }
 
-  function openEdit(cat: Category) {
+  async function openEdit(cat: Category) {
     setEditTarget(cat)
     reset({
       name: cat.name,
       parentCategory: cat.parentCategory ?? '',
       itemCodePrefix: (cat as any).itemCodePrefix ?? '',
+      aplicaA: cat.aplicaA ?? 'Ambas',
+      incomeAccount: (cat as any).incomeAccount ?? '',
+      expenseAccount: (cat as any).expenseAccount ?? '',
+      defaultCogsAccount: (cat as any).defaultCogsAccount ?? '',
     })
     setDialogOpen(true)
+
+    // La lista/árbol no traen incomeAccount/expenseAccount/defaultCogsAccount:
+    // se cargan solo en el detalle. Hacemos fetch completo para precargarlos.
+    setDetailLoading(true)
+    try {
+      const full = await getCategory(cat.id)
+      setEditTarget(full)
+      reset({
+        name: full.name,
+        parentCategory: full.parentCategory ?? '',
+        itemCodePrefix: (full as any).itemCodePrefix ?? '',
+        aplicaA: full.aplicaA ?? 'Ambas',
+        incomeAccount: (full as any).incomeAccount ?? '',
+        expenseAccount: (full as any).expenseAccount ?? '',
+        defaultCogsAccount: (full as any).defaultCogsAccount ?? '',
+      })
+    } catch {
+      toast.error('No se pudo cargar el detalle completo de la categoría')
+    } finally {
+      setDetailLoading(false)
+    }
   }
 
   function closeDialog() {
@@ -236,6 +275,12 @@ export default function CategoriesPage() {
     if (values.itemCodePrefix) {
       basePayload.itemCodePrefix = values.itemCodePrefix
     }
+    basePayload.aplicaA = values.aplicaA
+    basePayload.incomeAccount = values.incomeAccount || undefined
+    basePayload.expenseAccount = values.expenseAccount || undefined
+    // Un servicio nunca genera Costo de Mercancía Vendida (no hay movimiento de inventario que
+    // valuar) — se omite aunque el campo tuviera un valor cargado de antes.
+    basePayload.defaultCogsAccount = values.aplicaA === 'Servicios' ? undefined : (values.defaultCogsAccount || undefined)
     if (editTarget) {
       updateMutation.mutate({ id: editTarget.id, data: basePayload as UpdateCategoryDto })
     } else {
@@ -435,11 +480,11 @@ export default function CategoriesPage() {
 
       {/* ── Create / Edit Modal ── */}
       {dialogOpen && (
-        <div className="modal-overlay" onClick={closeDialog}>
+        <div className="modal-overlay" onClick={requestClose}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">{editTarget ? 'Editar Categoría' : 'Nueva Categoría'}</h2>
-              <button className="modal-close" type="button" onClick={closeDialog}>×</button>
+              <button className="modal-close" type="button" onClick={requestClose}>×</button>
             </div>
             <form onSubmit={handleSubmit(onSubmit)}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -482,9 +527,84 @@ export default function CategoriesPage() {
                   <input id="itemCodePrefix" className="ff-input" maxLength={5} placeholder="Ej: VEN" {...register('itemCodePrefix')} />
                   <p className="ff-hint">Máx 5 caracteres. Se usará como prefijo en códigos de artículo (ej: VEN-0001)</p>
                 </div>
+
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="aplicaA">Aplica a</label>
+                  <Controller
+                    name="aplicaA"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectItem value="Ambas">Ambas</SelectItem>
+                        <SelectItem value="Productos">Productos</SelectItem>
+                        <SelectItem value="Servicios">Servicios</SelectItem>
+                      </Select>
+                    )}
+                  />
+                  <p className="ff-hint">
+                    Restringe en qué tipo de artículo se puede usar esta categoría/subcategoría.
+                  </p>
+                </div>
+
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="incomeAccount">Cuenta de Ingreso</label>
+                  <Controller
+                    name="incomeAccount"
+                    control={control}
+                    render={({ field }) => (
+                      <AccountSelect
+                        id="incomeAccount"
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        rootType="Income"
+                        placeholder="Buscar cuenta de ingreso…"
+                        disabled={detailLoading}
+                      />
+                    )}
+                  />
+                </div>
+
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="expenseAccount">Cuenta de Gasto</label>
+                  <Controller
+                    name="expenseAccount"
+                    control={control}
+                    render={({ field }) => (
+                      <AccountSelect
+                        id="expenseAccount"
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        rootType="Expense"
+                        placeholder="Buscar cuenta de gasto…"
+                        disabled={detailLoading}
+                      />
+                    )}
+                  />
+                </div>
+
+                {watchedAplicaA !== 'Servicios' && (
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="defaultCogsAccount">Cuenta de Costo de Mercancía Vendida (COGS)</label>
+                    <Controller
+                      name="defaultCogsAccount"
+                      control={control}
+                      render={({ field }) => (
+                        <AccountSelect
+                          id="defaultCogsAccount"
+                          value={field.value ?? ''}
+                          onChange={field.onChange}
+                          accountType="Cost of Goods Sold"
+                          placeholder="Buscar cuenta de COGS…"
+                          disabled={detailLoading}
+                        />
+                      )}
+                    />
+                    <p className="ff-hint">Cuenta que controla el costo real en ventas — es el campo más importante de los tres.</p>
+                  </div>
+                )}
               </div>
               <div className="modal-foot">
-                <button type="button" className="btn btn-ghost" onClick={closeDialog}>Cancelar</button>
+                <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                   {isSubmitting ? 'Guardando…' : editTarget ? 'Guardar' : 'Crear'}
                 </button>
@@ -493,6 +613,16 @@ export default function CategoriesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {toDelete && (
         <div className="modal-overlay" onClick={() => setToDelete(null)}>

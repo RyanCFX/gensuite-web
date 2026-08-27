@@ -7,6 +7,8 @@ import type {
   PaginationParams,
   Gasto,
   CreateGastoDto,
+  FormatoImpresion,
+  AsientoPreviewRow,
 } from './types'
 
 // ---- Compras (update_stock=1) ----
@@ -17,6 +19,9 @@ export interface ListComprasParams extends PaginationParams {
   fromDate?: string
   toDate?: string
   branch?: string
+  ncf?: string
+  grandTotalMin?: number
+  grandTotalMax?: number
 }
 
 export async function listCompras(params?: ListComprasParams) {
@@ -49,6 +54,33 @@ export async function cancelCompra(id: string) {
   return unwrap(res)
 }
 
+export async function getCompraPdfBlobUrl(id: string, formato?: FormatoImpresion): Promise<string> {
+  const params = new URLSearchParams()
+  if (formato) params.set('formato', formato)
+  const qs = params.toString()
+  const url = qs ? `${ENDPOINTS.compras.pdf(id)}?${qs}` : ENDPOINTS.compras.pdf(id)
+  const res = await client.get<Blob>(url, {
+    responseType: 'blob',
+  })
+  return URL.createObjectURL(res.data)
+}
+
+export async function downloadCompraPdf(id: string, filename?: string, formato?: FormatoImpresion): Promise<void> {
+  const params = new URLSearchParams()
+  if (formato) params.set('formato', formato)
+  const qs = params.toString()
+  const url = qs ? `${ENDPOINTS.compras.pdf(id)}?${qs}` : ENDPOINTS.compras.pdf(id)
+  const res = await client.get<Blob>(url, {
+    responseType: 'blob',
+  })
+  const blobUrl = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = filename ?? `compra-${id}.pdf`
+  a.click()
+  URL.revokeObjectURL(blobUrl)
+}
+
 export async function amendCompra(id: string) {
   const res = await client.post<{ success: true; data: Compra }>(ENDPOINTS.compras.amend(id))
   return unwrap(res)
@@ -59,8 +91,10 @@ export async function deleteCompra(id: string) {
   return unwrap(res)
 }
 
-export async function returnCompra(id: string, items: { itemCode: string; qty: number }[]) {
-  const res = await client.post<{ success: true; data: Compra }>(ENDPOINTS.compras.return(id), { items })
+/** Preview de los asientos contables (GL) que se generarían al someter esta compra — solo
+ *  funciona mientras siga en Draft, no somete ni persiste nada. */
+export async function previewAsientosCompra(id: string) {
+  const res = await client.get<{ success: true; data: AsientoPreviewRow[] }>(ENDPOINTS.compras.previewAsientos(id))
   return unwrap(res)
 }
 
@@ -73,6 +107,9 @@ export interface ListGastosParams extends PaginationParams {
   toDate?: string
   tipoComprobante?: string
   esDeducible?: boolean
+  ncfProveedor?: string
+  grandTotalMin?: number
+  grandTotalMax?: number
 }
 
 export async function listGastos(params?: ListGastosParams) {
@@ -114,5 +151,12 @@ export async function cancelGasto(id: string) {
 
 export async function amendGasto(id: string) {
   const res = await client.post<{ success: true; data: Gasto }>(ENDPOINTS.gastos.amend(id))
+  return unwrap(res)
+}
+
+/** Preview de los asientos contables (GL) que se generarían al someter este gasto — solo
+ *  funciona mientras siga en Draft, no somete ni persiste nada. */
+export async function previewAsientosGasto(id: string) {
+  const res = await client.get<{ success: true; data: AsientoPreviewRow[] }>(ENDPOINTS.gastos.previewAsientos(id))
   return unwrap(res)
 }

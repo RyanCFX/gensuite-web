@@ -17,6 +17,18 @@ export interface ListNotesParams extends PaginationParams {
   fromDate?: string
   toDate?: string
   customer?: string
+  branch?: string
+  department?: string
+  createdAtFrom?: string
+  createdAtTo?: string
+  postingDateFrom?: string
+  postingDateTo?: string
+  ncf?: string
+  ncfType?: string
+  grandTotalMin?: number
+  grandTotalMax?: number
+  refundedAmountMin?: number
+  refundedAmountMax?: number
 }
 
 export async function listCreditNotes(params?: ListNotesParams) {
@@ -67,6 +79,16 @@ export async function getCreditNoteSaldoFavor(customerId: string) {
   return unwrap(res)
 }
 
+export async function downloadCreditNotePdf(id: string, filename?: string): Promise<void> {
+  const res = await client.get<Blob>(ENDPOINTS.creditNotes.pdf(id), { responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename ?? `nota-credito-${id}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export async function listDebitNotes(params?: ListNotesParams) {
   const res = await client.get(ENDPOINTS.debitNotes.list, { params })
   return unwrap(res)
@@ -85,4 +107,14 @@ export async function createDebitNote(data: CreateDebitNoteDto) {
 export async function submitDebitNote(id: string) {
   const res = await client.post(ENDPOINTS.debitNotes.submit(id))
   return unwrap(res)
+}
+
+export async function downloadDebitNotePdf(id: string, filename?: string): Promise<void> {
+  const res = await client.get<Blob>(ENDPOINTS.debitNotes.pdf(id), { responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename ?? `nota-debito-${id}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
 }

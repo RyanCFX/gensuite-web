@@ -1,12 +1,23 @@
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { useTabs } from '@/contexts/TabsContext'
 import { createJournalEntry, submitJournalEntry } from '@/shared/api/journal-entry'
-import type { CreateJournalEntryDto, JournalEntryLine } from '@/shared/api/types'
+import type { CreateJournalEntryDto, JournalEntryLine, ItemProps } from '@/shared/api/types'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { CostCenterSelect } from '@/components/shared/CostCenterSelect'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { listSucursales } from '@/shared/api/sucursales'
+import { getCuenta } from '@/shared/api/cuentas'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { formatDOP } from '@/lib/formatters'
 import { ArrowLeft, Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 interface EntryRow {
   id: number
@@ -15,29 +26,49 @@ interface EntryRow {
   debit: number
   credit: number
   description: string
+  branch: string
+  department: string
+  costCenter: string
+  reportType?: 'Profit and Loss' | 'Balance Sheet'
 }
 
 let rowCounter = 2
 
 function makeRow(): EntryRow {
-  return { id: rowCounter++, account: '', accountName: '', debit: 0, credit: 0, description: '' }
+  return { id: rowCounter++, account: '', accountName: '', debit: 0, credit: 0, description: '', branch: '', department: '', costCenter: '' }
 }
 
 function defaultRows(): EntryRow[] {
   return [
-    { id: 0, account: '', accountName: '', debit: 0, credit: 0, description: '' },
-    { id: 1, account: '', accountName: '', debit: 0, credit: 0, description: '' },
+    { id: 0, account: '', accountName: '', debit: 0, credit: 0, description: '', branch: '', department: '', costCenter: '' },
+    { id: 1, account: '', accountName: '', debit: 0, credit: 0, description: '', branch: '', department: '', costCenter: '' },
   ]
 }
 
 export default function JournalForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { multiTab, activeId, closeTab } = useTabs()
 
   const today = new Date().toISOString().slice(0, 10)
   const [postingDate, setPostingDate] = useState(today)
   const [remarks, setRemarks] = useState('')
   const [rows, setRows] = useState<EntryRow[]>(defaultRows)
+
+  // Defaults a nivel de cabecera — el backend los aplica a las líneas que no traigan valor propio
+  const [defaultBranch, setDefaultBranch] = useState('')
+  const [defaultDepartment, setDefaultDepartment] = useState('')
+  const [defaultCostCenter, setDefaultCostCenter] = useState<ItemProps | null>(null)
+
+  const [sucursalQuery, setSucursalQuery] = useState('')
+  const { data: sucursalesData, isLoading: sucursalesLoading } = useQuery({
+    queryKey: ['sucursales-search', sucursalQuery],
+    queryFn: () => listSucursales({ limit: 100 }),
+    staleTime: 30_000,
+  })
+  const sucursalOptions: SearchSelectOption[] = (sucursalesData?.items ?? [])
+    .filter((s) => !sucursalQuery || s.name.toLowerCase().includes(sucursalQuery.toLowerCase()))
+    .map((s) => ({ value: s.id, label: s.name }))
 
   const totalDebits = rows.reduce((s, r) => s + r.debit, 0)
   const totalCredits = rows.reduce((s, r) => s + r.credit, 0)
@@ -47,6 +78,10 @@ export default function JournalForm() {
   const createMutation = useMutation({
     mutationFn: (data: CreateJournalEntryDto) => createJournalEntry(data),
     onError: (err: { message?: string }) => {
+      if (isApiErrorCode(err, ERROR_CODES.BRANCH_REQUIRED)) {
+        toast.error(err?.message ?? 'Sucursal requerida para una o más líneas')
+        return
+      }
       toast.error(err?.message ?? 'Error al guardar el asiento')
     },
   })
@@ -66,10 +101,16 @@ export default function JournalForm() {
         debit: r.debit,
         credit: r.credit,
         description: r.description || undefined,
+        branch: r.branch || undefined,
+        department: r.department || undefined,
+        costCenter: r.costCenter || undefined,
       }))
     return {
       postingDate,
       remarks: remarks || undefined,
+      branch: defaultBranch || undefined,
+      department: defaultDepartment || undefined,
+      costCenter: defaultCostCenter?.id || undefined,
       entries,
     }
   }
@@ -78,8 +119,12 @@ export default function JournalForm() {
     const payload = buildPayload()
     const entry = await createMutation.mutateAsync(payload)
     toast.success('Asiento guardado como borrador')
+    const formTabId = activeId
     queryClient.invalidateQueries({ queryKey: ['journal-entries'] })
     navigate(`/asientos/${encodeURIComponent(entry.id)}`)
+    // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+    // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+    if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
   }
 
   async function handleSaveAndSubmit() {
@@ -88,8 +133,10 @@ export default function JournalForm() {
     const entry = await createMutation.mutateAsync(payload)
     await submitMutation.mutateAsync(entry.id)
     toast.success('Asiento guardado y confirmado')
+    const formTabId = activeId
     queryClient.invalidateQueries({ queryKey: ['journal-entries'] })
     navigate(`/asientos/${encodeURIComponent(entry.id)}`)
+    if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
   }
 
   const updateRow = useCallback((id: number, changes: Partial<EntryRow>) => {
@@ -104,6 +151,18 @@ export default function JournalForm() {
     setRows((prev) => [...prev, makeRow()])
   }, [])
 
+  const handleAccountChange = useCallback((id: number, accountId: string) => {
+    updateRow(id, { account: accountId, reportType: undefined })
+    if (!accountId) return
+    getCuenta(accountId)
+      .then((cuenta) => {
+        updateRow(id, { reportType: cuenta.reportType })
+      })
+      .catch(() => {
+        // Si falla el fetch puntual, no bloqueamos al usuario — el backend valida de todas formas
+      })
+  }, [updateRow])
+
   function handleDebitChange(id: number, value: number) {
     updateRow(id, { debit: value, credit: value > 0 ? 0 : undefined })
   }
@@ -113,6 +172,16 @@ export default function JournalForm() {
   }
 
   const isPending = createMutation.isPending || submitMutation.isPending
+
+  const isDirty = useDirtyCheck({
+    postingDate,
+    remarks,
+    rows,
+    defaultBranch,
+    defaultDepartment,
+    defaultCostCenter,
+  }, true)
+  useBeforeUnloadWarning(isDirty)
 
   return (
     <div className="page-container">
@@ -140,12 +209,11 @@ export default function JournalForm() {
                 <label className="ff-label" htmlFor="postingDate">
                   Fecha <span className="ff-required">*</span>
                 </label>
-                <input
+                <DatePicker
                   id="postingDate"
-                  type="date"
                   className="ff-input"
                   value={postingDate}
-                  onChange={(e) => setPostingDate(e.target.value)}
+                  onChange={setPostingDate}
                 />
               </div>
               <div className="ff-wrap">
@@ -157,6 +225,36 @@ export default function JournalForm() {
                   placeholder="Descripción del asiento…"
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="defaultBranch">Sucursal (default)</label>
+                <SearchSelect
+                  id="defaultBranch"
+                  value={defaultBranch}
+                  onChange={(val) => setDefaultBranch(val)}
+                  options={sucursalOptions}
+                  onSearch={setSucursalQuery}
+                  loading={sucursalesLoading}
+                  placeholder="Buscar sucursal…"
+                />
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="defaultDepartment">Departamento (default)</label>
+                <DepartmentSelect
+                  id="defaultDepartment"
+                  value={defaultDepartment}
+                  onChange={setDefaultDepartment}
+                />
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="defaultCostCenter">Centro de Costo (default)</label>
+                <CostCenterSelect
+                  id="defaultCostCenter"
+                  value={defaultCostCenter}
+                  onChange={setDefaultCostCenter}
                 />
               </div>
             </div>
@@ -186,20 +284,27 @@ export default function JournalForm() {
               <table className="items-table">
                 <thead>
                   <tr>
-                    <th style={{ width: '35%' }}>Cuenta</th>
-                    <th style={{ width: '15%', textAlign: 'right' }}>Débito</th>
-                    <th style={{ width: '15%', textAlign: 'right' }}>Crédito</th>
-                    <th>Descripción</th>
+                    <th style={{ width: '22%' }}>Cuenta</th>
+                    <th style={{ width: '10%', textAlign: 'right' }}>Débito</th>
+                    <th style={{ width: '10%', textAlign: 'right' }}>Crédito</th>
+                    <th style={{ width: '16%' }}>Descripción</th>
+                    <th style={{ width: '14%' }}>Sucursal</th>
+                    <th style={{ width: '14%' }}>Departamento</th>
+                    <th style={{ width: '14%' }}>Centro de Costo</th>
                     <th style={{ width: 40 }} />
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
+                  {rows.map((row) => {
+                    const requiresBranch = row.reportType === 'Profit and Loss'
+                    const branchResolved = row.branch || defaultBranch
+                    const branchMissing = requiresBranch && !branchResolved
+                    return (
                     <tr key={row.id}>
                       <td>
                         <AccountSelect
                           value={row.account}
-                          onChange={(val) => updateRow(row.id, { account: val })}
+                          onChange={(val) => handleAccountChange(row.id, val)}
                           ledgerOnly
                           placeholder="Buscar cuenta…"
                         />
@@ -236,6 +341,34 @@ export default function JournalForm() {
                         />
                       </td>
                       <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <SearchSelect
+                            value={row.branch}
+                            onChange={(val) => updateRow(row.id, { branch: val })}
+                            options={sucursalOptions}
+                            onSearch={setSucursalQuery}
+                            loading={sucursalesLoading}
+                            placeholder="Sucursal…"
+                            error={branchMissing}
+                          />
+                          {branchMissing && <span className="ff-required" title="Requerida: la cuenta es de Estado de Resultados">*</span>}
+                        </div>
+                      </td>
+                      <td>
+                        <DepartmentSelect
+                          value={row.department}
+                          onChange={(val) => updateRow(row.id, { department: val })}
+                          placeholder="Depto…"
+                        />
+                      </td>
+                      <td>
+                        <CostCenterSelect
+                          value={row.costCenter ? { id: row.costCenter, name: '' } : null}
+                          onChange={(val) => updateRow(row.id, { costCenter: val?.id ?? '' })}
+                          placeholder="C. Costo…"
+                        />
+                      </td>
+                      <td>
                         <button
                           type="button"
                           className="btn btn-ghost btn-size-xs"
@@ -248,7 +381,8 @@ export default function JournalForm() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
                 <tfoot>
                   <tr className="items-total-row">
@@ -259,7 +393,7 @@ export default function JournalForm() {
                     <td className="items-total-line" style={{ textAlign: 'right', fontWeight: 600 }}>
                       {formatDOP(totalCredits)}
                     </td>
-                    <td className="items-total-line" colSpan={2}>
+                    <td className="items-total-line" colSpan={5}>
                       <span style={{
                         fontWeight: 600,
                         fontSize: 13,

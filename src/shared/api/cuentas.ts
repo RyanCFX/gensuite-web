@@ -6,6 +6,8 @@ export interface ListCuentasParams extends PaginationParams {
   accountType?: string
   isGroup?: boolean
   includeDisabled?: boolean
+  /** Filtra solo cuentas usadas como tax_type/account_head en templates de impuestos */
+  soloImpuesto?: boolean
 }
 
 export async function listCuentas(params?: ListCuentasParams) {

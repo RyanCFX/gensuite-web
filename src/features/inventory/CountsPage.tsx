@@ -1,12 +1,18 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { listCounts, getCountTemplate, createCount, submitCount, type CountTemplateItem } from '@/shared/api/counts'
 import { listWarehouses } from '@/shared/api/inventory'
+import { listSucursales } from '@/shared/api/sucursales'
+import { listAlmacenes } from '@/shared/api/config'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { formatDate, formatNumber } from '@/lib/formatters'
 import type { InventoryCount } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { Plus, ClipboardList, Send } from 'lucide-react'
+import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { Plus, ClipboardList, Send, AlertTriangle } from 'lucide-react'
 
 const STATUS_BADGE: Record<string, string> = {
   Draft: 'badge-draft',
@@ -32,11 +38,57 @@ export default function CountsPage() {
   const [countRows, setCountRows] = useState<CountRow[]>([])
   const [templateLoading, setTemplateLoading] = useState(false)
   const [submitTarget, setSubmitTarget] = useState<InventoryCount | null>(null)
+  const [branch, setBranch] = useState<string>('')
+  const [department, setDepartment] = useState<string>('')
+  const [mixedBranchError, setMixedBranchError] = useState<string | null>(null)
 
   const { data: warehouses } = useQuery({
     queryKey: ['warehouses'],
     queryFn: listWarehouses,
   })
+
+  const { data: sucursales } = useQuery({
+    queryKey: ['sucursales', 'for-count'],
+    queryFn: () => listSucursales({ limit: 100 }),
+    enabled: showNewDialog,
+  })
+
+  const { data: almacenes } = useQuery({
+    queryKey: ['almacenes', 'for-count'],
+    queryFn: () => listAlmacenes(),
+    enabled: showNewDialog,
+  })
+
+  // Mapa almacén (warehouse) -> sucursal, para detectar mezcla de sucursales en las líneas
+  const warehouseToBranch = useMemo(() => {
+    const map = new Map<string, string>()
+    almacenes?.forEach((a) => {
+      if (a.branch) map.set(a.id, a.branch)
+    })
+    return map
+  }, [almacenes])
+
+  const [warehouseSearch, setWarehouseSearch] = useState('')
+  const warehouseOptions: SearchSelectOption[] = (warehouses ?? [])
+    .filter((w) => !warehouseSearch || w.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
+    .map((w) => ({ value: w.name, label: w.name }))
+
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchOptions: SearchSelectOption[] = (sucursales?.items ?? [])
+    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((s) => ({ value: s.id, label: s.name }))
+
+  const usedBranches = useMemo(() => {
+    const set = new Set<string>()
+    countRows.forEach((r) => {
+      const wh = r.warehouse || selectedWarehouse
+      const b = warehouseToBranch.get(wh)
+      if (b) set.add(b)
+    })
+    return set
+  }, [countRows, selectedWarehouse, warehouseToBranch])
+
+  const hasMixedBranches = usedBranches.size > 1
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['counts'],
@@ -51,8 +103,20 @@ export default function CountsPage() {
       setShowNewDialog(false)
       setSelectedWarehouse('')
       setCountRows([])
+      setBranch('')
+      setDepartment('')
+      setMixedBranchError(null)
     },
-    onError: () => toast.error('Error al guardar el conteo'),
+    onError: (error) => {
+      if (isApiErrorCode(error, ERROR_CODES.MIXED_BRANCH_COUNT)) {
+        setMixedBranchError(
+          `${error.message} Sugerencia: divide este conteo en dos conteos separados, uno por cada sucursal.`,
+        )
+        toast.error(error.message)
+        return
+      }
+      toast.error('Error al guardar el conteo')
+    },
   })
 
   const submitMutation = useMutation({
@@ -90,6 +154,8 @@ export default function CountsPage() {
     const today = new Date().toISOString().slice(0, 10)
     createMutation.mutate({
       postingDate: today,                         // required by BFF
+      branch: branch || undefined,
+      department: department || undefined,
       items: countRows.map((r) => ({
         itemCode: r.itemCode,
         warehouse: r.warehouse || selectedWarehouse,  // warehouse at item level
@@ -103,6 +169,9 @@ export default function CountsPage() {
     setShowNewDialog(false)
     setSelectedWarehouse('')
     setCountRows([])
+    setBranch('')
+    setDepartment('')
+    setMixedBranchError(null)
   }
 
   return (
@@ -203,20 +272,54 @@ export default function CountsPage() {
             </p>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
-              <div className="ff-wrap" style={{ marginBottom: 16 }}>
-                <label className="ff-label">Almacén</label>
-                <select
-                  className="ff-select"
-                  value={selectedWarehouse}
-                  onChange={(e) => handleWarehouseSelect(e.target.value)}
-                  style={{ maxWidth: 260 }}
-                >
-                  <option value="">Seleccionar almacén</option>
-                  {warehouses?.map((w) => (
-                    <option key={w.name} value={w.name}>{w.name}</option>
-                  ))}
-                </select>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
+                <div className="ff-wrap">
+                  <label className="ff-label">Almacén</label>
+                  <div style={{ maxWidth: 260 }}>
+                    <SearchSelect
+                      value={selectedWarehouse}
+                      onChange={handleWarehouseSelect}
+                      options={warehouseOptions}
+                      onSearch={setWarehouseSearch}
+                      selectedLabel={selectedWarehouse}
+                      placeholder="Seleccionar almacén"
+                    />
+                  </div>
+                </div>
+
+                <div className="ff-wrap">
+                  <label className="ff-label">Sucursal (opcional)</label>
+                  <div style={{ maxWidth: 260 }}>
+                    <SearchSelect
+                      value={branch}
+                      onChange={setBranch}
+                      options={branchOptions}
+                      onSearch={setBranchSearch}
+                      selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
+                      placeholder="Auto (según almacenes)"
+                    />
+                  </div>
+                </div>
+
+                <div className="ff-wrap">
+                  <label className="ff-label">Departamento (opcional)</label>
+                  <DepartmentSelect value={department} onChange={setDepartment} />
+                </div>
               </div>
+
+              {hasMixedBranches && (
+                <div className="inline-alert inline-alert-warn" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <AlertTriangle size={16} />
+                  <span>Estás mezclando almacenes de sucursales distintas — esto no se puede guardar en un solo conteo.</span>
+                </div>
+              )}
+
+              {mixedBranchError && (
+                <div className="inline-alert inline-alert-warn" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <AlertTriangle size={16} />
+                  <span>{mixedBranchError}</span>
+                </div>
+              )}
 
               {templateLoading && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

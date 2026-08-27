@@ -17,18 +17,33 @@ import type {
   CuentasEmpresa,
   UpdateCuentasEmpresaDto,
   TaxTemplate,
-  CreateTaxTemplateDto,
   ItemTaxTemplate,
-  CreateItemTaxTemplateDto,
+  TasaImpuesto,
+  CreateTasaImpuestoDto,
+  UpdateTasaImpuestoDto,
   FacturacionConfig,
+  HabilitarPosDto,
+  HabilitarPosResult,
   LayawayConfig,
   AlmacenListItem,
   CreateAlmacenDto,
   UpdateAlmacenDto,
+  PaisCatalogo,
+  CurrencyOption,
   Banco,
   Denominacion,
   CreateDenominacionDto,
   UpdateDenominacionDto,
+  AccountsSettings,
+  UpdateAccountsSettingsDto,
+  StockSettings,
+  UpdateStockSettingsDto,
+  SellingSettings,
+  UpdateSellingSettingsDto,
+  BuyingSettings,
+  UpdateBuyingSettingsDto,
+  SeguridadSettings,
+  UpdateSeguridadSettingsDto,
 } from './types'
 
 export async function getEmpresa() {
@@ -58,6 +73,12 @@ export async function getFacturacionConfig() {
 
 export async function updateFacturacionConfig(data: Partial<FacturacionConfig>) {
   const res = await client.put<{ success: true; data: FacturacionConfig }>(ENDPOINTS.config.facturacion, data)
+  return unwrap(res)
+}
+
+// Idempotente: activa el módulo POS (o reintenta si algo falló a mitad de camino).
+export async function habilitarPos(data: HabilitarPosDto) {
+  const res = await client.post<{ success: true; data: HabilitarPosResult }>(ENDPOINTS.config.posHabilitar, data)
   return unwrap(res)
 }
 
@@ -107,11 +128,15 @@ export async function updateDenominacion(id: string, data: UpdateDenominacionDto
 }
 
 export async function listAlmacenes(params?: { branch?: string }) {
-  const res = await client.get<{ success: true; data: AlmacenListItem[] }>(
+  // GET /config/almacenes devuelve el tipo de almacén como `type`, no `warehouseType`
+  // (a diferencia de Create/UpdateAlmacenDto, que sí usan `warehouseType` en el body) —
+  // normalizamos acá para que el resto del frontend use un solo nombre de campo.
+  const res = await client.get<{ success: true; data: (AlmacenListItem & { type?: string | null })[] }>(
     ENDPOINTS.config.almacenes,
     { params },
   )
-  return unwrap(res)
+  const items = unwrap(res)
+  return items.map(({ type, ...item }) => ({ ...item, warehouseType: item.warehouseType ?? type ?? undefined }))
 }
 
 export async function createAlmacen(data: CreateAlmacenDto) {
@@ -245,49 +270,21 @@ export async function updateCuentasEmpresa(data: UpdateCuentasEmpresaDto) {
   return unwrap(res)
 }
 
-// ─── Tax Templates — Ventas ───────────────────────────────────────────────────
+// ─── Tax Templates — Ventas (solo lectura: ahora se gestionan desde tasas-impuesto) ─────
 
 export async function listImpuestosVentas(): Promise<TaxTemplate[]> {
   const res = await client.get<{ success: true; data: TaxTemplate[] }>(ENDPOINTS.config.impuestosVentas)
   return unwrap(res)
 }
 
-export async function createImpuestoVentas(data: CreateTaxTemplateDto): Promise<TaxTemplate> {
-  const res = await client.post<{ success: true; data: TaxTemplate }>(ENDPOINTS.config.impuestosVentas, data)
-  return unwrap(res)
-}
-
-export async function updateImpuestoVentas(id: string, data: Partial<CreateTaxTemplateDto>): Promise<TaxTemplate> {
-  const res = await client.put<{ success: true; data: TaxTemplate }>(ENDPOINTS.config.impuestosVentasById(id), data)
-  return unwrap(res)
-}
-
-export async function deleteImpuestoVentas(id: string): Promise<void> {
-  await client.delete(ENDPOINTS.config.impuestosVentasById(id))
-}
-
-// ─── Tax Templates — Compras ──────────────────────────────────────────────────
+// ─── Tax Templates — Compras (solo lectura: ahora se gestionan desde tasas-impuesto) ────
 
 export async function listImpuestosCompras(): Promise<TaxTemplate[]> {
   const res = await client.get<{ success: true; data: TaxTemplate[] }>(ENDPOINTS.config.impuestosCompras)
   return unwrap(res)
 }
 
-export async function createImpuestoCompras(data: CreateTaxTemplateDto): Promise<TaxTemplate> {
-  const res = await client.post<{ success: true; data: TaxTemplate }>(ENDPOINTS.config.impuestosCompras, data)
-  return unwrap(res)
-}
-
-export async function updateImpuestoCompras(id: string, data: Partial<CreateTaxTemplateDto>): Promise<TaxTemplate> {
-  const res = await client.put<{ success: true; data: TaxTemplate }>(ENDPOINTS.config.impuestosComprasById(id), data)
-  return unwrap(res)
-}
-
-export async function deleteImpuestoCompras(id: string): Promise<void> {
-  await client.delete(ENDPOINTS.config.impuestosComprasById(id))
-}
-
-// ─── Item Tax Templates ────────────────────────────────────────────────────────
+// ─── Item Tax Templates (solo lectura: ahora se gestionan desde tasas-impuesto) ─────────
 
 export async function listItemTaxTemplates(): Promise<ItemTaxTemplate[]> {
   const res = await client.get<{ success: true; data: ItemTaxTemplate[] }>(ENDPOINTS.config.itemTaxTemplates)
@@ -299,16 +296,107 @@ export async function getItemTaxTemplate(id: string): Promise<ItemTaxTemplate> {
   return unwrap(res)
 }
 
-export async function createItemTaxTemplate(data: CreateItemTaxTemplateDto): Promise<ItemTaxTemplate> {
-  const res = await client.post<{ success: true; data: ItemTaxTemplate }>(ENDPOINTS.config.itemTaxTemplates, data)
+// ─── Tasas de Impuesto (catálogo base + combos) ───────────────────────────────
+
+export async function listTasasImpuesto(): Promise<TasaImpuesto[]> {
+  const res = await client.get<{ success: true; data: TasaImpuesto[] }>(ENDPOINTS.config.tasasImpuesto)
   return unwrap(res)
 }
 
-export async function updateItemTaxTemplate(id: string, data: Partial<CreateItemTaxTemplateDto>): Promise<ItemTaxTemplate> {
-  const res = await client.put<{ success: true; data: ItemTaxTemplate }>(ENDPOINTS.config.itemTaxTemplatesById(id), data)
+export async function getTasaImpuesto(id: string): Promise<TasaImpuesto> {
+  const res = await client.get<{ success: true; data: TasaImpuesto }>(ENDPOINTS.config.tasasImpuestoById(id))
   return unwrap(res)
 }
 
-export async function deleteItemTaxTemplate(id: string): Promise<void> {
-  await client.delete(ENDPOINTS.config.itemTaxTemplatesById(id))
+export async function createTasaImpuesto(data: CreateTasaImpuestoDto): Promise<TasaImpuesto> {
+  const res = await client.post<{ success: true; data: TasaImpuesto }>(ENDPOINTS.config.tasasImpuesto, data)
+  return unwrap(res)
+}
+
+export async function updateTasaImpuesto(id: string, data: UpdateTasaImpuestoDto): Promise<TasaImpuesto> {
+  const res = await client.put<{ success: true; data: TasaImpuesto }>(ENDPOINTS.config.tasasImpuestoById(id), data)
+  return unwrap(res)
+}
+
+export async function deleteTasaImpuesto(id: string): Promise<void> {
+  await client.delete(ENDPOINTS.config.tasasImpuestoById(id))
+}
+
+// ─── Ajustes avanzados (Settings singletons) ──────────────────────────────────
+
+export async function getAccountsSettings() {
+  const res = await client.get<{ success: true; data: AccountsSettings }>(ENDPOINTS.settings.accounts)
+  return unwrap(res)
+}
+
+export async function updateAccountsSettings(data: UpdateAccountsSettingsDto) {
+  const res = await client.put<{ success: true; data: AccountsSettings }>(ENDPOINTS.settings.accounts, data)
+  return unwrap(res)
+}
+
+export async function getStockSettings() {
+  const res = await client.get<{ success: true; data: StockSettings }>(ENDPOINTS.settings.stock)
+  return unwrap(res)
+}
+
+export async function updateStockSettings(data: UpdateStockSettingsDto) {
+  const res = await client.put<{ success: true; data: StockSettings }>(ENDPOINTS.settings.stock, data)
+  return unwrap(res)
+}
+
+export async function getSellingSettings() {
+  const res = await client.get<{ success: true; data: SellingSettings }>(ENDPOINTS.settings.selling)
+  return unwrap(res)
+}
+
+export async function updateSellingSettings(data: UpdateSellingSettingsDto) {
+  const res = await client.put<{ success: true; data: SellingSettings }>(ENDPOINTS.settings.selling, data)
+  return unwrap(res)
+}
+
+export async function getBuyingSettings() {
+  const res = await client.get<{ success: true; data: BuyingSettings }>(ENDPOINTS.settings.buying)
+  return unwrap(res)
+}
+
+export async function updateBuyingSettings(data: UpdateBuyingSettingsDto) {
+  const res = await client.put<{ success: true; data: BuyingSettings }>(ENDPOINTS.settings.buying, data)
+  return unwrap(res)
+}
+
+export async function getSeguridadSettings() {
+  const res = await client.get<{ success: true; data: SeguridadSettings }>(ENDPOINTS.settings.seguridad)
+  return unwrap(res)
+}
+
+export async function updateSeguridadSettings(data: UpdateSeguridadSettingsDto) {
+  const res = await client.put<{ success: true; data: SeguridadSettings }>(ENDPOINTS.settings.seguridad, data)
+  return unwrap(res)
+}
+
+export interface CatalogoFiscalItem {
+  value: string
+  label: string
+}
+
+export interface CatalogosFiscales {
+  ncfTypes: CatalogoFiscalItem[]
+  ncfTypesCompra: CatalogoFiscalItem[]
+  tipoBienes606: CatalogoFiscalItem[]
+  formaPago606: CatalogoFiscalItem[]
+}
+
+export async function getCatalogosFiscales() {
+  const res = await client.get<{ success: true; data: CatalogosFiscales }>(ENDPOINTS.config.catalogosFiscales)
+  return unwrap(res)
+}
+
+export async function listPaises(): Promise<PaisCatalogo[]> {
+  const res = await client.get<{ success: true; data: PaisCatalogo[] }>(ENDPOINTS.config.paises)
+  return unwrap(res)
+}
+
+export async function listCurrencies(): Promise<CurrencyOption[]> {
+  const res = await client.get<{ success: true; data: CurrencyOption[] }>(ENDPOINTS.config.currencies)
+  return unwrap(res)
 }

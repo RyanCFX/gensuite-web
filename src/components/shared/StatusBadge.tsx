@@ -12,6 +12,11 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
   draft: 'draft',
   submitted: 'submitted',
   cancelled: 'cancelled',
+  // Estados post-sometidos de devoluciones (ruta devoluciones): mismo significado visual
+  // que STATUS_BADGE/STATUS_LABEL locales de esa pantalla — centralizados aquí.
+  available: 'success',
+  partially_used: 'warning',
+  fully_used: 'neutral',
 }
 
 interface StatusBadgeProps {

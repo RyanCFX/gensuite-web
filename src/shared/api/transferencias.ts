@@ -5,6 +5,7 @@ import type { Transferencia, CreateTransferenciaDto, PaginatedResponse, Paginati
 export interface ListTransferenciasParams extends PaginationParams {
   status?: 'draft' | 'in_transit' | 'completed' | 'cancelled'
   warehouse?: string
+  branch?: string
 }
 
 export async function listTransferencias(params?: ListTransferenciasParams) {

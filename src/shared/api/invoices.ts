@@ -5,11 +5,13 @@ import type {
   CreateInvoiceDto,
   CancelInvoiceDto,
   SubmitInvoiceDto,
+  SubmitInvoiceResult,
   AplicarSaldoFavorDto,
   DraftVersion,
   PaginatedResponse,
   PaginationParams,
   ComponentTracking,
+  FormatoImpresion,
 } from './types'
 
 export interface ListInvoicesParams extends PaginationParams {
@@ -17,13 +19,23 @@ export interface ListInvoicesParams extends PaginationParams {
   status?: 'draft' | 'submitted' | 'cancelled' | 'all'
   fromDate?: string
   toDate?: string
-  paymentStatus?: 'paid' | 'unpaid' | 'partial' | 'overdue'
+  paymentStatus?: 'paid' | 'unpaid' | 'partly_paid' | ('paid' | 'unpaid' | 'partly_paid')[]
   ncfType?: string
   branch?: string
+  ncf?: string
+  grandTotalMin?: number
+  grandTotalMax?: number
 }
 
 export async function listInvoices(params?: ListInvoicesParams) {
-  const res = await client.get<PaginatedResponse<Invoice>>(ENDPOINTS.invoices.list, { params })
+  const { paymentStatus, ...rest } = params ?? {}
+  const res = await client.get<PaginatedResponse<Invoice>>(ENDPOINTS.invoices.list, {
+    params: {
+      ...rest,
+      // El backend espera un string separado por comas, no repetir la key ni corchetes.
+      paymentStatus: Array.isArray(paymentStatus) ? paymentStatus.join(',') : paymentStatus,
+    },
+  })
   return unwrapPaginated(res)
 }
 
@@ -38,7 +50,7 @@ export async function createInvoice(data: CreateInvoiceDto) {
 }
 
 export async function submitInvoice(id: string, data?: SubmitInvoiceDto) {
-  const res = await client.post<{ success: true; data: Invoice }>(ENDPOINTS.invoices.submit(id), data)
+  const res = await client.post<{ success: true; data: SubmitInvoiceResult }>(ENDPOINTS.invoices.submit(id), data)
   return unwrap(res)
 }
 
@@ -84,14 +96,29 @@ export async function asignarTrackingFactura(id: string, items: ComponentTrackin
   return unwrap(res)
 }
 
-export async function downloadInvoicePdf(id: string, filename?: string): Promise<void> {
-  const res = await client.get<Blob>(ENDPOINTS.invoices.pdf(id), {
-    responseType: 'blob',
+export async function getInvoicePdfBlobUrl(id: string, formato?: FormatoImpresion): Promise<string> {
+  const params = new URLSearchParams()
+  if (formato) params.set("formato", formato)
+  const qs = params.toString()
+  const url = qs ? `${ENDPOINTS.invoices.pdf(id)}?${qs}` : ENDPOINTS.invoices.pdf(id)
+  const res = await client.get<Blob>(url, {
+    responseType: "blob",
   })
-  const url = URL.createObjectURL(res.data)
-  const a = document.createElement('a')
-  a.href = url
+  return URL.createObjectURL(res.data)
+}
+
+export async function downloadInvoicePdf(id: string, filename?: string, formato?: FormatoImpresion): Promise<void> {
+  const params = new URLSearchParams()
+  if (formato) params.set("formato", formato)
+  const qs = params.toString()
+  const url = qs ? `${ENDPOINTS.invoices.pdf(id)}?${qs}` : ENDPOINTS.invoices.pdf(id)
+  const res = await client.get<Blob>(url, {
+    responseType: "blob",
+  })
+  const blobUrl = URL.createObjectURL(res.data)
+  const a = document.createElement("a")
+  a.href = blobUrl
   a.download = filename ?? `factura-${id}.pdf`
   a.click()
-  URL.revokeObjectURL(url)
+  URL.revokeObjectURL(blobUrl)
 }

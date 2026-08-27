@@ -5,10 +5,15 @@ import { listGastos, getGastoResumen } from '@/shared/api/compras-gastos'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { NCF_TYPES_COMPRA } from '@/lib/constants'
+import { getCatalogosFiscales } from '@/shared/api/config'
 import { Plus, ChevronLeft, ChevronRight, Search, Receipt } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { Select, SelectItem } from '@/components/ui/select'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 
 const PAGE_SIZE = 20
 
@@ -42,10 +47,23 @@ export default function GastosPage() {
   const [esDeducible, setEsDeducible] = useState<string>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [ncfProveedor, setNcfProveedor] = useState('')
+  const [grandTotalMin, setGrandTotalMin] = useState('')
+  const [grandTotalMax, setGrandTotalMax] = useState('')
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
 
   const offset = (page - 1) * PAGE_SIZE
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+  const [tipoComprobanteSearch, setTipoComprobanteSearch] = useState('')
+  const tipoComprobanteOptions: SearchSelectOption[] = (catalogos?.ncfTypesCompra ?? [])
+    .filter((t) => !tipoComprobanteSearch || t.label.toLowerCase().includes(tipoComprobanteSearch.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
 
   const { data: resumen, isLoading: resumenLoading } = useQuery({
     queryKey: ['gastos-resumen', month],
@@ -53,7 +71,7 @@ export default function GastosPage() {
   })
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['gastos', { supplier, status, tipoComprobante, esDeducible, fromDate, toDate, offset, orderBy }],
+    queryKey: ['gastos', { supplier, status, tipoComprobante, esDeducible, fromDate, toDate, ncfProveedor, grandTotalMin, grandTotalMax, offset, orderBy }],
     queryFn: () =>
       listGastos({
         supplier: supplier || undefined,
@@ -62,6 +80,9 @@ export default function GastosPage() {
         esDeducible: esDeducible !== 'all' ? esDeducible === 'true' : undefined,
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
+        ncfProveedor: ncfProveedor || undefined,
+        grandTotalMin: grandTotalMin ? Number(grandTotalMin) : undefined,
+        grandTotalMax: grandTotalMax ? Number(grandTotalMax) : undefined,
         orderBy: orderBy || undefined,
         limit: PAGE_SIZE,
         offset,
@@ -132,25 +153,67 @@ export default function GastosPage() {
                 onChange={(e) => { setSupplier(e.target.value); setPage(1) }}
               />
             </div>
-            <select className="filter-select" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1) }}>
-              <option value="all">Todos</option>
-              <option value="draft">Borrador</option>
-              <option value="submitted">Sometido</option>
-              <option value="cancelled">Anulado</option>
-            </select>
-            <select className="filter-select" value={tipoComprobante} onChange={(e) => { setTipoComprobante(e.target.value); setPage(1) }}>
-              <option value="all">Todos los NCF</option>
-              {NCF_TYPES_COMPRA.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
-            <select className="filter-select" value={esDeducible} onChange={(e) => { setEsDeducible(e.target.value); setPage(1) }}>
-              <option value="all">Deducible: Todos</option>
-              <option value="true">Deducibles</option>
-              <option value="false">No deducibles</option>
-            </select>
-            <input type="date" className="filter-select" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }} />
-            <input type="date" className="filter-select" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }} />
+            <FilterField label="Estado">
+              <Select value={status} onValueChange={(val) => { setStatus(val); setPage(1) }}>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="draft">Borrador</SelectItem>
+                <SelectItem value="submitted">Sometido</SelectItem>
+                <SelectItem value="cancelled">Anulado</SelectItem>
+              </Select>
+            </FilterField>
+            <FilterField label="Tipo NCF" style={{ width: 200 }}>
+              <SearchSelect
+                value={tipoComprobante === 'all' ? '' : tipoComprobante}
+                onChange={(val) => { setTipoComprobante(val || 'all'); setPage(1) }}
+                options={tipoComprobanteOptions}
+                onSearch={setTipoComprobanteSearch}
+                selectedLabel={catalogos?.ncfTypesCompra?.find((t) => t.value === tipoComprobante)?.label ?? ''}
+                placeholder="Todos los NCF"
+              />
+            </FilterField>
+            <FilterField label="Deducible">
+              <Select value={esDeducible} onValueChange={(val) => { setEsDeducible(val); setPage(1) }}>
+                <SelectItem value="all">Deducible: Todos</SelectItem>
+                <SelectItem value="true">Deducibles</SelectItem>
+                <SelectItem value="false">No deducibles</SelectItem>
+              </Select>
+            </FilterField>
+            <FilterField label="Desde">
+              <DatePicker className="filter-select" value={fromDate} onChange={(v) => { setFromDate(v); setPage(1) }} clearable />
+            </FilterField>
+            <FilterField label="Hasta">
+              <DatePicker className="filter-select" value={toDate} onChange={(v) => { setToDate(v); setPage(1) }} clearable />
+            </FilterField>
+            <div className="search-input-wrap">
+              <Search size={14} className="search-input-icon" />
+              <input
+                className="search-input"
+                placeholder="Buscar NCF del proveedor…"
+                value={ncfProveedor}
+                onChange={(e) => { setNcfProveedor(e.target.value); setPage(1) }}
+              />
+            </div>
+            <FilterField label="Total">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="number"
+                  className="ff-input ff-input-sm"
+                  style={{ width: 100 }}
+                  placeholder="Total min"
+                  value={grandTotalMin}
+                  onChange={(e) => { setGrandTotalMin(e.target.value); setPage(1) }}
+                />
+                <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+                <input
+                  type="number"
+                  className="ff-input ff-input-sm"
+                  style={{ width: 100 }}
+                  placeholder="Total max"
+                  value={grandTotalMax}
+                  onChange={(e) => { setGrandTotalMax(e.target.value); setPage(1) }}
+                />
+              </div>
+            </FilterField>
           </div>
         </div>
 
@@ -163,6 +226,7 @@ export default function GastosPage() {
                   <SortableTh label="Proveedor" sortKey="supplierName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
                   <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
                   <th>NCF</th>
+                  <th>N° Factura</th>
                   <th>Categoría</th>
                   <th>Deducible</th>
                   <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} align="right" />
@@ -173,7 +237,7 @@ export default function GastosPage() {
                 {isLoading
                   ? Array.from({ length: 8 }).map((_, i) => (
                       <tr key={i}>
-                        {Array.from({ length: 8 }).map((__, j) => (
+                        {Array.from({ length: 9 }).map((__, j) => (
                           <td key={j}><span className="skeleton-box" style={{ height: 16, width: '100%', display: 'block' }} /></td>
                         ))}
                       </tr>
@@ -181,7 +245,7 @@ export default function GastosPage() {
                   : isError
                     ? (
                         <tr>
-                          <td colSpan={8} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
+                          <td colSpan={9} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
                             Error al cargar los gastos
                           </td>
                         </tr>
@@ -189,7 +253,7 @@ export default function GastosPage() {
                     : data?.items.length === 0
                       ? (
                           <tr>
-                            <td colSpan={8}>
+                            <td colSpan={9}>
                               <div className="empty-state">
                                 <div className="empty-icon"><Plus size={20} /></div>
                                 <p className="empty-title">Sin gastos</p>
@@ -204,9 +268,19 @@ export default function GastosPage() {
                       : data?.items.map((g) => (
                           <tr key={g.id} className="table-row-clickable" onClick={() => navigate(`/gastos/${g.id}`)}>
                             <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{g.id}</td>
-                            <td style={{ fontWeight: 500 }}>{g.supplierName}</td>
+                            <td style={{ fontWeight: 500 }}>
+                              {g.esProveedorOcasional
+                                ? (
+                                    <span>
+                                      {g.proveedorOcasionalNombre ?? g.supplierName}
+                                      {' '}<span className="badge badge-warning">Ocasional</span>
+                                    </span>
+                                  )
+                                : g.supplierName}
+                            </td>
                             <td>{formatDate(g.postingDate)}</td>
                             <td className="td-muted" style={{ fontFamily: 'var(--font-mono)' }}>{g.ncfProveedor ?? '—'}</td>
+                            <td className="td-muted" style={{ fontFamily: 'var(--font-mono)' }}>{g.billNo ?? '—'}</td>
                             <td className="td-muted">{g.categoriaGasto ?? '—'}</td>
                             <td>
                               {g.esDeducible

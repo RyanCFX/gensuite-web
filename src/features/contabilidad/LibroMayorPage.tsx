@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { BookText } from 'lucide-react'
-import { getLibroMayor, type LibroMayorParams } from '@/shared/api/libroMayor'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { BookText, Download, Loader2 } from 'lucide-react'
+import { getLibroMayor, downloadLibroMayorPdf, type LibroMayorParams } from '@/shared/api/libroMayor'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
 
 function firstOfMonth(): string {
   const d = new Date()
@@ -42,13 +44,22 @@ export default function LibroMayorPage() {
     staleTime: 5 * 60 * 1000,
   })
 
-  const handleGenerar = () => {
-    setQueryParams({
+  function buildParams(): LibroMayorParams {
+    return {
       fromDate,
       toDate,
       account: account || undefined,
-    })
+    }
   }
+
+  const handleGenerar = () => {
+    setQueryParams(buildParams())
+  }
+
+  const downloadPdfMutation = useMutation({
+    mutationFn: () => downloadLibroMayorPdf(buildParams()),
+    onError: () => toast.error('No se pudo descargar el PDF'),
+  })
 
   return (
     <div className="page-container">
@@ -64,20 +75,20 @@ export default function LibroMayorPage() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
             <div className="ff-wrap">
               <label className="ff-label">Desde</label>
-              <input
-                type="date"
+              <DatePicker
                 className="ff-input"
                 value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
+                onChange={setFromDate}
+                clearable
               />
             </div>
             <div className="ff-wrap">
               <label className="ff-label">Hasta</label>
-              <input
-                type="date"
+              <DatePicker
                 className="ff-input"
                 value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
+                onChange={setToDate}
+                clearable
               />
             </div>
             <div className="ff-wrap" style={{ minWidth: 240 }}>
@@ -92,6 +103,14 @@ export default function LibroMayorPage() {
             <button className="btn btn-primary btn-size-sm" onClick={handleGenerar}>
               <BookText size={14} />
               Generar
+            </button>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => downloadPdfMutation.mutate()}
+              disabled={downloadPdfMutation.isPending}
+            >
+              {downloadPdfMutation.isPending ? <Loader2 size={14} className="spin" /> : <Download size={14} />}
+              Descargar PDF
             </button>
           </div>
         </div>

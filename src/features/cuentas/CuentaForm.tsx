@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffectOnActive } from 'keepalive-for-react'
 import { toast } from 'sonner'
+import { useTabs } from '@/contexts/TabsContext'
 import { getCuenta, createCuenta, updateCuenta } from '@/shared/api/cuentas'
 import type { CreateCuentaDto, UpdateCuentaDto } from '@/shared/api/types'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { ArrowLeft, AlertTriangle } from 'lucide-react'
+import { Select, SelectItem } from '@/components/ui/select'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 const ACCOUNT_TYPES = [
   'Bank',
@@ -27,6 +32,16 @@ const ACCOUNT_TYPES = [
 
 const CURRENCIES = ['DOP', 'USD', 'EUR'] as const
 
+const ROOT_TYPES = ['Asset', 'Liability', 'Equity', 'Income', 'Expense'] as const
+
+const ROOT_TYPE_LABELS: Record<(typeof ROOT_TYPES)[number], string> = {
+  Asset: 'Activo',
+  Liability: 'Pasivo',
+  Equity: 'Patrimonio',
+  Income: 'Ingreso',
+  Expense: 'Gasto',
+}
+
 interface FormState {
   accountName: string
   accountNumber: string
@@ -35,6 +50,8 @@ interface FormState {
   currency: string
   isGroup: boolean
   disabled: boolean
+  isRootAccount: boolean
+  rootType: string
 }
 
 const EMPTY_FORM: FormState = {
@@ -45,6 +62,8 @@ const EMPTY_FORM: FormState = {
   currency: 'DOP',
   isGroup: false,
   disabled: false,
+  isRootAccount: false,
+  rootType: '',
 }
 
 export default function CuentaForm() {
@@ -52,6 +71,7 @@ export default function CuentaForm() {
   const isEdit = Boolean(id)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { multiTab, activeId, closeTab } = useTabs()
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
@@ -61,6 +81,12 @@ export default function CuentaForm() {
     queryFn: () => getCuenta(decodeURIComponent(id!)),
     enabled: isEdit,
   })
+
+  // Con Multipestañas, esta pantalla queda montada (KeepAlive) al cambiar de pestaña — al volver
+  // a ella se re-consulta por si la cuenta cambió en el servidor mientras el usuario estaba en otra.
+  useEffectOnActive(() => {
+    if (isEdit) queryClient.invalidateQueries({ queryKey: ['cuenta', id] })
+  }, [isEdit, id], true)
 
   // Detect if account has GL movements (locked fields)
   const hasMovements = isEdit && cuenta ? (cuenta.debit + cuenta.credit) > 0 : false
@@ -75,17 +101,26 @@ export default function CuentaForm() {
         currency: cuenta.currency,
         isGroup: cuenta.isGroup,
         disabled: cuenta.disabled,
+        isRootAccount: false,
+        rootType: '',
       })
     }
   }, [cuenta])
+
+  const isDirty = useDirtyCheck(form, !isEdit || !isLoading)
+  useBeforeUnloadWarning(isDirty)
 
   const createMutation = useMutation({
     mutationFn: (data: CreateCuentaDto) => createCuenta(data),
     onSuccess: (data) => {
       toast.success('Cuenta creada correctamente')
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['cuentas'] })
       queryClient.invalidateQueries({ queryKey: ['cuentas-tree'] })
       navigate(`/cuentas/${encodeURIComponent(data.id)}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string }) => {
       toast.error(err?.message ?? 'Error al crear la cuenta')
@@ -96,10 +131,12 @@ export default function CuentaForm() {
     mutationFn: (data: UpdateCuentaDto) => updateCuenta(decodeURIComponent(id!), data),
     onSuccess: () => {
       toast.success('Cuenta actualizada correctamente')
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['cuentas'] })
       queryClient.invalidateQueries({ queryKey: ['cuentas-tree'] })
-      queryClient.invalidateQueries({ queryKey: ['cuenta', id] })
+      queryClient.removeQueries({ queryKey: ['cuenta', id] })
       navigate(`/cuentas/${id}`)
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string }) => {
       toast.error(err?.message ?? 'Error al actualizar la cuenta')
@@ -109,7 +146,13 @@ export default function CuentaForm() {
   function validate(): boolean {
     const newErrors: Partial<Record<keyof FormState, string>> = {}
     if (!form.accountName.trim()) newErrors.accountName = 'El nombre es requerido'
-    if (!isEdit && !form.parentAccount) newErrors.parentAccount = 'La cuenta padre es requerida'
+    if (!isEdit) {
+      if (form.isRootAccount) {
+        if (!form.rootType) newErrors.rootType = 'El tipo raíz es requerido'
+      } else if (!form.parentAccount) {
+        newErrors.parentAccount = 'La cuenta padre es requerida'
+      }
+    }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -131,14 +174,23 @@ export default function CuentaForm() {
       }
       updateMutation.mutate(payload)
     } else {
-      const payload: CreateCuentaDto = {
-        accountName: form.accountName,
-        parentAccount: form.parentAccount,
-        accountNumber: form.accountNumber || undefined,
-        accountType: form.accountType || undefined,
-        currency: form.currency,
-        isGroup: form.isGroup,
-      }
+      const payload: CreateCuentaDto = form.isRootAccount
+        ? {
+            accountName: form.accountName,
+            rootType: form.rootType as CreateCuentaDto['rootType'],
+            accountNumber: form.accountNumber || undefined,
+            accountType: form.accountType || undefined,
+            currency: form.currency,
+            isGroup: true,
+          }
+        : {
+            accountName: form.accountName,
+            parentAccount: form.parentAccount,
+            accountNumber: form.accountNumber || undefined,
+            accountType: form.accountType || undefined,
+            currency: form.currency,
+            isGroup: form.isGroup,
+          }
       createMutation.mutate(payload)
     }
   }
@@ -216,40 +268,72 @@ export default function CuentaForm() {
               />
             </div>
 
-            {/* Cuenta Padre */}
-            <div className="ff-wrap">
-              <label className="ff-label" htmlFor="parentAccount">
-                Cuenta Padre {!isEdit && <span className="ff-required">*</span>}
+            {/* Crear cuenta raíz — solo al crear */}
+            {!isEdit && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={form.isRootAccount}
+                  onChange={(e) => setField('isRootAccount', e.target.checked)}
+                />
+                Crear cuenta raíz (sin cuenta padre)
               </label>
-              <AccountSelect
-                id="parentAccount"
-                value={form.parentAccount}
-                onChange={(val) => setField('parentAccount', val)}
-                ledgerOnly={false}
-                placeholder="Seleccionar cuenta padre…"
-                error={Boolean(errors.parentAccount)}
-                disabled={hasMovements}
-              />
-              {errors.parentAccount && <p className="ff-error">{errors.parentAccount}</p>}
-            </div>
+            )}
+
+            {/* Cuenta Padre */}
+            {!form.isRootAccount && (
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="parentAccount">
+                  Cuenta Padre {!isEdit && <span className="ff-required">*</span>}
+                </label>
+                <AccountSelect
+                  id="parentAccount"
+                  value={form.parentAccount}
+                  onChange={(val) => setField('parentAccount', val)}
+                  ledgerOnly={false}
+                  placeholder="Seleccionar cuenta padre…"
+                  error={Boolean(errors.parentAccount)}
+                  disabled={hasMovements}
+                />
+                {errors.parentAccount && <p className="ff-error">{errors.parentAccount}</p>}
+              </div>
+            )}
+
+            {/* Tipo Raíz — solo al crear cuenta raíz */}
+            {!isEdit && form.isRootAccount && (
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="rootType">
+                  Tipo Raíz <span className="ff-required">*</span>
+                </label>
+                <Select
+                  value={form.rootType}
+                  onValueChange={(val) => setField('rootType', val)}
+                  placeholder="— Seleccionar —"
+                  className={errors.rootType ? 'ff-input-error' : ''}
+                >
+                  {ROOT_TYPES.map((rt) => (
+                    <SelectItem key={rt} value={rt}>{ROOT_TYPE_LABELS[rt]}</SelectItem>
+                  ))}
+                </Select>
+                {errors.rootType && <p className="ff-error">{errors.rootType}</p>}
+              </div>
+            )}
 
             {/* Tipo de Cuenta */}
             <div className="ff-wrap">
               <label className="ff-label" htmlFor="accountType">
                 Tipo de Cuenta
               </label>
-              <select
-                id="accountType"
-                className="ff-select"
+              <Select
                 value={form.accountType}
-                onChange={(e) => setField('accountType', e.target.value)}
+                onValueChange={(val) => setField('accountType', val)}
+                placeholder="— Sin tipo específico —"
                 disabled={hasMovements}
               >
-                <option value="">— Sin tipo específico —</option>
                 {ACCOUNT_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* Moneda */}
@@ -257,21 +341,19 @@ export default function CuentaForm() {
               <label className="ff-label" htmlFor="currency">
                 Moneda
               </label>
-              <select
-                id="currency"
-                className="ff-select"
+              <Select
                 value={form.currency}
-                onChange={(e) => setField('currency', e.target.value)}
+                onValueChange={(val) => setField('currency', val)}
                 disabled={hasMovements}
               >
                 {CURRENCIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
 
-            {/* Es cuenta grupo — only on create */}
-            {!isEdit && (
+            {/* Es cuenta grupo — only on create, no aplica si es cuenta raíz (siempre es grupo) */}
+            {!isEdit && !form.isRootAccount && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
                 <input
                   type="checkbox"

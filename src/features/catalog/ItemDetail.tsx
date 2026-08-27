@@ -5,10 +5,16 @@ import { toast } from 'sonner'
 import { getItem, toggleItem, listItemVariants, generateVariants, createVariant, getAttribute, updateItemPrices } from '@/shared/api/catalog'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listZonas } from '@/shared/api/zonas'
-import { listUbicaciones, getItemUbicaciones, assignItemUbicacion, unassignItemUbicacion } from '@/shared/api/ubicaciones'
+import { listUbicaciones, getItemUbicaciones, assignItemUbicacion, unassignItemUbicacion, moverStockUbicacion } from '@/shared/api/ubicaciones'
 import { formatDOP } from '@/lib/formatters'
-import { ToggleLeft, ToggleRight, Package, ArrowLeft, X, MapPin, Trash2, Info, DollarSign } from 'lucide-react'
+import { ToggleLeft, ToggleRight, Package, ArrowLeft, X, MapPin, Trash2, Info, DollarSign, ArrowRightLeft, Pencil } from 'lucide-react'
 import type { Item, GenerateVariantsResult, ItemAttribute, ApiError, UpdateItemPricesDto, ItemPricesResult } from '@/shared/api/types'
+import { Select, SelectItem } from '@/components/ui/select'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 
 // ─── Update Prices Modal ──────────────────────────────────────────────────────
 
@@ -39,6 +45,12 @@ function UpdatePricesModal({
   const [marginC, setMarginC] = useState(item.marginC?.toString() ?? '')
 
   const isCostPlus = priceMode === 'cost_plus'
+
+  const isDirty = useDirtyCheck(
+    { purchasePrice, standardRate, priceMode, priceA, priceB, priceC, marginA, marginB, marginC },
+    true,
+  )
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
 
   const mutation = useMutation({
     mutationFn: (data: UpdateItemPricesDto) => updateItemPrices(item.id, data),
@@ -88,11 +100,11 @@ function UpdatePricesModal({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2 className="modal-title">Actualizar Precios</h2>
-          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+          <button className="modal-close" onClick={requestClose}><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -130,14 +142,10 @@ function UpdatePricesModal({
             </div>
             <div className="ff-wrap">
               <label className="ff-label">Modo de Precio</label>
-              <select
-                className="ff-select"
-                value={priceMode}
-                onChange={(e) => setPriceMode(e.target.value as 'manual' | 'cost_plus')}
-              >
-                <option value="manual">Manual</option>
-                <option value="cost_plus">Sobre Costo</option>
-              </select>
+              <Select value={priceMode} onValueChange={(val) => setPriceMode(val as 'manual' | 'cost_plus')}>
+                <SelectItem value="manual">Manual</SelectItem>
+                <SelectItem value="cost_plus">Sobre Costo</SelectItem>
+              </Select>
             </div>
 
             {isCostPlus ? (
@@ -208,13 +216,22 @@ function UpdatePricesModal({
             )}
           </div>
           <div className="modal-foot">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+            <button type="button" className="btn btn-secondary" onClick={requestClose}>Cancelar</button>
             <button type="submit" className="btn btn-primary" disabled={mutation.isPending}>
               {mutation.isPending ? 'Guardando…' : 'Guardar'}
             </button>
           </div>
         </form>
       </div>
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }
@@ -308,7 +325,11 @@ function CreateVariantModal({
 
   const [standardRate, setStandardRate] = useState(0)
   const [attrValues, setAttrValues] = useState<Record<string, string>>({})
+  const [attrSearches, setAttrSearches] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+
+  const isDirty = useDirtyCheck({ standardRate, attrValues }, true)
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -330,16 +351,20 @@ function CreateVariantModal({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2 className="modal-title">Agregar variante</h2>
-          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+          <button className="modal-close" onClick={requestClose}><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {attributeIds.map((attrId, i) => {
               const attrData = attributeQueries[i]?.data
+              const attrSearch = attrSearches[attrId] ?? ''
+              const attrOptions: SearchSelectOption[] = (attrData?.values ?? [])
+                .filter((val) => !attrSearch || val.value.toLowerCase().includes(attrSearch.toLowerCase()))
+                .map((val) => ({ value: val.value, label: val.value }))
               return (
                 <div key={attrId} className="ff-wrap">
                   <label className="ff-label">
@@ -354,17 +379,14 @@ function CreateVariantModal({
                       required
                     />
                   ) : (
-                    <select
-                      className="ff-select"
+                    <SearchSelect
                       value={attrValues[attrId] ?? ''}
-                      onChange={(e) => setAttrValues((v) => ({ ...v, [attrId]: e.target.value }))}
-                      required
-                    >
-                      <option value="">Seleccionar…</option>
-                      {(attrData?.values ?? []).map((val) => (
-                        <option key={val.value} value={val.value}>{val.value}</option>
-                      ))}
-                    </select>
+                      onChange={(val) => setAttrValues((v) => ({ ...v, [attrId]: val }))}
+                      options={attrOptions}
+                      onSearch={(q) => setAttrSearches((s) => ({ ...s, [attrId]: q }))}
+                      selectedLabel={attrValues[attrId] ?? ''}
+                      placeholder="Seleccionar…"
+                    />
                   )}
                 </div>
               )
@@ -383,13 +405,22 @@ function CreateVariantModal({
             </div>
           </div>
           <div className="modal-foot">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+            <button type="button" className="btn btn-secondary" onClick={requestClose}>Cancelar</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
               {saving ? 'Guardando…' : 'Crear variante'}
             </button>
           </div>
         </form>
       </div>
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }
@@ -506,7 +537,7 @@ function VariantsPanel({ itemId, item }: { itemId: string; item: Item }) {
                     <tr
                       key={v.id}
                       className="table-row-clickable"
-                      onClick={() => navigate(`/inventario/articulos/${v.id}`)}
+                      onClick={() => navigate(`/inventario/productos/${v.id}`)}
                     >
                       <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{v.id}</td>
                       <td style={{ fontWeight: 500 }}>{v.itemName}</td>
@@ -567,6 +598,9 @@ function AssignUbicacionModal({
   const [esPrincipal, setEsPrincipal] = useState(false)
   const [notas, setNotas] = useState('')
 
+  const isDirty = useDirtyCheck({ zonaId, ubicacionId, esPrincipal, notas }, true)
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
+
   const { data: zonasData } = useQuery({
     queryKey: ['zonas', warehouse],
     queryFn: () => listZonas({ warehouse, limit: 100 }),
@@ -575,10 +609,20 @@ function AssignUbicacionModal({
 
   const { data: ubicacionesData } = useQuery({
     queryKey: ['ubicaciones', zonaId],
-    queryFn: () => listUbicaciones({ zona: zonaId, limit: 100 }),
+    queryFn: () => listUbicaciones({ zona: zonaId }),
     enabled: !!zonaId,
   })
   const ubicaciones = ubicacionesData?.items ?? []
+
+  const [zonaSearch, setZonaSearch] = useState('')
+  const zonaOptions: SearchSelectOption[] = zonas
+    .filter((z) => !zonaSearch || z.zonaName.toLowerCase().includes(zonaSearch.toLowerCase()))
+    .map((z) => ({ value: z.id, label: z.zonaName }))
+
+  const [ubicacionSearch, setUbicacionSearch] = useState('')
+  const ubicacionOptions: SearchSelectOption[] = ubicaciones
+    .filter((u) => !ubicacionSearch || u.ubicacionName.toLowerCase().includes(ubicacionSearch.toLowerCase()))
+    .map((u) => ({ value: u.id, label: u.ubicacionName }))
 
   const assignMutation = useMutation({
     mutationFn: () => assignItemUbicacion({ itemCode, warehouse, ubicacionId, esPrincipal, notas: notas || undefined }),
@@ -590,33 +634,38 @@ function AssignUbicacionModal({
   })
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2 className="modal-title">Asignar ubicación</h2>
-          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+          <button className="modal-close" onClick={requestClose}><X size={16} /></button>
         </div>
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="ff-wrap">
             <label className="ff-label ff-required">Zona</label>
-            <select className="ff-select" value={zonaId} onChange={(e) => { setZonaId(e.target.value); setUbicacionId('') }}>
-              <option value="">Seleccionar zona…</option>
-              {zonas.map((z) => (
-                <option key={z.id} value={z.id}>{z.zonaName}</option>
-              ))}
-            </select>
+            <SearchSelect
+              value={zonaId}
+              onChange={(val) => { setZonaId(val); setUbicacionId('') }}
+              options={zonaOptions}
+              onSearch={setZonaSearch}
+              selectedLabel={zonas.find((z) => z.id === zonaId)?.zonaName ?? ''}
+              placeholder="Seleccionar zona…"
+            />
             {zonasData && zonas.length === 0 && (
               <p className="ff-hint">Este almacén no tiene zonas todavía. Créalas en Inventario → Zonas y Ubicaciones.</p>
             )}
           </div>
           <div className="ff-wrap">
             <label className="ff-label ff-required">Ubicación / Rack</label>
-            <select className="ff-select" value={ubicacionId} onChange={(e) => setUbicacionId(e.target.value)} disabled={!zonaId}>
-              <option value="">Seleccionar ubicación…</option>
-              {ubicaciones.map((u) => (
-                <option key={u.id} value={u.id}>{u.ubicacionName}</option>
-              ))}
-            </select>
+            <SearchSelect
+              value={ubicacionId}
+              onChange={setUbicacionId}
+              options={ubicacionOptions}
+              onSearch={setUbicacionSearch}
+              selectedLabel={ubicaciones.find((u) => u.id === ubicacionId)?.ubicacionName ?? ''}
+              placeholder="Seleccionar ubicación…"
+              disabled={!zonaId}
+            />
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
             <input type="checkbox" checked={esPrincipal} onChange={(e) => setEsPrincipal(e.target.checked)} />
@@ -628,7 +677,7 @@ function AssignUbicacionModal({
           </div>
         </div>
         <div className="modal-foot">
-          <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-secondary" onClick={requestClose}>Cancelar</button>
           <button
             className="btn btn-primary"
             onClick={() => assignMutation.mutate()}
@@ -638,6 +687,145 @@ function AssignUbicacionModal({
           </button>
         </div>
       </div>
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
+    </div>
+  )
+}
+
+// ─── Mover Stock Modal ─────────────────────────────────────────────────────────
+
+function MoverUbicacionModal({
+  itemCode,
+  warehouse,
+  origen,
+  onClose,
+  onSuccess,
+}: {
+  itemCode: string
+  warehouse: string
+  origen: { id: string; label: string }
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [zonaId, setZonaId] = useState('')
+  const [ubicacionDestino, setUbicacionDestino] = useState('')
+  const [cantidad, setCantidad] = useState(1)
+  const [notas, setNotas] = useState('')
+
+  const isDirty = useDirtyCheck({ zonaId, ubicacionDestino, cantidad, notas }, true)
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
+
+  const { data: zonasData } = useQuery({
+    queryKey: ['zonas', warehouse],
+    queryFn: () => listZonas({ warehouse, limit: 100 }),
+  })
+  const zonas = zonasData?.items ?? []
+
+  const { data: ubicacionesData } = useQuery({
+    queryKey: ['ubicaciones', zonaId],
+    queryFn: () => listUbicaciones({ zona: zonaId }),
+    enabled: !!zonaId,
+  })
+  const ubicaciones = (ubicacionesData?.items ?? []).filter((u) => u.id !== origen.id)
+
+  const [zonaSearch, setZonaSearch] = useState('')
+  const zonaOptions: SearchSelectOption[] = zonas
+    .filter((z) => !zonaSearch || z.zonaName.toLowerCase().includes(zonaSearch.toLowerCase()))
+    .map((z) => ({ value: z.id, label: z.zonaName }))
+
+  const [ubicacionSearch, setUbicacionSearch] = useState('')
+  const ubicacionOptions: SearchSelectOption[] = ubicaciones
+    .filter((u) => !ubicacionSearch || u.ubicacionName.toLowerCase().includes(ubicacionSearch.toLowerCase()))
+    .map((u) => ({ value: u.id, label: u.ubicacionName }))
+
+  const moverMutation = useMutation({
+    mutationFn: () => moverStockUbicacion({ itemCode, cantidad, ubicacionOrigen: origen.id, ubicacionDestino, notas: notas || undefined }),
+    onSuccess: () => {
+      toast.success('Stock movido correctamente')
+      onSuccess()
+    },
+    onError: (err: ApiError) => toast.error(err?.message ?? 'Error al mover el stock'),
+  })
+
+  return (
+    <div className="modal-overlay" onClick={requestClose}>
+      <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2 className="modal-title">Mover stock</h2>
+          <button className="modal-close" onClick={requestClose}><X size={16} /></button>
+        </div>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="ff-wrap">
+            <label className="ff-label">Ubicación origen</label>
+            <input className="ff-input" value={origen.label} disabled />
+          </div>
+          <div className="ff-wrap">
+            <label className="ff-label ff-required">Zona destino</label>
+            <SearchSelect
+              value={zonaId}
+              onChange={(val) => { setZonaId(val); setUbicacionDestino('') }}
+              options={zonaOptions}
+              onSearch={setZonaSearch}
+              selectedLabel={zonas.find((z) => z.id === zonaId)?.zonaName ?? ''}
+              placeholder="Seleccionar zona…"
+            />
+          </div>
+          <div className="ff-wrap">
+            <label className="ff-label ff-required">Ubicación destino</label>
+            <SearchSelect
+              value={ubicacionDestino}
+              onChange={setUbicacionDestino}
+              options={ubicacionOptions}
+              onSearch={setUbicacionSearch}
+              selectedLabel={ubicaciones.find((u) => u.id === ubicacionDestino)?.ubicacionName ?? ''}
+              placeholder="Seleccionar ubicación…"
+              disabled={!zonaId}
+            />
+          </div>
+          <div className="ff-wrap">
+            <label className="ff-label ff-required">Cantidad</label>
+            <input
+              className="ff-input"
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={cantidad}
+              onChange={(e) => setCantidad(parseFloat(e.target.value) || 0)}
+            />
+          </div>
+          <div className="ff-wrap">
+            <label className="ff-label">Notas</label>
+            <textarea className="ff-textarea" rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Opcional" />
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-secondary" onClick={requestClose}>Cancelar</button>
+          <button
+            className="btn btn-primary"
+            onClick={() => moverMutation.mutate()}
+            disabled={!ubicacionDestino || cantidad <= 0 || moverMutation.isPending}
+          >
+            {moverMutation.isPending ? 'Moviendo…' : 'Mover'}
+          </button>
+        </div>
+      </div>
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }
@@ -648,14 +836,19 @@ function UbicacionesPanel({ itemCode }: { itemCode: string }) {
   const queryClient = useQueryClient()
   const [warehouse, setWarehouse] = useState('')
   const [showAssign, setShowAssign] = useState(false)
+  const [moverTarget, setMoverTarget] = useState<{ id: string; label: string } | null>(null)
 
   const { data: warehouses } = useQuery({
     queryKey: ['warehouses'],
     queryFn: listWarehouses,
   })
+  const [warehouseSearch, setWarehouseSearch] = useState('')
 
   // Selecciona el primer almacén disponible por defecto
   const activeWarehouse = warehouse || warehouses?.[0]?.id || ''
+  const warehouseOptions: SearchSelectOption[] = (warehouses ?? [])
+    .filter((w) => !warehouseSearch || w.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
+    .map((w) => ({ value: w.id, label: w.name }))
 
   const { data, isLoading } = useQuery({
     queryKey: ['item-ubicaciones', itemCode, activeWarehouse],
@@ -682,11 +875,16 @@ function UbicacionesPanel({ itemCode }: { itemCode: string }) {
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {(warehouses?.length ?? 0) > 1 && (
-            <select className="filter-select" value={activeWarehouse} onChange={(e) => setWarehouse(e.target.value)}>
-              {warehouses?.map((w) => (
-                <option key={w.id} value={w.id}>{w.name}</option>
-              ))}
-            </select>
+            <div style={{ width: 200 }}>
+              <SearchSelect
+                value={activeWarehouse}
+                onChange={setWarehouse}
+                options={warehouseOptions}
+                onSearch={setWarehouseSearch}
+                selectedLabel={warehouses?.find((w) => w.id === activeWarehouse)?.name ?? ''}
+                placeholder="Seleccionar almacén"
+              />
+            </div>
           )}
           <button className="btn btn-primary btn-size-sm" onClick={() => setShowAssign(true)} disabled={!activeWarehouse}>
             + Asignar ubicación
@@ -730,6 +928,13 @@ function UbicacionesPanel({ itemCode }: { itemCode: string }) {
                 {a.esPrincipal && <span className="badge badge-success">Principal</span>}
                 <button
                   className="btn btn-ghost btn-size-icon-sm"
+                  onClick={() => setMoverTarget({ id: a.ubicacionId, label: `${a.zonaName ?? '—'} / ${a.ubicacionName ?? a.ubicacionId}` })}
+                  title="Mover stock"
+                >
+                  <ArrowRightLeft size={13} />
+                </button>
+                <button
+                  className="btn btn-ghost btn-size-icon-sm"
                   style={{ color: 'var(--icon-muted)' }}
                   onClick={() => unassignMutation.mutate(a.id)}
                   disabled={unassignMutation.isPending}
@@ -749,6 +954,19 @@ function UbicacionesPanel({ itemCode }: { itemCode: string }) {
           onClose={() => setShowAssign(false)}
           onSuccess={() => {
             setShowAssign(false)
+            queryClient.invalidateQueries({ queryKey: ['item-ubicaciones', itemCode, activeWarehouse] })
+          }}
+        />
+      )}
+
+      {moverTarget && activeWarehouse && (
+        <MoverUbicacionModal
+          itemCode={itemCode}
+          warehouse={activeWarehouse}
+          origen={moverTarget}
+          onClose={() => setMoverTarget(null)}
+          onSuccess={() => {
+            setMoverTarget(null)
             queryClient.invalidateQueries({ queryKey: ['item-ubicaciones', itemCode, activeWarehouse] })
           }}
         />
@@ -797,12 +1015,17 @@ export default function ItemDetail() {
     return (
       <div className="page-container">
         <p style={{ color: 'var(--color-error)' }}>Error al cargar el artículo</p>
-        <button className="btn btn-ghost" style={{ marginTop: 16 }} onClick={() => navigate('/inventario/articulos')}>
+        <button className="btn btn-ghost" style={{ marginTop: 16 }} onClick={() => navigate(-1)}>
           Volver
         </button>
       </div>
     )
   }
+
+  // Productos y Servicios son módulos separados — las rutas de vuelta/edición dependen del tipo
+  // real del artículo cargado, sin importar desde qué módulo se haya llegado a esta pantalla.
+  const basePath = item.type === 'product' ? '/inventario/productos' : '/catalogo/servicios'
+  const moduleLabel = item.type === 'product' ? 'Productos' : 'Servicios'
 
   const stock = item.currentStock ?? 0
   let stockStatus: 'in-stock' | 'low-stock' | 'out-stock'
@@ -826,8 +1049,8 @@ export default function ItemDetail() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <a className="page-back-link" onClick={() => navigate('/inventario/articulos')}>
-            <ArrowLeft size={14} /> Artículos
+          <a className="page-back-link" onClick={() => navigate(basePath)}>
+            <ArrowLeft size={14} /> {moduleLabel}
           </a>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Package size={20} style={{ color: 'var(--text-secondary)' }} />
@@ -842,6 +1065,9 @@ export default function ItemDetail() {
           <p className="page-sub" style={{ fontFamily: 'monospace' }}>{item.id}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-secondary" onClick={() => navigate(`${basePath}/${item.id}/editar`)}>
+            <Pencil size={15} /> Editar
+          </button>
           {!item.hasVariants && (
             <button className="btn btn-secondary" onClick={() => setShowPricesModal(true)}>
               <DollarSign size={15} /> Actualizar Precios
@@ -865,7 +1091,7 @@ export default function ItemDetail() {
           Variante de:{' '}
           <a
             style={{ fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-            onClick={() => navigate(`/inventario/articulos/${item.variantOf}`)}
+            onClick={() => navigate(`/inventario/productos/${item.variantOf}`)}
           >
             {item.variantOf}
           </a>
@@ -884,12 +1110,21 @@ export default function ItemDetail() {
             </div>
           </div>
 
-          {!!item.standardRate && (
+           {!!item.standardRate && (
             <div className="stat-card">
               <div className="stat-card-top">
                 <span className="stat-label">Precio de Venta</span>
               </div>
               <div className="stat-value" style={{ fontSize: 28 }}>{formatDOP(item.standardRate)}</div>
+              {item.autoDiscount && (
+                <div className="stat-footer">
+                  <span className="badge badge-discount" style={{ fontSize: 11 }}>
+                    {item.autoDiscount.discountType === 'Discount Percentage'
+                      ? `${item.autoDiscount.discountPercentage ?? 0}% OFF (auto)`
+                      : `${formatDOP(item.autoDiscount.discountAmount ?? 0)} OFF (auto)`}
+                  </span>
+                </div>
+              )}
               {item.salesPriceDate && (
                 <div className="stat-footer">
                   <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>

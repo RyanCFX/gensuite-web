@@ -20,6 +20,8 @@ export interface SearchSelectProps {
   options: SearchSelectOption[]
   /** Called with debounced search query when user types */
   onSearch: (query: string) => void
+  /** Se dispara cada vez que el dropdown se abre — útil para forzar un refetch de `options`. */
+  onOpen?: () => void
   /** Debounce delay in ms (default 300) */
   debounceMs?: number
   /** Loading state — shows spinner in dropdown */
@@ -31,6 +33,15 @@ export interface SearchSelectProps {
   selectedLabel?: string
   className?: string
   id?: string
+  /** Contenido fijo renderizado encima de la lista de opciones (ej. botón "+ Agregar cliente") */
+  headerContent?: React.ReactNode
+  /**
+   * Se dispara al presionar Enter cuando no hay una opción enfocada ni un único
+   * resultado en `options` (p. ej. un lector de código de barras que escribe el
+   * código completo y da Enter antes de que el debounce traiga resultados).
+   * Recibe el texto escrito para que el padre pueda hacer una búsqueda inmediata.
+   */
+  onEnterWithoutMatch?: (query: string) => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -40,6 +51,7 @@ export function SearchSelect({
   onChange,
   options,
   onSearch,
+  onOpen,
   debounceMs = 300,
   loading = false,
   placeholder = 'Buscar…',
@@ -48,6 +60,8 @@ export function SearchSelect({
   selectedLabel,
   className = '',
   id,
+  headerContent,
+  onEnterWithoutMatch,
 }: SearchSelectProps) {
   const [inputValue, setInputValue] = useState('')
   const [focusedIdx, setFocusedIdx] = useState(-1)
@@ -94,6 +108,7 @@ export function SearchSelect({
 
   const handleFocus = () => {
     openDropdown()
+    onOpen?.()
     onSearch('')
     // Select all text so user can immediately type a new search
     inputRef.current?.select()
@@ -123,6 +138,7 @@ export function SearchSelect({
     if (!open) {
       if (e.key === 'Enter' || e.key === 'ArrowDown') {
         openDropdown()
+        onOpen?.()
         onSearch('')
       }
       return
@@ -143,6 +159,8 @@ export function SearchSelect({
           handleSelect(options[focusedIdx])
         } else if (options.length === 1) {
           handleSelect(options[0])
+        } else if (onEnterWithoutMatch && inputValue.trim()) {
+          onEnterWithoutMatch(inputValue.trim())
         }
         break
       case 'Escape':
@@ -210,6 +228,11 @@ export function SearchSelect({
       <FloatingPortal open={open} style={style} portalRef={portalRef}>
         <div className="search-select-dropdown" role="listbox" ref={listRef}
           style={{ position: 'static', maxHeight: 220 }}>
+          {headerContent && (
+            <div className="search-select-header" onMouseDown={(e) => e.preventDefault()}>
+              {headerContent}
+            </div>
+          )}
           {loading ? (
             <div className="search-select-loading">
               <span className="spinner spinner-brand spinner-sm" aria-hidden="true" />

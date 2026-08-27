@@ -4,16 +4,25 @@ import {
   listDebitNotes,
   createDebitNote,
   submitDebitNote,
+  downloadDebitNotePdf,
 } from '@/shared/api/notes'
 import { listInvoices } from '@/shared/api/invoices'
+import { listSucursales } from '@/shared/api/sucursales'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
+import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import type { Invoice, CreateDebitNoteDto } from '@/shared/api/types'
-import { Plus, Loader2, Trash2 } from 'lucide-react'
+import { Plus, Loader2, Trash2, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 
 interface NoteItem {
   itemCode: string
@@ -29,7 +38,13 @@ interface DebitNote {
   grandTotal?: number
   status: 'Draft' | 'Submitted' | 'Cancelled'
   reason?: string
+  branch?: string
+  department?: string
   items: NoteItem[]
+  /** Solo viene presente tras someter la nota — en Draft llega vacío/undefined */
+  ncf?: string
+  /** NCF de la factura original afectada — distinto de `ncf`, que es el propio de la nota */
+  ncfAfectado?: string | null
 }
 
 interface NoteLineItem {
@@ -59,10 +74,58 @@ export default function DebitNotesPage() {
   const [invoiceQuery, setInvoiceQuery] = useState('')
   const [reason, setReason] = useState('')
   const [noteItems, setNoteItems] = useState<NoteLineItem[]>([{ itemCode: '', qty: 1, rate: 0 }])
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
+  const [branchError, setBranchError] = useState(false)
+
+  const [filterBranch, setFilterBranch] = useState('')
+  const [filterDepartment, setFilterDepartment] = useState('')
+  const [createdAtFrom, setCreatedAtFrom] = useState('')
+  const [createdAtTo, setCreatedAtTo] = useState('')
+  const [postingDateFrom, setPostingDateFrom] = useState('')
+  const [postingDateTo, setPostingDateTo] = useState('')
+  const [ncf, setNcf] = useState('')
+  const [grandTotalMin, setGrandTotalMin] = useState('')
+  const [grandTotalMax, setGrandTotalMax] = useState('')
+  const [refundedAmountMin, setRefundedAmountMin] = useState('')
+  const [refundedAmountMax, setRefundedAmountMax] = useState('')
+
+  const { data: sucursalesData } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+  })
+  const sucursales = sucursalesData?.items ?? []
+  const [filterBranchSearch, setFilterBranchSearch] = useState('')
+  const filterBranchOptions: SearchSelectOption[] = sucursales
+    .filter((s) => !filterBranchSearch || s.name.toLowerCase().includes(filterBranchSearch.toLowerCase()))
+    .map((s) => ({ value: s.name, label: s.name }))
+
+  const [formBranchSearch, setFormBranchSearch] = useState('')
+  const formBranchOptions: SearchSelectOption[] = sucursales
+    .filter((s) => !formBranchSearch || s.name.toLowerCase().includes(formBranchSearch.toLowerCase()))
+    .map((s) => ({ value: s.name, label: s.name }))
 
   const { data: notesData, isLoading } = useQuery({
-    queryKey: ['debit-notes', orderBy],
-    queryFn: () => listDebitNotes({ orderBy: orderBy || undefined }),
+    queryKey: [
+      'debit-notes', orderBy, filterBranch, filterDepartment,
+      createdAtFrom, createdAtTo, postingDateFrom, postingDateTo,
+      ncf, grandTotalMin, grandTotalMax, refundedAmountMin, refundedAmountMax,
+    ],
+    queryFn: () =>
+      listDebitNotes({
+        orderBy: orderBy || undefined,
+        branch: filterBranch || undefined,
+        department: filterDepartment || undefined,
+        createdAtFrom: createdAtFrom || undefined,
+        createdAtTo: createdAtTo || undefined,
+        postingDateFrom: postingDateFrom || undefined,
+        postingDateTo: postingDateTo || undefined,
+        ncf: ncf || undefined,
+        grandTotalMin: grandTotalMin ? Number(grandTotalMin) : undefined,
+        grandTotalMax: grandTotalMax ? Number(grandTotalMax) : undefined,
+        refundedAmountMin: refundedAmountMin ? Number(refundedAmountMin) : undefined,
+        refundedAmountMax: refundedAmountMax ? Number(refundedAmountMax) : undefined,
+      } as Parameters<typeof listDebitNotes>[0]),
   })
 
   const { data: invoicesData, isLoading: invoicesLoading } = useQuery({
@@ -80,6 +143,11 @@ export default function DebitNotesPage() {
   }))
   const notes = (Array.isArray(notesData) ? notesData : []) as DebitNote[]
 
+  const downloadPdfMutation = useMutation({
+    mutationFn: (id: string) => downloadDebitNotePdf(id, `nota-debito-${id}.pdf`),
+    onError: () => toast.error('No se pudo descargar el PDF'),
+  })
+
   const createMutation = useMutation({
     mutationFn: (dto: CreateDebitNoteDto) => createDebitNote(dto) as Promise<DebitNote>,
     onSuccess: async (note: DebitNote) => {
@@ -89,6 +157,11 @@ export default function DebitNotesPage() {
       handleCloseModal()
     },
     onError: (err: { message?: string }) => {
+      if (isApiErrorCode(err, ERROR_CODES.BRANCH_REQUIRED)) {
+        setBranchError(true)
+        toast.error(err?.message ?? 'Selecciona una sucursal')
+        return
+      }
       toast.error(err?.message ?? 'Error al crear la nota de débito')
     },
   })
@@ -100,7 +173,16 @@ export default function DebitNotesPage() {
     setInvoiceQuery('')
     setReason('')
     setNoteItems([{ itemCode: '', qty: 1, rate: 0 }])
+    setBranch('')
+    setDepartment('')
+    setBranchError(false)
   }
+
+  const isDirty = useDirtyCheck(
+    { selectedInvoiceId, reason, noteItems, branch, department },
+    modalOpen,
+  )
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, handleCloseModal)
 
   function updateNoteItem(index: number, patch: Partial<NoteLineItem>) {
     setNoteItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)))
@@ -127,6 +209,8 @@ export default function DebitNotesPage() {
       customer: selectedInvoice.customer,
       postingDate: new Date().toISOString().slice(0, 10),
       notes: reason || undefined,
+      branch: branch || undefined,
+      department: department || undefined,
       items: noteItems
         .filter((i) => i.itemCode.trim())
         .map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate })),
@@ -146,30 +230,138 @@ export default function DebitNotesPage() {
         </button>
       </div>
 
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <FilterField label="Sucursal" style={{ width: 200 }}>
+            <SearchSelect
+              value={filterBranch}
+              onChange={setFilterBranch}
+              options={filterBranchOptions}
+              onSearch={setFilterBranchSearch}
+              selectedLabel={filterBranch}
+              placeholder="Todas las sucursales"
+            />
+          </FilterField>
+          <FilterField label="Departamento" style={{ minWidth: 220 }}>
+            <DepartmentSelect value={filterDepartment} onChange={setFilterDepartment} placeholder="Todos los departamentos" />
+          </FilterField>
+          <FilterField label="NCF">
+            <input
+              className="ff-input ff-input-sm"
+              style={{ width: 160 }}
+              placeholder="Buscar NCF…"
+              value={ncf}
+              onChange={(e) => setNcf(e.target.value)}
+            />
+          </FilterField>
+          <FilterField label="Creada desde">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={createdAtFrom}
+              onChange={setCreatedAtFrom}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Creada hasta">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={createdAtTo}
+              onChange={setCreatedAtTo}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Fecha desde">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={postingDateFrom}
+              onChange={setPostingDateFrom}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Fecha hasta">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={postingDateTo}
+              onChange={setPostingDateTo}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Total">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Total mín."
+                value={grandTotalMin}
+                onChange={(e) => setGrandTotalMin(e.target.value)}
+              />
+              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Total máx."
+                value={grandTotalMax}
+                onChange={(e) => setGrandTotalMax(e.target.value)}
+              />
+            </div>
+          </FilterField>
+          <FilterField label="Monto reembolsado">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Reemb. mín."
+                value={refundedAmountMin}
+                onChange={(e) => setRefundedAmountMin(e.target.value)}
+              />
+              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Reemb. máx."
+                value={refundedAmountMax}
+                onChange={(e) => setRefundedAmountMax(e.target.value)}
+              />
+            </div>
+          </FilterField>
+        </div>
+      </div>
+
       <div className="table-scroll">
         <table className="data-table">
           <thead>
             <tr>
               <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} />
+              <th>NCF</th>
+              <th>NCF Afectado</th>
               <th>Factura Original</th>
               <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} />
               <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} />
               <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={sort} align="right" />
               <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
+              <th />
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 6 }).map((__, j) => (
+                  {Array.from({ length: 9 }).map((__, j) => (
                     <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                   ))}
                 </tr>
               ))
             ) : notes.length === 0 ? (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={9}>
                   <div className="empty-state">
                     <div className="empty-title">Sin notas de débito</div>
                     <p className="empty-sub">Crea una nota de débito para agregar cargos adicionales a una factura.</p>
@@ -183,6 +375,12 @@ export default function DebitNotesPage() {
               notes.map((note) => (
                 <tr key={note.id}>
                   <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.id}</td>
+                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    {note.ncf ?? <span className="td-dim">Pendiente</span>}
+                  </td>
+                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    {note.ncfAfectado ?? <span className="td-dim">—</span>}
+                  </td>
                   <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.customer}</td>
                   <td>{note.customerName ?? '—'}</td>
                   <td>{formatDate(note.date)}</td>
@@ -192,6 +390,18 @@ export default function DebitNotesPage() {
                       {STATUS_LABEL[note.status] ?? note.status}
                     </span>
                   </td>
+                  <td>
+                    {note.status?.toLowerCase() === 'submitted' && (
+                      <button
+                        className="btn btn-ghost btn-size-icon-sm"
+                        title="Descargar PDF"
+                        onClick={() => downloadPdfMutation.mutate(note.id)}
+                        disabled={downloadPdfMutation.isPending && downloadPdfMutation.variables === note.id}
+                      >
+                        <Download size={14} />
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))
             )}
@@ -200,11 +410,11 @@ export default function DebitNotesPage() {
       </div>
 
       {modalOpen && (
-        <div className="modal-overlay" onClick={handleCloseModal}>
+        <div className="modal-overlay" onClick={requestClose}>
           <div className="modal-box modal-box-lg" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="modal-head">
               <h2 className="modal-title">Nueva Nota de Débito</h2>
-              <button className="modal-close" type="button" onClick={handleCloseModal}>×</button>
+              <button className="modal-close" type="button" onClick={requestClose}>×</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -248,6 +458,29 @@ export default function DebitNotesPage() {
                     placeholder="Ej: Cargo adicional por flete no incluido"
                     required
                   />
+                </div>
+
+                <div style={{ display: 'flex', gap: 16 }}>
+                  <div className="ff-wrap" style={{ flex: 1 }}>
+                    <label className="ff-label" htmlFor="branch-debit">Sucursal</label>
+                    <SearchSelect
+                      id="branch-debit"
+                      value={branch}
+                      onChange={(val) => { setBranch(val); setBranchError(false) }}
+                      options={formBranchOptions}
+                      onSearch={setFormBranchSearch}
+                      selectedLabel={branch}
+                      placeholder="Sin sucursal"
+                      error={branchError}
+                    />
+                    {branchError && (
+                      <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal</p>
+                    )}
+                  </div>
+                  <div className="ff-wrap" style={{ flex: 1 }}>
+                    <label className="ff-label" htmlFor="department-debit">Departamento</label>
+                    <DepartmentSelect id="department-debit" value={department} onChange={setDepartment} />
+                  </div>
                 </div>
 
                 <div>
@@ -323,7 +556,7 @@ export default function DebitNotesPage() {
                 </div>
               </div>
               <div className="modal-foot">
-                <button type="button" className="btn btn-ghost" onClick={handleCloseModal}>Cancelar</button>
+                <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
                   {createMutation.isPending && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
                   Crear y Someter
@@ -333,6 +566,15 @@ export default function DebitNotesPage() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }

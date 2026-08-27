@@ -5,12 +5,18 @@ import { listPedidos, cancelPedido } from '@/shared/api/pedidos'
 import type { Pedido } from '@/shared/api/types'
 import type { ListPedidosParams } from '@/shared/api/pedidos'
 import { listSucursales } from '@/shared/api/sucursales'
+import { listCustomers } from '@/shared/api/customers'
 import { displayId, formatDate, formatDOP } from '@/lib/formatters'
-import { Plus, Eye, Search, X, Loader2, Copy, PackageOpen } from 'lucide-react'
+import { Plus, Eye, X, Loader2, Copy, PackageOpen } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
+import { Select, SelectItem } from '@/components/ui/select'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -26,7 +32,9 @@ const STATUS_LABEL: Record<string, string> = {
 export default function PedidosPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [search, setSearch] = useState('')
+  const [customerId, setCustomerId] = useState('')
+  const [customerLabel, setCustomerLabel] = useState('')
+  const [customerQuery, setCustomerQuery] = useState('')
   const [status, setStatus] = useState<string>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -40,9 +48,24 @@ export default function PedidosPage() {
     queryFn: () => listSucursales({ limit: 100 }),
   })
   const sucursales = sucursalesData?.items ?? []
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchOptions: SearchSelectOption[] = sucursales
+    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((s) => ({ value: s.name, label: s.name }))
+
+  const { data: customersData, isLoading: customersLoading } = useQuery({
+    queryKey: ['customerSearch', customerQuery],
+    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
+  })
+
+  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
+    value: c.id,
+    label: c.customerName,
+    sublabel: c.rnc ?? c.cedula,
+  }))
 
   const params: ListPedidosParams = {
-    search: search || undefined,
+    customer: customerId || undefined,
     status: status === 'all' ? undefined : status as ListPedidosParams['status'],
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
@@ -80,42 +103,53 @@ export default function PedidosPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={15} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por cliente..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+          <FilterField label="Cliente" style={{ width: 260 }}>
+            <SearchSelect
+              value={customerId}
+              selectedLabel={customerLabel}
+              onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
+              options={customerOptions}
+              onSearch={setCustomerQuery}
+              loading={customersLoading}
+              placeholder="Filtrar por cliente…"
             />
-          </div>
-          <select className="filter-select" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="all">Todos los estados</option>
-            <option value="draft">Borrador</option>
-            <option value="submitted">En Proceso</option>
-            <option value="cancelled">Cancelado</option>
-          </select>
-          <select className="filter-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
-            <option value="">Todas las sucursales</option>
-            {sucursales.map((s) => (
-              <option key={s.id} value={s.name}>{s.name}</option>
-            ))}
-          </select>
-          <input
-            type="date"
-            className="ff-input ff-input-sm"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            style={{ width: 144 }}
-          />
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-          <input
-            type="date"
-            className="ff-input ff-input-sm"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            style={{ width: 144 }}
-          />
+          </FilterField>
+          <FilterField label="Estado">
+            <Select value={status} onValueChange={setStatus}>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="draft">Borrador</SelectItem>
+              <SelectItem value="submitted">En Proceso</SelectItem>
+              <SelectItem value="cancelled">Cancelado</SelectItem>
+            </Select>
+          </FilterField>
+          <FilterField label="Sucursal" style={{ width: 200 }}>
+            <SearchSelect
+              value={branch}
+              onChange={setBranch}
+              options={branchOptions}
+              onSearch={setBranchSearch}
+              selectedLabel={branch}
+              placeholder="Todas las sucursales"
+            />
+          </FilterField>
+          <FilterField label="Desde">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={fromDate}
+              onChange={setFromDate}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={toDate}
+              onChange={setToDate}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
             <input type="checkbox" checked={onlyLayaway} onChange={(e) => setOnlyLayaway(e.target.checked)} />
             <PackageOpen size={14} style={{ color: 'var(--text-secondary)' }} />

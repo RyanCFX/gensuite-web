@@ -7,8 +7,11 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
 import { displayId, formatDate, formatDOP } from '@/lib/formatters'
 import type { ApiError } from '@/shared/api/types'
-import { ArrowLeft, Download, Send, Trash2, GitBranch, Loader2, FileText, History, Copy, PackageOpen, AlertTriangle, Ban } from 'lucide-react'
+import { ArrowLeft, Download, Send, Trash2, GitBranch, FileText, History, Copy, PackageOpen, AlertTriangle, Ban } from 'lucide-react'
 import { toast } from 'sonner'
+import { Select, SelectItem } from '@/components/ui/select'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -44,6 +47,11 @@ export default function PedidoDetail() {
     enabled: cancelApartadoOpen,
     staleTime: 5 * 60_000,
   })
+  const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState('')
+  const modeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
+    .filter((m) => !m.disabled)
+    .filter((m) => !modeOfPaymentSearch || m.name.toLowerCase().includes(modeOfPaymentSearch.toLowerCase()))
+    .map((m) => ({ value: m.name, label: m.name }))
 
   const submitMutation = useMutation({
     mutationFn: () => submitPedido(id!),
@@ -158,8 +166,9 @@ export default function PedidoDetail() {
           </div>
         }
         description={`Cliente: ${pedido.customerName}`}
-        backTo="/pedidos"
-        backLabel="Pedidos"
+        action={
+          <a className="page-back-link" onClick={() => navigate('/pedidos')}><ArrowLeft size={14} /> Pedidos</a>
+        }
       />
 
       {stockWarning && (
@@ -255,8 +264,23 @@ export default function PedidoDetail() {
           <div className="fields-grid">
             <div className="detail-field">
               <span className="detail-label">Cliente</span>
-              <span className="detail-value">{pedido.customerName}</span>
+              <span className="detail-value">
+                {pedido.esClienteOcasional ? (
+                  <span>
+                    {pedido.clienteOcasionalNombre ?? pedido.customerName}
+                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 6 }}>(ocasional)</span>
+                  </span>
+                ) : (
+                  pedido.customerName
+                )}
+              </span>
             </div>
+            {pedido.esClienteOcasional && pedido.clienteOcasionalDireccion && (
+              <div className="detail-field">
+                <span className="detail-label">Dirección</span>
+                <span className="detail-value">{pedido.clienteOcasionalDireccion}</span>
+              </div>
+            )}
             <div className="detail-field">
               <span className="detail-label">Fecha</span>
               <span className="detail-value">{formatDate(pedido.transactionDate)}</span>
@@ -360,32 +384,28 @@ export default function PedidoDetail() {
 
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="apartadoRemanente">¿Qué hacer con el anticipo?</label>
-                <select
-                  id="apartadoRemanente"
-                  className="ff-select"
+                <Select
                   value={apartadoRemanente}
-                  onChange={(e) => setApartadoRemanente(e.target.value as '' | 'saldo_favor' | 'devolucion')}
+                  onValueChange={(val) => setApartadoRemanente(val as '' | 'saldo_favor' | 'devolucion')}
+                  placeholder="Usar default configurado"
                 >
-                  <option value="">Usar default configurado</option>
-                  <option value="saldo_favor">Saldo a favor</option>
-                  <option value="devolucion">Devolución en efectivo</option>
-                </select>
+                  <SelectItem value="saldo_favor">Saldo a favor</SelectItem>
+                  <SelectItem value="devolucion">Devolución en efectivo</SelectItem>
+                </Select>
               </div>
 
               {apartadoRemanente === 'devolucion' && (
                 <div className="ff-wrap">
                   <label className="ff-label ff-required" htmlFor="apartadoModeOfPayment">Método de pago de la devolución</label>
-                  <select
+                  <SearchSelect
                     id="apartadoModeOfPayment"
-                    className="ff-select"
                     value={apartadoModeOfPayment}
-                    onChange={(e) => setApartadoModeOfPayment(e.target.value)}
-                  >
-                    <option value="">Seleccionar…</option>
-                    {metodos?.filter((m) => !m.disabled).map((m) => (
-                      <option key={m.name} value={m.name}>{m.name}</option>
-                    ))}
-                  </select>
+                    onChange={setApartadoModeOfPayment}
+                    options={modeOfPaymentOptions}
+                    onSearch={setModeOfPaymentSearch}
+                    selectedLabel={apartadoModeOfPayment}
+                    placeholder="Seleccionar…"
+                  />
                 </div>
               )}
             </div>

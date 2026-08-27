@@ -1,7 +1,12 @@
 import { client, unwrap, unwrapPaginated } from './client'
 import type { JournalEntry, CreateJournalEntryDto, PaginatedResponse, PaginationParams } from './types'
 
-export async function listJournalEntries(params?: PaginationParams) {
+export interface ListJournalEntriesParams extends PaginationParams {
+  branch?: string
+  department?: string
+}
+
+export async function listJournalEntries(params?: ListJournalEntriesParams) {
   const res = await client.get<PaginatedResponse<JournalEntry>>('/journal-entry', { params })
   return unwrapPaginated(res)
 }

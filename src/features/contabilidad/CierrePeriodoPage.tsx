@@ -7,6 +7,12 @@ import { listEjerciciosFiscales } from '@/shared/api/ejercicioFiscal'
 import type { CierrePeriodo, CreateCierrePeriodoDto } from '@/shared/api/types'
 import { formatDate } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-warning',
@@ -34,6 +40,15 @@ export default function CierrePeriodoPage() {
   })
 
   const ejercicios = ejerciciosData?.items ?? []
+  const [fyFilterSearch, setFyFilterSearch] = useState('')
+  const fyFilterOptions: SearchSelectOption[] = ejercicios
+    .filter((fy) => !fyFilterSearch || fy.year.includes(fyFilterSearch))
+    .map((fy) => ({ value: fy.id, label: fy.year }))
+
+  const [formFYSearch, setFormFYSearch] = useState('')
+  const formFYOptions: SearchSelectOption[] = ejercicios
+    .filter((fy) => !formFYSearch || fy.year.includes(formFYSearch))
+    .map((fy) => ({ value: fy.id, label: `${fy.year}${fy.isClosed ? ' — Cerrado' : ' — Abierto'}` }))
 
   // ── Wizard state ──────────────────────────────────────────────────────────
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -62,6 +77,12 @@ export default function CierrePeriodoPage() {
   function closeWizard() {
     setWizardOpen(false)
   }
+
+  const isWizardDirty = useDirtyCheck(
+    { formFY, formPeriodEnd, formPostingDate, formCostCenter, formAccountHead, formRemarks },
+    wizardOpen,
+  )
+  const { requestClose: requestCloseWizard, confirming: confirmingWizardClose, confirmDiscard: confirmDiscardWizard, cancelDiscard: cancelDiscardWizard } = useConfirmClose(isWizardDirty, closeWizard)
 
   function handleFYChange(fyId: string) {
     setFormFY(fyId)
@@ -149,16 +170,16 @@ export default function CierrePeriodoPage() {
       {/* Filter bar */}
       <div className="filter-bar" style={{ marginBottom: 16 }}>
         <div className="filter-bar-left">
-          <select
-            className="filter-select"
-            value={fyFilter}
-            onChange={(e) => setFyFilter(e.target.value)}
-          >
-            <option value="">Todos los ejercicios</option>
-            {ejercicios.map((fy) => (
-              <option key={fy.id} value={fy.id}>{fy.year}</option>
-            ))}
-          </select>
+          <div style={{ width: 200 }}>
+            <SearchSelect
+              value={fyFilter}
+              onChange={setFyFilter}
+              options={fyFilterOptions}
+              onSearch={setFyFilterSearch}
+              selectedLabel={ejercicios.find((fy) => fy.id === fyFilter)?.year ?? ''}
+              placeholder="Todos los ejercicios"
+            />
+          </div>
         </div>
         <button className="btn btn-primary btn-size-sm" onClick={openWizard}>
           <Plus size={14} /> Nuevo cierre
@@ -232,7 +253,7 @@ export default function CierrePeriodoPage() {
 
       {/* ── Wizard modal ─────────────────────────────────────────────────── */}
       {wizardOpen && (
-        <div className="modal-overlay" onClick={closeWizard}>
+        <div className="modal-overlay" onClick={requestCloseWizard}>
           <div className="modal-box" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">
@@ -241,7 +262,7 @@ export default function CierrePeriodoPage() {
                   Paso {step} de 2
                 </span>
               </h2>
-              <button className="modal-close" onClick={closeWizard}><X size={16} /></button>
+              <button className="modal-close" onClick={requestCloseWizard}><X size={16} /></button>
             </div>
 
             {step === 1 && (
@@ -249,37 +270,31 @@ export default function CierrePeriodoPage() {
                 <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div className="ff-wrap">
                     <label className="ff-label ff-required">Ejercicio Fiscal</label>
-                    <select
-                      className="ff-select"
+                    <SearchSelect
                       value={formFY}
-                      onChange={(e) => handleFYChange(e.target.value)}
-                    >
-                      <option value="">Seleccionar ejercicio…</option>
-                      {ejercicios.map((fy) => (
-                        <option key={fy.id} value={fy.id}>
-                          {fy.year}{fy.isClosed ? ' — Cerrado' : ' — Abierto'}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={handleFYChange}
+                      options={formFYOptions}
+                      onSearch={setFormFYSearch}
+                      selectedLabel={selectedFY ? `${selectedFY.year}${selectedFY.isClosed ? ' — Cerrado' : ' — Abierto'}` : ''}
+                      placeholder="Seleccionar ejercicio…"
+                    />
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <div className="ff-wrap">
                       <label className="ff-label ff-required">Fin de Período</label>
-                      <input
-                        type="date"
+                      <DatePicker
                         className="ff-input"
                         value={formPeriodEnd}
-                        onChange={(e) => handlePeriodEndChange(e.target.value)}
+                        onChange={handlePeriodEndChange}
                       />
                     </div>
                     <div className="ff-wrap">
                       <label className="ff-label ff-required">Fecha de Registro</label>
-                      <input
-                        type="date"
+                      <DatePicker
                         className="ff-input"
                         value={formPostingDate}
-                        onChange={(e) => setFormPostingDate(e.target.value)}
+                        onChange={setFormPostingDate}
                       />
                     </div>
                   </div>
@@ -321,7 +336,7 @@ export default function CierrePeriodoPage() {
                   )}
                 </div>
                 <div className="modal-foot">
-                  <button className="btn btn-ghost" onClick={closeWizard}>Cancelar</button>
+                  <button className="btn btn-ghost" onClick={requestCloseWizard}>Cancelar</button>
                   <button className="btn btn-primary" onClick={goToStep2}>
                     Revisar <ChevronRight size={14} />
                   </button>
@@ -382,6 +397,16 @@ export default function CierrePeriodoPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirmingWizardClose}
+        onClose={cancelDiscardWizard}
+        onConfirm={confirmDiscardWizard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {/* ── Confirm submit dialog ─────────────────────────────────────────── */}
       {confirmTarget && (

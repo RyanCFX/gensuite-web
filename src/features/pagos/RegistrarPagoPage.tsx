@@ -1,0 +1,674 @@
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { useTabs } from '@/contexts/TabsContext'
+import { createPago, getPagosPendientes } from '@/shared/api/pagos'
+import { getSiguienteChequeCuenta } from '@/shared/api/tesoreria'
+import { SaldoFavorProveedorPagosSection } from './SaldoFavorProveedorPagosSection'
+import { listSuppliers } from '@/shared/api/suppliers'
+import { listMetodosPago, getFacturacionConfig } from '@/shared/api/config'
+import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { CheckCircle2, AlertTriangle, Wallet } from 'lucide-react'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { formatDOP } from '@/lib/formatters'
+import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
+import { listSucursales } from '@/shared/api/sucursales'
+import { getUser } from '@/shared/api/storage'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
+import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
+
+const SYSTEM_MANAGER_ROLE = 'System Manager'
+
+interface ReferenciaRow {
+  invoiceId: string
+  grandTotal: number
+  outstandingAmount: number
+  postingDate: string
+  checked: boolean
+}
+
+export default function RegistrarPagoPage() {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const { multiTab, activeId, closeTab } = useTabs()
+  const [searchParams] = useSearchParams()
+  const preselectSupplier = searchParams.get('supplier') ?? ''
+  const preselectInvoice = searchParams.get('invoice') ?? ''
+
+  const [supplierId, setSupplierId] = useState(preselectSupplier)
+  const [supplierLabel, setSupplierLabel] = useState('')
+  const [supplierQuery, setSupplierQuery] = useState('')
+  const [paidAmount, setPaidAmount] = useState<number>(0)
+  const [modeOfPayment, setModeOfPayment] = useState('')
+  const [bankAccount, setBankAccount] = useState('')
+  const [referenceNo, setReferenceNo] = useState('')
+  const referenceNoTocado = useRef(false)
+  const [referenceDate, setReferenceDate] = useState('')
+  const [remarks, setRemarks] = useState('')
+  const [postingDate, setPostingDate] = useState(new Date().toISOString().slice(0, 10))
+  const [referencias, setReferencias] = useState<ReferenciaRow[]>([])
+  const [manualRefs, setManualRefs] = useState<Record<string, number>>({})
+  const [advancePayment, setAdvancePayment] = useState(false)
+  const [branch, setBranch] = useState('')
+  const [branchSearch, setBranchSearch] = useState('')
+  const [branchError, setBranchError] = useState(false)
+  const [department, setDepartment] = useState('')
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
+
+  const currentUserEmail = getUser()?.email
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser', currentUserEmail],
+    queryFn: () => getUsuario(currentUserEmail!),
+    enabled: !!currentUserEmail,
+    staleTime: 5 * 60_000,
+  })
+
+  // ── Sucursal (branch) selector ────────────────────────────────────────────
+  const isSystemManager = currentUser?.roles?.includes(SYSTEM_MANAGER_ROLE) ?? false
+  const { data: myBranches } = useQuery({
+    queryKey: ['usuarioSucursales', currentUserEmail],
+    queryFn: () => getUsuarioSucursales(currentUserEmail!),
+    enabled: !!currentUserEmail,
+    staleTime: 60_000,
+  })
+  const { data: allSucursales } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+    enabled: isSystemManager,
+    staleTime: 60_000,
+  })
+  const branchOptions = useMemo(
+    () => (isSystemManager ? (allSucursales?.items.map((s) => s.name) ?? []) : (myBranches?.branches ?? [])),
+    [isSystemManager, allSucursales, myBranches],
+  )
+  const branchSelectOptions: SearchSelectOption[] = useMemo(() => {
+    const q = branchSearch.toLowerCase()
+    return branchOptions
+      .filter((b) => !q || b.toLowerCase().includes(q))
+      .map((b) => ({ value: b, label: b }))
+  }, [branchOptions, branchSearch])
+
+  useEffect(() => {
+    if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
+  }, [myBranches])
+
+  // Si solo hay una sucursal disponible, se selecciona sola y el select se bloquea.
+  useEffect(() => {
+    if (branchOptions.length === 1 && branch !== branchOptions[0]) setBranch(branchOptions[0])
+  }, [branchOptions, branch])
+
+  // ── Supplier search ───────────────────────────────────────────────────────
+
+  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
+    queryKey: ['supplierSearch', supplierQuery],
+    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
+    enabled: true,
+  })
+
+  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
+    value: s.id,
+    label: s.supplierName,
+    sublabel: s.rnc ?? s.cedula,
+  }))
+
+  // Si venimos con un proveedor preseleccionado (desde "Facturas Pendientes de
+  // Pago"), resolvemos su nombre para mostrarlo en el selector.
+  useEffect(() => {
+    if (!preselectSupplier) return
+    const found = suppliersData?.items.find((s) => s.id === preselectSupplier)
+    if (found) setSupplierLabel(found.supplierName)
+  }, [preselectSupplier, suppliersData])
+
+  // ── Facturas pendientes del proveedor seleccionado ───────────────────────
+
+  const { data: pendientesData, isLoading: pendientesLoading } = useQuery({
+    queryKey: ['pagos-pendientes-form', supplierId],
+    queryFn: () => getPagosPendientes({ supplier: supplierId, limit: 50 }),
+    enabled: !!supplierId && !advancePayment,
+    staleTime: 30_000,
+  })
+
+  useEffect(() => {
+    if (!supplierId || advancePayment) { setReferencias([]); setManualRefs({}); return }
+    const facturas = pendientesData?.items ?? []
+    setReferencias(
+      facturas
+        .filter((f) => f.outstandingAmount > 0)
+        .map((f) => ({
+          invoiceId: f.id,
+          grandTotal: f.grandTotal,
+          outstandingAmount: f.outstandingAmount,
+          postingDate: f.postingDate,
+          checked: f.id === preselectInvoice,
+        })),
+    )
+    setManualRefs({})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supplierId, pendientesData, advancePayment])
+
+  // ── Métodos de pago ──────────────────────────────────────────────────────
+
+  const { data: metodos } = useQuery({
+    queryKey: ['metodos-pago'],
+    queryFn: listMetodosPago,
+  })
+  const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState('')
+  const modeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
+    .filter((m) => !m.disabled)
+    .filter((m) => !modeOfPaymentSearch || m.name.toLowerCase().includes(modeOfPaymentSearch.toLowerCase()))
+    .map((m) => ({ value: m.name, label: m.name }))
+
+  const metodoSeleccionado = (metodos ?? []).find((m) => m.name === modeOfPayment)
+  const requiresBankAccount = metodoSeleccionado?.requiresBankAccount && !metodoSeleccionado.defaultBankAccount
+
+  const { data: cuentasBancarias } = useQuery({
+    queryKey: ['cuentas-bancarias-activas'],
+    queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
+    enabled: !!metodoSeleccionado?.requiresBankAccount,
+  })
+  const [bankAccountSearch, setBankAccountSearch] = useState('')
+  const bankAccountOptions: SearchSelectOption[] = (cuentasBancarias?.items ?? [])
+    .filter((c) => !bankAccountSearch || c.accountName.toLowerCase().includes(bankAccountSearch.toLowerCase()))
+    .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))
+
+  // ── Cheque: se infiere de la cuenta bancaria elegida, no de un toggle manual —
+  // toda cuenta bancaria trae su propia numeración (chequesManuales/ultimoCheque), sin
+  // depender de su tipoCuenta (campo opcional y de catálogo libre, no confiable para esto).
+
+  const cuentaSeleccionada = cuentasBancarias?.items.find((c) => c.id === bankAccount)
+  const esCheque = !!bankAccount && !!cuentaSeleccionada
+  const cuentaChequesManuales = cuentaSeleccionada?.chequesManuales ?? true
+
+  const { data: siguienteCheque } = useQuery({
+    queryKey: ['tesoreria-siguiente-cheque-cuenta', bankAccount],
+    queryFn: () => getSiguienteChequeCuenta(bankAccount),
+    enabled: esCheque && !!bankAccount,
+  })
+
+  useEffect(() => {
+    if (!esCheque || !siguienteCheque?.siguienteSugerido) return
+    // Numeración automática: el campo queda deshabilitado y siempre refleja el número que
+    // asignará el backend, sin importar lo que el usuario haya escrito antes.
+    if (!cuentaChequesManuales) {
+      setReferenceNo(siguienteCheque.siguienteSugerido)
+      return
+    }
+    // Numeración manual: solo se sugiere una vez, como punto de partida editable.
+    if (!referenceNoTocado.current && !referenceNo) {
+      setReferenceNo(siguienteCheque.siguienteSugerido)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esCheque, cuentaChequesManuales, siguienteCheque])
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  function toggleReferencia(invoiceId: string) {
+    setManualRefs((prev) => {
+      const next = { ...prev }
+      delete next[invoiceId]
+      return next
+    })
+    setReferencias((prev) =>
+      prev.map((r) => (r.invoiceId === invoiceId ? { ...r, checked: !r.checked } : r)),
+    )
+  }
+
+  function setAllocated(invoiceId: string, value: number) {
+    setManualRefs((prev) => ({ ...prev, [invoiceId]: value }))
+  }
+
+  const checkedRefs = referencias.filter((r) => r.checked)
+
+  // Asignación automática del monto del pago sobre las facturas seleccionadas:
+  // la más antigua primero, con tope por pendiente, hasta agotar el monto.
+  // Las filas editadas a mano conservan su valor y el resto se reparte entre las demás.
+  const computedAllocation = useMemo(() => {
+    const result: Record<string, number> = {}
+    const checked = referencias
+      .filter((r) => r.checked)
+      .slice()
+      .sort((a, b) =>
+        a.postingDate < b.postingDate ? -1 : a.postingDate > b.postingDate ? 1 : a.invoiceId < b.invoiceId ? -1 : 1,
+      )
+    let remaining = Math.max(0, paidAmount || 0)
+    for (const r of checked) {
+      if (r.invoiceId in manualRefs) {
+        const v = manualRefs[r.invoiceId]
+        result[r.invoiceId] = v
+        remaining = Math.round((remaining - v) * 100) / 100
+      }
+    }
+    for (const r of checked) {
+      if (r.invoiceId in manualRefs) continue
+      const alloc = Math.round(Math.min(remaining, r.outstandingAmount) * 100) / 100
+      result[r.invoiceId] = alloc
+      remaining = Math.round((remaining - alloc) * 100) / 100
+    }
+    return result
+  }, [referencias, manualRefs, paidAmount])
+
+  const totalAllocated = checkedRefs.reduce((s, r) => s + (computedAllocation[r.invoiceId] ?? 0), 0)
+  const diff = Math.round((paidAmount - totalAllocated) * 100) / 100
+
+  // Preseleccionar el monto del pago con el pendiente de la factura pre-marcada
+  // la primera vez que llegan las facturas (evita que el cajero tenga que calcularlo).
+  useEffect(() => {
+    if (preselectInvoice && paidAmount === 0) {
+      const target = referencias.find((r) => r.invoiceId === preselectInvoice && r.checked)
+      if (target) setPaidAmount(target.outstandingAmount)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [referencias])
+
+  // ── Mutation ─────────────────────────────────────────────────────────────
+
+  const pagoMutation = useMutation({
+    mutationFn: createPago,
+    onSuccess: (pago) => {
+      toast.success('Pago registrado — queda en Borrador, revísalo y somételo para aplicarlo')
+      const formTabId = activeId
+      queryClient.invalidateQueries({ queryKey: ['aging-proveedores'] })
+      queryClient.invalidateQueries({ queryKey: ['pagos-pendientes'] })
+      queryClient.invalidateQueries({ queryKey: ['pagos-pendientes-form', supplierId] })
+      queryClient.invalidateQueries({ queryKey: ['pagos'] })
+      navigate(`/pagos/${pago.id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
+    },
+    onError: (err: { message?: string }) => {
+      if (isApiErrorCode(err, ERROR_CODES.BRANCH_REQUIRED)) {
+        setBranchError(true)
+        toast.error(err?.message ?? 'Selecciona una sucursal')
+        return
+      }
+      toast.error(err?.message ?? 'Error al registrar el pago')
+    },
+  })
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!supplierId) { toast.error('Selecciona un proveedor'); return }
+    if (!paidAmount || paidAmount <= 0) { toast.error('Ingresa un monto válido'); return }
+    if (!modeOfPayment) { toast.error('Selecciona un método de pago'); return }
+    if (requiresBankAccount && !bankAccount) { toast.error('Selecciona una cuenta bancaria'); return }
+    if (esCheque && cuentaChequesManuales && !referenceNo) { toast.error('Ingresa el número de cheque'); return }
+    if (!advancePayment && diff !== 0) {
+      toast.error(
+        diff > 0
+          ? `Quedan ${formatDOP(diff)} sin asignar a ninguna factura`
+          : `La asignación excede el monto del pago en ${formatDOP(Math.abs(diff))}`,
+      )
+      return
+    }
+
+    pagoMutation.mutate({
+      supplier: supplierId,
+      postingDate,
+      paidAmount,
+      modeOfPayment,
+      bankAccount: bankAccount || undefined,
+      referenceNo: esCheque && !cuentaChequesManuales ? undefined : (referenceNo || undefined),
+      referenceDate: referenceDate || undefined,
+      remarks: remarks || undefined,
+      referencias: advancePayment || checkedRefs.length === 0
+        ? undefined
+        : checkedRefs.map((r) => ({ invoiceId: r.invoiceId, allocatedAmount: computedAllocation[r.invoiceId] ?? 0 })),
+      branch: branch || undefined,
+      department: usaDepartamentos ? (department || undefined) : undefined,
+      esCheque: esCheque || undefined,
+    })
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="page-container">
+      <PageHeader
+        title="Registrar Pago"
+        description="Registra un pago realizado a un proveedor"
+      />
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+        {/* ════════════════ INFORMACIÓN DEL PAGO ════════════════ */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <CheckCircle2 size={18} style={{ color: 'var(--success-text)' }} aria-hidden="true" />
+              Información del Pago
+            </span>
+          </div>
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* Monto / Método de Pago / Cuenta Bancaria */}
+            <div className="form-row form-row-3">
+              <div className="ff-wrap">
+                <label className="ff-label">Monto (RD$) <span className="ff-required">*</span></label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  className="ff-input"
+                  value={paidAmount || ''}
+                  onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label">Método de Pago <span className="ff-required">*</span></label>
+                <SearchSelect
+                  value={modeOfPayment}
+                  onChange={(val) => { setModeOfPayment(val); setBankAccount('') }}
+                  options={modeOfPaymentOptions}
+                  onSearch={setModeOfPaymentSearch}
+                  selectedLabel={modeOfPayment}
+                  placeholder="Seleccionar método…"
+                />
+              </div>
+
+              {metodoSeleccionado?.requiresBankAccount && (
+                <div className="ff-wrap">
+                  <label className="ff-label">
+                    Cuenta Bancaria {requiresBankAccount && <span className="ff-required">*</span>}
+                  </label>
+                  <SearchSelect
+                    value={bankAccount}
+                    onChange={(val) => {
+                      setBankAccount(val)
+                      referenceNoTocado.current = false
+                      setReferenceNo('')
+                    }}
+                    options={bankAccountOptions}
+                    onSearch={setBankAccountSearch}
+                    selectedLabel={cuentasBancarias?.items.find((c) => c.id === bankAccount)?.accountName ?? ''}
+                    placeholder={metodoSeleccionado.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
+                    error={requiresBankAccount && !bankAccount}
+                  />
+                  {esCheque && (
+                    <p className="ff-hint">
+                      Esta cuenta participa de la numeración de cheques.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Referencia / Fecha de Referencia / Fecha */}
+            <div className="form-row form-row-3">
+              <div className="ff-wrap">
+                <label className="ff-label">
+                  {esCheque ? 'Número de Cheque' : 'No. de Referencia'}
+                  {esCheque && cuentaChequesManuales && <span className="ff-required">*</span>}
+                </label>
+                <input
+                  className="ff-input"
+                  placeholder={esCheque ? 'Número de cheque…' : '# cheque, transferencia…'}
+                  value={referenceNo}
+                  disabled={esCheque && !cuentaChequesManuales}
+                  onChange={(e) => { referenceNoTocado.current = true; setReferenceNo(e.target.value) }}
+                />
+                {esCheque && !cuentaChequesManuales && (
+                  <p className="ff-hint" style={{ margin: 0 }}>
+                    {bankAccount
+                      ? 'Numeración automática — se asigna al guardar.'
+                      : 'Selecciona la cuenta bancaria para ver el número que se asignará.'}
+                  </p>
+                )}
+                {esCheque && cuentaChequesManuales && siguienteCheque?.ultimoCheque && (
+                  <p className="ff-hint">Último usado: {siguienteCheque.ultimoCheque} — sugerencia editable.</p>
+                )}
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Fecha de Referencia</label>
+                <DatePicker
+                  className="ff-input"
+                  value={referenceDate}
+                  onChange={setReferenceDate}
+                  clearable
+                />
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Fecha <span className="ff-required">*</span></label>
+                <DatePicker
+                  className="ff-input"
+                  value={postingDate}
+                  onChange={setPostingDate}
+                />
+              </div>
+            </div>
+
+            {/* Notas */}
+            <div className="ff-wrap">
+              <label className="ff-label">Notas</label>
+              <textarea
+                className="ff-textarea"
+                rows={2}
+                placeholder="Observaciones opcionales…"
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+              />
+            </div>
+
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border-default)', margin: '4px 0' }} />
+
+            {/* Proveedor / Sucursal / Departamento */}
+            <div className="form-row form-row-3">
+              <div className="ff-wrap">
+                <label className="ff-label">
+                  Proveedor <span className="ff-required">*</span>
+                </label>
+                <SearchSelect
+                  id="supplier"
+                  value={supplierId}
+                  selectedLabel={supplierLabel}
+                  onChange={(id, opt) => { setSupplierId(id === '' ? '' : (opt?.value ?? id)); setSupplierLabel(opt?.label ?? '') }}
+                  options={supplierOptions}
+                  onSearch={setSupplierQuery}
+                  loading={suppliersLoading}
+                  placeholder="Buscar proveedor…"
+                  error={!supplierId}
+                />
+              </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label ff-required" htmlFor="branch">Sucursal</label>
+                <SearchSelect
+                  id="branch"
+                  value={branch}
+                  selectedLabel={branch}
+                  error={!branch || branchError}
+                  onChange={(val) => { setBranch(val); setBranchError(false) }}
+                  options={branchSelectOptions}
+                  onSearch={setBranchSearch}
+                  placeholder="Sin especificar"
+                  className="ff-select"
+                  disabled={branchOptions.length === 1}
+                />
+                {branchError && <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal para continuar</p>}
+              </div>
+
+              {usaDepartamentos && (
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="department">Departamento</label>
+                  <DepartmentSelect id="department" value={department} onChange={setDepartment} />
+                </div>
+              )}
+            </div>
+
+            {/* Pago anticipado / sin aplicar a factura */}
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={advancePayment}
+                onChange={(e) => setAdvancePayment(e.target.checked)}
+                style={{ marginTop: 2 }}
+              />
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Wallet size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+                Pago anticipado — no aplicar a ninguna factura (queda como saldo a favor del proveedor)
+              </span>
+            </label>
+
+          </div>
+        </div>
+
+        {/* ════════════════ FACTURAS PENDIENTES ════════════════ */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Facturas Pendientes</span>
+            {checkedRefs.length > 0 && (
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                {checkedRefs.length} seleccionada{checkedRefs.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+
+          {advancePayment ? (
+            <div className="card-body" style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
+              Pago anticipado — no se aplicará a ninguna factura.
+            </div>
+          ) : !supplierId ? (
+            <div className="card-body" style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
+              Selecciona un proveedor para ver sus facturas pendientes
+            </div>
+          ) : pendientesLoading ? (
+            <div className="card-body" style={{ textAlign: 'center', padding: '24px 0' }}>
+              <span className="spinner spinner-brand spinner-sm" />
+            </div>
+          ) : referencias.length === 0 ? (
+            <div className="card-body" style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
+              Sin facturas pendientes para este proveedor
+            </div>
+          ) : (
+            <>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="items-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 36 }} />
+                      <th>Factura</th>
+                      <th style={{ textAlign: 'right' }}>Total</th>
+                      <th style={{ textAlign: 'right' }}>Pendiente</th>
+                      <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {referencias.map((ref) => (
+                      <tr key={ref.invoiceId} style={{ opacity: ref.checked ? 1 : 0.6 }}>
+                        <td style={{ textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={ref.checked}
+                            onChange={() => toggleReferencia(ref.invoiceId)}
+                            style={{ cursor: 'pointer', accentColor: 'var(--color-brand)' }}
+                          />
+                        </td>
+                        <td>
+                          <span style={{ fontWeight: 500, fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                            {ref.invoiceId}
+                          </span>
+                          <br />
+                          <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{ref.postingDate}</span>
+                        </td>
+                        <td style={{ textAlign: 'right', fontSize: 13 }}>{formatDOP(ref.grandTotal)}</td>
+                        <td style={{ textAlign: 'right', fontSize: 13, fontWeight: 500, color: 'var(--error-text)' }}>
+                          {formatDOP(ref.outstandingAmount)}
+                        </td>
+                        <td>
+                          <input
+                            className="items-input"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            style={{ textAlign: 'right' }}
+                            value={(computedAllocation[ref.invoiceId] ?? 0) || ''}
+                            disabled={!ref.checked}
+                            onChange={(e) => setAllocated(ref.invoiceId, parseFloat(e.target.value) || 0)}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Resumen de asignación */}
+              {checkedRefs.length > 0 && (
+                <div style={{
+                  padding: '12px 16px',
+                  borderTop: '1px solid var(--border-default)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                  alignItems: 'flex-end',
+                }}>
+                  <div style={{ display: 'flex', gap: 32, fontSize: 13 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Total asignado</span>
+                    <strong>{formatDOP(totalAllocated)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', gap: 32, fontSize: 13 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Monto del pago</span>
+                    <strong>{formatDOP(paidAmount)}</strong>
+                  </div>
+                  {diff !== 0 && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 12,
+                      color: diff > 0 ? 'var(--warning-text, #b45309)' : 'var(--error-text)',
+                      marginTop: 2,
+                    }}>
+                      <AlertTriangle size={13} />
+                      {diff > 0
+                        ? `Quedan ${formatDOP(diff)} sin asignar`
+                        : `Asignación excede el pago en ${formatDOP(Math.abs(diff))}`}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* ════════════════ SALDO A FAVOR ════════════════ */}
+        {supplierId && (
+          <SaldoFavorProveedorPagosSection
+            supplierId={supplierId}
+            supplierName={supplierLabel}
+            invoices={referencias.map((r) => ({ invoiceId: r.invoiceId, outstandingAmount: r.outstandingAmount, postingDate: r.postingDate, checked: r.checked }))}
+            onApplied={() => queryClient.invalidateQueries({ queryKey: ['pagos-pendientes-form', supplierId] })}
+          />
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={pagoMutation.isPending}
+        >
+          {pagoMutation.isPending
+            ? <><span className="spinner spinner-white spinner-sm" /> Registrando…</>
+            : 'Registrar Pago'}
+        </button>
+        </div>
+
+      </form>
+    </div>
+  )
+}

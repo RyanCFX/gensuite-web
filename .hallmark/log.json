@@ -1,0 +1,16 @@
+[
+  {
+    "date": "2026-08-04",
+    "macrostructure": "Bento Grid (dashboard, app-scope) only — Login reverted to its original asymmetric-auth-split at explicit user request",
+    "theme": "existing-brand, extended (brand-red #ff4538 kept as recognizable accent; added ink-deep navy + teal-accent sampled from the GenSuite logo, used only in the dashboard hero tile; DM Sans + JetBrains Mono now actually loaded via index.html, were previously referenced but never linked)",
+    "enrichment": "hand-built SVG sparkline in dashboard hero tile (real chart data, not invented)",
+    "brief": "GenSuite ERP · dashboard restructured to Bento Grid; a first Login restructure (Centered Mark) was tried, then explicitly reverted by the user (\"como estaba en un principio\") back to the original photo-split — do not re-propose Centered Mark for Login without being asked."
+  },
+  {
+    "date": "2026-07-30",
+    "macrostructure": "asymmetric-auth-split + hero-metric-rail (app-scope redesign, not marketing macrostructure)",
+    "theme": "existing-brand (preserved: brand-red #ff4538, DM Sans, JetBrains Mono) · modern-minimal genre",
+    "enrichment": "none (typography + structure only)",
+    "brief": "GenSuite ERP · redesign Login + Dashboard screens, preserve branding/logic"
+  }
+]

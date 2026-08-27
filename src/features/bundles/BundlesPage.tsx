@@ -2,15 +2,19 @@ import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { listBundles, getBundle, createBundle, updateBundle, deleteBundle } from '@/shared/api/bundles'
-import type { Bundle, BundleComponent } from '@/shared/api/types'
+import type { Bundle } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDOP } from '@/lib/formatters'
 import { useDebounce } from '@/lib/useDebounce'
 import { Plus, Trash2, X, Loader2, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { Select, SelectItem } from '@/components/ui/select'
 
 const PAGE_SIZE = 20
 
@@ -79,15 +83,11 @@ export default function BundlesPage() {
               onChange={handleSearchChange}
             />
           </div>
-          <select
-            className="filter-select"
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value as 'all' | 'active' | 'disabled'); setPage(1) }}
-          >
-            <option value="all">Todos</option>
-            <option value="active">Activos</option>
-            <option value="disabled">Desactivados</option>
-          </select>
+          <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val as 'all' | 'active' | 'disabled'); setPage(1) }}>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="active">Activos</SelectItem>
+            <SelectItem value="disabled">Desactivados</SelectItem>
+          </Select>
         </div>
         <div className="table-wrap">
           <table className="table-config">
@@ -243,6 +243,9 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
+  const isDirty = useDirtyCheck({ name, itemCode, priceA, priceB, priceC, itemUom, components }, !editId || initialized)
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
+
   function addComponent() {
     setComponents((prev) => [...prev, { itemCode: '', qty: 1 }])
   }
@@ -256,7 +259,7 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
   }
 
   const duplicateItemCodes = new Set(
-    components.map((c) => c.itemCode).filter((code, i, arr) => code && arr.indexOf(code) !== arr.lastIndexOf(code)),
+    components.filter((c) => components.filter((x) => x.itemCode === c.itemCode).length > 1).map((c) => c.itemCode),
   )
 
   function handleSubmit(e: React.FormEvent) {
@@ -272,11 +275,12 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-box" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2 className="modal-title">{editId ? 'Editar Combo' : 'Nuevo Combo'}</h2>
-          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+          <button className="modal-close" onClick={requestClose}><X size={16} /></button>
         </div>
         {loadingExisting ? (
           <div className="modal-body" style={{ textAlign: 'center', padding: 32 }}><Loader2 size={20} className="spin" /></div>
@@ -384,7 +388,7 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
               </div>
             </div>
             <div className="modal-foot">
-              <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+              <button type="button" className="btn btn-secondary" onClick={requestClose}>Cancelar</button>
               <button type="submit" className="btn btn-primary" disabled={isPending}>
                 {isPending ? 'Guardando…' : 'Guardar'}
               </button>
@@ -393,5 +397,15 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
         )}
       </div>
     </div>
+    <ConfirmModal
+      open={confirming}
+      onClose={cancelDiscard}
+      onConfirm={confirmDiscard}
+      title="¿Descartar cambios?"
+      description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+      confirmLabel="Descartar cambios"
+      variant="danger"
+    />
+    </>
   )
 }

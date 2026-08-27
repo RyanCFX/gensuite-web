@@ -3,6 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { listItemVariants } from '@/shared/api/catalog'
 import type { Item } from '@/shared/api/types'
 import { X, Loader2 } from 'lucide-react'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 
 interface VariantSelection {
   item: Item
@@ -17,6 +20,9 @@ interface VariantsModalProps {
 
 export function VariantsModal({ templateItem, onConfirm, onClose }: VariantsModalProps) {
   const [selections, setSelections] = useState<Map<string, number>>(new Map())
+
+  const isDirty = useDirtyCheck(Array.from(selections.entries()), true)
+  const closeModal = useConfirmClose(isDirty, onClose)
 
   const { data: variants, isLoading } = useQuery({
     queryKey: ['item-variants', templateItem.id],
@@ -53,11 +59,11 @@ export function VariantsModal({ templateItem, onConfirm, onClose }: VariantsModa
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={closeModal.requestClose}>
       <div className="modal-box" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2 className="modal-title">Variantes — {templateItem.itemName}</h2>
-          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+          <button className="modal-close" onClick={closeModal.requestClose}><X size={16} /></button>
         </div>
         <div className="modal-body">
           {isLoading ? (
@@ -110,12 +116,21 @@ export function VariantsModal({ templateItem, onConfirm, onClose }: VariantsModa
           )}
         </div>
         <div className="modal-foot">
-          <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-secondary" onClick={closeModal.requestClose}>Cancelar</button>
           <button className="btn btn-primary" onClick={handleConfirm} disabled={selections.size === 0}>
             Agregar ({selections.size}) variante(s)
           </button>
         </div>
       </div>
+      <ConfirmModal
+        open={closeModal.confirming}
+        onClose={closeModal.cancelDiscard}
+        onConfirm={closeModal.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
     </div>
   )
 }

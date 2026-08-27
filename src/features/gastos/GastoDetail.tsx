@@ -2,12 +2,16 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { getGasto, submitGasto, cancelGasto, amendGasto } from '@/shared/api/compras-gastos'
+import { getGasto, submitGasto, cancelGasto, amendGasto, previewAsientosGasto, updateGasto } from '@/shared/api/compras-gastos'
+import { listRetenciones } from '@/shared/api/retenciones'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { TIPO_BIENES_606, FORMA_PAGO_606 } from '@/lib/constants'
-import { Send, X, RotateCcw, Info, FileText, AlertCircle } from 'lucide-react'
+import { getCatalogosFiscales, listImpuestosCompras } from '@/shared/api/config'
+import { Send, X, RotateCcw, Info, FileText, AlertCircle, BookOpen } from 'lucide-react'
+import { SaldoFavorCxpSection } from '@/features/devoluciones-compras/SaldoFavorCxpSection'
+import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
+import type { ImpuestoDistribucionDto } from '@/shared/api/types'
 
 function apiErrorMessage(error: unknown, fallback: string) {
   const apiErr = error as { message?: string }
@@ -21,12 +25,33 @@ export default function GastoDetail() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
+  const [showAsientosPreview, setShowAsientosPreview] = useState(false)
 
   const { data: gasto, isLoading, isError } = useQuery({
     queryKey: ['gasto', id],
     queryFn: () => getGasto(id!),
     enabled: !!id,
   })
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+
+  const { data: retencionesData } = useQuery({
+    queryKey: ['retenciones-all'],
+    queryFn: () => listRetenciones({ limit: 100 }),
+    staleTime: 60 * 60_000,
+  })
+
+  const { data: impuestosCompras } = useQuery({
+    queryKey: ['impuestos-compras'],
+    queryFn: listImpuestosCompras,
+    staleTime: 60 * 60_000,
+  })
+  const impuestoTitulo = (templateId: string) =>
+    impuestosCompras?.find((t) => String(t.id) === templateId)?.title ?? templateId
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['gasto', id] })
@@ -60,8 +85,9 @@ export default function GastoDetail() {
 
   const isPending = submitMutation.isPending || cancelMutation.isPending || amendMutation.isPending
 
-  function getTipoBienesLabel(v?: string) { return TIPO_BIENES_606.find((t) => t.value === v)?.label ?? v ?? '—' }
-  function getFormaPagoLabel(v?: string) { return FORMA_PAGO_606.find((f) => f.value === v)?.label ?? v ?? '—' }
+  function getTipoBienesLabel(v?: string) { return (catalogos?.tipoBienes606 ?? []).find((t) => t.value === v)?.label ?? v ?? '—' }
+  function getFormaPagoLabel(v?: string) { return (catalogos?.formaPago606 ?? []).find((f) => f.value === v)?.label ?? v ?? '—' }
+  function fmtMonto(m?: number) { return m != null ? formatDOP(m) : '—' }
 
   const missing606 = !!gasto && (!gasto.tipoBienes606 || !gasto.formaPago606)
   const b17Violation = !!gasto && gasto.tipoComprobante === 'B17' && gasto.grandTotal > 50
@@ -99,13 +125,16 @@ export default function GastoDetail() {
 
       <PageHeader
         title={`Gasto ${gasto.id}`}
-        description={gasto.supplierName}
+        description={gasto.esProveedorOcasional ? (gasto.proveedorOcasionalNombre ?? gasto.supplierName) : gasto.supplierName}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {gasto.status === 'draft' && (
               <>
                 <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/gastos/${id}/editar`)}>
                   <FileText size={14} />Editar
+                </button>
+                <button className="btn btn-secondary btn-size-sm" onClick={() => setShowAsientosPreview(true)}>
+                  <BookOpen size={14} />Impacto contable
                 </button>
                 <button
                   className="btn btn-primary btn-size-sm"
@@ -118,9 +147,23 @@ export default function GastoDetail() {
               </>
             )}
             {gasto.status === 'submitted' && (
-              <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmAction('cancel')}>
-                <X size={14} />Anular
-              </button>
+              <>
+                <button
+                  className="btn btn-secondary btn-size-sm"
+                  onClick={() => {
+                    const postingDate = gasto.postingDate.split('T')[0]
+                    navigate(
+                      `/contabilidad/libro-diario?voucherNo=${encodeURIComponent(gasto.id)}` +
+                      `&voucherType=Purchase+Invoice&fromDate=${postingDate}&toDate=${postingDate}`,
+                    )
+                  }}
+                >
+                  <BookOpen size={14} />Ver asientos
+                </button>
+                <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmAction('cancel')}>
+                  <X size={14} />Anular
+                </button>
+              </>
             )}
             {gasto.status === 'cancelled' && (
               <button className="btn btn-secondary btn-size-sm" onClick={() => setConfirmAction('amend')}>
@@ -160,8 +203,23 @@ export default function GastoDetail() {
           <div className="fields-grid fields-grid-3">
             <div className="detail-field">
               <span className="detail-label">Proveedor</span>
-              <span className="detail-value">{gasto.supplierName}</span>
+              <span className="detail-value">
+                {gasto.esProveedorOcasional ? (
+                  <span>
+                    {gasto.proveedorOcasionalNombre ?? gasto.supplierName}
+                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 6 }}>(ocasional)</span>
+                  </span>
+                ) : (
+                  gasto.supplierName
+                )}
+              </span>
             </div>
+            {gasto.esProveedorOcasional && gasto.proveedorOcasionalRnc && (
+              <div className="detail-field">
+                <span className="detail-label">RNC/Cédula</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{gasto.proveedorOcasionalRnc}</span>
+              </div>
+            )}
             <div className="detail-field">
               <span className="detail-label">Fecha</span>
               <span className="detail-value">{formatDate(gasto.postingDate)}</span>
@@ -170,6 +228,47 @@ export default function GastoDetail() {
               <span className="detail-label">Categoría</span>
               <span className="detail-value">{gasto.categoriaGasto ?? '—'}</span>
             </div>
+            {((gasto.impuestos?.length ?? 0) > 0 || !!gasto.taxAmount) && (
+              <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+                <span className="detail-label">Impuestos</span>
+                <span className="detail-value" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {(gasto.impuestos ?? []).map((imp, idx) => (
+                    <span key={`${imp.id}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                      <span>{imp.id} ({imp.tasa}%)</span>
+                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{fmtMonto(imp.monto)}</strong>
+                    </span>
+                  ))}
+                  {gasto.taxAmount != null && (
+                    <span style={{ display: 'flex', justifyContent: 'space-between', gap: 16, borderTop: '1px solid var(--border-default)', paddingTop: 4 }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Total impuestos</span>
+                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{formatDOP(gasto.taxAmount)}</strong>
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
+            {(gasto.retenciones?.length ?? 0) > 0 && (
+              <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+                <span className="detail-label">Retenciones</span>
+                <span className="detail-value" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {(gasto.retenciones ?? []).map((r) => {
+                    const opt = retencionesData?.items?.find((x) => x.id === r.id)
+                    return (
+                      <span key={r.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                        <span>{opt?.categoryName ?? r.id} ({r.tasa}%)</span>
+                        <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{fmtMonto(r.monto)}</strong>
+                      </span>
+                    )
+                  })}
+                  <span style={{ display: 'flex', justifyContent: 'space-between', gap: 16, borderTop: '1px solid var(--border-default)', paddingTop: 4 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Total retenciones</span>
+                    <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                      {formatDOP((gasto.retenciones ?? []).reduce((s, r) => s + (r.monto ?? 0), 0))}
+                    </strong>
+                  </span>
+                </span>
+              </div>
+            )}
             <div className="detail-field">
               <span className="detail-label">Total</span>
               <span className="detail-value" style={{ fontSize: 18, fontWeight: 700 }}>{formatDOP(gasto.grandTotal)}</span>
@@ -178,8 +277,26 @@ export default function GastoDetail() {
               <span className="detail-label">Pendiente</span>
               <span className="detail-value">{formatDOP(gasto.outstandingAmount ?? 0)}</span>
             </div>
+            {gasto.cuentaCxpOverride && (
+              <div className="detail-field">
+                <span className="detail-label">Cuenta CxP (override)</span>
+                <span className="detail-value">{gasto.cuentaCxpOverride}</span>
+              </div>
+            )}
           </div>
         </div>
+
+        {!gasto.esProveedorOcasional && (
+          <SaldoFavorCxpSection
+            supplierId={gasto.supplier}
+            supplierName={gasto.supplierName}
+            invoiceId={gasto.id}
+            invoiceStatus={gasto.status}
+            invoiceGrandTotal={gasto.grandTotal}
+            outstandingAmount={gasto.outstandingAmount}
+            onChanged={() => queryClient.invalidateQueries({ queryKey: ['gasto', id] })}
+          />
+        )}
 
         {/* Items */}
         <div className="card">
@@ -200,8 +317,23 @@ export default function GastoDetail() {
               <tbody>
                 {gasto.items.map((item, i) => (
                   <tr key={i}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{item.itemCode}</td>
-                    <td>{item.description}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                      {item.itemCode ?? <span className="badge badge-info">Ad-hoc</span>}
+                    </td>
+                    <td>
+                      {item.itemName && <div style={{ fontWeight: 500 }}>{item.itemName}</div>}
+                      <div>{item.description ?? item.descripcion}</div>
+                      {!item.itemCode && (item.cuentaAlterna || item.tipoBienes606 || item.tipoGastoFiscal) && (
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                          {[item.cuentaAlterna, item.tipoBienes606, item.tipoGastoFiscal].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                      {item.itemCode && item.cuentaAlterna && (
+                        <span style={{ display: 'block', fontSize: 11, color: 'var(--text-tertiary)' }}>
+                          Cuenta: {item.cuentaAlterna}
+                        </span>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'right' }}>{item.qty}</td>
                     <td style={{ textAlign: 'right' }}>{formatDOP(item.rate)}</td>
                     <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
@@ -216,6 +348,7 @@ export default function GastoDetail() {
           </div>
         </div>
 
+
         {/* 606 Info */}
         <div className="dgii-section">
           <div className="dgii-section-title">
@@ -228,24 +361,70 @@ export default function GastoDetail() {
               <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{gasto.ncfProveedor ?? '—'}</span>
             </div>
             <div className="detail-field">
+              <span className="detail-label">N° Factura del Proveedor</span>
+              <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{gasto.billNo ?? '—'}</span>
+            </div>
+            <div className="detail-field">
               <span className="detail-label">Tipo Comprobante</span>
               <span className="detail-value">{gasto.tipoComprobante ?? '—'}</span>
             </div>
             <div className="detail-field">
               <span className="detail-label">Tipo de Bienes</span>
               <span className="detail-value">{getTipoBienesLabel(gasto.tipoBienes606)}</span>
+              {gasto.items.some((it) => it.tipoBienes606 && it.tipoBienes606 !== gasto.tipoBienes606) && (
+                <p className="ff-hint" style={{ marginTop: 4 }}>
+                  Algunos ítems ad-hoc tienen una clasificación distinta, pero el reporte 606 solo usa esta clasificación de cabecera (no desglosa por línea).
+                </p>
+              )}
             </div>
             <div className="detail-field">
               <span className="detail-label">Forma de Pago</span>
               <span className="detail-value">{getFormaPagoLabel(gasto.formaPago606)}</span>
             </div>
             <div className="detail-field">
-              <span className="detail-label">Retención ISR</span>
-              <span className="detail-value">{formatDOP(gasto.retencionIsr)}</span>
+              <span className="detail-label">Impuesto del Documento</span>
+              <span className="detail-value">
+                {gasto.taxesTemplate && gasto.taxesTemplate.length > 0
+                  ? (
+                    <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {gasto.taxesTemplate.map((t) => (
+                        <span key={t.id} className="badge badge-info">{impuestoTitulo(t.id)} ({t.tasa}%)</span>
+                      ))}
+                    </span>
+                  )
+                  : '—'}
+              </span>
             </div>
-            <div className="detail-field">
-              <span className="detail-label">Retención ITBIS</span>
-              <span className="detail-value">{formatDOP(gasto.retencionItbis)}</span>
+            <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+              <span className="detail-label">Impuestos</span>
+              <span className="detail-value">
+                {gasto.impuestos && gasto.impuestos.length > 0
+                  ? (
+                    <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {gasto.impuestos.map((imp, idx) => (
+                        <span key={`${imp.id}-${idx}`} className="badge badge-info">{imp.id} ({imp.tasa}%) · {fmtMonto(imp.monto)}</span>
+                      ))}
+                    </span>
+                  )
+                  : '—'}
+              </span>
+            </div>
+            <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+              <span className="detail-label">Retenciones</span>
+              <span className="detail-value">
+                {gasto.retenciones && gasto.retenciones.length > 0
+                  ? (
+                    <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {gasto.retenciones.map((r) => {
+                        const opt = retencionesData?.items?.find((x) => x.id === r.id)
+                        return (
+                          <span key={r.id} className="badge badge-info">{opt?.categoryName ?? r.id} ({r.tasa}%) · {fmtMonto(r.monto)}</span>
+                        )
+                      })}
+                    </span>
+                  )
+                  : '—'}
+              </span>
             </div>
           </div>
         </div>
@@ -270,6 +449,16 @@ export default function GastoDetail() {
           </div>
         </div>
       )}
+      <AsientosPreviewModal
+        open={showAsientosPreview}
+        onClose={() => setShowAsientosPreview(false)}
+        queryKey={['gasto-preview-asientos', id]}
+        queryFn={() => previewAsientosGasto(id!)}
+        onRedistribuir={(payload: ImpuestoDistribucionDto) =>
+          updateGasto(id!, { impuestoDistribucion: [payload] }).then(() =>
+            queryClient.invalidateQueries({ queryKey: ['gasto', id] }))
+        }
+      />
     </div>
   )
 }

@@ -1,17 +1,21 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffectOnActive } from 'keepalive-for-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useTabs } from '@/contexts/TabsContext'
 import { createPedido, updatePedido, getPedido, getPedidoDuplicateSource } from '@/shared/api/pedidos'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getQuotation } from '@/shared/api/quotations'
-import { getLayawayConfig, listAlmacenes } from '@/shared/api/config'
-import type { Item, ItemPrices, CreatePedidoDto, Bundle } from '@/shared/api/types'
+import { getLayawayConfig, listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
+import type { Item, ItemPrices, CreatePedidoDto, Bundle, Customer } from '@/shared/api/types'
+import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
 import { UomSelect } from '@/shared/ui/UomSelect'
-import { formatDOP } from '@/lib/formatters'
+import { formatDOP, round2 } from '@/lib/formatters'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, PackageOpen } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, PackageOpen, UserPlus } from 'lucide-react'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { toast } from 'sonner'
@@ -21,10 +25,13 @@ import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { listItems, getDefaultPriceTier } from '@/shared/api/catalog'
-import { client } from '@/shared/api/client'
+import { client, isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
+import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -38,6 +45,7 @@ interface LineItem {
   amount: number
   discountPct: number
   uom: string
+  conversionFactor: number
   maxDiscountPct?: number
   _prices?: ItemPrices
   warehouse: string
@@ -78,15 +86,29 @@ export default function PedidoForm() {
   const duplicateId = searchParams.get('duplicate')
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { multiTab, activeId, closeTab } = useTabs()
   const isEdit = !!id
 
-  const [customerId, setCustomerId] = useState('')
-  const [customerName, setCustomerName] = useState('')
-  const [customerPriceTier, setCustomerPriceTier] = useState<keyof ItemPrices | undefined>(undefined)
-  const [customerQuery, setCustomerQuery] = useState('')
-  const [transactionDate, setTransactionDate] = useState(todayIso())
+const [customerId, setCustomerId] = useState('')
+   const [customerName, setCustomerName] = useState('')
+   const [customerPriceTier, setCustomerPriceTier] = useState<keyof ItemPrices | undefined>(undefined)
+   const [customerQuery, setCustomerQuery] = useState('')
+   const [showCreateCustomer, setShowCreateCustomer] = useState(false)
+   const [esClienteOcasional, setEsClienteOcasional] = useState(false)
+   const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
+   const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
+   const [transactionDate, setTransactionDate] = useState(todayIso())
   const [deliveryDate, setDeliveryDate] = useState(defaultDelivery())
   const [items, setItems] = useState<LineItem[]>([])
+  const [highlightedRow, setHighlightedRow] = useState<number | null>(null)
+  const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
+  const flashRow = useCallback((index: number) => {
+    rowRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setTimeout(() => {
+      setHighlightedRow(index)
+      setTimeout(() => setHighlightedRow((cur) => (cur === index ? null : cur)), 2200)
+    }, 400)
+  }, [])
   const [notes, setNotes] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -96,7 +118,16 @@ export default function PedidoForm() {
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [isLayaway, setIsLayaway] = useState(false)
   const [branch, setBranch] = useState('')
+  const [branchError, setBranchError] = useState(false)
+  const [department, setDepartment] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
 
   const { data: layawayConfig } = useQuery({
     queryKey: ['layaway-config'],
@@ -112,11 +143,20 @@ export default function PedidoForm() {
         toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
         return
       }
-      const res = await listItems({ barcode: code, limit: 1, validateStock: true, branch })
+      const res = await listItems({ barcode: code, limit: 1, branch })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
+      const existingIndex = items.findIndex((row) => row.itemCode === item.id)
+      if (existingIndex !== -1) {
+        flashRow(existingIndex)
+        return
+      }
+      const targetIndex = items.length
       addRow()
-      setTimeout(() => selectCatalogItem(items.length, item), 0)
+      setTimeout(() => {
+        selectCatalogItem(targetIndex, item, { autoAddRow: false })
+        addRow()
+      }, 0)
     },
   })
 
@@ -129,12 +169,13 @@ export default function PedidoForm() {
       setTransactionDate(todayIso())
       setItems(q.items.map((i) => ({
         itemCode: i.itemCode,
-        description: i.description,
+        description: i.description ?? '',
         qty: i.qty,
         rate: i.rate,
         amount: i.amount,
         discountPct: (i as any).discountPct ?? 0,
-        uom: i.uom,
+         uom: i.uom,
+         conversionFactor: 1,
         warehouse: '',
       })))
       setNotes(q.notes ?? '')
@@ -155,8 +196,9 @@ export default function PedidoForm() {
         rate: i.rate,
         amount: calcAmount(i.qty, i.rate, i.discountPct ?? 0),
         discountPct: i.discountPct ?? 0,
-        uom: 'Unidad',
-        warehouse: '',
+         uom: 'Unidad',
+         conversionFactor: 1,
+         warehouse: '',
       })))
       getCustomer(src.customer).then((c) => {
         setCustomerName(c.customerName)
@@ -171,25 +213,38 @@ export default function PedidoForm() {
     queryFn: () => getPedido(id!),
     enabled: isEdit,
   })
-  useEffect(() => {
-    if (!existing || loaded) return
-    setCustomerId(existing.customer)
-    setTransactionDate(existing.transactionDate)
-    setDeliveryDate(existing.deliveryDate ?? defaultDelivery())
-    setItems(existing.items.map((i) => ({
-      itemCode: i.itemCode,
-      description: i.description,
-      qty: i.qty,
-      rate: i.rate,
-      amount: i.amount,
-      discountPct: (i as any).discountPct ?? 0,
-      uom: i.uom ?? 'Unidad',
-      warehouse: '',
-    })))
-    setNotes(existing.notes ?? '')
-    setBranch(existing.branch ?? '')
-    setLoaded(true)
-  }, [existing])
+
+  // Con Multipestañas, esta pantalla queda montada (KeepAlive) al cambiar de pestaña — al volver
+  // a ella se re-consulta por si el pedido cambió en el servidor mientras el usuario estaba en otra.
+  useEffectOnActive(() => {
+    if (isEdit) queryClient.invalidateQueries({ queryKey: ['pedido', id] })
+  }, [isEdit, id], true)
+useEffect(() => {
+     if (!existing || loaded) return
+     setCustomerId(existing.customer)
+     setTransactionDate(existing.transactionDate)
+     setDeliveryDate(existing.deliveryDate ?? defaultDelivery())
+     setItems(existing.items.map((i) => ({
+       itemCode: i.itemCode,
+       description: i.description,
+       qty: i.qty,
+       rate: i.rate,
+       amount: i.amount,
+       discountPct: (i as any).discountPct ?? 0,
+        uom: i.uom ?? 'Unidad',
+        conversionFactor: 1,
+       warehouse: '',
+     })))
+     setNotes(existing.notes ?? '')
+     setBranch(existing.branch ?? '')
+     setDepartment((existing as any).department ?? '')
+     if (existing.esClienteOcasional) {
+       setEsClienteOcasional(true)
+       setClienteOcasionalNombre(existing.clienteOcasionalNombre ?? '')
+       setClienteOcasionalDireccion(existing.clienteOcasionalDireccion ?? '')
+     }
+     setLoaded(true)
+   }, [existing])
 
   const { data: customersData } = useQuery({
     queryKey: ['customerSearch', customerQuery],
@@ -211,6 +266,14 @@ export default function PedidoForm() {
 
   const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({ value: c.id, label: c.customerName, sublabel: c.rnc ?? c.cedula }))
 
+  function handleCustomerCreated(customer: Customer) {
+    setShowCreateCustomer(false)
+    setCustomerId(customer.id)
+    setCustomerName(customer.customerName)
+    setCustomerPriceTier(customer.priceTier)
+    queryClient.invalidateQueries({ queryKey: ['customerSearch'] })
+  }
+
   // ── Sucursal (branch) selector ────────────────────────────────────────────
   const isSystemManager = currentUser?.roles?.includes(SYSTEM_MANAGER_ROLE) ?? false
   const { data: myBranches, refetch: refetchMyBranches } = useQuery({
@@ -228,6 +291,10 @@ export default function PedidoForm() {
   const branchOptions = isSystemManager
     ? (allSucursales?.items.map((s) => s.name) ?? [])
     : (myBranches?.branches ?? [])
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchSelectOptions: SearchSelectOption[] = branchOptions
+    .filter((b) => !branchSearch || b.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((b) => ({ value: b, label: b }))
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch && !isEdit) setBranch(myBranches.defaultBranch)
@@ -274,6 +341,11 @@ export default function PedidoForm() {
   function handleError(err: unknown) {
     const msg = (err as any)?.message ?? ''
     setSubmitError(msg)
+    if (isApiErrorCode(err, ERROR_CODES.BRANCH_REQUIRED)) {
+      setBranchError(true)
+      toast.error(msg || 'Selecciona una sucursal')
+      return
+    }
     if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) {
       setPinModalOpen(true)
       return
@@ -288,12 +360,32 @@ export default function PedidoForm() {
 
   const createMutation = useMutation({
     mutationFn: (dto: CreatePedidoDto) => createPedido(dto),
-    onSuccess: (p) => { setSubmitError(null); queryClient.invalidateQueries({ queryKey: ['pedidos'] }); toast.success('Pedido creado'); navigate(`/pedidos/${p.id}`) },
+    onSuccess: (p) => {
+      setSubmitError(null)
+      const formTabId = activeId
+      queryClient.invalidateQueries({ queryKey: ['pedidos'] })
+      toast.success('Pedido creado')
+      navigate(`/pedidos/${p.id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
+    },
     onError: (err) => handleError(err),
   })
   const updateMutation = useMutation({
     mutationFn: (dto: Partial<CreatePedidoDto>) => updatePedido(id!, dto),
-    onSuccess: (result) => { setSubmitError(null); queryClient.invalidateQueries({ queryKey: ['pedidos'] }); queryClient.invalidateQueries({ queryKey: ['pedido', id] }); toast.success('Pedido actualizado'); const newId = (result as any).id; navigate(newId && newId !== id ? `/pedidos/${newId}` : `/pedidos/${id}`) },
+    onSuccess: (result) => {
+      setSubmitError(null)
+      const formTabId = activeId
+      queryClient.invalidateQueries({ queryKey: ['pedidos'] })
+      queryClient.removeQueries({ queryKey: ['pedido', id] })
+      toast.success('Pedido actualizado')
+      const newId = (result as any).id
+      navigate(newId && newId !== id ? `/pedidos/${newId}` : `/pedidos/${id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
+    },
     onError: (err) => handleError(err),
   })
   const isPending = createMutation.isPending || updateMutation.isPending
@@ -317,49 +409,62 @@ export default function PedidoForm() {
       return updated
     }))
   }
-  function selectCatalogItem(index: number, catalogItem: Item) {
+  function selectCatalogItem(index: number, catalogItem: Item, opts?: { autoAddRow?: boolean }) {
+    const autoAddRow = opts?.autoAddRow ?? true
     const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
-    setItems((prev) => prev.map((row, i) => {
-      if (i !== index) return row
-      const rate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
-      return {
-        ...row,
-        itemCode: catalogItem.id,
-        itemLabel: catalogItem.itemName,
-        itemType: catalogItem.type,
-        description: catalogItem.internalDescription ?? catalogItem.itemName,
-        rate,
-        amount: calcAmount(row.qty, rate, row.discountPct),
-        uom: catalogItem.stockUom ?? row.uom,
-        maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
-        _prices: catalogItem.prices,
-        warehouse: defaultWarehouse(),
-        _stockByWarehouse: catalogItem.stockByWarehouse,
-        stockError: undefined,
-      }
-    }))
+    let wasLastRow = false
+    setItems((prev) => {
+      wasLastRow = index === prev.length - 1
+      return prev.map((row, i) => {
+        if (i !== index) return row
+        const rate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
+        return {
+          ...row,
+          itemCode: catalogItem.id,
+          itemLabel: catalogItem.itemName,
+          itemType: catalogItem.type,
+          description: catalogItem.internalDescription ?? catalogItem.itemName,
+          rate,
+          amount: calcAmount(row.qty, rate, row.discountPct),
+           uom: catalogItem.stockUom ?? row.uom,
+           conversionFactor: 1,
+           maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
+          _prices: catalogItem.prices,
+          warehouse: defaultWarehouse(),
+          _stockByWarehouse: catalogItem.stockByWarehouse,
+          stockError: undefined,
+        }
+      })
+    })
+    if (autoAddRow && wasLastRow) addRow()
   }
   function selectBundle(index: number, bundle: Bundle) {
     const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
-    setItems((prev) => prev.map((row, i) => {
-      if (i !== index) return row
-      const rate = bundle.prices?.[tier] ?? 0
-      return {
-        ...row,
-        itemCode: bundle.id,
-        itemLabel: bundle.itemName,
-        itemType: 'combo',
-        description: bundle.itemName,
-        rate,
-        amount: calcAmount(row.qty, rate, row.discountPct),
-        uom: bundle.itemUom ?? '',
-        maxDiscountPct: undefined,
-        _prices: bundle.prices,
-        warehouse: defaultWarehouse(),
-        _stockByWarehouse: undefined,
-        stockError: undefined,
-      }
-    }))
+    let wasLastRow = false
+    setItems((prev) => {
+      wasLastRow = index === prev.length - 1
+      return prev.map((row, i) => {
+        if (i !== index) return row
+        const rate = bundle.prices?.[tier] ?? 0
+        return {
+          ...row,
+          itemCode: bundle.id,
+          itemLabel: bundle.itemName,
+          itemType: 'combo',
+          description: bundle.itemName,
+          rate,
+          amount: calcAmount(row.qty, rate, row.discountPct),
+           uom: bundle.itemUom ?? '',
+           conversionFactor: 1,
+           maxDiscountPct: undefined,
+          _prices: bundle.prices,
+          warehouse: defaultWarehouse(),
+          _stockByWarehouse: undefined,
+          stockError: undefined,
+        }
+      })
+    })
+    if (wasLastRow) addRow()
   }
   function onVariantConfirm(selections: VariantSelection[]) {
     const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
@@ -377,6 +482,7 @@ export default function PedidoForm() {
           amount: calcAmount(s.qty, rate, 0),
           discountPct: 0,
           uom: s.item.stockUom ?? 'Unidad',
+          conversionFactor: 1,
           maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
           _prices: s.item.prices,
           warehouse: defaultWarehouse(),
@@ -404,7 +510,7 @@ export default function PedidoForm() {
       toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
       return
     }
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, uom: 'Unidad', warehouse: '' }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, uom: 'Unidad', conversionFactor: 1, warehouse: '' }])
   }
   function removeRow(index: number) { setItems((prev) => prev.filter((_, i) => i !== index)) }
 
@@ -413,26 +519,58 @@ export default function PedidoForm() {
   const totalDiscount = grossTotal - subtotal
   const total = subtotal
 
-  function submitDto() {
-    const itemsDto = items.map((i) => ({
-      itemCode: i.itemCode,
-      qty: i.qty,
-      rate: i.rate,
-      discountPct: i.discountPct || undefined,
-      warehouse: i.warehouse || undefined,
-    }))
-    if (isEdit) updateMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, branch: branch || undefined, items: itemsDto, quotation: quotationId || undefined })
-    else createMutation.mutate({ customer: customerId, transactionDate, deliveryDate: deliveryDate || undefined, branch: branch || undefined, items: itemsDto, quotation: quotationId || undefined, isLayaway: isLayaway || undefined })
-  }
+function submitDto() {
+     const itemsDto = items.map((i) => ({
+       itemCode: i.itemCode,
+       qty: i.qty,
+       rate: i.rate,
+       discountPct: i.discountPct || undefined,
+       warehouse: i.warehouse || undefined,
+       uom: i.uom || undefined,
+     }))
+     const baseDto = {
+       ...(esClienteOcasional
+         ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalDireccion: clienteOcasionalDireccion || undefined }
+         : { customer: customerId }),
+       transactionDate,
+       deliveryDate: deliveryDate || undefined,
+       branch: branch || undefined,
+       department: usaDepartamentos ? (department || undefined) : undefined,
+       items: itemsDto,
+       quotation: quotationId || undefined,
+       isLayaway: isLayaway || undefined,
+     }
+     if (isEdit) updateMutation.mutate(baseDto)
+     else createMutation.mutate(baseDto)
+   }
+
+  const isDirty = useDirtyCheck({
+    customerId,
+    esClienteOcasional,
+    clienteOcasionalNombre,
+    clienteOcasionalDireccion,
+    transactionDate,
+    deliveryDate,
+    items,
+    notes,
+    isLayaway,
+    branch,
+    department,
+  }, isEdit || quotationId || duplicateId ? loaded : true)
+  useBeforeUnloadWarning(isDirty)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitted(true)
     setSubmitError(null)
 
-    try {
-      if (!customerId) { toast.error('Selecciona un cliente'); return }
-      if (items.length === 0) { toast.error('Agrega al menos un artículo'); return }
+try {
+       if (esClienteOcasional) {
+         if (!clienteOcasionalNombre.trim()) { toast.error('Ingresa el nombre del cliente ocasional'); return }
+       } else {
+         if (!customerId) { toast.error('Selecciona un cliente'); return }
+       }
+       if (items.length === 0) { toast.error('Agrega al menos un artículo'); return }
       for (let i = 0; i < items.length; i++) {
         const item = items[i]; const num = i + 1
         if (!item.qty || item.qty <= 0) { toast.error(`Artículo #${num}: la cantidad es requerida`); return }
@@ -476,42 +614,94 @@ export default function PedidoForm() {
           <div className="card-header"><h2 className="card-title">Información General</h2></div>
           <div className="card-body">
             <div className="form-row form-row-3">
-              <div className="ff-wrap">
-                <label className="ff-label ff-required">Cliente</label>
-                <SearchSelect
-                  value={customerId}
-                  onChange={(id, opt) => {
-                    const cid = id === '' ? '' : (opt?.value ?? id)
-                    setCustomerId(cid)
-                    setCustomerName(opt?.label ?? '')
-                    const c = cid && customersData?.items?.find((c) => c.id === cid)
-                    setCustomerPriceTier(c?.priceTier)
-                  }}
-                  options={customerOptions}
-                  selectedLabel={customerName}
-                  onSearch={setCustomerQuery}
-                  loading={false}
-                  placeholder="Buscar cliente…"
-                  error={submitted && !customerId}
-                />
-              </div>
+<div className="ff-wrap">
+                 <label className="ff-label ff-required">Cliente</label>
+                 {esClienteOcasional ? (
+                   <input
+                     className="ff-input"
+                     value={clienteOcasionalNombre}
+                     onChange={(e) => setClienteOcasionalNombre(e.target.value)}
+                     placeholder="Nombre del cliente ocasional"
+                     required={esClienteOcasional}
+                   />
+                 ) : (
+                   <SearchSelect
+                     value={customerId}
+                     onChange={(id, opt) => {
+                       const cid = id === '' ? '' : (opt?.value ?? id)
+                       setCustomerId(cid)
+                       setCustomerName(opt?.label ?? '')
+                       const c = cid ? customersData?.items?.find((c) => c.id === cid) : undefined
+                       setCustomerPriceTier(c?.priceTier)
+                     }}
+                     options={customerOptions}
+                     selectedLabel={customerName}
+                     onSearch={setCustomerQuery}
+                     loading={false}
+                     placeholder="Buscar cliente…"
+                     error={submitted && !customerId}
+                     headerContent={
+                       <button
+                         type="button"
+                         className="btn btn-ghost btn-size-sm"
+                         style={{ width: '100%', justifyContent: 'flex-start' }}
+                         onClick={() => setShowCreateCustomer(true)}
+                       >
+                         <UserPlus size={14} /> Agregar cliente
+                       </button>
+                     }
+                   />
+                 )}
+               </div>
+               {esClienteOcasional && (
+                 <div className="ff-wrap">
+                   <label className="ff-label">Dirección</label>
+                   <input
+                     className="ff-input"
+                     value={clienteOcasionalDireccion}
+                     onChange={(e) => setClienteOcasionalDireccion(e.target.value)}
+                     placeholder="Dirección del cliente ocasional (opcional)"
+                   />
+                 </div>
+               )}
+
+               <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
+                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                   <input type="checkbox" checked={esClienteOcasional} onChange={(e) => { setEsClienteOcasional(e.target.checked); if (e.target.checked) setCustomerId('') }} />
+                   Venta ocasional (cliente no registrado)
+                 </label>
+                 {esClienteOcasional && (
+                   <p className="ff-hint" style={{ marginTop: 4 }}>
+                     Ingresa el nombre del cliente. No se requiere RUC/Cédula para pedidos.
+                   </p>
+                 )}
+               </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Fecha</label>
-                <input type="date" className="ff-input" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
+                <DatePicker value={transactionDate} onChange={setTransactionDate} className="ff-input" />
               </div>
               <div className="ff-wrap">
                 <label className="ff-label">Entrega estimada</label>
-                <input type="date" className="ff-input" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
+                <DatePicker value={deliveryDate} onChange={setDeliveryDate} className="ff-input" clearable />
               </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Sucursal</label>
-                <select className={`ff-select${!branch ? ' ff-input-error' : ''}`} value={branch} onChange={(e) => setBranch(e.target.value)}>
-                  <option value="">Sin especificar</option>
-                  {branchOptions.map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
+                <SearchSelect
+                  value={branch}
+                  onChange={(val) => { setBranch(val); setBranchError(false) }}
+                  options={branchSelectOptions}
+                  onSearch={setBranchSearch}
+                  selectedLabel={branch}
+                  placeholder="Sin especificar"
+                  error={!branch || branchError}
+                />
               </div>
+              {usaDepartamentos && (
+                <div className="ff-wrap">
+                  <label className="ff-label">Departamento</label>
+                  <DepartmentSelect value={department} onChange={setDepartment} placeholder="Buscar departamento…" />
+                </div>
+              )}
             </div>
 
             {!isEdit && (
@@ -556,7 +746,11 @@ export default function PedidoForm() {
                   <tr><td colSpan={9} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>No hay artículos.</td></tr>
                 ) : (
                   items.map((item, index) => (
-                    <tr key={index}>
+                    <tr
+                      key={index}
+                      ref={(el) => { rowRefs.current[index] = el }}
+                      className={highlightedRow === index ? 'row-flash' : undefined}
+                    >
                       <td>
                         <ItemSelect value={item.itemCode} selectedLabel={item.itemLabel} onSelect={(ci) => selectCatalogItem(index, ci)} onSelectBundle={(b) => selectBundle(index, b)} includeBundles onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0 })} onVariantSelect={(t) => setVariantTemplate(t)} validateStock branch={branch || undefined} />
                       </td>
@@ -572,7 +766,7 @@ export default function PedidoForm() {
                         )}
                       </td>
                       <td>
-                        <input className={`items-input${submitted && (!item.rate || item.rate <= 0) ? ' items-input-error' : ''}`} type="number" min="0" step="0.01" value={item.rate} disabled style={{ textAlign: 'right' }} />
+                        <input className={`items-input${submitted && (!item.rate || item.rate <= 0) ? ' items-input-error' : ''}`} type="number" min="0" step="0.01" value={round2(item.rate)} disabled style={{ textAlign: 'right' }} />
                       </td>
                       <td>
                         {(() => {
@@ -597,7 +791,7 @@ export default function PedidoForm() {
                           )
                         })()}
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount, { trimZeros: true })}</td>
                       <td>
                         {item.itemType === 'service' || item.itemType === 'combo' ? (
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
@@ -672,6 +866,13 @@ export default function PedidoForm() {
 
       {viewItemCode && (
         <ItemDetailModal itemCode={viewItemCode} onClose={() => setViewItemCode(null)} />
+      )}
+
+      {showCreateCustomer && (
+        <CustomerQuickCreateModal
+          onCreated={handleCustomerCreated}
+          onClose={() => setShowCreateCustomer(false)}
+        />
       )}
 
       <PinModal

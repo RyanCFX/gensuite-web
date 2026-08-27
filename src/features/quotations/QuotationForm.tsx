@@ -1,17 +1,20 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffectOnActive } from 'keepalive-for-react'
 
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useTabs } from '@/contexts/TabsContext'
 import { createQuotation, updateQuotation, getQuotation, getQuotationDuplicateSource } from '@/shared/api/quotations'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getDefaultPriceTier } from '@/shared/api/catalog'
-import { listImpuestosVentas, listAlmacenes } from '@/shared/api/config'
-import type { CreateQuotationDto, ItemPrices, Bundle } from '@/shared/api/types'
+import { listImpuestosVentas, listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
+import type { CreateQuotationDto, ItemPrices, Bundle, Customer } from '@/shared/api/types'
 import type { Item } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
-import { formatDOP, displayId } from '@/lib/formatters'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, ShieldAlert } from 'lucide-react'
+import { formatDOP, displayId, round2 } from '@/lib/formatters'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
+import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -27,6 +30,9 @@ import { client } from '@/shared/api/client'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -46,6 +52,9 @@ interface LineItem {
   uom: string
   _prices?: ItemPrices
   maxDiscountPct?: number
+  autoDiscountPct?: number
+  manualDiscountPct: number
+  allowsDiscount?: boolean
   warehouse: string
   /** Stock por almacén del artículo seleccionado, para validar contra el almacén elegido en la línea */
   _stockByWarehouse?: Record<string, number>
@@ -95,6 +104,7 @@ export default function QuotationForm() {
   const isEdit = !!id
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { multiTab, activeId, closeTab } = useTabs()
   const [searchParams] = useSearchParams()
   const duplicateId = searchParams.get('duplicate')
 
@@ -102,9 +112,22 @@ export default function QuotationForm() {
   const [customerName, setCustomerName] = useState('')
   const [customerPriceTier, setCustomerPriceTier] = useState<keyof ItemPrices | undefined>(undefined)
   const [customerQuery, setCustomerQuery] = useState('')
+  const [showCreateCustomer, setShowCreateCustomer] = useState(false)
+  const [esClienteOcasional, setEsClienteOcasional] = useState(false)
+  const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
+  const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
   const [date, setDate] = useState(todayIso())
   const [validTill, setValidTill] = useState(defaultValidTill())
   const [items, setItems] = useState<LineItem[]>([])
+  const [highlightedRow, setHighlightedRow] = useState<number | null>(null)
+  const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
+  const flashRow = useCallback((index: number) => {
+    rowRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setTimeout(() => {
+      setHighlightedRow(index)
+      setTimeout(() => setHighlightedRow((cur) => (cur === index ? null : cur)), 2200)
+    }, 400)
+  }, [])
   const [notes, setNotes] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
@@ -117,6 +140,13 @@ export default function QuotationForm() {
   const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
 
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
+
   // ── Load existing quotation when editing ─────────────────────────────────
   const { data: existingQuotation, isLoading: loadingQuotation } = useQuery({
     queryKey: ['quotation', id],
@@ -124,28 +154,40 @@ export default function QuotationForm() {
     enabled: isEdit,
   })
 
-  useEffect(() => {
-    if (!existingQuotation || initialized) return
-    setCustomerId(existingQuotation.customer)
-    setCustomerName(existingQuotation.customerName)
-    setDate(existingQuotation.date)
-    setValidTill(existingQuotation.validTill ?? defaultValidTill())
-    setItems(existingQuotation.items.map((i) => ({
-      itemCode: i.itemCode,
-      description: i.description,
-      qty: i.qty,
-      rate: i.rate,
-      amount: i.amount,
-      discountPct: i.discountPct ?? 0,
-      salesTaxPct: 0,
-      salesTaxTemplate: '',
-      uom: i.uom,
-      warehouse: '',
-    })))
-    setNotes(existingQuotation.notes ?? '')
-    setBranch(existingQuotation.branch ?? '')
-    setInitialized(true)
-  }, [existingQuotation, initialized])
+  // Con Multipestañas, esta pantalla queda montada (KeepAlive) al cambiar de pestaña — al volver
+  // a ella se re-consulta por si la cotización cambió en el servidor mientras el usuario estaba en otra.
+  useEffectOnActive(() => {
+    if (isEdit) queryClient.invalidateQueries({ queryKey: ['quotation', id] })
+  }, [isEdit, id], true)
+
+useEffect(() => {
+     if (!existingQuotation || initialized) return
+     setCustomerId(existingQuotation.customer)
+     setCustomerName(existingQuotation.customerName)
+     setDate(existingQuotation.date)
+     setValidTill(existingQuotation.validTill ?? defaultValidTill())
+      setItems(existingQuotation.items.map((i) => ({
+        itemCode: i.itemCode,
+        description: i.description ?? '',
+        qty: i.qty,
+        rate: i.rate,
+        amount: i.amount,
+        discountPct: i.discountPct ?? 0,
+        manualDiscountPct: 0,
+        salesTaxPct: 0,
+        salesTaxTemplate: '',
+        uom: i.uom,
+        warehouse: '',
+      })))
+     setNotes(existingQuotation.notes ?? '')
+     setBranch(existingQuotation.branch ?? '')
+     if (existingQuotation.esClienteOcasional) {
+       setEsClienteOcasional(true)
+       setClienteOcasionalNombre(existingQuotation.clienteOcasionalNombre ?? '')
+       setClienteOcasionalDireccion(existingQuotation.clienteOcasionalDireccion ?? '')
+     }
+     setInitialized(true)
+   }, [existingQuotation, initialized])
 
   // ── Duplicar: precargar desde una cotización existente (no crea nada) ────
   const { data: duplicateSource } = useQuery({
@@ -170,6 +212,7 @@ export default function QuotationForm() {
       rate: i.rate,
       amount: calcAmount(i.qty, i.rate, i.discountPct ?? 0),
       discountPct: i.discountPct ?? 0,
+      manualDiscountPct: 0,
       salesTaxPct: 0,
       salesTaxTemplate: '',
       uom: i.uom ?? 'Unidad',
@@ -192,11 +235,20 @@ export default function QuotationForm() {
         toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
         return
       }
-      const res = await listItems({ barcode: code, limit: 1, validateStock: true, branch })
+      const res = await listItems({ barcode: code, limit: 1, branch })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
+      const existingIndex = items.findIndex((row) => row.itemCode === item.id)
+      if (existingIndex !== -1) {
+        flashRow(existingIndex)
+        return
+      }
+      const targetIndex = items.length
       addRow()
-      setTimeout(() => selectCatalogItem(items.length, item), 0)
+      setTimeout(() => {
+        selectCatalogItem(targetIndex, item, { autoAddRow: false })
+        addRow()
+      }, 0)
     },
   })
 
@@ -309,14 +361,26 @@ export default function QuotationForm() {
     sublabel: c.rnc ?? c.cedula,
   }))
 
+  function handleCustomerCreated(customer: Customer) {
+    setShowCreateCustomer(false)
+    setCustomerId(customer.id)
+    setCustomerName(customer.customerName)
+    setCustomerPriceTier(customer.priceTier)
+    queryClient.invalidateQueries({ queryKey: ['customerSearch'] })
+  }
+
   // ── Mutations ────────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
     mutationFn: (dto: CreateQuotationDto) => createQuotation(dto),
     onSuccess: (quotation) => {
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['quotations'] })
       toast.success('Cotización creada correctamente')
       navigate(`/cotizaciones/${quotation.id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string }) => {
       handleError(err)
@@ -326,8 +390,9 @@ export default function QuotationForm() {
   const updateMutation = useMutation({
     mutationFn: (dto: Partial<CreateQuotationDto>) => updateQuotation(id!, dto),
     onSuccess: (quotation) => {
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['quotations'] })
-      queryClient.invalidateQueries({ queryKey: ['quotation', id] })
+      queryClient.removeQueries({ queryKey: ['quotation', id] })
       if (quotation.id !== id) {
         toast.success(`Nueva versión creada: ${displayId(quotation.id, quotation.sequence)}`)
         navigate(`/cotizaciones/${quotation.id}`)
@@ -335,6 +400,9 @@ export default function QuotationForm() {
         toast.success(`Versión ${quotation.sequence} guardada como historial`)
         navigate(`/cotizaciones/${quotation.id}`, { replace: true })
       }
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string }) => {
       handleError(err)
@@ -343,27 +411,29 @@ export default function QuotationForm() {
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
-  function submitDto() {
-    const dto: CreateQuotationDto = {
-      customer: customerId,
-      date,
-      validTill,
-      branch: branch || undefined,
-      items: items.map((i) => ({
-        itemCode: i.itemCode,
-        description: i.description,
-        qty: i.qty,
-        rate: i.rate,
-        discountPct: i.discountPct || undefined,
-        uom: i.uom || undefined,
-        warehouse: i.warehouse || undefined,
-      })),
-      notes: notes || undefined,
-      taxesTemplate: taxesTemplate || undefined,
-    }
-    if (id) updateMutation.mutate(dto)
-    else createMutation.mutate(dto)
-  }
+function submitDto() {
+     const dto: CreateQuotationDto = {
+       ...(esClienteOcasional
+         ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalDireccion: clienteOcasionalDireccion || undefined }
+         : { customer: customerId }),
+       date,
+       validTill,
+       branch: branch || undefined,
+       items: items.map((i) => ({
+         itemCode: i.itemCode,
+         description: i.description,
+         qty: i.qty,
+         rate: i.rate,
+         discountPct: i.discountPct || undefined,
+         uom: i.uom || undefined,
+         warehouse: i.warehouse || undefined,
+       })),
+       notes: notes || undefined,
+       taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
+     }
+     if (id) updateMutation.mutate(dto)
+     else createMutation.mutate(dto)
+   }
 
   function handleError(err: { message?: string }) {
     const msg = err?.message ?? ''
@@ -386,6 +456,9 @@ export default function QuotationForm() {
       prev.map((item, i) => {
         if (i !== index) return item
         const updated = { ...item, ...patch }
+        if ('manualDiscountPct' in patch) {
+          updated.discountPct = (updated.autoDiscountPct ?? 0) + (updated.manualDiscountPct ?? 0)
+        }
         if ('qty' in patch || 'rate' in patch || 'discountPct' in patch) {
           updated.amount = calcAmount(updated.qty, updated.rate, updated.discountPct)
         }
@@ -429,6 +502,9 @@ export default function QuotationForm() {
           salesTaxTemplate: s.item.salesTaxTemplate ?? '',
           uom: s.item.stockUom ?? 'Unidad',
           maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
+          autoDiscountPct: s.item.autoDiscount?.discountType === 'Discount Percentage' ? s.item.autoDiscount.discountPercentage : undefined,
+          manualDiscountPct: 0,
+          allowsDiscount: s.item.allowsDiscount,
           _prices: s.item.prices,
           warehouse: defaultWarehouse(),
           _stockByWarehouse: s.item.stockByWarehouse,
@@ -438,10 +514,13 @@ export default function QuotationForm() {
     setVariantTemplate(null)
   }
 
-  function selectCatalogItem(index: number, catalogItem: Item) {
+  function selectCatalogItem(index: number, catalogItem: Item, opts?: { autoAddRow?: boolean }) {
+    const autoAddRow = opts?.autoAddRow ?? true
     const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
-    setItems((prev) =>
-      prev.map((row, i) => {
+    let wasLastRow = false
+    setItems((prev) => {
+      wasLastRow = index === prev.length - 1
+      return prev.map((row, i) => {
         if (i !== index) return row
         const rate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
         return {
@@ -453,6 +532,9 @@ export default function QuotationForm() {
           rate,
           amount: calcAmount(row.qty, rate, row.discountPct),
           maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
+          autoDiscountPct: catalogItem.autoDiscount?.discountType === 'Discount Percentage' ? catalogItem.autoDiscount.discountPercentage : undefined,
+          manualDiscountPct: 0,
+          allowsDiscount: catalogItem.allowsDiscount,
           uom: catalogItem.stockUom ?? row.uom,
           _prices: catalogItem.prices,
           salesTaxPct: catalogItem.salesTaxPct ?? 0,
@@ -461,14 +543,17 @@ export default function QuotationForm() {
           _stockByWarehouse: catalogItem.stockByWarehouse,
           stockError: undefined,
         }
-      }),
-    )
+      })
+    })
+    if (autoAddRow && wasLastRow) addRow()
   }
 
   function selectBundle(index: number, bundle: Bundle) {
     const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
-    setItems((prev) =>
-      prev.map((row, i) => {
+    let wasLastRow = false
+    setItems((prev) => {
+      wasLastRow = index === prev.length - 1
+      return prev.map((row, i) => {
         if (i !== index) return row
         const rate = bundle.prices?.[tier] ?? 0
         return {
@@ -488,12 +573,13 @@ export default function QuotationForm() {
           _stockByWarehouse: undefined,
           stockError: undefined,
         }
-      }),
-    )
+      })
+    })
+    if (wasLastRow) addRow()
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '' })
+    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '' })
   }
 
   // ── Reprice on customer change ───────────────────────────────────────────
@@ -513,7 +599,7 @@ export default function QuotationForm() {
       toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
       return
     }
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', warehouse: '' }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', warehouse: '' }])
   }
   function removeRow(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index))
@@ -525,16 +611,37 @@ export default function QuotationForm() {
   const taxTotal = items.reduce((s, i) => s + (i.amount * i.salesTaxPct / 100), 0)
   const total = subtotal + taxTotal
 
+  const isDirty = useDirtyCheck({
+    customerId,
+    esClienteOcasional,
+    clienteOcasionalNombre,
+    clienteOcasionalDireccion,
+    date,
+    validTill,
+    items,
+    notes,
+    branch,
+    taxesTemplate,
+  }, isEdit || duplicateId ? initialized : true)
+  useBeforeUnloadWarning(isDirty)
+
   // ── Submit ────────────────────────────────────────────────────────────────
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitted(true)
 
-    if (!customerId) {
-      toast.error('Selecciona un cliente')
-      return
-    }
+if (esClienteOcasional) {
+       if (!clienteOcasionalNombre.trim()) {
+         toast.error('Ingresa el nombre del cliente ocasional')
+         return
+       }
+     } else {
+       if (!customerId) {
+         toast.error('Selecciona un cliente')
+         return
+       }
+     }
     if (items.length === 0) {
       toast.error('Agrega al menos un artículo')
       return
@@ -603,47 +710,90 @@ export default function QuotationForm() {
           </div>
           <div className="card-body">
             <div className="form-row form-row-3">
-              <div className="ff-wrap">
-                <label className="ff-label ff-required" htmlFor="customer">Cliente</label>
-                <SearchSelect
-                  id="customer"
-                  value={customerId}
-                  onChange={(id, opt) => {
-                    const cid = id === '' ? '' : (opt?.value ?? id)
-                    setCustomerId(cid)
-                    setCustomerName(opt?.label ?? '')
-                    const c = cid && customersData?.items?.find((c) => c.id === cid)
-                    setCustomerPriceTier(c?.priceTier)
-                  }}
-                  options={customerOptions}
-                  selectedLabel={customerName}
-                  onSearch={setCustomerQuery}
-                  loading={loadingCustomers}
-                  placeholder="Buscar cliente…"
-                  error={!customerId}
-                />
-              </div>
+<div className="ff-wrap">
+                 <label className="ff-label ff-required" htmlFor="customer">Cliente</label>
+                 {esClienteOcasional ? (
+                   <input
+                     id="customer"
+                     className="ff-input"
+                     value={clienteOcasionalNombre}
+                     onChange={(e) => setClienteOcasionalNombre(e.target.value)}
+                     placeholder="Nombre del cliente ocasional"
+                     required={esClienteOcasional}
+                   />
+                 ) : (
+                   <SearchSelect
+                     id="customer"
+                     value={customerId}
+                     onChange={(id, opt) => {
+                       const cid = id === '' ? '' : (opt?.value ?? id)
+                       setCustomerId(cid)
+                       setCustomerName(opt?.label ?? '')
+                       const c = cid ? customersData?.items?.find((c) => c.id === cid) : undefined
+                       setCustomerPriceTier(c?.priceTier)
+                     }}
+                     options={customerOptions}
+                     selectedLabel={customerName}
+                     onSearch={setCustomerQuery}
+                     loading={loadingCustomers}
+                     placeholder="Buscar cliente…"
+                     error={!customerId}
+                     headerContent={
+                       <button
+                         type="button"
+                         className="btn btn-ghost btn-size-sm"
+                         style={{ width: '100%', justifyContent: 'flex-start' }}
+                         onClick={() => setShowCreateCustomer(true)}
+                       >
+                         <UserPlus size={14} /> Agregar cliente
+                       </button>
+                     }
+                   />
+                 )}
+               </div>
+               {esClienteOcasional && (
+                 <div className="ff-wrap">
+                   <label className="ff-label" htmlFor="clienteOcasionalDireccion">Dirección</label>
+                   <input
+                     id="clienteOcasionalDireccion"
+                     className="ff-input"
+                     value={clienteOcasionalDireccion}
+                     onChange={(e) => setClienteOcasionalDireccion(e.target.value)}
+                     placeholder="Dirección del cliente ocasional (opcional)"
+                   />
+                 </div>
+               )}
+
+               <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
+                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                   <input type="checkbox" checked={esClienteOcasional} onChange={(e) => { setEsClienteOcasional(e.target.checked); if (e.target.checked) setCustomerId('') }} />
+                   Venta ocasional (cliente no registrado)
+                 </label>
+                 {esClienteOcasional && (
+                   <p className="ff-hint" style={{ marginTop: 4 }}>
+                     Ingresa el nombre del cliente. No se requiere RUC/Cédula para cotizaciones.
+                   </p>
+                 )}
+               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="date">Fecha</label>
-                <input
+                <DatePicker
                   id="date"
-                  type="date"
                   className="ff-input"
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  required
+                  onChange={setDate}
                 />
               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="validTill">Válida hasta</label>
-                <input
+                <DatePicker
                   id="validTill"
-                  type="date"
                   className="ff-input"
                   value={validTill}
-                  onChange={(e) => setValidTill(e.target.value)}
+                  onChange={setValidTill}
+                  clearable
                 />
               </div>
 
@@ -662,19 +812,21 @@ export default function QuotationForm() {
                 />
               </div>
 
-              <div className="ff-wrap">
-                <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
-                <SearchSelect
-                  id="taxesTemplate"
-                  value={taxesTemplate}
-                  onChange={(val) => setTaxesTemplate(val)}
-                  options={taxesTemplateOptions}
-                  onSearch={setTaxesTemplateSearch}
-                  selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
-                  placeholder="Usar el default de la compañía"
-                />
-                <p className="ff-hint">Impuesto aplicado al total del documento (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
-              </div>
+              {usaImpuestoDocumento && (
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
+                  <SearchSelect
+                    id="taxesTemplate"
+                    value={taxesTemplate}
+                    onChange={(val) => setTaxesTemplate(val)}
+                    options={taxesTemplateOptions}
+                    onSearch={setTaxesTemplateSearch}
+                    selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
+                    placeholder="Usar el default de la compañía"
+                  />
+                  <p className="ff-hint">Impuesto aplicado al total del documento (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -692,7 +844,10 @@ export default function QuotationForm() {
                   <th>Descripción</th>
                   <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
-                  <th style={{ textAlign: 'right', width: 80 }}>Dto. %</th>
+                  <th style={{ textAlign: 'right', width: 80 }}>
+                  Dto. %
+                  <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} />
+                </th>
                   <th style={{ textAlign: 'right', width: 80 }}>Impuesto</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 72 }}>UDM</th>
@@ -709,7 +864,11 @@ export default function QuotationForm() {
                   </tr>
                 ) : (
                   items.map((item, index) => (
-                    <tr key={index}>
+                    <tr
+                      key={index}
+                      ref={(el) => { rowRefs.current[index] = el }}
+                      className={highlightedRow === index ? 'row-flash' : undefined}
+                    >
                       {/* Artículo — SearchSelect por catálogo */}
                       <td style={{ minWidth: 200 }}>
                         <ItemSelect
@@ -758,7 +917,7 @@ export default function QuotationForm() {
                           type="number"
                           min="0"
                           step="0.01"
-                          value={item.rate}
+                          value={round2(item.rate)}
                           disabled
                           style={{ textAlign: 'right' }}
                         />
@@ -767,22 +926,38 @@ export default function QuotationForm() {
                       {/* Descuento */}
                       <td>
                         {(() => {
+                          const autoPct = item.autoDiscountPct ?? 0
                           const itemMax = item.maxDiscountPct && item.maxDiscountPct > 0 ? item.maxDiscountPct : 100
                           const userMax = currentUser?.maxDiscountPct && currentUser.maxDiscountPct > 0 ? currentUser.maxDiscountPct : 100
                           const priceLimit = maxDiscFromPrices(item.rate, item._prices)
                           const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
+                          const allowsManual = item.allowsDiscount !== false
                           return (
                             <>
+                              {autoPct > 0 && (
+                                <div style={{ marginBottom: 4 }}>
+                                  <span className="badge badge-discount" style={{ fontSize: 10, padding: '2px 6px' }}>
+                                    {autoPct}% auto
+                                  </span>
+                                </div>
+                              )}
                               <input
                                 className={`items-input${submitted && item.discountPct > effectiveLimit ? ' items-input-error' : ''}`}
                                 type="number"
                                 min="0"
                                 max="100"
                                 step="0.1"
-                                value={item.discountPct}
-                                onChange={(e) => updateItem(index, { discountPct: parseFloat(e.target.value) || 0 })}
+                                value={item.manualDiscountPct}
+                                onChange={(e) => updateItem(index, { manualDiscountPct: parseFloat(e.target.value) || 0 })}
                                 style={{ textAlign: 'right', width: 64 }}
+                                disabled={!allowsManual}
+                                title={allowsManual ? undefined : 'Este artículo no acepta descuentos'}
                               />
+                              {item.discountPct > 0 && (
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                  Total: {item.discountPct.toFixed(1)}%
+                                </span>
+                              )}
                               {effectiveLimit < 100 && (
                                 <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
                                   máx {effectiveLimit.toFixed(2)}%
@@ -793,6 +968,9 @@ export default function QuotationForm() {
                                   Supera el límite de {effectiveLimit.toFixed(2)}%
                                 </span>
                               )}
+                              <span style={{ fontSize: 10, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, cursor: 'help' }} title="El descuento puede incluir una parte automática (Pricing Rule) y una parte manual del vendedor. Ambas se suman contra el tope máximo.">
+                                ⓘ automático + manual
+                              </span>
                             </>
                           )
                         })()}
@@ -807,7 +985,7 @@ export default function QuotationForm() {
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount, { trimZeros: true })}</td>
 
                       <td>
                         {item.itemType === 'service' || item.itemType === 'combo' ? (
@@ -933,6 +1111,13 @@ export default function QuotationForm() {
 
       {viewItemCode && (
         <ItemDetailModal itemCode={viewItemCode} onClose={() => setViewItemCode(null)} />
+      )}
+
+      {showCreateCustomer && (
+        <CustomerQuickCreateModal
+          onCreated={handleCustomerCreated}
+          onClose={() => setShowCreateCustomer(false)}
+        />
       )}
     </div>
   )

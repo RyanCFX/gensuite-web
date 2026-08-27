@@ -45,3 +45,13 @@ export async function getLibroMayor(params?: LibroMayorParams): Promise<LibroMay
   )
   return res.data.data
 }
+
+export async function downloadLibroMayorPdf(params?: LibroMayorParams): Promise<void> {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.libroMayorPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `libro-mayor_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}

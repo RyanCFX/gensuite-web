@@ -1,11 +1,14 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffectOnActive } from 'keepalive-for-react'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { createItem, listCategories, listBrands } from '@/shared/api/catalog'
+import { useTabs } from '@/contexts/TabsContext'
+import { createItem, updateItem, getItem, listCategories, listBrands } from '@/shared/api/catalog'
+import type { CreateItemDto } from '@/shared/api/types'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listUOMs, getEmpresa, listItemTaxTemplates } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -13,16 +16,18 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { AttributeSelect } from '@/components/shared/AttributeSelect'
 import { ArrowLeft, Plus, Trash2, HelpCircle } from 'lucide-react'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 const schema = z.object({
   itemName: z.string().min(1, 'El nombre es requerido'),
   type: z.enum(['product', 'service']),
-  category: z.string().min(1, 'La categoría es requerida'),
+  category: z.string().optional(),
   subcategory: z.string().optional(),
   brand: z.string().optional(),
   itemCode: z.string().optional(),
   shortName: z.string().optional(),
   notes: z.string().optional(),
+  image: z.string().optional(),
   hasWarranty: z.boolean().optional(),
   warrantyPeriod: z.number().min(0).optional().catch(undefined),
   description: z.string().optional(),
@@ -45,11 +50,6 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-const TYPE_OPTIONS_ALL = [
-  { value: 'product', label: 'Producto' },
-  { value: 'service', label: 'Servicio' },
-]
-
 const PRICE_MODE_OPTIONS_ALL = [
   { value: 'manual', label: 'Manual' },
   { value: 'cost_plus', label: 'Sobre costo' },
@@ -70,28 +70,44 @@ const BARCODE_TYPE_OPTIONS_ALL = [
 export default function ItemForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const location = useLocation()
+  const { id } = useParams<{ id: string }>()
+  const isEdit = Boolean(id)
+  const { multiTab, activeId, closeTab } = useTabs()
+
+  // Productos y Servicios son módulos separados que comparten esta implementación — el tipo
+  // queda fijo según la ruta desde la que se entró, nunca es elegible por el usuario.
+  const fixedType: 'product' | 'service' = location.pathname.startsWith('/catalogo/servicios') ? 'service' : 'product'
+  const isProduct = fixedType === 'product'
+  const basePath = isProduct ? '/inventario/productos' : '/catalogo/servicios'
+  const moduleLabel = isProduct ? 'Producto' : 'Servicio'
+
   const [showVariants, setShowVariants] = useState(false)
   const [hasVariants, setHasVariants] = useState(false)
   const [selectedAttributes, setSelectedAttributes] = useState<string[]>([])
   const [showWarranty, setShowWarranty] = useState(false)
   const [barcodes, setBarcodes] = useState<{ barcode: string; barcodeType: string }[]>([])
+  const [noPurchaseTax, setNoPurchaseTax] = useState(false)
+  const [noSalesTax, setNoSalesTax] = useState(false)
 
-  const { data: categoriesData } = useQuery({
-    queryKey: ['categories-tree'],
-    queryFn: () => listCategories({ tree: true }),
+  const { data: categoriesData, refetch: refetchCategories } = useQuery({
+    queryKey: ['categories-tree', fixedType],
+    // Solo trae categorías que aplican a este tipo de artículo (aplicaA = 'Ambas' o fixedType) —
+    // el usuario nunca ve ni puede elegir una categoría que no le corresponde.
+    queryFn: () => listCategories({ tree: true, type: fixedType }),
   })
 
-  const { data: brandsData } = useQuery({
+  const { data: brandsData, refetch: refetchBrands } = useQuery({
     queryKey: ['brands', {}],
     queryFn: () => listBrands(),
   })
 
-  const { data: warehousesData } = useQuery({
+  const { data: warehousesData, refetch: refetchWarehouses } = useQuery({
     queryKey: ['warehouses'],
     queryFn: () => listWarehouses(),
   })
 
-  const { data: uomsData } = useQuery({
+  const { data: uomsData, refetch: refetchUoms } = useQuery({
     queryKey: ['uoms'],
     queryFn: listUOMs,
     staleTime: 5 * 60_000,
@@ -106,7 +122,7 @@ export default function ItemForm() {
   // "Impuesto de Compra"/"Impuesto de Venta" del artículo son Item Tax Template — mismo
   // doctype para ambos campos, distinto de los templates de impuesto de documento
   // (impuestos-ventas/impuestos-compras) que aplican al total de cotizaciones/facturas/compras.
-  const { data: itemTaxTemplates } = useQuery({
+  const { data: itemTaxTemplates, refetch: refetchItemTaxTemplates } = useQuery({
     queryKey: ['item-tax-templates'],
     queryFn: listItemTaxTemplates,
     staleTime: 5 * 60_000,
@@ -115,15 +131,50 @@ export default function ItemForm() {
   const itemCodeMode = empresa?.itemCodeMode ?? 'manual'
   const isAutoCode = itemCodeMode === 'auto' || itemCodeMode === 'prefix_auto'
 
+  const { data: existingItem, isLoading: itemLoading } = useQuery({
+    queryKey: ['item', id],
+    queryFn: () => getItem(id!),
+    enabled: isEdit,
+  })
+
+  // Con Multipestañas, esta pantalla queda montada (KeepAlive) al cambiar de pestaña — al volver
+  // a ella se re-consulta por si el artículo cambió en el servidor mientras el usuario estaba en otra.
+  useEffectOnActive(() => {
+    if (isEdit) queryClient.invalidateQueries({ queryKey: ['item', id] })
+  }, [isEdit, id], true)
+
   const createMutation = useMutation({
     mutationFn: (data: Parameters<typeof createItem>[0]) => createItem(data),
     onSuccess: (result) => {
-      toast.success(`Artículo creado con código ${result.id}`)
+      toast.success(`${moduleLabel} creado con código ${result.id}`)
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['items'] })
-      navigate('/inventario/articulos')
+      navigate(basePath)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
-    onError: () => {
-      toast.error('Error al crear el artículo')
+    onError: (err: { message?: string }) => {
+      // Ej. mismatch de categoría/tipo (400): "La categoría "X" solo aplica a Servicios,
+      // no se puede usar para un artículo de tipo Producto." — se muestra tal cual.
+      toast.error(err?.message ?? `Error al crear el ${moduleLabel.toLowerCase()}`)
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: (data: Partial<CreateItemDto>) => updateItem(id!, data),
+    onSuccess: () => {
+      toast.success(`${moduleLabel} actualizado`)
+      const formTabId = activeId
+      queryClient.invalidateQueries({ queryKey: ['items'] })
+      queryClient.removeQueries({ queryKey: ['item', id] })
+      navigate(`${basePath}/${id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(err?.message ?? `Error al actualizar el ${moduleLabel.toLowerCase()}`)
     },
   })
 
@@ -133,12 +184,13 @@ export default function ItemForm() {
     watch,
     control,
     setValue,
-    formState: { errors, isSubmitting },
+    reset,
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       itemName: '',
-      type: 'product',
+      type: fixedType,
       category: '',
       subcategory: '',
       brand: '',
@@ -154,6 +206,7 @@ export default function ItemForm() {
       description: '',
       shortName: '',
       notes: '',
+      image: '',
       hasWarranty: false,
       warrantyPeriod: undefined,
       defaultWarehouse: '',
@@ -166,7 +219,53 @@ export default function ItemForm() {
     },
   })
 
-  const selectedType = watch('type')
+  useBeforeUnloadWarning(isDirty)
+
+  // Precarga el formulario al editar — se corre una sola vez cuando llega el artículo.
+  useEffect(() => {
+    if (!existingItem) return
+    // Defensivo: si alguien entra a la URL de edición de Productos/Servicios con el id de un
+    // artículo del otro tipo, redirige al módulo correcto en vez de mostrar campos que no aplican.
+    if (existingItem.type !== fixedType) {
+      const correctBase = existingItem.type === 'product' ? '/inventario/productos' : '/catalogo/servicios'
+      navigate(`${correctBase}/${existingItem.id}/editar`, { replace: true })
+      return
+    }
+    reset({
+      itemName: existingItem.itemName,
+      type: existingItem.type,
+      category: existingItem.category ?? '',
+      subcategory: existingItem.subcategory ?? '',
+      brand: existingItem.brand ?? '',
+      itemCode: existingItem.id,
+      priceA: existingItem.prices?.A,
+      priceB: existingItem.prices?.B ?? existingItem.standardRate ?? 0,
+      priceC: existingItem.prices?.C,
+      priceMode: existingItem.priceMode ?? 'manual',
+      marginA: existingItem.marginA,
+      marginB: existingItem.marginB,
+      marginC: existingItem.marginC,
+      valuationRate: existingItem.valuationRate,
+      description: existingItem.internalDescription ?? '',
+      shortName: existingItem.shortName ?? '',
+      notes: existingItem.notes ?? '',
+      image: existingItem.image ?? '',
+      hasWarranty: existingItem.hasWarranty ?? false,
+      warrantyPeriod: existingItem.warrantyPeriod,
+      defaultWarehouse: existingItem.defaultWarehouse ?? '',
+      stockUom: existingItem.stockUom ?? '',
+      allowsDiscount: existingItem.allowsDiscount ?? true,
+      maxDiscountPct: existingItem.maxDiscountPct ?? 0,
+      trackingType: existingItem.trackingType ?? 'none',
+      purchaseTaxTemplate: existingItem.purchaseTaxTemplate ?? '',
+      salesTaxTemplate: existingItem.salesTaxTemplate ?? '',
+    })
+    setBarcodes(existingItem.barcodes ?? [])
+    setShowWarranty(!!existingItem.hasWarranty)
+    setNoPurchaseTax(!existingItem.purchaseTaxTemplate)
+    setNoSalesTax(!existingItem.salesTaxTemplate)
+  }, [existingItem, reset, fixedType, navigate])
+
   const watchedPriceMode = watch('priceMode')
   const watchedSalesTaxTemplate = watch('salesTaxTemplate')
   const watchedValuationRate = watch('valuationRate')
@@ -178,16 +277,34 @@ export default function ItemForm() {
   const watchedPriceC = watch('priceC')
 
   const onSubmit = (data: FormValues) => {
+    if (isProduct && !data.category) {
+      toast.error('Selecciona una categoría')
+      return
+    }
     if (subcategoryOptions.length > 0 && !data.subcategory) {
       toast.error('Selecciona una subcategoría')
       return
     }
-    const { description, ...rest } = data
-    createMutation.mutate({
+    if (data.priceMode === 'cost_plus' && !data.valuationRate) {
+      toast.error('Debes ingresar el Costo de Valoración para usar el modo "Sobre costo"')
+      return
+    }
+    if (!noPurchaseTax && !data.purchaseTaxTemplate) {
+      toast.error('Selecciona el impuesto de compra o marca "No lleva impuesto de compra"')
+      return
+    }
+    if (!noSalesTax && !data.salesTaxTemplate) {
+      toast.error('Selecciona el impuesto de venta o marca "No lleva impuesto de venta"')
+      return
+    }
+    const { description, itemCode, ...rest } = data
+    const payload = {
       ...rest,
-      brand: data.brand || undefined,
+      category: data.category || undefined,
+      brand: isProduct ? (data.brand || undefined) : undefined,
       subcategory: data.subcategory || undefined,
       internalDescription: description || undefined,
+      image: data.image || undefined,
       defaultWarehouse: data.defaultWarehouse || undefined,
       valuationRate: data.valuationRate || undefined,
       stockUom: data.stockUom || undefined,
@@ -206,14 +323,24 @@ export default function ItemForm() {
       warrantyPeriod: data.warrantyPeriod || undefined,
       barcodes: barcodes.length > 0 ? barcodes : undefined,
       trackingType: data.trackingType === 'none' ? undefined : data.trackingType,
-      purchaseTaxTemplate: data.purchaseTaxTemplate || undefined,
-      salesTaxTemplate: data.salesTaxTemplate || undefined,
-      hasVariants: hasVariants || undefined,
-      attributes:
-        hasVariants && selectedAttributes.length > 0
-          ? selectedAttributes.map((attr) => ({ attribute: attr }))
-          : undefined,
-    })
+      purchaseTaxTemplate: noPurchaseTax ? undefined : data.purchaseTaxTemplate || undefined,
+      salesTaxTemplate: noSalesTax ? undefined : data.salesTaxTemplate || undefined,
+    }
+
+    if (isEdit) {
+      // itemCode nunca se manda en el update — el backend lo rechaza (400) si viene en el body.
+      updateMutation.mutate(payload)
+    } else {
+      createMutation.mutate({
+        ...payload,
+        itemCode: itemCode || undefined,
+        hasVariants: hasVariants || undefined,
+        attributes:
+          hasVariants && selectedAttributes.length > 0
+            ? selectedAttributes.map((attr) => ({ attribute: attr }))
+            : undefined,
+      })
+    }
   }
 
   const parentCategories = useMemo(() => {
@@ -244,7 +371,6 @@ export default function ItemForm() {
   const [uomSearch, setUomSearch] = useState('')
   const [purchaseTaxSearch, setPurchaseTaxSearch] = useState('')
   const [salesTaxSearch, setSalesTaxSearch] = useState('')
-  const [typeSearch, setTypeSearch] = useState('')
   const [priceModeSearch, setPriceModeSearch] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
   const [trackingSearch, setTrackingSearch] = useState('')
@@ -291,11 +417,6 @@ export default function ItemForm() {
       .map((t) => ({ value: String(t.id), label: t.title }))
   }, [itemTaxTemplates, salesTaxSearch])
 
-  const typeOptions: SearchSelectOption[] = useMemo(() => {
-    const q = typeSearch.toLowerCase()
-    return TYPE_OPTIONS_ALL.filter((o) => !q || o.label.toLowerCase().includes(q))
-  }, [typeSearch])
-
   const priceModeOptions: SearchSelectOption[] = useMemo(() => {
     const q = priceModeSearch.toLowerCase()
     return PRICE_MODE_OPTIONS_ALL.filter((o) => !q || o.label.toLowerCase().includes(q))
@@ -333,10 +454,6 @@ export default function ItemForm() {
 
   const selectedBrandLabel = brands.find((b) => b.id === watchedBrand)?.name ?? ''
 
-  useEffect(() => {
-    setValue('subcategory', '')
-  }, [watchedCategory, setValue])
-
   const taxRate = useMemo(() => {
     const selected = itemTaxTemplates?.find((t) => String(t.id) === watchedSalesTaxTemplate)
     return selected?.taxes?.reduce((sum, t) => sum + (t.notApplicable ? 0 : t.rate), 0) ?? 0
@@ -365,17 +482,35 @@ export default function ItemForm() {
     return watchedValuationRate / (1 - (marginPct / 100))
   }
 
+  if (isEdit && itemLoading) {
+    return (
+      <div className="page-container">
+        <div className="skeleton-box" style={{ height: 28, width: '30%', marginBottom: 16 }} />
+        <div className="skeleton-box" style={{ height: 400, width: '100%' }} />
+      </div>
+    )
+  }
+
+  const backTo = isEdit ? `${basePath}/${id}` : basePath
+  const isTemplate = isEdit && !!existingItem?.hasVariants
+
   return (
     <div className="page-container">
-      <button className="page-back-link" onClick={() => navigate('/inventario/articulos')}>
-        <ArrowLeft size={14} /> Artículos
+      <button className="page-back-link" onClick={() => navigate(backTo)}>
+        <ArrowLeft size={14} /> {isEdit ? `Volver al ${moduleLabel.toLowerCase()}` : moduleLabel + 's'}
       </button>
 
       <PageHeader
-        title="Nuevo Artículo"
-        description="Registra un nuevo producto o servicio en el catálogo"
-        overline="Catálogo"
+        title={isEdit ? `Editar ${existingItem?.itemName ?? moduleLabel}` : `Nuevo ${moduleLabel}`}
+        description={isEdit ? `Modifica los datos del ${moduleLabel.toLowerCase()}` : `Registra un nuevo ${moduleLabel.toLowerCase()} en el catálogo`}
+        overline={isProduct ? 'Inventario' : 'Catálogo'}
       />
+
+      {isTemplate && (
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
+          Este artículo es un template con variantes — las variantes no se pueden editar aquí. Usa la ficha del artículo para gestionarlas.
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 420px', gap: 20, alignItems: 'start' }}>
 
@@ -387,30 +522,15 @@ export default function ItemForm() {
             <div className="card-header"><h2 className="card-title">Información General</h2></div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-              <div className="form-row">
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="type">Tipo <span className="ff-required">*</span></label>
-                  <Controller
-                    name="type"
-                    control={control}
-                    render={({ field }) => (
-                      <SearchSelect
-                        id="type"
-                        value={field.value}
-                        onChange={(val) => field.onChange(val)}
-                        options={typeOptions}
-                        onSearch={setTypeSearch}
-                        selectedLabel={TYPE_OPTIONS_ALL.find((o) => o.value === field.value)?.label ?? ''}
-                      />
-                    )}
-                  />
-                </div>
-
-                <div className="ff-wrap">
+              <div className="ff-wrap">
                   <label className="ff-label" htmlFor="itemCode">
-                    Código {!isAutoCode && <span className="ff-required">*</span>}
+                    Código {!isEdit && !isAutoCode && <span className="ff-required">*</span>}
                   </label>
-                  {isAutoCode ? (
+                  {isEdit ? (
+                    <div className="ff-input" style={{ color: 'var(--text-secondary)', cursor: 'default', background: 'var(--bg-muted)', fontFamily: 'var(--font-mono)' }}>
+                      {existingItem?.id}
+                    </div>
+                  ) : isAutoCode ? (
                     <div className="ff-input" style={{ color: 'var(--text-secondary)', cursor: 'default', background: 'var(--bg-muted)', fontFamily: codePreviewPrefix ? 'var(--font-mono)' : undefined }}>
                       {codePreviewPrefix
                         ? `${codePreviewPrefix}-XXXX`
@@ -424,13 +544,13 @@ export default function ItemForm() {
                       {...register('itemCode')}
                     />
                   )}
-                  {codePreviewPrefix && (
+                  {!isEdit && codePreviewPrefix && (
                     <p className="ff-hint">
                       Se usará el prefijo de la{subcategoryOptions.length > 0 && watchedSubcategory ? ' subcategoría' : ' categoría'}: <strong style={{ fontFamily: 'var(--font-mono)' }}>{codePreviewPrefix}-XXXX</strong>
                     </p>
                   )}
-                  {errors.itemCode && <span className="ff-error">{errors.itemCode.message}</span>}
-                </div>
+                  {isEdit && <p className="ff-hint">El código del artículo no se puede modificar.</p>}
+                  {!isEdit && errors.itemCode && <span className="ff-error">{errors.itemCode.message}</span>}
               </div>
 
               <div className="ff-wrap">
@@ -473,9 +593,19 @@ export default function ItemForm() {
                 <textarea id="notes" className="ff-textarea" rows={2} placeholder="Notas que aparecen en documentos" {...register('notes')} />
               </div>
 
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="image">Imagen (URL)</label>
+                <input
+                  id="image"
+                  className="ff-input"
+                  placeholder="https://…"
+                  {...register('image')}
+                />
+              </div>
+
               <div className="form-row">
                 <div className="ff-wrap">
-                  <label className="ff-label ff-required" htmlFor="category">Categoría</label>
+                  <label className={`ff-label${isProduct ? ' ff-required' : ''}`} htmlFor="category">Categoría</label>
                   <Controller
                     name="category"
                     control={control}
@@ -483,9 +613,15 @@ export default function ItemForm() {
                       <SearchSelect
                         id="category"
                         value={field.value ?? ''}
-                        onChange={(val) => field.onChange(val)}
+                        onChange={(val) => {
+                          field.onChange(val)
+                          // Solo se limpia al elegir manualmente una categoría distinta —
+                          // no debe correr al precargar el formulario en modo edición.
+                          if (val !== field.value) setValue('subcategory', '')
+                        }}
                         options={categoryOptions}
                         onSearch={setCatSearch}
+                        onOpen={() => refetchCategories()}
                         selectedLabel={selectedCategoryLabel}
                         placeholder="Seleccionar categoría"
                         error={!!errors.category}
@@ -495,7 +631,7 @@ export default function ItemForm() {
                   {errors.category && <span className="ff-error">{errors.category.message}</span>}
                 </div>
 
-                {selectedType === 'product' ? (
+                {isProduct && (
                   <div className="ff-wrap">
                     <label className="ff-label" htmlFor="brand">Marca</label>
                     <Controller
@@ -508,6 +644,7 @@ export default function ItemForm() {
                           onChange={(val) => field.onChange(val)}
                           options={brandOptions}
                           onSearch={setBrandSearch}
+                          onOpen={() => refetchBrands()}
                           selectedLabel={selectedBrandLabel}
                           placeholder="Seleccionar marca"
                           loading={false}
@@ -515,31 +652,10 @@ export default function ItemForm() {
                       )}
                     />
                   </div>
-                ) : subcategoryOptions.length > 0 ? (
-                  <div className="ff-wrap">
-                    <label className="ff-label ff-required" htmlFor="subcategory">Subcategoría</label>
-                    <Controller
-                      name="subcategory"
-                      control={control}
-                      render={({ field }) => (
-                        <SearchSelect
-                          id="subcategory"
-                          value={field.value ?? ''}
-                          onChange={(val) => field.onChange(val)}
-                          options={subcatFiltered}
-                          onSearch={setSubcatSearch}
-                          selectedLabel={subcategoryOptions.find((o) => o.value === field.value)?.label ?? ''}
-                          placeholder="Seleccionar subcategoría"
-                          error={!!errors.subcategory}
-                        />
-                      )}
-                    />
-                    {errors.subcategory && <span className="ff-error">{errors.subcategory.message}</span>}
-                  </div>
-                ) : null}
+                )}
               </div>
 
-              {selectedType === 'product' && subcategoryOptions.length > 0 && (
+              {subcategoryOptions.length > 0 && (
                 <div className="ff-wrap">
                   <label className="ff-label ff-required" htmlFor="subcategory">Subcategoría</label>
                   <Controller
@@ -552,6 +668,7 @@ export default function ItemForm() {
                         onChange={(val) => field.onChange(val)}
                         options={subcatFiltered}
                         onSearch={setSubcatSearch}
+                        onOpen={() => refetchCategories()}
                         selectedLabel={subcategoryOptions.find((o) => o.value === field.value)?.label ?? ''}
                         placeholder="Seleccionar subcategoría"
                         error={!!errors.subcategory}
@@ -565,7 +682,7 @@ export default function ItemForm() {
           </div>
 
           {/* ── Unidad de Medida ─────────────────────────────────────── */}
-          {selectedType === 'product' && (
+          {fixedType === 'product' && (
             <div className="card">
               <div className="card-header"><h2 className="card-title">Unidad de Medida</h2></div>
               <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -582,6 +699,7 @@ export default function ItemForm() {
                             onChange={(val) => field.onChange(val)}
                             options={uomOptions}
                             onSearch={setUomSearch}
+                            onOpen={() => refetchUoms()}
                             placeholder="Seleccionar UDM"
                           />
                       )}
@@ -595,8 +713,9 @@ export default function ItemForm() {
             </div>
           )}
 
-          {/* ── Variantes (opcional) ───────────────────────────────────── */}
-          {selectedType === 'product' && (
+          {/* ── Variantes (opcional) — solo al crear; editar variantes/atributos
+                de un template ya existente no está soportado por este formulario ── */}
+          {!isEdit && fixedType === 'product' && (
             <>
               <button
                 type="button"
@@ -653,21 +772,24 @@ export default function ItemForm() {
           <div className="card">
             <div className="card-header"><h2 className="card-title">Compra</h2></div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {selectedType === 'product' && (
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="valuationRate">Costo de Valoración</label>
-                  <input
-                    id="valuationRate"
-                    type="number" step="0.01" min="0"
-                    className="ff-input"
-                    placeholder="0.00"
-                    {...register('valuationRate', { valueAsNumber: true })}
-                  />
-                  <p className="ff-hint">Costo unitario del artículo (base para calcular márgenes)</p>
-                </div>
-              )}
               <div className="ff-wrap">
-                <label className="ff-label" htmlFor="purchaseTaxTemplate">Impuesto de Compra</label>
+                <label className="ff-label" htmlFor="valuationRate">Costo de Valoración</label>
+                <input
+                  id="valuationRate"
+                  type="number" step="0.01" min="0"
+                  className="ff-input"
+                  placeholder="0.00"
+                  {...register('valuationRate', { valueAsNumber: true })}
+                />
+                <p className="ff-hint">
+                  Costo unitario del artículo (base para calcular márgenes). Opcional — requerido solo si
+                  usas el modo de precio "Sobre costo".
+                </p>
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="purchaseTaxTemplate">
+                  Impuesto de Compra {!noPurchaseTax && <span className="ff-required">*</span>}
+                </label>
                 <Controller
                   name="purchaseTaxTemplate"
                   control={control}
@@ -678,11 +800,22 @@ export default function ItemForm() {
                       onChange={(val) => field.onChange(val)}
                       options={purchaseTaxOptions}
                       onSearch={setPurchaseTaxSearch}
+                      onOpen={() => refetchItemTaxTemplates()}
                       selectedLabel={itemTaxTemplates?.find((t) => String(t.id) === field.value)?.title ?? ''}
-                      placeholder="Sin impuesto"
+                      placeholder="Seleccionar impuesto"
+                      disabled={noPurchaseTax}
                     />
                   )}
                 />
+                <label className="ff-check-wrap" style={{ marginTop: 8 }}>
+                  <input
+                    type="checkbox"
+                    className="ff-check"
+                    checked={noPurchaseTax}
+                    onChange={(e) => setNoPurchaseTax(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 13 }}>No lleva impuesto de compra</span>
+                </label>
                 <p className="ff-hint">Excepción de impuesto para este artículo en compras y gastos (Item Tax Template)</p>
               </div>
             </div>
@@ -702,7 +835,13 @@ export default function ItemForm() {
                     <SearchSelect
                       id="priceMode"
                       value={field.value ?? ''}
-                      onChange={(val) => field.onChange(val)}
+                      onChange={(val) => {
+                        if (val === 'cost_plus' && !watchedValuationRate) {
+                          toast.error('Ingresa el Costo de Valoración para poder seleccionar "Sobre costo"')
+                          return
+                        }
+                        field.onChange(val)
+                      }}
                       options={priceModeOptions}
                       onSearch={setPriceModeSearch}
                       selectedLabel={PRICE_MODE_OPTIONS_ALL.find((o) => o.value === field.value)?.label ?? ''}
@@ -763,7 +902,9 @@ export default function ItemForm() {
 
               <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="salesTaxTemplate">Impuesto de Venta</label>
+                  <label className="ff-label" htmlFor="salesTaxTemplate">
+                    Impuesto de Venta {!noSalesTax && <span className="ff-required">*</span>}
+                  </label>
                   <Controller
                     name="salesTaxTemplate"
                     control={control}
@@ -774,16 +915,27 @@ export default function ItemForm() {
                         onChange={(val) => field.onChange(val)}
                         options={salesTaxOptions}
                         onSearch={setSalesTaxSearch}
+                        onOpen={() => refetchItemTaxTemplates()}
                         selectedLabel={itemTaxTemplates?.find((t) => String(t.id) === field.value)?.title ?? ''}
-                        placeholder="Sin impuesto"
+                        placeholder="Seleccionar impuesto"
+                        disabled={noSalesTax}
                       />
                     )}
                   />
-                  {taxRate > 0 && (
+                  {!noSalesTax && taxRate > 0 && (
                     <p className="ff-hint" style={{ marginTop: 4 }}>
                       Tasa de impuesto: {taxRate}%
                     </p>
                   )}
+                  <label className="ff-check-wrap" style={{ marginTop: 8 }}>
+                    <input
+                      type="checkbox"
+                      className="ff-check"
+                      checked={noSalesTax}
+                      onChange={(e) => setNoSalesTax(e.target.checked)}
+                    />
+                    <span style={{ fontSize: 13 }}>No lleva impuesto de venta</span>
+                  </label>
                   <p className="ff-hint">Excepción de impuesto para este artículo en cotizaciones, pedidos y facturas (Item Tax Template)</p>
                 </div>
               </div>
@@ -836,7 +988,7 @@ export default function ItemForm() {
                 </div>
               )}
 
-              {selectedType === 'product' && (
+              {fixedType === 'product' && (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span className="ff-label" style={{ margin: 0 }}>Códigos de barras</span>
@@ -887,7 +1039,7 @@ export default function ItemForm() {
           </div>
 
           {/* ── Inventario / Seguimiento ────────────────────────────────── */}
-          {selectedType === 'product' && (
+          {fixedType === 'product' && (
             <div className="card">
               <div className="card-header"><h2 className="card-title">Inventario</h2></div>
               <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -903,6 +1055,7 @@ export default function ItemForm() {
                         onChange={(val) => field.onChange(val)}
                         options={warehouseOptions}
                         onSearch={setWarehouseSearch}
+                        onOpen={() => refetchWarehouses()}
                         selectedLabel={warehouses.find((w) => w.id === field.value)?.name ?? ''}
                         placeholder="Sin asignar"
                       />
@@ -934,11 +1087,17 @@ export default function ItemForm() {
 
         {/* ════════════════ BOTONES (ancho completo) ════════════════ */}
         <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/inventario/articulos')}>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate(backTo)}>
             Cancelar
           </button>
-          <button type="submit" className="btn btn-primary" disabled={isSubmitting || createMutation.isPending}>
-            {createMutation.isPending ? 'Guardando…' : 'Crear Artículo'}
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={isSubmitting || createMutation.isPending || updateMutation.isPending}
+          >
+            {isEdit
+              ? (updateMutation.isPending ? 'Guardando…' : 'Guardar Cambios')
+              : (createMutation.isPending ? 'Guardando…' : `Crear ${moduleLabel}`)}
           </button>
         </div>
       </form>

@@ -15,6 +15,10 @@ import type { Brand } from '@/shared/api/types'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 
 const brandSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -42,16 +46,28 @@ export default function BrandsPage() {
     queryFn: () => listCategories(),
   })
 
+  const [categoryFilterSearch, setCategoryFilterSearch] = useState('')
+  const categoryFilterOptions: SearchSelectOption[] = (categoriesData?.items ?? [])
+    .filter((c) => !categoryFilterSearch || c.name.toLowerCase().includes(categoryFilterSearch.toLowerCase()))
+    .map((c) => ({ value: c.id, label: c.name }))
+
+  const [formCategorySearch, setFormCategorySearch] = useState('')
+  const formCategoryOptions: SearchSelectOption[] = (categoriesData?.items ?? [])
+    .filter((c) => !formCategorySearch || c.name.toLowerCase().includes(formCategorySearch.toLowerCase()))
+    .map((c) => ({ value: c.id, label: c.name }))
+
   const {
     register,
     control,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<BrandFormValues>({
     resolver: zodResolver(brandSchema),
     defaultValues: { name: '', description: '', categoryId: '' },
   })
+
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, closeDialog)
 
   const createMutation = useMutation({
     mutationFn: createBrand,
@@ -134,16 +150,16 @@ export default function BrandsPage() {
 
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <select
-            className="filter-select"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value === '_all' ? '' : e.target.value)}
-          >
-            <option value="_all">Todas las categorías</option>
-            {categoriesData?.items.map((cat) => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
-            ))}
-          </select>
+          <div style={{ width: 220 }}>
+            <SearchSelect
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              options={categoryFilterOptions}
+              onSearch={setCategoryFilterSearch}
+              selectedLabel={categoriesData?.items.find((c) => c.id === categoryFilter)?.name ?? ''}
+              placeholder="Todas las categorías"
+            />
+          </div>
         </div>
       </div>
 
@@ -213,11 +229,11 @@ export default function BrandsPage() {
       </div>
 
       {dialogOpen && (
-        <div className="modal-overlay" onClick={closeDialog}>
+        <div className="modal-overlay" onClick={requestClose}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">{editTarget ? 'Editar Marca' : 'Nueva Marca'}</h2>
-              <button className="modal-close" type="button" onClick={closeDialog}>×</button>
+              <button className="modal-close" type="button" onClick={requestClose}>×</button>
             </div>
             <form onSubmit={handleSubmit(onSubmit)}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -238,18 +254,20 @@ export default function BrandsPage() {
                     name="categoryId"
                     control={control}
                     render={({ field }) => (
-                      <select className="ff-select" value={field.value ?? ''} onChange={field.onChange}>
-                        <option value="">Sin categoría</option>
-                        {categoriesData?.items.map((cat) => (
-                          <option key={cat.id} value={cat.id}>{cat.name}</option>
-                        ))}
-                      </select>
+                      <SearchSelect
+                        value={field.value ?? ''}
+                        onChange={(val) => field.onChange(val)}
+                        options={formCategoryOptions}
+                        onSearch={setFormCategorySearch}
+                        selectedLabel={categoriesData?.items.find((c) => c.id === field.value)?.name ?? ''}
+                        placeholder="Sin categoría"
+                      />
                     )}
                   />
                 </div>
               </div>
               <div className="modal-foot">
-                <button type="button" className="btn btn-ghost" onClick={closeDialog}>Cancelar</button>
+                <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                   {isSubmitting ? 'Guardando…' : editTarget ? 'Guardar' : 'Crear'}
                 </button>
@@ -258,6 +276,16 @@ export default function BrandsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirming}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {toDelete && (
         <div className="modal-overlay" onClick={() => setToDelete(null)}>

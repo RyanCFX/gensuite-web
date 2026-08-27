@@ -3,17 +3,23 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   listUsuarios, createUsuario, updateUsuario, enableUsuario, deleteUsuario, resetPasswordUsuario, listRoles,
-  getUsuarioSucursales, getUsuarioAlmacenesPermitidos,
+  getUsuarioSucursales, getUsuarioAlmacenesPermitidos, getUsuario,
 } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
+import { listCajas } from '@/shared/api/cajas'
 import type { Usuario, CreateUsuarioDto, UpdateUsuarioDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { formatDate } from '@/lib/formatters'
 import { Plus, Ban, KeyRound, UserCheck, Pencil, X } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { useAuthStore } from '@/stores/auth.store'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -22,7 +28,6 @@ type ConfirmType = { type: 'disable'; user: Usuario } | { type: 'enable'; user: 
 export default function UsuariosPage() {
   const queryClient = useQueryClient()
   const authUser = useAuthStore((s) => s.user)
-  const logout = useAuthStore((s) => s.logout)
 
   const [showForm, setShowForm] = useState(false)
   const [editingUser, setEditingUser] = useState<Usuario | null>(null)
@@ -35,6 +40,9 @@ export default function UsuariosPage() {
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [selectedBranches, setSelectedBranches] = useState<string[]>([])
   const [defaultBranch, setDefaultBranch] = useState('')
+  const [defaultBranchSearch, setDefaultBranchSearch] = useState('')
+  const [defaultPosProfile, setDefaultPosProfile] = useState('')
+  const [defaultPosProfileSearch, setDefaultPosProfileSearch] = useState('')
   const { orderBy, sort } = useSortState()
 
   const { data, isLoading, isError } = useQuery({
@@ -65,12 +73,30 @@ export default function UsuariosPage() {
     enabled: !!editingUser,
   })
 
+  const { data: editingUserDetail } = useQuery({
+    queryKey: ['usuario-detail', editingUser?.email],
+    queryFn: () => getUsuario(editingUser!.email),
+    enabled: !!editingUser,
+  })
+
+  const { data: cajas } = useQuery({
+    queryKey: ['cajas'],
+    queryFn: listCajas,
+  })
+  const cajasHabilitadas = (cajas ?? []).filter((c) => !c.disabled)
+
   useEffect(() => {
     if (usuarioSucursales) {
       setSelectedBranches(usuarioSucursales.branches)
       setDefaultBranch(usuarioSucursales.defaultBranch ?? '')
     }
   }, [usuarioSucursales])
+
+  useEffect(() => {
+    if (editingUserDetail) {
+      setDefaultPosProfile(editingUserDetail.defaultPosProfile ?? '')
+    }
+  }, [editingUserDetail])
 
   const createMutation = useMutation({
     mutationFn: (dto: CreateUsuarioDto) => createUsuario(dto),
@@ -120,6 +146,12 @@ export default function UsuariosPage() {
 
   const isSystemManager = selectedRoles.includes(SYSTEM_MANAGER_ROLE)
 
+  const formIsDirty = useDirtyCheck(
+    { email, firstName, lastName, maxDiscountPct, selectedRoles, selectedBranches, defaultBranch, defaultPosProfile },
+    showForm && (!editingUser || (!!usuarioSucursales && !!editingUserDetail)),
+  )
+  const formClose = useConfirmClose(formIsDirty, resetForm)
+
   function openEdit(user: Usuario) {
     setEditingUser(user)
     setEmail(user.email)
@@ -129,6 +161,7 @@ export default function UsuariosPage() {
     setSelectedRoles(user.roles)
     setSelectedBranches([])
     setDefaultBranch('')
+    setDefaultPosProfile('')
     setShowForm(true)
   }
 
@@ -140,6 +173,7 @@ export default function UsuariosPage() {
     setSelectedRoles([])
     setSelectedBranches([])
     setDefaultBranch('')
+    setDefaultPosProfile('')
     setEditingUser(null)
     setShowForm(false)
   }
@@ -162,6 +196,7 @@ export default function UsuariosPage() {
         roles: selectedRoles,
         branches: isSystemManager ? undefined : selectedBranches,
         defaultBranch: isSystemManager ? undefined : (defaultBranch || undefined),
+        defaultPosProfile: defaultPosProfile || undefined,
       }
       updateMutation.mutate({ email, data: payload })
       if (email === authUser?.email && defaultBranch !== usuarioSucursales?.defaultBranch) {
@@ -281,14 +316,14 @@ export default function UsuariosPage() {
 
       {/* User Form Modal */}
       {showForm && (
-        <div className="modal-overlay" onClick={resetForm}>
+        <div className="modal-overlay" onClick={formClose.requestClose}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <div>
                 <h2 className="modal-title">{editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}</h2>
                 <p className="modal-sub">{editingUser ? 'Actualiza los datos del usuario.' : 'Crea un nuevo usuario con acceso al sistema.'}</p>
               </div>
-              <button className="modal-close" onClick={resetForm}><X size={16} /></button>
+              <button className="modal-close" onClick={formClose.requestClose}><X size={16} /></button>
             </div>
               <form onSubmit={handleSubmit}>
               <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
@@ -331,7 +366,21 @@ export default function UsuariosPage() {
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label">Roles</label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label className="ff-label">Roles</label>
+                    <button
+                      type="button"
+                      className="btn btn-link"
+                      style={{ fontSize: 12 }}
+                      onClick={() =>
+                        setSelectedRoles((prev) =>
+                          roles && prev.length === roles.length ? [] : (roles ?? []).map((r) => r.id),
+                        )
+                      }
+                    >
+                      {roles && selectedRoles.length === roles.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                    </button>
+                  </div>
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: '1fr 1fr',
@@ -343,14 +392,14 @@ export default function UsuariosPage() {
                     padding: 12,
                   }}>
                     {roles?.map((r) => (
-                      <label key={r} className="ff-check-wrap">
+                      <label key={r.id} className="ff-check-wrap">
                         <input
                           type="checkbox"
                           className="ff-check"
-                          checked={selectedRoles.includes(r)}
-                          onChange={() => toggleRole(r)}
+                          checked={selectedRoles.includes(r.id)}
+                          onChange={() => toggleRole(r.id)}
                         />
-                        <span style={{ fontSize: 13 }}>{r}</span>
+                        <span style={{ fontSize: 13 }}>{r.label}</span>
                       </label>
                     ))}
                   </div>
@@ -408,15 +457,34 @@ export default function UsuariosPage() {
 
                         <div className="ff-wrap">
                           <label className="ff-label">Sucursal por defecto</label>
-                          <select className="ff-select" value={defaultBranch} onChange={(e) => setDefaultBranch(e.target.value)}>
-                            <option value="">Sin sucursal por defecto</option>
-                            {selectedBranches.map((b) => (
-                              <option key={b} value={b}>{b}</option>
-                            ))}
-                          </select>
+                          <SearchSelect
+                            value={defaultBranch}
+                            onChange={setDefaultBranch}
+                            options={selectedBranches
+                              .filter((b) => !defaultBranchSearch || b.toLowerCase().includes(defaultBranchSearch.toLowerCase()))
+                              .map((b): SearchSelectOption => ({ value: b, label: b }))}
+                            onSearch={setDefaultBranchSearch}
+                            selectedLabel={defaultBranch}
+                            placeholder="Sin sucursal por defecto"
+                          />
                         </div>
                       </>
                     )}
+
+                    <div className="ff-wrap">
+                      <label className="ff-label">Caja por defecto</label>
+                      <SearchSelect
+                        value={defaultPosProfile}
+                        onChange={setDefaultPosProfile}
+                        options={cajasHabilitadas
+                          .filter((c) => !defaultPosProfileSearch || c.label.toLowerCase().includes(defaultPosProfileSearch.toLowerCase()))
+                          .map((c): SearchSelectOption => ({ value: c.id, label: c.label }))}
+                        onSearch={setDefaultPosProfileSearch}
+                        selectedLabel={cajasHabilitadas.find((c) => c.id === defaultPosProfile)?.label ?? ''}
+                        placeholder="Sin caja por defecto"
+                      />
+                      <p className="ff-hint">Se preseleccionará al abrir turno de caja.</p>
+                    </div>
 
                     {almacenesPermitidos && almacenesPermitidos.warehouses.length > 0 && (
                       <div className="ff-wrap">
@@ -430,7 +498,7 @@ export default function UsuariosPage() {
                 )}
               </div>
               <div className="modal-foot">
-                <button type="button" className="btn btn-secondary" onClick={resetForm}>Cancelar</button>
+                <button type="button" className="btn btn-secondary" onClick={formClose.requestClose}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={createMutation.isPending || updateMutation.isPending}>
                   {(createMutation.isPending || updateMutation.isPending) ? 'Guardando…' : (editingUser ? 'Guardar Cambios' : 'Crear Usuario')}
                 </button>
@@ -439,6 +507,16 @@ export default function UsuariosPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={formClose.confirming}
+        onClose={formClose.cancelDiscard}
+        onConfirm={formClose.confirmDiscard}
+        title="¿Descartar cambios?"
+        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
+        confirmLabel="Descartar cambios"
+        variant="danger"
+      />
 
       {/* Confirm disable/enable */}
       {confirm && (

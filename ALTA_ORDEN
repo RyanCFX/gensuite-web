@@ -1,0 +1,656 @@
+   PROCEDURE alta_orden (
+        --
+        pi_id_comando             IN       vpg_orden.id_comando%TYPE,
+        pi_id_entidad_consumo     IN       vpg_orden.id_entidad_consumo%TYPE,
+        pi_fch_programada         IN       vpg_orden.fch_programada%TYPE DEFAULT NULL,
+        pi_cod_transaccion        IN       vpg_orden.cod_transaccion%TYPE DEFAULT NULL,
+        pi_estado_orden           IN       vpg_orden.estado_orden%TYPE DEFAULT NULL,
+        pi_p1                     IN       VARCHAR2,
+        pi_p2                     IN       VARCHAR2 DEFAULT NULL,
+        pi_p3                     IN       VARCHAR2 DEFAULT NULL,
+        pi_p4                     IN       VARCHAR2 DEFAULT NULL,
+        pi_p5                     IN       VARCHAR2 DEFAULT NULL,
+        pi_p6                     IN       VARCHAR2 DEFAULT NULL,
+        pi_p7                     IN       VARCHAR2 DEFAULT NULL,
+        pi_p8                     IN       VARCHAR2 DEFAULT NULL,
+        pi_p9                     IN       VARCHAR2 DEFAULT NULL,
+        pi_p10                    IN       VARCHAR2 DEFAULT NULL,
+        pi_p11                    IN       VARCHAR2 DEFAULT NULL,
+        pi_p12                    IN       VARCHAR2 DEFAULT NULL,
+        pi_p13                    IN       VARCHAR2 DEFAULT NULL,
+        pi_p14                    IN       VARCHAR2 DEFAULT NULL,
+        pi_p15                    IN       VARCHAR2 DEFAULT NULL,
+        pi_p16                    IN       VARCHAR2 DEFAULT NULL,
+        pi_p17                    IN       VARCHAR2 DEFAULT NULL,
+        pi_p18                    IN       VARCHAR2 DEFAULT NULL,
+        pi_p19                    IN       VARCHAR2 DEFAULT NULL,
+        pi_p20                    IN       VARCHAR2 DEFAULT NULL,
+        pi_p21                    IN       VARCHAR2 DEFAULT NULL,
+        pi_p22                    IN       VARCHAR2 DEFAULT NULL,
+        pi_p23                    IN       VARCHAR2 DEFAULT NULL,
+        pi_p24                    IN       VARCHAR2 DEFAULT NULL,
+        pi_p25                    IN       VARCHAR2 DEFAULT NULL,
+        --
+        pi_cod_usuario            IN       VARCHAR2,
+        pi_master                 IN       VARCHAR2,
+        pi_id_tran                IN       tx_historico_transaccion.id_tran%TYPE,
+        pi_cod_gestion_tran       IN       tx_historico_transaccion.cod_gestion_tran%TYPE,
+        pi_fch_tran               IN       tx_historico_transaccion.fch_tran%TYPE,
+        pi_cod_unidad_negocio     IN       tx_historico_transaccion.cod_unidad_negocio%TYPE,
+        --
+        po_id_orden                OUT vpg_orden.id_orden%TYPE,
+        po_id_tran                 OUT vpg_orden.id_tran%TYPE,
+        po_fch_tran                OUT vpg_orden.fch_tran%TYPE,
+        po_cod_err                 OUT VARCHAR2,
+        po_msj_err                 OUT VARCHAR2
+    ) IS
+
+        --
+        v_id_tran                          NUMBER (15);
+        v_fch_tran                         DATE;
+        v_cod_gestion_tran                 VARCHAR2 (15);
+        v_cod_usuario                      VARCHAR2 (15);
+        --
+        v_cod_tran                         VARCHAR2 (100)
+                := v_cod_ent
+                   || '.ALTA_ORDEN';
+        v_nombre_tabla                     VARCHAR2 (50) := 'VPG_ORDEN';
+        v_reg_entidad                      cnf_entidad%ROWTYPE;
+        v_rowid_entidad                    ROWID;
+        v_trama_in                         VARCHAR2 (4000);
+        v_trama_out                        VARCHAR2 (4000);
+        err_app exception;
+        v_existe                           PLS_INTEGER;
+        v_reg_orden                        vpg_orden%ROWTYPE;
+        v_id_comando_ext                   NUMBER;
+        v_id_orden                         vpg_orden.id_orden%TYPE;
+        v_param_valor                      vpg_orden_param.valor%TYPE;
+        v_id                               NUMBER;
+        v_estado_orden                     vpg_orden.estado_orden%TYPE;
+        v_fch_programada                   vpg_orden.fch_programada%TYPE;
+        v_id_nodo                          NUMBER;
+        v_id_nodo_tmp                      NUMBER;
+        v_no_generar                       NUMBER;
+        v_cod_comando                      vpg_cnf_comando.cod_comando%TYPE;
+        v_json_param                       CLOB;
+
+    BEGIN
+        v_trama_in :=
+            'Usuario:'
+            || USER
+            || '|'
+            || 'pi_id_comando:'
+            || pi_id_comando
+            || '|'
+            || 'pi_id_entidad_consumo:'
+            || pi_id_entidad_consumo
+            || '|'
+            || 'pi_fch_programada:'
+            || pi_fch_programada
+            || '|'
+            || 'pi_cod_transaccion:'
+            || pi_cod_transaccion
+            || '|'
+             || 'pi_estado_orden:'
+            || pi_estado_orden
+            || '|'
+            || 'pi_p1:'
+            || pi_p1
+            || '|'
+            || 'pi_p2:'
+            || pi_p2
+            || '|'
+            || 'pi_p3:'
+            || pi_p3
+            || '|'
+            || 'pi_p4:'
+            || pi_p4
+            || '|'
+            || 'pi_p5:'
+            || pi_p5
+            || '|'
+            || 'pi_p6:'
+            || pi_p6
+            || '|'
+            || 'pi_p7:'
+            || pi_p7
+            || '|'
+            || 'pi_p8:'
+            || pi_p8
+            || '|'
+            || 'pi_p9:'
+            || pi_p9
+            || '|'
+            || 'pi_p10:'
+            || pi_p10
+            || '|'
+            || 'pi_p11:'
+            || pi_p11
+            || '|'
+            || 'pi_p12:'
+            || pi_p12
+            || '|'
+            || 'pi_p13:'
+            || pi_p13
+            || '|'
+            || 'pi_p14:'
+            || pi_p14
+            || '|'
+            || 'pi_p15:'
+            || pi_p15
+            || '|'
+            || 'pi_p16:'
+            || pi_p16
+            || '|'
+            || 'pi_p17:'
+            || pi_p17
+            || '|'
+            || 'pi_p18:'
+            || pi_p18
+            || '|'
+            || 'pi_p19:'
+            || pi_p19
+            || '|'
+            || 'pi_p20:'
+            || pi_p21
+            || '|'
+            || 'pi_p22:'
+            || pi_p22
+            || '|'
+            || 'pi_p23:'
+            || pi_p23
+            || '|'
+            || 'pi_p24:'
+            || pi_p24
+            || '|'
+            || 'pi_p25:'
+            || pi_p25
+            || '|'
+            --
+            || 'pi_id_tran:'
+            || pi_id_tran
+            || '|'
+            || 'pi_fch_tran:'
+            || pi_fch_tran
+            || '|'
+            || 'pi_cod_gestion_tran:'
+            || pi_cod_gestion_tran
+            || '|'
+            || 'pi_cod_usuario:'
+            || pi_cod_usuario
+            || '|'
+            || 'pi_cod_unidad_negocio:'
+            || pi_cod_unidad_negocio
+            || '|'
+            || 'pi_master:'
+            || pi_master;
+
+        IF pi_id_comando IS NULL
+        OR pi_id_entidad_consumo IS NULL
+        OR pi_master IS NULL THEN
+            po_cod_err := 'VPG-0007';   --MT_VPG.ALTA_ORDEN: Algun parametro de entrada requerido es nulo.
+            RAISE err_app;
+        END IF;
+
+        tx_cnf_entidad.get_entidad (
+            v_cod_tran,
+            v_reg_entidad,
+            v_rowid_entidad,
+            po_cod_err,
+            po_msj_err);
+
+        IF po_cod_err != 'OK' THEN
+            RAISE err_app;
+        END IF;
+
+
+        -- Obtener atributos transaccionales
+        IF pi_master = '1' THEN
+            tx_transaccion.get_transaccion (pi_cod_unidad_negocio,
+                                            v_id_tran,
+                                            v_cod_gestion_tran,
+                                            v_fch_tran,
+                                            po_cod_err,
+                                            po_msj_err
+                                           );
+
+            IF po_cod_err != 'OK' THEN
+                RAISE err_app;
+            END IF;
+        ELSE
+            v_id_tran             := pi_id_tran;
+            v_cod_gestion_tran    := pi_cod_gestion_tran;
+            v_fch_tran            := pi_fch_tran;
+        END IF;
+
+        po_id_tran := v_id_tran;
+        po_fch_tran := v_fch_tran;
+
+        ------------------------------ START LOGIC -------------------------
+
+        po_cod_err := 'VPG-0008';   --MT_VPG.ALTA_ORDEN: Error al obtener la informacion del comando externo.
+
+        SELECT id_comando_ext, cod_comando
+            INTO v_id_comando_ext, v_cod_comando
+        FROM vpg_cnf_comando
+        WHERE id_comando = pi_id_comando;
+
+        v_fch_programada    :=  NVL(pi_fch_programada,v_fch_tran);
+        v_estado_orden      :=  NVL(pi_estado_orden,c_estado_pendiente);
+
+        IF v_fch_programada > SYSDATE THEN
+            v_estado_orden  :=  c_estado_diferido;
+        END IF;
+
+
+        --Control para no generar ciertas ordenes hacia ericcson ya que los dispositivos no estan listos
+        SELECT COUNT(1)
+            INTO v_no_generar
+        FROM cnf_configuracion_especial
+        WHERE nombre_tabla = 'VPG_CONTROL_PROV'
+        AND tipo = 'CONTROL_CMD'
+        AND cod_registro = v_cod_comando
+        AND parametro_1 = '0';
+
+        IF v_no_generar = c_falso THEN
+
+            po_cod_err := 'VPG-0009';   --MT_VPG.ALTA_ORDEN: Error al obtener el nodo de ejecucion.
+
+            v_id_nodo := 1;
+
+
+            -- Ordenes del espeejo, insertar localmente primero. el proceso de facturacion luego la enviara.
+            IF pi_cod_transaccion = 'TX_BL_ESPEJO.GENERAR' THEN
+
+                po_cod_err := 'VPG-0010';   --MT_VPG.ALTA_ORDEN: Error al crear la orden.
+                cc_vpg_orden.alta(
+                        pi_id_comando               => pi_id_comando,
+                        pi_id_comando_ext           => v_id_comando_ext,
+                        pi_id_entidad_consumo       => pi_id_entidad_consumo,
+                        pi_id_nodo                  => v_id_nodo,
+                        pi_fch_programada           => v_fch_programada,
+                        pi_estado_orden             => v_estado_orden,
+                        pi_cod_err                  => NULL,
+                        pi_msj_err                  => NULL,
+                        pi_cod_transaccion          => pi_cod_transaccion,
+                        pi_cod_usuario              => pi_cod_usuario,
+                        pi_id_tran                  => v_id_tran,
+                        pi_cod_gestion_tran         => v_cod_gestion_tran,
+                        pi_fch_tran                 => v_fch_tran,
+                        pi_cod_unidad_negocio       => pi_cod_unidad_negocio,
+                        po_id_orden                 => v_id_orden,
+                        po_cod_err                  => po_cod_err,
+                        po_msj_err                  => po_msj_err);
+
+
+                IF po_cod_err <> 'OK' THEN
+                    RAISE err_app;
+                END IF;
+            END IF;
+
+
+            --INSERTAR LOS PARAMETROS DE LA ORDEN
+
+            FOR c_param IN (SELECT id_parametro, cod_parametro,  cod_parametro_ref, required, default_value
+                            FROM vpg_cnf_comando_param
+                            WHERE id_comando = pi_id_comando
+                             AND estado = 'A'
+                            ORDER BY cod_parametro_ref ASC)
+            LOOP
+
+                po_cod_err := 'VPG-0011';   --MT_VPG.ALTA_ORDEN: Parametro de orden requerido.
+                po_msj_err := 'MT_VPG.ALTA_ORDEN: El Parametro '||c_param.cod_parametro_ref|| ' es requerido ['||c_param.cod_parametro||']';
+                v_param_valor   :=  NULL;
+
+                IF c_param.cod_parametro_ref = 'P1' THEN
+                    IF pi_p1 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p1,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P2' THEN
+                    IF pi_p2 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p2,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P3' THEN
+                    IF pi_p3 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p3,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P4' THEN
+                    IF pi_p4 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p4,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P5' THEN
+                    IF pi_p5 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p5,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P6' THEN
+                    IF pi_p6 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p6,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P7' THEN
+                    IF pi_p7 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p7,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P8' THEN
+                    IF pi_p8 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p8,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P9' THEN
+                    IF pi_p9 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p9,c_param.default_value);
+                    END IF;
+
+                ELSIF c_param.cod_parametro_ref = 'P10' THEN
+                    IF pi_p10 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p10,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P11' THEN
+                    IF pi_p11 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p11,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P12' THEN
+                    IF pi_p12 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p12,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P13' THEN
+                    IF pi_p13 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p13,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P14' THEN
+                    IF pi_p14 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p14,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P15' THEN
+                    IF pi_p15 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p15,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P16' THEN
+                    IF pi_p16 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p16,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P17' THEN
+                    IF pi_p17 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p17,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P18' THEN
+                    IF pi_p18 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p18,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P19' THEN
+                    IF pi_p19 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p19,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P20' THEN
+                    IF pi_p20 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p20,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P21' THEN
+                    IF pi_p21 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p21,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P22' THEN
+                    IF pi_p22 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p22,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P23' THEN
+                    IF pi_p23 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p23,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P24' THEN
+                    IF pi_p24 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p24,c_param.default_value);
+                    END IF;
+                ELSIF c_param.cod_parametro_ref = 'P25' THEN
+                    IF pi_p25 IS NULL AND c_param.required = c_verdadero AND c_param.default_value IS NULL THEN
+                        RAISE err_app;
+                    ELSE
+                        v_param_valor   :=  NVL(pi_p25,c_param.default_value);
+                    END IF;
+
+                END IF;
+
+               IF pi_cod_transaccion = 'TX_BL_ESPEJO.GENERAR' THEN
+
+                    po_cod_err := 'VPG-0012';   --MT_VPG.ALTA_ORDEN: Error al insertar el paramentro.
+                    cc_vpg_orden_param.alta(
+                            pi_id_parametro             => c_param.id_parametro,
+                            pi_id_orden                 => v_id_orden,
+                            pi_valor                    => v_param_valor,
+                            pi_cod_usuario              => pi_cod_usuario,
+                            pi_id_tran                  => v_id_tran,
+                            pi_cod_gestion_tran         => v_cod_gestion_tran,
+                            pi_fch_tran                 => v_fch_tran,
+                            pi_cod_unidad_negocio       => pi_cod_unidad_negocio,
+                            po_id_orden_param           => v_id,
+                            po_cod_err                  => po_cod_err,
+                            po_msj_err                  => po_msj_err);
+
+                    IF po_cod_err <> 'OK' THEN
+                        RAISE err_app;
+                    END IF;
+
+               ELSE
+                    v_json_param    :=  v_json_param || '"'||c_param.cod_parametro||'":'||'"'||v_param_valor||'",';
+
+               END IF;
+
+            END LOOP;
+
+
+            --Insertar la orden en el nuevo esquema VPG_APP
+            IF pi_cod_transaccion <> 'TX_BL_ESPEJO.GENERAR' THEN
+                v_json_param    :=  '{'||RTRIM(v_json_param,',')||'}';
+
+                po_cod_err := 'VPG-0031';   --MT_VPG.ALTA_ORDEN: Error al insertar la orden en el esquema VPG.
+                vpg_app.mt_vpg.write_command
+                        (pi_order_ext_id                => NULL,
+                         pi_command_id                  => v_id_comando_ext,
+                         pi_consumer_entity_id          => pi_id_entidad_consumo,
+                         pi_scheduled_date              => v_fch_programada,
+                         pi_parameters                  => v_json_param,
+                         pi_order_type_code             => 'ORTYNOM',--v_estado_orden,
+                         pi_tran_id                     => v_id_tran,
+                         pi_tran_period                 => TO_CHAR (v_fch_tran, 'yyyymm'),
+                         pi_tran_date                   => v_fch_tran,
+                         pi_tran_user                   => pi_cod_usuario,
+                         pi_master                      => c_falso,
+                         po_tran_id                     => po_id_tran,
+                         po_tran_date                   => po_fch_tran,
+                         po_cod_err                     => po_cod_err,
+                         po_msj_err                     => po_msj_err);
+
+                IF po_cod_err <> 'OK' THEN
+                    RAISE err_app;
+                END IF;
+
+            END IF;
+
+        END IF;
+
+        ------------------------------ END LOGIC ---------------------
+        po_id_orden := v_id_orden;
+        po_cod_err  := 'OK';
+        po_msj_err  := '';
+
+
+        --
+        v_trama_out :=
+            'po_id_orden:'
+            || po_id_orden
+            || '|'
+            ||'po_id_tran:'
+            || po_id_tran
+            || '|'
+            || 'po_fch_tran:'
+            || po_fch_tran
+            || '|'
+            || 'po_cod_err:'
+            || po_cod_err
+            || '|'
+            || 'po_msj_err:'
+            || po_msj_err;
+
+        --
+
+        IF pi_master = '1' THEN
+            tx_transaccion.set_transaccion (v_id_tran,
+                                            v_cod_gestion_tran,
+                                            pi_cod_unidad_negocio,
+                                            v_cod_tran,
+                                            v_fch_tran,
+                                            pi_cod_usuario,
+                                            v_trama_in,
+                                            v_trama_out,
+                                            '0',
+                                            po_cod_err,
+                                            po_msj_err
+                                           );
+
+            IF po_cod_err != 'OK' THEN
+                RAISE err_app;
+            END IF;
+
+            COMMIT;
+        END IF;
+
+        tx_log.registra_log (
+            v_id_tran,
+            v_cod_gestion_tran,
+            pi_cod_unidad_negocio,
+            v_nombre_tabla,
+            NULL,
+            v_reg_entidad.cod_entidad,
+            pi_cod_usuario,
+            v_trama_in,
+            v_trama_out,
+            po_cod_err,
+            po_msj_err,
+            v_reg_entidad.log_file,
+            v_reg_entidad.log_table);
+    EXCEPTION
+        WHEN err_app THEN
+            IF po_msj_err IS NULL THEN
+                po_msj_err := get_error (po_cod_err);
+            END IF;
+
+            IF pi_master = '1' THEN
+                ROLLBACK;
+            END IF;
+
+            --
+            v_trama_out :=
+                'po_id_tran:'
+                || po_id_tran
+                || '|'
+                || 'po_fch_tran:'
+                || po_fch_tran
+                || '|'
+                || 'po_cod_err:'
+                || po_cod_err
+                || '|'
+                || 'po_msj_err:'
+                || po_msj_err;
+
+        IF v_reg_entidad.log_table IS NULL THEN
+            v_reg_entidad.log_table := '1';
+        END IF;
+            --
+            tx_log.registra_log (
+                v_id_tran,
+                v_cod_gestion_tran,
+                pi_cod_unidad_negocio,
+                v_nombre_tabla,
+                NULL,
+                v_reg_entidad.cod_entidad,
+                pi_cod_usuario,
+                v_trama_in,
+                v_trama_out,
+                po_cod_err,
+                po_msj_err,
+                v_reg_entidad.log_file,
+                v_reg_entidad.log_table);
+        WHEN OTHERS THEN
+            po_msj_err := get_error (po_cod_err);
+
+            IF pi_master = '1' THEN
+                ROLLBACK;
+            END IF;
+
+            v_trama_out :=
+                'po_id_tran:'
+                || po_id_tran
+                || '|'
+                || 'po_fch_tran:'
+                || po_fch_tran
+                || '|'
+                || 'po_cod_err:'
+                || po_cod_err
+                || '|'
+                || 'po_msj_err:'
+                || po_msj_err
+                || '|'
+                || 'sqlerrm:'
+                || SQLERRM;
+
+            tx_log.registra_log (
+                v_id_tran,
+                v_cod_gestion_tran,
+                pi_cod_unidad_negocio,
+                v_nombre_tabla,
+                NULL,
+                v_reg_entidad.cod_entidad,
+                pi_cod_usuario,
+                v_trama_in,
+                v_trama_out,
+                po_cod_err,
+                po_msj_err,
+                v_reg_entidad.log_file,
+                v_reg_entidad.log_table);
+    END alta_orden;

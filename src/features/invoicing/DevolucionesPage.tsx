@@ -2,11 +2,20 @@ import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listDevoluciones } from '@/shared/api/devoluciones'
+import { listSucursales } from '@/shared/api/sucursales'
+import { listDepartamentos } from '@/shared/api/departamentos'
+import { listCustomers } from '@/shared/api/customers'
+import { getCatalogosFiscales } from '@/shared/api/config'
 import { useDebounce } from '@/lib/useDebounce'
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, Plus } from 'lucide-react'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
+import { Select, SelectItem } from '@/components/ui/select'
 
 const PAGE_SIZE = 20
 
@@ -19,6 +28,10 @@ interface DevolucionRow {
   postingDate?: string
   grandTotal?: number
   status: string
+  /** Solo viene presente tras someter la nota — en Draft llega vacío/undefined */
+  ncf?: string
+  /** NCF de la factura original devuelta — distinto de `ncf`, que es el propio de la nota */
+  ncfAfectado?: string | null
 }
 
 // El backend devuelve el status en minúscula. Una vez Sometida, `status` deja de ser "submitted"
@@ -45,19 +58,97 @@ export default function DevolucionesPage() {
 
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
+  const [status, setStatus] = useState('all')
+  const [createdAtFrom, setCreatedAtFrom] = useState('')
+  const [createdAtTo, setCreatedAtTo] = useState('')
+  const [postingDateFrom, setPostingDateFrom] = useState('')
+  const [postingDateTo, setPostingDateTo] = useState('')
+  const [ncf, setNcf] = useState('')
+  const [ncfType, setNcfType] = useState('')
+  const [grandTotalMin, setGrandTotalMin] = useState('')
+  const [grandTotalMax, setGrandTotalMax] = useState('')
+  const [refundedAmountMin, setRefundedAmountMin] = useState('')
+  const [refundedAmountMax, setRefundedAmountMax] = useState('')
   const { orderBy, sort } = useSortState()
+
+  // ── Filtro por cliente (autocomplete real, mismo patrón que CreditNotesPage) ──
+  const [customerId, setCustomerId] = useState('')
+  const [customerLabel, setCustomerLabel] = useState('')
+  const [customerQuery, setCustomerQuery] = useState('')
+  const { data: customersData, isLoading: customersLoading } = useQuery({
+    queryKey: ['customerSearch', customerQuery],
+    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
+  })
+  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
+    value: c.id,
+    label: c.customerName,
+    sublabel: c.rnc ?? c.cedula,
+  }))
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+  const [ncfTypeSearch, setNcfTypeSearch] = useState('')
+  const ncfTypeOptions: SearchSelectOption[] = (catalogos?.ncfTypes ?? [])
+    .filter((t) => !ncfTypeSearch || t.label.toLowerCase().includes(ncfTypeSearch.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
 
+  const { data: sucursales } = useQuery({
+    queryKey: ['sucursales-all'],
+    queryFn: () => listSucursales({ limit: 100 }),
+  })
+
+  const { data: departamentos } = useQuery({
+    queryKey: ['departamentos-all'],
+    queryFn: () => listDepartamentos({ limit: 100 }),
+  })
+
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchOptions: SearchSelectOption[] = (sucursales?.items ?? [])
+    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((s) => ({ value: s.id, label: s.name }))
+
+  const [departmentSearch, setDepartmentSearch] = useState('')
+  const departmentOptions: SearchSelectOption[] = (departamentos?.items ?? [])
+    .filter((d) => !departmentSearch || d.name.toLowerCase().includes(departmentSearch.toLowerCase()))
+    .map((d) => ({ value: d.id, label: d.name }))
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['devoluciones', { search: debouncedSearch, offset, orderBy }],
+    queryKey: [
+      'devoluciones',
+      {
+        search: debouncedSearch, offset, orderBy, branch, department, customerId, status,
+        createdAtFrom, createdAtTo, postingDateFrom, postingDateTo,
+        ncf, ncfType, grandTotalMin, grandTotalMax, refundedAmountMin, refundedAmountMax,
+      },
+    ],
     queryFn: () =>
       listDevoluciones({
         search: debouncedSearch || undefined,
         limit: PAGE_SIZE,
         offset,
         orderBy: orderBy || undefined,
+        branch: branch || undefined,
+        department: department || undefined,
+        customer: customerId || undefined,
+        status: status === 'all' ? undefined : status,
+        createdAtFrom: createdAtFrom || undefined,
+        createdAtTo: createdAtTo || undefined,
+        postingDateFrom: postingDateFrom || undefined,
+        postingDateTo: postingDateTo || undefined,
+        ncf: ncf || undefined,
+        ncfType: ncfType || undefined,
+        grandTotalMin: grandTotalMin ? Number(grandTotalMin) : undefined,
+        grandTotalMax: grandTotalMax ? Number(grandTotalMax) : undefined,
+        refundedAmountMin: refundedAmountMin ? Number(refundedAmountMin) : undefined,
+        refundedAmountMax: refundedAmountMax ? Number(refundedAmountMax) : undefined,
       }),
   })
 
@@ -75,6 +166,10 @@ export default function DevolucionesPage() {
           <h1 className="page-title">Devoluciones</h1>
           {data && <p className="page-sub">{data.meta.total} devoluciones en total</p>}
         </div>
+        <button className="btn btn-primary" onClick={() => navigate('/devoluciones/nueva')}>
+          <Plus size={16} />
+          Nueva Devolución
+        </button>
       </div>
 
       <div className="filter-bar">
@@ -88,6 +183,147 @@ export default function DevolucionesPage() {
               onChange={handleSearchChange}
             />
           </div>
+          <FilterField label="Cliente" style={{ width: 220 }}>
+            <SearchSelect
+              value={customerId}
+              selectedLabel={customerLabel}
+              onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? ''); setPage(1) }}
+              options={customerOptions}
+              onSearch={setCustomerQuery}
+              loading={customersLoading}
+              placeholder="Filtrar por cliente…"
+            />
+          </FilterField>
+          <FilterField label="Sucursal" style={{ width: 200 }}>
+            <SearchSelect
+              value={branch}
+              onChange={(val) => { setBranch(val); setPage(1) }}
+              options={branchOptions}
+              onSearch={setBranchSearch}
+              selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
+              placeholder="Todas las sucursales"
+            />
+          </FilterField>
+          <FilterField label="Departamento" style={{ width: 200 }}>
+            <SearchSelect
+              value={department}
+              onChange={(val) => { setDepartment(val); setPage(1) }}
+              options={departmentOptions}
+              onSearch={setDepartmentSearch}
+              selectedLabel={departamentos?.items.find((d) => d.id === department)?.name ?? ''}
+              placeholder="Todos los departamentos"
+            />
+          </FilterField>
+          <FilterField label="Estado">
+            <Select
+              value={status}
+              onValueChange={(val) => { setStatus(val); setPage(1) }}
+            >
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="draft">Borrador</SelectItem>
+              <SelectItem value="submitted">Sometido</SelectItem>
+              <SelectItem value="cancelled">Cancelado</SelectItem>
+            </Select>
+          </FilterField>
+        </div>
+        <div className="filter-bar-left" style={{ marginTop: 8 }}>
+          <FilterField label="NCF">
+            <input
+              className="ff-input ff-input-sm"
+              style={{ width: 160 }}
+              placeholder="Buscar NCF…"
+              value={ncf}
+              onChange={(e) => { setNcf(e.target.value); setPage(1) }}
+            />
+          </FilterField>
+          <FilterField label="Tipo NCF" style={{ width: 200 }}>
+            <SearchSelect
+              value={ncfType}
+              onChange={(val) => { setNcfType(val); setPage(1) }}
+              options={ncfTypeOptions}
+              onSearch={setNcfTypeSearch}
+              selectedLabel={catalogos?.ncfTypes?.find((t) => t.value === ncfType)?.label ?? ''}
+              placeholder="Todos los tipos NCF"
+            />
+          </FilterField>
+          <FilterField label="Creada desde">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={createdAtFrom}
+              onChange={(v) => { setCreatedAtFrom(v); setPage(1) }}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Creada hasta">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={createdAtTo}
+              onChange={(v) => { setCreatedAtTo(v); setPage(1) }}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Fecha desde">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={postingDateFrom}
+              onChange={(v) => { setPostingDateFrom(v); setPage(1) }}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Fecha hasta">
+            <DatePicker
+              className="ff-input ff-input-sm"
+              value={postingDateTo}
+              onChange={(v) => { setPostingDateTo(v); setPage(1) }}
+              style={{ width: 144 }}
+              clearable
+            />
+          </FilterField>
+          <FilterField label="Total">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Total mín."
+                value={grandTotalMin}
+                onChange={(e) => { setGrandTotalMin(e.target.value); setPage(1) }}
+              />
+              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Total máx."
+                value={grandTotalMax}
+                onChange={(e) => { setGrandTotalMax(e.target.value); setPage(1) }}
+              />
+            </div>
+          </FilterField>
+          <FilterField label="Monto reembolsado">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Reemb. mín."
+                value={refundedAmountMin}
+                onChange={(e) => { setRefundedAmountMin(e.target.value); setPage(1) }}
+              />
+              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+              <input
+                type="number"
+                className="ff-input ff-input-sm"
+                style={{ width: 100 }}
+                placeholder="Reemb. máx."
+                value={refundedAmountMax}
+                onChange={(e) => { setRefundedAmountMax(e.target.value); setPage(1) }}
+              />
+            </div>
+          </FilterField>
         </div>
       </div>
 
@@ -96,6 +332,8 @@ export default function DevolucionesPage() {
           <thead>
             <tr>
               <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
+              <th>NCF</th>
+              <th>NCF Afectado</th>
               <th>Factura Original</th>
               <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
               <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
@@ -107,20 +345,20 @@ export default function DevolucionesPage() {
             {isLoading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 6 }).map((__, j) => (
+                  {Array.from({ length: 8 }).map((__, j) => (
                     <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                   ))}
                 </tr>
               ))
             ) : isError ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
+                <td colSpan={8} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
                   Error al cargar las devoluciones
                 </td>
               </tr>
             ) : data?.items.length === 0 ? (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={8}>
                   <div className="empty-state">
                     <div className="empty-title">Sin devoluciones</div>
                     <p className="empty-sub">Las devoluciones se crean desde el detalle de una factura sometida.</p>
@@ -138,6 +376,12 @@ export default function DevolucionesPage() {
                   >
                     <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>
                       {devolucion.id}
+                    </td>
+                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                      {devolucion.ncf ?? <span className="td-dim">Pendiente</span>}
+                    </td>
+                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                      {devolucion.ncfAfectado ?? <span className="td-dim">—</span>}
                     </td>
                     <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{devolucion.returnAgainst}</td>
                     <td>{devolucion.customerName ?? '—'}</td>

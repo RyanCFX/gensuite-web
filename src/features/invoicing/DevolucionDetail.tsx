@@ -1,9 +1,11 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { getDevolucion } from '@/shared/api/devoluciones'
-import { ArrowLeft, Receipt, Wallet } from 'lucide-react'
+import { downloadCreditNotePdf } from '@/shared/api/notes'
+import { ArrowLeft, Receipt, Wallet, Download } from 'lucide-react'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { NCF_TYPES } from '@/lib/constants'
+import { getCatalogosFiscales } from '@/shared/api/config'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -37,6 +39,17 @@ export default function DevolucionDetail() {
     enabled: !!id,
   })
 
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+
+  const downloadMutation = useMutation({
+    mutationFn: () => downloadCreditNotePdf(id!, `nota-credito-${id}.pdf`),
+    onError: () => toast.error('No se pudo descargar el PDF'),
+  })
+
   if (isLoading) {
     return (
       <div className="page-container">
@@ -60,7 +73,7 @@ export default function DevolucionDetail() {
     )
   }
 
-  const ncfLabel = NCF_TYPES.find((t) => t.value === devolucion.ncfType)?.label
+  const ncfLabel = catalogos?.ncfTypes.find((t) => t.value === devolucion.ncfType)?.label
   const usageStatus = devolucion.usageStatus
 
   return (
@@ -78,6 +91,23 @@ export default function DevolucionDetail() {
           </h1>
           <p className="page-sub">Cliente: {devolucion.customerName}</p>
         </div>
+        {devolucion.documentStatus === 'submitted' && (
+          <button
+            className="btn btn-secondary btn-size-sm"
+            onClick={() => downloadMutation.mutate()}
+            disabled={downloadMutation.isPending}
+          >
+            {downloadMutation.isPending ? (
+              <>
+                <span className="spinner" /> Descargando…
+              </>
+            ) : (
+              <>
+                <Download size={14} /> Descargar PDF
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
@@ -96,6 +126,12 @@ export default function DevolucionDetail() {
               <span className="detail-label">Tipo NCF</span>
               <span className="detail-value">
                 {ncfLabel ? <span className="badge badge-neutral">{ncfLabel}</span> : '—'}
+              </span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">NCF Afectado</span>
+              <span className="detail-value" style={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                {devolucion.ncfAfectado ?? <em style={{ fontStyle: 'italic', fontWeight: 400, color: 'var(--text-secondary)' }}>Pendiente</em>}
               </span>
             </div>
             <div className="detail-field">

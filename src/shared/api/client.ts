@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { getToken, getTenant, clearSession } from './storage'
-import type { ApiErrorResponse, ApiResponse, PaginatedResponse } from './types'
+import type { ApiError, ApiErrorResponse, ApiResponse, PaginatedResponse } from './types'
 
 export const BASE_URL = 'https://gensapi.ryancfx.click/api/v1'
 
@@ -46,13 +46,26 @@ client.interceptors.response.use(
 
     const { status } = error.response
 
-    if (status === 401) {
+    // El intento de login fallido también responde 401 — no forzar el reload/redirect
+    // en ese caso, para que LoginPage pueda mostrar el error sin perder lo que el usuario escribió.
+    const isLoginRequest = error.config?.url?.includes('/auth/login')
+
+    if (status === 401 && !isLoginRequest) {
       clearSession()
       window.location.href = '/login'
       return Promise.reject(error)
     }
 
     const data = error.response.data as ApiErrorResponse
+
+    // ERPNEXT_AUTH_ERROR: el BFF no pudo autenticarse contra ERPNext con las
+    // credenciales de la integración (no es la sesión del usuario) — tratamos esto
+    // como sesión inválida: cerramos sesión y redirigimos a login con un aviso.
+    if (!isLoginRequest && data?.error?.code === 'ERPNEXT_AUTH_ERROR') {
+      clearSession()
+      window.location.href = '/login?sessionExpired=1'
+      return Promise.reject(data.error)
+    }
 
     return Promise.reject(
       data?.error ?? {
@@ -80,4 +93,22 @@ export function unwrapPaginated<T>(response: { data: PaginatedResponse<T> }) {
 
 export function unwrapRaw<T>(response: { data: T }): T {
   return response.data
+}
+
+// ---- Error code helpers ----
+// Códigos de error que requieren un comportamiento de UI específico (no basta con
+// mostrar el `message` genérico). Ver plan/IMPLEMENTACION.md sección 2.
+
+export const ERROR_CODES = {
+  BRANCH_REQUIRED: 'BRANCH_REQUIRED',
+  MIXED_BRANCH_COUNT: 'MIXED_BRANCH_COUNT',
+} as const
+
+export function isApiErrorCode(error: unknown, code: string): error is ApiError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code: unknown }).code === code
+  )
 }

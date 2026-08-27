@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Eye, EyeOff } from 'lucide-react'
 import { AuthLayout } from '@/shared/layout/AuthLayout'
 import LogoMark from '@/components/LogoMark'
 import { isApiError } from '@/shared/api/auth'
@@ -33,13 +34,28 @@ const TENANT_ERROR_MESSAGES: Record<string, string> = {
 }
 
 export default function LoginPage() {
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const next = params.get('next') ?? '/dashboard'
 
-  const [serverError, setServerError] = useState<string | null>(null)
+  // El interceptor de axios redirige acá con ?sessionExpired=1 cuando el BFF
+  // responde ERPNEXT_AUTH_ERROR (credenciales de la integración rechazadas) —
+  // se trata como sesión inválida del lado del usuario.
+  const [serverError, setServerError] = useState<string | null>(() =>
+    params.get('sessionExpired') ? 'La sesión ha expirado, por favor vuelva a iniciar sesión.' : null,
+  )
   const [isRateLimited, setIsRateLimited] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const authLogin = useAuthStore((s) => s.login)
+
+  useEffect(() => {
+    if (params.get('sessionExpired')) {
+      const cleaned = new URLSearchParams(params)
+      cleaned.delete('sessionExpired')
+      setParams(cleaned, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const {
     register,
@@ -81,6 +97,17 @@ export default function LoginPage() {
       </div>
 
       <form className="auth-form" onSubmit={handleSubmit(onSubmit)} noValidate>
+        {serverError && (
+          <div className="auth-server-error" role="alert">
+            {serverError}
+          </div>
+        )}
+
+        {isRateLimited && (
+          <div className="auth-server-error" role="alert" aria-live="polite">
+            Demasiados intentos. Espera unos segundos e intenta de nuevo.
+          </div>
+        )}
         <div className="form-field">
           <Label htmlFor="email">Correo electrónico</Label>
           <Input
@@ -99,17 +126,33 @@ export default function LoginPage() {
 
         <div className="form-field">
           <Label htmlFor="password">Contraseña</Label>
-          <Input
-            id="password"
-            type="password"
-            placeholder="••••••••"
-            autoComplete="current-password"
-            {...register('password')}
-            data-error={!!errors.password}
-          />
+          <div className="form-input-wrap">
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="••••••••"
+              autoComplete="current-password"
+              {...register('password')}
+              data-error={!!errors.password}
+            />
+            <button
+              type="button"
+              className="form-input-toggle"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
           {errors.password?.message && (
             <span className="form-error">{errors.password.message}</span>
           )}
+          <div style={{ textAlign: 'right', marginTop: 4 }}>
+            <Link to="/forgot-password" className="auth-link" style={{ fontSize: 13 }}>
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
         </div>
 
         <div className="form-field">
@@ -127,17 +170,6 @@ export default function LoginPage() {
           )}
         </div>
 
-        {serverError && (
-          <div className="auth-server-error" role="alert">
-            {serverError}
-          </div>
-        )}
-
-        {isRateLimited && (
-          <div className="auth-server-error" role="alert" aria-live="polite">
-            Demasiados intentos. Espera unos segundos e intenta de nuevo.
-          </div>
-        )}
 
         <button
           type="submit"

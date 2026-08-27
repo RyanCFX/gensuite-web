@@ -1,15 +1,97 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import {
   getReporte606, getReporte607, getReporte608,
   getBalanceGeneral, getIngresosEgresos, getReporteVentas,
   getInventarioValoracion, getInventarioMovimientos,
-  getCxcAging, getCajaCuadre,
+  getCxcAging, getCxpAging, getCajaCuadre,
+  getLibroDiario, getLibroMayor,
+  getCuadreTurno, downloadCuadreTurnoExcel, downloadCuadreTurnoPdf,
+  getCorteCajaDia, downloadCorteCajaDiaPdf,
+  downloadReporteExcel,
+  downloadBalanceGeneralPdf, downloadIngresosEgresosPdf, downloadVentasPdf,
+  downloadInventarioValoracionPdf, downloadInventarioMovimientosPdf,
+  downloadCxcAgingPdf, downloadCxpAgingPdf, downloadCajaCuadrePdf,
 } from '@/shared/api/reportes'
+import type { LibroDiarioByDimension, CuadreTurnoRow, CorteCajaDiaTurno, AgingGroupBy } from '@/shared/api/types'
+import { CorteCajaView } from '@/components/shared/CorteCajaView'
+import { listSucursales } from '@/shared/api/sucursales'
+import { listCustomers } from '@/shared/api/customers'
+import { listSuppliers } from '@/shared/api/suppliers'
+import { listUsuarios } from '@/shared/api/usuarios'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { formatDate, formatDOP } from '@/lib/formatters'
-import { BarChart3, AlertCircle, Download, FileText } from 'lucide-react'
+import { formatDate, formatDateTime, formatDOP } from '@/lib/formatters'
+import { BarChart3, AlertCircle, Download, FileText, Loader2 } from 'lucide-react'
+import { Select, SelectItem } from '@/components/ui/select'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
+import { FilterField } from '@/shared/ui/FilterField'
+
+// ─── Branch / Department filter ──────────────────────────────────────────────
+
+function useBranchOptions() {
+  const { data } = useQuery({
+    queryKey: ['reportes-sucursales-options'],
+    queryFn: () => listSucursales({ limit: 100 }),
+    staleTime: 60_000,
+  })
+  return data?.items ?? []
+}
+
+/** Selectores opcionales de Sucursal / Departamento para reportes con rango de fechas. */
+function BranchDepartmentFilters({
+  branch,
+  onBranchChange,
+}: {
+  branch: string
+  onBranchChange: (v: string) => void
+  department: string
+  onDepartmentChange: (v: string) => void
+}) {
+  const branches = useBranchOptions()
+
+  const [branchSearch, setBranchSearch] = useState('')
+  const branchOptions: SearchSelectOption[] = branches
+    .filter((b) => !branchSearch || b.name.toLowerCase().includes(branchSearch.toLowerCase()))
+    .map((b) => ({ value: b.name, label: b.name }))
+
+  return (
+    <>
+      <FilterField label="Sucursal" style={{ width: 200 }}>
+        <SearchSelect
+          value={branch}
+          onChange={onBranchChange}
+          options={branchOptions}
+          onSearch={setBranchSearch}
+          selectedLabel={branch}
+          placeholder="Todas las sucursales"
+        />
+      </FilterField>
+    </>
+  )
+}
+
+/** Botón "Descargar PDF" reutilizable — mismo patrón que Libro Diario/Mayor. */
+function DownloadPdfButton({ onDownload }: { onDownload: () => Promise<void> }) {
+  const mutation = useMutation({
+    mutationFn: onDownload,
+    onError: () => toast.error('No se pudo descargar el PDF'),
+  })
+  return (
+    <button
+      className="btn btn-secondary btn-size-sm"
+      onClick={() => mutation.mutate()}
+      disabled={mutation.isPending}
+    >
+      {mutation.isPending ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
+      {' '}Descargar PDF
+    </button>
+  )
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -22,8 +104,12 @@ const REPORT_META: Record<string, { label: string; description: string }> = {
   ventas:       { label: 'Ventas',               description: 'Reporte de ventas por período' },
   stock:        { label: 'Valoración de Stock',  description: 'Costo y valor del inventario' },
   movimientos:  { label: 'Movimientos de Stock', description: 'Historial de entradas y salidas' },
-  cxcaging:    { label: 'Aging CxC',            description: 'Antigüedad de cuentas por cobrar' },
+  cxcaging:    { label: 'Antiguedad de saldos CxC', description: 'Antigüedad de cuentas por cobrar' },
   caja:         { label: 'Cuadre de Caja',       description: 'Resumen de movimientos de caja' },
+  libroDiario:  { label: 'Libro Diario',         description: 'Movimientos contables (GL) del período' },
+  libroMayor:   { label: 'Libro Mayor',          description: 'Movimientos por cuenta con saldo inicial y final' },
+  cuadreTurno:  { label: 'Cuadre por Turno',     description: 'Historial de turnos de caja cerrados y su cuadre' },
+  corteCajaDia: { label: 'Corte de Caja del Día', description: 'Ventas, ingresos, egresos e importe a entregar del día, consolidado y por turno' },
 }
 
 function thisYear() { return new Date().getFullYear() }
@@ -62,7 +148,7 @@ function ReportTable({
   data: Record<string, unknown>[]
   columns?: ColumnDef[]
 }) {
-  
+
   if (!data || data.length === 0) {
     return (
       <div className="empty-state">
@@ -158,13 +244,29 @@ function extractRows(data: unknown): { rows: Record<string, unknown>[]; columns?
 function DgiiReport({ tipo }: { tipo: '606' | '607' | '608' }) {
   const [year, setYear] = useState(thisYear())
   const [month, setMonth] = useState(thisMonth())
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
+  const [downloadingExcel, setDownloadingExcel] = useState(false)
   const fn = tipo === '606' ? getReporte606 : tipo === '607' ? getReporte607 : getReporte608
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['reporte-dgii', tipo, year, month],
-    queryFn: () => fn({ year, month }),
+    queryKey: ['reporte-dgii', tipo, year, month, branch, department],
+    queryFn: () => fn({ year, month, branch: branch || undefined, department: department || undefined }),
     retry: false,
   })
+
+  async function handleDownloadExcel() {
+    setDownloadingExcel(true)
+    try {
+      await downloadReporteExcel(tipo, year, month, branch || undefined)
+    } catch (err) {
+      const msg = (err as { message?: string })?.message ?? 'Error al descargar el Excel'
+      const { toast } = await import('sonner')
+      toast.error(msg)
+    } finally {
+      setDownloadingExcel(false)
+    }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -172,24 +274,29 @@ function DgiiReport({ tipo }: { tipo: '606' | '607' | '608' }) {
         <div className="filter-bar-left">
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
             Año:
-            <select className="filter-select" value={year} onChange={(e) => setYear(Number(e.target.value))}>
-              {[thisYear(), thisYear() - 1, thisYear() - 2].map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
+            <Select value={String(year)} onValueChange={(val) => setYear(Number(val))}>
+              {[thisYear(), thisYear() - 1, thisYear() - 2].map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+            </Select>
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
             Mes:
-            <select className="filter-select" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+            <Select value={String(month)} onValueChange={(val) => setMonth(Number(val))}>
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <option key={m} value={m}>
+                <SelectItem key={m} value={String(m)}>
                   {new Date(2000, m - 1, 1).toLocaleString('es-DO', { month: 'long' })}
-                </option>
+                </SelectItem>
               ))}
-            </select>
+            </Select>
           </label>
+          <BranchDepartmentFilters
+            branch={branch} onBranchChange={setBranch}
+            department={department} onDepartmentChange={setDepartment}
+          />
         </div>
         <div className="filter-bar-right">
-          <button className="btn btn-secondary btn-size-sm">
-            <Download size={13} aria-hidden="true" /> Exportar TXT
+          <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadExcel} disabled={downloadingExcel}>
+            {downloadingExcel ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
+            {' '}Descargar Excel
           </button>
         </div>
       </div>
@@ -208,15 +315,47 @@ function AutoTable({ data }: { data: unknown }) {
   return <ReportTable data={rows} columns={columns} />
 }
 
+// Mismos labels de fallback que ya usan AgingPage.tsx (Cobros) y AgingProveedoresPage.tsx (Pagos)
+// cuando el backend no manda `config.rangos` — para que los 3 lugares se vean consistentes.
+const AGING_DEFAULT_LABELS = ['Corriente', '0–30 días', '31–60 días', '61–90 días', '+90 días']
+
+// Tarea 42 §2 — sin esto, AutoTable infiere los headers de Object.keys() y salen como "range1",
+// "range2", "totalOutstanding" en vez de las etiquetas legibles que sí usan las pantallas de
+// Cobros/Pagos (que consumen `config.rangos` del backend).
+function buildAgingColumns(groupBy: AgingGroupBy, partyField: 'customer' | 'supplier', partyLabel: string, rangos: string[] | undefined): ColumnDef[] {
+  const labels = rangos && rangos.length === 5 ? rangos : AGING_DEFAULT_LABELS
+  const nameField = partyField === 'customer' ? 'customerName' : 'supplierName'
+  const partyColumns: ColumnDef[] = [
+    { fieldname: partyField, label: partyLabel },
+    { fieldname: nameField, label: 'Nombre' },
+  ]
+  const invoiceColumns: ColumnDef[] = groupBy === 'invoice'
+    ? [{ fieldname: 'invoice', label: 'Factura' }, { fieldname: 'dueDate', label: 'Vencimiento' }]
+    : []
+  return [
+    ...partyColumns,
+    ...invoiceColumns,
+    { fieldname: 'totalOutstanding', label: 'Total' },
+    { fieldname: 'current', label: labels[0] },
+    { fieldname: 'range1', label: labels[1] },
+    { fieldname: 'range2', label: labels[2] },
+    { fieldname: 'range3', label: labels[3] },
+    { fieldname: 'range4', label: labels[4] },
+  ]
+}
+
 function FinancialReport({ tipo }: { tipo: 'balance' | 'pl' }) {
   const [fromDate, setFromDate] = useState(monthStart())
   const [toDate, setToDate] = useState(today())
   const [periodicity, setPeriodicity] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly')
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
   const fn = tipo === 'balance' ? getBalanceGeneral : getIngresosEgresos
+  const downloadPdf = tipo === 'balance' ? downloadBalanceGeneralPdf : downloadIngresosEgresosPdf
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['reporte-financial', tipo, fromDate, toDate, periodicity],
-    queryFn: () => fn({ fromDate, toDate, periodicity }),
+    queryKey: ['reporte-financial', tipo, fromDate, toDate, periodicity, branch, department],
+    queryFn: () => fn({ fromDate, toDate, periodicity, branch: branch || undefined, department: department || undefined }),
     retry: false,
   })
 
@@ -226,13 +365,28 @@ function FinancialReport({ tipo }: { tipo: 'balance' | 'pl' }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-          <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-          <select className="filter-select" value={periodicity} onChange={(e) => setPeriodicity(e.target.value as typeof periodicity)}>
-            <option value="monthly">Mensual</option>
-            <option value="quarterly">Trimestral</option>
-            <option value="yearly">Anual</option>
-          </select>
+          <FilterField label="Desde">
+            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+          </FilterField>
+          <FilterField label="Periodicidad">
+            <Select value={periodicity} onValueChange={(val) => setPeriodicity(val as typeof periodicity)}>
+              <SelectItem value="monthly">Mensual</SelectItem>
+              <SelectItem value="quarterly">Trimestral</SelectItem>
+              <SelectItem value="yearly">Anual</SelectItem>
+            </Select>
+          </FilterField>
+          <BranchDepartmentFilters
+            branch={branch} onBranchChange={setBranch}
+            department={department} onDepartmentChange={setDepartment}
+          />
+        </div>
+        <div className="filter-bar-right">
+          <DownloadPdfButton
+            onDownload={() => downloadPdf({ fromDate, toDate, periodicity, branch: branch || undefined, department: department || undefined })}
+          />
         </div>
       </div>
       <div className="card">
@@ -257,10 +411,12 @@ function VentasReport() {
   const [fromDate, setFromDate] = useState(monthStart())
   const [toDate, setToDate] = useState(today())
   const [groupBy, setGroupBy] = useState<'day' | 'week' | 'month'>('month')
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['reporte-ventas', fromDate, toDate, groupBy],
-    queryFn: () => getReporteVentas({ fromDate, toDate, groupBy }),
+    queryKey: ['reporte-ventas', fromDate, toDate, groupBy, branch, department],
+    queryFn: () => getReporteVentas({ fromDate, toDate, groupBy, branch: branch || undefined, department: department || undefined }),
     retry: false,
   })
 
@@ -268,13 +424,28 @@ function VentasReport() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-          <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-          <select className="filter-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value as typeof groupBy)}>
-            <option value="day">Por día</option>
-            <option value="week">Por semana</option>
-            <option value="month">Por mes</option>
-          </select>
+          <FilterField label="Desde">
+            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+          </FilterField>
+          <FilterField label="Agrupar por">
+            <Select value={groupBy} onValueChange={(val) => setGroupBy(val as typeof groupBy)}>
+              <SelectItem value="day">Por día</SelectItem>
+              <SelectItem value="week">Por semana</SelectItem>
+              <SelectItem value="month">Por mes</SelectItem>
+            </Select>
+          </FilterField>
+          <BranchDepartmentFilters
+            branch={branch} onBranchChange={setBranch}
+            department={department} onDepartmentChange={setDepartment}
+          />
+        </div>
+        <div className="filter-bar-right">
+          <DownloadPdfButton
+            onDownload={() => downloadVentasPdf({ fromDate, toDate, groupBy, branch: branch || undefined, department: department || undefined })}
+          />
         </div>
       </div>
       <div className="card">
@@ -289,11 +460,14 @@ function VentasReport() {
 function InventarioReport({ tipo }: { tipo: 'stock' | 'movimientos' }) {
   const [fromDate, setFromDate] = useState(monthStart())
   const [toDate, setToDate] = useState(today())
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
   const fn = tipo === 'stock' ? getInventarioValoracion : getInventarioMovimientos
+  const downloadPdf = tipo === 'stock' ? downloadInventarioValoracionPdf : downloadInventarioMovimientosPdf
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['reporte-inventario', tipo, fromDate, toDate],
-    queryFn: () => fn({ fromDate, toDate }),
+    queryKey: ['reporte-inventario', tipo, fromDate, toDate, branch, department],
+    queryFn: () => fn({ fromDate, toDate, branch: branch || undefined, department: department || undefined }),
     retry: false,
   })
 
@@ -303,8 +477,21 @@ function InventarioReport({ tipo }: { tipo: 'stock' | 'movimientos' }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <input type="date" className="filter-select" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-          <input type="date" className="filter-select" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          <FilterField label="Desde">
+            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+          </FilterField>
+          <BranchDepartmentFilters
+            branch={branch} onBranchChange={setBranch}
+            department={department} onDepartmentChange={setDepartment}
+          />
+        </div>
+        <div className="filter-bar-right">
+          <DownloadPdfButton
+            onDownload={() => downloadPdf({ fromDate, toDate, branch: branch || undefined, department: department || undefined })}
+          />
         </div>
       </div>
       <div className="card">
@@ -323,17 +510,121 @@ function InventarioReport({ tipo }: { tipo: 'stock' | 'movimientos' }) {
 }
 
 function CxcAgingReport() {
+  const [customer, setCustomer] = useState('')
+  const [customerLabel, setCustomerLabel] = useState('')
+  const [customerQuery, setCustomerQuery] = useState('')
+  const [groupBy, setGroupBy] = useState<AgingGroupBy>('party')
+
+  const { data: customersData, isLoading: customersLoading } = useQuery({
+    queryKey: ['customerSearch', customerQuery],
+    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
+  })
+  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
+    value: c.id,
+    label: c.customerName,
+  }))
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['reporte-cxc-aging'],
-    queryFn: getCxcAging,
+    queryKey: ['reporte-cxc-aging', customer, groupBy],
+    queryFn: () => getCxcAging({ customer: customer || undefined, groupBy }),
     retry: false,
   })
 
+  const raw = data as { data?: Record<string, unknown>[]; config?: { rangos?: string[] } } | undefined
+  const rows = raw?.data ?? []
+  const columns = buildAgingColumns(groupBy, 'customer', 'Cliente', raw?.config?.rangos)
+
   return (
-    <div className="card">
-      {isLoading && <LoadingRows />}
-      {error && <ErrorBanner err={error} />}
-      {!isLoading && !error && <AutoTable data={data} />}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <FilterField label="Cliente" style={{ width: 240 }}>
+            <SearchSelect
+              value={customer}
+              selectedLabel={customerLabel}
+              onChange={(val, opt) => { setCustomer(val); setCustomerLabel(opt?.label ?? '') }}
+              options={customerOptions}
+              onSearch={setCustomerQuery}
+              loading={customersLoading}
+              placeholder="Todos los clientes"
+            />
+          </FilterField>
+          <FilterField label="Agrupar por">
+            <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
+              <SelectItem value="party">Agrupar por Cliente</SelectItem>
+              <SelectItem value="invoice">Agrupar por Factura</SelectItem>
+            </Select>
+          </FilterField>
+        </div>
+        <div className="filter-bar-right">
+          <DownloadPdfButton onDownload={() => downloadCxcAgingPdf({ customer: customer || undefined, groupBy })} />
+        </div>
+      </div>
+      <div className="card">
+        {isLoading && <LoadingRows />}
+        {error && <ErrorBanner err={error} />}
+        {!isLoading && !error && <ReportTable data={rows} columns={columns} />}
+      </div>
+    </div>
+  )
+}
+
+function CxpAgingReport() {
+  const [supplier, setSupplier] = useState('')
+  const [supplierLabel, setSupplierLabel] = useState('')
+  const [supplierQuery, setSupplierQuery] = useState('')
+  const [groupBy, setGroupBy] = useState<AgingGroupBy>('party')
+
+  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
+    queryKey: ['supplierSearch', supplierQuery],
+    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
+  })
+  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
+    value: s.id,
+    label: s.supplierName,
+  }))
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reporte-cxp-aging', supplier, groupBy],
+    queryFn: () => getCxpAging({ supplier: supplier || undefined, groupBy }),
+    retry: false,
+  })
+
+  const raw = data as { data?: Record<string, unknown>[]; config?: { rangos?: string[] } } | undefined
+  const rows = raw?.data ?? []
+  const columns = buildAgingColumns(groupBy, 'supplier', 'Proveedor', raw?.config?.rangos)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <FilterField label="Proveedor" style={{ width: 240 }}>
+            <SearchSelect
+              value={supplier}
+              selectedLabel={supplierLabel}
+              onChange={(val, opt) => { setSupplier(val); setSupplierLabel(opt?.label ?? '') }}
+              options={supplierOptions}
+              onSearch={setSupplierQuery}
+              loading={suppliersLoading}
+              placeholder="Todos los proveedores"
+            />
+          </FilterField>
+          <FilterField label="Agrupar por">
+            <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
+              <SelectItem value="party">Agrupar por Proveedor</SelectItem>
+              <SelectItem value="invoice">Agrupar por Factura</SelectItem>
+            </Select>
+          </FilterField>
+        </div>
+        <div className="filter-bar-right">
+          <DownloadPdfButton onDownload={() => downloadCxpAgingPdf({ supplier: supplier || undefined, groupBy })} />
+        </div>
+      </div>
+      <div className="card">
+        {isLoading && <LoadingRows />}
+        {error && <ErrorBanner err={error} />}
+        {!isLoading && !error && <ReportTable data={rows} columns={columns} />}
+      </div>
     </div>
   )
 }
@@ -351,9 +642,11 @@ type CajaCuadreData = {
 
 function CajaCuadreReport() {
   const [date, setDate] = useState(today())
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
   const { data, isLoading, error } = useQuery({
-    queryKey: ['reporte-caja', date],
-    queryFn: () => getCajaCuadre({ date }),
+    queryKey: ['reporte-caja', date, branch, department],
+    queryFn: () => getCajaCuadre({ date, branch: branch || undefined, department: department || undefined }),
     retry: false,
   })
 
@@ -364,9 +657,18 @@ function CajaCuadreReport() {
       {/* Filtro */}
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-            Fecha: <input type="date" className="filter-select" value={date} onChange={(e) => setDate(e.target.value)} />
-          </label>
+          <FilterField label="Fecha">
+            <DatePicker className="filter-select" clearable value={date} onChange={setDate} />
+          </FilterField>
+          <BranchDepartmentFilters
+            branch={branch} onBranchChange={setBranch}
+            department={department} onDepartmentChange={setDepartment}
+          />
+        </div>
+        <div className="filter-bar-right">
+          <DownloadPdfButton
+            onDownload={() => downloadCajaCuadrePdf({ date, branch: branch || undefined, department: department || undefined })}
+          />
         </div>
       </div>
 
@@ -439,20 +741,441 @@ function CajaCuadreReport() {
   )
 }
 
+function useCajeroOptions() {
+  const { data } = useQuery({
+    queryKey: ['reportes-cajeros-options'],
+    queryFn: () => listUsuarios({ limit: 100 }),
+    staleTime: 60_000,
+  })
+  return data?.items ?? []
+}
+
+function diferenciaColor(diff: number): string | undefined {
+  if (diff < 0) return 'var(--error-text)'
+  if (diff > 0) return 'var(--warning-text)'
+  return undefined
+}
+
+function CuadreTurnoReport() {
+  const [fromDate, setFromDate] = useState(monthStart())
+  const [toDate, setToDate] = useState(today())
+  const [cajero, setCajero] = useState('')
+  const [downloadingExcel, setDownloadingExcel] = useState(false)
+  const cajeros = useCajeroOptions()
+  const [cajeroSearch, setCajeroSearch] = useState('')
+  const cajeroOptions: SearchSelectOption[] = cajeros
+    .filter((u) => !cajeroSearch || u.fullName.toLowerCase().includes(cajeroSearch.toLowerCase()))
+    .map((u) => ({ value: u.email, label: u.fullName }))
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reporte-cuadre-turno', fromDate, toDate, cajero],
+    queryFn: () => getCuadreTurno({ fromDate, toDate, cajero: cajero || undefined }),
+    retry: false,
+  })
+
+  const rows: CuadreTurnoRow[] = data?.data?.rows ?? []
+
+  const resumen = rows.reduce(
+    (acc, r) => {
+      acc.totalDiferencia += r.difference
+      if (r.difference !== 0) acc.turnosConDiferencia.add(r.closingEntryId)
+      return acc
+    },
+    { totalDiferencia: 0, turnosConDiferencia: new Set<string>() },
+  )
+
+  async function handleDownloadExcel() {
+    setDownloadingExcel(true)
+    try {
+      await downloadCuadreTurnoExcel({ fromDate, toDate, cajero: cajero || undefined })
+    } catch (err) {
+      const msg = (err as { message?: string })?.message ?? 'Error al descargar el Excel'
+      const { toast } = await import('sonner')
+      toast.error(msg)
+    } finally {
+      setDownloadingExcel(false)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <FilterField label="Desde">
+            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+          </FilterField>
+          <FilterField label="Cajero" style={{ width: 200 }}>
+            <SearchSelect
+              value={cajero}
+              onChange={setCajero}
+              options={cajeroOptions}
+              onSearch={setCajeroSearch}
+              selectedLabel={cajeros.find((u) => u.email === cajero)?.fullName ?? ''}
+              placeholder="Todos los cajeros"
+            />
+          </FilterField>
+        </div>
+        <div className="filter-bar-right">
+          <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadExcel} disabled={downloadingExcel}>
+            {downloadingExcel ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
+            {' '}Descargar Excel
+          </button>
+          {/* Acción separada — /pdf ignora cualquier `format`, no es un tercer valor del selector de Excel */}
+          <DownloadPdfButton
+            onDownload={() => downloadCuadreTurnoPdf({ fromDate, toDate, cajero: cajero || undefined })}
+          />
+        </div>
+      </div>
+
+      {!isLoading && !error && rows.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+          {[
+            { label: 'Turnos en el período', value: String(new Set(rows.map((r) => r.closingEntryId)).size) },
+            { label: 'Turnos con diferencia', value: String(resumen.turnosConDiferencia.size) },
+            {
+              label: 'Diferencia total',
+              value: formatDOP(resumen.totalDiferencia),
+              color: diferenciaColor(resumen.totalDiferencia),
+            },
+          ].map((card) => (
+            <div key={card.label} className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                {card.label}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: card.color ?? 'var(--text-primary)' }}>
+                {card.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="card">
+        {isLoading && <LoadingRows />}
+        {error && <ErrorBanner err={error} />}
+        {!isLoading && !error && rows.length === 0 && (
+          <div className="empty-state">
+            <span className="empty-icon"><FileText size={20} /></span>
+            <p className="empty-title">Sin turnos cerrados</p>
+            <p className="empty-sub">No hay turnos de caja cerrados para los filtros seleccionados.</p>
+          </div>
+        )}
+        {!isLoading && !error && rows.length > 0 && (
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Turno</th>
+                  <th>Cajero</th>
+                  <th>Modo de Pago</th>
+                  <th style={{ textAlign: 'right' }}>Apertura</th>
+                  <th style={{ textAlign: 'right' }}>Esperado</th>
+                  <th style={{ textAlign: 'right' }}>Contado</th>
+                  <th style={{ textAlign: 'right' }}>Diferencia</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={`${r.closingEntryId}-${r.modeOfPayment}-${i}`}>
+                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                      {r.closingEntryId}
+                      <div className="td-muted" style={{ fontSize: 11 }}>{formatDateTime(r.periodStartDate)}</div>
+                    </td>
+                    <td>{r.cajero}</td>
+                    <td>{r.modeOfPayment}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatDOP(r.openingAmount)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatDOP(r.expectedAmount)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatDOP(r.closingAmount)}</td>
+                    <td
+                      style={{
+                        textAlign: 'right',
+                        fontFamily: 'monospace',
+                        fontWeight: 600,
+                        color: diferenciaColor(r.difference),
+                      }}
+                    >
+                      {r.difference > 0 ? '+' : ''}
+                      {formatDOP(r.difference)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CorteCajaDiaReport() {
+  const [date, setDate] = useState(today())
+  const [cajero, setCajero] = useState('')
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const cajeros = useCajeroOptions()
+  const [cajeroSearch, setCajeroSearch] = useState('')
+  const cajeroOptions: SearchSelectOption[] = cajeros
+    .filter((u) => !cajeroSearch || u.fullName.toLowerCase().includes(cajeroSearch.toLowerCase()))
+    .map((u) => ({ value: u.email, label: u.fullName }))
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reporte-corte-caja-dia', date, cajero],
+    queryFn: () => getCorteCajaDia({ date, cajero: cajero || undefined }),
+    enabled: !!date,
+    retry: false,
+  })
+
+  const result = data?.data
+  const turnos: CorteCajaDiaTurno[] = result?.turnos ?? []
+
+  async function handleDownloadPdf() {
+    setDownloadingPdf(true)
+    try {
+      await downloadCorteCajaDiaPdf({ date, cajero: cajero || undefined })
+    } catch (err) {
+      toast.error((err as { message?: string })?.message ?? 'No se pudo descargar el PDF')
+    } finally {
+      setDownloadingPdf(false)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <FilterField label="Fecha">
+            <DatePicker className="filter-select" value={date} onChange={setDate} />
+          </FilterField>
+          <FilterField label="Cajero" style={{ width: 200 }}>
+            <SearchSelect
+              value={cajero}
+              onChange={setCajero}
+              options={cajeroOptions}
+              onSearch={setCajeroSearch}
+              selectedLabel={cajeros.find((u) => u.email === cajero)?.fullName ?? ''}
+              placeholder="Todos los cajeros"
+            />
+          </FilterField>
+        </div>
+        <div className="filter-bar-right">
+          <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadPdf} disabled={downloadingPdf || !date}>
+            {downloadingPdf ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
+            {' '}Descargar PDF
+          </button>
+        </div>
+      </div>
+
+      {isLoading && <LoadingRows />}
+      {error && <ErrorBanner err={error} />}
+
+      {!isLoading && !error && result && (
+        <>
+          {turnos.length === 0 ? (
+            <div className="card">
+              <div className="empty-state">
+                <span className="empty-icon"><FileText size={20} /></span>
+                <p className="empty-title">Sin turnos cerrados</p>
+                <p className="empty-sub">No hay turnos de caja cerrados para la fecha y filtros seleccionados.</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Consolidado del día</h2>
+              <CorteCajaView corteCaja={result.consolidado} />
+
+              <div className="card">
+                <div className="card-header">
+                  <span className="card-title">Turnos del día</span>
+                </div>
+                <div className="table-scroll">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Turno</th>
+                        <th>Cajero</th>
+                        <th>Apertura</th>
+                        <th>Cierre</th>
+                        <th style={{ textAlign: 'right' }}>Ventas del Día</th>
+                        <th style={{ textAlign: 'right' }}>Egresos</th>
+                        <th style={{ textAlign: 'right' }}>Importe a Entregar</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {turnos.map((t) => (
+                        <tr key={t.id}>
+                          <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{t.id}</td>
+                          <td>{t.cajero}</td>
+                          <td style={{ fontSize: 12 }}>{formatDateTime(t.periodStartDate)}</td>
+                          <td style={{ fontSize: 12 }}>{formatDateTime(t.periodEndDate)}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatDOP(t.corteCaja.ventasDelDia.total)}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatDOP(t.corteCaja.egresos.total)}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{formatDOP(t.corteCaja.importeAEntregar)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function ByDimensionTable({ rows }: { rows: LibroDiarioByDimension[] }) {
+  return (
+    <div className="table-scroll">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Dimensión</th>
+            <th style={{ textAlign: 'right' }}>Total Débito</th>
+            <th style={{ textAlign: 'right' }}>Total Crédito</th>
+            <th style={{ textAlign: 'right' }}>Cantidad</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <td>{r.key}</td>
+              <td style={{ textAlign: 'right' }}>{formatDOP(r.totalDebit)}</td>
+              <td style={{ textAlign: 'right' }}>{formatDOP(r.totalCredit)}</td>
+              <td style={{ textAlign: 'right' }}>{r.count}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function LibroDiarioReport() {
+  const [fromDate, setFromDate] = useState(monthStart())
+  const [toDate, setToDate] = useState(today())
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
+  const [groupBy, setGroupBy] = useState<
+    'Group by Voucher' | 'Group by Voucher (Consolidated)' | 'Group by Account' | 'Group by Sucursal' | 'Group by Departamento'
+  >('Group by Voucher (Consolidated)')
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reporte-libro-diario', fromDate, toDate, branch, department, groupBy],
+    queryFn: () => getLibroDiario({ fromDate, toDate, branch: branch || undefined, department: department || undefined, groupBy }),
+    retry: false,
+  })
+
+  const { rows, columns } = extractRows(data)
+  const byDimension = (data as { data?: { byDimension?: LibroDiarioByDimension[] } } | undefined)?.data?.byDimension
+    ?? (data as { byDimension?: LibroDiarioByDimension[] } | undefined)?.byDimension
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <FilterField label="Desde">
+            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+          </FilterField>
+          <FilterField label="Agrupar por">
+            <Select value={groupBy} onValueChange={(val) => setGroupBy(val as typeof groupBy)}>
+              <SelectItem value="Group by Voucher">Agrupar por Voucher</SelectItem>
+              <SelectItem value="Group by Voucher (Consolidated)">Agrupar por Voucher (Consolidado)</SelectItem>
+              <SelectItem value="Group by Account">Agrupar por Cuenta</SelectItem>
+              <SelectItem value="Group by Sucursal">Agrupar por Sucursal</SelectItem>
+              <SelectItem value="Group by Departamento">Agrupar por Departamento</SelectItem>
+            </Select>
+          </FilterField>
+          <BranchDepartmentFilters
+            branch={branch} onBranchChange={setBranch}
+            department={department} onDepartmentChange={setDepartment}
+          />
+        </div>
+      </div>
+
+      {byDimension && byDimension.length > 0 && (
+        <div className="card">
+          <div style={{ padding: '14px 16px 10px', fontWeight: 600, fontSize: 13, borderBottom: '1px solid var(--border-default)' }}>
+            Resumen por {groupBy === 'Group by Sucursal' ? 'Sucursal' : 'Departamento'}
+          </div>
+          <ByDimensionTable rows={byDimension} />
+        </div>
+      )}
+
+      <div className="card">
+        {isLoading && <LoadingRows />}
+        {error && <ErrorBanner err={error} />}
+        {!isLoading && !error && <ReportTable data={rows} columns={columns} />}
+      </div>
+    </div>
+  )
+}
+
+function LibroMayorReport() {
+  const [fromDate, setFromDate] = useState(monthStart())
+  const [toDate, setToDate] = useState(today())
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reporte-libro-mayor', fromDate, toDate, branch, department],
+    queryFn: () => getLibroMayor({ fromDate, toDate, branch: branch || undefined, department: department || undefined }),
+    retry: false,
+  })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <FilterField label="Desde">
+            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+          </FilterField>
+          <BranchDepartmentFilters
+            branch={branch} onBranchChange={setBranch}
+            department={department} onDepartmentChange={setDepartment}
+          />
+        </div>
+      </div>
+      <div className="card">
+        {isLoading && <LoadingRows />}
+        {error && <ErrorBanner err={error} />}
+        {!isLoading && !error && <AutoTable data={data} />}
+      </div>
+    </div>
+  )
+}
+
 // ─── Nav items ────────────────────────────────────────────────────────────────
 
 const REPORT_NAV = [
   { key: '606',         group: 'DGII',       label: '606 – Compras' },
-  { key: '607',         group: 'DGII',       label: '607 – Retenciones' },
-  { key: '608',         group: 'DGII',       label: '608 – Ventas' },
+  { key: '607',         group: 'DGII',       label: '607 – Ventas' },
+  { key: '608',         group: 'DGII',       label: '608 – Anulaciones' },
   { key: 'ventas',      group: 'Ventas',     label: 'Ventas' },
   { key: 'balance',     group: 'Financiero', label: 'Balance General' },
   { key: 'pl',          group: 'Financiero', label: 'Estado de Resultados' },
   { key: 'stock',       group: 'Inventario', label: 'Valoración de Stock' },
   { key: 'movimientos', group: 'Inventario', label: 'Movimientos de Stock' },
-  { key: 'cxcaging',   group: 'CxC',        label: 'Aging CxC' },
+  { key: 'cxcaging',   group: 'CxC',        label: 'Antiguedad de saldos CxC' },
+  { key: 'cxpaging',   group: 'CXP',        label: 'Antiguedad de saldos CxP' },
   { key: 'caja',        group: 'Caja',       label: 'Cuadre de Caja' },
+  { key: 'cuadreTurno', group: 'Caja',       label: 'Cuadre por Turno' },
+  { key: 'corteCajaDia', group: 'Caja',      label: 'Corte de Caja del Día' },
+  { key: 'libroDiario', group: 'Contabilidad', label: 'Libro Diario' },
+  { key: 'libroMayor',  group: 'Contabilidad', label: 'Libro Mayor' },
 ]
+
+// Reportes que solo tienen sentido con el módulo POS habilitado (Facturacion Config.usaModuloPos).
+const POS_ONLY_REPORT_KEYS = new Set(['caja', 'cuadreTurno', 'corteCajaDia'])
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -461,9 +1184,23 @@ export default function ReportesPage() {
   const navigate = useNavigate()
   const active = tipo ?? '606'
   const meta = REPORT_META[active]
-  const groups = [...new Set(REPORT_NAV.map((n) => n.group))]
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const usaModuloPos = facturacionConfig?.usaModuloPos ?? false
+
+  const reportNav = usaModuloPos
+    ? REPORT_NAV
+    : REPORT_NAV.filter((n) => !POS_ONLY_REPORT_KEYS.has(n.key))
+  const groups = [...new Set(reportNav.map((n) => n.group))]
 
   function renderReport() {
+    if (!usaModuloPos && POS_ONLY_REPORT_KEYS.has(active)) {
+      return <ServiceUnavailable message="Este reporte requiere el módulo POS habilitado." />
+    }
     switch (active) {
       case '606':        return <DgiiReport tipo="606" />
       case '607':        return <DgiiReport tipo="607" />
@@ -474,7 +1211,12 @@ export default function ReportesPage() {
       case 'stock':      return <InventarioReport tipo="stock" />
       case 'movimientos':return <InventarioReport tipo="movimientos" />
       case 'cxcaging':  return <CxcAgingReport />
+      case 'cxpaging':  return <CxpAgingReport />
       case 'caja':       return <CajaCuadreReport />
+      case 'cuadreTurno': return <CuadreTurnoReport />
+      case 'corteCajaDia': return <CorteCajaDiaReport />
+      case 'libroDiario': return <LibroDiarioReport />
+      case 'libroMayor':  return <LibroMayorReport />
       default:           return <ServiceUnavailable message="Reporte no encontrado." />
     }
   }
@@ -492,7 +1234,7 @@ export default function ReportesPage() {
         {groups.map((group) => (
           <div key={group} style={{ marginBottom: 4, padding:'0px 10px' }}>
             <div style={{ padding: '6px 12px 2px' }}>{group}</div>
-            {REPORT_NAV.filter((n) => n.group === group).map((n) => (
+            {reportNav.filter((n) => n.group === group).map((n) => (
               <button
                 key={n.key}
                 className={`nav-item${active === n.key ? ' active' : ''}`}

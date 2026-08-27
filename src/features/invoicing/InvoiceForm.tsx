@@ -1,26 +1,31 @@
-import { useState, useEffect, useMemo, Fragment } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { createInvoice } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
 import { listItems, getDefaultPriceTier, getItem } from '@/shared/api/catalog'
-import { listImpuestosVentas, listAlmacenes } from '@/shared/api/config'
+import { listImpuestosVentas, listAlmacenes, getCatalogosFiscales, getStockSettings, getFacturacionConfig } from '@/shared/api/config'
+import { getItemUbicaciones } from '@/shared/api/ubicaciones'
 import type { CreateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking } from '@/shared/api/types'
 import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingModal'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
+import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
 import { ENDPOINTS } from '@/shared/api/endpoints'
-import { formatDOP } from '@/lib/formatters'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2 } from 'lucide-react'
+import { formatDOP, round2 } from '@/lib/formatters'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
+import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
-import { NCF_TYPES } from '@/lib/constants'
+import { useTabs } from '@/contexts/TabsContext'
+
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
+import { DatePicker } from '@/shared/ui/DatePicker'
 import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
@@ -28,11 +33,15 @@ import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
+import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
 
-type NcfType = 'B01' | 'B02' | 'B14' | 'B15' | 'B16'
+type NcfType = string
 
 interface LineItem {
   itemCode: string
@@ -48,15 +57,24 @@ interface LineItem {
   /** Precio base al stockUom — se usa para recalcular al cambiar UOM */
   baseRate: number
   uom: string
-
   /** Factor de conversión activo (UOM seleccionada / stockUom) */
   conversionFactor: number
   maxDiscountPct?: number
-  _prices?: ItemPrices
+  /** Porcentaje de descuento automático del Pricing Rule (solo lectura, se suma al manual) */
+  autoDiscountPct?: number
+  /** Descuento manual que escribe el vendedor (encima del automático) */
+  manualDiscountPct: number
+  allowsDiscount?: boolean
+  /** Almacén seleccionado para la línea */
   warehouse: string
-  /** Stock por almacén del artículo seleccionado, para validar contra el almacén elegido en la línea */
+  /** Precios por tier del catálogo, para recalcular al cambiar el pricing tier */
+  _prices?: ItemPrices
   _stockByWarehouse?: Record<string, number>
   stockError?: string
+  /** Ubicación/rack específico dentro del almacén elegido, si el artículo tiene alguna asignada ahí */
+  ubicacion?: string
+  /** Mensaje cuando el backend rechazó la venta por ambigüedad de ubicación (varias con stock) — obliga a elegir una */
+  ubicacionError?: string
   /** Componentes del combo con tracking de serial/lote activo (solo si itemType === 'combo') */
   _comboComponents?: { itemCode: string; itemName?: string; trackingType: 'serial' | 'batch'; qtyPerCombo: number }[]
   componentTracking?: ComponentTracking[]
@@ -116,17 +134,92 @@ function maxDiscFromPrices(rate: number, prices: ItemPrices | undefined): number
   return Math.max(0, (1 - minPrice / rate) * 100)
 }
 
+/** Selector de ubicación/rack de la línea — solo se muestra si el artículo tiene alguna ubicación
+ *  asignada en el almacén elegido. Si no tiene ninguna, no hay nada que elegir. */
+function LineUbicacionCell({
+  itemCode,
+  warehouse,
+  value,
+  error,
+  onChange,
+}: {
+  itemCode: string
+  warehouse: string
+  value?: string
+  error?: string
+  onChange: (ubicacion: string) => void
+}) {
+  const { data } = useQuery({
+    queryKey: ['item-ubicaciones', itemCode, warehouse],
+    queryFn: () => getItemUbicaciones(itemCode, warehouse),
+    enabled: !!itemCode && !!warehouse,
+  })
+  const ubicaciones = data?.items ?? []
+  const [search, setSearch] = useState('')
+
+  if (data?.note || ubicaciones.length === 0) {
+    return <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+  }
+
+  function ubicacionLabel(u: (typeof ubicaciones)[number]): string {
+    return u.zonaName ? `${u.zonaName} / ${u.ubicacionName ?? u.ubicacionId}` : u.ubicacionName ?? u.ubicacionId
+  }
+
+  const options: SearchSelectOption[] = ubicaciones
+    .filter((u) => !search || ubicacionLabel(u).toLowerCase().includes(search.toLowerCase()))
+    .map((u) => ({ value: u.ubicacionId, label: ubicacionLabel(u) }))
+
+  return (
+    <>
+      <SearchSelect
+        value={value ?? ''}
+        onChange={onChange}
+        options={options}
+        onSearch={setSearch}
+        selectedLabel={(() => {
+          const u = ubicaciones.find((u) => u.ubicacionId === value)
+          return u ? ubicacionLabel(u) : ''
+        })()}
+        placeholder="Sin especificar"
+        error={!!error}
+      />
+      {error && (
+        <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'normal', maxWidth: 160 }}>
+          {error}
+        </span>
+      )}
+    </>
+  )
+}
+
 export default function InvoiceForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { multiTab, activeId, closeTab } = useTabs()
 
   const [customerId, setCustomerId] = useState('')
   const [customerQuery, setCustomerQuery] = useState('')
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [showCreateCustomer, setShowCreateCustomer] = useState(false)
+  const [esClienteOcasional, setEsClienteOcasional] = useState(false)
+  const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
+  const [clienteOcasionalRnc, setClienteOcasionalRnc] = useState('')
+  const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
   const [postingDate, setPostingDate] = useState(todayIso())
   const [dueDate, setDueDate] = useState(defaultDueDate())
   const [ncfType, setNcfType] = useState<NcfType>('B02')
   const [items, setItems] = useState<LineItem[]>([])
+  const [highlightedRow, setHighlightedRow] = useState<number | null>(null)
+  const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
+  const flashRow = useCallback((index: number) => {
+    rowRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // Se espera a que el scroll suave asiente antes de animar, para que el highlight
+    // no pase inadvertido mientras la vista todavía se está moviendo.
+    setTimeout(() => {
+      setHighlightedRow(index)
+      setTimeout(() => setHighlightedRow((cur) => (cur === index ? null : cur)), 2200)
+    }, 400)
+  }, [])
   const [notes, setNotes] = useState('')
   const [semaforo, setSemaforo] = useState<SemaforoEntry | null>(null)
   const [loadingSemaforo, setLoadingSemaforo] = useState(false)
@@ -136,11 +229,32 @@ export default function InvoiceForm() {
   const [trackingModalIndex, setTrackingModalIndex] = useState<number | null>(null)
   const [submitted, setSubmitted] = useState(false)
   const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
+  const [branchError, setBranchError] = useState(false)
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
   const [branchSearch, setBranchSearch] = useState('')
   const [taxesTemplate, setTaxesTemplate] = useState('')
   const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
+  const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
+  // Si está inactivo, se permite capturar un serial/lote nuevo al vender en vez de exigir que ya exista.
+  const requiereSerialLoteCompra = facturacionConfig?.requiereSerialLoteCompra ?? false
+
+  // ── Stock settings: define si los seriales/lotes se capturan inline en la fila (useSerialBatchFields)
+  //    o vía diálogo emergente (ComponentTrackingModal). El catálogo es fijo, se cachea 1h.
+  const { data: stockSettings } = useQuery({
+    queryKey: ['stock-settings'],
+    queryFn: getStockSettings,
+    staleTime: 60 * 60_000,
+  })
+  const useInlineSerialBatch = stockSettings?.useSerialBatchFields === true
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
@@ -149,11 +263,20 @@ export default function InvoiceForm() {
         toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
         return
       }
-      const res = await listItems({ barcode: code, limit: 1, validateStock: true, branch })
+      const res = await listItems({ barcode: code, limit: 1, branch })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
+      const existingIndex = items.findIndex((row) => row.itemCode === item.id)
+      if (existingIndex !== -1) {
+        flashRow(existingIndex)
+        return
+      }
+      const targetIndex = items.length
       addRow()
-      setTimeout(() => selectCatalogItem(items.length, item), 0)
+      setTimeout(() => {
+        selectCatalogItem(targetIndex, item, { autoAddRow: false })
+        addRow()
+      }, 0)
     },
   })
 
@@ -204,10 +327,16 @@ export default function InvoiceForm() {
       .map((b) => ({ value: b, label: b }))
   }, [branchOptions, branchSearch])
 
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+
   const ncfTypeOptions: SearchSelectOption[] = useMemo(() => {
     const q = ncfTypeSearch.toLowerCase()
-    return NCF_TYPES.filter((t) => !q || t.label.toLowerCase().includes(q))
-  }, [ncfTypeSearch])
+    return (catalogos?.ncfTypes ?? []).filter((t) => !q || t.label.toLowerCase().includes(q))
+  }, [catalogos, ncfTypeSearch])
 
   // ── Impuesto del documento (Sales Taxes and Charges Template) ────────────
   const { data: taxesTemplates } = useQuery({
@@ -275,6 +404,13 @@ export default function InvoiceForm() {
     sublabel: c.rnc ?? c.cedula,
   }))
 
+  function handleCustomerCreated(customer: Customer) {
+    setShowCreateCustomer(false)
+    setCustomerId(customer.id)
+    setSelectedCustomer(customer)
+    queryClient.invalidateQueries({ queryKey: ['customerSearch'] })
+  }
+
   // ── Semaforo ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!selectedCustomer) {
@@ -306,20 +442,70 @@ export default function InvoiceForm() {
     }
   }, [selectedCustomer])
 
+  // ── Auto-select NCF type for ocasional customers ────────────────────────
+  useEffect(() => {
+    if (!esClienteOcasional) return
+    if (clienteOcasionalRnc.trim()) {
+      setNcfType('B01')
+    } else {
+      setNcfType('B02')
+    }
+  }, [esClienteOcasional, clienteOcasionalRnc])
+
   // ── Mutations ─────────────────────────────────────────────────────────────
+  /** Cuando el backend rechaza la venta por tener stock repartido en varias ubicaciones del mismo
+   *  almacén, marca la línea afectada para que el cajero elija una ahí mismo en vez de un toast genérico. */
+  function tryResolveUbicacionAmbiguity(msg: string): boolean {
+    const match = msg.match(/art[ií]culo\s+([A-Za-z0-9_.-]+)\s+tiene stock en varias ubicaciones/i)
+    const itemCode = match?.[1]
+    if (!itemCode) return false
+
+    let found = false
+    setItems((prev) =>
+      prev.map((row) => {
+        if (row.itemCode !== itemCode) return row
+        found = true
+        return { ...row, ubicacionError: 'Selecciona la ubicación específica desde la que se venderá este artículo.' }
+      }),
+    )
+    if (!found) return false
+
+    toast.error(`El artículo ${itemCode} tiene stock en varias ubicaciones. Selecciona una en la línea correspondiente.`)
+    return true
+  }
+
   const createMutation = useMutation({
     mutationFn: (dto: CreateInvoiceDto) => createInvoice(dto),
     onSuccess: (invoice) => {
+      const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       toast.success('Factura creada como borrador')
       navigate(`/facturas/${invoice.id}`)
+      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
-    onError: (err: { message?: string }) => {
+    onError: (err: { message?: string; code?: string }) => {
       const msg = err?.message ?? ''
+      if (isApiErrorCode(err, ERROR_CODES.BRANCH_REQUIRED)) {
+        setBranchError(true)
+        toast.error(msg || 'Selecciona una sucursal')
+        return
+      }
       if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) { setPinModalOpen(true); return }
       if (msg.toLowerCase().includes('no tienes acceso a la sucursal')) {
         refetchMyBranches()
         toast.error(`${msg} Tus sucursales asignadas se actualizaron, vuelve a intentar.`)
+        return
+      }
+      if (tryResolveUbicacionAmbiguity(msg)) return
+      if (msg.toLowerCase().includes('ubicac')) {
+        toast.error(msg || 'Error al crear la factura', {
+          action: {
+            label: 'Ver pendientes',
+            onClick: () => navigate('/inventario/zonas?tab=pendientes'),
+          },
+        })
         return
       }
       toast.error(msg || 'Error al crear la factura')
@@ -328,22 +514,42 @@ export default function InvoiceForm() {
 
   const isSaving = createMutation.isPending
 
+  const isDirty = useDirtyCheck({
+    customerId,
+    esClienteOcasional,
+    clienteOcasionalNombre,
+    clienteOcasionalRnc,
+    clienteOcasionalDireccion,
+    postingDate,
+    dueDate,
+    ncfType,
+    items,
+    notes,
+    branch,
+    department,
+    taxesTemplate,
+  }, true)
+  useBeforeUnloadWarning(isDirty)
+
   // ── Line item helpers ─────────────────────────────────────────────────────
-  function updateItem(index: number, patch: Partial<LineItem>) {
-    setItems((prev) =>
-      prev.map((item, i) => {
-        if (i !== index) return item
-        const updated = { ...item, ...patch }
-        if ('qty' in patch || 'rate' in patch || 'discountPct' in patch) {
-          updated.amount = calcAmount(updated.qty, updated.rate, updated.discountPct)
-        }
-        if ('qty' in patch || 'warehouse' in patch) {
-          updated.stockError = validateLineStock(updated)
-        }
-        return updated
-      }),
-    )
-  }
+   function updateItem(index: number, patch: Partial<LineItem>) {
+     setItems((prev) =>
+       prev.map((item, i) => {
+         if (i !== index) return item
+         const updated = { ...item, ...patch }
+         if ('manualDiscountPct' in patch) {
+           updated.discountPct = (updated.autoDiscountPct ?? 0) + (updated.manualDiscountPct ?? 0)
+         }
+         if ('qty' in patch || 'rate' in patch || 'discountPct' in patch) {
+           updated.amount = calcAmount(updated.qty, updated.rate, updated.discountPct)
+         }
+         if ('qty' in patch || 'warehouse' in patch) {
+           updated.stockError = validateLineStock(updated)
+         }
+         return updated
+       }),
+     )
+   }
 
   function updateWarehouse(index: number, warehouse: string) {
     setItems((prev) =>
@@ -351,16 +557,37 @@ export default function InvoiceForm() {
         if (i !== index) return item
         const available = item._stockByWarehouse?.[warehouse]
         const qty = available != null ? Math.min(item.qty, available) : item.qty
-        const updated = { ...item, warehouse, qty, amount: calcAmount(qty, item.rate, item.discountPct) }
+        const updated = { ...item, warehouse, qty, amount: calcAmount(qty, item.rate, item.discountPct), ubicacion: undefined, ubicacionError: undefined }
         updated.stockError = validateLineStock(updated)
         return updated
       }),
     )
   }
 
-  async function selectCatalogItem(index: number, catalogItem: Item) {
+  function updateComponentTracking(
+    index: number,
+    itemCode: string,
+    patch: { serials?: string[]; batches?: { batchId: string; qty: number }[] },
+  ) {
     setItems((prev) =>
       prev.map((row, i) => {
+        if (i !== index) return row
+        const others = (row.componentTracking ?? []).filter((t) => t.itemCode !== itemCode)
+        return { ...row, componentTracking: [...others, { itemCode, ...patch }] }
+      }),
+    )
+  }
+
+  function trackingEntry(row: LineItem, itemCode: string) {
+    return row.componentTracking?.find((t) => t.itemCode === itemCode)
+  }
+
+  async function selectCatalogItem(index: number, catalogItem: Item, opts?: { autoAddRow?: boolean }) {
+    const autoAddRow = opts?.autoAddRow ?? true
+    let wasLastRow = false
+    setItems((prev) => {
+      wasLastRow = index === prev.length - 1
+      return prev.map((row, i) => {
         if (i !== index) return row
         const tier = selectedCustomer?.priceTier ?? defaultPriceTier ?? 'B'
         const baseRate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
@@ -372,10 +599,13 @@ export default function InvoiceForm() {
           description: catalogItem.internalDescription ?? catalogItem.itemName,
           rate: baseRate,
           baseRate,
-          amount: calcAmount(row.qty, baseRate, row.discountPct),
+           amount: calcAmount(row.qty, baseRate, row.discountPct),
           uom: catalogItem.stockUom ?? row.uom,
           conversionFactor: 1,
           maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
+          autoDiscountPct: catalogItem.autoDiscount?.discountType === 'Discount Percentage' ? catalogItem.autoDiscount.discountPercentage : undefined,
+          manualDiscountPct: 0,
+          allowsDiscount: catalogItem.allowsDiscount,
           _prices: catalogItem.prices,
           salesTaxPct: catalogItem.salesTaxPct ?? 0,
           salesTaxTemplate: catalogItem.salesTaxTemplate ?? '',
@@ -384,18 +614,23 @@ export default function InvoiceForm() {
           stockError: undefined,
           _comboComponents: undefined,
           componentTracking: undefined,
+          ubicacion: undefined,
+          ubicacionError: undefined,
         }
-      }),
-    )
+      })
+    })
+    if (autoAddRow && wasLastRow) addRow()
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', _comboComponents: undefined, componentTracking: undefined })
+    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', _comboComponents: undefined, componentTracking: undefined, ubicacion: undefined, ubicacionError: undefined })
   }
 
   function selectBundle(index: number, bundle: Bundle) {
-    setItems((prev) =>
-      prev.map((row, i) => {
+    let wasLastRow = false
+    setItems((prev) => {
+      wasLastRow = index === prev.length - 1
+      return prev.map((row, i) => {
         if (i !== index) return row
         const tier = selectedCustomer?.priceTier ?? defaultPriceTier ?? 'B'
         const baseRate = bundle.prices?.[tier] ?? 0
@@ -419,9 +654,12 @@ export default function InvoiceForm() {
           stockError: undefined,
           _comboComponents: undefined,
           componentTracking: undefined,
+          ubicacion: undefined,
+          ubicacionError: undefined,
         }
-      }),
-    )
+      })
+    })
+    if (wasLastRow) addRow()
 
     // Detecta componentes del combo con tracking de serial/lote — solo aplica a facturación directa.
     Promise.all(
@@ -440,7 +678,8 @@ export default function InvoiceForm() {
       const tracked = results.filter((r): r is NonNullable<typeof r> => r != null)
       if (tracked.length === 0) return
       setItems((prev) => prev.map((row, i) => (i === index ? { ...row, _comboComponents: tracked } : row)))
-      setTrackingModalIndex(index)
+      // En modo inline (useSerialBatchFields) los campos se muestran en la fila; sin modal.
+      if (!useInlineSerialBatch) setTrackingModalIndex(index)
     })
   }
 
@@ -465,6 +704,9 @@ export default function InvoiceForm() {
           uom: s.item.stockUom ?? 'Unidad',
           conversionFactor: 1,
           maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
+          autoDiscountPct: s.item.autoDiscount?.discountType === 'Discount Percentage' ? s.item.autoDiscount.discountPercentage : undefined,
+          manualDiscountPct: 0,
+          allowsDiscount: s.item.allowsDiscount,
           _prices: s.item.prices,
           warehouse: defaultWarehouse(),
           _stockByWarehouse: s.item.stockByWarehouse,
@@ -491,7 +733,7 @@ export default function InvoiceForm() {
       toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
       return
     }
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, discountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', conversionFactor: 1, warehouse: '' }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, discountPct: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', conversionFactor: 1, warehouse: '' }])
   }
 
   function removeRow(index: number) {
@@ -509,18 +751,25 @@ export default function InvoiceForm() {
     e.preventDefault()
     setSubmitted(true)
 
-    if (!customerId) {
-      toast.error('Selecciona un cliente')
-      return
-    }
-    if (items.length === 0) {
-      toast.error('Agrega al menos un artículo')
-      return
-    }
-    if (ncfType === 'B01' && !selectedCustomer?.rnc) {
-      toast.error('El cliente necesita RNC para comprobante B01 (Crédito Fiscal)')
-      return
-    }
+if (esClienteOcasional) {
+       if (!clienteOcasionalNombre.trim()) {
+         toast.error('Ingresa el nombre del cliente ocasional')
+         return
+       }
+       if (ncfType === 'B01' && !clienteOcasionalRnc.trim()) {
+         toast.error('El RNC es requerido para comprobante B01 (Crédito Fiscal)')
+         return
+       }
+     } else {
+       if (!customerId) {
+         toast.error('Selecciona un cliente')
+         return
+       }
+       if (ncfType === 'B01' && !selectedCustomer?.rnc) {
+         toast.error('El cliente necesita RNC para comprobante B01 (Crédito Fiscal)')
+         return
+       }
+     }
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
@@ -543,28 +792,38 @@ export default function InvoiceForm() {
       }
     }
 
-    const itemsDto = items.map((i) => ({
-      itemCode: i.itemCode,
-      description: i.description,
-      qty: i.qty,
-      rate: i.rate,
-      discountPct: i.discountPct || undefined,
-      uom: i.uom || undefined,
-      warehouse: i.warehouse || undefined,
-      componentTracking: i.componentTracking,
-    }))
+const itemsDto = items.map((i) => ({
+       itemCode: i.itemCode,
+       description: i.description,
+       qty: i.qty,
+       rate: i.rate,
+       discountPct: i.discountPct || undefined,
+       uom: i.uom || undefined,
+       warehouse: i.warehouse || undefined,
+       ubicacion: i.ubicacion || undefined,
+       componentTracking: i.componentTracking,
+     }))
 
-    createMutation.mutate({
-      customer: customerId,
-      postingDate,
-      dueDate,
-      branch: branch || undefined,
-      ncfType,
-      items: itemsDto,
-      notes: notes || undefined,
-      taxesTemplate: taxesTemplate || undefined,
-    })
-  }
+     const baseDto = {
+       ...(esClienteOcasional
+         ? {
+             clienteOcasionalNombre: clienteOcasionalNombre || undefined,
+             clienteOcasionalRnc: clienteOcasionalRnc || undefined,
+             clienteOcasionalDireccion: clienteOcasionalDireccion || undefined,
+           }
+         : { customer: customerId }),
+       postingDate,
+       dueDate,
+       branch: branch || undefined,
+       department: usaDepartamentos ? (department || undefined) : undefined,
+       ncfType,
+       items: itemsDto,
+        notes: notes || undefined,
+        taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
+      }
+
+     createMutation.mutate(baseDto as CreateInvoiceDto)
+   }
 
   const semaforoStatusClass: Record<string, string> = {
     verde: 'semaforo-verde',
@@ -595,82 +854,145 @@ export default function InvoiceForm() {
           </div>
           <div className="card-body">
             <div className="form-row">
-              <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
-                <label className="ff-label ff-required" htmlFor="customer">Cliente</label>
-                <SearchSelect
-                  id="customer"
-                  value={customerId}
-                  onChange={(val, _opt) => {
-                    setCustomerId(val)
-                    if (!val) {
-                      setSelectedCustomer(null)
-                      setSemaforo(null)
-                    } else {
-                      const match = customersData?.items.find((c) => c.id === val) ?? null
-                      setSelectedCustomer(match)
-                    }
-                  }}
-                  options={customerOptions}
-                  onSearch={setCustomerQuery}
-                  loading={loadingCustomers}
-                  placeholder="Buscar cliente…"
-                  error={!customerId}
-                />
-                {selectedCustomer && (
-                  <div style={{ marginTop: 6 }}>
-                    {loadingSemaforo ? (
-                      <div className="skeleton-box" style={{ width: 120, height: 20 }} />
-                    ) : semaforo ? (
-                      <div className={`semaforo ${semaforoStatusClass[semaforo.semaforo] ?? ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                        <span className="semaforo-dot" />
-                        {semaforoLabel[semaforo.semaforo] ?? semaforo.semaforo}
-                        {` — ${(semaforo.pctUsado ?? 0).toFixed(0)}% del límite`}
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-              </div>
+<div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
+                 <label className="ff-label ff-required" htmlFor="customer">Cliente</label>
+                 {esClienteOcasional ? (
+                   <input
+                     id="customer"
+                     className="ff-input"
+                     value={clienteOcasionalNombre}
+                     onChange={(e) => setClienteOcasionalNombre(e.target.value)}
+                     placeholder="Nombre del cliente ocasional"
+                     required={esClienteOcasional}
+                   />
+                 ) : (
+                   <SearchSelect
+                     id="customer"
+                     value={customerId}
+                     onChange={(val, _opt) => {
+                       setCustomerId(val)
+                       if (!val) {
+                         setSelectedCustomer(null)
+                         setSemaforo(null)
+                       } else {
+                         const match = customersData?.items.find((c) => c.id === val) ?? null
+                         setSelectedCustomer(match)
+                       }
+                     }}
+                     options={customerOptions}
+                     onSearch={setCustomerQuery}
+                     loading={loadingCustomers}
+                     placeholder="Buscar cliente…"
+                     error={!customerId}
+                     headerContent={
+                       <button
+                         type="button"
+                         className="btn btn-ghost btn-size-sm"
+                         style={{ width: '100%', justifyContent: 'flex-start' }}
+                         onClick={() => setShowCreateCustomer(true)}
+                       >
+                         <UserPlus size={14} /> Agregar cliente
+                       </button>
+                     }
+                   />
+                 )}
+                 {selectedCustomer && !esClienteOcasional && (
+                   <div style={{ marginTop: 6 }}>
+                     {loadingSemaforo ? (
+                       <div className="skeleton-box" style={{ width: 120, height: 20 }} />
+                     ) : semaforo ? (
+                       <div className={`semaforo ${semaforoStatusClass[semaforo.semaforo] ?? ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                         <span className="semaforo-dot" />
+                         {semaforoLabel[semaforo.semaforo] ?? semaforo.semaforo}
+                         {` — ${(semaforo.pctUsado ?? 0).toFixed(0)}% del límite`}
+                       </div>
+                     ) : null}
+                   </div>
+                 )}
+               </div>
+               {esClienteOcasional && (
+                 <div className="ff-wrap">
+                   <label className="ff-label" htmlFor="clienteOcasionalDireccion">Dirección</label>
+                   <input
+                     id="clienteOcasionalDireccion"
+                     className="ff-input"
+                     value={clienteOcasionalDireccion}
+                     onChange={(e) => setClienteOcasionalDireccion(e.target.value)}
+                     placeholder="Dirección del cliente ocasional (opcional)"
+                   />
+                 </div>
+               )}
+
+               <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
+                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                   <input type="checkbox" checked={esClienteOcasional} onChange={(e) => { setEsClienteOcasional(e.target.checked); if (e.target.checked) { setCustomerId(''); setSelectedCustomer(null); setSemaforo(null) } }} />
+                   Venta ocasional (cliente no registrado)
+                 </label>
+                 {esClienteOcasional && (
+                   <p className="ff-hint" style={{ marginTop: 4 }}>
+                     Ingresa el nombre del cliente. Para Crédito Fiscal (B01), también se requiere el RNC.
+                   </p>
+                 )}
+               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="postingDate">Fecha</label>
-                <input
+                <DatePicker
                   id="postingDate"
-                  type="date"
                   className="ff-input"
                   value={postingDate}
-                  onChange={(e) => setPostingDate(e.target.value)}
-                  required
+                  onChange={setPostingDate}
                 />
               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="dueDate">Fecha vencimiento</label>
-                <input
+                <DatePicker
                   id="dueDate"
-                  type="date"
                   className="ff-input"
                   value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
+                  onChange={setDueDate}
+                  clearable
                 />
               </div>
 
-              <div className="ff-wrap">
-                <label className="ff-label" htmlFor="ncfType">Tipo NCF</label>
-                <SearchSelect
-                  id="ncfType"
-                  value={ncfType}
-                  selectedLabel={NCF_TYPES.find((t) => t.value === ncfType)?.label ?? ''}
-                  onChange={(val) => setNcfType((val || 'B02') as NcfType)}
-                  options={ncfTypeOptions}
-                  onSearch={setNcfTypeSearch}
-                  className="ff-select"
-                />
-                {ncfType === 'B01' && !selectedCustomer?.rnc && (
-                  <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
-                    B01 requiere RNC del cliente
-                  </p>
-                )}
-              </div>
+<div className="ff-wrap">
+                 <label className="ff-label" htmlFor="ncfType">Tipo NCF</label>
+                 <SearchSelect
+                   id="ncfType"
+                   value={ncfType}
+                   selectedLabel={(catalogos?.ncfTypes ?? []).find((t) => t.value === ncfType)?.label ?? ''}
+                   onChange={(val) => setNcfType((val || 'B02') as NcfType)}
+                   options={ncfTypeOptions}
+                   onSearch={setNcfTypeSearch}
+                   className="ff-select"
+                 />
+                 {ncfType === 'B01' && !selectedCustomer?.rnc && !esClienteOcasional && (
+                   <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
+                     B01 requiere RNC del cliente
+                   </p>
+                 )}
+                 {ncfType === 'B01' && esClienteOcasional && (
+                   <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
+                     B01 requiere RNC del cliente ocasional
+                   </p>
+                 )}
+               </div>
+
+               {esClienteOcasional && ncfType === 'B01' && (
+                 <div className="ff-wrap">
+                   <label className="ff-label ff-required" htmlFor="clienteOcasionalRnc">RNC del cliente</label>
+                   <input
+                     id="clienteOcasionalRnc"
+                     type="text"
+                     className="ff-input"
+                     value={clienteOcasionalRnc}
+                     onChange={(e) => setClienteOcasionalRnc(e.target.value)}
+                     placeholder="RNC del cliente ocasional"
+                     required
+                   />
+                 </div>
+               )}
 
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="branch">Sucursal</label>
@@ -678,30 +1000,40 @@ export default function InvoiceForm() {
                   id="branch"
                   value={branch}
                   selectedLabel={branch}
-                  error={!branch}
-                  onChange={(val) => setBranch(val)}
+                  error={!branch || branchError}
+                  onChange={(val) => { setBranch(val); setBranchError(false) }}
                   options={branchSelectOptions}
                   onSearch={setBranchSearch}
                   placeholder="Sin especificar"
                   className="ff-select"
                   disabled={branchOptions.length === 1}
                 />
+                {branchError && <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal para continuar</p>}
               </div>
 
-              <div className="ff-wrap">
-                <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
-                <SearchSelect
-                  id="taxesTemplate"
-                  value={taxesTemplate}
-                  onChange={(val) => setTaxesTemplate(val)}
-                  options={taxesTemplateOptions}
-                  onSearch={setTaxesTemplateSearch}
-                  selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
-                  placeholder="Usar el default de la compañía"
-                  className="ff-select"
-                />
-                <p className="ff-hint">Impuesto aplicado al total de la factura (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
-              </div>
+              {usaDepartamentos && (
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="department">Departamento</label>
+                  <DepartmentSelect id="department" value={department} onChange={setDepartment} />
+                </div>
+              )}
+
+              {usaImpuestoDocumento && (
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
+                  <SearchSelect
+                    id="taxesTemplate"
+                    value={taxesTemplate}
+                    onChange={(val) => setTaxesTemplate(val)}
+                    options={taxesTemplateOptions}
+                    onSearch={setTaxesTemplateSearch}
+                    selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
+                    placeholder="Usar el default de la compañía"
+                    className="ff-select"
+                  />
+                  <p className="ff-hint">Impuesto aplicado al total de la factura (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
+                </div>
+              )}
             </div>
 
             {semaforo?.semaforo === 'rojo' && (
@@ -725,25 +1057,32 @@ export default function InvoiceForm() {
                   <th>Descripción</th>
                   <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
-                  <th style={{ textAlign: 'right', width: 72 }}>Dto. %</th>
+                  <th style={{ textAlign: 'right', width: 72 }}>
+                  Dto. %
+                  <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} />
+                </th>
                   <th style={{ textAlign: 'right', width: 80 }}>Impuesto</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 56 }}>UDM</th>
                   <th style={{ width: 140 }}>Almacén</th>
+                  <th style={{ width: 140 }}>Ubicación</th>
                   <th style={{ width: 40 }} />
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={10} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+                    <td colSpan={11} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
                       No hay artículos. Agrega uno con el botón de abajo.
                     </td>
                   </tr>
                 ) : (
                   items.map((item, index) => (
                     <Fragment key={index}>
-                    <tr>
+                    <tr
+                      ref={(el) => { rowRefs.current[index] = el }}
+                      className={highlightedRow === index ? 'row-flash' : undefined}
+                    >
                       <td style={{ minWidth: 200 }}>
                         <ItemSelect
                           value={item.itemCode}
@@ -769,31 +1108,59 @@ export default function InvoiceForm() {
                         )}
                       </td>
                       <td>
-                        <input className="items-input" type="number" min="0" step="0.01" value={item.rate} disabled style={{ textAlign: 'right' }} />
+                        <input className="items-input" type="number" min="0" step="0.01" value={round2(item.rate)} disabled style={{ textAlign: 'right' }} />
                       </td>
-                      <td>
-                        {(() => {
-                          const itemMax = item.maxDiscountPct && item.maxDiscountPct > 0 ? item.maxDiscountPct : 100
-                          const userMax = currentUser?.maxDiscountPct && currentUser.maxDiscountPct > 0 ? currentUser.maxDiscountPct : 100
-                          const priceLimit = maxDiscFromPrices(item.rate, item._prices)
-                          const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
-                          return (
-                            <>
-                              <input className={`items-input${item.discountPct > effectiveLimit ? ' items-input-error' : ''}`} type="number" min="0" max="100" step="0.1" value={item.discountPct} onChange={(e) => updateItem(index, { discountPct: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right', width: 56 }} />
-                              {effectiveLimit < 100 && (
-                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                  máx {effectiveLimit.toFixed(2)}%
-                                </span>
-                              )}
-                              {item.discountPct > effectiveLimit && (
-                                <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                  Supera el límite de {effectiveLimit.toFixed(2)}%
-                                </span>
-                              )}
-                            </>
-                          )
-                        })()}
-                      </td>
+                       <td>
+                         {(() => {
+                           const autoPct = item.autoDiscountPct ?? 0
+                           const itemMax = item.maxDiscountPct && item.maxDiscountPct > 0 ? item.maxDiscountPct : 100
+                           const userMax = currentUser?.maxDiscountPct && currentUser.maxDiscountPct > 0 ? currentUser.maxDiscountPct : 100
+                           const priceLimit = maxDiscFromPrices(item.rate, item._prices)
+                           const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
+                           const allowsManual = item.allowsDiscount !== false
+                           return (
+                             <>
+                               {autoPct > 0 && (
+                                 <div style={{ marginBottom: 4 }}>
+                                   <span className="badge badge-discount" style={{ fontSize: 10, padding: '2px 6px' }}>
+                                     {autoPct}% auto
+                                   </span>
+                                 </div>
+                               )}
+                               <input
+                                 className={`items-input${submitted && item.discountPct > effectiveLimit ? ' items-input-error' : ''}`}
+                                 type="number"
+                                 min="0"
+                                 max="100"
+                                 step="0.1"
+                                 value={item.manualDiscountPct}
+                                 onChange={(e) => updateItem(index, { manualDiscountPct: parseFloat(e.target.value) || 0 })}
+                                 style={{ textAlign: 'right', width: 56 }}
+                                 disabled={!allowsManual}
+                                 title={allowsManual ? undefined : 'Este artículo no acepta descuentos'}
+                               />
+                               {item.discountPct > 0 && (
+                                 <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                   Total: {item.discountPct.toFixed(1)}%
+                                 </span>
+                               )}
+                               {effectiveLimit < 100 && (
+                                 <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                   máx {effectiveLimit.toFixed(2)}%
+                                 </span>
+                               )}
+                               {item.discountPct > effectiveLimit && (
+                                 <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                   Supera el límite de {effectiveLimit.toFixed(2)}%
+                                 </span>
+                               )}
+                               <span style={{ fontSize: 10, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, cursor: 'help' }} title="El descuento puede incluir una parte automática (Pricing Rule) y una parte manual del vendedor. Ambas se suman contra el tope máximo.">
+                                 ⓘ automático + manual
+                               </span>
+                             </>
+                           )
+                         })()}
+                       </td>
                       <td style={{ textAlign: 'right' }}>
                         {item.salesTaxPct > 0 ? (
                           <span className="td-muted" style={{ fontSize: 12 }}>
@@ -803,7 +1170,7 @@ export default function InvoiceForm() {
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount, { trimZeros: true })}</td>
                       <td>
                         {item.itemType === 'service' || item.itemType === 'combo' ? (
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
@@ -829,6 +1196,19 @@ export default function InvoiceForm() {
                           disabled={!item.itemCode}
                         />
                       </td>
+                      <td>
+                        {item.itemCode && item.warehouse ? (
+                          <LineUbicacionCell
+                            itemCode={item.itemCode}
+                            warehouse={item.warehouse}
+                            value={item.ubicacion}
+                            error={item.ubicacionError}
+                            onChange={(val) => updateItem(index, { ubicacion: val || undefined, ubicacionError: undefined })}
+                          />
+                        ) : (
+                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                        )}
+                      </td>
                       <td onClick={(e) => e.stopPropagation()} className="actions-cell">
                         <ActionsMenu>
                           <ActionsMenuItem
@@ -845,8 +1225,25 @@ export default function InvoiceForm() {
                     </tr>
                     {item.itemType === 'combo' && item._comboComponents && item._comboComponents.length > 0 && (
                       <tr>
-                        <td colSpan={10} style={{ padding: '4px 12px 10px' }}>
-                          {isTrackingComplete(item) ? (
+                        <td colSpan={11} style={{ padding: '4px 12px 10px' }}>
+                          {useInlineSerialBatch ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {getTrackingRequirement(item).map((req) => {
+                                const entry = trackingEntry(item, req.itemCode)
+                                return (
+                                  <TrackedComponentEditor
+                                    key={req.itemCode}
+                                    component={req}
+                                    serials={entry?.serials ?? []}
+                                    onChangeSerials={(s) => updateComponentTracking(index, req.itemCode, { serials: s })}
+                                    batches={entry?.batches ?? []}
+                                    onChangeBatches={(b) => updateComponentTracking(index, req.itemCode, { batches: b })}
+                                    allowNew={!requiereSerialLoteCompra}
+                                  />
+                                )
+                              })}
+                            </div>
+                          ) : isTrackingComplete(item) ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-success)' }}>
                               ✓ Series/lotes de componentes asignados
                               <button type="button" className="btn btn-ghost btn-size-xs" onClick={() => setTrackingModalIndex(index)}>
@@ -938,16 +1335,30 @@ export default function InvoiceForm() {
       <PinModal
         open={pinModalOpen}
         onClose={() => setPinModalOpen(false)}
-        onAuthorized={(userId) => {
-          client.defaults.headers.common['X-Admin-Pin'] = userId
-          setPinModalOpen(false)
-          const itemsDto = items.map((i) => ({
-            itemCode: i.itemCode, description: i.description, qty: i.qty, rate: i.rate,
-            discountPct: i.discountPct || undefined, uom: i.uom || undefined, warehouse: i.warehouse || undefined,
-            componentTracking: i.componentTracking,
-          }))
-          createMutation.mutate({ customer: customerId, postingDate, dueDate, branch: branch || undefined, ncfType, items: itemsDto, notes: notes || undefined, taxesTemplate: taxesTemplate || undefined })
-        }}
+onAuthorized={(userId) => {
+           client.defaults.headers.common['X-Admin-Pin'] = userId
+           setPinModalOpen(false)
+           const itemsDto = items.map((i) => ({
+             itemCode: i.itemCode, description: i.description, qty: i.qty, rate: i.rate,
+             discountPct: i.discountPct || undefined, uom: i.uom || undefined, warehouse: i.warehouse || undefined,
+             ubicacion: i.ubicacion || undefined,
+             componentTracking: i.componentTracking,
+           }))
+           const baseDto = {
+             ...(esClienteOcasional
+               ? {
+                   clienteOcasionalNombre: clienteOcasionalNombre || undefined,
+                   clienteOcasionalRnc: clienteOcasionalRnc || undefined,
+                   clienteOcasionalDireccion: clienteOcasionalDireccion || undefined,
+                 }
+               : { customer: customerId }),
+             postingDate, dueDate, branch: branch || undefined, department: usaDepartamentos ? (department || undefined) : undefined, ncfType,
+             items: itemsDto,
+             notes: notes || undefined,
+             taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
+           }
+createMutation.mutate(baseDto as CreateInvoiceDto)
+         }}
         title="Autorización requerida"
         description="El descuento supera tu límite. Ingresa el PIN de un administrador."
       />
@@ -964,11 +1375,19 @@ export default function InvoiceForm() {
         <ItemDetailModal itemCode={viewItemCode} onClose={() => setViewItemCode(null)} />
       )}
 
+      {showCreateCustomer && (
+        <CustomerQuickCreateModal
+          onCreated={handleCustomerCreated}
+          onClose={() => setShowCreateCustomer(false)}
+        />
+      )}
+
       {trackingModalIndex != null && items[trackingModalIndex] && (
         <ComponentTrackingModal
           bundleName={items[trackingModalIndex].itemLabel ?? items[trackingModalIndex].itemCode}
           components={getTrackingRequirement(items[trackingModalIndex])}
           initial={items[trackingModalIndex].componentTracking}
+          allowNew={!requiereSerialLoteCompra}
           onConfirm={(tracking) => {
             updateItem(trackingModalIndex, { componentTracking: tracking })
             setTrackingModalIndex(null)

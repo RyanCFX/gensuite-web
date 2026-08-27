@@ -18,6 +18,8 @@ interface SearchableSelectProps {
   disabled?: boolean
   className?: string
   error?: boolean
+  /** Se dispara cada vez que el dropdown se abre — útil para forzar un refetch de `options`. */
+  onOpen?: () => void
 }
 
 export function SearchableSelect({
@@ -30,6 +32,7 @@ export function SearchableSelect({
   disabled = false,
   className = 'ff-select',
   error = false,
+  onOpen,
 }: SearchableSelectProps) {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -54,7 +57,9 @@ export function SearchableSelect({
       setQuery('')
       setHighlighted(0)
       setTimeout(() => searchRef.current?.focus(), 0)
+      onOpen?.()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const select = useCallback((val: string) => {

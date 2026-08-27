@@ -16,19 +16,22 @@ interface AccountSelectProps {
   rootType?: 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense'
   // If true, exclude group accounts (only ledger accounts accept transactions)
   ledgerOnly?: boolean
+  // If true, filter to accounts already used as tax_type/account_head in tax templates
+  soloImpuesto?: boolean
 }
 
-export function AccountSelect({ value, onChange, placeholder = 'Buscar cuenta…', error, disabled, id, accountType, rootType, ledgerOnly = true }: AccountSelectProps) {
+export function AccountSelect({ value, onChange, placeholder = 'Buscar cuenta…', error, disabled, id, accountType, rootType, ledgerOnly = true, soloImpuesto }: AccountSelectProps) {
   const [query, setQuery] = useState('')
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['accounts-search', query, accountType, rootType],
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['accounts-search', query, accountType, rootType, soloImpuesto],
     queryFn: () => listCuentas({
       search: query || undefined,
       accountType: accountType || undefined,
       rootType: rootType || undefined,
       isGroup: ledgerOnly ? false : undefined,  // exclude groups when ledgerOnly
-      limit: 20,
+      soloImpuesto: soloImpuesto || undefined,
+      // limit: 300
     }),
     staleTime: 30_000,
   })
@@ -46,6 +49,7 @@ export function AccountSelect({ value, onChange, placeholder = 'Buscar cuenta…
       onChange={(id) => onChange(id)}
       options={options}
       onSearch={setQuery}
+      onOpen={() => refetch()}
       loading={isLoading}
       placeholder={placeholder}
       error={error}

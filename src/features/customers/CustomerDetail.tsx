@@ -3,12 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getCustomer, deleteCustomer } from '@/shared/api/customers'
-import { getSemaforoByCustomer, getSaldoFavor } from '@/shared/api/cobros'
+import { getSemaforoByCustomer, getSaldoFavor, getEstadoCuenta, downloadEstadoCuentaPdf } from '@/shared/api/cobros'
 import { getCreditNoteSaldoFavor, removerCreditNoteAplicada } from '@/shared/api/notes'
 import { client } from '@/shared/api/client'
-import type { Invoice } from '@/shared/api/types'
+import type { Invoice, EstadoCuentaResponse } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { Pencil, Ban, Building2, User, ArrowLeft, Wallet, Receipt, X } from 'lucide-react'
+import { Pencil, Ban, Building2, User, ArrowLeft, Wallet, Receipt, X, FileText, Download, Eye, EyeOff } from 'lucide-react'
 
 function SemaforoIndicator({ customerId }: { customerId: string }) {
   const { data: entry } = useQuery({
@@ -234,11 +234,197 @@ function RecentInvoices({ customerId }: { customerId: string }) {
   )
 }
 
+function EstadoCuentaPreview({
+  customerId,
+  customerName,
+  data,
+  isLoading,
+}: {
+  customerId: string
+  customerName: string
+  data?: EstadoCuentaResponse | null
+  isLoading: boolean
+}) {
+  const [showPreview, setShowPreview] = useState(true)
+
+  const phone = data?.telefono ?? data?.cliente?.telefono ?? 'No especificado'
+  const isDataValid = data && typeof data.empresa === 'string' && data.cliente && Array.isArray(data.documentos)
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card-header">
+        <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <FileText size={16} /> Estado de Cuenta
+        </h2>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="btn btn-ghost btn-size-sm"
+            onClick={() => setShowPreview(!showPreview)}
+          >
+            {showPreview ? <EyeOff size={14} /> : <Eye size={14} />}
+            {showPreview ? 'Ocultar' : 'Ver'}
+          </button>
+          <button
+            className="btn btn-secondary btn-size-sm"
+            onClick={() => downloadEstadoCuentaPdf(customerId, `estado-cuenta-${customerName}.pdf`)}
+          >
+            <Download size={14} />
+            Descargar PDF
+          </button>
+        </div>
+      </div>
+
+      {isLoading && (
+        <div className="card-body">
+          <div className="skeleton-box" style={{ height: 200, width: '100%' }} />
+        </div>
+      )}
+
+      {!isLoading && data && !showPreview && (
+        <div className="card-body">
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            Datos del estado de cuenta para <strong>{customerName}</strong>
+          </p>
+        </div>
+      )}
+
+      {!isLoading && data && showPreview && isDataValid && (
+        <>
+          {/* ── Cabecera ─────────────────────────────────────── */}
+          <div className="card-body">
+            <div className="fields-grid fields-grid-3" style={{ marginBottom: 16 }}>
+              <div className="detail-field">
+                <span className="detail-label">Cliente</span>
+                <span className="detail-value">{data.cliente.nombre}</span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">Teléfono</span>
+                <span className="detail-value">{phone}</span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">Fecha</span>
+                <span className="detail-value">{formatDate(data.fecha)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Documentos pendientes ────────────────────────── */}
+          <div className="card-body" style={{ paddingTop: 0 }}>
+            {data.documentos.length === 0 ? (
+              <div className="empty-state">
+                <p className="empty-title">Sin documentos pendientes</p>
+                <p className="empty-sub">Este cliente no tiene saldos pendientes de cobro.</p>
+              </div>
+            ) : (
+              <>
+                <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
+                  Documentos Pendientes
+                </h3>
+                <div className="table-scroll">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Número</th>
+                        <th>Comprobante</th>
+                        <th>Vence</th>
+                        <th style={{ textAlign: 'right' }}>Monto</th>
+                        <th style={{ textAlign: 'right' }}>Aplicado</th>
+                        <th style={{ textAlign: 'right' }}>Saldo</th>
+                        <th style={{ textAlign: 'right' }}>Días</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.documentos.map((doc, i) => (
+                        <tr key={i}>
+                          <td>{formatDate(doc.fecha)}</td>
+                          <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{doc.numero}</td>
+                          <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{doc.comprobante}</td>
+                          <td>{formatDate(doc.vence)}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(doc.monto)}</td>
+                          <td style={{ textAlign: 'right' }}>{formatDOP(doc.aplicado)}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--error-text)' }}>{formatDOP(doc.saldo)}</td>
+                          <td style={{ textAlign: 'right' }}>{doc.dias}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colSpan={7} style={{ textAlign: 'right', fontWeight: 700 }}>Total Pendiente</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--error-text)' }}>{formatDOP(data.totalPendiente)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* ── Antigüedad de saldos ─────────────────────────── */}
+          {data.aging && data.aging.length > 0 && (
+            <div className="card-body" style={{ paddingTop: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
+                Antigüedad de Saldos
+              </h3>
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      {data.aging.map((bucket, i) => (
+                        <th key={i} style={{ textAlign: 'right' }}>{bucket.label}</th>
+                      ))}
+                      <th style={{ textAlign: 'right', fontWeight: 700 }}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      {data.aging.map((bucket, i) => (
+                        <td key={i} style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(bucket.total)}</td>
+                      ))}
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatDOP(data.totalPendiente)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {!isLoading && data && showPreview && !isDataValid && (
+        <div className="card-body">
+          <div className="empty-state">
+            <p className="empty-title">Datos no disponibles</p>
+            <p className="empty-sub">La respuesta del servidor no tiene el formato esperado.</p>
+          </div>
+        </div>
+      )}
+
+      {!isLoading && !data && (
+        <div className="card-body">
+          <div className="empty-state">
+            <p className="empty-title">Error al cargar el estado de cuenta</p>
+            <p className="empty-sub">No se pudo obtener la información del servidor.</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function CustomerDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [showDisableDialog, setShowDisableDialog] = useState(false)
+  const [showEstadoCuenta, setShowEstadoCuenta] = useState(false)
+
+  const { data: estadoCuenta, isLoading: isEstadoCuentaLoading } = useQuery({
+    queryKey: ['estado-cuenta', id],
+    queryFn: () => id ? getEstadoCuenta(id) : null,
+    enabled: Boolean(id) && showEstadoCuenta,
+    retry: false,
+  })
 
   const { data: customer, isLoading, isError } = useQuery({
     queryKey: ['customer', id],
@@ -291,15 +477,24 @@ export default function CustomerDetail() {
               ? <Building2 size={20} style={{ color: 'var(--text-secondary)' }} />
               : <User size={20} style={{ color: 'var(--text-secondary)' }} />}
             {customer.customerName}
+            {customer.isSystemManaged && <span className="badge badge-neutral">Cliente del sistema</span>}
             {customer.disabled && <span className="badge badge-error">Inactivo</span>}
           </h1>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={() => navigate(`/clientes/${id}/editar`)}>
-            <Pencil size={14} />
-            Editar
-          </button>
-          {!customer.disabled && (
+          {!customer.isSystemManaged && (
+            <button className="btn btn-secondary" onClick={() => navigate(`/clientes/${id}/editar`)}>
+              <Pencil size={14} />
+              Editar
+            </button>
+          )}
+          {id && (
+            <button className="btn btn-secondary" onClick={() => setShowEstadoCuenta(!showEstadoCuenta)}>
+              <FileText size={14} />
+              Estado de Cuenta
+            </button>
+          )}
+          {!customer.disabled && !customer.isSystemManaged && (
             <button className="btn btn-danger" onClick={() => setShowDisableDialog(true)}>
               <Ban size={14} />
               Desactivar
@@ -311,6 +506,15 @@ export default function CustomerDetail() {
       {customer.hasCredit && id && <SemaforoIndicator customerId={id} />}
       {id && <SaldoFavorIndicator customerId={id} />}
       {id && <CreditNotesIndicator customerId={id} />}
+
+      {id && showEstadoCuenta && (
+        <EstadoCuentaPreview
+          customerId={id}
+          customerName={customer.customerName}
+          data={estadoCuenta}
+          isLoading={isEstadoCuentaLoading}
+        />
+      )}
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
@@ -339,9 +543,52 @@ export default function CustomerDetail() {
               <span className="detail-value">{customer.emailInvoice ?? '—'}</span>
             </div>
             <div className="detail-field">
+              <span className="detail-label">Dirección</span>
+              <span className="detail-value">{customer.address ?? '—'}</span>
+            </div>
+            <div className="detail-field">
               <span className="detail-label">Grupo de clientes</span>
               <span className="detail-value">{customer.customerGroup ?? '—'}</span>
             </div>
+            <div className="detail-field">
+              <span className="detail-label">Sucursal</span>
+              <span className="detail-value">{customer.branch ?? '—'}</span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">Forma de Pago por Defecto</span>
+              <span className="detail-value">{customer.formaPagoDefault ?? '—'}</span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">Cuenta CxC Alterna</span>
+              <span className="detail-value">{customer.cuentaCxcDefault ?? '—'}</span>
+            </div>
+            <div className="detail-field">
+              <span className="detail-label">Encargado de Cobros</span>
+              <span className="detail-value">{customer.encargadoCxc ?? '—'}</span>
+            </div>
+            {customer.impuestoVentasDefault && customer.impuestoVentasDefault.length > 0 && (
+              <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+                <span className="detail-label">Impuesto(s) de Venta por Defecto</span>
+                <span className="detail-value" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {customer.impuestoVentasDefault.map((t) => (
+                    <span key={t} className="badge badge-info">{t}</span>
+                  ))}
+                </span>
+              </div>
+            )}
+            {customer.telefonos && customer.telefonos.length > 0 && (
+              <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+                <span className="detail-label">Teléfonos</span>
+                <span className="detail-value" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {customer.telefonos.map((t, i) => (
+                    <span key={i}>
+                      {t.telefono}
+                      {t.etiqueta && <span style={{ color: 'var(--text-tertiary)', marginLeft: 6 }}>({t.etiqueta})</span>}
+                    </span>
+                  ))}
+                </span>
+              </div>
+            )}
             {customer.priceTier && (
               <div className="detail-field">
                 <span className="detail-label">Nivel de precio</span>
