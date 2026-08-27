@@ -3,7 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Download, Loader2, Info } from 'lucide-react'
 import { getAging } from '@/shared/api/cobros'
-import type { AgingGroupBy } from '@/shared/api/types'
+import type { AgingGroupBy, AgingInvoiceEntry } from '@/shared/api/types'
 import { listCustomers } from '@/shared/api/customers'
 import { downloadCxcAgingPdf } from '@/shared/api/reportes'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -152,11 +152,11 @@ export default function AgingPage() {
                           </tr>
                         )
                       : isInvoiceView
-                        ? rows.map((entry, i) => (
-                            <tr key={'invoice' in entry ? `${entry.invoice}-${i}` : i}>
+                        ? (rows as AgingInvoiceEntry[]).map((entry, i) => (
+                            <tr key={`${entry.invoice}-${i}`}>
                               <td style={{ fontWeight: 500 }}>{entry.customerName ?? entry.customer}</td>
-                              <td>{'invoice' in entry ? entry.invoice : ''}</td>
-                              <td>{'dueDate' in entry && entry.dueDate ? formatDate(entry.dueDate) : ''}</td>
+                              <td>{entry.invoice}</td>
+                              <td>{entry.dueDate ? formatDate(entry.dueDate) : ''}</td>
                               <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatDOP(entry.totalOutstanding)}</td>
                               {showCurrent && <td style={{ textAlign: 'right' }}>{formatDOP(entry.current)}</td>}
                               <td style={{ textAlign: 'right', ...agingStyle(entry.range1) }}>{formatDOP(entry.range1)}</td>

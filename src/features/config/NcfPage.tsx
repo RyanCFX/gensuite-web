@@ -8,6 +8,8 @@ import {
   getCatalogosFiscales,
 } from '@/shared/api/config'
 import type { NcfSerie, CreateNcfSerieDto, UpdateNcfSerieDto } from '@/shared/api/types'
+
+type NcfType = CreateNcfSerieDto['ncfType']
 import { PageHeader } from '@/components/shared/PageHeader'
 import { formatDate } from '@/lib/formatters'
 import {
@@ -136,7 +138,7 @@ function StatusBadgePill({ serie }: { serie: NcfSerie }) {
 // ─── Create Modal ─────────────────────────────────────────────────────────────
 
 function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [ncfType, setNcfType] = useState('B02')
+  const [ncfType, setNcfType] = useState<NcfType>('B02')
   const [start, setStart] = useState(1)
   const [end, setEnd] = useState(50000000)
   const [expiration, setExpiration] = useState('')
@@ -196,7 +198,7 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             {/* Tipo NCF */}
             <div className="ff-wrap">
               <label className="ff-label">Tipo de Comprobante <span className="ff-required">*</span></label>
-              <Select value={ncfType} onValueChange={setNcfType}>
+              <Select value={ncfType} onValueChange={(v) => setNcfType(v as NcfType)}>
                 {ncfTypeOptions.map((t) => (
                   <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                 ))}
@@ -388,7 +390,7 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
                 <label className="ff-label">Tipo de Comprobante</label>
                 <Select
                   value={ncfType}
-                  onValueChange={setNcfType}
+                  onValueChange={(v) => setNcfType(v as NcfType)}
                   disabled={hasUsed}
                 >
                   {ncfTypeOptions.map((t) => (

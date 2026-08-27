@@ -18,6 +18,8 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { listSucursales } from '@/shared/api/sucursales'
 import { validateRNCDetailed, formatRNC } from '@/lib/validators/dgii'
 import { formatDOP } from '@/lib/formatters'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 function today(): string {
   const d = new Date()

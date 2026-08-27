@@ -222,7 +222,7 @@ export default function RetencionesPage() {
         ...(r.mode === 'catalogo'
           ? {
               componentes: (r.componentes ?? []).map((c) => ({
-                impuestoBaseId: c.impuestoBaseId,
+                impuestoBaseId: c.impuestoBaseId!,
                 factor: c.factor || 100,
               })),
             }

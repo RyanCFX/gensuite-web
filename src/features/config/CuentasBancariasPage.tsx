@@ -262,7 +262,6 @@ export default function CuentasBancariasPage() {
         isDefault: values.isDefault,
         balanceInicial: values.balanceInicial ?? 0,
         ultimoCheque: values.ultimoCheque,
-        ultimoDeposito: values.ultimoDeposito,
         tipoCuenta: values.tipoCuenta || undefined,
         chequePrintTemplate: values.chequePrintTemplate || undefined,
       })
