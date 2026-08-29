@@ -48,6 +48,8 @@ const GastoDetail     = lazy(() => import('@/features/gastos/GastoDetail'))
 const GastoForm       = lazy(() => import('@/features/gastos/GastoForm'))
 const EcfRecibidosPage  = lazy(() => import('@/features/ecf-recibidos/EcfRecibidosPage'))
 const EcfRecibidoDetail = lazy(() => import('@/features/ecf-recibidos/EcfRecibidoDetail'))
+const EcfEmitidosPage   = lazy(() => import('@/features/ecf-emitidos/EcfEmitidosPage'))
+const EcfEmitidoDetail  = lazy(() => import('@/features/ecf-emitidos/EcfEmitidoDetail'))
 const DevolucionesComprasPage = lazy(() => import('@/features/devoluciones-compras/DevolucionesPage'))
 const DevolucionCompraDetail  = lazy(() => import('@/features/devoluciones-compras/DevolucionDetail'))
 const DevolucionCompraForm    = lazy(() => import('@/features/devoluciones-compras/DevolucionForm'))
@@ -237,6 +239,10 @@ export default function App() {
             {/* e-CF Recibidos */}
             <Route path="/ecf-recibidos" element={<Suspense fallback={<PageLoader />}><EcfRecibidosPage /></Suspense>} />
             <Route path="/ecf-recibidos/:voucherId" element={<Suspense fallback={<PageLoader />}><EcfRecibidoDetail /></Suspense>} />
+
+            {/* e-CF Emitidos */}
+            <Route path="/ecf-emitidos" element={<Suspense fallback={<PageLoader />}><EcfEmitidosPage /></Suspense>} />
+            <Route path="/ecf-emitidos/:voucherId" element={<Suspense fallback={<PageLoader />}><EcfEmitidoDetail /></Suspense>} />
 
             {/* Gastos */}
             <Route path="/gastos" element={<Suspense fallback={<PageLoader />}><GastosPage /></Suspense>} />

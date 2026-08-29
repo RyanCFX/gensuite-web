@@ -113,6 +113,26 @@ export const ECF_ENV_LABELS: Record<string, string> = {
   eCF: 'Producción (eCF)',
 }
 
+/** Chip corto de ambiente para la bandeja/detalle. `null` si es producción (no se muestra chip). */
+export function ecfEnvChip(env?: string | null): { label: string; className: string } | null {
+  switch (env) {
+    case 'TesteCF':
+      return { label: 'Pruebas', className: 'badge-info' }
+    case 'CerteCF':
+      return { label: 'Certificación', className: 'badge-warning' }
+    default:
+      return null
+  }
+}
+
+/** ¿Ofrecer el botón "Refrescar estado"? Sí en estados no terminales, y también en NOT_FOUND
+ *  (terminal, pero cuya acción principal es reconsultar a la DGII — ver documento #53 §2).
+ *  `esTerminal` viene de `flujo.esTerminal` (autoridad del BFF). */
+export function ecfPuedeRefrescar(status: string | null | undefined, esTerminal: boolean): boolean {
+  if (status?.toUpperCase() === 'NOT_FOUND') return true
+  return !esTerminal
+}
+
 /** Label legible de un typeId de e-CF (ej. "31" → "31 — Crédito Fiscal"). */
 export function ecfTipoLabel(typeId: string): string {
   const entry = ECF_TIPOS.find((t) => t.typeId === typeId)
@@ -174,8 +194,9 @@ export function ecfStatusBadge(status?: string | null): string {
     case 'PENDING':
     case 'SIGNED':
     case 'IN_PROCESS':
-    case 'WAITING_DEFERRED':
       return 'badge-warning'
+    case 'WAITING_DEFERRED':
+      return 'badge-info'
     case 'REJECTED':
     case 'FAILED':
     case 'NOT_FOUND':

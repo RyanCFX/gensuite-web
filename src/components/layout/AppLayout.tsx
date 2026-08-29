@@ -131,6 +131,11 @@ const NAV_VENTAS: NavEntry[] = [
     path: "/devoluciones",
   },
   {
+    label: "e-CF Emitidos",
+    icon: <Receipt size={16} aria-hidden="true" />,
+    path: "/ecf-emitidos",
+  },
+  {
     label: "Reportes",
     icon: <BarChart3 size={16} aria-hidden="true" />,
     prefix: "/reportes/ventas|/reportes/607",

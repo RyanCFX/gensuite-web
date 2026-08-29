@@ -387,7 +387,38 @@ certificación real se opera en el panel de Aura/DGII, no aquí.
 - **"Desactivar contingencia"** (`POST …/desactivar`, sin body) → `ConfirmModal`; si quedan
   diferidos sin transmitir, el texto lo advierte.
 
-### 11.8 Errores nuevos manejados (F9)
+### 11.9 Bandeja de e-CF emitidos (#53) — `/ecf-emitidos`
+
+`src/features/ecf-emitidos/*` — espejo del lado **emitido** (`origin: ISSUED`) de la bandeja de
+recibidos. **Solo lectura + botón "Refrescar estado".** La emisión ocurre en el ciclo de la
+factura (#48); la anulación, desde el flujo de cancelación de la factura (#50) — aquí **no** hay
+acciones de emitir/anular.
+
+- **Lista** (`GET /ecf/emitidos`, paginada): filtros `estado` DGII, `rnc` (comprador), `ncf`
+  exacto (campo de búsqueda), `typeId`, `env`, `from`/`to`, toggle *incluir archivados*. Columnas:
+  e-NCF (+ chip `env` si ≠ `eCF`, + chip *Contingencia* si `deferredSend`), tipo, fecha, comprador,
+  total, badge de estado (reutiliza `ecfStatusBadge`/`ecfStatusLabel` de `dgii.ts`), enlace al
+  documento ERPNext (`Sales Invoice` → `/facturas/:id`, `Purchase Invoice` → `/compras/:id`), y
+  botón inline **Refrescar** en estados no terminales (o `NOT_FOUND`). El filtro fino por `ncf`
+  puede hacer que `meta.total` no coincida con lo mostrado — se muestra `data.note` si viene.
+- **Detalle** (`GET /ecf/emitidos/:voucherId`): stepper de `flujo.pasos` (`EcfFlujoStepper`) +
+  banner de `flujo.alerta` (color por `flujo.requiereAtencion`, texto **del backend**, nunca
+  reconstruido); datos DGII (`trackId`, `securityCode`, `lastError`); totales
+  (`taxedAmount`/`exemptAmount`/`itbisAmount`/`iscAmount`/`total`); tabla de `items[]`; QR
+  (`qrUrl`, con `qrcode.react`) + botón *Verificar en DGII*; enlace al documento ERPNext y, para
+  `Sales Invoice`, botón *PDF/A* (reusa `downloadInvoiceEcfPdfa`).
+- **Refrescar** (`POST /ecf/emitidos/:voucherId/refresh`): si `cambio === true`, invalida las
+  queries y toast `statusPrevio → status`.
+
+Helpers nuevos en `dgii.ts`: `ecfEnvChip`, `ecfPuedeRefrescar`. `ecfStatusBadge` ahora devuelve
+`badge-info` (azul) para `WAITING_DEFERRED`. Tipos nuevos en `types.ts`: `VoucherEmitido`,
+`LineaVoucher`, `EcfFlujo`, `EcfFlujoPaso`, `EcfEmitidoDetail`, `RefreshEcfEmitidoResult`.
+
+> **openapi.json**: los paths `/ecf/emitidos*` **todavía no están** en el spec — los tipos y
+> contratos derivan del documento #53 y son tolerantes. Confirmar contra la respuesta real al
+> integrar con el BFF.
+
+### 11.10 Errores nuevos manejados (F9)
 
 - **`PUT /config/ecf { habilitado: true }` → `400`** cuando el tenant está en `live` sin
   certificación completa: `EcfConfigSection` detecta el mensaje (`/certificaci[oó]n/i`) y muestra

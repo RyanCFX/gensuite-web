@@ -62,6 +62,11 @@ export const ENDPOINTS = {
     vincular: (voucherId: string) => `/ecf/recibidos/${encodeURIComponent(voucherId)}/vincular`,
     aprobacionComercial: (voucherId: string) => `/ecf/recibidos/${encodeURIComponent(voucherId)}/aprobacion-comercial`,
   },
+  ecfEmitidos: {
+    list: '/ecf/emitidos',
+    byId: (voucherId: string) => `/ecf/emitidos/${encodeURIComponent(voucherId)}`,
+    refresh: (voucherId: string) => `/ecf/emitidos/${encodeURIComponent(voucherId)}/refresh`,
+  },
   debitNotes: {
     list: '/debit-notes',
     byId: (id: string) => `/debit-notes/${id}`,

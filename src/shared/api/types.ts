@@ -2721,6 +2721,99 @@ export interface CargarManualEcfDto {
   company?: string;
 }
 
+// ─── e-CF emitidos (bandeja `origin: ISSUED`) — listado + detalle + refresh ────
+// El openapi.json aún no publica los paths `/ecf/emitidos*`; estos tipos derivan del documento
+// de la tarea (#53) y son tolerantes (campos opcionales/`unknown` donde el contrato no es
+// explícito). Confirmar contra la respuesta real al integrar.
+
+/** Un paso del flujo de estado derivado (`flujo.pasos[]`). */
+export interface EcfFlujoPaso {
+  estado: EcfStatusDgii;
+  label: string;
+  alcanzado: boolean;
+  actual: boolean;
+  terminal: boolean;
+  /** ISO — solo algunos pasos traen fecha real; el resto es `null`. Nunca inventar. */
+  at: string | null;
+}
+
+/** Flujo de estado del comprobante ante la DGII (derivado por el BFF). */
+export interface EcfFlujo {
+  estadoActual: EcfStatusDgii;
+  esTerminal: boolean;
+  /** true cuando el estado terminal NO es ACCEPTED. */
+  requiereAtencion: boolean;
+  /** Instrucción ya redactada en español, o null. No reconstruir desde `status`. */
+  alerta: string | null;
+  pasos: EcfFlujoPaso[];
+}
+
+/** Documento de ERPNext vinculado al comprobante. */
+export interface EcfEmitidoErpnext {
+  doctype: "Sales Invoice" | "Purchase Invoice";
+  docname: string;
+  outboxState?: string | null;
+  attempt?: number | null;
+}
+
+export interface VoucherEmitido {
+  voucherId: string;
+  ncf: string;
+  typeId: EcfTipoElectronico;
+  status: EcfStatusDgii;
+  env: EcfEnv;
+  counterpartRnc: string | null;
+  counterpartName: string | null;
+  total: number;
+  taxedAmount: number;
+  exemptAmount: number;
+  itbisAmount: number;
+  iscAmount: number;
+  currency: string;
+  exchangeRate?: number | null;
+  /** URL del timbre DGII — QR + "Verificar en DGII". `null` hasta que se firma. */
+  qrUrl: string | null;
+  securityCode: string | null;
+  trackId: string | null;
+  lastError: string | null;
+  /** Solo relevante en REJECTED — ver documento #53 §2. */
+  sequenceConsumed: boolean | null;
+  /** true = emitido en contingencia (Decreto 587-24). */
+  deferredSend: boolean;
+  archived: boolean;
+  issuedAt: string | null;
+  createdAt: string;
+  erpnext: EcfEmitidoErpnext | null;
+  flujo: EcfFlujo;
+}
+
+/** Línea de un e-CF emitido — solo en el detalle. Montos como strings numéricos. */
+export interface LineaVoucher {
+  description: string;
+  quantity: string;
+  unitPrice: string;
+  discountAmount?: string | null;
+  itbisRate?: string | null;
+  itbisAmount?: string | null;
+  iscAmount?: string | null;
+  itbisRetention?: string | null;
+  itbisRetentionRate?: string | null;
+  isrRetention?: string | null;
+  isrRetentionRate?: string | null;
+  lineTotal: string;
+}
+
+export interface EcfEmitidoDetail extends VoucherEmitido {
+  items: LineaVoucher[];
+}
+
+/** Respuesta de POST /ecf/emitidos/:voucherId/refresh. */
+export interface RefreshEcfEmitidoResult extends EcfEmitidoDetail {
+  statusPrevio: EcfStatusDgii;
+  /** true si el estado cambió tras consultar a la DGII. */
+  cambio: boolean;
+}
+
 // POST /config/pos/habilitar
 export interface HabilitarPosDto {
   warehouse: string;

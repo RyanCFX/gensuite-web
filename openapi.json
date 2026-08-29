@@ -24596,9 +24596,19 @@
               "B14",
               "B15",
               "B16",
-              "B17"
+              "B17",
+              "E31",
+              "E32",
+              "E33",
+              "E34",
+              "E41",
+              "E43",
+              "E44",
+              "E45",
+              "E46",
+              "E47"
             ],
-            "description": "B01=Crédito Fiscal, B02=Consumo, B03=Nota de Débito, B04=Nota de Crédito, B11=Compras/Informal, B12=Registro Único de Ingresos, B13=Gastos Menores, B14=Regímenes Especiales, B15=Gubernamentales, B16=Exportaciones, B17=Pagos al Exterior"
+            "description": "B01=Crédito Fiscal, B02=Consumo, B03=Nota de Débito, B04=Nota de Crédito, B11=Compras/Informal, B12=Registro Único de Ingresos, B13=Gastos Menores, B14=Regímenes Especiales, B15=Gubernamentales, B16=Exportaciones, B17=Pagos al Exterior. También se acepta el código e-CF equivalente (E31, E32, E33, E34, E41, E43, E44, E45, E46, E47)."
           },
           "items": {
             "type": "array",
@@ -24678,9 +24688,19 @@
               "B14",
               "B15",
               "B16",
-              "B17"
+              "B17",
+              "E31",
+              "E32",
+              "E33",
+              "E34",
+              "E41",
+              "E43",
+              "E44",
+              "E45",
+              "E46",
+              "E47"
             ],
-            "description": "B01=Crédito Fiscal, B02=Consumo, B03=Nota de Débito, B04=Nota de Crédito, B11=Compras/Informal, B12=Registro Único de Ingresos, B13=Gastos Menores, B14=Regímenes Especiales, B15=Gubernamentales, B16=Exportaciones, B17=Pagos al Exterior"
+            "description": "B01=Crédito Fiscal, B02=Consumo, B03=Nota de Débito, B04=Nota de Crédito, B11=Compras/Informal, B12=Registro Único de Ingresos, B13=Gastos Menores, B14=Regímenes Especiales, B15=Gubernamentales, B16=Exportaciones, B17=Pagos al Exterior. También se acepta el código e-CF equivalente (E31, E32, E33, E34, E41, E43, E44, E45, E46, E47)."
           },
           "items": {
             "type": "array",

@@ -58,6 +58,7 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'gastos',       label: 'Gastos',               group: 'Operaciones',  path: '/gastos',                         icon: <CreditCard size={15} />, keywords: 'expenses gastos operativos 606' },
   { id: 'gasto-nuevo',  label: 'Nuevo Gasto',          group: 'Operaciones',  path: '/gastos/nuevo',                   icon: <CreditCard size={15} />, keywords: 'crear gasto expense' },
   { id: 'ecf-recibidos', label: 'e-CF Recibidos',      group: 'Operaciones',  path: '/ecf-recibidos',                  icon: <Receipt size={15} />, keywords: 'ecf recibidos bandeja terceros conciliacion acecf aprobacion comercial proveedor' },
+  { id: 'ecf-emitidos', label: 'e-CF Emitidos',        group: 'Operaciones',  path: '/ecf-emitidos',                   icon: <Receipt size={15} />, keywords: 'ecf emitidos bandeja comprobantes electronicos dgii ncf estado flujo qr timbre track id' },
   { id: 'proveedores',  label: 'Proveedores',          group: 'Operaciones',  path: '/proveedores',                    icon: <Truck size={15} />, keywords: 'suppliers vendor proveedor' },
 
   // ── Finanzas / CxC ─────────────────────────────────────────────────────────
