@@ -58,11 +58,8 @@ interface ItemRow {
   /** Componentes del combo con tracking de serial/lote activo (solo si el artículo es un combo) */
   _comboComponents?: { itemCode: string; itemName?: string; trackingType: 'serial' | 'batch'; qtyPerCombo: number }[]
   componentTracking?: ComponentTracking[]
-  /** Cuenta contable alterna de esta línea — solo tiene efecto real en líneas que no afectan
-   *  valorización de inventario (ver tooltip en la UI). Si se omite, usa el default del artículo. */
-  cuentaContable?: string
-  /** Si tiene entradas, divide el monto de la línea (qty × rate) entre varias cuentas — ignora
-   *  `cuentaContable` de esta misma línea. No se puede combinar con seriales/lotes. */
+  /** Si tiene entradas, divide el monto de la línea (qty × rate) entre varias cuentas.
+   *  No se puede combinar con seriales/lotes. */
   distribucionCuenta?: DistribucionCuentaDto[]
 }
 
@@ -311,14 +308,12 @@ function SerialBatchRow({
         </td>
       </tr>
 
-      {/* Cuenta contable alterna / dividir cuenta (opcional) */}
+      {/* Dividir cuenta contable de la línea (opcional) */}
+      {((item.distribucionCuenta && item.distribucionCuenta.length > 0) || item.trackingType === 'none') && (
       <tr className="tracking-row">
         <td colSpan={8} style={{ padding: '4px 8px 8px' }}>
           {item.distribucionCuenta && item.distribucionCuenta.length > 0 ? (
             <div style={{ maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>
-                Dividir cuenta contable
-              </span>
               <DistribucionCuentaEditor
                 rows={item.distribucionCuenta}
                 onChange={(rows) => setItems((prev) => prev.map((r, i) => (i === idx ? { ...r, distribucionCuenta: rows } : r)))}
@@ -335,37 +330,17 @@ function SerialBatchRow({
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, maxWidth: 420 }}>
-              <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                Cuenta contable
-              </span>
-              <div style={{ flex: 1 }}>
-                <AccountSelect
-                  value={item.cuentaContable ?? ''}
-                  onChange={(v) => updateItem(idx, 'cuentaContable', v)}
-                  placeholder="Usar la cuenta default del artículo"
-                />
-              </div>
-              <span
-                style={{ fontSize: 11, color: 'var(--text-tertiary)', cursor: 'help', flexShrink: 0 }}
-                title="Solo tiene efecto en líneas que no afectan valorización de inventario (ej. flete/servicio dentro de la compra, o si el inventario perpetuo está desactivado). En una línea de producto de stock normal, ERPNext sigue debitando la cuenta de inventario sin importar este campo. Lo mismo aplica si dividís la cuenta."
-              >
-                <Info size={12} />
-              </span>
-              {item.trackingType === 'none' && (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-size-xs"
-                  style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
-                  onClick={() => setItems((prev) => prev.map((r, i) => (i === idx ? { ...r, distribucionCuenta: [{ cuenta: '', monto: r.qty * r.rate }] } : r)))}
-                >
-                  Dividir cuenta
-                </button>
-              )}
-            </div>
+            <button
+              type="button"
+              className="btn btn-ghost btn-size-xs"
+              onClick={() => setItems((prev) => prev.map((r, i) => (i === idx ? { ...r, distribucionCuenta: [{ cuenta: '', monto: r.qty * r.rate }] } : r)))}
+            >
+              Dividir cuenta
+            </button>
           )}
         </td>
       </tr>
+      )}
 
       {/* Tracking row */}
       {(item.trackingType === 'serial' || item.trackingType === 'batch' || (item._comboComponents && item._comboComponents.length > 0)) && (
@@ -821,7 +796,6 @@ export default function CompraForm() {
         batches: ci.batches ?? [],
         purchaseTaxPct: 0,
         purchaseTaxTemplate: '',
-        cuentaContable: ci.cuentaContable ?? '',
       })),
     )
     setBranch(compraData.branch ?? '')
@@ -991,7 +965,7 @@ export default function CompraForm() {
         ...(i.componentTracking && i.componentTracking.length > 0 ? { componentTracking: i.componentTracking } : {}),
         ...((i.distribucionCuenta ?? []).filter((d) => d.cuenta).length > 0
           ? { distribucionCuenta: i.distribucionCuenta!.filter((d) => d.cuenta) }
-          : { cuentaContable: i.cuentaContable || undefined }),
+          : {}),
       })),
       ncfProveedor: ncfProveedor || undefined,
       billNo: billNo || undefined,
