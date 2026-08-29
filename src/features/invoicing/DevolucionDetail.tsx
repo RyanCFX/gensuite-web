@@ -1,11 +1,14 @@
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { getDevolucion } from '@/shared/api/devoluciones'
+import { getDevolucion, cancelDevolucion } from '@/shared/api/devoluciones'
 import { downloadCreditNotePdf } from '@/shared/api/notes'
-import { ArrowLeft, Receipt, Wallet, Download } from 'lucide-react'
+import { ArrowLeft, Receipt, Wallet, Download, Ban } from 'lucide-react'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { getCatalogosFiscales } from '@/shared/api/config'
+import { Modal } from '@/shared/ui/Modal'
+import type { ApiError } from '@/shared/api/types'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -32,12 +35,33 @@ const USAGE_BADGE: Record<string, string> = {
 export default function DevolucionDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
 
   const { data: devolucion, isLoading } = useQuery({
     queryKey: ['devolucion', id],
     queryFn: () => getDevolucion(id!),
     enabled: !!id,
   })
+
+  const cancelMutation = useMutation({
+    mutationFn: () => cancelDevolucion(id!, { reason: cancelReason.trim() }),
+    onSuccess: (res) => {
+      toast.success(res?.message ?? 'Devolución cancelada')
+      queryClient.invalidateQueries({ queryKey: ['devolucion', id] })
+      queryClient.invalidateQueries({ queryKey: ['devoluciones'] })
+      setCancelModalOpen(false)
+      setCancelReason('')
+    },
+    // El backend valida estado (400 si ya fue sometida), permisos (403), existencia (404)
+    // y doble cancelación (409). En todos los casos se muestra su `message` tal cual.
+    onError: (err: ApiError) => toast.error(err?.message ?? 'No se pudo cancelar la devolución'),
+  })
+
+  const cancelReasonValid =
+    cancelReason.trim().length >= 10 && cancelReason.trim().length <= 500
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
@@ -106,6 +130,14 @@ export default function DevolucionDetail() {
                 <Download size={14} /> Descargar PDF
               </>
             )}
+          </button>
+        )}
+        {devolucion.documentStatus === 'draft' && (
+          <button
+            className="btn btn-danger btn-size-sm"
+            onClick={() => { setCancelReason(''); setCancelModalOpen(true) }}
+          >
+            <Ban size={14} /> Cancelar devolución
           </button>
         )}
       </div>
@@ -288,6 +320,51 @@ export default function DevolucionDetail() {
           </div>
         </div>
       )}
+
+      <Modal
+        open={cancelModalOpen}
+        onClose={() => !cancelMutation.isPending && setCancelModalOpen(false)}
+        title="Cancelar devolución"
+        subtitle="La devolución no se elimina: queda registrada como cancelada."
+        size="sm"
+        footer={
+          <>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => setCancelModalOpen(false)}
+              disabled={cancelMutation.isPending}
+            >
+              Volver
+            </button>
+            <button
+              className="btn btn-danger btn-size-sm"
+              onClick={() => cancelMutation.mutate()}
+              disabled={!cancelReasonValid || cancelMutation.isPending}
+            >
+              {cancelMutation.isPending
+                ? <span className="spinner spinner-white spinner-sm" />
+                : 'Cancelar devolución'}
+            </button>
+          </>
+        }
+      >
+        <div className="ff-wrap">
+          <label className="ff-label ff-required" htmlFor="devolucionCancelReason">
+            Motivo de la cancelación
+          </label>
+          <textarea
+            id="devolucionCancelReason"
+            className="ff-textarea"
+            rows={3}
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="Describe el motivo de la cancelación (mínimo 10 caracteres)"
+            maxLength={500}
+            autoFocus
+          />
+          <p className="ff-hint">{cancelReason.trim().length}/500 caracteres (mínimo 10)</p>
+        </div>
+      </Modal>
     </div>
   )
 }

@@ -2,7 +2,10 @@ import axios from 'axios'
 import { getToken, getTenant, clearSession } from './storage'
 import type { ApiError, ApiErrorResponse, ApiResponse, PaginatedResponse } from './types'
 
-export const BASE_URL = 'https://gensapi.ryancfx.click/api/v1'
+// Ruta relativa por defecto: el dev server hace de proxy hacia el backend
+// (ver vite.config.ts). Evita el bloqueo por Mixed Content cuando el front
+// se sirve por HTTPS y el backend es HTTP.
+export const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 
 export const client = axios.create({
   baseURL: BASE_URL,

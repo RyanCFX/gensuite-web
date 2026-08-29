@@ -151,6 +151,33 @@ export function ItemDetailModal({ itemCode, onClose }: { itemCode: string; onClo
                 </div>
               </div>
 
+              {/* ── Existencias por almacén ── */}
+              {item.type === 'product' && !item.hasVariants && (
+                <div className="card" style={{ boxShadow: 'none' }}>
+                  <div className="card-header">
+                    <span className="card-title">Existencias por almacén</span>
+                  </div>
+                  <div className="card-body" style={{ paddingTop: 12 }}>
+                    {(() => {
+                      const entries = Object.entries(item.stockByWarehouse ?? {}).sort((a, b) => b[1] - a[1])
+                      if (entries.length === 0) {
+                        return <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Sin existencias</p>
+                      }
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {entries.map(([warehouseName, qty]) => (
+                            <div key={warehouseName} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13 }}>
+                              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{warehouseName}</span>
+                              <span style={{ fontWeight: 500, flexShrink: 0 }}>{qty}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })()}
+                  </div>
+                </div>
+              )}
+
               {/* ── Ubicaciones (Zona / Rack) ── */}
               {item.type === 'product' && !item.hasVariants && (
                 <div className="card" style={{ boxShadow: 'none' }}>

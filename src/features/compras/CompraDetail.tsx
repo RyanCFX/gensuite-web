@@ -8,6 +8,7 @@ import {
 } from '@/shared/api/compras-gastos'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { EcfStatusCard } from '@/components/shared/EcfStatusCard'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
 import { listRetenciones } from '@/shared/api/retenciones'
@@ -16,7 +17,9 @@ import { PdfFormatButton } from '@/components/shared/PdfFormatButton'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import { SaldoFavorCxpSection } from '@/features/devoluciones-compras/SaldoFavorCxpSection'
 import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
-import type { FormatoImpresion, ImpuestoDistribucionDto } from '@/shared/api/types'
+import { ECF_SUBMIT_UNAVAILABLE_MSG } from '@/shared/api/ecf'
+import { useAuthStore } from '@/stores/auth.store'
+import type { FormatoImpresion, ImpuestoDistribucionDto, EcfSubmitResult, ApiError } from '@/shared/api/types'
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | 'delete' | null
 
@@ -24,9 +27,12 @@ export default function CompraDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const isSystemManager = useAuthStore((s) => s.user?.roles?.includes('System Manager') ?? false)
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [showAsientosPreview, setShowAsientosPreview] = useState(false)
+  // e-CF autogenerado al someter (proveedor ocasional sin NCF + e-CF habilitado). Raro hoy.
+  const [ecfResult, setEcfResult] = useState<EcfSubmitResult | null>(null)
 
   const { data: compra, isLoading, isError } = useQuery({
     queryKey: ['compra', id],
@@ -73,12 +79,22 @@ export default function CompraDetail() {
       queryClient.invalidateQueries({ queryKey: ['compra', id] })
       queryClient.invalidateQueries({ queryKey: ['compras'] })
       setConfirmAction(null)
+      if (result?.ecf) setEcfResult(result.ecf)
       const updatedPrices = (result as any)?.updatedPrices
       if (updatedPrices && updatedPrices > 0) {
         toast.info(`Se actualizaron los precios de ${updatedPrices} artículo(s) (modo sobre costo)`)
       }
     },
-    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al someter la compra'),
+    onError: (err: ApiError) => {
+      if (err?.statusCode === 503) {
+        toast.error(ECF_SUBMIT_UNAVAILABLE_MSG, {
+          duration: 8000,
+          action: isSystemManager ? { label: 'Contingencia', onClick: () => navigate('/config/ecf/admin') } : undefined,
+        })
+        return
+      }
+      toast.error(err?.message ?? 'Error al someter la compra')
+    },
   })
 
   const cancelMutation = useMutation({
@@ -225,6 +241,8 @@ export default function CompraDetail() {
             <span className="badge badge-default">Enmendada de {compra.amendedFrom}</span>
           )}
         </div>
+
+        {(ecfResult ?? compra.ecf) && <EcfStatusCard ecf={ecfResult ?? compra.ecf!} />}
 
         <div className="card">
           <div className="card-header">

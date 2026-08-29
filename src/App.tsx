@@ -46,6 +46,8 @@ const RecepcionForm   = lazy(() => import('@/features/compras/RecepcionForm'))
 const GastosPage      = lazy(() => import('@/features/gastos/GastosPage'))
 const GastoDetail     = lazy(() => import('@/features/gastos/GastoDetail'))
 const GastoForm       = lazy(() => import('@/features/gastos/GastoForm'))
+const EcfRecibidosPage  = lazy(() => import('@/features/ecf-recibidos/EcfRecibidosPage'))
+const EcfRecibidoDetail = lazy(() => import('@/features/ecf-recibidos/EcfRecibidoDetail'))
 const DevolucionesComprasPage = lazy(() => import('@/features/devoluciones-compras/DevolucionesPage'))
 const DevolucionCompraDetail  = lazy(() => import('@/features/devoluciones-compras/DevolucionDetail'))
 const DevolucionCompraForm    = lazy(() => import('@/features/devoluciones-compras/DevolucionForm'))
@@ -67,6 +69,9 @@ const UsuariosPage    = lazy(() => import('@/features/usuarios/UsuariosPage'))
 const ReportesPage    = lazy(() => import('@/features/reportes/ReportesPage'))
 const EmpresaConfig   = lazy(() => import('@/features/config/EmpresaConfig'))
 const NcfPage         = lazy(() => import('@/features/config/NcfPage'))
+const EcfAdminPage    = lazy(() => import('@/features/config/EcfAdminPage'))
+const EcfCertificacionPage = lazy(() => import('@/features/config/EcfCertificacionPage'))
+const EcfContingenciaPage  = lazy(() => import('@/features/config/EcfContingenciaPage'))
 const SucursalesPage  = lazy(() => import('@/features/config/SucursalesPage'))
 const CajasPage       = lazy(() => import('@/features/config/CajasPage'))
 const ConfigPage      = lazy(() => import('@/features/config/ConfigPage'))
@@ -184,6 +189,7 @@ export default function App() {
             {/* Facturación */}
             <Route path="/facturas" element={<Suspense fallback={<PageLoader />}><InvoicesPage /></Suspense>} />
             <Route path="/facturas/nueva" element={<Suspense fallback={<PageLoader />}><InvoiceForm /></Suspense>} />
+            <Route path="/facturas/:id/editar" element={<Suspense fallback={<PageLoader />}><InvoiceForm /></Suspense>} />
             <Route path="/facturas/:id" element={<Suspense fallback={<PageLoader />}><InvoiceDetail /></Suspense>} />
             <Route path="/notas-credito" element={<Suspense fallback={<PageLoader />}><CreditNotesPage /></Suspense>} />
             <Route path="/notas-debito" element={<Suspense fallback={<PageLoader />}><DebitNotesPage /></Suspense>} />
@@ -227,6 +233,10 @@ export default function App() {
             <Route path="/devoluciones-compras/nueva" element={<Suspense fallback={<PageLoader />}><DevolucionCompraForm /></Suspense>} />
             <Route path="/devoluciones-compras/:id/editar" element={<Suspense fallback={<PageLoader />}><DevolucionCompraForm /></Suspense>} />
             <Route path="/devoluciones-compras/:id" element={<Suspense fallback={<PageLoader />}><DevolucionCompraDetail /></Suspense>} />
+
+            {/* e-CF Recibidos */}
+            <Route path="/ecf-recibidos" element={<Suspense fallback={<PageLoader />}><EcfRecibidosPage /></Suspense>} />
+            <Route path="/ecf-recibidos/:voucherId" element={<Suspense fallback={<PageLoader />}><EcfRecibidoDetail /></Suspense>} />
 
             {/* Gastos */}
             <Route path="/gastos" element={<Suspense fallback={<PageLoader />}><GastosPage /></Suspense>} />
@@ -309,6 +319,9 @@ export default function App() {
             <Route path="/config/empresa" element={<Suspense fallback={<PageLoader />}><EmpresaConfig /></Suspense>} />
             {/* /config/ncf and /config/sucursales must be before /config/:seccion to avoid being caught as seccion */}
             <Route path="/config/ncf" element={<Suspense fallback={<PageLoader />}><NcfPage /></Suspense>} />
+            <Route path="/config/ecf/admin" element={<Suspense fallback={<PageLoader />}><EcfAdminPage /></Suspense>} />
+            <Route path="/config/ecf/certificacion" element={<Suspense fallback={<PageLoader />}><EcfCertificacionPage /></Suspense>} />
+            <Route path="/config/ecf/contingencia" element={<Suspense fallback={<PageLoader />}><EcfContingenciaPage /></Suspense>} />
             <Route path="/config/sucursales" element={<Suspense fallback={<PageLoader />}><SucursalesPage /></Suspense>} />
             <Route path="/config/plantillas-facturas" element={<Suspense fallback={<PageLoader />}><InvoiceTemplateEditorPage /></Suspense>} />
             <Route path="/config/cajas" element={<Suspense fallback={<PageLoader />}><CajasPage /></Suspense>} />

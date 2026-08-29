@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { getCatalogosFiscales } from '@/shared/api/config'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
+import { RelatedDocsCard } from '@/components/shared/RelatedDocsCard'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
@@ -246,6 +247,17 @@ export default function QuotationDetail() {
           </>
         )}
       </div>
+
+      <RelatedDocsCard
+        rows={[
+          {
+            label: 'Pedido de venta',
+            links: quotation.salesOrder
+              ? [{ code: quotation.salesOrder, to: `/pedidos/${quotation.salesOrder}` }]
+              : [],
+          },
+        ]}
+      />
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">

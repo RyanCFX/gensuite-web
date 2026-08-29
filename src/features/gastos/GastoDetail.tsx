@@ -6,12 +6,15 @@ import { getGasto, submitGasto, cancelGasto, amendGasto, previewAsientosGasto, u
 import { listRetenciones } from '@/shared/api/retenciones'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { EcfStatusCard } from '@/components/shared/EcfStatusCard'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { getCatalogosFiscales, listImpuestosCompras } from '@/shared/api/config'
 import { Send, X, RotateCcw, Info, FileText, AlertCircle, BookOpen } from 'lucide-react'
 import { SaldoFavorCxpSection } from '@/features/devoluciones-compras/SaldoFavorCxpSection'
 import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
-import type { ImpuestoDistribucionDto } from '@/shared/api/types'
+import { ECF_SUBMIT_UNAVAILABLE_MSG } from '@/shared/api/ecf'
+import { useAuthStore } from '@/stores/auth.store'
+import type { ImpuestoDistribucionDto, EcfSubmitResult, ApiError } from '@/shared/api/types'
 
 function apiErrorMessage(error: unknown, fallback: string) {
   const apiErr = error as { message?: string }
@@ -24,8 +27,11 @@ export default function GastoDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const isSystemManager = useAuthStore((s) => s.user?.roles?.includes('System Manager') ?? false)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [showAsientosPreview, setShowAsientosPreview] = useState(false)
+  // e-CF autogenerado al someter (gasto B11/B13/B14/B15/B17 sin NCF + e-CF habilitado). Raro hoy.
+  const [ecfResult, setEcfResult] = useState<EcfSubmitResult | null>(null)
 
   const { data: gasto, isLoading, isError } = useQuery({
     queryKey: ['gasto', id],
@@ -61,8 +67,17 @@ export default function GastoDetail() {
 
   const submitMutation = useMutation({
     mutationFn: () => submitGasto(id!),
-    onSuccess: () => { toast.success('Gasto sometido'); invalidate() },
-    onError: (error) => toast.error(apiErrorMessage(error, 'Error al someter el gasto')),
+    onSuccess: (result) => { toast.success('Gasto sometido'); if (result?.ecf) setEcfResult(result.ecf); invalidate() },
+    onError: (error) => {
+      if ((error as Partial<ApiError>)?.statusCode === 503) {
+        toast.error(ECF_SUBMIT_UNAVAILABLE_MSG, {
+          duration: 8000,
+          action: isSystemManager ? { label: 'Contingencia', onClick: () => navigate('/config/ecf/admin') } : undefined,
+        })
+        return
+      }
+      toast.error(apiErrorMessage(error, 'Error al someter el gasto'))
+    },
   })
 
   const cancelMutation = useMutation({
@@ -184,6 +199,8 @@ export default function GastoDetail() {
             <span className="badge badge-default">Enmienda de {gasto.amendedFrom}</span>
           )}
         </div>
+
+        {(ecfResult ?? gasto.ecf) && <EcfStatusCard ecf={ecfResult ?? gasto.ecf!} />}
 
         {gasto.status === 'draft' && blockSubmit && (
           <div className="inline-alert inline-alert-error">

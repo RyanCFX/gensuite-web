@@ -4969,6 +4969,52 @@
         "tags": [
           "Invoices"
         ]
+      },
+      "patch": {
+        "description": "Solo facturas en borrador (docstatus=0). El body es la representación completa de la factura, con las mismas reglas fiscales que al crear; las líneas se sustituyen por completo. Se guarda un snapshot del estado previo (historial de borrador). Una factura sometida se modifica con cancel + amend.",
+        "operationId": "InvoicesController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInvoiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar una factura en borrador (reemplazo completo)",
+        "tags": [
+          "Invoices"
+        ]
       }
     },
     "/api/v1/invoices/{id}/versions/{sequence}": {
@@ -5333,6 +5379,44 @@
           }
         ],
         "summary": "Get invoice PDF",
+        "tags": [
+          "Invoices"
+        ]
+      }
+    },
+    "/api/v1/invoices/{id}/ecf/pdfa": {
+      "get": {
+        "description": "Proxy de Aura — solo disponible si la factura se emitió electrónicamente (custom_ecf_voucher_id). 404 si no.",
+        "operationId": "InvoicesController_getEcfPdfA",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF/A-1b certificable del comprobante electrónico (archivado fiscal)",
         "tags": [
           "Invoices"
         ]
@@ -6714,7 +6798,7 @@
     },
     "/api/v1/config/catalogos-fiscales": {
       "get": {
-        "description": "Fuente única de verdad — lee las opciones reales de los Select de Sales Invoice/Purchase Invoice en ERPNext (respeta Property Setters). Reemplaza cualquier constante hardcodeada equivalente en el frontend.",
+        "description": "Fuente única de verdad — lee las opciones reales de los Select de Sales Invoice/Purchase Invoice en ERPNext (respeta Property Setters). Reemplaza cualquier constante hardcodeada equivalente en el frontend. Si la facturación electrónica está habilitada en el tenant, `ncfTypes` devuelve los comprobantes electrónicos (E31, E32, …) que el tenant emite; si no, los tipos NCF físicos actuales. El flag `facturacionElectronicaHabilitada` indica cuál de los dos se está devolviendo.",
         "operationId": "ConfigController_getCatalogosFiscales",
         "parameters": [
           {
@@ -10380,6 +10464,1010 @@
         ]
       }
     },
+    "/api/v1/config/ecf": {
+      "get": {
+        "operationId": "EcfController_getEcfConfig",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configuración de facturación electrónica: tipos habilitados, defaults y estado de provisioning en Aura",
+        "tags": [
+          "Facturación Electrónica (e-CF)"
+        ]
+      },
+      "put": {
+        "operationId": "EcfController_updateEcfConfig",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEcfConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar configuración de facturación electrónica",
+        "tags": [
+          "Facturación Electrónica (e-CF)"
+        ]
+      }
+    },
+    "/api/v1/config/ecf/secuencias": {
+      "get": {
+        "operationId": "EcfController_listSequences",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rangos e-NCF del tenant (proxy de Aura Sequences)",
+        "tags": [
+          "Facturación Electrónica (e-CF)"
+        ]
+      },
+      "post": {
+        "operationId": "EcfController_createSequence",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEcfSequenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear un rango e-NCF",
+        "tags": [
+          "Facturación Electrónica (e-CF)"
+        ]
+      }
+    },
+    "/api/v1/config/ecf/secuencias/{id}": {
+      "patch": {
+        "operationId": "EcfController_updateSequence",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEcfSequenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar un rango e-NCF (solo stopOn/expireAt — typeId y env son inmutables)",
+        "tags": [
+          "Facturación Electrónica (e-CF)"
+        ]
+      },
+      "delete": {
+        "operationId": "EcfController_deleteSequence",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar un rango e-NCF (solo si nunca emitió un comprobante)",
+        "tags": [
+          "Facturación Electrónica (e-CF)"
+        ]
+      }
+    },
+    "/api/v1/config/ecf/secuencias/anular-rangos": {
+      "post": {
+        "description": "Aura salta automáticamente cualquier e-CF ya ACCEPTED dentro del rango — no anula un comprobante aceptado por la DGII.",
+        "operationId": "EcfController_voidRanges",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidEcfRangesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Anular rangos e-NCF nunca usados (cambio de rango, cierre de operación)",
+        "tags": [
+          "Facturación Electrónica (e-CF)"
+        ]
+      }
+    },
+    "/api/v1/config/ecf/tipos": {
+      "get": {
+        "operationId": "EcfController_getTipos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Catálogo unificado NCF físico + e-CF, marcando cuáles son electrónicos",
+        "tags": [
+          "Facturación Electrónica (e-CF)"
+        ]
+      }
+    },
+    "/api/v1/config/ecf/certificacion": {
+      "get": {
+        "description": "La certificación real se opera desde el panel de Aura — esto es solo consulta.",
+        "operationId": "EcfController_getCertificacion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Progreso de certificación DGII (proxy de solo lectura, 14 pasos + CERTIFIED)",
+        "tags": [
+          "Facturación Electrónica (e-CF)"
+        ]
+      }
+    },
+    "/api/v1/config/ecf/contingencia/activar": {
+      "post": {
+        "operationId": "EcfController_activarContingencia",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivarContingenciaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activar contingencia (Decreto 587-24) — requiere System Manager",
+        "tags": [
+          "Facturación Electrónica (e-CF)"
+        ]
+      }
+    },
+    "/api/v1/config/ecf/contingencia/desactivar": {
+      "post": {
+        "operationId": "EcfController_desactivarContingencia",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Desactivar contingencia — requiere System Manager",
+        "tags": [
+          "Facturación Electrónica (e-CF)"
+        ]
+      }
+    },
+    "/api/v1/config/ecf/contingencia/flush": {
+      "post": {
+        "operationId": "EcfController_flushContingencia",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlushContingenciaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reenviar a la DGII los e-CF diferidos (WAITING_DEFERRED) — requiere System Manager",
+        "tags": [
+          "Facturación Electrónica (e-CF)"
+        ]
+      }
+    },
+    "/api/v1/config/ecf/contingencia/pendientes": {
+      "get": {
+        "operationId": "EcfController_pendientesContingencia",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "e-CF en WAITING_DEFERRED, con horas en diferido",
+        "tags": [
+          "Facturación Electrónica (e-CF)"
+        ]
+      }
+    },
+    "/api/v1/config/ecf/admin/connect": {
+      "post": {
+        "operationId": "EcfAdminController_connectApiKey",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectApiKeyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Conectar la API Key de Aura del tenant (creada manualmente en el panel de Aura)",
+        "tags": [
+          "Facturación Electrónica (e-CF) — Administración"
+        ]
+      }
+    },
+    "/api/v1/config/ecf/admin/clients": {
+      "post": {
+        "operationId": "EcfAdminController_createClient",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEcfClientDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear el Client de Aura (RNC emisor) para una compañía",
+        "tags": [
+          "Facturación Electrónica (e-CF) — Administración"
+        ]
+      }
+    },
+    "/api/v1/config/ecf/admin/certificate": {
+      "post": {
+        "operationId": "EcfAdminController_uploadCertificate",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadEcfCertificateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Subir el certificado de firma (.p12, base64) del Client de Aura",
+        "tags": [
+          "Facturación Electrónica (e-CF) — Administración"
+        ]
+      }
+    },
+    "/api/v1/config/ecf/admin/webhook": {
+      "post": {
+        "operationId": "EcfAdminController_registerWebhook",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterEcfWebhookDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar el webhook del BFF en Aura para este tenant",
+        "tags": [
+          "Facturación Electrónica (e-CF) — Administración"
+        ]
+      }
+    },
+    "/api/v1/ecf/recibidos": {
+      "get": {
+        "operationId": "EcfRecepcionController_list",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "description": "Estado DGII del voucher en Aura.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "SIGNED",
+                "IN_PROCESS",
+                "ACCEPTED",
+                "CONDITIONAL",
+                "REJECTED",
+                "NOT_FOUND",
+                "WAITING_DEFERRED",
+                "VOIDED",
+                "FAILED"
+              ]
+            }
+          },
+          {
+            "name": "rnc",
+            "required": false,
+            "in": "query",
+            "description": "RNC/Cédula del emisor (contraparte).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "typeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "31",
+                "32",
+                "33",
+                "34",
+                "41",
+                "43",
+                "44",
+                "45",
+                "46",
+                "47"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "yyyy-MM-dd",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "yyyy-MM-dd",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "required": false,
+            "in": "query",
+            "description": "Compañía (si el tenant tiene más de un Client de Aura).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bandeja de e-CF recibidos de terceros (paginada, con conciliación)",
+        "tags": [
+          "Facturación Electrónica (e-CF) — Recepción"
+        ]
+      }
+    },
+    "/api/v1/ecf/recibidos/cargar-manual": {
+      "post": {
+        "operationId": "EcfRecepcionController_cargarManual",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CargarManualEcfDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cargar manualmente un e-CF recibido (XML del portal DGII, fallback de /fe/recepcion)",
+        "tags": [
+          "Facturación Electrónica (e-CF) — Recepción"
+        ]
+      }
+    },
+    "/api/v1/ecf/recibidos/{voucherId}": {
+      "get": {
+        "operationId": "EcfRecepcionController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "voucherId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un e-CF recibido: líneas, conciliación y ACECF",
+        "tags": [
+          "Facturación Electrónica (e-CF) — Recepción"
+        ]
+      }
+    },
+    "/api/v1/ecf/recibidos/{voucherId}/vincular": {
+      "post": {
+        "operationId": "EcfRecepcionController_vincular",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "voucherId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VincularEcfRecibidoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vincular un e-CF recibido a una Purchase Invoice existente",
+        "tags": [
+          "Facturación Electrónica (e-CF) — Recepción"
+        ]
+      }
+    },
+    "/api/v1/ecf/recibidos/{voucherId}/aprobacion-comercial": {
+      "post": {
+        "operationId": "EcfRecepcionController_aprobacionComercial",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "voucherId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AprobacionComercialDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "ACECF — aceptar o rechazar comercialmente un e-CF recibido (dentro de la ventana legal)",
+        "tags": [
+          "Facturación Electrónica (e-CF) — Recepción"
+        ]
+      }
+    },
     "/api/v1/catalog/categories": {
       "get": {
         "operationId": "CategoriesController_findAll",
@@ -11184,6 +12272,7 @@
     },
     "/api/v1/catalog/items/{id}": {
       "get": {
+        "description": "Incluye `stockByWarehouse` (`{ almacén: qty }`, solo almacenes con existencia) para artículos de stock. Para valuación/valor por almacén usar `GET /catalog/items/:id/stock`.",
         "operationId": "ItemsController_findOne",
         "parameters": [
           {
@@ -18013,6 +19102,53 @@
         ]
       }
     },
+    "/api/v1/devoluciones/{id}/cancelar": {
+      "post": {
+        "operationId": "DevolucionesController_cancel",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelDevolucionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancela una devolución que todavía está EN BORRADOR. El documento no se elimina: se marca como cancelada por el usuario y el motivo (obligatorio) queda como Comment para auditoría. Una devolución ya sometida no se cancela por acá (su nota de crédito ya consumió NCF).",
+        "tags": [
+          "Devoluciones"
+        ]
+      }
+    },
     "/api/v1/sucursales": {
       "get": {
         "operationId": "SucursalesController_findAll",
@@ -22188,7 +23324,7 @@
         ]
       },
       "post": {
-        "description": "Genera el Print Format nativo automáticamente al crear. Vincule la plantilla a una cuenta bancaria vía PUT /cuentas-bancarias/:id (campo chequePrintTemplate) para que se use al imprimir sus cheques.",
+        "description": "Genera el Print Format nativo automáticamente al crear. Vincule la plantilla a una cuenta bancaria vía PUT /cuentas-bancarias/:id (campo chequePrintTemplate) para que se use al imprimir sus cheques, o configúrela como default del tenant vía PUT /config/facturacion (campo chequePrintTemplateDefault) para las cuentas que no tengan una propia.",
         "operationId": "ChequePrintTemplatesController_create",
         "parameters": [
           {
@@ -23500,6 +24636,88 @@
           "items"
         ]
       },
+      "UpdateInvoiceDto": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "type": "string",
+            "example": "CUST-0001",
+            "description": "Cliente registrado. Exactamente uno de `customer`/`clienteOcasionalNombre` es requerido."
+          },
+          "clienteOcasionalNombre": {
+            "type": "string",
+            "example": "Juan Pérez",
+            "description": "Nombre de la persona cuando la factura es para alguien sin registrar como cliente. No enviar junto con `customer`."
+          },
+          "clienteOcasionalRnc": {
+            "type": "string",
+            "example": "132456789",
+            "description": "RNC del comprador ocasional (sin registrar como cliente). Obligatorio cuando `clienteOcasionalNombre` viene junto con `ncfType: \"B01\"` (Crédito Fiscal) — la DGII exige el RNC del comprador en ese caso. Sin efecto para clientes registrados (customer)."
+          },
+          "clienteOcasionalDireccion": {
+            "type": "string",
+            "example": "Av. Independencia 45, Santo Domingo",
+            "description": "Dirección del comprador ocasional (sin registrar como cliente). Solo tiene efecto junto con `clienteOcasionalNombre`."
+          },
+          "postingDate": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "ncfType": {
+            "type": "string",
+            "enum": [
+              "B01",
+              "B02",
+              "B03",
+              "B04",
+              "B11",
+              "B12",
+              "B13",
+              "B14",
+              "B15",
+              "B16",
+              "B17"
+            ],
+            "description": "B01=Crédito Fiscal, B02=Consumo, B03=Nota de Débito, B04=Nota de Crédito, B11=Compras/Informal, B12=Registro Único de Ingresos, B13=Gastos Menores, B14=Regímenes Especiales, B15=Gubernamentales, B16=Exportaciones, B17=Pagos al Exterior"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceItemDto"
+            }
+          },
+          "notes": {
+            "type": "string"
+          },
+          "salesOrder": {
+            "type": "string",
+            "example": "SONO-2026-00001",
+            "description": "Pedido de venta al que pertenece esta factura. ERPNext actualiza el estado del pedido automáticamente."
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+          },
+          "department": {
+            "type": "string",
+            "example": "Ventas - JBC",
+            "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
+          },
+          "taxesTemplate": {
+            "type": "string",
+            "example": "Dominican Republic Tax - JB",
+            "description": "ID del template de impuestos del documento (Sales Taxes and Charges Template, ver /config/impuestos-ventas). Si se omite, se usa el template marcado como default para la compañía, si existe."
+          }
+        },
+        "required": [
+          "postingDate",
+          "ncfType",
+          "items"
+        ]
+      },
       "AplicarSaldoFavorDto": {
         "type": "object",
         "properties": {
@@ -23886,6 +25104,11 @@
               ]
             }
           },
+          "chequePrintTemplateDefault": {
+            "type": "string",
+            "example": "Talonario Estándar",
+            "description": "Nombre de un Cheque Print Template (ver /tesoreria/cheque-print-templates) usado para imprimir un cheque cuando la cuenta bancaria emisora no tiene su propia plantilla configurada (PUT /cuentas-bancarias/:id, campo chequePrintTemplate). Si tampoco hay default aquí, se usa el comprobante HTML genérico (no alineado a un talonario físico). Enviar \"\" para quitar el default sin configurar uno nuevo."
+          },
           "turnoMaxHoras": {
             "type": "number",
             "default": 24,
@@ -24128,6 +25351,68 @@
             "type": "number",
             "example": 12,
             "description": "[Deprecated] Usar conversions[]. Factor de conversión."
+          },
+          "codigoDgii": {
+            "type": "string",
+            "enum": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10",
+              "11",
+              "12",
+              "13",
+              "14",
+              "15",
+              "16",
+              "17",
+              "18",
+              "19",
+              "20",
+              "21",
+              "22",
+              "23",
+              "24",
+              "25",
+              "26",
+              "27",
+              "28",
+              "29",
+              "30",
+              "31",
+              "32",
+              "33",
+              "34",
+              "35",
+              "36",
+              "37",
+              "38",
+              "39",
+              "40",
+              "41",
+              "42",
+              "43",
+              "44",
+              "45",
+              "46",
+              "47",
+              "48",
+              "49",
+              "50",
+              "51",
+              "52",
+              "53",
+              "54",
+              "55"
+            ],
+            "example": "21",
+            "description": "Código de la tabla de 55 unidades de medida DGII (ver GET /config/uom). Opcional: una UOM sin código sigue siendo válida en ERPNext, pero unitCode se omite al emitir un e-CF con ítems que la usen."
           }
         },
         "required": [
@@ -24158,6 +25443,68 @@
             "type": "number",
             "example": 24,
             "description": "[Deprecated] Usar conversions[]. Factor de conversión."
+          },
+          "codigoDgii": {
+            "type": "string",
+            "enum": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10",
+              "11",
+              "12",
+              "13",
+              "14",
+              "15",
+              "16",
+              "17",
+              "18",
+              "19",
+              "20",
+              "21",
+              "22",
+              "23",
+              "24",
+              "25",
+              "26",
+              "27",
+              "28",
+              "29",
+              "30",
+              "31",
+              "32",
+              "33",
+              "34",
+              "35",
+              "36",
+              "37",
+              "38",
+              "39",
+              "40",
+              "41",
+              "42",
+              "43",
+              "44",
+              "45",
+              "46",
+              "47",
+              "48",
+              "49",
+              "50",
+              "51",
+              "52",
+              "53",
+              "54",
+              "55"
+            ],
+            "example": "21",
+            "description": "Código de la tabla de 55 unidades de medida DGII. Enviar cadena vacía (\"\") para desasignar el código de esta UOM."
           }
         }
       },
@@ -25169,6 +26516,390 @@
         },
         "required": [
           "closingAmounts"
+        ]
+      },
+      "UpdateEcfConfigDto": {
+        "type": "object",
+        "properties": {
+          "habilitado": {
+            "type": "boolean",
+            "default": false,
+            "description": "Si está inactivo, todos los comprobantes se emiten como NCF físico (comportamiento actual) sin llamar a Aura, sin importar tiposElectronicos."
+          },
+          "tiposElectronicos": {
+            "type": "array",
+            "description": "typeId de e-CF habilitados para esta compañía (ej. [\"31\",\"32\"]). Un tipo NO listado sigue emitiéndose como NCF físico aunque `habilitado` esté activo — migración por tipo, no big-bang.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "31",
+                "32",
+                "33",
+                "34",
+                "41",
+                "43",
+                "44",
+                "45",
+                "46",
+                "47"
+              ]
+            }
+          },
+          "emitirAlSometer": {
+            "type": "boolean",
+            "default": true,
+            "description": "Si está activo, la emisión del e-CF ocurre automáticamente al someter el documento."
+          },
+          "bloquearSubmitSiAuraCaido": {
+            "type": "boolean",
+            "default": true,
+            "description": "Si Aura/DGII no responde: activo = se bloquea la facturación (default seguro); inactivo = se activa contingencia automáticamente."
+          },
+          "tipoPagoDefault": {
+            "type": "number",
+            "enum": [1, 2, 3],
+            "description": "TipoPago DGII por defecto: 1=Contado, 2=Crédito, 3=Gratuito."
+          },
+          "tipoIngresosDefault": {
+            "type": "string",
+            "enum": [
+              "01",
+              "02",
+              "03",
+              "04",
+              "05",
+              "06"
+            ],
+            "description": "TipoIngresos DGII por defecto: 01=Habituales, 02=Financieros, 03=Extraordinarios, 04=Arrendamientos, 05=Venta activo, 06=Otros."
+          },
+          "diasLimiteAprobacionComercial": {
+            "type": "number",
+            "default": 3,
+            "description": "Días para aprobar/rechazar comercialmente (ACECF) un e-CF recibido."
+          },
+          "rolesAprobacionComercial": {
+            "default": [
+              "System Manager"
+            ],
+            "description": "Roles autorizados para aceptar/rechazar comercialmente (ACECF) un e-CF recibido.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "adjuntarPdfa": {
+            "type": "boolean",
+            "default": false,
+            "description": "Si está activo, al aceptarse un e-CF se descarga y adjunta automáticamente el PDF/A."
+          },
+          "umbralAlertaSecuencia": {
+            "type": "number",
+            "default": 50,
+            "description": "Umbral de alerta de secuencia e-NCF — mismo criterio que Facturacion Config.ncfAlertaMinimo."
+          }
+        }
+      },
+      "CreateEcfSequenceDto": {
+        "type": "object",
+        "properties": {
+          "typeId": {
+            "type": "string",
+            "enum": [
+              "31",
+              "32",
+              "33",
+              "34",
+              "41",
+              "43",
+              "44",
+              "45",
+              "46",
+              "47"
+            ]
+          },
+          "env": {
+            "type": "string",
+            "enum": [
+              "TesteCF",
+              "CerteCF",
+              "eCF"
+            ],
+            "description": "Si se omite, se infiere del modo activo (test → TesteCF, live → eCF)."
+          },
+          "startOn": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 99999998
+          },
+          "stopOn": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 99999999
+          },
+          "expireAt": {
+            "type": "string",
+            "example": "2028-12-31"
+          }
+        },
+        "required": [
+          "typeId",
+          "startOn",
+          "stopOn"
+        ]
+      },
+      "UpdateEcfSequenceDto": {
+        "type": "object",
+        "properties": {
+          "stopOn": {
+            "type": "number",
+            "description": "Solo se puede extender (debe ser ≥ currentNumber actual)."
+          },
+          "expireAt": {
+            "type": "string",
+            "example": "2028-12-31"
+          }
+        }
+      },
+      "EcfVoidRangeDto": {
+        "type": "object",
+        "properties": {
+          "typeId": {
+            "type": "string",
+            "enum": [
+              "31",
+              "32",
+              "33",
+              "34",
+              "41",
+              "43",
+              "44",
+              "45",
+              "46",
+              "47"
+            ]
+          },
+          "from": {
+            "type": "number",
+            "minimum": 1
+          },
+          "to": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "typeId",
+          "from",
+          "to"
+        ]
+      },
+      "VoidEcfRangesDto": {
+        "type": "object",
+        "properties": {
+          "ranges": {
+            "maxItems": 10,
+            "description": "Hasta 10 rangos contiguos por llamada. Los e-CF ya ACCEPTED dentro del rango se saltan automáticamente (Aura no anula un comprobante aceptado por la DGII).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EcfVoidRangeDto"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "ranges"
+        ]
+      },
+      "ActivarContingenciaDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Motivo de la activación (Decreto 587-24)."
+          },
+          "autorizadoHasta": {
+            "type": "string",
+            "description": "ISO datetime hasta cuándo queda autorizada la contingencia. Default: 72h desde ahora (ventana legal)."
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
+      "FlushContingenciaDto": {
+        "type": "object",
+        "properties": {
+          "voucherIds": {
+            "description": "IDs de vouchers a reenviar. Si se omite, se reenvían todos los WAITING_DEFERRED del Client.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ConnectApiKeyDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "apiKey": {
+            "type": "string",
+            "description": "API Key completa generada en el panel de Aura (formato aura_\u003Cmode\u003E_\u003Chex\u003E_\u003Csecret\u003E). Se valida contra Aura y se cifra antes de persistirse — nunca se devuelve de vuelta."
+          }
+        },
+        "required": [
+          "mode",
+          "apiKey"
+        ]
+      },
+      "CreateEcfClientDto": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "string",
+            "description": "Nombre exacto de la Company en ERPNext a la que corresponde este RNC emisor."
+          },
+          "rnc": {
+            "type": "string",
+            "pattern": "^\\d{9,11}$"
+          },
+          "legalName": {
+            "type": "string"
+          },
+          "tradeName": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "municipality": {
+            "type": "string"
+          },
+          "province": {
+            "type": "string"
+          },
+          "phones": {
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "email": {
+            "type": "string"
+          },
+          "economicActivity": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "test",
+              "live"
+            ],
+            "description": "Ambiente contra el que se crea el Client. Si se omite, usa el activeMode ya conectado para el tenant."
+          }
+        },
+        "required": [
+          "company",
+          "rnc",
+          "legalName",
+          "address"
+        ]
+      },
+      "UploadEcfCertificateDto": {
+        "type": "object",
+        "properties": {
+          "p12Base64": {
+            "type": "string",
+            "description": "Certificado PKCS#12 (.p12) codificado en base64, sin prefijo data:..."
+          },
+          "password": {
+            "type": "string",
+            "description": "Contraseña del .p12"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "test",
+              "live"
+            ]
+          }
+        },
+        "required": [
+          "p12Base64",
+          "password"
+        ]
+      },
+      "RegisterEcfWebhookDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "test",
+              "live"
+            ]
+          }
+        }
+      },
+      "CargarManualEcfDto": {
+        "type": "object",
+        "properties": {
+          "signedXml": {
+            "type": "string",
+            "description": "XML semilla firmado del emisor, crudo o en base64 (ej. descargado del portal DGII)."
+          },
+          "company": {
+            "type": "string",
+            "description": "Compañía (si el tenant tiene más de un Client de Aura)."
+          }
+        },
+        "required": [
+          "signedXml"
+        ]
+      },
+      "VincularEcfRecibidoDto": {
+        "type": "object",
+        "properties": {
+          "purchaseInvoice": {
+            "type": "string",
+            "description": "ID de la Purchase Invoice a vincular con este e-CF recibido."
+          }
+        },
+        "required": [
+          "purchaseInvoice"
+        ]
+      },
+      "AprobacionComercialDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACCEPTED",
+              "REJECTED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Obligatorio cuando status=REJECTED."
+          }
+        },
+        "required": [
+          "status"
         ]
       },
       "CreateCategoryDto": {
@@ -27495,6 +29226,11 @@
           "reason": {
             "type": "string",
             "description": "Motivo de la devolución"
+          },
+          "modificationCode": {
+            "type": "number",
+            "enum": [1, 2, 3, 4, 5],
+            "description": "Código de modificación DGII (Tabla VI) — solo obligatorio si el tenant emite esta nota como e-CF (E34): 1=Anula, 2=Corrige texto, 3=Corrige montos, 4=Reemplazo contingencia, 5=Referencia a Factura de Consumo. Sin efecto en el flujo físico (NCF B04)."
           }
         },
         "required": [
@@ -27570,6 +29306,16 @@
             "type": "string",
             "example": "Ventas - JBC",
             "description": "Departamento de la nota de débito (dimensión contable informativa, nunca obligatoria)."
+          },
+          "referenceInvoice": {
+            "type": "string",
+            "example": "SINV-0042",
+            "description": "Factura que esta nota de débito afecta — a diferencia de la nota de crédito (que siempre deriva de una factura vía return_against), la de débito se crea desde cero. Solo obligatorio si el tenant emite esta nota como e-CF (E33): Aura exige referenceNcf/referenceDate del comprobante afectado. Sin efecto en el flujo físico (NCF B03)."
+          },
+          "modificationCode": {
+            "type": "number",
+            "enum": [1, 2, 3, 4, 5],
+            "description": "Código de modificación DGII (Tabla VI) — solo obligatorio si el tenant emite esta nota como e-CF (E33). Ver CreateCreditNoteDto.modificationCode para el detalle de cada código."
           }
         },
         "required": [
@@ -28021,6 +29767,20 @@
         "required": [
           "invoiceId",
           "resolution",
+          "reason"
+        ]
+      },
+      "CancelDevolucionDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500,
+            "description": "Motivo obligatorio de la cancelación. Queda registrado como Comment en el documento (auditoría)."
+          }
+        },
+        "required": [
           "reason"
         ]
       },

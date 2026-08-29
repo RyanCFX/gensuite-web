@@ -44,6 +44,9 @@ import type {
   UpdateBuyingSettingsDto,
   SeguridadSettings,
   UpdateSeguridadSettingsDto,
+  UpdateUOMResult,
+  EcfConfig,
+  UpdateEcfConfigDto,
 } from './types'
 
 export async function getEmpresa() {
@@ -169,7 +172,17 @@ export async function getUOM(id: string) {
 }
 
 export async function updateUOM(id: string, data: UpdateUOMDto) {
-  const res = await client.put<{ success: true; data: { id: string } }>(ENDPOINTS.config.uomById(id), data)
+  const res = await client.put<{ success: true; data: UpdateUOMResult }>(ENDPOINTS.config.uomById(id), data)
+  return unwrap(res)
+}
+
+export async function getEcfConfig() {
+  const res = await client.get<{ success: true; data: EcfConfig }>(ENDPOINTS.config.ecf)
+  return unwrap(res)
+}
+
+export async function updateEcfConfig(data: UpdateEcfConfigDto) {
+  const res = await client.put<{ success: true; data: EcfConfig }>(ENDPOINTS.config.ecf, data)
   return unwrap(res)
 }
 

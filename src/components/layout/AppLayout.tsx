@@ -58,6 +58,9 @@ interface NavItem {
   label: string;
   icon: React.ReactNode;
   path: string;
+  /** Si es true, el ítem solo se marca activo en la ruta exacta (no en sub-rutas). Útil cuando
+   *  un hermano usa una sub-ruta del mismo path (ej. /config/ecf y /config/ecf/admin). */
+  exact?: boolean;
 }
 
 interface NavGroup {
@@ -95,41 +98,6 @@ const NAV_MAIN: NavItem[] = [
     path: "/clientes",
   },
 ];
-
-const NAV_CATALOG: NavEntry = {
-  label: "Tablas",
-  icon: <Package size={16} aria-hidden="true" />,
-  prefix: "/catalogo",
-  children: [
-    {
-      label: "Categorías",
-      icon: <Package size={14} />,
-      path: "/catalogo/categorias",
-    },
-    { label: "Marcas", icon: <Shield size={14} />, path: "/catalogo/marcas" },
-    {
-      label: "Servicios",
-      icon: <ClipboardList size={14} />,
-      path: "/catalogo/servicios",
-    },
-    { label: "Combos", icon: <Package size={14} />, path: "/catalogo/combos" },
-    {
-      label: "Atributos",
-      icon: <Tag size={14} />,
-      path: "/catalogo/atributos",
-    },
-    {
-      label: "Descuentos",
-      icon: <Percent size={14} />,
-      path: "/catalogo/descuentos",
-    },
-    {
-      label: "Cuentas por Pagar",
-      icon: <FileText size={14} />,
-      path: "/catalogo/cuentas-por-pagar",
-    },
-  ],
-};
 
 const NAV_VENTAS: NavEntry[] = [
   {
@@ -176,13 +144,31 @@ const NAV_OPS: NavEntry[] = [
   {
     label: "Inventario",
     icon: <Warehouse size={16} aria-hidden="true" />,
-    prefix: "/inventario|/transferencias",
+    prefix:
+      "/inventario|/transferencias|/catalogo/categorias|/catalogo/marcas|/catalogo/atributos|/catalogo/descuentos|/catalogo/combos",
     children: [
       {
         label: "Productos",
         icon: <Package size={14} />,
         path: "/inventario/productos",
       },
+      {
+        label: "Categorías",
+        icon: <Package size={14} />,
+        path: "/catalogo/categorias",
+      },
+      { label: "Marcas", icon: <Shield size={14} />, path: "/catalogo/marcas" },
+      {
+        label: "Atributos",
+        icon: <Tag size={14} />,
+        path: "/catalogo/atributos",
+      },
+      {
+        label: "Descuentos",
+        icon: <Percent size={14} />,
+        path: "/catalogo/descuentos",
+      },
+      { label: "Combos", icon: <Package size={14} />, path: "/catalogo/combos" },
       {
         label: "Stock Actual",
         icon: <Warehouse size={14} />,
@@ -221,6 +207,11 @@ const NAV_OPS: NavEntry[] = [
     ],
   },
   {
+    label: "Servicios",
+    icon: <ClipboardList size={16} aria-hidden="true" />,
+    path: "/catalogo/servicios",
+  },
+  {
     label: "Compras",
     icon: <ShoppingCart size={16} aria-hidden="true" />,
     prefix: "/compras",
@@ -248,6 +239,11 @@ const NAV_OPS: NavEntry[] = [
     label: "Gastos",
     icon: <CreditCard size={16} aria-hidden="true" />,
     path: "/gastos",
+  },
+  {
+    label: "e-CF Recibidos",
+    icon: <Receipt size={16} aria-hidden="true" />,
+    path: "/ecf-recibidos",
   },
   {
     label: "Proveedores",
@@ -285,12 +281,13 @@ const NAV_FINANZAS: NavEntry[] = [
   {
     label: "Cuentas por Pagar",
     icon: <CreditCard size={16} aria-hidden="true" />,
-    prefix: "/pagos",
+    prefix: "/pagos|/catalogo/cuentas-por-pagar",
     children: [
       { label: "Pagos", icon: <ClipboardList size={14} />, path: "/pagos/lista" },
       { label: "Pendientes de Pago", icon: <Receipt size={14} />, path: "/pagos/pendientes" },
       { label: "Registrar Pago", icon: <Wallet size={14} />, path: "/pagos/nuevo" },
       { label: "Antiguedad de saldos CxP", icon: <BarChart3 size={14} />, path: "/pagos/aging" },
+      { label: "Catálogo", icon: <FileText size={14} />, path: "/catalogo/cuentas-por-pagar" },
     ],
   },
   {
@@ -430,6 +427,34 @@ const NAV_CONFIG: NavEntry = {
       path: "/config/facturacion",
     },
     {
+      label: "Facturación Electrónica",
+      icon: <ShieldCheck size={14} />,
+      prefix: "/config/ecf",
+      children: [
+        {
+          label: "Administración",
+          icon: <ShieldCheck size={14} />,
+          path: "/config/ecf",
+          exact: true,
+        },
+        {
+          label: "Avanzado",
+          icon: <Settings size={14} />,
+          path: "/config/ecf/admin",
+        },
+        {
+          label: "Certificación DGII",
+          icon: <Shield size={14} />,
+          path: "/config/ecf/certificacion",
+        },
+        {
+          label: "Contingencia",
+          icon: <Clock size={14} />,
+          path: "/config/ecf/contingencia",
+        },
+      ],
+    },
+    {
       label: "Plantillas de Facturas",
       icon: <LayoutTemplate size={14} />,
       path: "/config/plantillas-facturas",
@@ -524,7 +549,26 @@ const NAV_CONFIG: NavEntry = {
   ],
 };
 
-const ADMIN_ONLY_PATHS = new Set(["/config/permisos", "/config/roles", "/config/cajas"]);
+const ADMIN_ONLY_PATHS = new Set([
+  "/config/permisos",
+  "/config/roles",
+  "/config/cajas",
+  "/config/ecf/admin",
+  "/config/ecf/certificacion",
+  "/config/ecf/contingencia",
+]);
+
+// Quita (recursivamente, incluidos los sub-grupos) los ítems de ADMIN_ONLY_PATHS para usuarios
+// sin el rol "System Manager". Un grupo que se queda sin hijos se elimina por completo.
+function stripAdminOnlyEntry(entry: NavEntry): NavEntry | null {
+  if (isGroup(entry)) {
+    const children = entry.children
+      .map(stripAdminOnlyEntry)
+      .filter((c): c is NavEntry => c !== null);
+    return children.length ? { ...entry, children } : null;
+  }
+  return ADMIN_ONLY_PATHS.has(entry.path) ? null : entry;
+}
 
 // Grupos/ítems de NAV_FINANZAS que solo tienen sentido con el módulo POS habilitado
 // (Facturacion Config.usaModuloPos) — identificados por su `prefix` (grupos) o `path` (ítems sueltos).
@@ -571,7 +615,9 @@ function NavChildBtn({
   pathname: string;
   style?: React.CSSProperties;
 }) {
-  const active = pathname === child.path || pathname.startsWith(child.path + "/");
+  const active = child.exact
+    ? pathname === child.path
+    : pathname === child.path || pathname.startsWith(child.path + "/");
   return (
     <button
       className={`nav-item nav-child${active ? " active" : ""}`}
@@ -953,12 +999,7 @@ function AppLayoutInner() {
 
   const configNavAdminFiltered: NavEntry = isSystemManager
     ? NAV_CONFIG
-    : {
-        ...(NAV_CONFIG as NavGroup),
-        children: (NAV_CONFIG as NavGroup).children.filter(
-          (item) => isGroup(item) || !ADMIN_ONLY_PATHS.has(item.path),
-        ),
-      };
+    : (stripAdminOnlyEntry(NAV_CONFIG) as NavGroup);
 
   // Sin Impuesto de Documento, las plantillas de Ventas/Compras/Artículo dejan de tener sentido
   // en el menú — colapsa el grupo "Impuestos" a un único ítem plano que va directo al catálogo.
@@ -1081,7 +1122,6 @@ function AppLayoutInner() {
             collapsed={collapsed}
           />
         ))}
-        {renderEntry(NAV_CATALOG, handleNav, collapsed)}
       </div>
 
       {/* Ventas */}

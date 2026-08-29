@@ -5,6 +5,7 @@ import { getPedido, submitPedido, cancelPedido, amendPedido, downloadPedidoPdf, 
 import { listMetodosPago } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
+import { RelatedDocsCard } from '@/components/shared/RelatedDocsCard'
 import { displayId, formatDate, formatDOP } from '@/lib/formatters'
 import type { ApiError } from '@/shared/api/types'
 import { ArrowLeft, Download, Send, Trash2, GitBranch, FileText, History, Copy, PackageOpen, AlertTriangle, Ban } from 'lucide-react'
@@ -251,12 +252,34 @@ export default function PedidoDetail() {
             </button>
           </>
         )}
-        {pedido.facturaId && (
-          <span className="badge badge-success" style={{ marginLeft: 8 }}>
-            <FileText size={12} /> Factura generada: {pedido.facturaId}
-          </span>
-        )}
+        {(() => {
+          const n = pedido.invoices?.length ?? (pedido.facturaId ? 1 : 0)
+          if (n === 0) return null
+          return (
+            <span className="badge badge-success" style={{ marginLeft: 8 }}>
+              <FileText size={12} /> {n > 1 ? `${n} facturas generadas` : 'Factura generada'}
+            </span>
+          )
+        })()}
       </div>
+
+      <RelatedDocsCard
+        rows={[
+          {
+            label: 'Cotización',
+            links: pedido.quotation
+              ? [{ code: pedido.quotation, to: `/cotizaciones/${pedido.quotation}` }]
+              : [],
+          },
+          (() => {
+            const facturas = pedido.invoices ?? (pedido.facturaId ? [pedido.facturaId] : [])
+            return {
+              label: facturas.length > 1 ? 'Facturas' : 'Factura',
+              links: facturas.map((f) => ({ code: f, to: `/facturas/${f}` })),
+            }
+          })(),
+        ]}
+      />
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header"><h2 className="card-title">Información General</h2></div>
