@@ -3307,24 +3307,33 @@ tbody .badge {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
+/* Contenedor por página. `position: relative` únicamente para anclar `.tpl-canvas-page-side`
+   (absoluta) — su tamaño en el layout lo da solo `.tpl-canvas-page-block` (la página), así que
+   la etiqueta de al lado no descentra la página respecto al botón "Agregar página". */
+.tpl-canvas-page-item {
+  position: relative;
+}
+
+/* El tamaño explícito (width/height inline, calculado con `zoom`) hace que este bloque ocupe en
+   el layout flex exactamente el espacio que la página ocupa visualmente una vez escalada — sin
+   esto, `.tpl-canvas-page` reserva su alto sin escalar (transform no afecta layout) y el `gap` de
+   `.tpl-canvas-pages` se ve cada vez más grande al hacer zoom out. */
 .tpl-canvas-page-block {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
-/* Superpuesta a la esquina de la propia página (no ocupa una fila propia arriba) para que la
-   etiqueta "Página N" no le sume altura a la separación entre páginas — esa separación la
-   controla únicamente el `gap` de `.tpl-canvas-pages` (ver más abajo, máx. 10px). Nunca se
-   imprime: `TemplateEditorPrintTarget` no la renderiza, es solo chrome del editor. */
-.tpl-canvas-page-label-row {
+/* Al lado de la página (nunca superpuesta) — posicionada fuera de `.tpl-canvas-page-block` para
+   no quedar recortada por su `overflow: hidden`. Nunca se imprime: `TemplateEditorPrintTarget`
+   no la renderiza, es solo chrome del editor. */
+.tpl-canvas-page-side {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 0;
+  left: calc(100% + 8px);
   z-index: 3;
   display: flex;
   align-items: center;
@@ -3380,7 +3389,7 @@ tbody .badge {
   flex-shrink: 0;
   background: #ffffff;
   box-shadow: var(--shadow-lg);
-  transform-origin: top center;
+  transform-origin: top left;
   outline: 1px solid #d4d4d4;
 }
 

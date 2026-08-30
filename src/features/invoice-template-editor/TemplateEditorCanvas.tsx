@@ -140,23 +140,19 @@ export function TemplateEditorCanvas({
           const isActivePage = p.id === selectedPageId
 
           return (
-            <div key={p.id} className="tpl-canvas-page-block">
-              <div className="tpl-canvas-page-label-row">
-                <span className="tpl-canvas-page-label">Página {pageIndex + 1}</span>
-                {pages.length > 1 && (
-                  <button type="button" className="tpl-canvas-page-remove" title="Eliminar página" onClick={() => onRemovePage(p.id)}>
-                    <X size={11} />
-                  </button>
-                )}
-              </div>
+            <div key={p.id} className="tpl-canvas-page-item">
               <div
-                className="tpl-canvas-page"
-                ref={getPageRefCallback(p.id)}
-                data-page-id={p.id}
-                style={{ width: pageSpec.width, height: canvasHeight, transform: `scale(${zoom})` }}
-                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
-                onDrop={(e) => handleDrop(e, p.id)}
+                className="tpl-canvas-page-block"
+                style={{ width: pageSpec.width * zoom, height: canvasHeight * zoom }}
               >
+                <div
+                  className="tpl-canvas-page"
+                  ref={getPageRefCallback(p.id)}
+                  data-page-id={p.id}
+                  style={{ width: pageSpec.width, height: canvasHeight, transform: `scale(${zoom})` }}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
+                  onDrop={(e) => handleDrop(e, p.id)}
+                >
                 <div className="tpl-cut-guide" style={{ top: canvasHeight - CANVAS_BOTTOM_MARGIN / 2 }} />
 
                 {
@@ -295,6 +291,15 @@ export function TemplateEditorCanvas({
                       delete gestureStart.current[id]
                     }}
                   />
+                )}
+                </div>
+              </div>
+              <div className="tpl-canvas-page-side">
+                <span className="tpl-canvas-page-label">Página {pageIndex + 1}</span>
+                {pages.length > 1 && (
+                  <button type="button" className="tpl-canvas-page-remove" title="Eliminar página" onClick={() => onRemovePage(p.id)}>
+                    <X size={11} />
+                  </button>
                 )}
               </div>
             </div>
