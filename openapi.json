@@ -8757,107 +8757,6 @@
         ]
       }
     },
-    "/api/v1/inventory/repost-valuacion": {
-      "post": {
-        "operationId": "InventoryController_createRepostValuacion",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateRepostValuacionDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Encola el recálculo nativo de ERPNext de la cola de valuación (FIFO/Moving Average) de un artículo — repara una tasa de costo corrupta (ej. negativa) que bloquea devoluciones o compras posteriores sobre ese artículo. Requiere rol System Manager o Accounts Manager. Solo encola el trabajo — ERPNext lo procesa en segundo plano, puede tardar minutos.",
-        "tags": [
-          "Inventario"
-        ]
-      },
-      "get": {
-        "operationId": "InventoryController_listRepostsValuacion",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "default": 20,
-              "type": "number"
-            }
-          },
-          {
-            "name": "offset",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": 0,
-              "type": "number"
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "orderBy",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Lista los recálculos de valuación encolados/en curso/completados, para hacer seguimiento sin entrar al Desk de ERPNext.",
-        "tags": [
-          "Inventario"
-        ]
-      }
-    },
     "/api/v1/inventory/counts": {
       "get": {
         "operationId": "CountsController_findAll",
@@ -25504,11 +25403,6 @@
             ],
             "default": "email",
             "description": "\"email\": al crear un usuario (POST /usuarios) o resetear su contraseña (POST /usuarios/:email/reset-password) se genera un link y se manda por correo (comportamiento histórico). \"directo\": el administrador escribe la contraseña él mismo en el momento (`password` en la creación, `newPassword` en el reset) y se fija de una vez en ERPNext sin enviar ningún correo — útil si el tenant no tiene canal de email saliente confiable."
-          },
-          "redondeoTotalDeshabilitado": {
-            "type": "boolean",
-            "default": false,
-            "description": "Espejo de `Accounts Settings.disable_rounded_total` de ERPNext (setting global, no es un campo propio de Facturacion Config) — aplica como default a toda factura/compra nueva del tenant. Si está en false (default de ERPNext), el `grand_total` con centavos se redondea a `rounded_total` y es ESE monto redondeado el que queda como `outstanding_amount`/ `amountDue` a cobrar (ej. grand_total=168.57 → se cobra 169.00) — pensado para efectivo, que no maneja denominaciones fraccionarias en RD. Si se activa (true), ERPNext deja de redondear: se cobra el grand_total exacto, con centavos — más apropiado si el negocio solo cobra con tarjeta/cheque/transferencia. Cambiar esto NO afecta facturas ya sometidas, solo las que se sometan después."
           }
         }
       },
@@ -26524,29 +26418,6 @@
             "type": "string"
           }
         }
-      },
-      "CreateRepostValuacionDto": {
-        "type": "object",
-        "properties": {
-          "itemCode": {
-            "type": "string",
-            "example": "E2E-TEST-001",
-            "description": "Artículo cuya cola de valuación (FIFO/Moving Average) se va a recalcular desde cero."
-          },
-          "warehouse": {
-            "type": "string",
-            "description": "Almacén específico a recalcular. Si se omite, ERPNext recalcula el artículo en TODOS los almacenes donde tiene movimientos."
-          },
-          "postingDate": {
-            "type": "string",
-            "example": "2026-07-01",
-            "description": "Fecha desde la cual recalcular la cola de valuación — debe ser igual o anterior a la fecha del primer movimiento de inventario problemático de este artículo/almacén (ver GET /inventory/history/:itemCode). Un valor posterior deja intacta la corrupción anterior a esa fecha."
-          }
-        },
-        "required": [
-          "itemCode",
-          "postingDate"
-        ]
       },
       "CountItemDto": {
         "type": "object",
@@ -30162,11 +30033,6 @@
             "minLength": 10,
             "maxLength": 500,
             "description": "Motivo obligatorio de la devolución (auditoría)."
-          },
-          "modificationCode": {
-            "type": "number",
-            "enum": [1, 2, 3, 4, 5],
-            "description": "Código de modificación DGII (Tabla VI) — solo obligatorio si el tenant emite esta nota como e-CF (E34): 1=Anula, 2=Corrige texto, 3=Corrige montos, 4=Reemplazo contingencia, 5=Referencia a Factura de Consumo. Sin efecto en el flujo físico (NCF B04)."
           }
         },
         "required": [
