@@ -17,11 +17,12 @@ import type { CreateDevolucionCompraDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { DatePicker } from '@/shared/ui/DatePicker'
-import { Save, X, Building2, FileText, Undo2, Check } from 'lucide-react'
-import { formatDOP, formatDate } from '@/lib/formatters'
+import { Save, X, Building2, FileText, Undo2, Check, AlertTriangle } from 'lucide-react'
+import { formatDOP, formatDate, daysSince } from '@/lib/formatters'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { DEVOLUCION_DIAS_LIMITE_ITBIS } from '@/lib/constants'
 
 interface FormItem {
   itemCode: string
@@ -130,6 +131,12 @@ export default function DevolucionForm() {
   const effectiveReason = reason || (isEdit ? devolucion?.reason ?? '' : '')
 
   const returnedTotal = rows.reduce((acc, it) => acc + it.returnQty * it.rate, 0)
+
+  // Regla fiscal (la controla el backend): pasados los 30 días de la factura de compra original,
+  // la devolución ya no reintegra el ITBIS, solo el monto neto antes de impuestos. Aquí solo se
+  // avisa con anticipación — el cálculo real siempre lo hace el backend.
+  const diasDesdeFactura = daysSince(sourceCompra?.postingDate)
+  const facturaVencidaParaItbis = diasDesdeFactura != null && diasDesdeFactura > DEVOLUCION_DIAS_LIMITE_ITBIS
 
   const isDirty = useDirtyCheck({ items: rows, postingDate: effectivePostingDate, reason: effectiveReason }, !isLoading && rows.length > 0)
   const confirmClose = useConfirmClose(isDirty, () => (isEdit ? navigate(-1) : navigate('/devoluciones-compras')))
@@ -305,6 +312,14 @@ export default function DevolucionForm() {
           </div>
         }
       />
+
+      {facturaVencidaParaItbis && (
+        <div className="inline-alert inline-alert-warn">
+          <AlertTriangle size={16} />
+          Esta factura tiene más de {DEVOLUCION_DIAS_LIMITE_ITBIS} días ({diasDesdeFactura} días) — por regla fiscal,
+          la devolución no reintegrará el ITBIS, solo el monto neto antes de impuestos.
+        </div>
+      )}
 
       <div className="card">
         <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

@@ -2135,6 +2135,7 @@ function FacturacionConfigSection() {
    const [modoPagoCaja, setModoPagoCaja] = useState<string | null>(null)
    const [modosPagoConciliar, setModosPagoConciliar] = useState<string[]>([])
    const [rolesCierreCajaAjena, setRolesCierreCajaAjena] = useState<string[]>([])
+   const [redondearTotales, setRedondearTotales] = useState(true)
 
    useEffect(() => {
      if (data) {
@@ -2154,6 +2155,7 @@ function FacturacionConfigSection() {
         setModoPagoCaja(data.modoPagoCaja ?? null)
         setModosPagoConciliar(data.modosPagoConciliar ?? [])
         setRolesCierreCajaAjena(data.rolesCierreCajaAjena ?? [])
+        setRedondearTotales(!(data.redondeoTotalDeshabilitado ?? false))
       }
     }, [data])
 
@@ -2335,6 +2337,25 @@ function FacturacionConfigSection() {
           <p className="ff-hint" style={{ marginTop: 4 }}>
             Si está desactivado, se oculta el selector de plantilla de Impuesto de Documento en Factura, Cotización
             y Compra. No afecta documentos ya guardados con una plantilla asignada.
+          </p>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-check-wrap">
+            <input
+              type="checkbox"
+              className="ff-check"
+              checked={redondearTotales}
+              onChange={(e) => setRedondearTotales(e.target.checked)}
+            />
+            <span style={{ fontSize: 13 }}>Redondear totales a la unidad</span>
+          </label>
+          <p className="ff-hint" style={{ marginTop: 4 }}>
+            Si está activo (default), el total con centavos de cada factura/compra se redondea al peso más cercano
+            y ese es el monto que se cobra o queda pendiente (ej. RD$168.57 se cobra como RD$169.00) — pensado para
+            ventas en efectivo, que no manejan centavos físicos. Si se desactiva, se cobra el monto exacto con
+            centavos — más apropiado si el negocio solo cobra con tarjeta, cheque o transferencia. Cambiarlo no
+            afecta facturas o compras ya sometidas, solo las que se sometan después de guardar.
           </p>
         </div>
 
@@ -2639,6 +2660,7 @@ function FacturacionConfigSection() {
                 modoPagoCaja,
                 modosPagoConciliar,
                 rolesCierreCajaAjena,
+                redondeoTotalDeshabilitado: !redondearTotales,
               })}
             disabled={saveMutation.isPending}
           >

@@ -379,6 +379,11 @@ function validateAndSubmit() {
                  <span style={{ color: 'var(--color-error)', fontWeight: 600 }}>Saldo pendiente:</span>
                  <span style={{ color: 'var(--color-error)', fontWeight: 600 }}>{formatDOP(selectedInvoice.outstandingAmount)}</span>
                </div>
+               {!!selectedInvoice.roundingAdjustment && (
+                 <p style={{ margin: 0, fontSize: 11, color: 'var(--text-tertiary)' }}>
+                   El saldo pendiente incluye un ajuste por redondeo de {selectedInvoice.roundingAdjustment > 0 ? '+' : ''}{formatDOP(selectedInvoice.roundingAdjustment)}.
+                 </p>
+               )}
 
                <div className="divider" />
 

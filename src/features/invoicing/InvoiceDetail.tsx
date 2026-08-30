@@ -376,10 +376,15 @@ export default function InvoiceDetail() {
   );
 
   const creditoAplicado = creditoAplicadoSaldoFavor + creditoAplicadoNotas;
+  // Monto real a cobrar de la factura, ya con el redondeo de moneda de ERPNext aplicado (igual a
+  // grandTotal si el tenant no redondea). Usar SIEMPRE este valor para armar/validar el cobro —
+  // grandTotal es el monto bruto antes de redondear, no lo que el cajero debe cobrar.
+  const roundedTotal = invoice ? invoice.roundedTotal ?? invoice.grandTotal : 0;
+  const roundingAdjustment = invoice?.roundingAdjustment ?? 0;
   // Lo que realmente queda pendiente en esta factura (antes de someter) — el backend valida contra esto,
   // no contra el grandTotal bruto, ya que puede haber crédito ya aplicado previamente.
   const pendingAmount = invoice
-    ? Math.max(0, invoice.grandTotal - creditoAplicado)
+    ? Math.max(0, roundedTotal - creditoAplicado)
     : 0;
 
   const noCredit = invoice?.status === "draft" && customer?.hasCredit === false;
@@ -395,11 +400,15 @@ export default function InvoiceDetail() {
   // el backend ignora `payments` por completo y siempre manda la factura a Caja
   // (custom_enviada_a_caja=1, sin NCF). No tiene sentido mostrar el bloque de pago.
   const posCliente = usaModuloPos && noCredit;
-  // Escenarios 1 y 2: se muestra el bloque "¿Cómo se cobra?" — opcional en general,
-  // obligatorio si el cliente no tiene crédito (limitación temporal del backend: si se
-  // somete a crédito sin payments, la factura queda en CxC igual aunque no debería).
+  // Con el módulo POS activo, el cobro siempre pasa por Caja/turno sin importar si el
+  // cliente tiene crédito o no — no solo en el caso "de consumo" (posCliente). Antes de
+  // que existiera el módulo POS, esta pantalla nunca mostraba campos de pago; con POS
+  // activo debe seguir igual.
+  // Escenarios 1 y 2 (sin POS): se muestra el bloque "¿Cómo se cobra?" — opcional en
+  // general, obligatorio si el cliente no tiene crédito (limitación temporal del backend:
+  // si se somete a crédito sin payments, la factura queda en CxC igual aunque no debería).
   const showPaymentBlock =
-    invoice?.status === "draft" && !paidByCreditNote && !posCliente;
+    invoice?.status === "draft" && !paidByCreditNote && !posCliente && !usaModuloPos;
   const paymentRequired = showPaymentBlock && noCredit;
 
   const metodosActivos = (metodos ?? []).filter((m) => !m.disabled);
@@ -2108,18 +2117,33 @@ export default function InvoiceDetail() {
             )}
             <div
               className="items-total-line"
-              style={{ fontWeight: 700, fontSize: 15 }}
+              style={{ fontWeight: roundingAdjustment !== 0 ? 500 : 700, fontSize: roundingAdjustment !== 0 ? 13 : 15 }}
             >
               <span>Total</span>
               <span>{formatDOP(invoice.grandTotal)}</span>
             </div>
+            {roundingAdjustment !== 0 && (
+              <div className="items-total-line" style={{ color: "var(--text-tertiary)", fontSize: 13 }}>
+                <span>Ajuste por redondeo</span>
+                <span>{roundingAdjustment > 0 ? "+" : ""}{formatDOP(roundingAdjustment)}</span>
+              </div>
+            )}
+            {roundingAdjustment !== 0 && (
+              <div
+                className="items-total-line"
+                style={{ fontWeight: 700, fontSize: 15 }}
+              >
+                <span>Total a pagar</span>
+                <span>{formatDOP(roundedTotal)}</span>
+              </div>
+            )}
             {creditoAplicado > 0 && (
               <div
                 className="items-total-line"
                 style={{ fontWeight: 700, fontSize: 15 }}
               >
                 <span>Total después de crédito</span>
-                <span>{formatDOP(invoice.grandTotal - creditoAplicado)}</span>
+                <span>{formatDOP(roundedTotal - creditoAplicado)}</span>
               </div>
             )}
             {invoice.status === "submitted" && (

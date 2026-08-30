@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Route, Navigate } from 'react-router-dom'
+import { SentryRoutes as Routes } from '@/lib/sentry'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import AppLayout from '@/components/layout/AppLayout'
 import LoginPage from '@/pages/LoginPage'
@@ -100,6 +101,7 @@ const CuentasBancariasPage = lazy(() => import('@/features/config/CuentasBancari
 const DepartamentosPage   = lazy(() => import('@/features/config/DepartamentosPage'))
 const RetencionesPage     = lazy(() => import('@/features/config/RetencionesPage'))
 const AjustesAvanzadosPage = lazy(() => import('@/features/config/AjustesAvanzadosPage'))
+const RepostValuacionPage  = lazy(() => import('@/features/inventory/RepostValuacionPage'))
 const NotificacionesPage   = lazy(() => import('@/features/config/NotificacionesPage'))
 const PermisosPage         = lazy(() => import('@/features/config/PermisosPage'))
 const RolesPage            = lazy(() => import('@/features/config/RolesPage'))
@@ -341,6 +343,7 @@ export default function App() {
             <Route path="/config/departamentos" element={<Suspense fallback={<PageLoader />}><DepartamentosPage /></Suspense>} />
             <Route path="/config/retenciones" element={<Suspense fallback={<PageLoader />}><RetencionesPage /></Suspense>} />
             <Route path="/config/ajustes-avanzados" element={<Suspense fallback={<PageLoader />}><AjustesAvanzadosPage /></Suspense>} />
+            <Route path="/config/recalculo-valuacion" element={<Suspense fallback={<PageLoader />}><RepostValuacionPage /></Suspense>} />
             <Route path="/config/notificaciones" element={<Suspense fallback={<PageLoader />}><NotificacionesPage /></Suspense>} />
             <Route path="/config/permisos" element={<Suspense fallback={<PageLoader />}><PermisosPage /></Suspense>} />
             <Route path="/config/roles" element={<Suspense fallback={<PageLoader />}><RolesPage /></Suspense>} />

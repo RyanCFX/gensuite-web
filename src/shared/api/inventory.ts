@@ -10,6 +10,9 @@ import type {
   Warehouse,
   PaginatedResponse,
   PaginationParams,
+  CreateRepostValuacionDto,
+  CreateRepostValuacionResult,
+  RepostValuacionItem,
 } from './types'
 
 export interface InventoryFilterParams extends PaginationParams {
@@ -59,6 +62,21 @@ export async function getInventoryHistory(params?: HistoryFilterParams) {
 
 export async function getItemHistory(itemCode: string, params?: HistoryFilterParams) {
   const res = await client.get<PaginatedResponse<InventoryHistory>>(ENDPOINTS.inventory.historyByItem(itemCode), { params })
+  return unwrapPaginated(res)
+}
+
+// ─── Recálculo de valuación (Repost Item Valuation) ────────────────────────────
+
+export async function createRepostValuacion(data: CreateRepostValuacionDto) {
+  const res = await client.post<{ success: true; data: CreateRepostValuacionResult }>(
+    ENDPOINTS.inventory.repostValuacion,
+    data,
+  )
+  return unwrap(res)
+}
+
+export async function listRepostsValuacion(params?: PaginationParams) {
+  const res = await client.get<PaginatedResponse<RepostValuacionItem>>(ENDPOINTS.inventory.repostValuacion, { params })
   return unwrapPaginated(res)
 }
 

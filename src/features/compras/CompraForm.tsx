@@ -35,7 +35,6 @@ import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { AccountSelect } from '@/components/shared/AccountSelect'
-import { DistribucionCuentaEditor } from '@/components/shared/DistribucionCuentaEditor'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
@@ -307,40 +306,6 @@ function SerialBatchRow({
           </button>
         </td>
       </tr>
-
-      {/* Dividir cuenta contable de la línea (opcional) */}
-      {((item.distribucionCuenta && item.distribucionCuenta.length > 0) || item.trackingType === 'none') && (
-      <tr className="tracking-row">
-        <td colSpan={8} style={{ padding: '4px 8px 8px' }}>
-          {item.distribucionCuenta && item.distribucionCuenta.length > 0 ? (
-            <div style={{ maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <DistribucionCuentaEditor
-                rows={item.distribucionCuenta}
-                onChange={(rows) => setItems((prev) => prev.map((r, i) => (i === idx ? { ...r, distribucionCuenta: rows } : r)))}
-                targetAmount={item.qty * item.rate}
-                targetLabel="de la línea"
-              />
-              <button
-                type="button"
-                className="btn btn-ghost btn-size-xs"
-                style={{ alignSelf: 'flex-start' }}
-                onClick={() => setItems((prev) => prev.map((r, i) => (i === idx ? { ...r, distribucionCuenta: undefined } : r)))}
-              >
-                Usar una sola cuenta
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="btn btn-ghost btn-size-xs"
-              onClick={() => setItems((prev) => prev.map((r, i) => (i === idx ? { ...r, distribucionCuenta: [{ cuenta: '', monto: r.qty * r.rate }] } : r)))}
-            >
-              Dividir cuenta
-            </button>
-          )}
-        </td>
-      </tr>
-      )}
 
       {/* Tracking row */}
       {(item.trackingType === 'serial' || item.trackingType === 'batch' || (item._comboComponents && item._comboComponents.length > 0)) && (

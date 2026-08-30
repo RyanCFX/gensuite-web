@@ -13,7 +13,7 @@ import { getEcfEmitido, refreshEcfEmitido } from '@/shared/api/ecf-emitidos'
 import { downloadInvoiceEcfPdfa } from '@/shared/api/invoices'
 import { formatDate, formatDateTime, formatDOP, formatNumber } from '@/lib/formatters'
 import {
-  ecfStatusLabel, ecfStatusBadge, ecfTipoLabel, ecfEnvChip, ecfPuedeRefrescar, ECF_ENV_LABELS,
+  ecfStatusLabel, ecfFlujoStatusLabel, ecfStatusBadge, ecfTipoLabel, ecfEnvChip, ecfPuedeRefrescar, ECF_ENV_LABELS,
 } from '@/lib/dgii'
 import { EcfFlujoStepper } from './EcfFlujoStepper'
 
@@ -43,7 +43,7 @@ export default function EcfEmitidoDetail() {
     mutationFn: () => refreshEcfEmitido(voucherId),
     onSuccess: (res) => {
       if (res.cambio) {
-        toast.success(`Estado actualizado: ${ecfStatusLabel(res.statusPrevio)} → ${ecfStatusLabel(res.status)}`)
+        toast.success(`Estado actualizado: ${ecfStatusLabel(res.statusPrevio)} → ${ecfFlujoStatusLabel(res.flujo, res.status)}`)
       } else {
         toast.info('El estado no ha cambiado')
       }
@@ -98,7 +98,7 @@ export default function EcfEmitidoDetail() {
           </a>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontFamily: 'monospace' }}>{v.ncf}</span>
-            <span className={`badge ${ecfStatusBadge(v.status)}`}>{ecfStatusLabel(v.status)}</span>
+            <span className={`badge ${ecfStatusBadge(v.status)}`}>{ecfFlujoStatusLabel(v.flujo, v.status)}</span>
             {chip && <span className={`badge ${chip.className}`}>{chip.label}</span>}
             {v.deferredSend && <span className="badge badge-info">Contingencia</span>}
           </h1>

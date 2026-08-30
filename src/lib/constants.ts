@@ -102,3 +102,9 @@ export const ERROR_MESSAGES: Record<string, string> = {
 
 export const TENANT_SLUG = import.meta.env.VITE_TENANT_SLUG ?? 'tenant1'
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
+
+/** Días desde la fecha de la factura/compra original a partir de los cuales el backend, por
+ *  regla fiscal, ya no devuelve el ITBIS en una devolución — solo el monto neto antes de
+ *  impuestos (aplica igual a devoluciones de venta y de compra). Puramente informativo para
+ *  avisarle al usuario antes de crear la devolución; el backend es quien controla el cálculo real. */
+export const DEVOLUCION_DIAS_LIMITE_ITBIS = 30

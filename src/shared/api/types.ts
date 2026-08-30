@@ -296,6 +296,13 @@ export interface Invoice {
   ncfAfectado?: string | null;
   subtotal: number;
   grandTotal: number;
+  /** Monto REAL a cobrar, con el redondeo de moneda de ERPNext ya aplicado (redondea al peso más
+   *  cercano) — igual a `grandTotal` si la compañía tiene el redondeo desactivado. Este es el
+   *  monto que debe cobrarse en efectivo, no `grandTotal`. Puede faltar en respuestas antiguas —
+   *  usar `roundedTotal ?? grandTotal`. */
+  roundedTotal?: number;
+  /** `roundedTotal - grandTotal` — puede ser negativo. 0 si la compañía no redondea. */
+  roundingAdjustment?: number;
   /** Monto total de impuestos del documento (Sales Taxes and Charges), si se aplicó un template */
   taxAmount?: number;
   outstandingAmount: number;
@@ -612,6 +619,10 @@ export interface DevolucionDto {
   /** Obligatorio solo si resolution === 'refund' */
   refundModeOfPayment?: string;
   reason: string;
+  /** Código de modificación DGII (Tabla VI) de la nota de crédito generada — solo obligatorio si
+   *  el tenant emite esta nota como e-CF (E34): 1=Anula, 2=Corrige texto, 3=Corrige montos,
+   *  4=Reemplazo contingencia, 5=Referencia a Factura de Consumo. Sin efecto en el flujo físico (NCF B04). */
+  modificationCode?: EcfModificationCode;
 }
 
 // POST /devoluciones/:id/cancelar — solo devoluciones en borrador. El documento no se elimina:
@@ -1630,6 +1641,46 @@ export interface InventoryHistory {
   postingDate: string;
 }
 
+// ─── Recálculo de valuación (Repost Item Valuation) ───────────────────────────
+// Herramienta administrativa (System Manager / Accounts Manager) que expone el mecanismo nativo
+// de ERPNext para reparar una cola de valuación FIFO/Moving Average corrupta (ej. tasa de costo
+// negativa por movimientos retroactivos o stock negativo) sin entrar al Desk. Ver POST/GET
+// /inventory/repost-valuacion — el openapi.json no publica el schema de respuesta; los campos de
+// abajo salen de la especificación de la tarea, no están confirmados contra un ejemplo real.
+
+// POST /inventory/repost-valuacion
+export interface CreateRepostValuacionDto {
+  itemCode: string;
+  /** Si se omite, ERPNext recalcula el artículo en TODOS los almacenes donde tiene movimientos. */
+  warehouse?: string;
+  /** Fecha desde la cual recalcular — debe ser igual o anterior al primer movimiento problemático. */
+  postingDate: string;
+}
+
+export interface CreateRepostValuacionResult {
+  id: string;
+  status: "queued";
+  /** Ya trae el texto explicativo listo para mostrar (ej. "puede tardar unos minutos..."). */
+  message: string;
+}
+
+export type RepostValuacionStatus = "Queued" | "In Progress" | "Completed" | "Skipped" | "Failed";
+
+// GET /inventory/repost-valuacion
+export interface RepostValuacionItem {
+  id: string;
+  itemCode: string;
+  /** Ausente si se encoló para TODOS los almacenes del artículo. */
+  warehouse?: string | null;
+  status: RepostValuacionStatus;
+  postingDate: string;
+  /** Solo relevante si status es Failed o Skipped. */
+  errorLog?: string | null;
+  totalRepostingCount: number;
+  currentIndex: number;
+  createdAt: string;
+}
+
 // ─── Physical Count ───────────────────────────────────────────────────────────
 // API: CreateCountDto requires postingDate (root), items have {itemCode, warehouse, qty}
 // The "countedQty" concept is just "qty" in the BFF.
@@ -2384,6 +2435,8 @@ export interface FacturacionConfig {
   turnoMaxHoras?: number
   /** Cuando a una Secuencia NCF le queden este número de comprobantes o menos, GET /config/ncf marca esa serie con alertaActiva=true y se envía el correo del tipo de notificación "Secuencia NCF por agotarse" (una vez por día por serie). Default 50. */
   ncfAlertaMinimo?: number
+  /** Espejo de `Accounts Settings.disable_rounded_total` de ERPNext — aplica como default a toda factura/compra nueva del tenant. Si está en false (default), el grand_total con centavos se redondea a rounded_total y ese es el monto que queda a cobrar (pensado para efectivo). Si está en true, se cobra el grand_total exacto con centavos (pensado para tarjeta/cheque/transferencia). No afecta documentos ya sometidos. */
+  redondeoTotalDeshabilitado?: boolean
 }
 
 // ─── Facturación Electrónica (e-CF) ────────────────────────────────────────────
@@ -3185,6 +3238,9 @@ export interface CobroResumen {
   invoiceId: string;
   paymentEntryIds: string[];
   outstandingAmount: number;
+  /** Ver `Invoice.roundedTotal`/`roundingAdjustment`. */
+  roundedTotal?: number;
+  roundingAdjustment?: number;
   fullyPaid: boolean;
   vuelto: VueltoLine[];
 }
@@ -3203,6 +3259,10 @@ export interface PendienteCobroItem {
    customer: string;
    customerName: string;
    grandTotal: number;
+   /** Monto real a cobrar, con redondeo de moneda aplicado — usar en vez de `grandTotal` para
+    *  prellenar/validar el cobro. Ver `Invoice.roundedTotal`. */
+   roundedTotal?: number;
+   roundingAdjustment?: number;
    postingDate: string;
    esClienteOcasional: boolean;
    clienteOcasionalNombre?: string;
@@ -3217,6 +3277,9 @@ export interface CompletarCobroResult {
    isPos: boolean;
    paymentEntryIds: string[];
    outstandingAmount: number;
+   /** Ver `Invoice.roundedTotal`/`roundingAdjustment`. */
+   roundedTotal?: number;
+   roundingAdjustment?: number;
    fullyPaid: boolean;
    vuelto: VueltoLine[];
    esClienteOcasional: boolean;
@@ -3235,6 +3298,9 @@ export interface CajaPendienteItem {
   customerName: string
   ncf?: string
   grandTotal: number
+  /** Ver `Invoice.roundedTotal`/`roundingAdjustment`. */
+  roundedTotal?: number
+  roundingAdjustment?: number
   outstandingAmount: number
   postingDate: string
 }
@@ -3250,6 +3316,9 @@ export interface CobrarFacturaResult {
   invoiceId: string
   paymentEntryIds: string[]
   outstandingAmount: number
+  /** Ver `Invoice.roundedTotal`/`roundingAdjustment`. */
+  roundedTotal?: number
+  roundingAdjustment?: number
   fullyPaid: boolean
   vuelto: VueltoLine[]
 }

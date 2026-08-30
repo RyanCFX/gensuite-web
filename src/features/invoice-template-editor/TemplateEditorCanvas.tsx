@@ -301,7 +301,12 @@ export function TemplateEditorCanvas({
           )
         })}
 
-        <button type="button" className="tpl-add-page-btn" onClick={onAddPage}>
+        <button
+          type="button"
+          className="tpl-add-page-btn"
+          style={{ width: pageSpec.width * zoom }}
+          onClick={onAddPage}
+        >
           <Plus size={15} /> Agregar página
         </button>
       </div>

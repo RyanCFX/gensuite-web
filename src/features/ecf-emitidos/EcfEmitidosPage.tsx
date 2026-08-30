@@ -16,7 +16,7 @@ import type { VoucherEmitido, EcfStatusDgii, EcfTipoElectronico, EcfEnv } from '
 import { useDebounce } from '@/lib/useDebounce'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import {
-  ecfStatusLabel, ecfStatusBadge, ecfTipoLabel, ecfEnvChip, ecfPuedeRefrescar, ECF_TIPOS,
+  ecfStatusLabel, ecfFlujoStatusLabel, ecfStatusBadge, ecfTipoLabel, ecfEnvChip, ecfPuedeRefrescar, ECF_TIPOS,
 } from '@/lib/dgii'
 import { FilterField } from '@/shared/ui/FilterField'
 import { DatePicker } from '@/shared/ui/DatePicker'
@@ -81,7 +81,7 @@ export default function EcfEmitidosPage() {
     mutationFn: (voucherId: string) => refreshEcfEmitido(voucherId),
     onSuccess: (res) => {
       if (res.cambio) {
-        toast.success(`Estado actualizado: ${ecfStatusLabel(res.statusPrevio)} → ${ecfStatusLabel(res.status)}`)
+        toast.success(`Estado actualizado: ${ecfStatusLabel(res.statusPrevio)} → ${ecfFlujoStatusLabel(res.flujo, res.status)}`)
       } else {
         toast.info('El estado no ha cambiado')
       }
@@ -245,7 +245,7 @@ export default function EcfEmitidosPage() {
                     <td style={{ textAlign: 'right', fontWeight: 500 }}>
                       {formatDOP(it.total)}{it.currency && it.currency !== 'DOP' ? ` ${it.currency}` : ''}
                     </td>
-                    <td><span className={`badge ${ecfStatusBadge(it.status)}`}>{ecfStatusLabel(it.status)}</span></td>
+                    <td><span className={`badge ${ecfStatusBadge(it.status)}`}>{ecfFlujoStatusLabel(it.flujo, it.status)}</span></td>
                     <td onClick={(e) => e.stopPropagation()}>
                       {docPath ? (
                         <a

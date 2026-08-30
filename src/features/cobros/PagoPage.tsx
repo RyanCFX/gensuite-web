@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { registerPago } from '@/shared/api/cobros'
@@ -39,6 +40,7 @@ interface PedidoReferenciaRow {
 }
 
 export default function PagoPage() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   const [customerId, setCustomerId] = useState('')
@@ -283,28 +285,15 @@ export default function PagoPage() {
 
   const pagoMutation = useMutation({
     mutationFn: registerPago,
-    onSuccess: () => {
+    onSuccess: (result) => {
       toast.success('Cobro registrado correctamente')
       queryClient.invalidateQueries({ queryKey: ['aging'] })
       queryClient.invalidateQueries({ queryKey: ['semaforo'] })
       queryClient.invalidateQueries({ queryKey: ['invoices-pending', customerId] })
       queryClient.invalidateQueries({ queryKey: ['pedidos-layaway-pending', customerId] })
       queryClient.invalidateQueries({ queryKey: ['pedidos'] })
-      setCustomerId('')
-      setCustomerQuery('')
-      setPaidAmount(0)
-      setModeOfPayment('')
-      setBankAccount('')
-      setReferenceNo('')
-      setReferenceDate('')
-      setRemarks('')
-      setPostingDate(new Date().toISOString().slice(0, 10))
-      setReferencias([])
-      setManualRefs({})
-      setPedidoReferencias([])
-      setAdvancePayment(false)
-      setBranch('')
-      setDepartment('')
+      queryClient.invalidateQueries({ queryKey: ['cobros'] })
+      navigate(`/cobros/${result.id}`)
     },
     onError: (err: { message?: string }) => {
       if (isApiErrorCode(err, ERROR_CODES.BRANCH_REQUIRED)) {

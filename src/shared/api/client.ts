@@ -1,4 +1,5 @@
 import axios from 'axios'
+import * as Sentry from '@sentry/react'
 import { getToken, getTenant, clearSession } from './storage'
 import type { ApiError, ApiErrorResponse, ApiResponse, PaginatedResponse } from './types'
 
@@ -39,7 +40,14 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (response) => response,
   (error) => {
+    const requestUrl = axios.isAxiosError(error) ? error.config?.url : undefined
+    const requestMethod = axios.isAxiosError(error) ? error.config?.method : undefined
+
     if (!axios.isAxiosError(error) || !error.response) {
+      // Sin respuesta del servidor (backend caído, CORS, timeout, sin conexión) — a diferencia de
+      // un 4xx (error de validación esperado), esto siempre es una falla real que vale reportar.
+      Sentry.captureException(error, { extra: { url: requestUrl, method: requestMethod } })
+      Sentry.logger.error('Request sin respuesta del servidor', { url: requestUrl, method: requestMethod })
       return Promise.reject({
         code: 'NETWORK_ERROR',
         message: 'Error de conexión con el servidor',
@@ -54,6 +62,7 @@ client.interceptors.response.use(
     const isLoginRequest = error.config?.url?.includes('/auth/login')
 
     if (status === 401 && !isLoginRequest) {
+      Sentry.logger.warn('Sesión inválida (401) — redirigiendo a login', { url: requestUrl })
       clearSession()
       window.location.href = '/login'
       return Promise.reject(error)
@@ -65,9 +74,25 @@ client.interceptors.response.use(
     // credenciales de la integración (no es la sesión del usuario) — tratamos esto
     // como sesión inválida: cerramos sesión y redirigimos a login con un aviso.
     if (!isLoginRequest && data?.error?.code === 'ERPNEXT_AUTH_ERROR') {
+      Sentry.captureException(new Error('ERPNEXT_AUTH_ERROR'), { extra: { url: requestUrl, method: requestMethod } })
+      Sentry.logger.error('ERPNEXT_AUTH_ERROR — el BFF no pudo autenticarse contra ERPNext', { url: requestUrl })
       clearSession()
       window.location.href = '/login?sessionExpired=1'
       return Promise.reject(data.error)
+    }
+
+    // 5xx: falla real del backend (no un error de validación del usuario) — se reporta como
+    // Issue y como log estructurado, con el tenant ya etiquetado en el scope global.
+    if (status >= 500) {
+      Sentry.captureException(error, {
+        extra: { url: requestUrl, method: requestMethod, status, code: data?.error?.code },
+      })
+      Sentry.logger.error('Error 5xx del backend', {
+        url: requestUrl,
+        method: requestMethod,
+        status,
+        code: data?.error?.code,
+      })
     }
 
     return Promise.reject(

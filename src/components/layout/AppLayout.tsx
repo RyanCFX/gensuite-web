@@ -42,6 +42,7 @@ import {
   Landmark,
   ArrowRightLeft,
   Printer,
+  Wrench,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { CommandPalette } from "./CommandPalette";
@@ -535,6 +536,11 @@ const NAV_CONFIG: NavEntry = {
       label: "Ajustes Avanzados",
       icon: <Settings size={14} />,
       path: "/config/ajustes-avanzados",
+    },
+    {
+      label: "Recálculo de Valuación",
+      icon: <Wrench size={14} />,
+      path: "/config/recalculo-valuacion",
     },
     {
       label: "Notificaciones",

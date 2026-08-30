@@ -139,6 +139,7 @@ export const ENDPOINTS = {
       mover: '/inventory/ubicaciones/mover',
       movimientos: '/inventory/ubicaciones/movimientos',
     },
+    repostValuacion: '/inventory/repost-valuacion',
   },
   compras: {
     list: '/compras',

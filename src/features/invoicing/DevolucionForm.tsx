@@ -6,16 +6,20 @@ import { useTabs } from '@/contexts/TabsContext'
 import { listInvoices, getInvoice } from '@/shared/api/invoices'
 import { listCustomers } from '@/shared/api/customers'
 import { listMetodosPago } from '@/shared/api/config'
+import { getEcfTipos } from '@/shared/api/ecf'
 import { createDevolucion } from '@/shared/api/devoluciones'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { formatDOP, formatDate } from '@/lib/formatters'
+import { formatDOP, formatDate, daysSince } from '@/lib/formatters'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
-import { RotateCcw, Users, FileText, Check } from 'lucide-react'
-import type { ApiError } from '@/shared/api/types'
+import { RotateCcw, Users, FileText, Check, AlertCircle, AlertTriangle } from 'lucide-react'
+import type { ApiError, EcfModificationCode } from '@/shared/api/types'
+import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
+import { Select, SelectItem } from '@/components/ui/select'
+import { DEVOLUCION_DIAS_LIMITE_ITBIS } from '@/lib/constants'
 
 const RETURN_RESOLUTION_OPTIONS: SearchSelectOption[] = [
   { value: 'credit_note_only', label: 'Saldo a favor' },
@@ -100,6 +104,11 @@ export default function DevolucionForm() {
     staleTime: 5 * 60_000,
   })
 
+  // e-CF: si la Nota de Crédito (typeId 34) se emite como comprobante electrónico para este
+  // tenant, el modificationCode (Tabla VI DGII) es obligatorio para poder someterla en Aura.
+  const { data: ecfTipos } = useQuery({ queryKey: ['ecf-tipos'], queryFn: getEcfTipos, staleTime: 60 * 60_000 })
+  const notaCreditoEsEcf = ecfTipoElectronicoHabilitado(ecfTipos, '34')
+
   const [returnFullInvoice, setReturnFullInvoice] = useState(true)
   const [returnRows, setReturnRows] = useState<ReturnRow[]>([])
   const [returnResolution, setReturnResolution] = useState<'refund' | 'credit_note_only'>('credit_note_only')
@@ -107,6 +116,18 @@ export default function DevolucionForm() {
   const [returnReason, setReturnReason] = useState('')
   const [returnResolutionSearch, setReturnResolutionSearch] = useState('')
   const [returnModeOfPaymentSearch, setReturnModeOfPaymentSearch] = useState('')
+  const [modificationCode, setModificationCode] = useState<EcfModificationCode | ''>('')
+  const [modificationCodeError, setModificationCodeError] = useState('')
+  const modificationCodeTouched = useRef(false)
+
+  // Infiere el código de modificación DGII a partir de lo que el usuario elige devolver: la
+  // factura completa se declara como "Anula" (1), una devolución parcial como "Corrige montos"
+  // (3). El usuario puede sobreescribirlo (ej. si en realidad es una corrección de texto o un
+  // caso de contingencia/factura de consumo) — a partir de ahí dejamos de reinferir.
+  useEffect(() => {
+    if (modificationCodeTouched.current) return
+    setModificationCode(returnFullInvoice ? 1 : 3)
+  }, [returnFullInvoice])
 
   const rowsSeededFor = useRef('')
   useEffect(() => {
@@ -130,6 +151,9 @@ export default function DevolucionForm() {
     setReturnResolution('credit_note_only')
     setReturnModeOfPayment('')
     setReturnReason('')
+    modificationCodeTouched.current = false
+    setModificationCode(1)
+    setModificationCodeError('')
   }
 
   function toggleReturnRow(itemCode: string) {
@@ -138,6 +162,12 @@ export default function DevolucionForm() {
   function setReturnRowQty(itemCode: string, qty: number) {
     setReturnRows((prev) => prev.map((r) => (r.itemCode === itemCode ? { ...r, qty } : r)))
   }
+
+  // Regla fiscal (la controla el backend): pasados los 30 días de la factura original, la
+  // devolución ya no reintegra el ITBIS, solo el monto neto antes de impuestos. Aquí solo se
+  // avisa con anticipación — el cálculo real siempre lo hace el backend.
+  const diasDesdeFactura = daysSince(invoice?.postingDate)
+  const facturaVencidaParaItbis = diasDesdeFactura != null && diasDesdeFactura > DEVOLUCION_DIAS_LIMITE_ITBIS
 
   const hasOutstandingBalance = (invoice?.outstandingAmount ?? 0) > 0
   const returnResolutionOptions: SearchSelectOption[] = useMemo(() => {
@@ -161,23 +191,27 @@ export default function DevolucionForm() {
   const returnItemsValid =
     returnFullInvoice ||
     (returnCheckedRows.length > 0 && returnCheckedRows.every((r) => r.qty > 0 && r.qty <= r.qtyPurchased))
-  const canConfirmReturn = returnReasonValid && returnModeValid && returnItemsValid
+  const returnModificationCodeValid = !notaCreditoEsEcf || !!modificationCode
+  const canConfirmReturn = returnReasonValid && returnModeValid && returnItemsValid && returnModificationCodeValid
 
   const isDirty = useDirtyCheck(
-    { returnFullInvoice, returnRows, returnResolution, returnModeOfPayment, returnReason },
+    { returnFullInvoice, returnRows, returnResolution, returnModeOfPayment, returnReason, modificationCode },
     !!invoiceId && !loadingInvoice,
   )
   const confirmClose = useConfirmClose(isDirty, () => navigate('/devoluciones'))
 
   const devolucionMutation = useMutation({
-    mutationFn: () =>
-      createDevolucion({
+    mutationFn: () => {
+      setModificationCodeError('')
+      return createDevolucion({
         invoiceId,
         items: returnFullInvoice ? undefined : returnCheckedRows.map((r) => ({ itemCode: r.itemCode, qty: r.qty })),
         resolution: returnResolution,
         refundModeOfPayment: returnResolution === 'refund' ? returnModeOfPayment : undefined,
         reason: returnReason.trim(),
-      }),
+        modificationCode: modificationCode || undefined,
+      })
+    },
     onSuccess: (result) => {
       toast.success(result.message ?? 'Devolución procesada correctamente', {
         duration: result.appliedToOriginalInvoice ? 8000 : undefined,
@@ -191,6 +225,14 @@ export default function DevolucionForm() {
       if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: ApiError) => {
+      // El backend rechaza con 400 si la nota de crédito se emite como e-CF y falta el
+      // modificationCode — puede pasar aunque no lo hayamos marcado como requerido (el frontend
+      // no adivina si el tenant tiene e-CF activo con certeza total). En ese caso lo mostramos
+      // como error de validación del campo, no como un toast genérico.
+      if (err?.message?.toLowerCase().includes('modificationcode')) {
+        setModificationCodeError(err.message)
+        return
+      }
       toast.error(err?.message ?? 'Error al procesar la devolución')
     },
   })
@@ -316,6 +358,13 @@ export default function DevolucionForm() {
               <span className="card-title">Devolver producto(s)</span>
             </div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {facturaVencidaParaItbis && (
+                <div className="inline-alert inline-alert-warn">
+                  <AlertTriangle size={16} />
+                  Esta factura tiene más de {DEVOLUCION_DIAS_LIMITE_ITBIS} días ({diasDesdeFactura} días) — por regla
+                  fiscal, la nota de crédito no reintegrará el ITBIS, solo el monto neto antes de impuestos.
+                </div>
+              )}
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
                 <input
                   type="checkbox"
@@ -372,6 +421,34 @@ export default function DevolucionForm() {
                   </table>
                 </div>
               )}
+
+              <div className="ff-wrap">
+                <label className={`ff-label${notaCreditoEsEcf ? ' ff-required' : ''}`}>Código de modificación (DGII)</label>
+                <Select
+                  value={modificationCode ? String(modificationCode) : ''}
+                  onValueChange={(v) => {
+                    modificationCodeTouched.current = true
+                    setModificationCode(v ? (Number(v) as EcfModificationCode) : '')
+                    setModificationCodeError('')
+                  }}
+                  placeholder="Selecciona el código…"
+                >
+                  {ECF_MODIFICATION_CODES.map((c) => (
+                    <SelectItem key={c.code} value={String(c.code)}>{c.label}</SelectItem>
+                  ))}
+                </Select>
+                <p className="ff-hint">
+                  Preseleccionado según la devolución ({returnFullInvoice ? '"Anula" para factura completa' : '"Corrige montos" para devolución parcial'}) —
+                  cámbialo si no aplica. Solo tiene efecto si esta nota de crédito se emite como comprobante
+                  electrónico (e-CF) ante la DGII; si el negocio no emite e-CF, se ignora.
+                </p>
+                {modificationCodeError && (
+                  <div className="inline-alert inline-alert-error" style={{ marginTop: 4 }}>
+                    <AlertCircle size={14} />
+                    {modificationCodeError}
+                  </div>
+                )}
+              </div>
 
               <div className="ff-wrap">
                 <label className="ff-label ff-required">¿Qué hacer con el monto?</label>

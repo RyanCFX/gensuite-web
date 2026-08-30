@@ -1,4 +1,4 @@
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, differenceInCalendarDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 export function formatDate(isoDate?: string | null): string {
@@ -7,6 +7,16 @@ export function formatDate(isoDate?: string | null): string {
     return format(parseISO(isoDate), 'dd/MM/yyyy', { locale: es })
   } catch {
     return isoDate
+  }
+}
+
+/** Días calendario transcurridos entre una fecha ISO y hoy — null si no se pudo parsear. */
+export function daysSince(isoDate?: string | null): number | null {
+  if (!isoDate) return null
+  try {
+    return differenceInCalendarDays(new Date(), parseISO(isoDate))
+  } catch {
+    return null
   }
 }
 

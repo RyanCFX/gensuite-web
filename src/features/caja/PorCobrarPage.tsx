@@ -38,6 +38,11 @@ export default function PorCobrarPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<PendienteCobroItem | null>(null)
   const [confirmDescartar, setConfirmDescartar] = useState<PendienteCobroItem | null>(null)
 
+  // Monto real a cobrar (con redondeo de moneda aplicado) — usar en vez de grandTotal para
+  // prellenar, validar y someter el cobro.
+  const selectedRoundedTotal = selectedInvoice ? selectedInvoice.roundedTotal ?? selectedInvoice.grandTotal : 0
+  const selectedRoundingAdjustment = selectedInvoice?.roundingAdjustment ?? 0
+
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
 
@@ -46,7 +51,7 @@ export default function PorCobrarPage() {
     queryFn: () => listPorCobrar({ search: debouncedSearch || undefined, offset, limit: PAGE_SIZE }),
   })
 
-  const { data: facturacion } = useQuery({
+  const { data: facturacion, isLoading: facturacionLoading } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
     staleTime: 5 * 60_000,
@@ -66,7 +71,7 @@ export default function PorCobrarPage() {
     .filter((m) => !directoMopSearch || m.name.toLowerCase().includes(directoMopSearch.toLowerCase()))
     .map((m) => ({ value: m.name, label: m.name }))
 
-  const { data: turno } = useQuery({
+  const { data: turno, isLoading: turnoLoading } = useQuery({
     queryKey: ['turno-actual'],
     queryFn: getTurnoActual,
     enabled: usaModuloPos,
@@ -75,7 +80,10 @@ export default function PorCobrarPage() {
    const pendientes = data?.items ?? []
    const totalPages = data?.meta ? Math.ceil((data.meta.total ?? 0) / PAGE_SIZE) : 1
 
-   const turnoBlocked = usaModuloPos && !turno
+   // Mientras facturacion-config o turno-actual siguen cargando, no sabemos todavía si el
+   // módulo POS está activo ni si hay un turno abierto — no mostrar "Caja bloqueada" hasta
+   // que ambos hayan resuelto, para no parpadear ese estado en cada carga/refetch.
+   const turnoBlocked = !facturacionLoading && !turnoLoading && usaModuloPos && !turno
 
    // ─── Turn expiration ──────────────────────────────────────
    const [turnoVencido, setTurnoVencido] = useState(false)
@@ -191,7 +199,7 @@ function openModal(invoice: PendienteCobroItem) {
          payments: [{
            ...emptyPaymentLine(),
            modeOfPayment: cashMethod,
-           amount: String(invoice.grandTotal),
+           amount: String(invoice.roundedTotal ?? invoice.grandTotal),
          }],
        })
      }
@@ -211,7 +219,7 @@ function openModal(invoice: PendienteCobroItem) {
 function validateAndSubmit() {
      if (!selectedInvoice) return
      if (turnoVencido) { toast.error('Tu turno ha expirado. Cierra el turno actual y abre uno nuevo.'); return }
-     const total = selectedInvoice.grandTotal
+     const total = selectedRoundedTotal
 
      if (flujoCobro === 'directo') {
        if (!directoMop) { toast.error('Selecciona un método de pago'); return }
@@ -256,7 +264,7 @@ function validateAndSubmit() {
     (() => {
       if (!paymentsValue.payments.some((p) => p.modeOfPayment && Number(p.amount) > 0)) return false
       const entered = sumPayments(paymentsValue.payments)
-      if (entered > (selectedInvoice?.grandTotal ?? 0) + PAYMENT_LINES_TOLERANCE) return false
+      if (entered > selectedRoundedTotal + PAYMENT_LINES_TOLERANCE) return false
       if (paymentsValue.vueltoEnabled) {
         const cash = cashAmount(paymentsValue.payments, metodosActivos)
         const tenderedCash = Number(paymentsValue.tenderedCash) || 0
@@ -364,7 +372,7 @@ function validateAndSubmit() {
                          )}</td>
                         <td className="td-muted">{formatDate(inv.postingDate)}</td>
                         <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600 }}>
-                          {formatDOP(inv.grandTotal)}
+                          {formatDOP(inv.roundedTotal ?? inv.grandTotal)}
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 6 }}>
@@ -420,10 +428,16 @@ function validateAndSubmit() {
                  <span style={{ color: 'var(--text-secondary)' }}>NCF:</span>
                  <span style={{ fontStyle: 'italic', color: 'var(--text-tertiary)' }}>Se asignará al cobrar</span>
                  <span style={{ color: 'var(--text-secondary)' }}>Monto a cobrar:</span>
-                 <span style={{ fontWeight: 700, color: 'var(--color-error)' }}>{formatDOP(selectedInvoice.grandTotal)}</span>
+                 <span style={{ fontWeight: 700, color: 'var(--color-error)' }}>{formatDOP(selectedRoundedTotal)}</span>
                </div>
+               {selectedRoundingAdjustment !== 0 && (
+                 <p style={{ margin: 0, fontSize: 11, color: 'var(--text-tertiary)' }}>
+                   Incluye ajuste por redondeo: {selectedRoundingAdjustment > 0 ? '+' : ''}{formatDOP(selectedRoundingAdjustment)}
+                   {' '}(total sin redondear: {formatDOP(selectedInvoice.grandTotal)})
+                 </p>
+               )}
 
-{(selectedInvoice.grandTotal > 0 || (customerData?.rnc ?? customerData?.cedula) || selectedInvoice.esClienteOcasional) && (
+{(selectedRoundedTotal > 0 || (customerData?.rnc ?? customerData?.cedula) || selectedInvoice.esClienteOcasional) && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
                       Condición fiscal del comprobante
@@ -498,17 +512,17 @@ function validateAndSubmit() {
                      />
                    </div>
                    <p className="ff-hint" style={{ margin: 0 }}>
-                     Se cobrará el total de {formatDOP(selectedInvoice.grandTotal)} con este método.
+                     Se cobrará el total de {formatDOP(selectedRoundedTotal)} con este método.
                    </p>
                  </div>
                ) : (
                  <>
                    <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: 0, lineHeight: 1.5 }}>
                      El monto de cada línea de pago es lo que se aplica a la factura.
-                     La suma no puede exceder <strong>{formatDOP(selectedInvoice.grandTotal)}</strong>.
+                     La suma no puede exceder <strong>{formatDOP(selectedRoundedTotal)}</strong>.
                    </p>
                    <PaymentLinesEditor
-                     amountDue={selectedInvoice.grandTotal}
+                     amountDue={selectedRoundedTotal}
                      value={paymentsValue}
                      onChange={setPaymentsValue}
                    />
@@ -524,7 +538,7 @@ function validateAndSubmit() {
                  disabled={completarMutation.isPending || (flujoCobro === 'caja' && !canSubmitCaja)}
                >
                  {completarMutation.isPending ? 'Procesando…' : `Cobrar ${formatDOP(
-                   flujoCobro === 'directo' ? selectedInvoice.grandTotal : sumPayments(paymentsValue.payments)
+                   flujoCobro === 'directo' ? selectedRoundedTotal : sumPayments(paymentsValue.payments)
                  )}`}
                </button>
              </div>
@@ -552,7 +566,7 @@ function validateAndSubmit() {
                  <span style={{ color: 'var(--text-secondary)' }}>Cliente:</span>
                  <span>{confirmDescartar.customerName}</span>
                  <span style={{ color: 'var(--text-secondary)' }}>Total:</span>
-                 <span>{formatDOP(confirmDescartar.grandTotal)}</span>
+                 <span>{formatDOP(confirmDescartar.roundedTotal ?? confirmDescartar.grandTotal)}</span>
                </div>
              </div>
              <div className="modal-foot">

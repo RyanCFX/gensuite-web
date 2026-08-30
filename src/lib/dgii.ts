@@ -2,7 +2,7 @@
 // (e-CF) y por el código DGII de Unidades de Medida. No hay endpoint que los exponga — son
 // tablas fijas que solo cambian con un deploy.
 
-import type { EcfTipoCatalogo, EcfModificationCode } from '@/shared/api/types'
+import type { EcfTipoCatalogo, EcfModificationCode, EcfFlujoPaso } from '@/shared/api/types'
 
 /** Tipos de comprobante electrónico (e-CF) habilitables en /config/ecf.tiposElectronicos. */
 export const ECF_TIPOS = [
@@ -182,6 +182,14 @@ const ECF_STATUS_LABELS: Record<string, string> = {
 export function ecfStatusLabel(status?: string | null): string {
   if (!status) return '—'
   return ECF_STATUS_LABELS[status.toUpperCase()] ?? status
+}
+
+/** Label a mostrar para el estado actual de un e-CF: usa el label del paso `actual` del flujo
+ *  derivado por el BFF (fuente de verdad) y solo cae al mapa hardcodeado de arriba si el flujo
+ *  no trae pasos (p. ej. respuestas parciales que no incluyen `flujo`). */
+export function ecfFlujoStatusLabel(flujo?: { pasos: EcfFlujoPaso[] } | null, status?: string | null): string {
+  const actual = flujo?.pasos?.find((p) => p.actual)
+  return actual?.label ?? ecfStatusLabel(status)
 }
 
 /** Badge sugerido para el estado DGII. */
