@@ -296,6 +296,13 @@ export interface Invoice {
   ncfAfectado?: string | null;
   subtotal: number;
   grandTotal: number;
+  /** Monto REAL a cobrar, con el redondeo de moneda de ERPNext ya aplicado (redondea al peso más
+   *  cercano) — igual a `grandTotal` si la compañía tiene el redondeo desactivado. Este es el
+   *  monto que debe cobrarse en efectivo, no `grandTotal`. Puede faltar en respuestas antiguas —
+   *  usar `roundedTotal ?? grandTotal`. */
+  roundedTotal?: number;
+  /** `roundedTotal - grandTotal` — puede ser negativo. 0 si la compañía no redondea. */
+  roundingAdjustment?: number;
   /** Monto total de impuestos del documento (Sales Taxes and Charges), si se aplicó un template */
   taxAmount?: number;
   outstandingAmount: number;
@@ -332,6 +339,11 @@ export interface Invoice {
   clienteOcasionalRnc?: string;
   /** Dirección del cliente ocasional (solo presente cuando esClienteOcasional=true). */
   clienteOcasionalDireccion?: string;
+  /** Presente solo si la factura se emitió electrónicamente como e-CF (ausente —no null— en el
+   *  100% de los casos hoy). Ver POST /invoices/:id/submit. */
+  ecf?: EcfSubmitResult;
+  /** ID del Pedido de venta del que se originó esta factura, si aplica. */
+  salesOrder?: string;
 }
 
 export interface PendingTrackingEntry {
@@ -384,6 +396,14 @@ export interface CreateInvoiceDto {
   /** ID de un Sales Taxes and Charges Template (/config/impuestos-ventas). Si se omite, se usa el default de la compañía si existe. */
   taxesTemplate?: string;
 }
+
+/**
+ * PATCH /invoices/:id — edición de una factura en borrador. Mismo shape que CreateInvoiceDto:
+ * el body es la factura completa (reemplazo total, no un parche); las líneas enviadas sustituyen
+ * por completo a las existentes. 400 si la factura ya no está en borrador (usar cancel + amend)
+ * o si fue enviada a Caja.
+ */
+export type UpdateInvoiceDto = CreateInvoiceDto;
 
 // POST /invoices/:id/cancel — reason is mandatory, 10-500 chars.
 // motivoAnulacion (código DGII, Formato 608) es obligatorio solo si la factura ya tiene NCF asignado.
@@ -443,6 +463,8 @@ export interface Quotation {
   grandTotal?: number;
   taxAmount?: number;
   message?: string;
+  /** ID del Pedido de venta generado a partir de esta cotización, si ya se convirtió. */
+  salesOrder?: string;
 }
 
 export interface CreateQuotationDto {
@@ -520,6 +542,10 @@ export interface CreditNote {
   appliedTo?: CreditNoteAppliedTo[];
 }
 
+/** Código de modificación DGII (Tabla VI): 1=Anula, 2=Corrige texto, 3=Corrige montos,
+ *  4=Reemplazo por contingencia, 5=Referencia a Factura de Consumo. */
+export type EcfModificationCode = 1 | 2 | 3 | 4 | 5;
+
 export interface CreateCreditNoteDto {
   originalInvoice: string; // field name corrected from invoiceId
   postingDate: string; // required
@@ -530,6 +556,9 @@ export interface CreateCreditNoteDto {
     uom?: string;
   }[];
   reason?: string;
+  /** Solo obligatorio si el tenant emite esta nota como e-CF (E34) — si se omite, el submit
+   *  falla con 400. Sin efecto en el flujo físico (NCF B04). */
+  modificationCode?: EcfModificationCode;
 }
 
 // POST /credit-notes/:id/refund — reembolsa una nota de crédito existente (refunded: false)
@@ -589,6 +618,22 @@ export interface DevolucionDto {
   resolution: "refund" | "credit_note_only";
   /** Obligatorio solo si resolution === 'refund' */
   refundModeOfPayment?: string;
+  reason: string;
+  /** Código de modificación DGII (Tabla VI) de la nota de crédito generada — solo obligatorio si
+   *  el tenant emite esta nota como e-CF (E34): 1=Anula, 2=Corrige texto, 3=Corrige montos,
+   *  4=Reemplazo contingencia, 5=Referencia a Factura de Consumo. Sin efecto en el flujo físico (NCF B04). */
+  modificationCode?: EcfModificationCode;
+}
+
+// POST /devoluciones/:id/cancelar — solo devoluciones en borrador. El documento no se elimina:
+// pasa a documentStatus === 'cancelled' y sigue apareciendo en listados/historial.
+export interface CancelDevolucionDto {
+  /** Obligatorio, 10–500 caracteres. Queda como Comment del documento (auditoría). */
+  reason: string;
+}
+
+export interface CancelDevolucionResult {
+  message: string;
   reason: string;
 }
 
@@ -801,6 +846,11 @@ export interface CreateDebitNoteDto {
     uom?: string;
   }[];
   notes?: string;
+  /** Factura que esta nota de débito afecta. Solo obligatorio si se emite como e-CF (E33) —
+   *  Aura exige el e-NCF afectado. Sin efecto en el flujo físico (NCF B03). */
+  referenceInvoice?: string;
+  /** Ver CreateCreditNoteDto.modificationCode — mismas reglas (obligatorio solo para e-CF E33). */
+  modificationCode?: EcfModificationCode;
 }
 
 // ─── Item / Catalog ───────────────────────────────────────────────────────────
@@ -871,7 +921,14 @@ export interface Item {
   prices?: ItemPrices;
   valuationRate?: number;
   currentStock?: number;
-  /** Presente solo cuando se filtra GET /catalog/items?branch=... — stock por almacén de esa sucursal */
+  /**
+   * Stock por almacén: `{ "<nombre del almacén>": <cantidad> }`, solo almacenes con existencia ≠ 0.
+   * La suma de los valores es igual a `currentStock`.
+   * - En el detalle (GET /catalog/items/:id) viene siempre para artículos de stock; se omite para
+   *   servicios o si no hay existencia en ningún almacén.
+   * - En el listado (GET /catalog/items) solo se puebla al filtrar por `branch`.
+   * Solo cantidades (sin valuación); para valor de inventario por almacén usar GET /catalog/items/:id/stock.
+   */
   stockByWarehouse?: Record<string, number>;
   internalDescription?: string;
   shortName?: string;
@@ -1100,8 +1157,12 @@ export interface Pedido {
   amendedFrom?: string;
   sequence: number;
   history?: AmendmentEntry[];
+  /** ID de la cotización de la que se originó este pedido, si aplica. */
   quotation?: string;
+  /** @deprecated usar `invoices`. Primera factura generada — se mantiene por compatibilidad. */
   facturaId?: string;
+  /** IDs de las facturas generadas a partir de este pedido (normalmente 0 o 1). */
+  invoices?: string[];
   createdAt: string;
   modifiedAt: string;
   grandTotal?: number;
@@ -1580,6 +1641,46 @@ export interface InventoryHistory {
   postingDate: string;
 }
 
+// ─── Recálculo de valuación (Repost Item Valuation) ───────────────────────────
+// Herramienta administrativa (System Manager / Accounts Manager) que expone el mecanismo nativo
+// de ERPNext para reparar una cola de valuación FIFO/Moving Average corrupta (ej. tasa de costo
+// negativa por movimientos retroactivos o stock negativo) sin entrar al Desk. Ver POST/GET
+// /inventory/repost-valuacion — el openapi.json no publica el schema de respuesta; los campos de
+// abajo salen de la especificación de la tarea, no están confirmados contra un ejemplo real.
+
+// POST /inventory/repost-valuacion
+export interface CreateRepostValuacionDto {
+  itemCode: string;
+  /** Si se omite, ERPNext recalcula el artículo en TODOS los almacenes donde tiene movimientos. */
+  warehouse?: string;
+  /** Fecha desde la cual recalcular — debe ser igual o anterior al primer movimiento problemático. */
+  postingDate: string;
+}
+
+export interface CreateRepostValuacionResult {
+  id: string;
+  status: "queued";
+  /** Ya trae el texto explicativo listo para mostrar (ej. "puede tardar unos minutos..."). */
+  message: string;
+}
+
+export type RepostValuacionStatus = "Queued" | "In Progress" | "Completed" | "Skipped" | "Failed";
+
+// GET /inventory/repost-valuacion
+export interface RepostValuacionItem {
+  id: string;
+  itemCode: string;
+  /** Ausente si se encoló para TODOS los almacenes del artículo. */
+  warehouse?: string | null;
+  status: RepostValuacionStatus;
+  postingDate: string;
+  /** Solo relevante si status es Failed o Skipped. */
+  errorLog?: string | null;
+  totalRepostingCount: number;
+  currentIndex: number;
+  createdAt: string;
+}
+
 // ─── Physical Count ───────────────────────────────────────────────────────────
 // API: CreateCountDto requires postingDate (root), items have {itemCode, warehouse, qty}
 // The "countedQty" concept is just "qty" in the BFF.
@@ -1679,6 +1780,9 @@ export interface Compra {
   /** Cuenta por Pagar (credit_to) alterna para este documento, si se sobreescribió con
    *  cuentaCxpOverride. Una devolución solo puede aplicarse contra facturas con la misma cuenta CxP. */
   cuentaCxpOverride?: string;
+  /** Presente solo si el comprador autogeneró un e-CF (E41) al someter — proveedor ocasional sin
+   *  NCF y e-CF habilitado. Ausente en el caso normal (NCF físico capturado a mano). */
+  ecf?: EcfSubmitResult;
 }
 
 export interface DistribucionCuentaDto {
@@ -1939,6 +2043,9 @@ export interface Gasto {
   /** Cuenta por Pagar (credit_to) alterna para este documento, si se sobreescribió con
    *  cuentaCxpOverride. Una devolución solo puede aplicarse contra facturas con la misma cuenta CxP. */
   cuentaCxpOverride?: string;
+  /** Presente solo si el comprador autogeneró un e-CF (E41/E43/E44/E45/E47) al someter — gasto de
+   *  tipo B11/B13/B14/B15/B17 sin NCF y e-CF habilitado. Ausente en el caso normal. */
+  ecf?: EcfSubmitResult;
 }
 
 export interface CreateGastoDto {
@@ -2328,6 +2435,436 @@ export interface FacturacionConfig {
   turnoMaxHoras?: number
   /** Cuando a una Secuencia NCF le queden este número de comprobantes o menos, GET /config/ncf marca esa serie con alertaActiva=true y se envía el correo del tipo de notificación "Secuencia NCF por agotarse" (una vez por día por serie). Default 50. */
   ncfAlertaMinimo?: number
+  /** Espejo de `Accounts Settings.disable_rounded_total` de ERPNext — aplica como default a toda factura/compra nueva del tenant. Si está en false (default), el grand_total con centavos se redondea a rounded_total y ese es el monto que queda a cobrar (pensado para efectivo). Si está en true, se cobra el grand_total exacto con centavos (pensado para tarjeta/cheque/transferencia). No afecta documentos ya sometidos. */
+  redondeoTotalDeshabilitado?: boolean
+}
+
+// ─── Facturación Electrónica (e-CF) ────────────────────────────────────────────
+// F0-F1 ya aterrizaron (cimientos + config). No hay todavía emisión real de e-CF
+// (fases F3-F6) — ver GET/PUT /config/ecf.
+
+export type EcfTipoElectronico = "31" | "32" | "33" | "34" | "41" | "43" | "44" | "45" | "46" | "47";
+
+/** Uno por RNC emisor conectado a Aura — solo lectura, gestionado por soporte/backend. */
+export interface EcfProvisioningCliente {
+  company: string;
+  rnc: string;
+  certificateExpiresAt?: string | null;
+  certificationStage?: string | null;
+  contingencyMode?: boolean;
+}
+
+/** Estado de la conexión del tenant con Aura. Para el tenant promedio hoy `provisionado`
+ *  es false y el resto viene vacío/null — es normal, no un error. Solo lectura: no hay
+ *  todavía un flujo de auto-servicio para conectar un tenant a Aura desde la UI. */
+export interface EcfProvisioning {
+  provisionado: boolean;
+  activeMode: "test" | "live" | null;
+  hasApiKeyTest: boolean;
+  hasApiKeyLive: boolean;
+  clientes: EcfProvisioningCliente[];
+}
+
+export interface EcfConfig {
+  habilitado: boolean;
+  company?: string | null;
+  /** typeId de e-CF habilitados para esta compañía. Un tipo NO listado sigue emitiéndose
+   *  como NCF físico aunque `habilitado` esté activo — migración por tipo, no big-bang. */
+  tiposElectronicos: EcfTipoElectronico[];
+  auraClientId?: string | null;
+  ambiente?: string | null;
+  contingenciaActiva: boolean;
+  /** Si está activo, la emisión del e-CF ocurre automáticamente al someter el documento. */
+  emitirAlSometer: boolean;
+  /** Si Aura/DGII no responde: true = se bloquea la facturación (default seguro); false =
+   *  se activa contingencia automáticamente. */
+  bloquearSubmitSiAuraCaido: boolean;
+  /** 1=Contado, 2=Crédito, 3=Gratuito. */
+  tipoPagoDefault: 1 | 2 | 3;
+  /** 01=Habituales, 02=Financieros, 03=Extraordinarios, 04=Arrendamientos, 05=Venta de
+   *  activo, 06=Otros. */
+  tipoIngresosDefault: "01" | "02" | "03" | "04" | "05" | "06";
+  /** Días para aprobar/rechazar comercialmente (ACECF) un e-CF recibido — solo relevante
+   *  para comprobantes recibidos de terceros (fase futura). */
+  diasLimiteAprobacionComercial: number;
+  /** Si está activo, adjunta automáticamente el PDF de archivo fiscal cuando un
+   *  comprobante es aceptado por la DGII (fase futura, pero el campo ya se puede configurar). */
+  adjuntarPdfa: boolean;
+  /** Mismo concepto que FacturacionConfig.ncfAlertaMinimo, aplicado a rangos electrónicos. */
+  umbralAlertaSecuencia: number;
+  provisioning: EcfProvisioning;
+  /** Presente si el doctype de configuración e-CF aún no está instalado en el tenant —
+   *  tratar igual que en GET /config/facturacion: mostrar defaults, sin romper la pantalla. */
+  note?: string;
+}
+
+export interface UpdateEcfConfigDto {
+  habilitado?: boolean;
+  tiposElectronicos?: EcfTipoElectronico[];
+  emitirAlSometer?: boolean;
+  bloquearSubmitSiAuraCaido?: boolean;
+  tipoPagoDefault?: 1 | 2 | 3;
+  tipoIngresosDefault?: "01" | "02" | "03" | "04" | "05" | "06";
+  diasLimiteAprobacionComercial?: number;
+  adjuntarPdfa?: boolean;
+  umbralAlertaSecuencia?: number;
+}
+
+// ─── e-CF — Secuencias e-NCF (/config/ecf/secuencias) ──────────────────────────
+// Análogo a las Secuencias NCF físicas (NcfSerie / /config/ncf) pero para los tipos
+// electrónicos. Mismos campos derivados (exhausted/remaining/usedPct/alertaActiva).
+
+export type EcfEnv = "TesteCF" | "CerteCF" | "eCF";
+
+export interface EcfSequence {
+  id: string;
+  typeId: EcfTipoElectronico;
+  /** Equivalente físico (B01, B02…) — solo referencia visual, el dato real es typeId. */
+  ncfType: string;
+  env: EcfEnv;
+  startOn: number;
+  stopOn: number;
+  currentNumber: number;
+  expireAt: string | null;
+  exhausted: boolean;
+  used: number;
+  remaining: number;
+  usedPct: number;
+  umbralAlerta: number;
+  alertaActiva: boolean;
+}
+
+export interface CreateEcfSequenceDto {
+  typeId: EcfTipoElectronico;
+  startOn: number;
+  stopOn: number;
+  expireAt?: string;
+  /** Opcional — se infiere del ambiente activo (test → TesteCF, live → eCF). */
+  env?: EcfEnv;
+}
+
+/** Solo se puede extender un rango — typeId/env son inmutables. */
+export interface UpdateEcfSequenceDto {
+  stopOn?: number;
+  expireAt?: string;
+}
+
+/** GET /config/ecf/tipos — catálogo unificado NCF físico + e-CF. */
+export interface EcfTipoCatalogo {
+  ncfType: string;
+  typeId: EcfTipoElectronico | null;
+  /** true = ya habilitado para emitirse como e-CF en este tenant. */
+  electronico: boolean;
+}
+
+// ─── e-CF — Administración / provisioning (/config/ecf/admin/*) ─────────────────
+// Requieren rol "System Manager" en el tenant (validado en vivo contra ERPNext → 403).
+
+export type EcfMode = "test" | "live";
+
+export interface EcfConnectApiKeyDto {
+  mode: EcfMode;
+  apiKey: string;
+}
+
+export interface EcfConnectResult {
+  mode: EcfMode;
+  connected: boolean;
+}
+
+export interface CreateEcfClientDto {
+  /** Nombre EXACTO de la Company en ERPNext. */
+  company: string;
+  rnc: string;
+  legalName: string;
+  tradeName?: string;
+  address: string;
+  municipality?: string;
+  province?: string;
+  /** Máximo 3. */
+  phones?: string[];
+  email?: string;
+  economicActivity?: string;
+  /** Opcional — si se omite usa el ambiente activo ya conectado. */
+  mode?: EcfMode;
+}
+
+/** Objeto Client de Aura (respuesta de POST /config/ecf/admin/clients). Laxo a propósito. */
+export interface EcfClient {
+  id: string;
+  rnc: string;
+  legalName: string;
+  activeEnv?: string;
+  hasCertificate?: boolean;
+  certificationStage?: string | null;
+  certificateExpiresAt?: string | null;
+  [key: string]: unknown;
+}
+
+export interface UploadEcfCertificateDto {
+  /** Archivo .p12 completo en base64, sin el prefijo data:... */
+  p12Base64: string;
+  password: string;
+  mode?: EcfMode;
+}
+
+export interface UploadEcfCertificateResult {
+  certificateExpiresAt: string;
+}
+
+export interface RegisterEcfWebhookDto {
+  mode?: EcfMode;
+}
+
+export interface RegisterEcfWebhookResult {
+  id: string;
+  url: string;
+  mode: EcfMode;
+}
+
+// ─── e-CF — Resultado / estado del comprobante electrónico de una factura ──────
+// Viene tanto en POST /invoices/:id/submit (data.ecf, recién emitido) como en
+// GET /invoices/:id (data.ecf, estado actualizado en segundo plano por webhook).
+// `status` recorre PENDING → SIGNED → ACCEPTED | CONDITIONAL | REJECTED | FAILED | …
+export interface EcfSubmitResult {
+  voucherId: string;
+  status: string;
+  qrUrl?: string | null;
+  securityCode?: string | null;
+  /** true = emitido en modo contingencia (caída de Aura/DGII). Caso muy raro. */
+  deferred?: boolean;
+  message?: string;
+}
+
+// POST /config/ecf/secuencias/anular-rangos — anula sub-rangos e-NCF nunca usados.
+export interface EcfVoidRangeDto {
+  typeId: EcfTipoElectronico;
+  from: number;
+  to: number;
+}
+
+export interface VoidEcfRangesDto {
+  /** Hasta 10 rangos por llamada. Los e-CF ya ACCEPTED se saltan automáticamente. */
+  ranges: EcfVoidRangeDto[];
+  reason?: string;
+}
+
+// ─── e-CF F9 — certificación DGII + contingencia (Decreto 587-24) ─────────────
+// El openapi documenta los paths y los DTOs de request, no las respuestas — estos tipos derivan
+// del documento de la tarea (tolerantes: campos opcionales donde no es explícito).
+
+// GET /config/ecf/certificacion (solo lectura, requiere ?company=)
+export interface EcfCertificacion {
+  /** Etapa cruda del trámite de 14 pasos + "CERTIFIED" (ej. "STATUS_VERIFIED"). */
+  stage: string;
+  /** Etiqueta ya traducida al español por el backend. */
+  stageLabel: string;
+  /** Qué falta, ya en español ("" si CERTIFIED). */
+  siguientePaso: string;
+  /** Derivado de stage === "CERTIFIED" si el backend no lo trae. */
+  certified?: boolean;
+  /** Progreso numérico, si el backend lo incluye. */
+  paso?: number;
+  totalPasos?: number;
+}
+
+// GET /config/ecf/contingencia/pendientes — e-CF en WAITING_DEFERRED
+export interface EcfDiferidoItem {
+  voucherId: string;
+  ncf: string;
+  typeId: EcfTipoElectronico;
+  status: string;
+  issuedAt: string;
+  /** Horas que lleva firmado en diferido (límite legal: 72h). */
+  horasEnDiferido: number;
+}
+
+export interface ActivarContingenciaDto {
+  /** Obligatorio, 1–500 caracteres (Decreto 587-24). */
+  motivo: string;
+  /** ISO datetime. Si se omite, el backend usa 72h desde ahora. */
+  autorizadoHasta?: string;
+}
+
+export interface FlushContingenciaDto {
+  /** IDs a reenviar. Si se omite, se reenvían todos los WAITING_DEFERRED del Client. */
+  voucherIds?: string[];
+}
+
+export interface FlushContingenciaResult {
+  /** Cuántos se reencolaron para reenvío a la DGII. */
+  queued: number;
+  /** Cuántos superaron las 72h legales sin transmitirse (requieren anulación manual + 608). */
+  expired: number;
+  /** Cuántos son de tipos que Aura no permite reenviar en contingencia (E41/E43/E45/E46/E47). */
+  disallowed: number;
+}
+
+// ─── e-CF recibidos de terceros (F8) — bandeja + conciliación + ACECF ─────────
+// El openapi.json documenta los paths (/ecf/recibidos*) y los DTOs de request, pero no las
+// respuestas — estos tipos derivan del documento de la tarea y son tolerantes (campos opcionales
+// donde el contrato no es explícito). Confirmar contra la respuesta real al integrar.
+
+export type EcfStatusDgii =
+  | "PENDING" | "SIGNED" | "IN_PROCESS" | "ACCEPTED" | "CONDITIONAL" | "REJECTED"
+  | "NOT_FOUND" | "WAITING_DEFERRED" | "VOIDED" | "FAILED";
+
+/** Resultado de la conciliación automática con Purchase Invoices existentes. */
+export type EcfConciliacion = "CONCILIADO" | "UNICO" | "MULTIPLE" | "NINGUNO";
+
+export type AcecfStatus = "ACCEPTED" | "REJECTED";
+
+export interface EcfRecibidoAcecf {
+  /** null mientras no se ha decidido la aprobación comercial. */
+  status: AcecfStatus | null;
+  reason?: string | null;
+  decidedAt?: string | null;
+  decidedBy?: string | null;
+}
+
+export interface EcfRecibidoListItem {
+  voucherId: string;
+  ncf: string;
+  typeId: EcfTipoElectronico;
+  status: EcfStatusDgii;
+  /** RNC/Cédula del emisor (contraparte). */
+  counterpartRnc: string;
+  counterpartName: string;
+  total: number;
+  currency: string;
+  issuedAt: string;
+  /** Purchase Invoice ya vinculada, o null. */
+  purchaseInvoice: string | null;
+  conciliacion: EcfConciliacion;
+  /** Ids de las Purchase Invoice candidatas (1 si UNICO, varios si MULTIPLE, vacío si no hay). */
+  candidatosConciliacion: string[];
+  acecf: EcfRecibidoAcecf;
+}
+
+export interface EcfRecibidoItem {
+  description: string;
+  qty: number;
+  unitPrice: number;
+  /** % de ITBIS de la línea. */
+  itbisRate?: number;
+  amount?: number;
+  uom?: string;
+}
+
+export interface EcfRecibidoDetail extends EcfRecibidoListItem {
+  /** Líneas tal como las emitió el proveedor — solo lectura, nunca crean una Purchase Invoice. */
+  items: EcfRecibidoItem[];
+  /** ISO — límite legal para decidir la aprobación comercial (ACECF). */
+  slaVenceEn: string | null;
+}
+
+export interface VincularEcfRecibidoDto {
+  purchaseInvoice: string;
+}
+
+export interface AprobacionComercialDto {
+  status: AcecfStatus;
+  /** Obligatorio cuando status === "REJECTED". */
+  reason?: string;
+}
+
+export interface CargarManualEcfDto {
+  /** XML semilla firmado del emisor, crudo o en base64. */
+  signedXml: string;
+  company?: string;
+}
+
+// ─── e-CF emitidos (bandeja `origin: ISSUED`) — listado + detalle + refresh ────
+// El openapi.json aún no publica los paths `/ecf/emitidos*`; estos tipos derivan del documento
+// de la tarea (#53) y son tolerantes (campos opcionales/`unknown` donde el contrato no es
+// explícito). Confirmar contra la respuesta real al integrar.
+
+/** Un paso del flujo de estado derivado (`flujo.pasos[]`). */
+export interface EcfFlujoPaso {
+  estado: EcfStatusDgii;
+  label: string;
+  alcanzado: boolean;
+  actual: boolean;
+  terminal: boolean;
+  /** ISO — solo algunos pasos traen fecha real; el resto es `null`. Nunca inventar. */
+  at: string | null;
+}
+
+/** Flujo de estado del comprobante ante la DGII (derivado por el BFF). */
+export interface EcfFlujo {
+  estadoActual: EcfStatusDgii;
+  esTerminal: boolean;
+  /** true cuando el estado terminal NO es ACCEPTED. */
+  requiereAtencion: boolean;
+  /** Instrucción ya redactada en español, o null. No reconstruir desde `status`. */
+  alerta: string | null;
+  pasos: EcfFlujoPaso[];
+}
+
+/** Documento de ERPNext vinculado al comprobante. */
+export interface EcfEmitidoErpnext {
+  doctype: "Sales Invoice" | "Purchase Invoice";
+  docname: string;
+  outboxState?: string | null;
+  attempt?: number | null;
+}
+
+export interface VoucherEmitido {
+  voucherId: string;
+  ncf: string;
+  typeId: EcfTipoElectronico;
+  status: EcfStatusDgii;
+  env: EcfEnv;
+  counterpartRnc: string | null;
+  counterpartName: string | null;
+  total: number;
+  taxedAmount: number;
+  exemptAmount: number;
+  itbisAmount: number;
+  iscAmount: number;
+  currency: string;
+  exchangeRate?: number | null;
+  /** URL del timbre DGII — QR + "Verificar en DGII". `null` hasta que se firma. */
+  qrUrl: string | null;
+  securityCode: string | null;
+  trackId: string | null;
+  lastError: string | null;
+  /** Solo relevante en REJECTED — ver documento #53 §2. */
+  sequenceConsumed: boolean | null;
+  /** true = emitido en contingencia (Decreto 587-24). */
+  deferredSend: boolean;
+  archived: boolean;
+  issuedAt: string | null;
+  createdAt: string;
+  erpnext: EcfEmitidoErpnext | null;
+  flujo: EcfFlujo;
+}
+
+/** Línea de un e-CF emitido — solo en el detalle. Montos como strings numéricos. */
+export interface LineaVoucher {
+  description: string;
+  quantity: string;
+  unitPrice: string;
+  discountAmount?: string | null;
+  itbisRate?: string | null;
+  itbisAmount?: string | null;
+  iscAmount?: string | null;
+  itbisRetention?: string | null;
+  itbisRetentionRate?: string | null;
+  isrRetention?: string | null;
+  isrRetentionRate?: string | null;
+  lineTotal: string;
+}
+
+export interface EcfEmitidoDetail extends VoucherEmitido {
+  items: LineaVoucher[];
+}
+
+/** Respuesta de POST /ecf/emitidos/:voucherId/refresh. */
+export interface RefreshEcfEmitidoResult extends EcfEmitidoDetail {
+  statusPrevio: EcfStatusDgii;
+  /** true si el estado cambió tras consultar a la DGII. */
+  cambio: boolean;
 }
 
 // POST /config/pos/habilitar
@@ -2701,6 +3238,9 @@ export interface CobroResumen {
   invoiceId: string;
   paymentEntryIds: string[];
   outstandingAmount: number;
+  /** Ver `Invoice.roundedTotal`/`roundingAdjustment`. */
+  roundedTotal?: number;
+  roundingAdjustment?: number;
   fullyPaid: boolean;
   vuelto: VueltoLine[];
 }
@@ -2719,6 +3259,10 @@ export interface PendienteCobroItem {
    customer: string;
    customerName: string;
    grandTotal: number;
+   /** Monto real a cobrar, con redondeo de moneda aplicado — usar en vez de `grandTotal` para
+    *  prellenar/validar el cobro. Ver `Invoice.roundedTotal`. */
+   roundedTotal?: number;
+   roundingAdjustment?: number;
    postingDate: string;
    esClienteOcasional: boolean;
    clienteOcasionalNombre?: string;
@@ -2733,6 +3277,9 @@ export interface CompletarCobroResult {
    isPos: boolean;
    paymentEntryIds: string[];
    outstandingAmount: number;
+   /** Ver `Invoice.roundedTotal`/`roundingAdjustment`. */
+   roundedTotal?: number;
+   roundingAdjustment?: number;
    fullyPaid: boolean;
    vuelto: VueltoLine[];
    esClienteOcasional: boolean;
@@ -2751,6 +3298,9 @@ export interface CajaPendienteItem {
   customerName: string
   ncf?: string
   grandTotal: number
+  /** Ver `Invoice.roundedTotal`/`roundingAdjustment`. */
+  roundedTotal?: number
+  roundingAdjustment?: number
   outstandingAmount: number
   postingDate: string
 }
@@ -2766,6 +3316,9 @@ export interface CobrarFacturaResult {
   invoiceId: string
   paymentEntryIds: string[]
   outstandingAmount: number
+  /** Ver `Invoice.roundedTotal`/`roundingAdjustment`. */
+  roundedTotal?: number
+  roundingAdjustment?: number
   fullyPaid: boolean
   vuelto: VueltoLine[]
 }
@@ -2781,6 +3334,13 @@ export interface ListaPrecio {
 export interface UOM {
   name: string;
   mustBeWholeNumber: boolean;
+  /** Código DGII (uno de los 62 de la tabla fija) — null si esta UOM no tiene código asignado. */
+  codigoDgii?: string | null;
+  /** Abreviatura DGII correspondiente a `codigoDgii` — null si no tiene código asignado. */
+  abreviaturaDgii?: string | null;
+  /** true si `codigoDgii` es uno de los 62 códigos válidos. Campo defensivo — en la práctica
+   *  siempre coincide con "codigoDgii no es null". */
+  validaDgii?: boolean;
 }
 
 export interface UomConversionEntry {
@@ -2796,11 +3356,22 @@ export interface UOMDetail extends UOM {
 export interface CreateUOMDto {
   name: string;
   conversions?: { toUom: string; factor: number }[];
+  /** Uno de los 62 códigos DGII (ver DGII_UOM_CODES) — opcional. */
+  codigoDgii?: string;
 }
 
 export interface UpdateUOMDto {
   name?: string;
   conversions?: { toUom: string; factor: number }[];
+  /** Uno de los 62 códigos DGII. Enviar "" (string vacío) desasigna el código actual. */
+  codigoDgii?: string;
+}
+
+// PUT /config/uom/:id — la respuesta puede traer `warning` (no bloqueante) cuando el código
+// DGII enviado ya está asignado a otra UOM.
+export interface UpdateUOMResult {
+  id: string;
+  warning?: string;
 }
 
 export interface Grupo {

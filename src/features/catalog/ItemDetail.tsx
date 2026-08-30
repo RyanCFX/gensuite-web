@@ -1349,6 +1349,40 @@ export default function ItemDetail() {
         </div>
       )}
 
+      {item.type === 'product' && !item.hasVariants && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header">
+            <h2 className="card-title">Existencias por almacén</h2>
+          </div>
+          <div className="card-body">
+            {(() => {
+              const entries = Object.entries(item.stockByWarehouse ?? {}).sort((a, b) => b[1] - a[1])
+              if (entries.length === 0) {
+                return <p style={{ color: 'var(--text-tertiary)', fontSize: 13, margin: 0 }}>Sin existencias</p>
+              }
+              return (
+                <table className="data-table" style={{ width: '100%' }}>
+                  <thead>
+                    <tr>
+                      <th>Almacén</th>
+                      <th style={{ textAlign: 'right' }}>Cantidad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entries.map(([warehouseName, qty]) => (
+                      <tr key={warehouseName}>
+                        <td>{warehouseName}</td>
+                        <td style={{ textAlign: 'right' }}>{qty}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+            })()}
+          </div>
+        </div>
+      )}
+
       {item.type === 'product' && !item.hasVariants && !item.variantOf && (
         <UbicacionesPanel itemCode={item.id} />
       )}

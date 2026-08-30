@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
-import { createInvoice } from '@/shared/api/invoices'
-import { listCustomers } from '@/shared/api/customers'
+import { useNavigate, useParams } from 'react-router-dom'
+import { createInvoice, updateInvoice, getInvoice } from '@/shared/api/invoices'
+import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
 import { listItems, getDefaultPriceTier, getItem } from '@/shared/api/catalog'
 import { listImpuestosVentas, listAlmacenes, getCatalogosFiscales, getStockSettings, getFacturacionConfig } from '@/shared/api/config'
 import { getItemUbicaciones } from '@/shared/api/ubicaciones'
-import type { CreateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking } from '@/shared/api/types'
+import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking } from '@/shared/api/types'
 import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingModal'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
@@ -197,6 +197,29 @@ export default function InvoiceForm() {
   const queryClient = useQueryClient()
   const { multiTab, activeId, closeTab } = useTabs()
 
+  // ── Modo edición de borrador (PATCH /invoices/:id) ────────────────────────
+  // La misma pantalla sirve para crear (`/facturas/nueva`) y para editar un borrador
+  // (`/facturas/:id/editar`). En edición se precarga el detalle actual y al guardar se hace
+  // un PATCH con reemplazo COMPLETO (todas las líneas), no un diff.
+  const { id: editId } = useParams<{ id: string }>()
+  const isEdit = !!editId
+  // Fases de hidratación: primero los escalares, luego (cuando ya hay almacenes de la sucursal)
+  // las líneas — así el efecto que limpia almacenes al cambiar de sucursal no borra lo cargado.
+  const scalarsHydratedRef = useRef(false)
+  const itemsHydratedRef = useRef(false)
+  // Mientras sea false, se ignoran los auto-efectos disparados por el cliente (auto-NCF, repricing)
+  // para no pisar los valores que vienen del borrador. Se activa en cuanto el usuario toca el cliente.
+  const customerTouchedRef = useRef(!isEdit)
+  // En edición pasa a true al terminar de precargar el borrador — a partir de ahí el detector de
+  // cambios sin guardar toma su "foto" contra el estado ya hidratado (no contra el formulario vacío).
+  const [hydrationDone, setHydrationDone] = useState(!isEdit)
+
+  const { data: editingInvoice, isLoading: loadingEditingInvoice } = useQuery({
+    queryKey: ['invoice', editId],
+    queryFn: () => getInvoice(editId!),
+    enabled: isEdit,
+  })
+
   const [customerId, setCustomerId] = useState('')
   const [customerQuery, setCustomerQuery] = useState('')
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
@@ -363,8 +386,11 @@ export default function InvoiceForm() {
     staleTime: 60_000,
   })
 
-  // Al cambiar de sucursal, el almacén elegido en cada línea deja de ser válido
+  // Al cambiar de sucursal, el almacén elegido en cada línea deja de ser válido.
+  // En edición se ignora el cambio de sucursal que produce la propia hidratación del borrador,
+  // para no borrar los almacenes que vienen en GET /invoices/:id.
   useEffect(() => {
+    if (isEdit && !itemsHydratedRef.current) return
     setItems((prev) => prev.map((row) => (row.warehouse ? { ...row, warehouse: '', stockError: undefined } : row)))
   }, [branch])
 
@@ -432,7 +458,7 @@ export default function InvoiceForm() {
 
   // ── Auto-select NCF type based on customer (only for new customers) ───────
   useEffect(() => {
-    if (!selectedCustomer) return
+    if (!selectedCustomer || !customerTouchedRef.current) return
     if (selectedCustomer.isGovernment) {
       setNcfType('B15')
     } else if (selectedCustomer.rnc) {
@@ -444,7 +470,7 @@ export default function InvoiceForm() {
 
   // ── Auto-select NCF type for ocasional customers ────────────────────────
   useEffect(() => {
-    if (!esClienteOcasional) return
+    if (!esClienteOcasional || !customerTouchedRef.current) return
     if (clienteOcasionalRnc.trim()) {
       setNcfType('B01')
     } else {
@@ -474,19 +500,28 @@ export default function InvoiceForm() {
     return true
   }
 
-  const createMutation = useMutation({
-    mutationFn: (dto: CreateInvoiceDto) => createInvoice(dto),
-    onSuccess: (invoice) => {
-      const formTabId = activeId
-      queryClient.invalidateQueries({ queryKey: ['invoices'] })
-      toast.success('Factura creada como borrador')
-      navigate(`/facturas/${invoice.id}`)
-      // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
-      // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
-      if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
-    },
-    onError: (err: { message?: string; code?: string }) => {
+  function handleInvoiceSaved(invoice: { id: string }, successMsg: string) {
+    const formTabId = activeId
+    queryClient.invalidateQueries({ queryKey: ['invoices'] })
+    if (isEdit) queryClient.invalidateQueries({ queryKey: ['invoice', editId] })
+    toast.success(successMsg)
+    navigate(`/facturas/${invoice.id}`)
+    // La pestaña del formulario ya no representa nada útil una vez guardado — se cierra sin
+    // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
+    if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
+  }
+
+  function handleInvoiceMutationError(err: { message?: string; code?: string }) {
       const msg = err?.message ?? ''
+      const low = msg.toLowerCase()
+      // 400 del PATCH: el borrador dejó de serlo (ya sometido) o fue enviado a Caja. El mensaje del
+      // backend es accionable ("usar cancelar + enmendar" / "se edita al cobrar"): se muestra tal
+      // cual y se devuelve al detalle, donde sí están las acciones correctas.
+      if (isEdit && (low.includes('no está en borrador') || low.includes('no esta en borrador') || low.includes('enmendar') || low.includes('caja'))) {
+        toast.error(msg || 'Esta factura ya no se puede editar')
+        navigate(`/facturas/${editId}`)
+        return
+      }
       if (isApiErrorCode(err, ERROR_CODES.BRANCH_REQUIRED)) {
         setBranchError(true)
         toast.error(msg || 'Selecciona una sucursal')
@@ -508,11 +543,28 @@ export default function InvoiceForm() {
         })
         return
       }
-      toast.error(msg || 'Error al crear la factura')
-    },
+      toast.error(msg || (isEdit ? 'Error al guardar la factura' : 'Error al crear la factura'))
+  }
+
+  const createMutation = useMutation({
+    mutationFn: (dto: CreateInvoiceDto) => createInvoice(dto),
+    onSuccess: (invoice) => handleInvoiceSaved(invoice, 'Factura creada como borrador'),
+    onError: handleInvoiceMutationError,
   })
 
-  const isSaving = createMutation.isPending
+  const updateMutation = useMutation({
+    mutationFn: (dto: UpdateInvoiceDto) => updateInvoice(editId!, dto),
+    onSuccess: (invoice) => handleInvoiceSaved(invoice, 'Cambios guardados'),
+    onError: handleInvoiceMutationError,
+  })
+
+  /** Crea o edita según el modo de la pantalla — mismo body en ambos casos (factura completa). */
+  function persistInvoice(dto: CreateInvoiceDto) {
+    if (isEdit) updateMutation.mutate(dto)
+    else createMutation.mutate(dto)
+  }
+
+  const isSaving = createMutation.isPending || updateMutation.isPending
 
   const isDirty = useDirtyCheck({
     customerId,
@@ -528,8 +580,87 @@ export default function InvoiceForm() {
     branch,
     department,
     taxesTemplate,
-  }, true)
+  }, hydrationDone)
   useBeforeUnloadWarning(isDirty)
+
+  // ── Hidratación del borrador en modo edición ─────────────────────────────
+  // Fase 1: escalares (cliente, fechas, NCF, sucursal, depto, notas). Se corre una sola vez.
+  useEffect(() => {
+    if (!isEdit || !editingInvoice || scalarsHydratedRef.current) return
+    scalarsHydratedRef.current = true
+    const inv = editingInvoice
+    setPostingDate((inv.postingDate ?? '').slice(0, 10) || todayIso())
+    setDueDate((inv.dueDate ?? '').slice(0, 10))
+    setNcfType((inv.ncfType || 'B02') as NcfType)
+    setBranch(inv.branch ?? '')
+    setDepartment(inv.department ?? '')
+    setNotes(inv.notes ?? '')
+    if (inv.esClienteOcasional) {
+      setEsClienteOcasional(true)
+      setClienteOcasionalNombre(inv.clienteOcasionalNombre ?? '')
+      setClienteOcasionalRnc(inv.clienteOcasionalRnc ?? '')
+      setClienteOcasionalDireccion(inv.clienteOcasionalDireccion ?? '')
+    } else if (inv.customer) {
+      setCustomerId(inv.customer)
+      getCustomer(inv.customer).then(setSelectedCustomer).catch(() => {})
+    }
+    // El impuesto del documento (taxesTemplate) no viene en GET /invoices/:id; si se deja sin tocar
+    // el PATCH reusa el default de la compañía. El usuario puede re-seleccionarlo si aplica.
+  }, [isEdit, editingInvoice])
+
+  // Fase 2: líneas. Espera a tener los almacenes de la sucursal cargados para que el efecto que
+  // limpia el almacén de cada fila al cambiar de sucursal no borre lo recién hidratado.
+  useEffect(() => {
+    if (!isEdit || !editingInvoice || !scalarsHydratedRef.current || itemsHydratedRef.current) return
+    // Espera a que la sucursal hidratada esté aplicada (el efecto que limpia almacenes ya está
+    // silenciado durante la hidratación, así que no hace falta esperar además a `branchWarehouses`).
+    if (editingInvoice.branch && branch !== editingInvoice.branch) return
+    itemsHydratedRef.current = true
+    let cancelled = false
+    ;(async () => {
+      const rows: LineItem[] = await Promise.all(
+        editingInvoice.items.map(async (it): Promise<LineItem> => {
+          let cat: Item | undefined
+          try {
+            cat = await getItem(it.itemCode)
+          } catch {
+            // Sin catálogo la línea sigue siendo editable, solo pierde límites de descuento/stock.
+          }
+          const discountPct = it.discountPct ?? 0
+          return {
+            itemCode: it.itemCode,
+            itemLabel: cat?.itemName ?? it.itemCode,
+            itemType: cat?.type,
+            description: it.description ?? cat?.internalDescription ?? cat?.itemName ?? '',
+            qty: it.qty,
+            rate: it.rate,
+            amount: calcAmount(it.qty, it.rate, discountPct),
+            discountPct,
+            salesTaxPct: cat?.salesTaxPct ?? 0,
+            salesTaxTemplate: cat?.salesTaxTemplate ?? '',
+            baseRate: it.rate,
+            uom: it.uom || cat?.stockUom || 'Unidad',
+            conversionFactor: 1,
+            maxDiscountPct: cat?.allowsDiscount ? cat?.maxDiscountPct : undefined,
+            autoDiscountPct: undefined,
+            manualDiscountPct: discountPct,
+            allowsDiscount: cat?.allowsDiscount,
+            warehouse: it.warehouse ?? '',
+            _prices: cat?.prices,
+            _stockByWarehouse: cat?.stockByWarehouse,
+            ubicacion: it.ubicacion || undefined,
+          }
+        }),
+      )
+      if (!cancelled) {
+        setItems(rows)
+        setHydrationDone(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isEdit, editingInvoice, branch])
 
   // ── Line item helpers ─────────────────────────────────────────────────────
    function updateItem(index: number, patch: Partial<LineItem>) {
@@ -718,6 +849,8 @@ export default function InvoiceForm() {
 
   // ── Reprice on customer change ───────────────────────────────────────────
   useEffect(() => {
+    // En edición no se re-tarifica al hidratar el cliente: se respetan los precios del borrador.
+    if (!customerTouchedRef.current) return
     const tier = selectedCustomer?.priceTier ?? defaultPriceTier ?? 'B'
     setItems((prev) =>
       prev.map((row) => {
@@ -822,7 +955,7 @@ const itemsDto = items.map((i) => ({
         taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
       }
 
-     createMutation.mutate(baseDto as CreateInvoiceDto)
+     persistInvoice(baseDto as CreateInvoiceDto)
    }
 
   const semaforoStatusClass: Record<string, string> = {
@@ -840,12 +973,18 @@ const itemsDto = items.map((i) => ({
     <div className="page-container">
       <div className="page-header">
         <div>
-          <a className="page-back-link" onClick={() => navigate('/facturas')}>
-            <ArrowLeft size={14} /> Facturas
+          <a className="page-back-link" onClick={() => navigate(isEdit ? `/facturas/${editId}` : '/facturas')}>
+            <ArrowLeft size={14} /> {isEdit ? 'Factura' : 'Facturas'}
           </a>
-          <h1 className="page-title">Nueva Factura</h1>
+          <h1 className="page-title">{isEdit ? 'Editar Factura' : 'Nueva Factura'}</h1>
         </div>
       </div>
+
+      {isEdit && loadingEditingInvoice && (
+        <div className="inline-alert" style={{ marginBottom: 16 }}>
+          <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Cargando borrador…
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         <div className="card">
@@ -870,6 +1009,7 @@ const itemsDto = items.map((i) => ({
                      id="customer"
                      value={customerId}
                      onChange={(val, _opt) => {
+                       customerTouchedRef.current = true
                        setCustomerId(val)
                        if (!val) {
                          setSelectedCustomer(null)
@@ -925,7 +1065,7 @@ const itemsDto = items.map((i) => ({
 
                <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
-                   <input type="checkbox" checked={esClienteOcasional} onChange={(e) => { setEsClienteOcasional(e.target.checked); if (e.target.checked) { setCustomerId(''); setSelectedCustomer(null); setSemaforo(null) } }} />
+                   <input type="checkbox" checked={esClienteOcasional} onChange={(e) => { customerTouchedRef.current = true; setEsClienteOcasional(e.target.checked); if (e.target.checked) { setCustomerId(''); setSelectedCustomer(null); setSemaforo(null) } }} />
                    Venta ocasional (cliente no registrado)
                  </label>
                  {esClienteOcasional && (
@@ -987,7 +1127,7 @@ const itemsDto = items.map((i) => ({
                      type="text"
                      className="ff-input"
                      value={clienteOcasionalRnc}
-                     onChange={(e) => setClienteOcasionalRnc(e.target.value)}
+                     onChange={(e) => { customerTouchedRef.current = true; setClienteOcasionalRnc(e.target.value) }}
                      placeholder="RNC del cliente ocasional"
                      required
                    />
@@ -1191,7 +1331,7 @@ const itemsDto = items.map((i) => ({
                           onChange={(val) => updateWarehouse(index, val)}
                           options={warehouseSelectOptions}
                           onSearch={setWarehouseSearch}
-                          selectedLabel={branchWarehouses?.find((w) => w.id === item.warehouse)?.name ?? ''}
+                          selectedLabel={branchWarehouses?.find((w) => w.id === item.warehouse)?.name ?? item.warehouse ?? ''}
                           placeholder="Almacén por defecto"
                           disabled={!item.itemCode}
                         />
@@ -1319,7 +1459,7 @@ const itemsDto = items.map((i) => ({
           <button
             type="button"
             className="btn btn-ghost"
-            onClick={() => navigate('/facturas')}
+            onClick={() => navigate(isEdit ? `/facturas/${editId}` : '/facturas')}
           >
             Cancelar
           </button>
@@ -1327,7 +1467,7 @@ const itemsDto = items.map((i) => ({
             {isSaving
               ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
               : <Save size={15} />}
-            Guardar Borrador
+            {isEdit ? 'Guardar cambios' : 'Guardar Borrador'}
           </button>
         </div>
       </form>
@@ -1357,7 +1497,7 @@ onAuthorized={(userId) => {
              notes: notes || undefined,
              taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
            }
-createMutation.mutate(baseDto as CreateInvoiceDto)
+persistInvoice(baseDto as CreateInvoiceDto)
          }}
         title="Autorización requerida"
         description="El descuento supera tu límite. Ingresa el PIN de un administrador."

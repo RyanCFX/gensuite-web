@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTabs } from '@/contexts/TabsContext'
 import { toast } from 'sonner'
@@ -19,12 +19,13 @@ import {
   getFacturacionConfig, updateFacturacionConfig,
   listDenominaciones, createDenominacion, updateDenominacion,
   habilitarPos,
+  getEcfConfig, updateEcfConfig,
 } from '@/shared/api/config'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { listCustomerGroups, createCustomerGroup, deleteCustomerGroup } from '@/shared/api/customers'
 import { listRoles } from '@/shared/api/usuarios'
-import type { CobrosConfig, MetodoPago, TaxLineCategory, TasaImpuesto, TasaImpuestoComponente, CreateTasaImpuestoDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError, UpdateAlmacenDto, FormatoImpresion } from '@/shared/api/types'
+import type { CobrosConfig, MetodoPago, TaxLineCategory, TasaImpuesto, TasaImpuestoComponente, CreateTasaImpuestoDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError, UpdateAlmacenDto, FormatoImpresion, EcfTipoElectronico } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
@@ -34,8 +35,9 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { formatDate } from '@/lib/formatters'
-import { Plus, Trash2, Save, FileWarning, X, Pencil, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, Save, FileWarning, X, Pencil, ChevronLeft, ChevronRight, Info, ChevronDown } from 'lucide-react'
 import EjercicioFiscalSection from './EjercicioFiscalSection'
+import { DGII_UOM_CODES, dgiiUomLabel, ECF_TIPOS, TIPO_PAGO_DEFAULT_OPTIONS, TIPO_INGRESOS_DEFAULT_OPTIONS } from '@/lib/dgii'
 
 function is503(error: unknown): boolean {
   if (axios.isAxiosError(error) && error.response?.status === 503) return true
@@ -637,11 +639,13 @@ function UomSection() {
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
   const [newUomName, setNewUomName] = useState('')
+  const [newCodigoDgii, setNewCodigoDgii] = useState('')
   const [conversions, setConversions] = useState<UomConversionRow[]>([])
   const [convErrors, setConvErrors] = useState<Record<number, string>>({})
   const [detailId, setDetailId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState('')
+  const [editCodigoDgii, setEditCodigoDgii] = useState('')
   const [editConversions, setEditConversions] = useState<UomConversionRow[]>([])
   const [editConvErrors, setEditConvErrors] = useState<Record<number, string>>({})
   const [page, setPage] = useState(1)
@@ -670,12 +674,14 @@ function UomSection() {
       conversions: conversions.length
         ? conversions.map(c => ({ toUom: c.toUom, factor: Number(c.factor) }))
         : undefined,
+      codigoDgii: newCodigoDgii || undefined,
     }),
     onSuccess: () => {
       toast.success('Unidad creada')
       queryClient.invalidateQueries({ queryKey: ['uom'] })
       setShowCreate(false)
       setNewUomName('')
+      setNewCodigoDgii('')
       setConversions([])
       setConvErrors({})
     },
@@ -685,8 +691,9 @@ function UomSection() {
   const updateMutation = useMutation({
     mutationFn: ({ id, dto }: { id: string; dto: Parameters<typeof updateUOM>[1] }) =>
       updateUOM(id, dto),
-    onSuccess: () => {
+    onSuccess: (result) => {
       toast.success('Unidad actualizada')
+      if (result?.warning) toast.warning(result.warning)
       queryClient.invalidateQueries({ queryKey: ['uom'] })
       setEditing(false)
       setDetailId(null)
@@ -697,6 +704,7 @@ function UomSection() {
   function openEdit() {
     if (!detailData) return
     setEditName(detailId ?? '')
+    setEditCodigoDgii(detailData.codigoDgii ?? '')
     setEditConversions(
       detailData.conversions.map(c => ({ toUom: c.toUom, factor: String(c.factor), searchQuery: '' }))
     )
@@ -719,6 +727,7 @@ function UomSection() {
 
     const dto: Parameters<typeof updateUOM>[1] = {}
     if (editName && editName !== detailId) dto.name = editName
+    if (editCodigoDgii !== (detailData?.codigoDgii ?? '')) dto.codigoDgii = editCodigoDgii
     const validConversions = editConversions.filter(r => r.toUom && r.factor)
     if (validConversions.length) {
       dto.conversions = validConversions.map(r => ({ toUom: r.toUom, factor: Number(r.factor) }))
@@ -764,9 +773,9 @@ function UomSection() {
   // UOMs disponibles para seleccionar como destino (excluye la UOM que se está creando)
   const availableUoms = uoms.filter(u => u.name !== newUomName)
 
-  const createIsDirty = useDirtyCheck({ newUomName, conversions }, showCreate)
+  const createIsDirty = useDirtyCheck({ newUomName, newCodigoDgii, conversions }, showCreate)
   const createClose = useConfirmClose(createIsDirty, () => setShowCreate(false))
-  const editIsDirty = useDirtyCheck({ editName, editConversions }, editing)
+  const editIsDirty = useDirtyCheck({ editName, editCodigoDgii, editConversions }, editing)
   const detailClose = useConfirmClose(editIsDirty, () => { setDetailId(null); setEditing(false) })
   const editCancelClose = useConfirmClose(editIsDirty, () => setEditing(false))
 
@@ -783,7 +792,7 @@ function UomSection() {
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             />
-            <button className="btn btn-primary btn-size-sm" onClick={() => { setNewUomName(''); setConversions([]); setConvErrors({}); setShowCreate(true) }}>
+            <button className="btn btn-primary btn-size-sm" onClick={() => { setNewUomName(''); setNewCodigoDgii(''); setConversions([]); setConvErrors({}); setShowCreate(true) }}>
               <Plus size={14} />Nueva
             </button>
           </div>
@@ -797,6 +806,7 @@ function UomSection() {
                     <thead>
                       <tr>
                         <th>Nombre</th>
+                        <th>Código DGII</th>
                         <th style={{ width: 100 }} />
                       </tr>
                     </thead>
@@ -804,7 +814,7 @@ function UomSection() {
                       {pageUoms.length === 0
                         ? (
                             <tr>
-                              <td colSpan={2} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '24px 0' }}>
+                              <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '24px 0' }}>
                                 Sin resultados para "{search}"
                               </td>
                             </tr>
@@ -812,6 +822,11 @@ function UomSection() {
                         : pageUoms.map(u => (
                             <tr key={u.name}>
                               <td style={{ fontWeight: 500 }}>{u.name}</td>
+                              <td>
+                                {u.codigoDgii
+                                  ? <span className="badge badge--gray">{u.codigoDgii} — {u.abreviaturaDgii}</span>
+                                  : <span style={{ color: 'var(--text-tertiary)' }}>—</span>}
+                              </td>
                               <td>
                                 <button className="btn btn-ghost btn-size-sm" onClick={() => setDetailId(u.name)}>
                                   Ver detalle
@@ -871,6 +886,20 @@ function UomSection() {
                   placeholder="Caja, Litro, Kg…"
                   autoFocus
                 />
+              </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label">Código DGII</label>
+                <Select value={newCodigoDgii} onValueChange={setNewCodigoDgii} placeholder="Ninguno">
+                  <SelectItem value="">Ninguno</SelectItem>
+                  {DGII_UOM_CODES.map((c) => (
+                    <SelectItem key={c.codigo} value={c.codigo}>{dgiiUomLabel(c.codigo)}</SelectItem>
+                  ))}
+                </Select>
+                <p className="ff-hint">
+                  Unidad de medida que exige la DGII en cada línea de un comprobante electrónico.
+                  Opcional — sin código, esta unidad sigue siendo válida para todo lo demás.
+                </p>
               </div>
 
               {/* Conversions table */}
@@ -976,6 +1005,19 @@ function UomSection() {
                   <div className="ff-wrap">
                     <label className="ff-label">Nombre</label>
                     <input className="ff-input" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                  </div>
+
+                  <div className="ff-wrap">
+                    <label className="ff-label">Código DGII</label>
+                    <Select value={editCodigoDgii} onValueChange={setEditCodigoDgii} placeholder="Ninguno">
+                      <SelectItem value="">Ninguno</SelectItem>
+                      {DGII_UOM_CODES.map((c) => (
+                        <SelectItem key={c.codigo} value={c.codigo}>{dgiiUomLabel(c.codigo)}</SelectItem>
+                      ))}
+                    </Select>
+                    <p className="ff-hint">
+                      Unidad de medida que exige la DGII en cada línea de un comprobante electrónico.
+                    </p>
                   </div>
 
                   <div>
@@ -2093,6 +2135,7 @@ function FacturacionConfigSection() {
    const [modoPagoCaja, setModoPagoCaja] = useState<string | null>(null)
    const [modosPagoConciliar, setModosPagoConciliar] = useState<string[]>([])
    const [rolesCierreCajaAjena, setRolesCierreCajaAjena] = useState<string[]>([])
+   const [redondearTotales, setRedondearTotales] = useState(true)
 
    useEffect(() => {
      if (data) {
@@ -2112,6 +2155,7 @@ function FacturacionConfigSection() {
         setModoPagoCaja(data.modoPagoCaja ?? null)
         setModosPagoConciliar(data.modosPagoConciliar ?? [])
         setRolesCierreCajaAjena(data.rolesCierreCajaAjena ?? [])
+        setRedondearTotales(!(data.redondeoTotalDeshabilitado ?? false))
       }
     }, [data])
 
@@ -2293,6 +2337,25 @@ function FacturacionConfigSection() {
           <p className="ff-hint" style={{ marginTop: 4 }}>
             Si está desactivado, se oculta el selector de plantilla de Impuesto de Documento en Factura, Cotización
             y Compra. No afecta documentos ya guardados con una plantilla asignada.
+          </p>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-check-wrap">
+            <input
+              type="checkbox"
+              className="ff-check"
+              checked={redondearTotales}
+              onChange={(e) => setRedondearTotales(e.target.checked)}
+            />
+            <span style={{ fontSize: 13 }}>Redondear totales a la unidad</span>
+          </label>
+          <p className="ff-hint" style={{ marginTop: 4 }}>
+            Si está activo (default), el total con centavos de cada factura/compra se redondea al peso más cercano
+            y ese es el monto que se cobra o queda pendiente (ej. RD$168.57 se cobra como RD$169.00) — pensado para
+            ventas en efectivo, que no manejan centavos físicos. Si se desactiva, se cobra el monto exacto con
+            centavos — más apropiado si el negocio solo cobra con tarjeta, cheque o transferencia. Cambiarlo no
+            afecta facturas o compras ya sometidas, solo las que se sometan después de guardar.
           </p>
         </div>
 
@@ -2597,11 +2660,345 @@ function FacturacionConfigSection() {
                 modoPagoCaja,
                 modosPagoConciliar,
                 rolesCierreCajaAjena,
+                redondeoTotalDeshabilitado: !redondearTotales,
               })}
             disabled={saveMutation.isPending}
           >
             <Save size={14} /> Guardar
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---- Facturación Electrónica (e-CF) Section ----
+// F0-F1 ya aterrizaron en el backend (cimientos + config). Todavía no existe ninguna fase de
+// emisión real (F3-F6) — esta pantalla es solo scaffolding de configuración para adelantar
+// trabajo. No hay endpoints de emisión/consulta/anulación de e-CF que probar todavía.
+function EcfConfigSection() {
+  const queryClient = useQueryClient()
+  const { data, isLoading } = useQuery({ queryKey: ['ecf-config'], queryFn: getEcfConfig })
+
+  const [habilitado, setHabilitado] = useState(false)
+  const [tiposElectronicos, setTiposElectronicos] = useState<EcfTipoElectronico[]>([])
+  const [tipoPagoDefault, setTipoPagoDefault] = useState<1 | 2 | 3>(1)
+  const [tipoIngresosDefault, setTipoIngresosDefault] = useState('01')
+  const [diasLimiteAprobacionComercial, setDiasLimiteAprobacionComercial] = useState(3)
+  const [adjuntarPdfa, setAdjuntarPdfa] = useState(false)
+  const [umbralAlertaSecuencia, setUmbralAlertaSecuencia] = useState(50)
+  const [emitirAlSometer, setEmitirAlSometer] = useState(true)
+  const [bloquearSubmitSiAuraCaido, setBloquearSubmitSiAuraCaido] = useState(true)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  // 400 al habilitar e-CF en modo live sin certificación DGII completa (F9 §3.1).
+  const [certRequiredMsg, setCertRequiredMsg] = useState('')
+
+  useEffect(() => {
+    if (data) {
+      setHabilitado(data.habilitado ?? false)
+      setTiposElectronicos(data.tiposElectronicos ?? [])
+      setTipoPagoDefault(data.tipoPagoDefault ?? 1)
+      setTipoIngresosDefault(data.tipoIngresosDefault ?? '01')
+      setDiasLimiteAprobacionComercial(data.diasLimiteAprobacionComercial ?? 3)
+      setAdjuntarPdfa(data.adjuntarPdfa ?? false)
+      setUmbralAlertaSecuencia(data.umbralAlertaSecuencia ?? 50)
+      setEmitirAlSometer(data.emitirAlSometer ?? true)
+      setBloquearSubmitSiAuraCaido(data.bloquearSubmitSiAuraCaido ?? true)
+    }
+  }, [data])
+
+  const saveMutation = useMutation({
+    mutationFn: () => updateEcfConfig({
+      habilitado,
+      tiposElectronicos,
+      tipoPagoDefault,
+      tipoIngresosDefault: tipoIngresosDefault as '01' | '02' | '03' | '04' | '05' | '06',
+      diasLimiteAprobacionComercial,
+      adjuntarPdfa,
+      umbralAlertaSecuencia,
+      emitirAlSometer,
+      bloquearSubmitSiAuraCaido,
+    }),
+    onSuccess: () => {
+      toast.success('Configuración de facturación electrónica actualizada')
+      setCertRequiredMsg('')
+      queryClient.invalidateQueries({ queryKey: ['ecf-config'] })
+    },
+    onError: (err: ApiError) => {
+      if (err?.statusCode === 400 && /certificaci[oó]n/i.test(err.message ?? '')) {
+        setCertRequiredMsg(err.message)
+        return
+      }
+      toast.error(err?.message ?? 'Error al guardar')
+    },
+  })
+
+  function toggleTipoElectronico(typeId: EcfTipoElectronico) {
+    setTiposElectronicos((prev) => (prev.includes(typeId) ? prev.filter((t) => t !== typeId) : [...prev, typeId]))
+  }
+
+  if (isLoading) return <span className="skeleton-box" style={{ height: 200, display: 'block' }} />
+
+  const provisioning = data?.provisioning
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">Facturación Electrónica (e-CF)</span>
+      </div>
+      <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {data?.note && (
+          <div className="inline-alert inline-alert-info">
+            <Info size={15} />
+            <span>{data.note}</span>
+          </div>
+        )}
+
+        {certRequiredMsg && (
+          <div className="inline-alert inline-alert-warn" style={{ alignItems: 'flex-start' }}>
+            <FileWarning size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+            <span>
+              {certRequiredMsg}{' '}
+              <Link to="/config/ecf/admin">Ver progreso de certificación</Link>.
+            </span>
+          </div>
+        )}
+
+        <div className="inline-alert inline-alert-info" style={{ alignItems: 'flex-start' }}>
+          <Info size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>
+            Esta pantalla solo configura el módulo de facturación electrónica. La emisión real de e-CF
+            (someter, consultar estatus, anular) todavía no está disponible — es una fase futura del backend.
+            Mientras tanto, la facturación sigue funcionando 100% igual que hoy con NCF físico.
+          </span>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-check-wrap">
+            <input
+              type="checkbox"
+              className="ff-check"
+              checked={habilitado}
+              onChange={(e) => setHabilitado(e.target.checked)}
+            />
+            <span style={{ fontSize: 13, fontWeight: 500 }}>Habilitar facturación electrónica</span>
+          </label>
+          <p className="ff-hint" style={{ marginTop: 4 }}>
+            Si está apagado, este tenant sigue facturando 100% igual que hoy (NCF físico). El resto de esta
+            pantalla solo tiene efecto cuando esté activo.
+          </p>
+        </div>
+
+        <div className="ff-wrap" style={{ opacity: habilitado ? 1 : 0.5 }}>
+          <label className="ff-label">Tipos de comprobante electrónico</label>
+          <p className="ff-hint" style={{ marginBottom: 8 }}>
+            Solo los tipos marcados aquí se emiten electrónicamente. Un tipo no marcado sigue emitiéndose
+            físico — la migración puede ser gradual, por tipo, no todo o nada.
+          </p>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 8,
+            border: '1px solid var(--border-default)',
+            borderRadius: 'var(--radius-md)',
+            padding: 12,
+          }}>
+            {ECF_TIPOS.map((t) => (
+              <label key={t.typeId} className="ff-check-wrap">
+                <input
+                  type="checkbox"
+                  className="ff-check"
+                  disabled={!habilitado}
+                  checked={tiposElectronicos.includes(t.typeId)}
+                  onChange={() => toggleTipoElectronico(t.typeId)}
+                />
+                <span style={{ fontSize: 13 }}>{t.typeId} — {t.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="form-row" style={{ opacity: habilitado ? 1 : 0.5 }}>
+          <div className="ff-wrap">
+            <label className="ff-label">Tipo de Pago por defecto</label>
+            <Select
+              value={String(tipoPagoDefault)}
+              onValueChange={(val) => setTipoPagoDefault(Number(val) as 1 | 2 | 3)}
+              disabled={!habilitado}
+            >
+              {TIPO_PAGO_DEFAULT_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>
+              ))}
+            </Select>
+          </div>
+          <div className="ff-wrap">
+            <label className="ff-label">Tipo de Ingresos por defecto</label>
+            <Select value={tipoIngresosDefault} onValueChange={setTipoIngresosDefault} disabled={!habilitado}>
+              {TIPO_INGRESOS_DEFAULT_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </Select>
+          </div>
+        </div>
+
+        <div className="form-row" style={{ opacity: habilitado ? 1 : 0.5 }}>
+          <div className="ff-wrap">
+            <label className="ff-label">Días límite para aprobación comercial</label>
+            <p className="ff-hint" style={{ marginBottom: 4 }}>
+              Solo relevante para comprobantes recibidos de terceros (fase futura).
+            </p>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              className="ff-input"
+              style={{ width: 120 }}
+              value={diasLimiteAprobacionComercial}
+              disabled={!habilitado}
+              onChange={(e) => setDiasLimiteAprobacionComercial(Math.max(0, parseInt(e.target.value, 10) || 0))}
+            />
+          </div>
+          <div className="ff-wrap">
+            <label className="ff-label">Umbral de alerta de secuencia</label>
+            <p className="ff-hint" style={{ marginBottom: 4 }}>
+              Mismo criterio que la alerta de NCF físico, aplicado a los rangos electrónicos.
+            </p>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              className="ff-input"
+              style={{ width: 120 }}
+              value={umbralAlertaSecuencia}
+              disabled={!habilitado}
+              onChange={(e) => setUmbralAlertaSecuencia(Math.max(0, parseInt(e.target.value, 10) || 0))}
+            />
+          </div>
+        </div>
+
+        <div className="ff-wrap" style={{ opacity: habilitado ? 1 : 0.5 }}>
+          <label className="ff-check-wrap">
+            <input
+              type="checkbox"
+              className="ff-check"
+              checked={adjuntarPdfa}
+              disabled={!habilitado}
+              onChange={(e) => setAdjuntarPdfa(e.target.checked)}
+            />
+            <span style={{ fontSize: 13 }}>Adjuntar PDF de archivo fiscal automáticamente</span>
+          </label>
+          <p className="ff-hint" style={{ marginTop: 4 }}>
+            Cuando un comprobante es aceptado por la DGII, adjunta automáticamente su PDF/A (fase futura, pero
+            el campo ya se puede configurar).
+          </p>
+        </div>
+
+        {/* Sección avanzada, colapsada por default */}
+        <div style={{ borderTop: '1px solid var(--border-default)', paddingTop: 12 }}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-size-sm"
+            onClick={() => setShowAdvanced((v) => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+          >
+            <ChevronDown size={14} style={{ transform: showAdvanced ? 'rotate(180deg)' : undefined, transition: 'transform .15s' }} />
+            Avanzado
+          </button>
+          {showAdvanced && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 12, opacity: habilitado ? 1 : 0.5 }}>
+              <div className="ff-wrap">
+                <label className="ff-check-wrap">
+                  <input
+                    type="checkbox"
+                    className="ff-check"
+                    checked={emitirAlSometer}
+                    disabled={!habilitado}
+                    onChange={(e) => setEmitirAlSometer(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 13 }}>Emitir al someter</span>
+                </label>
+                <p className="ff-hint" style={{ marginTop: 4 }}>
+                  Si está activo (caso normal), la emisión del e-CF ocurre automáticamente al someter el
+                  documento. Desactivarlo es un modo excepcional/de depuración.
+                </p>
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-check-wrap">
+                  <input
+                    type="checkbox"
+                    className="ff-check"
+                    checked={bloquearSubmitSiAuraCaido}
+                    disabled={!habilitado}
+                    onChange={(e) => setBloquearSubmitSiAuraCaido(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 13 }}>Bloquear sometimiento si Aura no responde</span>
+                </label>
+                <p className="ff-hint" style={{ marginTop: 4 }}>
+                  Si Aura/DGII no responde: activo = se bloquea la facturación (default seguro); inactivo =
+                  se activa contingencia automáticamente y se sigue facturando.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            className="btn btn-primary btn-size-sm"
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending}
+          >
+            <Save size={14} /> Guardar
+          </button>
+        </div>
+
+        {/* Estado de conexión con Aura — solo lectura */}
+        <div style={{ borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
+          <label className="ff-label">Estado de conexión con Aura</label>
+          <p className="ff-hint" style={{ marginBottom: 8 }}>
+            Gestionado por soporte — todavía no hay un flujo de auto-servicio para conectar este tenant a Aura
+            desde aquí.
+          </p>
+          {!provisioning?.provisionado ? (
+            <div className="empty-state" style={{ padding: '20px 0' }}>
+              <p className="empty-title">Este tenant aún no está conectado a Aura</p>
+              <p className="empty-sub">Contacta a soporte para activar la facturación electrónica.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 13 }}>
+                <span><strong>Ambiente activo:</strong> {provisioning.activeMode === 'live' ? 'Producción (live)' : provisioning.activeMode === 'test' ? 'Pruebas (test)' : 'No configurado'}</span>
+                <span><strong>API Key test:</strong> {provisioning.hasApiKeyTest ? 'Configurada' : 'No configurada'}</span>
+                <span><strong>API Key live:</strong> {provisioning.hasApiKeyLive ? 'Configurada' : 'No configurada'}</span>
+              </div>
+              {provisioning.clientes.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Sin RNC emisores conectados todavía.</p>
+              ) : (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Compañía</th>
+                      <th>RNC</th>
+                      <th>Certificado vence</th>
+                      <th>Etapa de certificación</th>
+                      <th>Contingencia</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {provisioning.clientes.map((c, i) => (
+                      <tr key={i}>
+                        <td>{c.company}</td>
+                        <td>{c.rnc}</td>
+                        <td>{c.certificateExpiresAt ? formatDate(c.certificateExpiresAt) : '—'}</td>
+                        <td>{c.certificationStage ?? '—'}</td>
+                        <td>{c.contingencyMode ? 'Activa' : 'Inactiva'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -2801,6 +3198,7 @@ const SECTION_TITLES: Record<string, string> = {
   'grupos-clientes': 'Grupos de Clientes',
   facturacion: 'Configuración de Facturación',
   denominaciones: 'Denominaciones',
+  ecf: 'Facturación Electrónica',
 }
 
 export default function ConfigPage() {
@@ -2823,6 +3221,7 @@ export default function ConfigPage() {
     'grupos-clientes': <GruposClientesSection />,
     facturacion: <FacturacionConfigSection />,
     denominaciones: <DenominacionesSection />,
+    ecf: <EcfConfigSection />,
   }
 
   return (

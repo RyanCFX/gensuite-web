@@ -7,10 +7,13 @@ import {
   downloadDebitNotePdf,
 } from '@/shared/api/notes'
 import { listInvoices } from '@/shared/api/invoices'
+import { getEcfTipos } from '@/shared/api/ecf'
 import { listSucursales } from '@/shared/api/sucursales'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
-import type { Invoice, CreateDebitNoteDto } from '@/shared/api/types'
+import type { Invoice, CreateDebitNoteDto, EcfModificationCode } from '@/shared/api/types'
+import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
+import { Select, SelectItem } from '@/components/ui/select'
 import { Plus, Loader2, Trash2, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatDOP } from '@/lib/formatters'
@@ -73,6 +76,7 @@ export default function DebitNotesPage() {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('')
   const [invoiceQuery, setInvoiceQuery] = useState('')
   const [reason, setReason] = useState('')
+  const [modificationCode, setModificationCode] = useState<EcfModificationCode | ''>('')
   const [noteItems, setNoteItems] = useState<NoteLineItem[]>([{ itemCode: '', qty: 1, rate: 0 }])
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
@@ -134,6 +138,11 @@ export default function DebitNotesPage() {
     enabled: modalOpen,
   })
 
+  // B03 (Nota de Débito) → typeId 33. Si el tenant lo tiene habilitado como e-CF, el código de
+  // modificación DGII es obligatorio al crear la nota.
+  const { data: ecfTipos } = useQuery({ queryKey: ['ecf-tipos'], queryFn: getEcfTipos, staleTime: 60 * 60_000 })
+  const ndEsEcf = ecfTipoElectronicoHabilitado(ecfTipos, '33')
+
   const submittedInvoices = invoicesData?.items ?? []
 
   const invoiceOptions: SearchSelectOption[] = submittedInvoices.map((inv) => ({
@@ -172,6 +181,7 @@ export default function DebitNotesPage() {
     setSelectedInvoiceId('')
     setInvoiceQuery('')
     setReason('')
+    setModificationCode('')
     setNoteItems([{ itemCode: '', qty: 1, rate: 0 }])
     setBranch('')
     setDepartment('')
@@ -179,7 +189,7 @@ export default function DebitNotesPage() {
   }
 
   const isDirty = useDirtyCheck(
-    { selectedInvoiceId, reason, noteItems, branch, department },
+    { selectedInvoiceId, reason, modificationCode, noteItems, branch, department },
     modalOpen,
   )
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, handleCloseModal)
@@ -204,6 +214,7 @@ export default function DebitNotesPage() {
       toast.error('Agrega al menos un artículo con código')
       return
     }
+    if (ndEsEcf && !modificationCode) { toast.error('Selecciona el código de modificación DGII'); return }
 
     const dto: CreateDebitNoteDto = {
       customer: selectedInvoice.customer,
@@ -211,6 +222,8 @@ export default function DebitNotesPage() {
       notes: reason || undefined,
       branch: branch || undefined,
       department: department || undefined,
+      referenceInvoice: selectedInvoice.id,
+      modificationCode: modificationCode || undefined,
       items: noteItems
         .filter((i) => i.itemCode.trim())
         .map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate })),
@@ -419,11 +432,11 @@ export default function DebitNotesPage() {
             <form onSubmit={handleSubmit}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div className="ff-wrap">
-                  <label className="ff-label">Factura original (sometida)</label>
+                  <label className="ff-label ff-required" htmlFor="invoice-debit">Factura afectada (sometida)</label>
                   <SearchSelect
                     id="invoice-debit"
                     value={selectedInvoiceId}
-                    onChange={(id, _opt) => {
+                    onChange={(id) => {
                       setSelectedInvoiceId(id)
                       if (!id) {
                         setSelectedInvoice(null)
@@ -438,6 +451,10 @@ export default function DebitNotesPage() {
                     placeholder="Buscar factura por cliente…"
                     error={!selectedInvoiceId}
                   />
+                  <p className="ff-hint">
+                    La nota de débito queda vinculada a esta factura. Obligatoria para notas electrónicas
+                    (Aura exige el comprobante afectado).
+                  </p>
                   {selectedInvoice && (
                     <div style={{ marginTop: 4, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface-sunken)', fontSize: 13 }}>
                       <span style={{ fontWeight: 500 }}>{selectedInvoice.customerName}</span>
@@ -459,6 +476,24 @@ export default function DebitNotesPage() {
                     required
                   />
                 </div>
+
+                {ndEsEcf && (
+                  <div className="ff-wrap">
+                    <label className="ff-label ff-required">Código de modificación (DGII)</label>
+                    <Select
+                      value={modificationCode ? String(modificationCode) : ''}
+                      onValueChange={(v) => setModificationCode(v ? (Number(v) as EcfModificationCode) : '')}
+                      placeholder="Selecciona el código…"
+                    >
+                      {ECF_MODIFICATION_CODES.map((c) => (
+                        <SelectItem key={c.code} value={String(c.code)}>{c.label}</SelectItem>
+                      ))}
+                    </Select>
+                    <p className="ff-hint">
+                      Requerido para notas de débito electrónicas — declara ante la DGII qué corrige esta nota.
+                    </p>
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', gap: 16 }}>
                   <div className="ff-wrap" style={{ flex: 1 }}>

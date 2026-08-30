@@ -5,6 +5,8 @@ import type {
   DevolucionResult,
   DevolucionDetail,
   DevolucionListItem,
+  CancelDevolucionDto,
+  CancelDevolucionResult,
   PaginatedResponse,
   PaginationParams,
 } from './types'
@@ -44,5 +46,15 @@ export async function listDevoluciones(params?: ListDevolucionesParams) {
 // GET /devoluciones/:id — detalle, incluye la factura original devuelta
 export async function getDevolucion(id: string) {
   const res = await client.get<{ success: true; data: DevolucionDetail }>(ENDPOINTS.devoluciones.byId(id))
+  return unwrap(res)
+}
+
+// POST /devoluciones/:id/cancelar — cancela una devolución en borrador (no la elimina).
+// Mismo patrón que cancelInvoice (Facturación). El backend valida estado y permisos.
+export async function cancelDevolucion(id: string, data: CancelDevolucionDto) {
+  const res = await client.post<{ success: true; data: CancelDevolucionResult }>(
+    ENDPOINTS.devoluciones.cancelar(id),
+    data,
+  )
   return unwrap(res)
 }

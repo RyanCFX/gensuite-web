@@ -3,6 +3,7 @@ import { ENDPOINTS } from './endpoints'
 import type {
   Invoice,
   CreateInvoiceDto,
+  UpdateInvoiceDto,
   CancelInvoiceDto,
   SubmitInvoiceDto,
   SubmitInvoiceResult,
@@ -46,6 +47,16 @@ export async function getInvoice(id: string) {
 
 export async function createInvoice(data: CreateInvoiceDto) {
   const res = await client.post<{ success: true; data: Invoice }>(ENDPOINTS.invoices.list, data)
+  return unwrap(res)
+}
+
+/**
+ * PATCH /invoices/:id — edita una factura en borrador. REEMPLAZO COMPLETO: `data` es la factura
+ * entera (todas las líneas), no un parche. Cada llamada sube `sequence` y guarda un snapshot en
+ * `history[]`. 400 si la factura ya no está en borrador (usar cancel + amend) o si fue enviada a Caja.
+ */
+export async function updateInvoice(id: string, data: UpdateInvoiceDto) {
+  const res = await client.patch<{ success: true; data: Invoice }>(ENDPOINTS.invoices.byId(id), data)
   return unwrap(res)
 }
 
@@ -119,6 +130,18 @@ export async function downloadInvoicePdf(id: string, filename?: string, formato?
   const a = document.createElement("a")
   a.href = blobUrl
   a.download = filename ?? `factura-${id}.pdf`
+  a.click()
+  URL.revokeObjectURL(blobUrl)
+}
+
+// PDF/A-1b certificable del comprobante electrónico — archivado fiscal de largo plazo, distinto
+// del PDF normal de la factura. 404 si la factura no tiene un e-CF emitido.
+export async function downloadInvoiceEcfPdfa(id: string, filename?: string): Promise<void> {
+  const res = await client.get<Blob>(ENDPOINTS.invoices.ecfPdfa(id), { responseType: "blob" })
+  const blobUrl = URL.createObjectURL(res.data)
+  const a = document.createElement("a")
+  a.href = blobUrl
+  a.download = filename ?? `factura-${id}-pdfa.pdf`
   a.click()
   URL.revokeObjectURL(blobUrl)
 }

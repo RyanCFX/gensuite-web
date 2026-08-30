@@ -12,11 +12,14 @@ import {
 } from '@/shared/api/notes'
 import { listInvoices, getInvoice } from '@/shared/api/invoices'
 import { listMetodosPago, getCatalogosFiscales } from '@/shared/api/config'
+import { getEcfTipos } from '@/shared/api/ecf'
 import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listDepartamentos } from '@/shared/api/departamentos'
-import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo } from '@/shared/api/types'
+import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo, EcfModificationCode } from '@/shared/api/types'
+import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
+import { Select, SelectItem } from '@/components/ui/select'
 import { Plus, Loader2, Wallet, ArrowRightLeft, ChevronDown, ChevronRight, Download } from 'lucide-react'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
@@ -117,6 +120,12 @@ export default function CreditNotesPage() {
     queryFn: getCatalogosFiscales,
     staleTime: 60 * 60_000,
   })
+
+  // B04 (Nota de Crédito) → typeId 34. Si el tenant lo tiene habilitado como e-CF, el código de
+  // modificación DGII es obligatorio al crear la nota.
+  const { data: ecfTipos } = useQuery({ queryKey: ['ecf-tipos'], queryFn: getEcfTipos, staleTime: 60 * 60_000 })
+  const ncEsEcf = ecfTipoElectronicoHabilitado(ecfTipos, '34')
+
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
   const ncfTypeOptions: SearchSelectOption[] = (catalogos?.ncfTypes ?? [])
     .filter((t) => !ncfTypeSearch || t.label.toLowerCase().includes(ncfTypeSearch.toLowerCase()))
@@ -168,6 +177,7 @@ export default function CreditNotesPage() {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('')
   const [invoiceQuery, setInvoiceQuery] = useState('')
   const [reason, setReason] = useState('')
+  const [modificationCode, setModificationCode] = useState<EcfModificationCode | ''>('')
   const [noteItems, setNoteItems] = useState<NoteLineItem[]>([])
   const [refundTarget, setRefundTarget] = useState<CreditNoteRow | null>(null)
   const [refundAmount, setRefundAmount] = useState(0)
@@ -242,8 +252,19 @@ export default function CreditNotesPage() {
     if (selectedInvoiceDetail && selectedInvoiceDetail.id === selectedInvoiceId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- precarga los artículos al llegar el detalle de la factura seleccionada
       setNoteItems(selectedInvoiceDetail.items.map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate })))
+      // La factura preseleccionada por ?originalInvoice= puede no estar en la lista de 20 —
+      // completa la tarjeta de resumen desde el detalle.
+      setSelectedInvoice((prev) => prev ?? selectedInvoiceDetail)
     }
   }, [selectedInvoiceDetail, selectedInvoiceId])
+
+  // Atajo desde el detalle de una factura con e-CF aceptado ("Emitir Nota de Crédito").
+  useEffect(() => {
+    const preId = searchParams.get('originalInvoice')
+    if (!preId) return
+    setModalOpen(true)
+    setSelectedInvoiceId(preId)
+  }, [searchParams])
 
   const { data: invoicesData, isLoading: invoicesLoading } = useQuery({
     queryKey: ['invoices-submitted', invoiceQuery],
@@ -293,10 +314,11 @@ export default function CreditNotesPage() {
     setSelectedInvoiceId('')
     setInvoiceQuery('')
     setReason('')
+    setModificationCode('')
     setNoteItems([])
   }
 
-  const crearIsDirty = useDirtyCheck({ selectedInvoiceId, reason, noteItems }, modalOpen)
+  const crearIsDirty = useDirtyCheck({ selectedInvoiceId, reason, modificationCode, noteItems }, modalOpen)
   const crearClose = useConfirmClose(crearIsDirty, handleCloseModal)
 
   const refundMutation = useMutation({
@@ -458,12 +480,14 @@ export default function CreditNotesPage() {
     if (!selectedInvoice) { toast.error('Selecciona una factura'); return }
     if (!reason.trim()) { toast.error('Indica el motivo de la nota de crédito'); return }
     if (noteItems.length === 0) { toast.error('Agrega al menos un artículo'); return }
+    if (ncEsEcf && !modificationCode) { toast.error('Selecciona el código de modificación DGII'); return }
 
     const dto: CreateCreditNoteDto = {
       originalInvoice: selectedInvoice.id,
       postingDate: new Date().toISOString().slice(0, 10),
       reason,
       items: noteItems.map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate })),
+      modificationCode: modificationCode || undefined,
     }
     createMutation.mutate(dto)
   }
@@ -806,6 +830,24 @@ export default function CreditNotesPage() {
                     required
                   />
                 </div>
+
+                {ncEsEcf && (
+                  <div className="ff-wrap">
+                    <label className="ff-label ff-required">Código de modificación (DGII)</label>
+                    <Select
+                      value={modificationCode ? String(modificationCode) : ''}
+                      onValueChange={(v) => setModificationCode(v ? (Number(v) as EcfModificationCode) : '')}
+                      placeholder="Selecciona el código…"
+                    >
+                      {ECF_MODIFICATION_CODES.map((c) => (
+                        <SelectItem key={c.code} value={String(c.code)}>{c.label}</SelectItem>
+                      ))}
+                    </Select>
+                    <p className="ff-hint">
+                      Requerido para notas de crédito electrónicas — declara ante la DGII qué corrige esta nota.
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>

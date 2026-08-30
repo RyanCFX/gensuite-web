@@ -7,6 +7,7 @@ import {
   cancelInvoice,
   amendInvoice,
   downloadInvoicePdf,
+  downloadInvoiceEcfPdfa,
   getInvoicePdfBlobUrl,
   aplicarSaldoFavor,
   removerSaldoFavor,
@@ -24,7 +25,9 @@ import { createDevolucion } from "@/shared/api/devoluciones";
 import { getItem } from "@/shared/api/catalog";
 import { getBundle } from "@/shared/api/bundles";
 import { getTurnoActual, abrirTurno } from "@/shared/api/pos";
-import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion } from "@/shared/api/types";
+import { ECF_SUBMIT_UNAVAILABLE_MSG } from "@/shared/api/ecf";
+import { useAuthStore } from "@/stores/auth.store";
+import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion, EcfSubmitResult } from "@/shared/api/types";
 import { MOTIVOS_ANULACION_DGII } from "@/lib/constants";
 import { ConfirmModal } from "@/shared/ui/Modal";
 import { useConfirmClose } from "@/shared/hooks/useConfirmClose";
@@ -50,6 +53,7 @@ import {
   Clock,
   BookOpen,
   Eye,
+  Archive,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -60,6 +64,8 @@ import {
 } from "@/lib/formatters";
 
 import { DocumentHistoryCard } from "@/components/shared/DocumentHistoryCard";
+import { EcfStatusCard } from "@/components/shared/EcfStatusCard";
+import { RelatedDocsCard } from "@/components/shared/RelatedDocsCard";
 import { PdfFormatButton } from "@/components/shared/PdfFormatButton";
 import { PdfPreviewModal } from "@/components/shared/PdfPreviewModal";
 import { SearchSelect } from "@/shared/ui/SearchSelect";
@@ -88,6 +94,7 @@ export default function InvoiceDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const isSystemManager = useAuthStore((s) => s.user?.roles?.includes("System Manager") ?? false);
 
   // Bloque opcional (u obligatorio si el cliente no tiene crédito) de "¿Cómo se cobra?"
   // al someter — ver escenarios en handleSubmitClick. La forma del bloque depende de
@@ -101,12 +108,16 @@ export default function InvoiceDetail() {
   const [creditErrorMsg, setCreditErrorMsg] = useState("");
   const [lastSubmitBody, setLastSubmitBody] = useState<SubmitInvoiceDto | undefined>(undefined);
   const [submitResult, setSubmitResult] = useState<{ outstandingAmount: number; invoiceId: string } | null>(null);
+  // Resultado del e-CF cuando la factura se emitió electrónicamente (raro hoy — ver Parte 3).
+  const [ecfResult, setEcfResult] = useState<EcfSubmitResult | null>(null);
   const [trackingRecovery, setTrackingRecovery] = useState<TrackedComponent | null>(null);
   const [trackingRecoveryLoading, setTrackingRecoveryLoading] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelMotivo, setCancelMotivo] = useState("");
   const [cancelForbiddenMsg, setCancelForbiddenMsg] = useState("");
+  // Cancelar una factura con e-CF aceptado devuelve 409 — la única corrección es una Nota de Crédito.
+  const [ecfCancelBlockedMsg, setEcfCancelBlockedMsg] = useState("");
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [returnFullInvoice, setReturnFullInvoice] = useState(true);
   const [returnRows, setReturnRows] = useState<
@@ -365,10 +376,15 @@ export default function InvoiceDetail() {
   );
 
   const creditoAplicado = creditoAplicadoSaldoFavor + creditoAplicadoNotas;
+  // Monto real a cobrar de la factura, ya con el redondeo de moneda de ERPNext aplicado (igual a
+  // grandTotal si el tenant no redondea). Usar SIEMPRE este valor para armar/validar el cobro —
+  // grandTotal es el monto bruto antes de redondear, no lo que el cajero debe cobrar.
+  const roundedTotal = invoice ? invoice.roundedTotal ?? invoice.grandTotal : 0;
+  const roundingAdjustment = invoice?.roundingAdjustment ?? 0;
   // Lo que realmente queda pendiente en esta factura (antes de someter) — el backend valida contra esto,
   // no contra el grandTotal bruto, ya que puede haber crédito ya aplicado previamente.
   const pendingAmount = invoice
-    ? Math.max(0, invoice.grandTotal - creditoAplicado)
+    ? Math.max(0, roundedTotal - creditoAplicado)
     : 0;
 
   const noCredit = invoice?.status === "draft" && customer?.hasCredit === false;
@@ -384,11 +400,15 @@ export default function InvoiceDetail() {
   // el backend ignora `payments` por completo y siempre manda la factura a Caja
   // (custom_enviada_a_caja=1, sin NCF). No tiene sentido mostrar el bloque de pago.
   const posCliente = usaModuloPos && noCredit;
-  // Escenarios 1 y 2: se muestra el bloque "¿Cómo se cobra?" — opcional en general,
-  // obligatorio si el cliente no tiene crédito (limitación temporal del backend: si se
-  // somete a crédito sin payments, la factura queda en CxC igual aunque no debería).
+  // Con el módulo POS activo, el cobro siempre pasa por Caja/turno sin importar si el
+  // cliente tiene crédito o no — no solo en el caso "de consumo" (posCliente). Antes de
+  // que existiera el módulo POS, esta pantalla nunca mostraba campos de pago; con POS
+  // activo debe seguir igual.
+  // Escenarios 1 y 2 (sin POS): se muestra el bloque "¿Cómo se cobra?" — opcional en
+  // general, obligatorio si el cliente no tiene crédito (limitación temporal del backend:
+  // si se somete a crédito sin payments, la factura queda en CxC igual aunque no debería).
   const showPaymentBlock =
-    invoice?.status === "draft" && !paidByCreditNote && !posCliente;
+    invoice?.status === "draft" && !paidByCreditNote && !posCliente && !usaModuloPos;
   const paymentRequired = showPaymentBlock && noCredit;
 
   const metodosActivos = (metodos ?? []).filter((m) => !m.disabled);
@@ -449,6 +469,7 @@ export default function InvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: ["turno-actual"] });
       setCreditErrorOpen(false);
       setSubmitResult(null);
+      setEcfResult(null);
       setPayments(EMPTY_PAYMENT_LINES_VALUE);
       setDirectoMop("");
       setDirectoAmount("");
@@ -477,10 +498,23 @@ export default function InvoiceDetail() {
       } else {
         toast.success("Factura sometida — NCF asignado");
       }
+      // Bloque e-CF: solo presente cuando el tenant emitió esta factura electrónicamente.
+      if ("ecf" in updated && updated.ecf) {
+        setEcfResult(updated.ecf);
+      }
       downloadInvoicePdf(id!, `factura-${id}.pdf`, formatoImpresionDefault);
     },
-    onError: (err: { message?: string }) => {
+    onError: (err: ApiError) => {
       const msg = err?.message ?? "";
+      if (err?.statusCode === 503) {
+        toast.error(ECF_SUBMIT_UNAVAILABLE_MSG, {
+          duration: 8000,
+          action: isSystemManager
+            ? { label: "Contingencia", onClick: () => navigate("/config/ecf/admin") }
+            : undefined,
+        });
+        return;
+      }
       if (/excede\s+el\s+cr[eé]dito\s+disponible/i.test(msg)) {
         setCreditErrorMsg(msg);
         setCreditErrorOpen(true);
@@ -650,6 +684,13 @@ export default function InvoiceDetail() {
     },
     onError: (err: ApiError) => {
       if (err?.statusCode === 409) {
+        // Un e-CF aceptado por la DGII no se puede anular — hay que emitir una Nota de Crédito.
+        if (/nota de cr[eé]dito/i.test(err.message ?? "")) {
+          setCancelModalOpen(false);
+          setEcfCancelBlockedMsg(err.message);
+          queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+          return;
+        }
         toast.error("La factura ya está cancelada.");
         queryClient.invalidateQueries({ queryKey: ["invoice", id] });
         setCancelModalOpen(false);
@@ -670,6 +711,15 @@ export default function InvoiceDetail() {
     setCancelMotivo("");
     setCancelForbiddenMsg("");
     setCancelModalOpen(true);
+  }
+
+  // Un e-CF ya aceptado (o aceptado condicionalmente) por la DGII no se puede anular: la única
+  // corrección posible es una Nota de Crédito Electrónica que lo referencie.
+  const ecfAceptado =
+    invoice?.ecf?.status === "ACCEPTED" || invoice?.ecf?.status === "CONDITIONAL";
+
+  function irANotaCredito() {
+    navigate(`/notas-credito?originalInvoice=${encodeURIComponent(id!)}`);
   }
 
   const cancelMotivoRequired = Boolean(invoice?.ncf);
@@ -778,6 +828,17 @@ export default function InvoiceDetail() {
     mutationFn: (formato?: FormatoImpresion) => getInvoicePdfBlobUrl(id!, formato ?? formatoImpresionDefault),
     onSuccess: (url) => setPreviewUrl(url),
     onError: (err: { message?: string }) => toast.error(err?.message ?? "No se pudo generar la vista previa del PDF"),
+  });
+
+  // PDF/A de archivado fiscal — solo relevante para facturas con e-CF emitido.
+  const pdfaMutation = useMutation({
+    mutationFn: () => downloadInvoiceEcfPdfa(id!, `factura-${id}-pdfa.pdf`),
+    onError: (err: ApiError) =>
+      toast.error(
+        err?.statusCode === 404
+          ? "Esta factura no tiene un e-CF emitido."
+          : err?.message ?? "No se pudo descargar el PDF/A",
+      ),
   });
 
   if (isLoading) {
@@ -917,6 +978,14 @@ export default function InvoiceDetail() {
                 flexWrap: "wrap",
               }}
             >
+              <button
+                className="btn btn-secondary btn-size-sm"
+                onClick={() => navigate(`/facturas/${id}/editar`)}
+                disabled={isActionsLoading}
+              >
+                <FileEdit size={14} /> Editar
+              </button>
+
               <button
                 className="btn btn-danger btn-size-sm"
                 onClick={openCancelModal}
@@ -1104,6 +1173,16 @@ export default function InvoiceDetail() {
               loading={downloadMutation.isPending}
               formatosPermitidos={formatosPermitidos}
             />
+            {invoice.ecf && (
+              <button
+                className="btn btn-secondary btn-size-sm"
+                onClick={() => pdfaMutation.mutate()}
+                disabled={pdfaMutation.isPending}
+                title="Formato certificable para archivado fiscal de largo plazo"
+              >
+                <Archive size={14} /> {pdfaMutation.isPending ? "Generando…" : "PDF/A (archivo fiscal)"}
+              </button>
+            )}
             <button
               className="btn btn-secondary btn-size-sm"
               onClick={openReturnModal}
@@ -1123,13 +1202,23 @@ export default function InvoiceDetail() {
             >
               <BookOpen size={14} /> Ver asientos
             </button>
-            <button
-              className="btn btn-danger btn-size-sm"
-              onClick={openCancelModal}
-              disabled={isActionsLoading}
-            >
-              <XCircle size={14} /> Cancelar
-            </button>
+            {ecfAceptado ? (
+              <button
+                className="btn btn-primary btn-size-sm"
+                onClick={irANotaCredito}
+                disabled={isActionsLoading}
+              >
+                <RotateCcw size={14} /> Emitir Nota de Crédito
+              </button>
+            ) : (
+              <button
+                className="btn btn-danger btn-size-sm"
+                onClick={openCancelModal}
+                disabled={isActionsLoading}
+              >
+                <XCircle size={14} /> Cancelar
+              </button>
+            )}
           </>
         )}
         {invoice.status === "cancelled" && (
@@ -1167,6 +1256,35 @@ export default function InvoiceDetail() {
           </button>
         </div>
       )}
+
+      {(ecfAceptado || ecfCancelBlockedMsg) && invoice.status === "submitted" && (
+        <div
+          className="inline-alert inline-alert-info"
+          style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+        >
+          <Receipt size={16} style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: 13, flex: 1 }}>
+            {ecfCancelBlockedMsg ||
+              "Esta factura tiene un e-CF aceptado por la DGII. No se puede anular — para corregirla, emite una Nota de Crédito Electrónica que la referencie."}
+          </span>
+          <button className="btn btn-primary btn-size-sm" onClick={irANotaCredito}>
+            Emitir Nota de Crédito
+          </button>
+        </div>
+      )}
+
+      {(ecfResult ?? invoice.ecf) && <EcfStatusCard ecf={ecfResult ?? invoice.ecf!} />}
+
+      <RelatedDocsCard
+        rows={[
+          {
+            label: "Pedido de venta",
+            links: invoice.salesOrder
+              ? [{ code: invoice.salesOrder, to: `/pedidos/${invoice.salesOrder}` }]
+              : [],
+          },
+        ]}
+      />
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
@@ -1999,18 +2117,33 @@ export default function InvoiceDetail() {
             )}
             <div
               className="items-total-line"
-              style={{ fontWeight: 700, fontSize: 15 }}
+              style={{ fontWeight: roundingAdjustment !== 0 ? 500 : 700, fontSize: roundingAdjustment !== 0 ? 13 : 15 }}
             >
               <span>Total</span>
               <span>{formatDOP(invoice.grandTotal)}</span>
             </div>
+            {roundingAdjustment !== 0 && (
+              <div className="items-total-line" style={{ color: "var(--text-tertiary)", fontSize: 13 }}>
+                <span>Ajuste por redondeo</span>
+                <span>{roundingAdjustment > 0 ? "+" : ""}{formatDOP(roundingAdjustment)}</span>
+              </div>
+            )}
+            {roundingAdjustment !== 0 && (
+              <div
+                className="items-total-line"
+                style={{ fontWeight: 700, fontSize: 15 }}
+              >
+                <span>Total a pagar</span>
+                <span>{formatDOP(roundedTotal)}</span>
+              </div>
+            )}
             {creditoAplicado > 0 && (
               <div
                 className="items-total-line"
                 style={{ fontWeight: 700, fontSize: 15 }}
               >
                 <span>Total después de crédito</span>
-                <span>{formatDOP(invoice.grandTotal - creditoAplicado)}</span>
+                <span>{formatDOP(roundedTotal - creditoAplicado)}</span>
               </div>
             )}
             {invoice.status === "submitted" && (

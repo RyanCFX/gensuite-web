@@ -57,6 +57,8 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'dev-compras',  label: 'Devoluciones de Compras', group: 'Operaciones', path: '/devoluciones-compras',          icon: <Receipt size={15} />, keywords: 'devoluciones return compras proveedores credito' },
   { id: 'gastos',       label: 'Gastos',               group: 'Operaciones',  path: '/gastos',                         icon: <CreditCard size={15} />, keywords: 'expenses gastos operativos 606' },
   { id: 'gasto-nuevo',  label: 'Nuevo Gasto',          group: 'Operaciones',  path: '/gastos/nuevo',                   icon: <CreditCard size={15} />, keywords: 'crear gasto expense' },
+  { id: 'ecf-recibidos', label: 'e-CF Recibidos',      group: 'Operaciones',  path: '/ecf-recibidos',                  icon: <Receipt size={15} />, keywords: 'ecf recibidos bandeja terceros conciliacion acecf aprobacion comercial proveedor' },
+  { id: 'ecf-emitidos', label: 'e-CF Emitidos',        group: 'Operaciones',  path: '/ecf-emitidos',                   icon: <Receipt size={15} />, keywords: 'ecf emitidos bandeja comprobantes electronicos dgii ncf estado flujo qr timbre track id' },
   { id: 'proveedores',  label: 'Proveedores',          group: 'Operaciones',  path: '/proveedores',                    icon: <Truck size={15} />, keywords: 'suppliers vendor proveedor' },
 
   // ── Finanzas / CxC ─────────────────────────────────────────────────────────
@@ -99,6 +101,10 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'cfg-uom',      label: 'Unidades de Medida',   group: 'Configuración', path: '/config/uom',                  icon: <Settings size={15} />, keywords: 'uom units medida unidades' },
   { id: 'cfg-precios',  label: 'Listas de Precio',     group: 'Configuración', path: '/config/listas-precio',        icon: <Settings size={15} />, keywords: 'price list precios lista' },
   { id: 'cfg-ncf',      label: 'Secuencias NCF',       group: 'Configuración', path: '/config/ncf',                  icon: <Shield size={15} />, keywords: 'ncf comprobantes fiscales b01 b02 dgii secuencias' },
+  { id: 'cfg-ecf',      label: 'Facturación Electrónica · Administración', group: 'Configuración', path: '/config/ecf', icon: <Shield size={15} />, keywords: 'ecf e-cf facturacion electronica dgii aura b31 b32 administracion' },
+  { id: 'cfg-ecf-admin', label: 'Facturación Electrónica · Avanzado',  group: 'Configuración', path: '/config/ecf/admin',        icon: <Shield size={15} />, keywords: 'ecf aura api key certificado p12 webhook emisor rnc provisioning conectar avanzado' },
+  { id: 'cfg-ecf-cert', label: 'Facturación Electrónica · Certificación DGII', group: 'Configuración', path: '/config/ecf/certificacion', icon: <Shield size={15} />, keywords: 'ecf certificacion dgii 14 pasos progreso stage certified trámite' },
+  { id: 'cfg-ecf-cont', label: 'Facturación Electrónica · Contingencia', group: 'Configuración', path: '/config/ecf/contingencia', icon: <Shield size={15} />, keywords: 'ecf contingencia decreto 587-24 diferido waiting deferred reenviar flush 72 horas' },
   { id: 'cfg-tes-tipos-doc', label: 'Tipos de Documento Bancario', group: 'Configuración', path: '/config/tesoreria/tipos-documento', icon: <CreditCard size={15} />, keywords: 'tesoreria cheque deposito transferencia catalogo bank document type' },
   { id: 'cfg-tes-plantillas', label: 'Plantillas de Cheque', group: 'Configuración', path: '/config/tesoreria/plantillas-cheque', icon: <CreditCard size={15} />, keywords: 'tesoreria cheque print template imprimir talonario' },
   { id: 'cfg-perfil',   label: 'Mi Perfil',            group: 'Configuración', path: '/config/perfil',               icon: <UserCog size={15} />, keywords: 'perfil usuario profile settings' },

@@ -21,6 +21,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { EcfSequencesPanel } from './EcfSequencesPanel'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -676,6 +677,7 @@ type ModalState =
 export default function NcfPage() {
   const qc = useQueryClient()
   const [modal, setModal] = useState<ModalState>({ type: 'none' })
+  const [tab, setTab] = useState<'fisico' | 'ecf'>('fisico')
 
   const { data: series, isLoading, isError } = useQuery({
     queryKey: ['ncf-series'],
@@ -738,12 +740,29 @@ export default function NcfPage() {
         title="Secuencias NCF"
         description="Números de Comprobante Fiscal — DGII República Dominicana"
         action={
-          <button className="btn btn-primary" onClick={() => setModal({ type: 'create' })}>
-            <Plus size={14} aria-hidden="true" /> Nueva Secuencia
-          </button>
+          tab === 'fisico'
+            ? (
+                <button className="btn btn-primary" onClick={() => setModal({ type: 'create' })}>
+                  <Plus size={14} aria-hidden="true" /> Nueva Secuencia
+                </button>
+              )
+            : undefined
         }
       />
 
+      <div className="tabs-bar" style={{ marginBottom: 16 }}>
+        <button type="button" className={`tab-btn${tab === 'fisico' ? ' on' : ''}`} onClick={() => setTab('fisico')}>
+          Físico
+        </button>
+        <button type="button" className={`tab-btn${tab === 'ecf' ? ' on' : ''}`} onClick={() => setTab('ecf')}>
+          Electrónico (e-NCF)
+        </button>
+      </div>
+
+      {tab === 'ecf' && <EcfSequencesPanel />}
+
+      {tab === 'fisico' && (
+      <>
       <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Proactive alerts */}
@@ -991,6 +1010,8 @@ export default function NcfPage() {
           onClose={() => setModal({ type: 'none' })}
           isPending={enableMutation.isPending}
         />
+      )}
+      </>
       )}
     </div>
   )
