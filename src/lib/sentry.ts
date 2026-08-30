@@ -34,6 +34,12 @@ export function initSentry(): void {
 
   Sentry.init({
     dsn,
+    // El DSN apunta a GlitchTip por HTTP (IP self-hosted). Servido el front por HTTPS, mandar los
+    // envelopes directo a esa URL dispara Mixed Content y el navegador los bloquea. `tunnel` hace
+    // que el SDK los mande a esta ruta relativa propia en vez del host del DSN — el dev server
+    // (vite.config.ts) la reenvía al ingest real de GlitchTip, así la petición insegura sale del
+    // servidor y no del navegador.
+    tunnel: '/glitchtip-tunnel',
     environment: import.meta.env.MODE,
     // Logs estructurados (Sentry.logger.*) — feature de GlitchTip/Sentry además de Issues.
     enableLogs: true,
