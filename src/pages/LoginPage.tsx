@@ -11,6 +11,11 @@ import { useAuthStore } from '@/stores/auth.store'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+// En producción el tenant se resuelve del lado del backend (no hay múltiples
+// organizaciones seleccionables desde el login) — el campo se oculta y se
+// envía `tenant: null` al API en vez del valor tecleado en el form.
+const IS_PRODUCTION = import.meta.env.PROD
+
 const schema = z.object({
   email: z
     .string()
@@ -19,9 +24,9 @@ const schema = z.object({
   password: z
     .string()
     .min(1, 'La contraseña es obligatoria'),
-  tenant: z
-    .string()
-    .min(1, 'El tenant es obligatorio'),
+  tenant: IS_PRODUCTION
+    ? z.string().optional()
+    : z.string().min(1, 'El tenant es obligatorio'),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -63,14 +68,14 @@ export default function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { tenant: 'tenant1' },
+    defaultValues: { tenant: IS_PRODUCTION ? undefined : 'tenant1' },
   })
 
   async function onSubmit(values: FormValues) {
     setServerError(null)
 
     try {
-      await authLogin(values.email, values.password, values.tenant)
+      await authLogin(values.email, values.password, IS_PRODUCTION ? null : values.tenant)
       navigate(next, { replace: true })
     } catch (error) {
       if (isApiError(error)) {
@@ -155,21 +160,22 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="form-field">
-          <Label htmlFor="tenant">Tenant</Label>
-          <Input
-            id="tenant"
-            type="text"
-            placeholder="tenant1"
-            autoComplete="organization"
-            {...register('tenant')}
-            data-error={!!errors.tenant}
-          />
-          {errors.tenant?.message && (
-            <span className="form-error">{errors.tenant.message}</span>
-          )}
-        </div>
-
+        {!IS_PRODUCTION && (
+          <div className="form-field">
+            <Label htmlFor="tenant">Tenant</Label>
+            <Input
+              id="tenant"
+              type="text"
+              placeholder="tenant1"
+              autoComplete="organization"
+              {...register('tenant')}
+              data-error={!!errors.tenant}
+            />
+            {errors.tenant?.message && (
+              <span className="form-error">{errors.tenant.message}</span>
+            )}
+          </div>
+        )}
 
         <button
           type="submit"
