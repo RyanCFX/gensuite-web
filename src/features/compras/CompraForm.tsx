@@ -529,6 +529,7 @@ export default function CompraForm() {
   const requiereSerialLoteCompra = facturacionConfig?.requiereSerialLoteCompra ?? false
 
   const [ncfProveedor, setNcfProveedor] = useState('')
+  const [tipoComprobante, setTipoComprobante] = useState('')
   const [billNo, setBillNo] = useState('')
   const [tipoBienes606, setTipoBienes606] = useState('')
   const [formaPago606, setFormaPago606] = useState('')
@@ -563,6 +564,11 @@ export default function CompraForm() {
     .filter((t) => !tipoBienes606Search || t.label.toLowerCase().includes(tipoBienes606Search.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
 
+  const [tipoComprobanteSearch, setTipoComprobanteSearch] = useState('')
+  const tipoComprobanteOptions: SearchSelectOption[] = (catalogos?.ncfTypesCompra ?? [])
+    .filter((t) => !tipoComprobanteSearch || t.label.toLowerCase().includes(tipoComprobanteSearch.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
+
   const [formaPago606Search, setFormaPago606Search] = useState('')
   const formaPago606Options: SearchSelectOption[] = (catalogos?.formaPago606 ?? [])
     .filter((f) => !formaPago606Search || f.label.toLowerCase().includes(formaPago606Search.toLowerCase()))
@@ -586,7 +592,10 @@ export default function CompraForm() {
     setSupplierName(supplier.supplierName)
     if (!tipoBienes606Touched && supplier.defaultTipoBienes606) setTipoBienes606(supplier.defaultTipoBienes606)
     if (!formaPago606Touched && supplier.defaultFormaPago606) setFormaPago606(supplier.defaultFormaPago606)
-    if (!tipoPagoTouched && supplier.defaultTipoPagoProveedor) setTipoPago(supplier.defaultTipoPagoProveedor)
+    if (!tipoPagoTouched) {
+      if (!supplier.diasCredito) setTipoPago('Contado')
+      else if (supplier.defaultTipoPagoProveedor) setTipoPago(supplier.defaultTipoPagoProveedor)
+    }
     queryClient.invalidateQueries({ queryKey: ['supplierSearch'] })
   }
 
@@ -766,6 +775,7 @@ export default function CompraForm() {
     setBranch(compraData.branch ?? '')
     setDepartment(compraData.department ?? '')
     setNcfProveedor(compraData.ncfProveedor ?? '')
+    setTipoComprobante(compraData.tipoComprobante ?? '')
     setBillNo(compraData.billNo ?? '')
     setTipoBienes606(compraData.tipoBienes606 ?? '')
     setFormaPago606(compraData.formaPago606 ?? '')
@@ -933,6 +943,7 @@ export default function CompraForm() {
           : {}),
       })),
       ncfProveedor: ncfProveedor || undefined,
+      tipoComprobante: (tipoComprobante as CreateCompraDto['tipoComprobante']) || undefined,
       billNo: billNo || undefined,
       tipoBienes606: tipoBienes606 || undefined,
       formaPago606: formaPago606 || undefined,
@@ -1073,7 +1084,12 @@ export default function CompraForm() {
                         if (selected) {
                           if (!tipoBienes606Touched && selected.defaultTipoBienes606) setTipoBienes606(selected.defaultTipoBienes606)
                           if (!formaPago606Touched && selected.defaultFormaPago606) setFormaPago606(selected.defaultFormaPago606)
-                          if (!tipoPagoTouched && selected.defaultTipoPagoProveedor) setTipoPago(selected.defaultTipoPagoProveedor)
+                          if (!tipoPagoTouched) {
+                            // Sin días de crédito, no se le puede facturar a crédito — se
+                            // auto-selecciona Contado sin importar el default del proveedor.
+                            if (!selected.diasCredito) setTipoPago('Contado')
+                            else if (selected.defaultTipoPagoProveedor) setTipoPago(selected.defaultTipoPagoProveedor)
+                          }
                           if (selected.diasCredito) {
                             const base = new Date(postingDate || new Date().toISOString().split('T')[0])
                             base.setDate(base.getDate() + selected.diasCredito)
@@ -1126,6 +1142,8 @@ export default function CompraForm() {
                         if (e.target.checked) {
                           setSupplierId('')
                           setSupplierName('')
+                          // Un proveedor ocasional nunca tiene términos de crédito.
+                          if (!tipoPagoTouched) setTipoPago('Contado')
                         } else {
                           setProveedorOcasionalNombre('')
                           setProveedorOcasionalRnc('')
@@ -1302,7 +1320,9 @@ export default function CompraForm() {
             </div>
             <div className="form-row form-row-3">
               <div className="ff-wrap">
-                <label className="ff-label">NCF Proveedor</label>
+                <label className="ff-label">
+                  {esProveedorOcasional ? 'NCF Proveedor (opcional)' : <>NCF Proveedor <span className="ff-required">*</span></>}
+                </label>
                 <input
                   className={`ff-input${!ncfValid ? ' ff-input-error' : ''}`}
                   placeholder="B01XXXXXXXXXX"
@@ -1311,6 +1331,9 @@ export default function CompraForm() {
                 />
                 {!ncfValid && (
                   <span className="ff-error">Formato inválido. Debe ser B o E seguido de 10 dígitos.</span>
+                )}
+                {esProveedorOcasional && !ncfProveedor && (
+                  <p className="ff-hint">Déjelo en blanco para que el sistema genere el comprobante automáticamente al someter.</p>
                 )}
               </div>
 
@@ -1323,6 +1346,21 @@ export default function CompraForm() {
                   onChange={(e) => setBillNo(e.target.value)}
                 />
               </div>
+
+              {esProveedorOcasional && !ncfProveedor && (
+                <div className="ff-wrap">
+                  <label className="ff-label">Tipo de Comprobante</label>
+                  <SearchSelect
+                    value={tipoComprobante}
+                    onChange={setTipoComprobante}
+                    options={tipoComprobanteOptions}
+                    onSearch={setTipoComprobanteSearch}
+                    selectedLabel={catalogos?.ncfTypesCompra?.find((t) => t.value === tipoComprobante)?.label ?? ''}
+                    placeholder="B11 - Compras/Informal (default)"
+                  />
+                  <p className="ff-hint">Tipo de comprobante a generar automáticamente al someter (default B11 si no se elige).</p>
+                </div>
+              )}
 
               <div className="ff-wrap">
                 <label className="ff-label">Tipo de Bienes 606</label>

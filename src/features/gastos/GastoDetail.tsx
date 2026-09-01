@@ -12,9 +12,10 @@ import { getCatalogosFiscales, listImpuestosCompras } from '@/shared/api/config'
 import { Send, X, RotateCcw, Info, FileText, AlertCircle, BookOpen } from 'lucide-react'
 import { SaldoFavorCxpSection } from '@/features/devoluciones-compras/SaldoFavorCxpSection'
 import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
+import { PagoContadoModal } from '@/components/shared/PagoContadoModal'
 import { ECF_SUBMIT_UNAVAILABLE_MSG } from '@/shared/api/ecf'
 import { useAuthStore } from '@/stores/auth.store'
-import type { ImpuestoDistribucionDto, EcfSubmitResult, ApiError } from '@/shared/api/types'
+import type { ImpuestoDistribucionDto, EcfSubmitResult, ApiError, PagoContadoDto } from '@/shared/api/types'
 
 function apiErrorMessage(error: unknown, fallback: string) {
   const apiErr = error as { message?: string }
@@ -30,6 +31,7 @@ export default function GastoDetail() {
   const isSystemManager = useAuthStore((s) => s.user?.roles?.includes('System Manager') ?? false)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [showAsientosPreview, setShowAsientosPreview] = useState(false)
+  const [showPagoContadoModal, setShowPagoContadoModal] = useState(false)
   // e-CF autogenerado al someter (gasto B11/B13/B14/B15/B17 sin NCF + e-CF habilitado). Raro hoy.
   const [ecfResult, setEcfResult] = useState<EcfSubmitResult | null>(null)
 
@@ -66,14 +68,32 @@ export default function GastoDetail() {
   }
 
   const submitMutation = useMutation({
-    mutationFn: () => submitGasto(id!),
-    onSuccess: (result) => { toast.success('Gasto sometido'); if (result?.ecf) setEcfResult(result.ecf); invalidate() },
-    onError: (error) => {
+    mutationFn: (body?: PagoContadoDto) => submitGasto(id!, body),
+    onSuccess: (result) => {
+      toast.success('Gasto sometido')
+      if (result.data?.ecf) setEcfResult(result.data.ecf)
+      setShowPagoContadoModal(false)
+      invalidate()
+      if (result.pago) {
+        toast.success('Pago registrado', {
+          action: { label: 'Ver pago', onClick: () => navigate(`/pagos/${result.pago!.id}`) },
+        })
+      }
+    },
+    onError: (error, body) => {
       if ((error as Partial<ApiError>)?.statusCode === 503) {
         toast.error(ECF_SUBMIT_UNAVAILABLE_MSG, {
           duration: 8000,
           action: isSystemManager ? { label: 'Contingencia', onClick: () => navigate('/config/ecf/admin') } : undefined,
         })
+        return
+      }
+      // El gasto probablemente sí quedó sometido (el 500 ocurre al crear el Payment Entry, ya
+      // con el gasto confirmado) — refrescamos el detalle en vez de tratarlo como fallo total.
+      if (body && (error as Partial<ApiError>)?.statusCode === 500) {
+        toast.error(apiErrorMessage(error, 'El gasto se sometió pero el pago no pudo registrarse — regístralo manualmente'), { duration: 10000 })
+        setShowPagoContadoModal(false)
+        invalidate()
         return
       }
       toast.error(apiErrorMessage(error, 'Error al someter el gasto'))
@@ -93,7 +113,7 @@ export default function GastoDetail() {
   })
 
   function handleConfirm() {
-    if (confirmAction === 'submit') submitMutation.mutate()
+    if (confirmAction === 'submit') submitMutation.mutate(undefined)
     else if (confirmAction === 'cancel') cancelMutation.mutate()
     else if (confirmAction === 'amend') amendMutation.mutate()
   }
@@ -153,7 +173,7 @@ export default function GastoDetail() {
                 </button>
                 <button
                   className="btn btn-primary btn-size-sm"
-                  onClick={() => setConfirmAction('submit')}
+                  onClick={() => (gasto.tipoPago === 'Contado' ? setShowPagoContadoModal(true) : setConfirmAction('submit'))}
                   disabled={blockSubmit}
                   title={blockSubmit ? 'Completa los campos 606 requeridos y respeta el límite de Gastos Menores antes de someter' : undefined}
                 >
@@ -399,6 +419,10 @@ export default function GastoDetail() {
               <span className="detail-value">{getFormaPagoLabel(gasto.formaPago606)}</span>
             </div>
             <div className="detail-field">
+              <span className="detail-label">Tipo de Pago</span>
+              <span className="detail-value">{gasto.tipoPago ?? '—'}</span>
+            </div>
+            <div className="detail-field">
               <span className="detail-label">Impuesto del Documento</span>
               <span className="detail-value">
                 {gasto.taxesTemplate && gasto.taxesTemplate.length > 0
@@ -475,6 +499,14 @@ export default function GastoDetail() {
           updateGasto(id!, { impuestoDistribucion: [payload] }).then(() =>
             queryClient.invalidateQueries({ queryKey: ['gasto', id] }))
         }
+      />
+      <PagoContadoModal
+        open={showPagoContadoModal}
+        onClose={() => setShowPagoContadoModal(false)}
+        outstandingAmount={gasto.outstandingAmount ?? gasto.grandTotal}
+        postingDate={gasto.postingDate.split('T')[0]}
+        loading={submitMutation.isPending}
+        onConfirm={(body) => submitMutation.mutate(body)}
       />
     </div>
   )

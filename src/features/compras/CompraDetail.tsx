@@ -17,9 +17,10 @@ import { PdfFormatButton } from '@/components/shared/PdfFormatButton'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import { SaldoFavorCxpSection } from '@/features/devoluciones-compras/SaldoFavorCxpSection'
 import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
+import { PagoContadoModal } from '@/components/shared/PagoContadoModal'
 import { ECF_SUBMIT_UNAVAILABLE_MSG } from '@/shared/api/ecf'
 import { useAuthStore } from '@/stores/auth.store'
-import type { FormatoImpresion, ImpuestoDistribucionDto, EcfSubmitResult, ApiError } from '@/shared/api/types'
+import type { FormatoImpresion, ImpuestoDistribucionDto, EcfSubmitResult, ApiError, PagoContadoDto } from '@/shared/api/types'
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | 'delete' | null
 
@@ -31,6 +32,7 @@ export default function CompraDetail() {
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [showAsientosPreview, setShowAsientosPreview] = useState(false)
+  const [showPagoContadoModal, setShowPagoContadoModal] = useState(false)
   // e-CF autogenerado al someter (proveedor ocasional sin NCF + e-CF habilitado). Raro hoy.
   const [ecfResult, setEcfResult] = useState<EcfSubmitResult | null>(null)
 
@@ -73,24 +75,39 @@ export default function CompraDetail() {
   })
 
   const submitMutation = useMutation({
-    mutationFn: () => submitCompra(id!),
+    mutationFn: (body?: PagoContadoDto) => submitCompra(id!, body),
     onSuccess: (result) => {
       toast.success('Compra sometida')
       queryClient.invalidateQueries({ queryKey: ['compra', id] })
       queryClient.invalidateQueries({ queryKey: ['compras'] })
       setConfirmAction(null)
-      if (result?.ecf) setEcfResult(result.ecf)
-      const updatedPrices = (result as any)?.updatedPrices
+      setShowPagoContadoModal(false)
+      if (result.data?.ecf) setEcfResult(result.data.ecf)
+      const updatedPrices = (result.data as any)?.updatedPrices
       if (updatedPrices && updatedPrices > 0) {
         toast.info(`Se actualizaron los precios de ${updatedPrices} artículo(s) (modo sobre costo)`)
       }
+      if (result.pago) {
+        toast.success('Pago registrado', {
+          action: { label: 'Ver pago', onClick: () => navigate(`/pagos/${result.pago!.id}`) },
+        })
+      }
     },
-    onError: (err: ApiError) => {
+    onError: (err: ApiError, body) => {
       if (err?.statusCode === 503) {
         toast.error(ECF_SUBMIT_UNAVAILABLE_MSG, {
           duration: 8000,
           action: isSystemManager ? { label: 'Contingencia', onClick: () => navigate('/config/ecf/admin') } : undefined,
         })
+        return
+      }
+      // La compra probablemente sí quedó sometida (el 500 ocurre al crear el Payment Entry, ya
+      // con la compra confirmada) — refrescamos el detalle en vez de tratarlo como fallo total.
+      if (body && err?.statusCode === 500) {
+        toast.error(err?.message ?? 'La compra se sometió pero el pago no pudo registrarse — regístralo manualmente', { duration: 10000 })
+        queryClient.invalidateQueries({ queryKey: ['compra', id] })
+        queryClient.invalidateQueries({ queryKey: ['compras'] })
+        setShowPagoContadoModal(false)
         return
       }
       toast.error(err?.message ?? 'Error al someter la compra')
@@ -123,7 +140,7 @@ export default function CompraDetail() {
   })
 
   function handleConfirm() {
-    if (confirmAction === 'submit') submitMutation.mutate()
+    if (confirmAction === 'submit') submitMutation.mutate(undefined)
     else if (confirmAction === 'cancel') cancelMutation.mutate()
     else if (confirmAction === 'amend') amendMutation.mutate()
     else if (confirmAction === 'delete') deleteMutation.mutate()
@@ -184,7 +201,10 @@ export default function CompraDetail() {
                 <button className="btn btn-secondary btn-size-sm" onClick={() => setShowAsientosPreview(true)}>
                   <BookOpen size={14} />Impacto contable
                 </button>
-                <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmAction('submit')}>
+                <button
+                  className="btn btn-primary btn-size-sm"
+                  onClick={() => (compra.tipoPago === 'Contado' ? setShowPagoContadoModal(true) : setConfirmAction('submit'))}
+                >
                   <Send size={14} />Someter
                 </button>
                 <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmAction('delete')}>
@@ -453,6 +473,14 @@ export default function CompraDetail() {
           </div>
         </div>
       )}
+      <PagoContadoModal
+        open={showPagoContadoModal}
+        onClose={() => setShowPagoContadoModal(false)}
+        outstandingAmount={compra.outstandingAmount ?? compra.grandTotal}
+        postingDate={compra.postingDate.split('T')[0]}
+        loading={submitMutation.isPending}
+        onConfirm={(body) => submitMutation.mutate(body)}
+      />
       <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
       <AsientosPreviewModal
         open={showAsientosPreview}
