@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { listMetodosPago } from '@/shared/api/config'
 import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
+import { getSiguienteChequeCuenta } from '@/shared/api/tesoreria'
 import { Modal } from '@/shared/ui/Modal'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
@@ -24,10 +25,13 @@ export function PagoContadoModal({ open, onClose, outstandingAmount, postingDate
   const [bankAccount, setBankAccount] = useState('')
   const [referenceDate, setReferenceDate] = useState('')
   const [referenceNo, setReferenceNo] = useState('')
+  const referenceNoTocado = useRef(false)
   const [remarks, setRemarks] = useState('')
 
   // Reinicia el formulario cada vez que el modal pasa de cerrado a abierto — ajustar estado
   // durante el render evita un render de sobra en cascada (mismo patrón que PrintLabelsModal).
+  // El ref no puede tocarse durante el render (regla de React), así que su reset va aparte en
+  // un efecto normal sincronizado con la misma transición.
   const [wasOpen, setWasOpen] = useState(open)
   if (open !== wasOpen) {
     setWasOpen(open)
@@ -39,6 +43,9 @@ export function PagoContadoModal({ open, onClose, outstandingAmount, postingDate
       setRemarks('')
     }
   }
+  useEffect(() => {
+    if (open) referenceNoTocado.current = false
+  }, [open])
 
   const { data: metodos } = useQuery({
     queryKey: ['metodos-pago'],
@@ -47,13 +54,11 @@ export function PagoContadoModal({ open, onClose, outstandingAmount, postingDate
   })
   const metodoSeleccionado = (metodos ?? []).find((m) => m.name === modeOfPayment)
   // Se infiere enteramente de la config del método de pago (Config > Métodos de Pago) — no hay
-  // checkbox manual, el backend siempre lo fuerza si el método está marcado como cheque.
+  // checkbox manual, el backend siempre lo fuerza si el método está marcado como cheque. Elegir
+  // una cuenta bancaria por sí solo NO implica cheque (a diferencia del criterio legacy de
+  // RegistrarPagoPage) — solo la config del método decide.
   const esCheque = !!metodoSeleccionado?.esCheque
-
   const showBankAccount = esCheque || !!metodoSeleccionado?.requiresBankAccount
-  // Un cheque siempre requiere indicar de qué cuenta sale, sin importar defaultBankAccount —
-  // ese default solo exime al método de pago cuando NO es cheque (ver PagoContadoDto.esCheque).
-  const bankAccountRequired = esCheque || (showBankAccount && !metodoSeleccionado?.defaultBankAccount)
 
   const { data: cuentasBancarias } = useQuery({
     queryKey: ['cuentas-bancarias-activas'],
@@ -61,20 +66,51 @@ export function PagoContadoModal({ open, onClose, outstandingAmount, postingDate
     enabled: open && showBankAccount,
   })
 
+  const cuentaSeleccionada = cuentasBancarias?.items.find((c) => c.id === bankAccount)
+  // Un cheque siempre requiere indicar de qué cuenta sale, sin importar defaultBankAccount —
+  // ese default solo exime al método de pago cuando NO es cheque (ver PagoContadoDto.esCheque).
+  const bankAccountRequired = esCheque || (showBankAccount && !metodoSeleccionado?.defaultBankAccount)
+  const cuentaChequesManuales = cuentaSeleccionada?.chequesManuales ?? true
+
+  const { data: siguienteCheque } = useQuery({
+    queryKey: ['tesoreria-siguiente-cheque-cuenta', bankAccount],
+    queryFn: () => getSiguienteChequeCuenta(bankAccount),
+    enabled: open && esCheque && !!bankAccount,
+  })
+
+  useEffect(() => {
+    if (!esCheque || !siguienteCheque?.siguienteSugerido) return
+    // Numeración automática: el campo queda deshabilitado y siempre refleja el número que
+    // asignará el backend, sin importar lo que el usuario haya escrito antes.
+    if (!cuentaChequesManuales) {
+      setReferenceNo(siguienteCheque.siguienteSugerido)
+      return
+    }
+    // Numeración manual: solo se sugiere una vez, como punto de partida editable.
+    if (!referenceNoTocado.current && !referenceNo) {
+      setReferenceNo(siguienteCheque.siguienteSugerido)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esCheque, cuentaChequesManuales, siguienteCheque])
+
+  const referenceNoRequired = esCheque && cuentaChequesManuales
+
   function handleConfirm() {
     if (!modeOfPayment) return
     if (bankAccountRequired && !bankAccount) return
+    if (referenceNoRequired && !referenceNo) return
     onConfirm({
       modeOfPayment,
       esCheque: esCheque || undefined,
       bankAccount: bankAccount || undefined,
       referenceDate: referenceDate || undefined,
-      referenceNo: referenceNo || undefined,
+      // Numeración automática: el backend asigna el número — enviarlo igual sería rechazado.
+      referenceNo: esCheque && !cuentaChequesManuales ? undefined : (referenceNo || undefined),
       remarks: remarks || undefined,
     })
   }
 
-  const canConfirm = !!modeOfPayment && (!bankAccountRequired || !!bankAccount)
+  const canConfirm = !!modeOfPayment && (!bankAccountRequired || !!bankAccount) && (!referenceNoRequired || !!referenceNo)
 
   return (
     <Modal
@@ -121,25 +157,46 @@ export function PagoContadoModal({ open, onClose, outstandingAmount, postingDate
             </label>
             <Select
               value={bankAccount}
-              onValueChange={setBankAccount}
+              onValueChange={(val) => {
+                setBankAccount(val)
+                referenceNoTocado.current = false
+                setReferenceNo('')
+              }}
               placeholder={metodoSeleccionado?.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
             >
-              {(cuentasBancarias?.items ?? []).map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.accountName}</SelectItem>
-              ))}
+              {(cuentasBancarias?.items ?? [])
+                // Un cheque solo puede emitirse contra una cuenta corriente.
+                .filter((c) => !esCheque || c.tipoCuenta === 'Cuenta Corriente')
+                .map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.accountName}</SelectItem>
+                ))}
             </Select>
           </div>
         )}
 
         <div className="form-row form-row-2">
           <div className="ff-wrap">
-            <label className="ff-label">{esCheque ? 'Número de Cheque' : 'No. de Referencia'}</label>
+            <label className="ff-label">
+              {esCheque ? 'Número de Cheque' : 'No. de Referencia'}
+              {esCheque && cuentaChequesManuales && <span className="ff-required">*</span>}
+            </label>
             <input
               className="ff-input"
               placeholder={esCheque ? 'Número de cheque…' : '# cheque, transferencia…'}
               value={referenceNo}
-              onChange={(e) => setReferenceNo(e.target.value)}
+              disabled={esCheque && !cuentaChequesManuales}
+              onChange={(e) => { referenceNoTocado.current = true; setReferenceNo(e.target.value) }}
             />
+            {esCheque && !cuentaChequesManuales && (
+              <p className="ff-hint" style={{ margin: 0 }}>
+                {bankAccount
+                  ? 'Numeración automática — se asigna al guardar.'
+                  : 'Selecciona la cuenta bancaria para ver el número que se asignará.'}
+              </p>
+            )}
+            {esCheque && cuentaChequesManuales && siguienteCheque?.ultimoCheque && (
+              <p className="ff-hint">Último usado: {siguienteCheque.ultimoCheque} — sugerencia editable.</p>
+            )}
           </div>
           <div className="ff-wrap">
             <label className="ff-label">Fecha de Referencia</label>
