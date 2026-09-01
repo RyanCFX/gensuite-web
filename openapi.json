@@ -8757,6 +8757,107 @@
         ]
       }
     },
+    "/api/v1/inventory/repost-valuacion": {
+      "post": {
+        "operationId": "InventoryController_createRepostValuacion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRepostValuacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Encola el recálculo nativo de ERPNext de la cola de valuación (FIFO/Moving Average) de un artículo — repara una tasa de costo corrupta (ej. negativa) que bloquea devoluciones o compras posteriores sobre ese artículo. Requiere rol System Manager o Accounts Manager. Solo encola el trabajo — ERPNext lo procesa en segundo plano, puede tardar minutos.",
+        "tags": [
+          "Inventario"
+        ]
+      },
+      "get": {
+        "operationId": "InventoryController_listRepostsValuacion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lista los recálculos de valuación encolados/en curso/completados, para hacer seguimiento sin entrar al Desk de ERPNext.",
+        "tags": [
+          "Inventario"
+        ]
+      }
+    },
     "/api/v1/inventory/counts": {
       "get": {
         "operationId": "CountsController_findAll",
@@ -14454,6 +14555,7 @@
     },
     "/api/v1/compras/{id}/submit": {
       "post": {
+        "description": "Si la compra es de tipoPago \"Contado\", debe enviarse el body con la información de pago (modeOfPayment y, si aplica, esCheque/referenceNo/referenceDate/remarks/bankAccount) — se crea y somete el Payment Entry por el saldo pendiente en el mismo request, para que la compra no quede como un pago pendiente.",
         "operationId": "ComprasController_submit",
         "parameters": [
           {
@@ -14473,6 +14575,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PagoContadoDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": ""
@@ -15525,6 +15637,7 @@
     },
     "/api/v1/gastos/{id}/submit": {
       "post": {
+        "description": "Si el gasto es de tipoPago \"Contado\", debe enviarse el body con la información de pago (modeOfPayment y, si aplica, esCheque/referenceNo/referenceDate/remarks/bankAccount) — se crea y somete el Payment Entry por el saldo pendiente en el mismo request, para que el gasto no quede como un pago pendiente.",
         "operationId": "GastosController_submit",
         "parameters": [
           {
@@ -15544,6 +15657,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PagoContadoDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": ""
@@ -24025,6 +24148,796 @@
           "Tesorería — Cheques"
         ]
       }
+    },
+    "/api/v1/plantillas": {
+      "get": {
+        "operationId": "PlantillasController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Pos Invoice",
+                "Label 5x2"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantillaImpresionListEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar plantillas de impresión (pos_invoice / label_5x2)",
+        "tags": [
+          "Plantillas de Impresión"
+        ]
+      },
+      "post": {
+        "operationId": "PlantillasController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlantillaImpresionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantillaImpresionEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear plantilla de impresión",
+        "tags": [
+          "Plantillas de Impresión"
+        ]
+      }
+    },
+    "/api/v1/plantillas/default": {
+      "get": {
+        "operationId": "PlantillasController_findDefault",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "Pos Invoice",
+                "Label 5x2"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantillaImpresionEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Plantilla default de un tipo para la compañía",
+        "tags": [
+          "Plantillas de Impresión"
+        ]
+      }
+    },
+    "/api/v1/plantillas/campos-disponibles": {
+      "get": {
+        "description": "Introspección real por tenant (§2 del plan): solo lista los bindings cuyo campo fuente existe en este site. Catálogos separados por tipo — el de Pos Invoice (factura) nunca se mezcla con el de Label 5x2 (artículo).",
+        "operationId": "PlantillasController_getCamposDisponibles",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "Pos Invoice",
+                "Label 5x2"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CamposDisponiblesEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Catálogo de campos disponibles para un tipo de plantilla",
+        "tags": [
+          "Plantillas de Impresión"
+        ]
+      }
+    },
+    "/api/v1/plantillas/render-data": {
+      "get": {
+        "description": "Reemplazo de POST /render (§3 del plan) — el backend no renderiza, solo devuelve el documento ya resuelto para que el editor/frontend arme la salida imprimible. Siempre usa la plantilla vigente (is_default o templateId) — no existe histórico/snapshot. type=Pos Invoice requiere sourceId (un Sales Invoice) y responde {template, values}. type=Label 5x2 requiere sourceIds (códigos de Item separados por coma, admite repetidos para imprimir varias copias) y responde {template, labels: [{sourceId, values}]}.",
+        "operationId": "PlantillasController_getRenderData",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Pos Invoice",
+                "Label 5x2"
+              ]
+            }
+          },
+          {
+            "name": "sourceId",
+            "required": false,
+            "in": "query",
+            "description": "Nombre del documento fuente en ERPNext. Obligatorio cuando type=Pos Invoice (un Sales Invoice) — se ignora si se manda sourceIds.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceIds",
+            "required": false,
+            "in": "query",
+            "description": "Códigos de artículo (Item) separados por coma. Obligatorio cuando type=Label 5x2 — acepta repetidos (ej. \"ITEM-1,ITEM-1,ITEM-2\" para imprimir 2 etiquetas de ITEM-1 y 1 de ITEM-2 en una sola llamada).",
+            "schema": {
+              "example": "ITEM-1,ITEM-1,ITEM-2",
+              "type": "string"
+            }
+          },
+          {
+            "name": "templateId",
+            "required": false,
+            "in": "query",
+            "description": "Plantilla a usar. Si no se manda, se usa la is_default del (company, type).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Documento fuente ya resuelto contra el catálogo de bindings",
+        "tags": [
+          "Plantillas de Impresión"
+        ]
+      }
+    },
+    "/api/v1/plantillas/logo": {
+      "post": {
+        "description": "multipart/form-data con el archivo en el campo \"file\". Con ?termico=true, además convierte la imagen a 1-bit (dithering) para impresoras térmicas — ver §1.4 del plan.",
+        "operationId": "PlantillasController_uploadLogo",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "termico",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoUploadEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Subir el logo usado por el elemento `logo` del editor",
+        "tags": [
+          "Plantillas de Impresión"
+        ]
+      }
+    },
+    "/api/v1/plantillas/{id}": {
+      "get": {
+        "operationId": "PlantillasController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantillaImpresionEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una plantilla de impresión",
+        "tags": [
+          "Plantillas de Impresión"
+        ]
+      },
+      "put": {
+        "operationId": "PlantillasController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePlantillaImpresionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantillaImpresionEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar una plantilla de impresión",
+        "tags": [
+          "Plantillas de Impresión"
+        ]
+      },
+      "delete": {
+        "operationId": "PlantillasController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteMessageEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar una plantilla de impresión",
+        "tags": [
+          "Plantillas de Impresión"
+        ]
+      }
+    },
+    "/api/v1/plantillas/{id}/predeterminada": {
+      "post": {
+        "description": "ERPNext desmarca sola cualquier otra default previa del mismo tipo, vía el hook validate del doctype (§1.3 del plan).",
+        "operationId": "PlantillasController_setDefault",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantillaImpresionEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Marcar como default de su (compañía, tipo)",
+        "tags": [
+          "Plantillas de Impresión"
+        ]
+      }
+    },
+    "/api/v1/impresoras": {
+      "get": {
+        "operationId": "ImpresorasController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar impresoras configuradas del tenant",
+        "tags": [
+          "Impresoras"
+        ]
+      },
+      "post": {
+        "operationId": "ImpresorasController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateImpresoraDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar una impresora",
+        "tags": [
+          "Impresoras"
+        ]
+      }
+    },
+    "/api/v1/impresoras/mi-seleccion": {
+      "get": {
+        "operationId": "ImpresorasController_getSeleccion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Impresora seleccionada por el usuario logueado (data: null si no ha seleccionado ninguna)",
+        "tags": [
+          "Impresoras"
+        ]
+      },
+      "put": {
+        "operationId": "ImpresorasController_setSeleccion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSeleccionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Seleccionar (o quitar, con impresoraId null) la impresora del usuario logueado",
+        "tags": [
+          "Impresoras"
+        ]
+      }
+    },
+    "/api/v1/impresoras/{id}": {
+      "put": {
+        "operationId": "ImpresorasController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateImpresoraDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar una impresora",
+        "tags": [
+          "Impresoras"
+        ]
+      },
+      "delete": {
+        "operationId": "ImpresorasController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar una impresora",
+        "tags": [
+          "Impresoras"
+        ]
+      }
+    },
+    "/api/v1/qz/certificado": {
+      "get": {
+        "operationId": "QzController_getCertificado",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Certificado público X.509 para QZ Tray, en texto plano sin envolver (igual para todos los tenants)",
+        "tags": [
+          "QZ Tray"
+        ]
+      }
+    },
+    "/api/v1/qz/firmar": {
+      "post": {
+        "operationId": "QzController_firmar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FirmarQzDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Firma un mensaje que QZ Tray pidió firmar (SHA512withRSA + base64)",
+        "tags": [
+          "QZ Tray"
+        ]
+      }
     }
   },
   "info": {
@@ -25403,6 +26316,11 @@
             ],
             "default": "email",
             "description": "\"email\": al crear un usuario (POST /usuarios) o resetear su contraseña (POST /usuarios/:email/reset-password) se genera un link y se manda por correo (comportamiento histórico). \"directo\": el administrador escribe la contraseña él mismo en el momento (`password` en la creación, `newPassword` en el reset) y se fija de una vez en ERPNext sin enviar ningún correo — útil si el tenant no tiene canal de email saliente confiable."
+          },
+          "redondeoTotalDeshabilitado": {
+            "type": "boolean",
+            "default": false,
+            "description": "Espejo de `Accounts Settings.disable_rounded_total` de ERPNext (setting global, no es un campo propio de Facturacion Config) — aplica como default a toda factura/compra nueva del tenant. Si está en false (default de ERPNext), el `grand_total` con centavos se redondea a `rounded_total` y es ESE monto redondeado el que queda como `outstanding_amount`/ `amountDue` a cobrar (ej. grand_total=168.57 → se cobra 169.00) — pensado para efectivo, que no maneja denominaciones fraccionarias en RD. Si se activa (true), ERPNext deja de redondear: se cobra el grand_total exacto, con centavos — más apropiado si el negocio solo cobra con tarjeta/cheque/transferencia. Cambiar esto NO afecta facturas ya sometidas, solo las que se sometan después."
           }
         }
       },
@@ -26418,6 +27336,29 @@
             "type": "string"
           }
         }
+      },
+      "CreateRepostValuacionDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "example": "E2E-TEST-001",
+            "description": "Artículo cuya cola de valuación (FIFO/Moving Average) se va a recalcular desde cero."
+          },
+          "warehouse": {
+            "type": "string",
+            "description": "Almacén específico a recalcular. Si se omite, ERPNext recalcula el artículo en TODOS los almacenes donde tiene movimientos."
+          },
+          "postingDate": {
+            "type": "string",
+            "example": "2026-07-01",
+            "description": "Fecha desde la cual recalcular la cola de valuación — debe ser igual o anterior a la fecha del primer movimiento de inventario problemático de este artículo/almacén (ver GET /inventory/history/:itemCode). Un valor posterior deja intacta la corrupción anterior a esa fecha."
+          }
+        },
+        "required": [
+          "itemCode",
+          "postingDate"
+        ]
       },
       "CountItemDto": {
         "type": "object",
@@ -28594,7 +29535,24 @@
           },
           "ncfProveedor": {
             "type": "string",
-            "description": "NCF del comprobante del proveedor (B01, E31, etc.). Obligatorio al guardar/editar una compra."
+            "description": "NCF del comprobante del proveedor (B01, E31, etc.). Obligatorio si el proveedor está registrado (no ocasional). Para un proveedor ocasional puede omitirse: el sistema genera el comprobante automáticamente al someter (POST /compras/:id/submit) usando `tipoComprobante` — electrónico vía Aura si el tenant emite e-CF para ese tipo, o el siguiente NCF físico disponible si no."
+          },
+          "tipoComprobante": {
+            "type": "string",
+            "enum": [
+              "B01",
+              "B02",
+              "B03",
+              "B04",
+              "B11",
+              "B12",
+              "B13",
+              "B14",
+              "B15",
+              "B16",
+              "B17"
+            ],
+            "description": "Tipo de comprobante a generar cuando el proveedor es ocasional y se omite `ncfProveedor` — B01=Crédito Fiscal, B02=Consumo, B11=Compras/Informal (default si se omite este campo), B13=Gastos Menores, B17=Pagos al Exterior, etc. Sin efecto si `ncfProveedor` viene lleno o el proveedor está registrado (esos casos nunca auto-generan)."
           },
           "billNo": {
             "type": "string",
@@ -28660,8 +29618,7 @@
         },
         "required": [
           "postingDate",
-          "items",
-          "ncfProveedor"
+          "items"
         ]
       },
       "UpdateCompraDto": {
@@ -28705,7 +29662,24 @@
           },
           "ncfProveedor": {
             "type": "string",
-            "description": "NCF del comprobante del proveedor (B01, E31, etc.). Obligatorio al guardar/editar una compra."
+            "description": "NCF del comprobante del proveedor (B01, E31, etc.). Obligatorio si el proveedor está registrado (no ocasional). Para un proveedor ocasional puede omitirse: el sistema genera el comprobante automáticamente al someter (POST /compras/:id/submit) usando `tipoComprobante` — electrónico vía Aura si el tenant emite e-CF para ese tipo, o el siguiente NCF físico disponible si no."
+          },
+          "tipoComprobante": {
+            "type": "string",
+            "enum": [
+              "B01",
+              "B02",
+              "B03",
+              "B04",
+              "B11",
+              "B12",
+              "B13",
+              "B14",
+              "B15",
+              "B16",
+              "B17"
+            ],
+            "description": "Tipo de comprobante a generar cuando el proveedor es ocasional y se omite `ncfProveedor` — B01=Crédito Fiscal, B02=Consumo, B11=Compras/Informal (default si se omite este campo), B13=Gastos Menores, B17=Pagos al Exterior, etc. Sin efecto si `ncfProveedor` viene lleno o el proveedor está registrado (esos casos nunca auto-generan)."
           },
           "billNo": {
             "type": "string",
@@ -28769,6 +29743,38 @@
             }
           }
         }
+      },
+      "PagoContadoDto": {
+        "type": "object",
+        "properties": {
+          "modeOfPayment": {
+            "type": "string",
+            "example": "Efectivo"
+          },
+          "referenceNo": {
+            "type": "string",
+            "description": "Número de cheque, transferencia, etc."
+          },
+          "esCheque": {
+            "type": "boolean",
+            "default": false,
+            "description": "Marca este pago como cheque — activa la numeración por cuenta bancaria (manual o automática) y lo registra en el historial de cheques (/tesoreria/cheques). Requiere \"bankAccount\"."
+          },
+          "referenceDate": {
+            "type": "string"
+          },
+          "remarks": {
+            "type": "string"
+          },
+          "bankAccount": {
+            "type": "string",
+            "example": "BA-00001",
+            "description": "Cuenta bancaria (Bank Account) desde la que se hace este pago. Obligatorio si el método de pago requiere cuenta bancaria y no tiene una configurada por defecto."
+          }
+        },
+        "required": [
+          "modeOfPayment"
+        ]
       },
       "DevolucionCompraItemDto": {
         "type": "object",
@@ -29010,6 +30016,15 @@
               "type": "string"
             }
           },
+          "tipoPago": {
+            "type": "string",
+            "enum": [
+              "Contado",
+              "Crédito"
+            ],
+            "default": "Contado",
+            "description": "Si es \"Contado\", al someter el gasto (POST /gastos/:id/submit) es obligatorio enviar la información de pago para que no quede como saldo pendiente — ver PagoContadoDto."
+          },
           "categoriaGasto": {
             "type": "string",
             "enum": [
@@ -29137,6 +30152,15 @@
             "items": {
               "type": "string"
             }
+          },
+          "tipoPago": {
+            "type": "string",
+            "enum": [
+              "Contado",
+              "Crédito"
+            ],
+            "default": "Contado",
+            "description": "Si es \"Contado\", al someter el gasto (POST /gastos/:id/submit) es obligatorio enviar la información de pago para que no quede como saldo pendiente — ver PagoContadoDto."
           },
           "categoriaGasto": {
             "type": "string",
@@ -30033,6 +31057,11 @@
             "minLength": 10,
             "maxLength": 500,
             "description": "Motivo obligatorio de la devolución (auditoría)."
+          },
+          "modificationCode": {
+            "type": "number",
+            "enum": [1, 2, 3, 4, 5],
+            "description": "Código de modificación DGII (Tabla VI) — solo obligatorio si el tenant emite esta nota como e-CF (E34): 1=Anula, 2=Corrige texto, 3=Corrige montos, 4=Reemplazo contingencia, 5=Referencia a Factura de Consumo. Sin efecto en el flujo físico (NCF B04)."
           }
         },
         "required": [
@@ -31616,6 +32645,338 @@
             "description": "Motivo de la anulación (informativo)."
           }
         }
+      },
+      "PlantillaImpresionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "plantillaType": {
+            "type": "string",
+            "enum": [
+              "Pos Invoice",
+              "Label 5x2"
+            ]
+          },
+          "plantillaName": {
+            "type": "string"
+          },
+          "company": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "catalogVersion": {
+            "type": "number"
+          },
+          "documentJson": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "plantillaType",
+          "plantillaName",
+          "company",
+          "isDefault",
+          "catalogVersion",
+          "documentJson"
+        ]
+      },
+      "PlantillaImpresionListMetaDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "offset": {
+            "type": "number"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "total",
+          "limit",
+          "offset",
+          "hasMore"
+        ]
+      },
+      "PlantillaImpresionListEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlantillaImpresionResponseDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PlantillaImpresionListMetaDto"
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ]
+      },
+      "PlantillaImpresionEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PlantillaImpresionResponseDto"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "CampoDisponibleDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "empresa.nombre"
+          },
+          "label": {
+            "type": "string",
+            "example": "Nombre de la empresa"
+          },
+          "array": {
+            "type": "boolean",
+            "description": "Si es true, el valor correspondiente en render-data es un arreglo (tabla), no un escalar."
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "array"
+        ]
+      },
+      "CamposDisponiblesEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CampoDisponibleDto"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "LogoUploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "fileUrl": {
+            "type": "string",
+            "example": "/files/logo_abc123.png"
+          },
+          "fileName": {
+            "type": "string",
+            "example": "logo_abc123.png"
+          }
+        },
+        "required": [
+          "fileUrl",
+          "fileName"
+        ]
+      },
+      "LogoUploadEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/LogoUploadResponseDto"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "CreatePlantillaImpresionDto": {
+        "type": "object",
+        "properties": {
+          "plantillaType": {
+            "type": "string",
+            "enum": [
+              "Pos Invoice",
+              "Label 5x2"
+            ]
+          },
+          "plantillaName": {
+            "type": "string",
+            "example": "Ticket POS estándar"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Si es true, se convierte en la plantilla default de su (compañía, tipo) — ERPNext desmarca sola cualquier otra default previa vía el hook validate del doctype."
+          },
+          "catalogVersion": {
+            "type": "number",
+            "default": 1,
+            "description": "Versión del catálogo de campos contra el que se guardó documentJson. Se fija en 1 si no se manda."
+          },
+          "documentJson": {
+            "type": "object",
+            "description": "TemplateDocument completo (page + pages[].elements[]) tal cual lo produce el editor.",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "plantillaType",
+          "plantillaName",
+          "documentJson"
+        ]
+      },
+      "UpdatePlantillaImpresionDto": {
+        "type": "object",
+        "properties": {
+          "plantillaType": {
+            "type": "string",
+            "enum": [
+              "Pos Invoice",
+              "Label 5x2"
+            ]
+          },
+          "plantillaName": {
+            "type": "string",
+            "example": "Ticket POS estándar"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Si es true, se convierte en la plantilla default de su (compañía, tipo) — ERPNext desmarca sola cualquier otra default previa vía el hook validate del doctype."
+          },
+          "catalogVersion": {
+            "type": "number",
+            "default": 1,
+            "description": "Versión del catálogo de campos contra el que se guardó documentJson. Se fija en 1 si no se manda."
+          },
+          "documentJson": {
+            "type": "object",
+            "description": "TemplateDocument completo (page + pages[].elements[]) tal cual lo produce el editor.",
+            "additionalProperties": true
+          }
+        }
+      },
+      "DeleteMessageDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Plantilla de impresión eliminada"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "DeleteMessageEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DeleteMessageDto"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "CreateImpresoraDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Nombre visible, ej. \"Caja 1\""
+          },
+          "brand": {
+            "type": "string",
+            "description": "Texto libre, puramente descriptivo, ej. \"Star\""
+          },
+          "model": {
+            "type": "string",
+            "description": "Texto libre, puramente descriptivo, ej. \"TSP143\""
+          },
+          "qzPrinterName": {
+            "type": "string",
+            "description": "Nombre exacto reportado por qz.printers.find() en la máquina del usuario. Opaco para el backend, no se valida."
+          }
+        },
+        "required": [
+          "name",
+          "qzPrinterName"
+        ]
+      },
+      "SetSeleccionDto": {
+        "type": "object",
+        "properties": {
+          "impresoraId": {
+            "type": "string",
+            "description": "ID de la impresora a seleccionar, o null/omitido para \"ninguna\"",
+            "nullable": true
+          }
+        }
+      },
+      "UpdateImpresoraDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Nombre visible, ej. \"Caja 1\""
+          },
+          "brand": {
+            "type": "string",
+            "description": "Texto libre, puramente descriptivo, ej. \"Star\""
+          },
+          "model": {
+            "type": "string",
+            "description": "Texto libre, puramente descriptivo, ej. \"TSP143\""
+          },
+          "qzPrinterName": {
+            "type": "string",
+            "description": "Nombre exacto reportado por qz.printers.find() en la máquina del usuario. Opaco para el backend, no se valida."
+          }
+        }
+      },
+      "FirmarQzDto": {
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "string",
+            "description": "String exacto que QZ Tray pidió firmar"
+          }
+        },
+        "required": [
+          "request"
+        ]
       }
     }
   }
