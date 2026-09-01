@@ -113,7 +113,7 @@ export default function RepostValuacionPage() {
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="inline-alert inline-alert-info">
               <AlertTriangle size={16} />
-              Esto NO se procesa al instante — ERPNext lo hace en segundo plano y puede tardar
+              Esto NO se procesa al instante — el sistema lo hace en segundo plano y puede tardar
               varios minutos. Puedes salir de esta pantalla y volver luego a revisar el progreso
               en "Recálculos recientes".
             </div>

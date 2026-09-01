@@ -16,7 +16,7 @@ interface AuthState {
   user: AuthUser | null
   tenant: AuthTenant | null
   isAuthenticated: boolean
-  login: (email: string, password: string, tenantSlug?: string) => Promise<void>
+  login: (email: string, password: string, tenantSlug?: string | null) => Promise<void>
   setSession: (result: AuthResult) => void
   logout: () => void
   hydrate: () => void

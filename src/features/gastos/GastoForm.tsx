@@ -84,9 +84,6 @@ function emptyAdHocItem(): ItemRow {
 
 const NCF_REGEX = /^[BE]\d{10}$/
 const B17_MAX = 50
-// CreateGastoDto.tipoComprobante solo acepta este subconjunto de tipos de NCF (según openapi.json),
-// aunque el catálogo ncfTypesCompra trae más — ver uso en tipoComprobanteOptions.
-const TIPO_COMPROBANTE_GASTO_VALUES = new Set(['B01', 'B13', 'B14', 'B15', 'B16', 'B17', 'E31'])
 
 /** Muestra (solo lectura) la cuenta contable que aplicará a una línea de concepto de Cuentas
  *  por Pagar: la cuenta configurada en el concepto o, si no tiene una, la cuenta de gastos por
@@ -138,6 +135,8 @@ export default function GastoForm() {
   const [tipoComprobante, setTipoComprobante] = useState<string>('')
   const [tipoBienes606, setTipoBienes606] = useState('')
   const [formaPago606, setFormaPago606] = useState('')
+  const [tipoPago, setTipoPago] = useState<'Contado' | 'Crédito'>('Contado')
+  const [tipoPagoTouched, setTipoPagoTouched] = useState(false)
   const [taxesTemplate, setTaxesTemplate] = useState<string[]>([])
   const [categoriaGasto, setCategoriaGasto] = useState<string>('')
   const [esDeducible, setEsDeducible] = useState(true)
@@ -278,6 +277,8 @@ export default function GastoForm() {
     setTipoComprobante(gastoData.tipoComprobante ?? '')
     setTipoBienes606(gastoData.tipoBienes606 ?? '')
     setFormaPago606(gastoData.formaPago606 ?? '')
+    setTipoPago(gastoData.tipoPago ?? 'Contado')
+    setTipoPagoTouched(true)
     setTaxesTemplate((gastoData.taxesTemplate ?? []).map((t) => t.id))
     setRetenciones((gastoData.retenciones ?? []).map((r) => r.id))
     setCategoriaGasto(gastoData.categoriaGasto ?? '')
@@ -295,7 +296,6 @@ export default function GastoForm() {
   })
   const [tipoComprobanteSearch, setTipoComprobanteSearch] = useState('')
   const tipoComprobanteOptions: SearchSelectOption[] = (catalogos?.ncfTypesCompra ?? [])
-    .filter((t) => TIPO_COMPROBANTE_GASTO_VALUES.has(t.value))
     .filter((t) => !tipoComprobanteSearch || t.label.toLowerCase().includes(tipoComprobanteSearch.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
 
@@ -375,7 +375,14 @@ export default function GastoForm() {
     if (!dueDateTouched && s.diasCredito) {
       setDueDate(formatDateFns(addDays(new Date(), s.diasCredito), 'yyyy-MM-dd'))
     }
-  }, [supplierDetail, esProveedorOcasional, tipoBienes606, formaPago606, dueDateTouched])
+
+    if (!tipoPagoTouched) {
+      // Sin días de crédito, no se le puede facturar a crédito — se auto-selecciona Contado
+      // sin importar el default del proveedor.
+      if (!s.diasCredito) setTipoPago('Contado')
+      else if (s.defaultTipoPagoProveedor) setTipoPago(s.defaultTipoPagoProveedor)
+    }
+  }, [supplierDetail, esProveedorOcasional, tipoBienes606, formaPago606, dueDateTouched, tipoPagoTouched])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Hint: cuando el usuario no dejó ninguna retención pero el proveedor tiene defaults,
@@ -628,6 +635,7 @@ export default function GastoForm() {
       tipoComprobante: tipoComprobante as CreateGastoDto['tipoComprobante'] || undefined,
       tipoBienes606: tipoBienes606 || undefined,
       formaPago606: formaPago606 || undefined,
+      tipoPago,
       categoriaGasto: categoriaGasto as CreateGastoDto['categoriaGasto'] || undefined,
       esDeducible,
       retenciones: retenciones.length > 0 ? retenciones : undefined,
@@ -716,6 +724,8 @@ export default function GastoForm() {
                         if (e.target.checked) {
                           setSupplierId('')
                           setSupplierLabel('')
+                          // Un proveedor ocasional nunca tiene términos de crédito.
+                          if (!tipoPagoTouched) setTipoPago('Contado')
                         } else {
                           setProveedorOcasionalNombre('')
                           setProveedorOcasionalRnc('')
@@ -933,7 +943,9 @@ export default function GastoForm() {
             {/* ── Comprobante fiscal ── */}
             <div className="form-row form-row-3">
               <div className="ff-wrap">
-                <label className="ff-label">NCF Proveedor</label>
+                <label className="ff-label">
+                  {esProveedorOcasional ? 'NCF Proveedor (opcional)' : <>NCF Proveedor <span className="ff-required">*</span></>}
+                </label>
                 <input
                   className={`ff-input${!ncfValid ? ' ff-input-error' : ''}`}
                   placeholder="B13XXXXXXXXXX"
@@ -949,6 +961,9 @@ export default function GastoForm() {
                   }}
                 />
                 {!ncfValid && <span className="ff-error">Formato inválido.</span>}
+                {esProveedorOcasional && !ncfProveedor && (
+                  <p className="ff-hint">Déjelo en blanco para que el sistema genere el comprobante automáticamente al someter.</p>
+                )}
               </div>
 
               <div className="ff-wrap">
@@ -961,18 +976,21 @@ export default function GastoForm() {
                 />
               </div>
 
-              <div className="ff-wrap">
-                <label className="ff-label">Tipo Comprobante</label>
-                <SearchSelect
-                  value={tipoComprobante}
-                  onChange={setTipoComprobante}
-                  options={tipoComprobanteOptions}
-                  onSearch={setTipoComprobanteSearch}
-                  selectedLabel={catalogos?.ncfTypesCompra?.find((t) => t.value === tipoComprobante)?.label ?? ''}
-                  placeholder="Seleccionar"
-                  error={isB17 && b17Error}
-                />
-              </div>
+              {esProveedorOcasional && !ncfProveedor && (
+                <div className="ff-wrap">
+                  <label className="ff-label">Tipo Comprobante</label>
+                  <SearchSelect
+                    value={tipoComprobante}
+                    onChange={setTipoComprobante}
+                    options={tipoComprobanteOptions}
+                    onSearch={setTipoComprobanteSearch}
+                    selectedLabel={catalogos?.ncfTypesCompra?.find((t) => t.value === tipoComprobante)?.label ?? ''}
+                    placeholder="Seleccionar"
+                    error={isB17 && b17Error}
+                  />
+                  <p className="ff-hint">Tipo de comprobante a generar automáticamente al someter.</p>
+                </div>
+              )}
 
               <div className="ff-wrap">
                 <label className="ff-label">Cuenta CxP (override)</label>
@@ -1020,6 +1038,17 @@ export default function GastoForm() {
                 <label className="ff-label">Categoría de Gasto</label>
                 <Select value={categoriaGasto} onValueChange={setCategoriaGasto} placeholder="Seleccionar categoría">
                   {CATEGORIA_GASTO.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                </Select>
+              </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label">Tipo de Pago</label>
+                <Select
+                  value={tipoPago}
+                  onValueChange={(val) => { setTipoPago(val as 'Contado' | 'Crédito'); setTipoPagoTouched(true) }}
+                >
+                  <SelectItem value="Contado">Contado</SelectItem>
+                  <SelectItem value="Crédito">Crédito</SelectItem>
                 </Select>
               </div>
             </div>

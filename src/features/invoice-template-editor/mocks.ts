@@ -1,7 +1,6 @@
 import type {
   TemplateDocument,
   TemplateElement,
-  TemplateFieldCategory,
   TemplateGalleryItem,
   TemplatePage,
   TemplateSummary,
@@ -49,75 +48,6 @@ function scalePosElements(elements: TemplateElement[]): TemplateElement[] {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Datos disponibles (campos que se pueden enlazar a un elemento del canvas)
-// ─────────────────────────────────────────────────────────────────────────
-
-export const MOCK_AVAILABLE_FIELDS: TemplateFieldCategory[] = [
-  {
-    key: 'empresa',
-    label: 'Empresa',
-    fields: [
-      { key: 'empresa.nombre', label: 'Nombre comercial', sample: 'Ferretería El Tornillo SRL' },
-      { key: 'empresa.rnc', label: 'RNC', sample: '1-31-45678-9' },
-      { key: 'empresa.direccion', label: 'Dirección', sample: 'Av. 27 de Febrero #123, Santo Domingo' },
-      { key: 'empresa.telefono', label: 'Teléfono', sample: '(809) 555-1234' },
-      { key: 'empresa.logo', label: 'Logo', sample: '' },
-    ],
-  },
-  {
-    key: 'factura',
-    label: 'Factura',
-    fields: [
-      { key: 'factura.ncf', label: 'NCF', sample: 'B0100000123' },
-      { key: 'factura.tipoNcf', label: 'Tipo de comprobante', sample: 'Consumo' },
-      { key: 'factura.fecha', label: 'Fecha', sample: '2026-08-14' },
-      { key: 'factura.numero', label: 'No. de factura', sample: 'FAC-001234' },
-      { key: 'factura.vendedor', label: 'Vendedor', sample: 'Ryan Castro' },
-    ],
-  },
-  {
-    key: 'cliente',
-    label: 'Cliente',
-    fields: [
-      { key: 'cliente.nombre', label: 'Nombre', sample: 'Juan Pérez' },
-      { key: 'cliente.rncCedula', label: 'RNC / Cédula', sample: '001-1234567-8' },
-      { key: 'cliente.direccion', label: 'Dirección', sample: 'Calle Segunda #45' },
-      { key: 'cliente.telefono', label: 'Teléfono', sample: '(809) 555-9876' },
-    ],
-  },
-  {
-    key: 'totales',
-    label: 'Totales',
-    fields: [
-      { key: 'totales.subtotal', label: 'Subtotal', sample: 'RD$ 1,000.00', numeric: true },
-      { key: 'totales.itbis18', label: 'ITBIS 18%', sample: 'RD$ 180.00', numeric: true },
-      { key: 'totales.itbis16', label: 'ITBIS 16%', sample: 'RD$ 0.00', numeric: true },
-      { key: 'totales.exento', label: 'Exento', sample: 'RD$ 0.00', numeric: true },
-      { key: 'totales.total', label: 'Total', sample: 'RD$ 1,180.00', numeric: true },
-    ],
-  },
-  {
-    key: 'items',
-    label: 'Items',
-    fields: [
-      { key: 'items.tabla', label: 'Tabla de productos', sample: '' },
-      { key: 'items.cantidad', label: 'Cantidad (por línea)', sample: '2', numeric: true },
-      { key: 'items.precio', label: 'Precio unitario (por línea)', sample: '500.00', numeric: true },
-    ],
-  },
-]
-
-// TODO API: GET /template-editor/fields
-// Debe devolver TemplateFieldCategory[] con los campos realmente disponibles para el tenant
-// (agrupados por categoría, con su `key` de binding y un `sample` representativo). Esto permite
-// que tenants con impuestos/monedas distintos (ej. sin ITBIS 16%, con IVU, etc.) reciban solo los
-// campos que les aplican, sin tener que redeployar el editor.
-export async function fetchAvailableFields(): Promise<TemplateFieldCategory[]> {
-  await delay()
-  return MOCK_AVAILABLE_FIELDS
-}
-
-// ─────────────────────────────────────────────────────────────────────────
 // Plantillas por defecto (contenido inicial de cada documento)
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -129,16 +59,15 @@ function buildDefaultPosInvoice(): TemplateDocument {
     pages: singlePage(scalePosElements([
       { id: nextId('el'), type: 'text', binding: 'empresa.nombre', text: 'Ferretería El Tornillo SRL', x: 20, y: 12, width: 262, height: 20, rotation: 0, fontSize: 13, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'center' },
       { id: nextId('el'), type: 'text', binding: 'empresa.rnc', text: 'RNC: 1-31-45678-9', x: 20, y: 34, width: 262, height: 16, rotation: 0, fontSize: 10, fontWeight: 'normal', fontStyle: 'normal', textDecoration: 'none', align: 'center' },
-      { id: nextId('el'), type: 'text', binding: 'empresa.direccion', text: 'Av. 27 de Febrero #123, Santo Domingo', x: 20, y: 50, width: 262, height: 16, rotation: 0, fontSize: 9, fontWeight: 'normal', fontStyle: 'normal', textDecoration: 'none', align: 'center' },
-      { id: nextId('el'), type: 'line', x: 20, y: 74, width: 262, height: 1, rotation: 0, style: 'dashed', thickness: 1 },
-      { id: nextId('el'), type: 'text', binding: 'factura.ncf', text: 'NCF: B0100000123', x: 20, y: 82, width: 180, height: 16, rotation: 0, fontSize: 10, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'left' },
-      { id: nextId('el'), type: 'date', binding: 'factura.fecha', x: 20, y: 100, width: 180, height: 16, rotation: 0, format: 'dd/MM/yyyy HH:mm', fontSize: 9 },
-      { id: nextId('el'), type: 'text', binding: 'cliente.nombre', text: 'Cliente: Juan Pérez', x: 20, y: 120, width: 262, height: 16, rotation: 0, fontSize: 9, fontWeight: 'normal', fontStyle: 'normal', textDecoration: 'none', align: 'left' },
-      { id: nextId('el'), type: 'line', x: 20, y: 142, width: 262, height: 1, rotation: 0, style: 'solid', thickness: 1 },
-      { id: nextId('el'), type: 'table', x: 20, y: 150, width: 262, height: 90, rotation: 0, fontSize: 9, columns: DEFAULT_TABLE_COLUMNS.map((c) => ({ ...c })) },
-      { id: nextId('el'), type: 'line', x: 20, y: 246, width: 262, height: 1, rotation: 0, style: 'solid', thickness: 1 },
-      { id: nextId('el'), type: 'text', binding: 'totales.total', text: 'Total: RD$ 1,180.00', x: 20, y: 254, width: 262, height: 18, rotation: 0, fontSize: 11, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'right' },
-      { id: nextId('el'), type: 'qr', binding: 'factura.ncf', x: 111, y: 284, width: 80, height: 80, rotation: 0, errorCorrection: 'M' },
+      { id: nextId('el'), type: 'line', x: 20, y: 58, width: 262, height: 1, rotation: 0, style: 'dashed', thickness: 1 },
+      { id: nextId('el'), type: 'text', binding: 'factura.ncf', text: 'NCF: B0100000123', x: 20, y: 66, width: 180, height: 16, rotation: 0, fontSize: 10, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'left' },
+      { id: nextId('el'), type: 'date', binding: 'factura.fecha', x: 20, y: 84, width: 180, height: 16, rotation: 0, format: 'dd/MM/yyyy HH:mm', fontSize: 9 },
+      { id: nextId('el'), type: 'text', binding: 'cliente.nombre', text: 'Cliente: Juan Pérez', x: 20, y: 104, width: 262, height: 16, rotation: 0, fontSize: 9, fontWeight: 'normal', fontStyle: 'normal', textDecoration: 'none', align: 'left' },
+      { id: nextId('el'), type: 'line', x: 20, y: 126, width: 262, height: 1, rotation: 0, style: 'solid', thickness: 1 },
+      { id: nextId('el'), type: 'table', x: 20, y: 134, width: 262, height: 90, rotation: 0, fontSize: 9, columns: DEFAULT_TABLE_COLUMNS.map((c) => ({ ...c })) },
+      { id: nextId('el'), type: 'line', x: 20, y: 230, width: 262, height: 1, rotation: 0, style: 'solid', thickness: 1 },
+      { id: nextId('el'), type: 'text', binding: 'factura.total', text: 'Total: RD$ 1,180.00', x: 20, y: 238, width: 262, height: 18, rotation: 0, fontSize: 11, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'right' },
+      { id: nextId('el'), type: 'qr', binding: 'factura.ncf', x: 111, y: 268, width: 80, height: 80, rotation: 0, errorCorrection: 'M' },
     ])),
   }
 }
@@ -149,9 +78,9 @@ function buildDefaultLabel(): TemplateDocument {
     type: 'label_5x2',
     page,
     pages: singlePage([
-      { id: nextId('el'), type: 'text', text: 'Nombre del producto', x: 10, y: 10, width: 380, height: 20, rotation: 0, fontSize: 12, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'left' },
-      { id: nextId('el'), type: 'text', text: 'RD$ 0.00', x: 10, y: 34, width: 180, height: 18, rotation: 0, fontSize: 11, fontWeight: 'normal', fontStyle: 'normal', textDecoration: 'none', align: 'left' },
-      { id: nextId('el'), type: 'barcode', binding: 'items.cantidad', x: 10, y: 70, width: 300, height: 70, rotation: 0, format: 'CODE128' },
+      { id: nextId('el'), type: 'text', binding: 'producto.nombre', text: 'Nombre del producto', x: 10, y: 10, width: 380, height: 20, rotation: 0, fontSize: 12, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'left' },
+      { id: nextId('el'), type: 'text', binding: 'producto.precio', text: 'RD$ 0.00', x: 10, y: 34, width: 180, height: 18, rotation: 0, fontSize: 11, fontWeight: 'normal', fontStyle: 'normal', textDecoration: 'none', align: 'left' },
+      { id: nextId('el'), type: 'barcode', binding: 'producto.codigoBarras', x: 10, y: 70, width: 300, height: 70, rotation: 0, format: 'CODE128' },
     ]),
   }
 }
@@ -176,7 +105,7 @@ function buildMinimalPosInvoice(): TemplateDocument {
       { id: nextId('el'), type: 'line', x: 20, y: 62, width: 262, height: 1, rotation: 0, style: 'solid', thickness: 1 },
       { id: nextId('el'), type: 'table', x: 20, y: 70, width: 262, height: 90, rotation: 0, fontSize: 9, columns: DEFAULT_TABLE_COLUMNS.map((c) => ({ ...c })) },
       { id: nextId('el'), type: 'line', x: 20, y: 166, width: 262, height: 1, rotation: 0, style: 'solid', thickness: 1 },
-      { id: nextId('el'), type: 'text', binding: 'totales.total', text: 'Total: RD$ 1,180.00', x: 20, y: 174, width: 262, height: 18, rotation: 0, fontSize: 12, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'right' },
+      { id: nextId('el'), type: 'text', binding: 'factura.total', text: 'Total: RD$ 1,180.00', x: 20, y: 174, width: 262, height: 18, rotation: 0, fontSize: 12, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'right' },
     ])),
   }
 }
@@ -197,7 +126,7 @@ function buildLogoPosInvoice(): TemplateDocument {
       { id: nextId('el'), type: 'line', x: 20, y: 90, width: 262, height: 1, rotation: 0, style: 'dashed', thickness: 1 },
       { id: nextId('el'), type: 'text', binding: 'factura.ncf', text: 'NCF: B0100000123', x: 20, y: 98, width: 262, height: 16, rotation: 0, fontSize: 10, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'left' },
       { id: nextId('el'), type: 'table', x: 20, y: 120, width: 262, height: 90, rotation: 0, fontSize: 9, columns: DEFAULT_TABLE_COLUMNS.map((c) => ({ ...c })) },
-      { id: nextId('el'), type: 'text', binding: 'totales.total', text: 'Total: RD$ 1,180.00', x: 20, y: 216, width: 262, height: 18, rotation: 0, fontSize: 11, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'right' },
+      { id: nextId('el'), type: 'text', binding: 'factura.total', text: 'Total: RD$ 1,180.00', x: 20, y: 216, width: 262, height: 18, rotation: 0, fontSize: 11, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'right' },
       { id: nextId('el'), type: 'barcode', binding: 'factura.ncf', x: 71, y: 246, width: 160, height: 60, rotation: 0, format: 'CODE128' },
     ])),
   }
@@ -209,8 +138,8 @@ function buildSimpleLabel(): TemplateDocument {
     type: 'label_5x2',
     page,
     pages: singlePage([
-      { id: nextId('el'), type: 'text', text: 'Nombre del producto', x: 10, y: 20, width: 380, height: 24, rotation: 0, fontSize: 14, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'center' },
-      { id: nextId('el'), type: 'text', text: 'RD$ 0.00', x: 10, y: 60, width: 380, height: 30, rotation: 0, fontSize: 18, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'center' },
+      { id: nextId('el'), type: 'text', binding: 'producto.nombre', text: 'Nombre del producto', x: 10, y: 20, width: 380, height: 24, rotation: 0, fontSize: 14, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'center' },
+      { id: nextId('el'), type: 'text', binding: 'producto.precio', text: 'RD$ 0.00', x: 10, y: 60, width: 380, height: 30, rotation: 0, fontSize: 18, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', align: 'center' },
     ]),
   }
 }

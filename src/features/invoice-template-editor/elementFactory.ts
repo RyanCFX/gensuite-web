@@ -43,11 +43,10 @@ export function createDefaultElement(type: ElementType, overrides: Partial<Templ
 }
 
 /** Al insertar un "dato disponible" desde la columna izquierda, se elige el tipo de elemento y
- * el binding más natural para ese campo (ej. empresa.logo -> logo, items.tabla -> table). */
+ * el binding más natural para ese campo (ej. items.tabla -> table). `empresa.logoUrl` no tiene
+ * caso especial aquí porque nunca aparece en este catálogo — se filtra en apiAdapters.ts, ya
+ * que el elemento Logo no soporta cargar una imagen desde una URL/binding, solo subida manual. */
 export function createElementFromField(field: TemplateFieldDef): TemplateElement {
-  if (field.key === 'empresa.logo') {
-    return createDefaultElement('logo')
-  }
   if (field.key === 'items.tabla') {
     return createDefaultElement('table')
   }

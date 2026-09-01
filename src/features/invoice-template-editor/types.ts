@@ -173,6 +173,9 @@ export interface TemplateFieldDef {
   label: string
   sample: string
   numeric?: boolean
+  /** Si es true, el valor real (en render-data) es un arreglo de objetos (tabla), no un
+   * escalar — viene tal cual de GET /plantillas/campos-disponibles para catálogos reales. */
+  array?: boolean
 }
 
 export interface TemplateFieldCategory {

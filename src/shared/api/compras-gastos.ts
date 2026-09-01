@@ -9,6 +9,8 @@ import type {
   CreateGastoDto,
   FormatoImpresion,
   AsientoPreviewRow,
+  PagoContadoDto,
+  SubmitConPagoResult,
 } from './types'
 
 // ---- Compras (update_stock=1) ----
@@ -44,9 +46,11 @@ export async function updateCompra(id: string, data: Partial<CreateCompraDto>) {
   return unwrap(res)
 }
 
-export async function submitCompra(id: string) {
-  const res = await client.post<{ success: true; data: Compra }>(ENDPOINTS.compras.submit(id))
-  return unwrap(res)
+/** `body` es requerido por el backend cuando la compra es de tipoPago "Contado" (ver
+ *  PagoContadoDto) — se omite para compras a Crédito. */
+export async function submitCompra(id: string, body?: PagoContadoDto): Promise<SubmitConPagoResult<Compra>> {
+  const res = await client.post<{ success: true; data: Compra; pago?: { id: string } }>(ENDPOINTS.compras.submit(id), body)
+  return { data: unwrap(res), pago: res.data.pago }
 }
 
 export async function cancelCompra(id: string) {
@@ -139,9 +143,11 @@ export async function updateGasto(id: string, data: Partial<CreateGastoDto>) {
   return unwrap(res)
 }
 
-export async function submitGasto(id: string) {
-  const res = await client.post<{ success: true; data: Gasto }>(ENDPOINTS.gastos.submit(id))
-  return unwrap(res)
+/** `body` es requerido por el backend cuando el gasto es de tipoPago "Contado" (ver
+ *  PagoContadoDto) — se omite para gastos a Crédito. */
+export async function submitGasto(id: string, body?: PagoContadoDto): Promise<SubmitConPagoResult<Gasto>> {
+  const res = await client.post<{ success: true; data: Gasto; pago?: { id: string } }>(ENDPOINTS.gastos.submit(id), body)
+  return { data: unwrap(res), pago: res.data.pago }
 }
 
 export async function cancelGasto(id: string) {

@@ -42,6 +42,17 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
         },
+        // Archivos subidos (ej. logo de plantillas, ver POST /plantillas/logo) — el backend los
+        // sirve con `Cross-Origin-Resource-Policy: same-origin`, así que un <img src> cargado
+        // directo contra la IP del backend es bloqueado por el navegador (ERR_BLOCKED_BY_RESPONSE.
+        // NotSameOrigin) aunque la imagen exista y responda 200. Proxeándolo bajo el propio origen
+        // del front (igual que /api) el navegador lo ve como same-origin y el CORP header ya no
+        // aplica — no requiere ningún cambio del lado del backend.
+        "/files": {
+          target: apiTarget,
+          changeOrigin: true,
+          secure: false,
+        },
         ...glitchtipProxy,
       },
     },
@@ -50,6 +61,11 @@ export default defineConfig(({ mode }) => {
       allowedHosts: true,
       proxy: {
         "/api": {
+          target: apiTarget,
+          changeOrigin: true,
+          secure: false,
+        },
+        "/files": {
           target: apiTarget,
           changeOrigin: true,
           secure: false,

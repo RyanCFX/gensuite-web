@@ -1,11 +1,16 @@
 import { useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, BringToFront, SendToBack, Copy, Trash2, Upload, Sigma, GitBranch, Table as TableIcon, MousePointer2 } from 'lucide-react'
 import type { TemplateElement, TemplateFieldCategory, TextAlign, TextElement } from './types'
 import { CONDITION_OPERATOR_LABELS } from './constants'
+import { uploadPlantillaLogo } from '@/shared/api/plantillas'
 
 interface Props {
   element: TemplateElement | undefined
   fields: TemplateFieldCategory[]
+  /** true cuando el formato activo es térmico (Pos Invoice) — el logo se sube con
+   * `?termico=true` para que el backend genere también la versión 1-bit (§4 del doc). */
+  termico: boolean
   onUpdate: (patch: Partial<TemplateElement>) => void
   onDelete: () => void
   onDuplicate: () => void
@@ -136,9 +141,10 @@ function TextStyleControl({ element, onUpdate }: { element: TextElement; onUpdat
 }
 
 export function TemplateEditorRightPanel({
-  element, fields, onUpdate, onDelete, onDuplicate, onBringToFront, onSendToBack, onOpenConditional, onOpenFormula, onOpenTable,
+  element, fields, termico, onUpdate, onDelete, onDuplicate, onBringToFront, onSendToBack, onOpenConditional, onOpenFormula, onOpenTable,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
 
   if (!element) {
     return (
@@ -149,12 +155,20 @@ export function TemplateEditorRightPanel({
     )
   }
 
-  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
+    e.target.value = ''
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => onUpdate({ src: reader.result as string, processed: true })
-    reader.readAsDataURL(file)
+    setUploadingLogo(true)
+    try {
+      const result = await uploadPlantillaLogo(file, termico)
+      // Se guarda la URL devuelta por el backend, nunca el archivo embebido en base64 (§4).
+      onUpdate({ src: result.fileUrl, processed: termico })
+    } catch {
+      toast.error('No se pudo subir el logo')
+    } finally {
+      setUploadingLogo(false)
+    }
   }
 
   return (
@@ -267,9 +281,9 @@ export function TemplateEditorRightPanel({
         {element.type === 'logo' && (
           <div className="ff-wrap">
             <label className="ff-label">Imagen</label>
-            <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
-            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => fileInputRef.current?.click()}>
-              <Upload size={14} /> {element.src ? 'Reemplazar imagen…' : 'Subir imagen…'}
+            <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} disabled={uploadingLogo} />
+            <button type="button" className="btn btn-secondary btn-size-sm" disabled={uploadingLogo} onClick={() => fileInputRef.current?.click()}>
+              <Upload size={14} /> {uploadingLogo ? 'Subiendo…' : element.src ? 'Reemplazar imagen…' : 'Subir imagen…'}
             </button>
             <p className="ff-hint">Se procesará a blanco y negro (1-bit) para impresión térmica.</p>
           </div>

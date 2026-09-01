@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Database, Shapes, LayoutTemplate, FileClock } from 'lucide-react'
+import { ChevronDown, ChevronRight, Database, Shapes, LayoutTemplate, FileClock, Cloud } from 'lucide-react'
 import { ELEMENT_PALETTE } from './constants'
 import { setDragPayload } from './dragPayload'
 import { ElementTypeIcon } from './elementIcons'
 import { TemplateGalleryTab } from './TemplateGalleryTab'
 import { DraftsTab } from './DraftsTab'
-import type { DraftSummary, ElementType, TemplateFieldCategory, TemplateFieldDef, TemplateGalleryItem } from './types'
+import { SavedTemplatesTab } from './SavedTemplatesTab'
+import type { DraftSummary, ElementType, TemplateDocument, TemplateFieldCategory, TemplateFieldDef, TemplateGalleryItem, TemplateType } from './types'
 
 interface Props {
   fields: TemplateFieldCategory[]
@@ -23,13 +24,19 @@ interface Props {
   onPreviewDraft: (id: string) => void
   onLoadDraft: (id: string) => void
   onDeleteDraft: (id: string) => void
+
+  format: TemplateType
+  onUseSavedTemplate: (document: TemplateDocument, templateId: string, name: string) => void
+  onSetDefaultTemplate: (id: string) => Promise<void>
+  onDeleteTemplate: (id: string) => Promise<void>
 }
 
-type LeftTab = 'diseno' | 'plantillas' | 'borradores'
+type LeftTab = 'diseno' | 'plantillas' | 'guardadas' | 'borradores'
 
 const TABS: { key: LeftTab; label: string; icon: typeof Database }[] = [
   { key: 'diseno', label: 'Diseño', icon: Database },
   { key: 'plantillas', label: 'Plantillas', icon: LayoutTemplate },
+  { key: 'guardadas', label: 'Guardadas', icon: Cloud },
   { key: 'borradores', label: 'Borradores', icon: FileClock },
 ]
 
@@ -118,6 +125,7 @@ export function TemplateEditorLeftPanel({
   fields, fieldsLoading, onInsertField, onInsertElement,
   gallery, galleryLoading, onPreviewGalleryItem, onUseGalleryItem,
   drafts, onSaveDraft, onPreviewDraft, onLoadDraft, onDeleteDraft,
+  format, onUseSavedTemplate, onSetDefaultTemplate, onDeleteTemplate,
 }: Props) {
   const [tab, setTab] = useState<LeftTab>('diseno')
 
@@ -143,6 +151,14 @@ export function TemplateEditorLeftPanel({
         )}
         {tab === 'plantillas' && (
           <TemplateGalleryTab items={gallery} loading={galleryLoading} onPreview={onPreviewGalleryItem} onUse={onUseGalleryItem} />
+        )}
+        {tab === 'guardadas' && (
+          <SavedTemplatesTab
+            type={format}
+            onUse={onUseSavedTemplate}
+            onSetDefault={onSetDefaultTemplate}
+            onDelete={onDeleteTemplate}
+          />
         )}
         {tab === 'borradores' && (
           <DraftsTab

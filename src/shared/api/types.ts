@@ -46,7 +46,7 @@ export interface PaginationParams {
 export interface LoginRequest {
   email: string;
   password: string;
-  tenant?: string;
+  tenant?: string | null;
 }
 
 export interface AuthTenant {
@@ -1763,6 +1763,10 @@ export interface Compra {
   ncfProveedor?: string;
   /** N° de factura del proveedor (native field `bill_no` en ERPNext) */
   billNo?: string | null;
+  /** Tipo de comprobante generado/a generar — solo relevante si el proveedor es ocasional y no
+   *  se envía `ncfProveedor` (el sistema lo auto-genera al someter). Sin efecto en proveedores
+   *  registrados, que siempre traen su propio `ncfProveedor`. */
+  tipoComprobante?: "B01" | "B02" | "B03" | "B04" | "B11" | "B12" | "B13" | "B14" | "B15" | "B16" | "B17";
   tipoBienes606?: string;
   formaPago606?: string;
   retencionItbis?: number;
@@ -1783,6 +1787,29 @@ export interface Compra {
   /** Presente solo si el comprador autogeneró un e-CF (E41) al someter — proveedor ocasional sin
    *  NCF y e-CF habilitado. Ausente en el caso normal (NCF físico capturado a mano). */
   ecf?: EcfSubmitResult;
+}
+
+/** Body requerido en POST /compras/:id/submit y /gastos/:id/submit cuando la factura es de
+ *  tipoPago "Contado" — el backend crea y somete el Payment Entry por el saldo pendiente
+ *  (outstandingAmount) en el mismo request, así la factura no queda como un pago pendiente. */
+export interface PagoContadoDto {
+  modeOfPayment: string;
+  referenceNo?: string;
+  /** Marca este pago como cheque — activa la numeración por cuenta bancaria y lo registra en
+   *  el historial de cheques (/tesoreria/cheques). Requiere `bankAccount`. */
+  esCheque?: boolean;
+  referenceDate?: string;
+  remarks?: string;
+  /** Cuenta bancaria (id de CuentaBancaria) — requerida si el método de pago tiene
+   *  requiresBankAccount=true y no tiene defaultBankAccount, o si esCheque=true. */
+  bankAccount?: string;
+}
+
+/** Respuesta de POST /compras/:id/submit y /gastos/:id/submit cuando la factura es de Contado —
+ *  además de la factura ya sometida, trae el id del Payment Entry creado (si se pudo crear). */
+export interface SubmitConPagoResult<T> {
+  data: T;
+  pago?: { id: string };
 }
 
 export interface DistribucionCuentaDto {
@@ -1838,7 +1865,14 @@ export interface CreateCompraDto {
     distribucionCuenta?: DistribucionCuentaDto[];
     // NO description
   }[];
+  /** NCF del comprobante del proveedor. Obligatorio si el proveedor está registrado (no
+   *  ocasional). Para un proveedor ocasional puede omitirse: el sistema genera el comprobante
+   *  automáticamente al someter usando `tipoComprobante`. */
   ncfProveedor?: string;
+  /** Tipo de comprobante a generar cuando el proveedor es ocasional y se omite `ncfProveedor`
+   *  (default B11 si se omite este campo). Sin efecto si `ncfProveedor` viene lleno o el
+   *  proveedor está registrado. */
+  tipoComprobante?: "B01" | "B02" | "B03" | "B04" | "B11" | "B12" | "B13" | "B14" | "B15" | "B16" | "B17";
   billNo?: string;
   tipoBienes606?: string;
   formaPago606?: string;
@@ -2024,6 +2058,7 @@ export interface Gasto {
   tipoComprobante?: "B01" | "B13" | "B14" | "B15" | "B16" | "B17" | "E31";
   tipoBienes606?: string;
   formaPago606?: string;
+  tipoPago?: "Contado" | "Crédito";
   /** Retenciones aplicadas al gasto, enriquecidas con su tasa vigente (igual que
    *  Supplier.retencionesDefault en el GET de detalle — no confundir con el `string[]` de ids
    *  que se envía en CreateGastoDto). */
@@ -2067,6 +2102,7 @@ export interface CreateGastoDto {
   tipoComprobante?: "B01" | "B13" | "B14" | "B15" | "B16" | "B17" | "E31";
   tipoBienes606?: string;
   formaPago606?: string;
+  tipoPago?: "Contado" | "Crédito";
   categoriaGasto?: "Operativo" | "Administrativo" | "Ventas" | "Financiero";
   esDeducible?: boolean;
   /** Ids de config/retenciones a aplicar (multiselect). Si se omite, el BFF aplica las retenciones
@@ -3082,6 +3118,9 @@ export interface MetodoPago {
   requiresBankAccount?: boolean;
   /** Cuenta bancaria (id de CuentaBancaria) usada automáticamente si la operación no especifica una. */
   defaultBankAccount?: string;
+  /** Si es true, todo pago/cobro con este método (Compras, Gastos, Pagos a proveedores) se trata
+   *  siempre como cheque — el backend lo fuerza sin importar el `esCheque` que envíe el caller. */
+  esCheque?: boolean;
 }
 
 // GET /config/bancos — catálogo nativo ERPNext (Bank), solo lectura
@@ -4801,3 +4840,89 @@ export interface ChequePrintTemplate {
 export type CreateChequePrintTemplateDto = Omit<ChequePrintTemplate, "hasPrintFormat">;
 
 export type UpdateChequePrintTemplateDto = Partial<Omit<CreateChequePrintTemplateDto, "bankName">>;
+
+// ─── Plantillas de Impresión (POS + etiquetas) ──────────────────────────────
+// Ver docs/tasks/55_plantillas_impresion_editor_pos_y_etiquetas.md — el backend nunca
+// interpreta `documentJson`, lo trata como blob opaco (ver TemplateDocument en
+// src/features/invoice-template-editor/types.ts). El valor de `plantillaType` trae un
+// espacio literal ("Pos Invoice"/"Label 5x2") — así viaja en la query string también.
+
+export type PlantillaApiType = "Pos Invoice" | "Label 5x2";
+
+export interface PlantillaImpresion {
+  id: string;
+  plantillaType: PlantillaApiType;
+  plantillaName: string;
+  company: string;
+  isDefault: boolean;
+  catalogVersion: number;
+  /** TemplateDocument completo tal cual lo produce el editor — el backend no lo valida. */
+  documentJson: Record<string, unknown>;
+}
+
+export interface CreatePlantillaImpresionDto {
+  plantillaType: PlantillaApiType;
+  plantillaName: string;
+  isDefault?: boolean;
+  catalogVersion?: number;
+  documentJson: Record<string, unknown>;
+}
+
+export type UpdatePlantillaImpresionDto = Partial<CreatePlantillaImpresionDto>;
+
+export interface CampoDisponiblePlantilla {
+  key: string;
+  label: string;
+  /** Si es true, el valor correspondiente en render-data es un arreglo (tabla), no un escalar. */
+  array: boolean;
+}
+
+export interface LogoPlantillaUploadResult {
+  fileUrl: string;
+  fileName: string;
+}
+
+/** Respuesta de GET /plantillas/render-data?type=Pos Invoice — una key ausente en `values`
+ * significa lo mismo que presente con `null` (el binding no existe en este tenant o el dato
+ * vino vacío). */
+export interface RenderDataPosInvoice {
+  template: { id: string; document: Record<string, unknown> };
+  values: Record<string, unknown>;
+}
+
+/** Respuesta de GET /plantillas/render-data?type=Label 5x2 — `labels` respeta el orden (con
+ * repeticiones) de `sourceIds` enviado. */
+export interface RenderDataLabels {
+  template: { id: string; document: Record<string, unknown> };
+  labels: Array<{ sourceId: string; values: Record<string, unknown> }>;
+}
+
+// ─── Impresoras (QZ Tray) ────────────────────────────────────────────────────
+// Ver docs/tasks/56_persistencia_configuracion_impresoras.md — "brand"/"model" son texto libre
+// puramente descriptivo (el backend no los valida ni interpreta); `qzPrinterName` es el único
+// campo con significado técnico, opaco para el backend también (lo resuelve/valida el cliente
+// contra `qz.printers.find()`).
+
+export interface Impresora {
+  id: string;
+  name: string;
+  brand?: string;
+  model?: string;
+  qzPrinterName: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateImpresoraDto {
+  name: string;
+  brand?: string;
+  model?: string;
+  qzPrinterName: string;
+}
+
+export type UpdateImpresoraDto = Partial<CreateImpresoraDto>;
+
+export interface SetSeleccionDto {
+  /** `null` u omitido = "ninguna" (cae al diálogo de impresión del navegador). */
+  impresoraId?: string | null;
+}

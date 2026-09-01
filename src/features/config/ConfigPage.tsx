@@ -425,6 +425,7 @@ function MetodosPagoSection() {
   const [editAccount, setEditAccount] = useState('')
   const [editRequiresBankAccount, setEditRequiresBankAccount] = useState(false)
   const [editDefaultBankAccount, setEditDefaultBankAccount] = useState('')
+  const [editEsCheque, setEditEsCheque] = useState(false)
   const [defaultBankAccountSearch, setDefaultBankAccountSearch] = useState('')
 
   const { data, isLoading } = useQuery({ queryKey: ['metodos-pago'], queryFn: listMetodosPago })
@@ -440,7 +441,7 @@ function MetodosPagoSection() {
 
   const newIsDirty = useDirtyCheck({ newName, newType }, showNew)
   const newClose = useConfirmClose(newIsDirty, () => setShowNew(false))
-  const editIsDirty = useDirtyCheck({ editAccount, editRequiresBankAccount, editDefaultBankAccount }, !!editTarget)
+  const editIsDirty = useDirtyCheck({ editAccount, editRequiresBankAccount, editDefaultBankAccount, editEsCheque }, !!editTarget)
   const editClose = useConfirmClose(editIsDirty, () => setEditTarget(null))
 
   const createMutation = useMutation({
@@ -461,6 +462,7 @@ function MetodosPagoSection() {
     setEditAccount(m.account ?? '')
     setEditRequiresBankAccount(!!m.requiresBankAccount)
     setEditDefaultBankAccount(m.defaultBankAccount ?? '')
+    setEditEsCheque(!!m.esCheque)
     setShowNew(false)
   }
 
@@ -489,7 +491,10 @@ function MetodosPagoSection() {
                   <tbody>
                     {data?.map((m) => (
                       <tr key={m.name}>
-                        <td style={{ fontWeight: 500 }}>{m.name}</td>
+                        <td style={{ fontWeight: 500 }}>
+                          {m.name}
+                          {m.esCheque && <span className="badge badge-info" style={{ marginLeft: 6 }}>Cheque</span>}
+                        </td>
                         <td className="td-muted">{m.type}</td>
                         <td>
                           {m.disabled
@@ -571,11 +576,34 @@ function MetodosPagoSection() {
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                 <input
                   type="checkbox"
+                  checked={editEsCheque}
+                  onChange={(e) => {
+                    setEditEsCheque(e.target.checked)
+                    if (e.target.checked) setEditRequiresBankAccount(true)
+                  }}
+                />
+                Es cheque
+              </label>
+              {editEsCheque && (
+                <p className="ff-hint">
+                  Todo pago con este método (en Compras, Gastos y Pagos a proveedores) se tratará
+                  siempre como pago con cheque — se pedirá cuenta bancaria y número de cheque, y
+                  quedará registrado en el historial de cheques.
+                </p>
+              )}
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: editEsCheque ? 'default' : 'pointer' }}>
+                <input
+                  type="checkbox"
                   checked={editRequiresBankAccount}
+                  disabled={editEsCheque}
                   onChange={(e) => setEditRequiresBankAccount(e.target.checked)}
                 />
                 Requiere cuenta bancaria
               </label>
+              {editEsCheque && (
+                <p className="ff-hint">Requerida automáticamente — todo cheque necesita indicar de qué cuenta sale.</p>
+              )}
 
               {editRequiresBankAccount && (
                 <div className="ff-wrap">
@@ -602,6 +630,7 @@ function MetodosPagoSection() {
                     account: editAccount || undefined,
                     requiresBankAccount: editRequiresBankAccount,
                     defaultBankAccount: editRequiresBankAccount ? (editDefaultBankAccount || undefined) : undefined,
+                    esCheque: editEsCheque,
                   },
                 })}
                 disabled={updateMutation.isPending}
