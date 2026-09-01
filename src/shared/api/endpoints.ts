@@ -241,6 +241,7 @@ export const ENDPOINTS = {
     empresa: '/config/empresa',
     cobros: '/config/cobros',
     metodosPago: '/config/metodos-pago',
+    metodosPagoById: (id: string) => `/config/metodos-pago/${encodeURIComponent(id)}`,
     almacenes: '/config/almacenes',
     uom: '/config/uom',
     uomById: (id: string) => `/config/uom/${encodeURIComponent(id)}`,
