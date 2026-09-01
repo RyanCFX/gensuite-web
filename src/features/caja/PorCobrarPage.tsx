@@ -7,6 +7,7 @@ import { listPorCobrar, completarCobro, descartarFactura } from '@/shared/api/ca
 import { getFacturacionConfig, listMetodosPago } from '@/shared/api/config'
 import { getCustomer } from '@/shared/api/customers'
 import { getTurnoActual } from '@/shared/api/pos'
+import { downloadInvoicePdf } from '@/shared/api/invoices'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useDebounce } from '@/lib/useDebounce'
 import { PaymentLinesEditor } from '@/components/shared/PaymentLinesEditor'
@@ -16,6 +17,7 @@ import { TurnoCajaIndicator } from '@/components/shared/TurnoCajaIndicator'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { usePosTicketPrinter } from '@/shared/hooks/usePosTicketPrinter'
 import {
   EMPTY_PAYMENT_LINES_VALUE,
   buildSubmitPayload,
@@ -65,6 +67,7 @@ export default function PorCobrarPage() {
 
   const usaModuloPos = facturacion?.usaModuloPos ?? false
   const flujoCobro = facturacion?.flujoCobro ?? 'directo'
+  const { tryPrintPosTicket, printTargetNode } = usePosTicketPrinter()
   const metodosActivos = (metodos ?? []).filter((m) => !m.disabled)
   const [directoMopSearch, setDirectoMopSearch] = useState('')
   const directoMopOptions: SearchSelectOption[] = metodosActivos
@@ -151,7 +154,8 @@ const [directoMop, setDirectoMop] = useState('')
   // ─── Completar cobro mutation ───────────────────────────────────────
   const completarMutation = useMutation({
     mutationFn: (dto: CobrarFacturaDto) => completarCobro(selectedInvoice!.id, { ...dto, condicionFiscal }),
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
+      const invoiceId = selectedInvoice!.id
       const msg = `Factura cobrada — NCF: ${res.ncf}`
       if (res.fullyPaid) {
         toast.success(msg)
@@ -160,6 +164,22 @@ const [directoMop, setDirectoMop] = useState('')
       }
       closeModal()
       queryClient.invalidateQueries({ queryKey: ['caja-por-cobrar'] })
+      // Este es el cierre real de la venta (§5.2 del doc de plantillas) — someter la factura
+      // solo la reservó y la mandó aquí sin NCF ni pago completo. El gate es `usaModuloPos`
+      // (toda factura en esta cola es una venta POS), no el formato de página genérico.
+      if (res.fullyPaid && usaModuloPos) {
+        // El modal de cobro ya se cerró — sin este toast, la resolución de render-data + el
+        // envío a QZ Tray/impresión ocurren en silencio y el usuario no tiene forma de saber
+        // que algo sigue en curso mientras espera el ticket.
+        const toastId = toast.loading('Preparando ticket para imprimir…')
+        const printed = await tryPrintPosTicket(invoiceId)
+        if (printed) {
+          toast.success('Ticket enviado a imprimir', { id: toastId })
+        } else {
+          toast.error('No se pudo imprimir el ticket — se descargará el PDF en su lugar', { id: toastId })
+          downloadInvoicePdf(invoiceId, `factura-${invoiceId}.pdf`, 'pos')
+        }
+      }
     },
     onError: (err: { message?: string }) => {
       toast.error(err?.message ?? 'Error al completar el cobro')
@@ -592,6 +612,7 @@ function validateAndSubmit() {
          confirmLabel="Descartar cambios"
          variant="danger"
        />
+       {printTargetNode}
      </div>
    )
  }

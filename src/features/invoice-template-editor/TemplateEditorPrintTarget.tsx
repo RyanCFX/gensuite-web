@@ -11,14 +11,20 @@ const CSS_PX_PER_INCH = 96
 interface Props {
   doc: TemplateDocument
   fields: TemplateFieldCategory[]
+  values?: Record<string, unknown>
+  /** Impresión en lote (ej. etiquetas, §3.2 del doc de la tarea) — una entrada por instancia a
+   * imprimir, en el mismo orden que se pidió. Cuando se pasa (no vacío), `doc.pages` se repite
+   * una vez por cada entrada (cada una con sus propios `values`) y se ignora la prop `values`. */
+  labels?: Record<string, unknown>[]
 }
 
 /** Nodo invisible en pantalla (ver `.tpl-print-root` en index.css) que solo se muestra al
  * imprimir — es lo único visible en la hoja/ticket físico cuando se llama a `window.print()`.
  * Cada página de la plantilla se manda como un trabajo de impresión separado (`break-after:
  * page` entre cada una, ver `.tpl-print-page-wrap` en index.css). */
-export function TemplateEditorPrintTarget({ doc, fields }: Props) {
+export function TemplateEditorPrintTarget({ doc, fields, values, labels }: Props) {
   const scale = CSS_PX_PER_INCH / doc.page.dpi
+  const instances = labels && labels.length > 0 ? labels : [values]
 
   function pageHeight(elements: TemplateElement[]) {
     return doc.page.height ?? elements.reduce((max, el) => Math.max(max, el.y + el.height), 0) + 24
@@ -26,36 +32,42 @@ export function TemplateEditorPrintTarget({ doc, fields }: Props) {
 
   return (
     <div className="tpl-print-root">
-      {doc.pages.map((page) => {
-        const height = pageHeight(page.elements)
-        return (
-          // El wrapper tiene el tamaño FÍSICO real ya escalado (post-transform) — flexbox lo
-          // centra usando estas dimensiones reales. `.tpl-print-page` adentro conserva su
-          // ancho "de modelo" (sin escalar) y solo se ve más chico visualmente por su propio
-          // `transform: scale()`; centrar por flexbox el elemento SIN transformar centraría
-          // según su caja de layout original (576px), no según su tamaño visual real
-          // (~72mm/272px).
-          <div key={page.id} className="tpl-print-page-wrap" style={{ width: doc.page.width * scale, height: height * scale }}>
-            <div className="tpl-print-page" style={{ width: doc.page.width, height, transform: `scale(${scale})` }}>
-              {page.elements.map((el) => (
-                <div
-                  key={el.id}
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    width: el.width,
-                    height: el.height,
-                    transform: `translate(${el.x}px, ${el.y}px) rotate(${el.rotation}deg)`,
-                  }}
-                >
-                  <TemplateEditorElementView element={el} fields={fields} />
-                </div>
-              ))}
+      {instances.map((instanceValues, instanceIndex) =>
+        doc.pages.map((page) => {
+          const height = pageHeight(page.elements)
+          return (
+            // El wrapper tiene el tamaño FÍSICO real ya escalado (post-transform) — flexbox lo
+            // centra usando estas dimensiones reales. `.tpl-print-page` adentro conserva su
+            // ancho "de modelo" (sin escalar) y solo se ve más chico visualmente por su propio
+            // `transform: scale()`; centrar por flexbox el elemento SIN transformar centraría
+            // según su caja de layout original (576px), no según su tamaño visual real
+            // (~72mm/272px).
+            <div
+              key={`${instanceIndex}_${page.id}`}
+              className="tpl-print-page-wrap"
+              style={{ width: doc.page.width * scale, height: height * scale }}
+            >
+              <div className="tpl-print-page" style={{ width: doc.page.width, height, transform: `scale(${scale})` }}>
+                {page.elements.map((el) => (
+                  <div
+                    key={el.id}
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      width: el.width,
+                      height: el.height,
+                      transform: `translate(${el.x}px, ${el.y}px) rotate(${el.rotation}deg)`,
+                    }}
+                  >
+                    <TemplateEditorElementView element={el} fields={fields} values={instanceValues} />
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )
-      })}
+          )
+        }),
+      )}
     </div>
   )
 }

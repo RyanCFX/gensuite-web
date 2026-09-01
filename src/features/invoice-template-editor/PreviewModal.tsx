@@ -6,6 +6,7 @@ import { MIN_CANVAS_HEIGHT } from './constants'
 interface Props {
   doc: TemplateDocument
   fields: TemplateFieldCategory[]
+  values?: Record<string, unknown>
   onClose: () => void
 }
 
@@ -13,7 +14,7 @@ function pageContentHeight(doc: TemplateDocument, elements: TemplateElement[]) {
   return doc.page.height ?? Math.max(MIN_CANVAS_HEIGHT, elements.reduce((m, el) => Math.max(m, el.y + el.height), 0) + 40)
 }
 
-export function PreviewModal({ doc, fields, onClose }: Props) {
+export function PreviewModal({ doc, fields, values, onClose }: Props) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
@@ -44,7 +45,7 @@ export function PreviewModal({ doc, fields, onClose }: Props) {
                       transform: `rotate(${el.rotation}deg)`,
                     }}
                   >
-                    <TemplateEditorElementView element={el} fields={fields} />
+                    <TemplateEditorElementView element={el} fields={fields} values={values} />
                   </div>
                 ))}
               </div>

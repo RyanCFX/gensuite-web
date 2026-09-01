@@ -99,6 +99,7 @@ const CentrosCostoPage    = lazy(() => import('@/features/config/CentrosCostoPag
 const BancosPage          = lazy(() => import('@/features/config/BancosPage'))
 const CuentasBancariasPage = lazy(() => import('@/features/config/CuentasBancariasPage'))
 const DepartamentosPage   = lazy(() => import('@/features/config/DepartamentosPage'))
+const ImpresorasPage      = lazy(() => import('@/features/config/ImpresorasPage'))
 const RetencionesPage     = lazy(() => import('@/features/config/RetencionesPage'))
 const AjustesAvanzadosPage = lazy(() => import('@/features/config/AjustesAvanzadosPage'))
 const RepostValuacionPage  = lazy(() => import('@/features/inventory/RepostValuacionPage'))
@@ -331,7 +332,8 @@ export default function App() {
             <Route path="/config/ecf/certificacion" element={<Suspense fallback={<PageLoader />}><EcfCertificacionPage /></Suspense>} />
             <Route path="/config/ecf/contingencia" element={<Suspense fallback={<PageLoader />}><EcfContingenciaPage /></Suspense>} />
             <Route path="/config/sucursales" element={<Suspense fallback={<PageLoader />}><SucursalesPage /></Suspense>} />
-            <Route path="/config/plantillas-facturas" element={<Suspense fallback={<PageLoader />}><InvoiceTemplateEditorPage /></Suspense>} />
+            <Route path="/config/plantillas-facturas" element={<Suspense fallback={<PageLoader />}><InvoiceTemplateEditorPage fixedType="pos_invoice" /></Suspense>} />
+            <Route path="/config/plantillas-etiquetas" element={<Suspense fallback={<PageLoader />}><InvoiceTemplateEditorPage fixedType="label_5x2" /></Suspense>} />
             <Route path="/config/cajas" element={<Suspense fallback={<PageLoader />}><CajasPage /></Suspense>} />
             <Route path="/config/centros-costo" element={<Suspense fallback={<PageLoader />}><CentrosCostoPage /></Suspense>} />
             <Route path="/config/bancos" element={<Suspense fallback={<PageLoader />}><BancosPage /></Suspense>} />
@@ -341,6 +343,7 @@ export default function App() {
             <Route path="/config/tesoreria/plantillas-cheque/nueva" element={<Suspense fallback={<PageLoader />}><PlantillaChequeForm /></Suspense>} />
             <Route path="/config/tesoreria/plantillas-cheque/:id" element={<Suspense fallback={<PageLoader />}><PlantillaChequeForm /></Suspense>} />
             <Route path="/config/departamentos" element={<Suspense fallback={<PageLoader />}><DepartamentosPage /></Suspense>} />
+            <Route path="/config/impresoras" element={<Suspense fallback={<PageLoader />}><ImpresorasPage /></Suspense>} />
             <Route path="/config/retenciones" element={<Suspense fallback={<PageLoader />}><RetencionesPage /></Suspense>} />
             <Route path="/config/ajustes-avanzados" element={<Suspense fallback={<PageLoader />}><AjustesAvanzadosPage /></Suspense>} />
             <Route path="/config/recalculo-valuacion" element={<Suspense fallback={<PageLoader />}><RepostValuacionPage /></Suspense>} />

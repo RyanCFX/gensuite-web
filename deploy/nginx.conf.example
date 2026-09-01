@@ -1,0 +1,53 @@
+# Config de referencia para el servidor nginx que sirve el build estático (dist/) de
+# gensuite.ryancfx.click por HTTPS.
+#
+# El bundle pide `/api/v1/...` y `/glitchtip-tunnel` como rutas RELATIVAS al propio dominio
+# (ver VITE_API_BASE_URL en .env y `tunnel` en src/lib/sentry.ts) — nunca a la IP del backend
+# directamente. Por eso el navegador no ve Mixed Content: la petición insegura hacia
+# 207.180.235.134 sale de nginx (servidor a servidor), no del navegador.
+#
+# Requisito para que esto funcione: el build de producción debe compilarse con
+# VITE_API_BASE_URL=/api/v1 (el valor por defecto en .env de este repo). Si el build actualmente
+# desplegado se generó con VITE_API_BASE_URL apuntando a http://207.180.235.134:4000 (URL
+# absoluta), hay que recompilar (`npm run build`) con la variable relativa y volver a desplegar
+# el `dist/` — de lo contrario el bundle sigue teniendo la IP "horneada" adentro y este proxy
+# nunca llega a usarse.
+
+server {
+    listen 443 ssl;
+    server_name gensuite.ryancfx.click;
+
+    # ... certificados TLS, root del build (dist/), etc. ...
+
+    location /api/ {
+        proxy_pass http://207.180.235.134:4000/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Archivos subidos (ej. logo de plantillas de impresión, GET /files/:fileName). El backend
+    # los sirve con `Cross-Origin-Resource-Policy: same-origin`, por lo que un <img src> apuntando
+    # directo a la IP del backend es bloqueado por el navegador aunque el archivo exista. Al
+    # proxearlo bajo este mismo dominio queda como same-origin desde el punto de vista del
+    # navegador — ver `resolveFileUrl` en src/shared/api/client.ts.
+    location /files/ {
+        proxy_pass http://207.180.235.134:4000/files/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Tunnel de GlitchTip (ver src/lib/sentry.ts) — reenvía el envelope al ingest real,
+    # agregando la query string (sentry_key/version/client) que el SDK omite cuando usa `tunnel`.
+    location = /glitchtip-tunnel {
+        proxy_pass http://207.180.235.134:8001/api/4/envelope/?sentry_version=7&sentry_key=57f8c190070f47e39cf074a62078cea4&sentry_client=sentry.javascript.react;
+        proxy_set_header Host $host;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

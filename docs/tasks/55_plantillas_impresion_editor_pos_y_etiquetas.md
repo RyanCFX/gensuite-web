@@ -12,6 +12,12 @@
 > transmite por sí solo. Si tu `openapi.json` no tiene todavía `/plantillas/render-data` o
 > `/plantillas/logo`, está desactualizado: regenéralo desde `GET /api/docs-json` del BFF
 > desplegado antes de continuar. No adivines el contrato de esos dos endpoints en particular.
+>
+> **Validado end-to-end contra el tenant real `jbc`** (los 9 endpoints, contra una factura y
+> artículos reales) antes de escribir este documento — todos los ejemplos de request/response de
+> este documento son respuestas reales capturadas en esa prueba, no inventadas. En el camino se
+> encontró y corrigió un bug real en `POST /plantillas/logo` (corrompía imágenes binarias) — ya
+> arreglado en el BFF, no requiere ninguna acción de frontend.
 
 ---
 
@@ -174,6 +180,15 @@ Mismo body que crear, pero **todos los campos opcionales** — pensado para auto
 Devuelve la plantilla actualizada con `isDefault: true`. Igual que en creación, el backend
 desmarca sola cualquier otra default previa del mismo `(company, plantillaType)` — no hace falta
 ningún otro request. `404` si el id no existe.
+
+⚠️ **No mandes `Content-Type: application/json` en este request si no vas a mandar body.**
+Confirmado probando contra el servidor real: si el header `Content-Type: application/json` está
+presente pero el body viene vacío, Fastify lo rechaza con `400 "Body cannot be empty when
+content-type is set to 'application/json'"` — **antes** de que el controlador llegue a
+ejecutarse. Sin ese header (o sin body en absoluto), funciona normal. Esto afecta a **cualquier**
+`POST`/`DELETE` sin body de esta API, no solo a este endpoint — si tu cliente HTTP (ej. una
+instancia global de axios) agrega `Content-Type: application/json` a todas las requests por
+default, hay que quitarlo explícitamente para las llamadas sin body (`predeterminada`, `DELETE`).
 
 ### 1.7 Eliminar — `DELETE /plantillas/:id` (200)
 

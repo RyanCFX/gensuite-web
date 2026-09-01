@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { Select, SelectItem } from '@/components/ui/select'
-import { CANVAS_BOTTOM_MARGIN, TEMPLATE_FORMATS } from './constants'
+import { CANVAS_BOTTOM_MARGIN } from './constants'
 import { useTemplateEditorStore } from './store'
 import { TemplateEditorLeftPanel } from './TemplateEditorLeftPanel'
 import { TemplateEditorCanvas } from './TemplateEditorCanvas'
@@ -13,69 +12,47 @@ import { FormulaBuilderModal } from './FormulaBuilderModal'
 import { TableColumnsModal } from './TableColumnsModal'
 import { PreviewModal } from './PreviewModal'
 import { TemplateEditorPrintTarget } from './TemplateEditorPrintTarget'
-import { pageSizeMm, paperWidthMm } from './printUtils'
+import { printDocument } from './printUtils'
 import { getDraft } from './drafts'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import type { TemplateDocument, TemplateGalleryItem, TemplateType } from './types'
 
-const PRINT_STYLE_TAG_ID = 'tpl-print-page-size'
-
-function printDocument(doc: TemplateDocument) {
-  const { height } = pageSizeMm(doc)
-  // El "papel" declarado a @page/html/body es el ancho NOMINAL del rollo físico (ej. 80mm),
-  // no el ancho del contenido imprimible (ej. 72mm) — son distintos a propósito. Si se
-  // declaran iguales, el sobrante entre el rollo real y el contenido queda a criterio del
-  // driver/impresora repartirlo como margen (lo cual salía descentrado hacia la izquierda).
-  // Centrando nosotros mismos el contenido dentro del ancho del rollo (ver `.tpl-print-root`
-  // en index.css) el resultado es determinista sin importar el driver.
-  const paperMm = `${paperWidthMm(doc).toFixed(2)}mm`
-  // Alto "auto" para pos_invoice (rollo continuo, el ticket crece con el contenido);
-  // alto fijo para formatos con `page.height` definido (ej. etiquetas).
-  const heightMm = height ? `${height.toFixed(2)}mm` : 'auto'
-
-  let styleTag = document.getElementById(PRINT_STYLE_TAG_ID) as HTMLStyleElement | null
-  if (!styleTag) {
-    styleTag = document.createElement('style')
-    styleTag.id = PRINT_STYLE_TAG_ID
-    document.head.appendChild(styleTag)
-  }
-  // No basta con declarar `@page`: algunos drivers/OS ignoran un tamaño de página
-  // personalizado y usan el papel por defecto (ej. Letter/A4) del diálogo de impresión, lo
-  // cual reduce proporcionalmente todo el contenido dentro de esa página más grande y el
-  // ticket sale diminuto. Forzar explícitamente el ancho real en html/body evita que el motor
-  // de impresión reinterprete el tamaño del contenido según el papel que termine usando.
-  styleTag.textContent = `
-    @page { size: ${paperMm} ${heightMm}; margin: 0; }
-    @media print {
-      html, body {
-        width: ${paperMm} !important;
-        height: ${heightMm === 'auto' ? 'auto' : heightMm} !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        overflow: hidden !important;
-      }
-    }
-  `
-  window.print()
-}
-
 type ActiveModal = 'conditional' | 'formula' | 'table' | 'preview' | null
 
-export default function InvoiceTemplateEditorPage() {
+const PAGE_COPY: Record<TemplateType, { title: string; description: string }> = {
+  pos_invoice: { title: 'Plantillas de Facturas', description: 'Diseña el formato de impresión del ticket POS' },
+  label_5x2: { title: 'Plantillas de Etiquetas', description: 'Diseña el formato de impresión de etiquetas de producto' },
+}
+
+interface Props {
+  /** Bloquea el editor a un solo tipo de plantilla — Facturas y Etiquetas son pantallas
+   * separadas (cada una en su propia ruta), ya no hay selector de formato dentro del editor. */
+  fixedType: TemplateType
+}
+
+export default function InvoiceTemplateEditorPage({ fixedType }: Props) {
   const {
     format, documents, loadingDocuments, availableFields, fieldsLoading, selectedIds, zoom, saving, history,
     templateGallery, galleryLoading, drafts,
     init, setFormat, setPageHeight, addPage, removePage,
     addElement, addElementFromField, updateElement, removeElement, duplicateElement,
     bringToFront, sendToBack, selectIds, beginTransaction, zoomIn, zoomOut, zoomByFactor, undo, redo, save,
-    applyDocument, saveDraft, removeDraft,
+    applyDocument, saveDraft, removeDraft, setDefaultTemplate, deleteTemplate,
   } = useTemplateEditorStore()
 
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
   const [previewDoc, setPreviewDoc] = useState<TemplateDocument | null>(null)
-  const [pendingApply, setPendingApply] = useState<{ document: TemplateDocument; label: string } | null>(null)
+  const [pendingApply, setPendingApply] = useState<{
+    document: TemplateDocument
+    label: string
+    meta?: { templateId?: string | null; templateName?: string }
+  } | null>(null)
 
   useEffect(() => { init() }, [init])
+  // Cada pantalla (Facturas/Etiquetas) bloquea el store al tipo que le corresponde — el store
+  // sigue siendo el mismo para ambas (carga los dos tipos en `init()`), solo cambia cuál está
+  // "activo" en cada ruta.
+  useEffect(() => { setFormat(fixedType) }, [fixedType, setFormat])
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -115,10 +92,9 @@ export default function InvoiceTemplateEditorPage() {
     toast.success('Plantilla guardada correctamente')
   }
 
-  function handleTestPrint() {
+  async function handleTestPrint() {
     if (!doc) return
-    printDocument(doc)
-    toast.info('Selecciona tu impresora térmica (ej. Star TSP100) en el diálogo de impresión')
+    await printDocument(doc)
   }
 
   function handleUseGalleryItem(item: TemplateGalleryItem) {
@@ -140,9 +116,13 @@ export default function InvoiceTemplateEditorPage() {
     setPendingApply({ document: draft.document, label: draft.name })
   }
 
+  function handleUseSavedTemplate(document: TemplateDocument, templateId: string, name: string) {
+    setPendingApply({ document, label: name, meta: { templateId, templateName: name } })
+  }
+
   function confirmApply() {
     if (!pendingApply) return
-    applyDocument(pendingApply.document)
+    applyDocument(pendingApply.document, pendingApply.meta)
     setPendingApply(null)
     toast.success('Plantilla aplicada al canvas')
   }
@@ -150,7 +130,7 @@ export default function InvoiceTemplateEditorPage() {
   if (loadingDocuments || !doc) {
     return (
       <div className="page-container">
-        <PageHeader title="Editor de Plantillas" description="Diseña el formato de impresión de facturas y etiquetas" />
+        <PageHeader title={PAGE_COPY[fixedType].title} description={PAGE_COPY[fixedType].description} />
         <div className="card"><div className="card-body" style={{ textAlign: 'center', padding: '48px 0' }}><span className="spinner spinner-brand spinner-md" /></div></div>
       </div>
     )
@@ -173,22 +153,16 @@ export default function InvoiceTemplateEditorPage() {
           onPreviewDraft={handlePreviewDraft}
           onLoadDraft={handleLoadDraft}
           onDeleteDraft={(id) => { removeDraft(id); toast.success('Borrador eliminado') }}
+          format={format}
+          onUseSavedTemplate={handleUseSavedTemplate}
+          onSetDefaultTemplate={setDefaultTemplate}
+          onDeleteTemplate={deleteTemplate}
         />
       </aside>
 
       <div className="tpl-editor-content">
         <div className="tpl-editor-header">
-          <PageHeader title="Editor de Plantillas" description="Diseña el formato de impresión de facturas y etiquetas" />
-          <div className="ff-wrap tpl-format-select">
-            <label className="ff-label">Formato de factura</label>
-            <Select value={format} onValueChange={(v) => setFormat(v as TemplateType)}>
-              {TEMPLATE_FORMATS.map((f) => (
-                <SelectItem key={f.type} value={f.type} disabled={f.comingSoon}>
-                  {f.label}{f.comingSoon ? ' (próximamente)' : ''}
-                </SelectItem>
-              ))}
-            </Select>
-          </div>
+          <PageHeader title={PAGE_COPY[fixedType].title} description={PAGE_COPY[fixedType].description} />
 
           <div className="ff-wrap tpl-height-control">
             <label className="ff-label">Alto de página (px)</label>
@@ -257,6 +231,7 @@ export default function InvoiceTemplateEditorPage() {
             key={selectedElement?.id ?? 'none'}
             element={selectedElement}
             fields={availableFields}
+            termico={format === 'pos_invoice'}
             onUpdate={(patch) => selectedElement && updateElement(selectedElement.id, patch)}
             onDelete={() => selectedElement && removeElement(selectedElement.id)}
             onDuplicate={() => selectedElement && duplicateElement(selectedElement.id)}

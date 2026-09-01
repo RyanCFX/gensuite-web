@@ -9,9 +9,10 @@ import { getSupplier } from '@/shared/api/suppliers'
 import { getCatalogosFiscales, listImpuestosCompras, getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { PrintLabelsModal } from '@/components/shared/PrintLabelsModal'
 import { Badge } from '@/shared/ui/Badge'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { Send, X, RotateCcw, FileText, Receipt } from 'lucide-react'
+import { Send, X, RotateCcw, FileText, Receipt, Printer } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -43,6 +44,7 @@ export default function RecepcionDetail() {
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [showFacturar, setShowFacturar] = useState(false)
+  const [showPrintLabels, setShowPrintLabels] = useState(false)
   const [form, setForm] = useState<FacturarPurchaseReceiptDto>(defaultFacturarForm())
 
   const { data: receipt, isLoading, isError } = useQuery({
@@ -232,6 +234,9 @@ export default function RecepcionDetail() {
             )}
             {receipt.status === 'submitted' && (
               <>
+                <button className="btn btn-secondary btn-size-sm" onClick={() => setShowPrintLabels(true)}>
+                  <Printer size={14} />Imprimir etiquetas
+                </button>
                 {canFacturar && (
                   <button className="btn btn-primary btn-size-sm" onClick={openFacturar}>
                     <Receipt size={14} />Facturar
@@ -485,6 +490,11 @@ export default function RecepcionDetail() {
         </div>
       )}
 
+      <PrintLabelsModal
+        open={showPrintLabels}
+        onClose={() => setShowPrintLabels(false)}
+        initialItems={receipt.items.map((it) => ({ itemCode: it.itemCode, itemName: it.itemName, qty: it.qty }))}
+      />
     </div>
   )
 }

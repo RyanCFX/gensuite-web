@@ -82,6 +82,7 @@ function isAutoCollapseRoute(pathname: string): boolean {
   return (
     pathname.startsWith("/reportes") ||
     pathname.startsWith("/config/plantillas-facturas") ||
+    pathname.startsWith("/config/plantillas-etiquetas") ||
     // Editor visual de plantillas de cheque (nueva o edición) — full-bleed igual que el de facturas.
     /^\/config\/tesoreria\/plantillas-cheque\/[^/]+$/.test(pathname)
   );
@@ -397,6 +398,11 @@ const NAV_CONFIG: NavEntry = {
       path: "/config/cajas",
     },
     {
+      label: "Impresoras",
+      icon: <Printer size={14} />,
+      path: "/config/impresoras",
+    },
+    {
       label: "Centros de Costo",
       icon: <Building2 size={14} />,
       path: "/config/centros-costo",
@@ -415,11 +421,6 @@ const NAV_CONFIG: NavEntry = {
       label: "Tipos de Documento Bancario",
       icon: <Receipt size={14} />,
       path: "/config/tesoreria/tipos-documento",
-    },
-    {
-      label: "Plantillas de Cheque",
-      icon: <Printer size={14} />,
-      path: "/config/tesoreria/plantillas-cheque",
     },
     {
       label: "Departamentos",
@@ -461,9 +462,26 @@ const NAV_CONFIG: NavEntry = {
       ],
     },
     {
-      label: "Plantillas de Facturas",
+      label: "Plantillas",
       icon: <LayoutTemplate size={14} />,
-      path: "/config/plantillas-facturas",
+      prefix: "/config/plantillas-facturas|/config/plantillas-etiquetas|/config/tesoreria/plantillas-cheque",
+      children: [
+        {
+          label: "Facturas",
+          icon: <LayoutTemplate size={14} />,
+          path: "/config/plantillas-facturas",
+        },
+        {
+          label: "Etiquetas",
+          icon: <Tag size={14} />,
+          path: "/config/plantillas-etiquetas",
+        },
+        {
+          label: "Cheques",
+          icon: <Printer size={14} />,
+          path: "/config/tesoreria/plantillas-cheque",
+        },
+      ],
     },
     {
       label: "Almacenes",

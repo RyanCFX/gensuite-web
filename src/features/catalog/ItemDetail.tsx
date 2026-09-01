@@ -7,7 +7,8 @@ import { listWarehouses } from '@/shared/api/inventory'
 import { listZonas } from '@/shared/api/zonas'
 import { listUbicaciones, getItemUbicaciones, assignItemUbicacion, unassignItemUbicacion, moverStockUbicacion } from '@/shared/api/ubicaciones'
 import { formatDOP } from '@/lib/formatters'
-import { ToggleLeft, ToggleRight, Package, ArrowLeft, X, MapPin, Trash2, Info, DollarSign, ArrowRightLeft, Pencil } from 'lucide-react'
+import { PrintLabelsModal } from '@/components/shared/PrintLabelsModal'
+import { ToggleLeft, ToggleRight, Package, ArrowLeft, X, MapPin, Trash2, Info, DollarSign, ArrowRightLeft, Pencil, Printer } from 'lucide-react'
 import type { Item, GenerateVariantsResult, ItemAttribute, ApiError, UpdateItemPricesDto, ItemPricesResult } from '@/shared/api/types'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -989,6 +990,7 @@ export default function ItemDetail() {
   })
 
   const [showPricesModal, setShowPricesModal] = useState(false)
+  const [showPrintLabels, setShowPrintLabels] = useState(false)
 
   const toggleMutation = useMutation({
     mutationFn: () => toggleItem(id!),
@@ -1071,6 +1073,11 @@ export default function ItemDetail() {
           {!item.hasVariants && (
             <button className="btn btn-secondary" onClick={() => setShowPricesModal(true)}>
               <DollarSign size={15} /> Actualizar Precios
+            </button>
+          )}
+          {item.type === 'product' && !item.hasVariants && (
+            <button className="btn btn-secondary" onClick={() => setShowPrintLabels(true)}>
+              <Printer size={15} /> Imprimir etiqueta
             </button>
           )}
           <button
@@ -1479,6 +1486,12 @@ export default function ItemDetail() {
           }}
         />
       )}
+
+      <PrintLabelsModal
+        open={showPrintLabels}
+        onClose={() => setShowPrintLabels(false)}
+        initialItems={[{ itemCode: item.id, itemName: item.itemName, qty: 1 }]}
+      />
     </div>
   )
 }

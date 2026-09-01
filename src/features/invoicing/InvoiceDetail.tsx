@@ -26,6 +26,7 @@ import { getItem } from "@/shared/api/catalog";
 import { getBundle } from "@/shared/api/bundles";
 import { getTurnoActual, abrirTurno } from "@/shared/api/pos";
 import { ECF_SUBMIT_UNAVAILABLE_MSG } from "@/shared/api/ecf";
+import { usePosTicketPrinter } from "@/shared/hooks/usePosTicketPrinter";
 import { useAuthStore } from "@/stores/auth.store";
 import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion, EcfSubmitResult } from "@/shared/api/types";
 import { MOTIVOS_ANULACION_DGII } from "@/lib/constants";
@@ -54,6 +55,7 @@ import {
   BookOpen,
   Eye,
   Archive,
+  Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -110,6 +112,12 @@ export default function InvoiceDetail() {
   const [submitResult, setSubmitResult] = useState<{ outstandingAmount: number; invoiceId: string } | null>(null);
   // Resultado del e-CF cuando la factura se emitió electrónicamente (raro hoy — ver Parte 3).
   const [ecfResult, setEcfResult] = useState<EcfSubmitResult | null>(null);
+  // Imprime el ticket resolviendo la plantilla Pos Invoice contra datos reales (§3 del doc de
+  // plantillas) — usado solo por el botón manual "Imprimir POS" (ver más abajo). El cierre real
+  // de venta en tenants con módulo POS ocurre en Caja al cobrar, no al someter la factura (una
+  // venta de consumo se somete sin NCF y espera el cobro) — esa impresión automática vive en
+  // CajaPage.tsx, no aquí.
+  const { tryPrintPosTicket, printTargetNode } = usePosTicketPrinter();
   const [trackingRecovery, setTrackingRecovery] = useState<TrackedComponent | null>(null);
   const [trackingRecoveryLoading, setTrackingRecoveryLoading] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
@@ -206,6 +214,11 @@ export default function InvoiceDetail() {
   const flujoCobro = facturacionConfig?.flujoCobro ?? "directo";
   const formatoImpresionDefault = facturacionConfig?.formatoImpresionDefault ?? "a4";
   const formatosPermitidos = facturacionConfig?.formatosPermitidos;
+  // "Ver PDF"/"Descargar PDF" generan un PDF real vía el backend viejo (Puppeteer) — el
+  // formato "pos" ya no se ofrece ahí porque render-data no produce ningún PDF/archivo
+  // descargable; para eso existe el botón separado "Imprimir POS" (ver más abajo).
+  const formatosPermitidosPdf = formatosPermitidos?.filter((f) => f !== "pos");
+  const permitePos = formatosPermitidos?.includes("pos") ?? false;
 
   const { data: turno } = useQuery({
     queryKey: ['turno-actual'],
@@ -502,7 +515,10 @@ export default function InvoiceDetail() {
       if ("ecf" in updated && updated.ecf) {
         setEcfResult(updated.ecf);
       }
-      downloadInvoicePdf(id!, `factura-${id}.pdf`, formatoImpresionDefault);
+      // El cierre real de una venta POS ocurre al cobrarse en Caja (ver CajaPage.tsx), no
+      // aquí — someter solo asigna NCF/reserva la factura. Se conserva el PDF viejo tal cual
+      // para este momento.
+      downloadInvoicePdf(updated.id ?? id!, `factura-${updated.id ?? id}.pdf`, formatoImpresionDefault);
     },
     onError: (err: ApiError) => {
       const msg = err?.message ?? "";
@@ -821,6 +837,19 @@ export default function InvoiceDetail() {
   const downloadMutation = useMutation({
     mutationFn: (formato?: FormatoImpresion) => downloadInvoicePdf(id!, `factura-${id}.pdf`, formato ?? formatoImpresionDefault),
     onError: (err: { message?: string }) => toast.error(err?.message ?? "No se pudo descargar el PDF"),
+  });
+
+  // Botón "Imprimir POS" — a diferencia de "Ver PDF"/"Descargar PDF", no genera ningún
+  // archivo: resuelve la factura contra la plantilla Pos Invoice default y dispara la
+  // impresión térmica directamente (mismo mecanismo que al cerrar una venta).
+  const printPosMutation = useMutation({
+    mutationFn: () => tryPrintPosTicket(id!),
+    onSuccess: (printed) => {
+      if (!printed) {
+        toast.error("No hay una plantilla POS configurada — descargando PDF en su lugar");
+        downloadMutation.mutate("pos");
+      }
+    },
   });
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -1166,13 +1195,28 @@ export default function InvoiceDetail() {
               label="Ver PDF"
               loadingLabel="Generando…"
               icon={<Eye size={14} />}
-              formatosPermitidos={formatosPermitidos}
+              formatosPermitidos={formatosPermitidosPdf}
             />
             <PdfFormatButton
               onSelect={(formato) => downloadMutation.mutate(formato)}
               loading={downloadMutation.isPending}
-              formatosPermitidos={formatosPermitidos}
+              formatosPermitidos={formatosPermitidosPdf}
             />
+            {permitePos && (
+              <button
+                className="btn btn-secondary btn-size-sm"
+                onClick={() => printPosMutation.mutate()}
+                disabled={printPosMutation.isPending}
+                title="Imprime el ticket usando la plantilla POS del editor de plantillas"
+              >
+                {printPosMutation.isPending ? (
+                  <span className="spinner" />
+                ) : (
+                  <Printer size={14} />
+                )}{" "}
+                Imprimir POS
+              </button>
+            )}
             {invoice.ecf && (
               <button
                 className="btn btn-secondary btn-size-sm"
@@ -2673,6 +2717,7 @@ export default function InvoiceDetail() {
         variant="danger"
       />
       <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
+      {printTargetNode}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { Search, DollarSign, ChevronLeft, ChevronRight, X, Clock } from 'lucide-
 import { listPendientes, cobrarFactura } from '@/shared/api/caja'
 import { getFacturacionConfig, listMetodosPago } from '@/shared/api/config'
 import { getTurnoActual } from '@/shared/api/pos'
+import { downloadInvoicePdf } from '@/shared/api/invoices'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useDebounce } from '@/lib/useDebounce'
 import { PaymentLinesEditor } from '@/components/shared/PaymentLinesEditor'
@@ -14,6 +15,7 @@ import { TurnoCajaIndicator } from '@/components/shared/TurnoCajaIndicator'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { usePosTicketPrinter } from '@/shared/hooks/usePosTicketPrinter'
 import {
   EMPTY_PAYMENT_LINES_VALUE,
   buildSubmitPayload,
@@ -56,6 +58,7 @@ export default function CajaPage() {
 
    const usaModuloPos = facturacion?.usaModuloPos ?? false
    const flujoCobro = facturacion?.flujoCobro ?? 'directo'
+   const { tryPrintPosTicket, printTargetNode } = usePosTicketPrinter()
    const metodosActivos = (metodos ?? []).filter((m) => !m.disabled)
    const pendientes = data?.items ?? []
    const [directoMopSearch, setDirectoMopSearch] = useState('')
@@ -111,14 +114,34 @@ const [directoMop, setDirectoMop] = useState('')
 
   const cobrarMutation = useMutation({
     mutationFn: (dto: CobrarFacturaDto) => cobrarFactura(selectedInvoice!.id, dto),
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
+      const invoiceId = selectedInvoice!.id
       if (res.fullyPaid) {
-        toast.success(`Factura ${selectedInvoice!.id} saldada`)
+        toast.success(`Factura ${invoiceId} saldada`)
       } else {
         toast.success(`Cobro parcial: nuevo saldo ${formatDOP(res.outstandingAmount)}`)
       }
       closeModal()
       queryClient.invalidateQueries({ queryKey: ['caja-pendientes'] })
+      // El cierre real de una venta de consumo ocurre aquí, no al someter la factura — someter
+      // solo la reserva y la manda a Caja sin completar el pago (§5.2 del doc de plantillas).
+      // El gate es `usaModuloPos` (toda factura cobrada en Caja es una venta POS) — NO
+      // `formatoImpresionDefault === 'pos'`, que es la preferencia de formato de página
+      // genérica del tenant (independiente de si usa el módulo POS) y no debe condicionar si
+      // se imprime el ticket aquí.
+      if (res.fullyPaid && usaModuloPos) {
+        // El modal de cobro ya se cerró — sin este toast, la resolución de render-data + el
+        // envío a QZ Tray/impresión ocurren en silencio y el usuario no tiene forma de saber
+        // que algo sigue en curso mientras espera el ticket.
+        const toastId = toast.loading('Preparando ticket para imprimir…')
+        const printed = await tryPrintPosTicket(invoiceId)
+        if (printed) {
+          toast.success('Ticket enviado a imprimir', { id: toastId })
+        } else {
+          toast.error('No se pudo imprimir el ticket — se descargará el PDF en su lugar', { id: toastId })
+          downloadInvoicePdf(invoiceId, `factura-${invoiceId}.pdf`, 'pos')
+        }
+      }
     },
     onError: (err: { message?: string }) => {
       toast.error(err?.message ?? 'Error al procesar el cobro')
@@ -469,6 +492,7 @@ function validateAndSubmit() {
       />
       </>
     )}
+    {printTargetNode}
   </div>
 )
 }

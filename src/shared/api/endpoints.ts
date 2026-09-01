@@ -467,4 +467,22 @@ export const ENDPOINTS = {
     logsResumen: '/notificaciones/logs/resumen',
     probar: (codigo: string) => `/notificaciones/tipos/${encodeURIComponent(codigo)}/probar`,
   },
+  plantillas: {
+    list: '/plantillas',
+    byId: (id: string) => `/plantillas/${encodeURIComponent(id)}`,
+    default: '/plantillas/default',
+    camposDisponibles: '/plantillas/campos-disponibles',
+    renderData: '/plantillas/render-data',
+    logo: '/plantillas/logo',
+    predeterminada: (id: string) => `/plantillas/${encodeURIComponent(id)}/predeterminada`,
+  },
+  impresoras: {
+    list: '/impresoras',
+    byId: (id: string) => `/impresoras/${encodeURIComponent(id)}`,
+    miSeleccion: '/impresoras/mi-seleccion',
+  },
+  qz: {
+    certificado: '/qz/certificado',
+    firmar: '/qz/firmar',
+  },
 } as const
