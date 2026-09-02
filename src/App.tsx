@@ -44,6 +44,12 @@ const CompraForm      = lazy(() => import('@/features/compras/CompraForm'))
 const RecepcionesPage = lazy(() => import('@/features/compras/RecepcionesPage'))
 const RecepcionDetail = lazy(() => import('@/features/compras/RecepcionDetail'))
 const RecepcionForm   = lazy(() => import('@/features/compras/RecepcionForm'))
+const SolicitudesPage = lazy(() => import('@/features/compras/SolicitudesPage'))
+const SolicitudDetail = lazy(() => import('@/features/compras/SolicitudDetail'))
+const SolicitudForm   = lazy(() => import('@/features/compras/SolicitudForm'))
+const OrdenesPage     = lazy(() => import('@/features/compras/OrdenesPage'))
+const OrdenDetail     = lazy(() => import('@/features/compras/OrdenDetail'))
+const OrdenForm       = lazy(() => import('@/features/compras/OrdenForm'))
 const GastosPage      = lazy(() => import('@/features/gastos/GastosPage'))
 const GastoDetail     = lazy(() => import('@/features/gastos/GastoDetail'))
 const GastoForm       = lazy(() => import('@/features/gastos/GastoForm'))
@@ -228,6 +234,18 @@ export default function App() {
             <Route path="/compras/recepciones/nueva" element={<Suspense fallback={<PageLoader />}><RecepcionForm /></Suspense>} />
             <Route path="/compras/recepciones/:id/editar" element={<Suspense fallback={<PageLoader />}><RecepcionForm /></Suspense>} />
             <Route path="/compras/recepciones/:id" element={<Suspense fallback={<PageLoader />}><RecepcionDetail /></Suspense>} />
+
+            {/* Solicitudes de Compra (Material Request) */}
+            <Route path="/compras/solicitudes" element={<Suspense fallback={<PageLoader />}><SolicitudesPage /></Suspense>} />
+            <Route path="/compras/solicitudes/nueva" element={<Suspense fallback={<PageLoader />}><SolicitudForm /></Suspense>} />
+            <Route path="/compras/solicitudes/:id/editar" element={<Suspense fallback={<PageLoader />}><SolicitudForm /></Suspense>} />
+            <Route path="/compras/solicitudes/:id" element={<Suspense fallback={<PageLoader />}><SolicitudDetail /></Suspense>} />
+
+            {/* Órdenes de Compra (Purchase Order) */}
+            <Route path="/compras/ordenes" element={<Suspense fallback={<PageLoader />}><OrdenesPage /></Suspense>} />
+            <Route path="/compras/ordenes/nueva" element={<Suspense fallback={<PageLoader />}><OrdenForm /></Suspense>} />
+            <Route path="/compras/ordenes/:id/editar" element={<Suspense fallback={<PageLoader />}><OrdenForm /></Suspense>} />
+            <Route path="/compras/ordenes/:id" element={<Suspense fallback={<PageLoader />}><OrdenDetail /></Suspense>} />
 
             {/* Costos de Importación (Landed Cost) */}
             <Route path="/compras/costos-importacion" element={<Suspense fallback={<PageLoader />}><CostosImportacionPage /></Suspense>} />

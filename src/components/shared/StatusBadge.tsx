@@ -17,6 +17,18 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
   available: 'success',
   partially_used: 'warning',
   fully_used: 'neutral',
+  // erpStatus nativo de Solicitud de Compra (Material Request):
+  Pending: 'warning',
+  Stopped: 'lost',
+  'Partially Ordered': 'info',
+  // erpStatus nativo de Orden de Compra (Purchase Order):
+  'On Hold': 'warning',
+  'To Receive and Bill': 'info',
+  'To Bill': 'info',
+  'To Receive': 'info',
+  Completed: 'success',
+  Closed: 'neutral',
+  Delivered: 'success',
 }
 
 interface StatusBadgeProps {

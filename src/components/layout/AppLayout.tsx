@@ -224,6 +224,16 @@ const NAV_OPS: NavEntry[] = [
     prefix: "/compras",
     children: [
       { label: "Compras", icon: <ShoppingCart size={14} />, path: "/compras" },
+      {
+        label: "Solicitudes de Compra",
+        icon: <ClipboardList size={14} />,
+        path: "/compras/solicitudes",
+      },
+      {
+        label: "Órdenes de Compra",
+        icon: <ShoppingCart size={14} />,
+        path: "/compras/ordenes",
+      },
       { label: "Devoluciones de Compras", icon: <Receipt size={14} />, path: "/devoluciones-compras" },
       {
         label: "Recepción de Mercancía",

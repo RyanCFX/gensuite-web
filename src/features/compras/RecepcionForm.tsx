@@ -17,11 +17,14 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
+import { QtyInput } from '@/shared/ui/QtyInput'
 import type { Item } from '@/shared/api/types'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
-import { listItems } from '@/shared/api/catalog'
+import { listItems, getItem } from '@/shared/api/catalog'
+import { SeleccionarOrdenCompraModal } from '@/components/shared/SeleccionarOrdenCompraModal'
+import type { OrdenCompraImportLine } from '@/components/shared/SeleccionarOrdenCompraModal'
 import { useAuthStore } from '@/stores/auth.store'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
@@ -43,6 +46,9 @@ interface ItemRow {
   serials: string[]
   batches: { batchId: string; expiryDate?: string; qty: number }[]
   lineError?: string
+  /** Enlace manual (caso excepcional) a una línea de Orden de Compra — ver SeleccionarOrdenCompraModal. */
+  ordenCompra?: string
+  ordenCompraItem?: string
 }
 
 function emptyItem(defaultWh?: string): ItemRow {
@@ -193,13 +199,12 @@ function SerialBatchRow({
           />
         </td>
         <td>
-          <input
+          <QtyInput
             className="items-input"
-            type="number"
-            step="0.001"
             style={{ textAlign: 'right' }}
             value={item.qty}
-            onChange={(e) => updateItem(idx, 'qty', parseFloat(e.target.value) || 0)}
+            uom={item.uom}
+            onChange={(v) => updateItem(idx, 'qty', v)}
           />
         </td>
         <td>
@@ -431,6 +436,7 @@ export default function RecepcionForm() {
   const [department, setDepartment] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
+  const [showEnlazarOrden, setShowEnlazarOrden] = useState(false)
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
@@ -673,6 +679,7 @@ export default function RecepcionForm() {
         uom: i.uom || undefined,
         ...(i.serials.length > 0 ? { serials: i.serials } : {}),
         ...(i.batches.length > 0 ? { batches: i.batches } : {}),
+        ...(i.ordenCompra && i.ordenCompraItem ? { ordenCompra: i.ordenCompra, ordenCompraItem: i.ordenCompraItem } : {}),
       })),
     }
     saveMutation.mutate(dto)
@@ -707,6 +714,52 @@ export default function RecepcionForm() {
       i === idx ? { ...row, itemCode: '', itemLabel: undefined, description: '', rate: 0, trackingType: 'none', serials: [], batches: [] } : row,
     ))
   }, [])
+
+  // Enlace manual (caso excepcional) a una Orden de Compra — trae sus líneas pendientes de
+  // recibir como filas nuevas, marcadas con ordenCompra/ordenCompraItem (ver §3 del doc de
+  // Solicitud/Orden de Compra). El camino normal sigue siendo /compras/ordenes/:id/recibir.
+  async function handleImportOrdenLines(
+    lines: OrdenCompraImportLine[],
+    orden: { id: string; supplier: string; supplierName: string },
+  ) {
+    if (supplierId && supplierId !== orden.supplier) {
+      toast.error(`Esta orden es del proveedor ${orden.supplierName}, distinto al proveedor ya seleccionado`)
+      return
+    }
+    if (!supplierId) {
+      setSupplierId(orden.supplier)
+      setSupplierName(orden.supplierName)
+    }
+
+    const startIndex = items.length
+    setItems((prev) => [...prev, ...lines.map(() => emptyItem(defaultWh))])
+
+    const catalogItems = await Promise.all(lines.map((l) => getItem(l.itemCode).catch(() => null)))
+
+    setItems((prev) => prev.map((row, idx) => {
+      const li = idx - startIndex
+      if (li < 0 || li >= lines.length) return row
+      const line = lines[li]
+      const catalogItem = catalogItems[li]
+      const trackingType = catalogItem?.trackingType ?? 'none'
+      return {
+        ...row,
+        itemCode: line.itemCode,
+        itemLabel: catalogItem?.itemName ?? line.description,
+        description: catalogItem?.internalDescription ?? line.description ?? catalogItem?.itemName ?? '',
+        qty: line.qty,
+        rate: line.rate,
+        baseRate: line.rate,
+        uom: line.uom || catalogItem?.stockUom || row.uom,
+        warehouse: line.warehouse || row.warehouse,
+        trackingType,
+        ordenCompra: line.ordenCompra,
+        ordenCompraItem: line.ordenCompraItem,
+      }
+    }))
+    setItems((prev) => [...prev, emptyItem(defaultWh)])
+    toast.success(`${lines.length} artículo(s) traído(s) de la orden ${orden.id}`)
+  }
 
   if (isEdit && loadingEdit) {
     return (
@@ -802,14 +855,24 @@ export default function RecepcionForm() {
           <div className="card">
             <div className="card-header">
               <span className="card-title">Artículos</span>
-              <button
-                type="button"
-                className="btn btn-secondary btn-size-sm"
-                onClick={() => setItems((prev) => [...prev, emptyItem(defaultWh)])}
-              >
-                <Plus size={14} />
-                Agregar
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-size-sm"
+                  onClick={() => setShowEnlazarOrden(true)}
+                  title="Traer los artículos pendientes de una Orden de Compra existente"
+                >
+                  Enlazar Orden de Compra
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-size-sm"
+                  onClick={() => setItems((prev) => [...prev, emptyItem(defaultWh)])}
+                >
+                  <Plus size={14} />
+                  Agregar
+                </button>
+              </div>
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               <div className="items-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
@@ -873,6 +936,13 @@ export default function RecepcionForm() {
           onClose={() => setVariantTemplate(null)}
         />
       )}
+
+      <SeleccionarOrdenCompraModal
+        open={showEnlazarOrden}
+        onClose={() => setShowEnlazarOrden(false)}
+        mode="recepcion"
+        onImport={handleImportOrdenLines}
+      />
     </div>
   )
 }
