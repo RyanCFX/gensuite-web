@@ -1863,6 +1863,14 @@ export interface CreateCompraDto {
      *  coincidir exactamente con el monto de la línea. Si se envía, `cuentaContable` de esta línea
      *  se ignora. No se puede combinar con `serials`/`batches` en la misma línea. */
     distribucionCuenta?: DistribucionCuentaDto[];
+    /** Enlace manual a una línea de Orden de Compra (id de OrdenCompraItem) — deben mandarse
+     *  junto con `ordenCompra` (400 si solo viene uno). Caso excepcional: el camino normal es
+     *  POST /compras/ordenes/:id/facturar, que enlaza automáticamente. El backend RECHAZA esta
+     *  operación si la orden referenciada ya tiene perReceived > 0 (duplicaría inventario ya
+     *  recibido por conduce) — usar purchase-receipt/:id/facturar u ordenes/:id/facturar en ese caso.
+     *  No usar en una línea que sea un Combo. */
+    ordenCompra?: string;
+    ordenCompraItem?: string;
     // NO description
   }[];
   /** NCF del comprobante del proveedor. Obligatorio si el proveedor está registrado (no
@@ -1946,6 +1954,12 @@ export interface CreatePurchaseReceiptDto {
     uom?: string;
     serials?: string[];
     batches?: { batchId: string; expiryDate?: string; qty: number }[];
+    /** Enlace manual a una línea de Orden de Compra (id de OrdenCompraItem) — deben mandarse
+     *  junto con `ordenCompra` (400 si solo viene uno). Caso excepcional: el camino normal es
+     *  POST /compras/ordenes/:id/recibir, que enlaza automáticamente. A diferencia de Compras,
+     *  acá no hay guard — recibir contra una orden es el caso normal. No usar en un Combo. */
+    ordenCompra?: string;
+    ordenCompraItem?: string;
   }[];
 }
 
@@ -1961,6 +1975,224 @@ export interface FacturarPurchaseReceiptDto {
   retencionIsr?: number;
   tipoPago?: "Contado" | "Crédito";
   taxesTemplate?: string;
+}
+
+// ─── Solicitud de Compra (Material Request) ───────────────────────────────────
+// Pedido interno de intención ("necesito N de este artículo"), sin proveedor ni precio
+// obligatorios. Se convierte en una o varias Órdenes de Compra vía /generar-orden.
+
+export interface SolicitudCompraItem {
+  /** Id real de esta línea (Material Request Item) — es lo que hay que mandar como
+   *  `materialRequestItem` al generar una orden, NO el itemCode. */
+  id: string;
+  itemCode: string;
+  itemName: string;
+  qty: number;
+  uom: string;
+  /** Precio estimado — puede venir en 0 si la solicitud no lo especificó. */
+  rate: number;
+  warehouse?: string;
+  scheduleDate: string;
+  /** Cuánto de esta línea ya fue llevado a una Orden de Compra. Remanente = qty - orderedQty. */
+  orderedQty: number;
+  branch?: string | null;
+  department?: string | null;
+}
+
+export interface SolicitudCompra {
+  id: string;
+  transactionDate: string;
+  scheduleDate: string;
+  status: "draft" | "submitted" | "cancelled";
+  /** Estado nativo de ERPNext, con más matices que `status` — para el badge visual. */
+  erpStatus: "Draft" | "Submitted" | "Stopped" | "Cancelled" | "Pending" | "Partially Ordered" | "Ordered";
+  /** 0-100, % ya ordenado del total de la solicitud. */
+  perOrdered: number;
+  items: SolicitudCompraItem[];
+  amendedFrom?: string | null;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+export interface CreateSolicitudCompraDto {
+  transactionDate: string;
+  /** Fecha por defecto en que se necesita la mercancía, aplicada a toda línea que no traiga la
+   *  suya propia. Debe ser >= transactionDate. */
+  scheduleDate?: string;
+  /** Sucursal por defecto — Material Request no tiene sucursal en la cabecera nativa, se aplica
+   *  a cada línea que no traiga la suya. */
+  branch?: string;
+  department?: string;
+  items: {
+    itemCode: string;
+    description?: string;
+    qty: number;
+    /** Precio estimado — opcional, una solicitud no exige precio. */
+    rate?: number;
+    uom?: string;
+    warehouse?: string;
+    scheduleDate?: string;
+    branch?: string;
+    department?: string;
+  }[];
+}
+
+export type UpdateSolicitudCompraDto = Partial<CreateSolicitudCompraDto>;
+
+/** Body de POST /compras/solicitudes/:id/generar-orden — crea una Orden de Compra (Draft) a
+ *  partir del remanente pendiente de ordenar de la solicitud. Puede llamarse varias veces sobre
+ *  la misma solicitud, cada vez trae solo lo que falte (el backend recalcula el remanente real). */
+export interface OrdenFromSolicitudItemOverrideDto {
+  /** id de SolicitudCompraItem (no el itemCode). */
+  materialRequestItem: string;
+  /** Si se omite, ordena todo el remanente de esa línea. */
+  qty?: number;
+  /** Precio acordado con el proveedor — obligatorio si la línea de la solicitud no trae rate. */
+  rate?: number;
+  warehouse?: string;
+  scheduleDate?: string;
+}
+
+export interface CreateOrdenFromSolicitudDto {
+  supplier: string;
+  transactionDate?: string;
+  scheduleDate?: string;
+  currency?: string;
+  conversionRate?: number;
+  taxesTemplate?: string;
+  branch?: string;
+  department?: string;
+  /** Si se omite, ordena TODO el remanente pendiente de la solicitud. */
+  items?: OrdenFromSolicitudItemOverrideDto[];
+}
+
+// ─── Orden de Compra (Purchase Order) ──────────────────────────────────────────
+// El pedido formal a un proveedor específico, con precios — se genera desde una Solicitud de
+// Compra o se crea directa. Se recibe (Purchase Receipt) y/o se factura (Purchase Invoice).
+
+export interface OrdenCompraItem {
+  /** Id real de esta línea (Purchase Order Item) — es lo que hay que mandar como
+   *  `purchaseOrderItem` al recibir o facturar, NO el itemCode. */
+  id: string;
+  itemCode: string;
+  itemName?: string;
+  qty: number;
+  rate: number;
+  amount: number;
+  warehouse?: string;
+  uom?: string;
+  scheduleDate: string;
+  /** Cuánto de esta línea ya fue recibido/facturado. Remanente = qty - receivedQty/billedAmt. */
+  receivedQty: number;
+  billedAmt: number;
+  /** Presentes solo si esta línea viene de una Solicitud de Compra. */
+  materialRequest?: string | null;
+  materialRequestItem?: string | null;
+}
+
+export interface OrdenCompra {
+  id: string;
+  supplier: string;
+  supplierName: string;
+  transactionDate: string;
+  scheduleDate: string;
+  currency: string;
+  conversionRate: number;
+  status: "draft" | "submitted" | "cancelled";
+  /** Estado nativo de ERPNext, con más matices que `status` — para el badge visual. */
+  erpStatus: "Draft" | "On Hold" | "To Receive and Bill" | "To Bill" | "To Receive" | "Completed" | "Cancelled" | "Closed" | "Delivered";
+  /** 0-100, % ya recibido — independiente de perBilled (puede estar 100% recibida y 0% facturada). */
+  perReceived: number;
+  /** 0-100, % ya facturado. */
+  perBilled: number;
+  grandTotal: number;
+  netTotal: number;
+  branch?: string | null;
+  department?: string | null;
+  items: OrdenCompraItem[];
+  amendedFrom?: string | null;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+export interface CreateOrdenCompraDto {
+  supplier: string;
+  transactionDate: string;
+  scheduleDate?: string;
+  currency?: string;
+  /** Obligatorio SOLO si currency es distinta a la moneda de la compañía. */
+  conversionRate?: number;
+  /** Id del template de impuestos de compra — si se omite, usa el default del proveedor o de
+   *  la compañía. */
+  taxesTemplate?: string;
+  setWarehouse?: string;
+  branch?: string;
+  department?: string;
+  items: {
+    itemCode: string;
+    description?: string;
+    qty: number;
+    rate: number;
+    discountPct?: number;
+    uom?: string;
+    warehouse?: string;
+    scheduleDate?: string;
+    /** Enlace manual de trazabilidad a una Solicitud de Compra — normalmente NO se manda a mano,
+     *  se genera solo vía POST /compras/solicitudes/:id/generar-orden. */
+    materialRequestItem?: string;
+    materialRequest?: string;
+  }[];
+}
+
+export type UpdateOrdenCompraDto = Partial<CreateOrdenCompraDto>;
+
+export interface ReceiptFromOrdenItemOverrideDto {
+  /** id de OrdenCompraItem (no el itemCode). */
+  purchaseOrderItem: string;
+  /** Si se omite, recibe todo el remanente de esa línea. */
+  qty?: number;
+  warehouse?: string;
+  /** Requerido si el artículo tiene tracking de serial activo — uno por unidad recibida. */
+  serials?: string[];
+  /** Requerido si el artículo tiene tracking de lote activo. */
+  batches?: { batchId: string; expiryDate?: string; qty: number }[];
+}
+
+export interface CreateReceiptFromOrdenDto {
+  supplierDeliveryNote?: string;
+  /** Si se omite, recibe TODO el remanente pendiente de la orden. */
+  items?: ReceiptFromOrdenItemOverrideDto[];
+}
+
+export interface InvoiceFromOrdenItemOverrideDto {
+  /** id de OrdenCompraItem (no el itemCode). */
+  purchaseOrderItem: string;
+  /** Si se omite, factura todo el remanente de esa línea. */
+  qty?: number;
+}
+
+export interface CreateInvoiceFromOrdenDto {
+  dueDate?: string;
+  ncfProveedor?: string;
+  billNo?: string;
+  tipoBienes606?: string;
+  formaPago606?: string;
+  retencionItbis?: number;
+  retencionIsr?: number;
+  tipoPago?: "Contado" | "Crédito";
+  taxesTemplate?: string;
+  /** Si se omite, factura TODO el remanente pendiente de la orden. */
+  items?: InvoiceFromOrdenItemOverrideDto[];
+}
+
+/** Respuesta de POST /compras/ordenes/:id/facturar — la Purchase Invoice creada y sometida.
+ *  `warning` solo aparece cuando la orden ya tenía recepción parcial/total (perReceived > 0):
+ *  no es un error, la operación sí se completó — mostrarlo como aviso no bloqueante.
+ *  Nota: el ejemplo de la doc del backend usa `name` en vez de `id` para el documento creado —
+ *  se tipa con ambos por si acaso, usar `id ?? name` al leerlo. */
+export interface FacturarOrdenResult {
+  data: Compra & { name?: string };
+  warning?: string;
 }
 
 // ─── Gasto (Purchase Invoice — update_stock=0) ────────────────────────────────
@@ -3397,6 +3629,10 @@ export interface CreateUOMDto {
   conversions?: { toUom: string; factor: number }[];
   /** Uno de los 62 códigos DGII (ver DGII_UOM_CODES) — opcional. */
   codigoDgii?: string;
+  /** Si es true, la cantidad expresada en esta UOM debe ser un número entero (sin decimales)
+   *  tanto al comprar como al vender. Ej: "Unidad", "Caja". UOMs continuas (Kg, Litro, Metro)
+   *  deben dejarlo en false. Default false. */
+  mustBeWholeNumber?: boolean;
 }
 
 export interface UpdateUOMDto {
@@ -3404,6 +3640,7 @@ export interface UpdateUOMDto {
   conversions?: { toUom: string; factor: number }[];
   /** Uno de los 62 códigos DGII. Enviar "" (string vacío) desasigna el código actual. */
   codigoDgii?: string;
+  mustBeWholeNumber?: boolean;
 }
 
 // PUT /config/uom/:id — la respuesta puede traer `warning` (no bloqueante) cuando el código
