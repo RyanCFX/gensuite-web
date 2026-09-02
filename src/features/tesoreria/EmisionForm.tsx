@@ -103,17 +103,26 @@ export default function EmisionForm() {
   }
 
   // ── Sugerencia de número de cheque ──────────────────────────────────────
+  const cuentaChequesManuales = cuentaBancariaObj?.chequesManuales ?? true
   const { data: siguienteCheque } = useQuery({
     queryKey: ['tesoreria-siguiente-cheque', cuentaBancaria],
     queryFn: () => getSiguienteCheque(cuentaBancaria),
     enabled: !!cuentaBancaria && esCheque,
   })
   useEffect(() => {
-    if (esCheque && siguienteCheque?.siguienteSugerido && !numeroChequeTocado.current && !numeroCheque) {
+    if (!esCheque || !siguienteCheque?.siguienteSugerido) return
+    // Numeración automática: el campo queda deshabilitado y siempre refleja el número que
+    // asignará el backend, sin importar lo que el usuario haya escrito antes.
+    if (!cuentaChequesManuales) {
+      setNumeroCheque(siguienteCheque.siguienteSugerido)
+      return
+    }
+    // Numeración manual: solo se sugiere una vez, como punto de partida editable.
+    if (!numeroChequeTocado.current && !numeroCheque) {
       setNumeroCheque(siguienteCheque.siguienteSugerido)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [siguienteCheque, esCheque])
+  }, [esCheque, cuentaChequesManuales, siguienteCheque])
 
   // ── Facturas pendientes (solo Supplier — no hay endpoint de pendientes para Customer) ──
   const { data: pendientes, isLoading: pendientesLoading } = useQuery({
@@ -197,6 +206,10 @@ export default function EmisionForm() {
       if (!rnc) { toast.error('Este tipo de documento requiere el RNC del tercero'); return }
       if (rncDetail && !rncDetail.valid) { toast.error(`RNC inválido: ${rncDetail.reason}`); return }
     }
+    if (esCheque && tieneBeneficiarioEfectivo && beneficiarioTipo === 'Supplier' && liquidaciones.length === 0) {
+      toast.error('Selecciona al menos una factura a liquidar con el cheque')
+      return
+    }
 
     const dto: CreateEmisionDto = {
       fecha,
@@ -209,7 +222,8 @@ export default function EmisionForm() {
         : undefined,
       beneficiarioNombre: beneficiarioNombre || undefined,
       referencias: {
-        numeroCheque: numeroCheque || undefined,
+        // Numeración automática: el backend asigna el número — enviarlo igual sería rechazado.
+        numeroCheque: esCheque && !cuentaChequesManuales ? undefined : (numeroCheque || undefined),
         numeroReferencia: numeroReferencia || undefined,
         comprobante: comprobante || undefined,
         ncf: ncf || undefined,
@@ -320,22 +334,31 @@ export default function EmisionForm() {
                 </div>
 
                 <div>
-                  <label className="ff-label">Facturas a liquidar</label>
+                  <label className="ff-label">
+                    Facturas a liquidar {esCheque && beneficiarioTipo === 'Supplier' && <span className="ff-required">*</span>}
+                  </label>
                   {beneficiarioTipo === 'Customer' ? (
                     <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
                       No hay liquidación de facturas disponible para un beneficiario Cliente en
                       Emisiones — el monto completo queda como pago sin aplicar.
                     </p>
                   ) : (
-                    <LiquidacionFacturasTable
-                      pendientes={pendientes ?? []}
-                      isLoading={pendientesLoading}
-                      monto={monto}
-                      onChange={handleLiquidacionesChange}
-                      permiteExceder
-                      disabledMessage={!beneficiarioId ? 'Selecciona un proveedor para ver sus facturas pendientes' : undefined}
-                      emptyMessage="Sin facturas pendientes para este proveedor"
-                    />
+                    <>
+                      {esCheque && (
+                        <p className="ff-hint" style={{ marginTop: 0, marginBottom: 8 }}>
+                          Un cheque debe liquidar al menos una factura — selecciona cuáles.
+                        </p>
+                      )}
+                      <LiquidacionFacturasTable
+                        pendientes={pendientes ?? []}
+                        isLoading={pendientesLoading}
+                        monto={monto}
+                        onChange={handleLiquidacionesChange}
+                        permiteExceder
+                        disabledMessage={!beneficiarioId ? 'Selecciona un proveedor para ver sus facturas pendientes' : undefined}
+                        emptyMessage="Sin facturas pendientes para este proveedor"
+                      />
+                    </>
                   )}
                 </div>
               </>
@@ -380,9 +403,16 @@ export default function EmisionForm() {
                   <input
                     className="ff-input"
                     value={numeroCheque}
+                    disabled={!cuentaChequesManuales}
                     onChange={(e) => { numeroChequeTocado.current = true; setNumeroCheque(e.target.value) }}
                   />
-                  {siguienteCheque?.ultimoCheque && (
+                  {!cuentaChequesManuales ? (
+                    <p className="ff-hint">
+                      {cuentaBancaria
+                        ? 'Numeración automática — se asigna al guardar.'
+                        : 'Selecciona la cuenta bancaria para ver el número que se asignará.'}
+                    </p>
+                  ) : siguienteCheque?.ultimoCheque && (
                     <p className="ff-hint">Último usado: {siguienteCheque.ultimoCheque} — sugerencia editable, no es una reserva.</p>
                   )}
                 </div>
