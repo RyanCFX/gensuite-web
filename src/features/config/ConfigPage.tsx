@@ -669,12 +669,14 @@ function UomSection() {
   const [showCreate, setShowCreate] = useState(false)
   const [newUomName, setNewUomName] = useState('')
   const [newCodigoDgii, setNewCodigoDgii] = useState('')
+  const [newMustBeWholeNumber, setNewMustBeWholeNumber] = useState(false)
   const [conversions, setConversions] = useState<UomConversionRow[]>([])
   const [convErrors, setConvErrors] = useState<Record<number, string>>({})
   const [detailId, setDetailId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editCodigoDgii, setEditCodigoDgii] = useState('')
+  const [editMustBeWholeNumber, setEditMustBeWholeNumber] = useState(false)
   const [editConversions, setEditConversions] = useState<UomConversionRow[]>([])
   const [editConvErrors, setEditConvErrors] = useState<Record<number, string>>({})
   const [page, setPage] = useState(1)
@@ -704,6 +706,7 @@ function UomSection() {
         ? conversions.map(c => ({ toUom: c.toUom, factor: Number(c.factor) }))
         : undefined,
       codigoDgii: newCodigoDgii || undefined,
+      mustBeWholeNumber: newMustBeWholeNumber,
     }),
     onSuccess: () => {
       toast.success('Unidad creada')
@@ -711,6 +714,7 @@ function UomSection() {
       setShowCreate(false)
       setNewUomName('')
       setNewCodigoDgii('')
+      setNewMustBeWholeNumber(false)
       setConversions([])
       setConvErrors({})
     },
@@ -734,6 +738,7 @@ function UomSection() {
     if (!detailData) return
     setEditName(detailId ?? '')
     setEditCodigoDgii(detailData.codigoDgii ?? '')
+    setEditMustBeWholeNumber(detailData.mustBeWholeNumber ?? false)
     setEditConversions(
       detailData.conversions.map(c => ({ toUom: c.toUom, factor: String(c.factor), searchQuery: '' }))
     )
@@ -757,6 +762,7 @@ function UomSection() {
     const dto: Parameters<typeof updateUOM>[1] = {}
     if (editName && editName !== detailId) dto.name = editName
     if (editCodigoDgii !== (detailData?.codigoDgii ?? '')) dto.codigoDgii = editCodigoDgii
+    if (editMustBeWholeNumber !== (detailData?.mustBeWholeNumber ?? false)) dto.mustBeWholeNumber = editMustBeWholeNumber
     const validConversions = editConversions.filter(r => r.toUom && r.factor)
     if (validConversions.length) {
       dto.conversions = validConversions.map(r => ({ toUom: r.toUom, factor: Number(r.factor) }))
@@ -802,9 +808,9 @@ function UomSection() {
   // UOMs disponibles para seleccionar como destino (excluye la UOM que se está creando)
   const availableUoms = uoms.filter(u => u.name !== newUomName)
 
-  const createIsDirty = useDirtyCheck({ newUomName, newCodigoDgii, conversions }, showCreate)
+  const createIsDirty = useDirtyCheck({ newUomName, newCodigoDgii, newMustBeWholeNumber, conversions }, showCreate)
   const createClose = useConfirmClose(createIsDirty, () => setShowCreate(false))
-  const editIsDirty = useDirtyCheck({ editName, editCodigoDgii, editConversions }, editing)
+  const editIsDirty = useDirtyCheck({ editName, editCodigoDgii, editMustBeWholeNumber, editConversions }, editing)
   const detailClose = useConfirmClose(editIsDirty, () => { setDetailId(null); setEditing(false) })
   const editCancelClose = useConfirmClose(editIsDirty, () => setEditing(false))
 
@@ -836,6 +842,7 @@ function UomSection() {
                       <tr>
                         <th>Nombre</th>
                         <th>Código DGII</th>
+                        <th>Solo enteros</th>
                         <th style={{ width: 100 }} />
                       </tr>
                     </thead>
@@ -843,7 +850,7 @@ function UomSection() {
                       {pageUoms.length === 0
                         ? (
                             <tr>
-                              <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '24px 0' }}>
+                              <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '24px 0' }}>
                                 Sin resultados para "{search}"
                               </td>
                             </tr>
@@ -855,6 +862,11 @@ function UomSection() {
                                 {u.codigoDgii
                                   ? <span className="badge badge--gray">{u.codigoDgii} — {u.abreviaturaDgii}</span>
                                   : <span style={{ color: 'var(--text-tertiary)' }}>—</span>}
+                              </td>
+                              <td>
+                                {u.mustBeWholeNumber
+                                  ? <span className="badge badge-info">Sí</span>
+                                  : <span style={{ color: 'var(--text-tertiary)' }}>No</span>}
                               </td>
                               <td>
                                 <button className="btn btn-ghost btn-size-sm" onClick={() => setDetailId(u.name)}>
@@ -930,6 +942,18 @@ function UomSection() {
                   Opcional — sin código, esta unidad sigue siendo válida para todo lo demás.
                 </p>
               </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={newMustBeWholeNumber}
+                  onChange={(e) => setNewMustBeWholeNumber(e.target.checked)}
+                />
+                Solo cantidades enteras (sin decimales)
+              </label>
+              <p className="ff-hint" style={{ marginTop: -8 }}>
+                Ej: "Unidad", "Caja". UOMs continuas (Kg, Litro, Metro) deben dejarlo desmarcado.
+              </p>
 
               {/* Conversions table */}
               <div>
@@ -1049,6 +1073,18 @@ function UomSection() {
                     </p>
                   </div>
 
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={editMustBeWholeNumber}
+                      onChange={(e) => setEditMustBeWholeNumber(e.target.checked)}
+                    />
+                    Solo cantidades enteras (sin decimales)
+                  </label>
+                  <p className="ff-hint" style={{ marginTop: -8 }}>
+                    Ej: "Unidad", "Caja". UOMs continuas (Kg, Litro, Metro) deben dejarlo desmarcado.
+                  </p>
+
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <span className="ff-label" style={{ margin: 0 }}>
@@ -1142,6 +1178,20 @@ function UomSection() {
             ) : (
               <>
                 <div className="modal-body">
+                  {!isDetailLoading && detailData && (
+                    <div className="fields-grid fields-grid-2" style={{ marginBottom: 16 }}>
+                      <div className="detail-field">
+                        <span className="detail-label">Código DGII</span>
+                        <span className="detail-value">
+                          {detailData.codigoDgii ? `${detailData.codigoDgii} — ${detailData.abreviaturaDgii}` : '—'}
+                        </span>
+                      </div>
+                      <div className="detail-field">
+                        <span className="detail-label">Solo cantidades enteras</span>
+                        <span className="detail-value">{detailData.mustBeWholeNumber ? 'Sí' : 'No'}</span>
+                      </div>
+                    </div>
+                  )}
                   {isDetailLoading
                     ? <span className="skeleton-box" style={{ height: 80, display: 'block' }} />
                     : detailData?.conversions.length
