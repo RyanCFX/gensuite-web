@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffectOnActive } from 'keepalive-for-react'
@@ -17,6 +17,7 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { AttributeSelect } from '@/components/shared/AttributeSelect'
 import { ArrowLeft, Plus, Trash2, HelpCircle } from 'lucide-react'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 
 const schema = z.object({
   itemName: z.string().min(1, 'El nombre es requerido'),
@@ -89,6 +90,31 @@ export default function ItemForm() {
   const [barcodes, setBarcodes] = useState<{ barcode: string; barcodeType: string }[]>([])
   const [noPurchaseTax, setNoPurchaseTax] = useState(false)
   const [noSalesTax, setNoSalesTax] = useState(false)
+
+  // ── Escáner de código de barras ──────────────────────────────────────────
+  // Mismo comportamiento que en facturas/compras: detecta la lectura aunque el foco
+  // no esté en un input de este listado — si el código ya existe, lo resalta en vez
+  // de duplicarlo; si no existe, agrega una fila nueva con ese código.
+  const [highlightedBarcode, setHighlightedBarcode] = useState<number | null>(null)
+  const barcodeRowRefs = useRef<(HTMLDivElement | null)[]>([])
+  const flashBarcodeRow = useCallback((index: number) => {
+    barcodeRowRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setTimeout(() => {
+      setHighlightedBarcode(index)
+      setTimeout(() => setHighlightedBarcode((cur) => (cur === index ? null : cur)), 2200)
+    }, 400)
+  }, [])
+  useBarcodeScanner({
+    enabled: isProduct,
+    onBarcode: (code) => {
+      const existingIndex = barcodes.findIndex((b) => b.barcode.trim().toLowerCase() === code.trim().toLowerCase())
+      if (existingIndex !== -1) {
+        flashBarcodeRow(existingIndex)
+        return
+      }
+      setBarcodes((prev) => [...prev, { barcode: code, barcodeType: 'EAN' }])
+    },
+  })
 
   const { data: categoriesData, refetch: refetchCategories } = useQuery({
     queryKey: ['categories-tree', fixedType],
@@ -1005,7 +1031,12 @@ export default function ItemForm() {
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {barcodes.map((bc, idx) => (
-                        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <div
+                          key={idx}
+                          ref={(el) => { barcodeRowRefs.current[idx] = el }}
+                          className={highlightedBarcode === idx ? 'row-flash-block' : undefined}
+                          style={{ display: 'flex', gap: 8, alignItems: 'center' }}
+                        >
                           <input
                             className="ff-input"
                             style={{ flex: 1 }}

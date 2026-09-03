@@ -31,6 +31,7 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { QtyInput } from '@/shared/ui/QtyInput'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 
@@ -69,6 +70,7 @@ interface NoteLineItem {
   itemCode: string
   qty: number
   rate: number
+  uom?: string
 }
 
 // El backend devuelve el status en minúscula. Una vez Sometida, `status` deja de ser "submitted"
@@ -251,7 +253,7 @@ export default function CreditNotesPage() {
   useEffect(() => {
     if (selectedInvoiceDetail && selectedInvoiceDetail.id === selectedInvoiceId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- precarga los artículos al llegar el detalle de la factura seleccionada
-      setNoteItems(selectedInvoiceDetail.items.map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate })))
+      setNoteItems(selectedInvoiceDetail.items.map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate, uom: i.uom })))
       // La factura preseleccionada por ?originalInvoice= puede no estar en la lista de 20 —
       // completa la tarjeta de resumen desde el detalle.
       setSelectedInvoice((prev) => prev ?? selectedInvoiceDetail)
@@ -858,7 +860,7 @@ export default function CreditNotesPage() {
                           value=""
                           onChange={(val) => {
                             const item = selectedInvoiceDetail?.items.find((i) => i.itemCode === val)
-                            if (item) setNoteItems((prev) => [...prev, { itemCode: item.itemCode, qty: item.qty, rate: item.rate }])
+                            if (item) setNoteItems((prev) => [...prev, { itemCode: item.itemCode, qty: item.qty, rate: item.rate, uom: item.uom }])
                           }}
                           options={addItemOptions}
                           onSearch={setAddItemSearch}
@@ -893,13 +895,11 @@ export default function CreditNotesPage() {
                             <tr key={index}>
                               <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.itemCode}</td>
                               <td>
-                                <input
+                                <QtyInput
                                   className="items-input"
-                                  type="number"
-                                  min="0"
-                                  step="1"
                                   value={item.qty}
-                                  onChange={(e) => updateNoteItem(index, { qty: parseFloat(e.target.value) || 0 })}
+                                  uom={item.uom}
+                                  onChange={(v) => updateNoteItem(index, { qty: v })}
                                   style={{ textAlign: 'right' }}
                                 />
                               </td>

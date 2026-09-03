@@ -12,6 +12,7 @@ import type { CreateQuotationDto, ItemPrices, Bundle, Customer } from '@/shared/
 import type { Item } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
+import { QtyInput } from '@/shared/ui/QtyInput'
 import { formatDOP, displayId, round2 } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
@@ -895,13 +896,11 @@ if (esClienteOcasional) {
                       </td>
 
                       <td>
-                        <input
+                        <QtyInput
                           className={`items-input${(submitted && (!item.qty || item.qty <= 0)) || item.stockError ? ' items-input-error' : ''}`}
-                          type="number"
-                          min="0"
-                          step="1"
                           value={item.qty}
-                          onChange={(e) => updateItem(index, { qty: parseFloat(e.target.value) || 0 })}
+                          uom={item.uom}
+                          onChange={(v) => updateItem(index, { qty: v })}
                           style={{ textAlign: 'right' }}
                         />
                         {item.stockError && (

@@ -28,6 +28,7 @@ import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
+import { QtyInput } from '@/shared/ui/QtyInput'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { DistribucionCuentaEditor } from '@/components/shared/DistribucionCuentaEditor'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
@@ -837,7 +838,7 @@ export default function GastoForm() {
                           {!item.isAdHoc && item.itemType === 'service' ? (
                             <span className="td-muted" style={{ display: 'block', textAlign: 'right' }}>—</span>
                           ) : (
-                            <input className="items-input" type="number" min="0.001" step="0.001" style={{ textAlign: 'right' }} value={item.qty} onChange={(e) => updateItem(idx, 'qty', parseFloat(e.target.value) || 0)} />
+                            <QtyInput className="items-input" style={{ textAlign: 'right' }} value={item.qty} uom={item.uom} onChange={(v) => updateItem(idx, 'qty', v)} />
                           )}
                         </td>
                         <td>

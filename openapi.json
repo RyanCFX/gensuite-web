@@ -21328,6 +21328,1237 @@
         ]
       }
     },
+    "/api/v1/compras/ordenes": {
+      "get": {
+        "operationId": "OrdenesController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplier",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "submitted",
+                "cancelled",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "erpStatus",
+            "required": false,
+            "in": "query",
+            "description": "Estado nativo de ERPNext (`status`), distinto del `status` de arriba (sobre docstatus).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Draft",
+                "On Hold",
+                "To Receive and Bill",
+                "To Bill",
+                "To Receive",
+                "Completed",
+                "Cancelled",
+                "Closed",
+                "Delivered"
+              ]
+            }
+          },
+          {
+            "name": "receiptStatus",
+            "required": false,
+            "in": "query",
+            "description": "pending = per_received \u003C 100. received = per_received = 100.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "received",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "billingStatus",
+            "required": false,
+            "in": "query",
+            "description": "pending = per_billed \u003C 100. billed = per_billed = 100.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "billed",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Sucursal Norte",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Compras - JBC",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar órdenes de compra",
+        "tags": [
+          "Compras — Órdenes de Compra (Purchase Order)"
+        ]
+      },
+      "post": {
+        "description": "Para comprar sin haber levantado una solicitud interna primero. Si viene de una solicitud, use POST /compras/solicitudes/:id/generar-orden en su lugar.",
+        "operationId": "OrdenesController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrdenCompraDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear orden de compra directa (Draft) — sin solicitud previa",
+        "tags": [
+          "Compras — Órdenes de Compra (Purchase Order)"
+        ]
+      }
+    },
+    "/api/v1/compras/ordenes/{id}": {
+      "get": {
+        "operationId": "OrdenesController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una orden de compra",
+        "tags": [
+          "Compras — Órdenes de Compra (Purchase Order)"
+        ]
+      },
+      "put": {
+        "operationId": "OrdenesController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrdenCompraDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar orden en Draft",
+        "tags": [
+          "Compras — Órdenes de Compra (Purchase Order)"
+        ]
+      },
+      "delete": {
+        "operationId": "OrdenesController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar orden en Draft",
+        "tags": [
+          "Compras — Órdenes de Compra (Purchase Order)"
+        ]
+      }
+    },
+    "/api/v1/compras/ordenes/{id}/pdf": {
+      "get": {
+        "operationId": "OrdenesController_getPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Descargar orden de compra en PDF",
+        "tags": [
+          "Compras — Órdenes de Compra (Purchase Order)"
+        ]
+      }
+    },
+    "/api/v1/compras/ordenes/{id}/submit": {
+      "post": {
+        "operationId": "OrdenesController_submit",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Someter orden de compra",
+        "tags": [
+          "Compras — Órdenes de Compra (Purchase Order)"
+        ]
+      }
+    },
+    "/api/v1/compras/ordenes/{id}/cancel": {
+      "post": {
+        "operationId": "OrdenesController_cancel",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar orden sometida (solo si no tiene recepciones ni facturas asociadas)",
+        "tags": [
+          "Compras — Órdenes de Compra (Purchase Order)"
+        ]
+      }
+    },
+    "/api/v1/compras/ordenes/{id}/amend": {
+      "post": {
+        "operationId": "OrdenesController_amend",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enmendar orden cancelada (crea Draft con amended_from)",
+        "tags": [
+          "Compras — Órdenes de Compra (Purchase Order)"
+        ]
+      }
+    },
+    "/api/v1/compras/ordenes/{id}/cerrar": {
+      "post": {
+        "description": "Para cuando el proveedor nunca va a entregar el resto de la orden. No revierte lo ya recibido/facturado; solo detiene el remanente.",
+        "operationId": "OrdenesController_cerrar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cerrar orden (Closed) — la saca de pendiente sin cancelarla",
+        "tags": [
+          "Compras — Órdenes de Compra (Purchase Order)"
+        ]
+      }
+    },
+    "/api/v1/compras/ordenes/{id}/reabrir": {
+      "post": {
+        "operationId": "OrdenesController_reabrir",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reabrir una orden cerrada o en espera",
+        "tags": [
+          "Compras — Órdenes de Compra (Purchase Order)"
+        ]
+      }
+    },
+    "/api/v1/compras/ordenes/{id}/en-espera": {
+      "post": {
+        "operationId": "OrdenesController_enEspera",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Poner la orden en espera (On Hold)",
+        "tags": [
+          "Compras — Órdenes de Compra (Purchase Order)"
+        ]
+      }
+    },
+    "/api/v1/compras/ordenes/{id}/recibir": {
+      "post": {
+        "description": "Usa el mapper nativo de ERPNext para copiar el remanente pendiente de recibir — se puede llamar varias veces sobre la misma orden.",
+        "operationId": "OrdenesController_recibir",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReceiptFromOrdenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Generar recepción de mercancía (Purchase Receipt Draft) para esta orden",
+        "tags": [
+          "Compras — Órdenes de Compra (Purchase Order)"
+        ]
+      }
+    },
+    "/api/v1/compras/ordenes/{id}/facturar": {
+      "post": {
+        "description": "Si la orden ya tiene mercancía recibida por conduce, la respuesta incluye un campo \"warning\" sugiriendo facturar desde POST /compras/purchase-receipt/:id/facturar en su lugar.",
+        "operationId": "OrdenesController_facturar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvoiceFromOrdenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Generar la factura del proveedor (Purchase Invoice, update_stock=0) para esta orden",
+        "tags": [
+          "Compras — Órdenes de Compra (Purchase Order)"
+        ]
+      }
+    },
+    "/api/v1/compras/solicitudes": {
+      "get": {
+        "operationId": "SolicitudesController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "submitted",
+                "cancelled",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "erpStatus",
+            "required": false,
+            "in": "query",
+            "description": "Estado nativo de ERPNext (`status`), distinto del `status` de arriba (que es sobre docstatus). Útil para filtrar p. ej. solo las detenidas (Stopped).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Draft",
+                "Submitted",
+                "Stopped",
+                "Cancelled",
+                "Pending",
+                "Partially Ordered",
+                "Ordered"
+              ]
+            }
+          },
+          {
+            "name": "orderingStatus",
+            "required": false,
+            "in": "query",
+            "description": "pending = per_ordered = 0. partial = 0 \u003C per_ordered \u003C 100. ordered = per_ordered = 100.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "partial",
+                "ordered",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar solicitudes de compra",
+        "tags": [
+          "Compras — Solicitudes de Compra (Material Request)"
+        ]
+      },
+      "post": {
+        "description": "Un pedido interno de intención (\"necesito N de este artículo\"), sin proveedor ni precio obligatorios. Sométala y luego use POST /:id/generar-orden para convertirla en una orden de compra formal a un proveedor.",
+        "operationId": "SolicitudesController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSolicitudCompraDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear solicitud de compra (Draft)",
+        "tags": [
+          "Compras — Solicitudes de Compra (Material Request)"
+        ]
+      }
+    },
+    "/api/v1/compras/solicitudes/{id}": {
+      "get": {
+        "operationId": "SolicitudesController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una solicitud de compra",
+        "tags": [
+          "Compras — Solicitudes de Compra (Material Request)"
+        ]
+      },
+      "put": {
+        "operationId": "SolicitudesController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSolicitudCompraDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar solicitud en Draft",
+        "tags": [
+          "Compras — Solicitudes de Compra (Material Request)"
+        ]
+      },
+      "delete": {
+        "operationId": "SolicitudesController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar solicitud en Draft",
+        "tags": [
+          "Compras — Solicitudes de Compra (Material Request)"
+        ]
+      }
+    },
+    "/api/v1/compras/solicitudes/{id}/pdf": {
+      "get": {
+        "operationId": "SolicitudesController_getPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Descargar solicitud de compra en PDF",
+        "tags": [
+          "Compras — Solicitudes de Compra (Material Request)"
+        ]
+      }
+    },
+    "/api/v1/compras/solicitudes/{id}/submit": {
+      "post": {
+        "operationId": "SolicitudesController_submit",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Someter solicitud de compra",
+        "tags": [
+          "Compras — Solicitudes de Compra (Material Request)"
+        ]
+      }
+    },
+    "/api/v1/compras/solicitudes/{id}/cancel": {
+      "post": {
+        "operationId": "SolicitudesController_cancel",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar solicitud sometida (solo si no tiene órdenes generadas)",
+        "tags": [
+          "Compras — Solicitudes de Compra (Material Request)"
+        ]
+      }
+    },
+    "/api/v1/compras/solicitudes/{id}/amend": {
+      "post": {
+        "operationId": "SolicitudesController_amend",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enmendar solicitud cancelada (crea Draft con amended_from)",
+        "tags": [
+          "Compras — Solicitudes de Compra (Material Request)"
+        ]
+      }
+    },
+    "/api/v1/compras/solicitudes/{id}/detener": {
+      "post": {
+        "operationId": "SolicitudesController_detener",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detener solicitud (Stopped) — deja de contar como pendiente de ordenar",
+        "tags": [
+          "Compras — Solicitudes de Compra (Material Request)"
+        ]
+      }
+    },
+    "/api/v1/compras/solicitudes/{id}/reanudar": {
+      "post": {
+        "operationId": "SolicitudesController_reanudar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reanudar una solicitud detenida",
+        "tags": [
+          "Compras — Solicitudes de Compra (Material Request)"
+        ]
+      }
+    },
+    "/api/v1/compras/solicitudes/{id}/generar-orden": {
+      "post": {
+        "description": "Usa el mapper nativo de ERPNext para copiar el remanente pendiente de ordenar — se puede llamar varias veces sobre la misma solicitud (cada vez trae solo lo que falte). \"supplier\" es obligatorio: la solicitud no tiene proveedor.",
+        "operationId": "SolicitudesController_generarOrden",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrdenFromSolicitudDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Generar Orden de Compra (Draft) desde esta solicitud",
+        "tags": [
+          "Compras — Solicitudes de Compra (Material Request)"
+        ]
+      }
+    },
     "/api/v1/permisos/catalogo": {
       "get": {
         "operationId": "PermisosController_getCatalogo",
@@ -25095,11 +26326,6 @@
             "type": "string",
             "example": "ryan@empresa.com",
             "description": "Correo al que se envía el correo de prueba"
-          },
-          "nombre": {
-            "type": "string",
-            "example": "Ryan",
-            "description": "Nombre opcional, solo para el saludo del correo de prueba"
           }
         },
         "required": [
@@ -26392,6 +27618,10 @@
             "type": "string",
             "example": "BA-00001",
             "description": "Cuenta bancaria (Bank Account) usada por defecto cuando requiresBankAccount es true y el cobro/pago no especifica una explícitamente."
+          },
+          "esCheque": {
+            "type": "boolean",
+            "description": "Si es true, todo pago con este método (Compras/Gastos vía POST /:id/submit, o POST /pagos) se trata siempre como pago con cheque — exige cuenta bancaria (Bank Account) y activa el registro de cheque (/tesoreria/cheques), sin que el caller tenga que enviar \"esCheque\" explícito. El número de cheque solo se pide si la cuenta bancaria resultante numera manualmente (Bank Account.custom_cheques_manuales) — en modo automático se asigna solo."
           }
         }
       },
@@ -26602,6 +27832,11 @@
             ],
             "example": "21",
             "description": "Código de la tabla de 55 unidades de medida DGII (ver GET /config/uom). Opcional: una UOM sin código sigue siendo válida en ERPNext, pero unitCode se omite al emitir un e-CF con ítems que la usen."
+          },
+          "mustBeWholeNumber": {
+            "type": "boolean",
+            "default": false,
+            "description": "Si es true, la cantidad expresada en esta UOM debe ser un número entero (sin decimales) tanto al comprar como al vender. Ej: \"Unidad\", \"Caja\". UOMs continuas (Kg, Litro, Metro) deben dejarlo en false."
           }
         },
         "required": [
@@ -26694,6 +27929,10 @@
             ],
             "example": "21",
             "description": "Código de la tabla de 55 unidades de medida DGII. Enviar cadena vacía (\"\") para desasignar el código de esta UOM."
+          },
+          "mustBeWholeNumber": {
+            "type": "boolean",
+            "description": "Si es true, la cantidad expresada en esta UOM debe ser un número entero (sin decimales) tanto al comprar como al vender."
           }
         }
       },
@@ -29466,6 +30705,14 @@
             "items": {
               "$ref": "#/components/schemas/ComponentTrackingDto"
             }
+          },
+          "ordenCompra": {
+            "type": "string",
+            "description": "Orden de compra a la que pertenece esta línea (enlace manual). Requiere también \"ordenCompraItem\". El BFF rechaza la compra si esa orden ya tiene mercancía recibida por conduce (per_received \u003E 0) — en ese caso factúrela desde POST /compras/purchase-receipt/:id/facturar para no duplicar el inventario. No usar en una línea de combo ni junto con distribucionCuenta."
+          },
+          "ordenCompraItem": {
+            "type": "string",
+            "description": "name (id) de la fila \"Purchase Order Item\" que esta línea liquida — acompaña a \"ordenCompra\"."
           }
         },
         "required": [
@@ -29550,9 +30797,19 @@
               "B14",
               "B15",
               "B16",
-              "B17"
+              "B17",
+              "E31",
+              "E32",
+              "E33",
+              "E34",
+              "E41",
+              "E43",
+              "E44",
+              "E45",
+              "E46",
+              "E47"
             ],
-            "description": "Tipo de comprobante a generar cuando el proveedor es ocasional y se omite `ncfProveedor` — B01=Crédito Fiscal, B02=Consumo, B11=Compras/Informal (default si se omite este campo), B13=Gastos Menores, B17=Pagos al Exterior, etc. Sin efecto si `ncfProveedor` viene lleno o el proveedor está registrado (esos casos nunca auto-generan)."
+            "description": "Tipo de comprobante de esta compra — B01=Crédito Fiscal, B02=Consumo, B11=Compras/Informal, B13=Gastos Menores, B17=Pagos al Exterior, etc. (o su equivalente electrónico E31/E41/...). Siempre obligatorio. Cuando el proveedor es ocasional y se omite `ncfProveedor`, el sistema usa este tipo para auto-generar el comprobante al someter — sin efecto en ese sentido si `ncfProveedor` viene lleno o el proveedor está registrado (esos casos nunca auto-generan, pero el tipo se guarda igual)."
           },
           "billNo": {
             "type": "string",
@@ -29618,7 +30875,8 @@
         },
         "required": [
           "postingDate",
-          "items"
+          "items",
+          "tipoComprobante"
         ]
       },
       "UpdateCompraDto": {
@@ -29677,9 +30935,19 @@
               "B14",
               "B15",
               "B16",
-              "B17"
+              "B17",
+              "E31",
+              "E32",
+              "E33",
+              "E34",
+              "E41",
+              "E43",
+              "E44",
+              "E45",
+              "E46",
+              "E47"
             ],
-            "description": "Tipo de comprobante a generar cuando el proveedor es ocasional y se omite `ncfProveedor` — B01=Crédito Fiscal, B02=Consumo, B11=Compras/Informal (default si se omite este campo), B13=Gastos Menores, B17=Pagos al Exterior, etc. Sin efecto si `ncfProveedor` viene lleno o el proveedor está registrado (esos casos nunca auto-generan)."
+            "description": "Tipo de comprobante de esta compra — B01=Crédito Fiscal, B02=Consumo, B11=Compras/Informal, B13=Gastos Menores, B17=Pagos al Exterior, etc. (o su equivalente electrónico E31/E41/...). Siempre obligatorio. Cuando el proveedor es ocasional y se omite `ncfProveedor`, el sistema usa este tipo para auto-generar el comprobante al someter — sin efecto en ese sentido si `ncfProveedor` viene lleno o el proveedor está registrado (esos casos nunca auto-generan, pero el tipo se guarda igual)."
           },
           "billNo": {
             "type": "string",
@@ -29996,9 +31264,19 @@
               "B14",
               "B15",
               "B16",
-              "B17"
+              "B17",
+              "E31",
+              "E32",
+              "E33",
+              "E34",
+              "E41",
+              "E43",
+              "E44",
+              "E45",
+              "E46",
+              "E47"
             ],
-            "description": "B01=Crédito Fiscal, B02=Consumo, B03=Nota de Débito, B04=Nota de Crédito, B11=Compras/Informal, B12=Registro Único de Ingresos, B13=Gastos Menores, B14=Regímenes Especiales, B15=Gubernamentales, B16=Exportaciones, B17=Pagos al Exterior"
+            "description": "B01=Crédito Fiscal, B02=Consumo, B03=Nota de Débito, B04=Nota de Crédito, B11=Compras/Informal, B12=Registro Único de Ingresos, B13=Gastos Menores, B14=Regímenes Especiales, B15=Gubernamentales, B16=Exportaciones, B17=Pagos al Exterior (o su equivalente electrónico E31/E41/...). Siempre obligatorio."
           },
           "tipoBienes606": {
             "type": "string"
@@ -30072,7 +31350,8 @@
         },
         "required": [
           "postingDate",
-          "items"
+          "items",
+          "tipoComprobante"
         ]
       },
       "UpdateGastoDto": {
@@ -30133,9 +31412,19 @@
               "B14",
               "B15",
               "B16",
-              "B17"
+              "B17",
+              "E31",
+              "E32",
+              "E33",
+              "E34",
+              "E41",
+              "E43",
+              "E44",
+              "E45",
+              "E46",
+              "E47"
             ],
-            "description": "B01=Crédito Fiscal, B02=Consumo, B03=Nota de Débito, B04=Nota de Crédito, B11=Compras/Informal, B12=Registro Único de Ingresos, B13=Gastos Menores, B14=Regímenes Especiales, B15=Gubernamentales, B16=Exportaciones, B17=Pagos al Exterior"
+            "description": "B01=Crédito Fiscal, B02=Consumo, B03=Nota de Débito, B04=Nota de Crédito, B11=Compras/Informal, B12=Registro Único de Ingresos, B13=Gastos Menores, B14=Regímenes Especiales, B15=Gubernamentales, B16=Exportaciones, B17=Pagos al Exterior (o su equivalente electrónico E31/E41/...). Siempre obligatorio."
           },
           "tipoBienes606": {
             "type": "string"
@@ -31428,6 +32717,14 @@
             "items": {
               "$ref": "#/components/schemas/ReceiptComponentTrackingDto"
             }
+          },
+          "ordenCompra": {
+            "type": "string",
+            "description": "Orden de compra a la que pertenece esta línea (enlace manual — normalmente se genera automáticamente vía POST /compras/ordenes/:id/recibir en vez de esto). Requiere también \"ordenCompraItem\". No usar en una línea de combo (expandComboLines la convierte en N líneas de componentes, sin una fila de orden correcta para asignarle a cada una)."
+          },
+          "ordenCompraItem": {
+            "type": "string",
+            "description": "name (id) de la fila \"Purchase Order Item\" que esta línea liquida — acompaña a \"ordenCompra\"."
           }
         },
         "required": [
@@ -31544,6 +32841,425 @@
             "description": "ID del template de impuestos del documento. Si se omite, se usa el default de la compañía."
           }
         }
+      },
+      "OrdenCompraItemDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "example": "PROD-001"
+          },
+          "description": {
+            "type": "string",
+            "description": "Si se omite, el BFF la obtiene automáticamente del artículo."
+          },
+          "qty": {
+            "type": "number"
+          },
+          "rate": {
+            "type": "number"
+          },
+          "discountPct": {
+            "type": "number",
+            "example": 10,
+            "description": "% de descuento en la línea (0-100)"
+          },
+          "uom": {
+            "type": "string"
+          },
+          "warehouse": {
+            "type": "string"
+          },
+          "scheduleDate": {
+            "type": "string",
+            "description": "Fecha en que se espera recibir esta línea. Si se omite, cae a scheduleDate/transactionDate de la orden."
+          },
+          "materialRequestItem": {
+            "type": "string",
+            "description": "name (id) de la fila \"Material Request Item\" de una solicitud, para trazabilidad manual — normalmente NO se manda acá: se genera solo al crear la orden vía POST /compras/solicitudes/:id/generar-orden."
+          },
+          "materialRequest": {
+            "type": "string",
+            "description": "id de la Solicitud de Compra origen de esta línea (acompaña a materialRequestItem)."
+          }
+        },
+        "required": [
+          "itemCode",
+          "qty",
+          "rate"
+        ]
+      },
+      "CreateOrdenCompraDto": {
+        "type": "object",
+        "properties": {
+          "supplier": {
+            "type": "string"
+          },
+          "transactionDate": {
+            "type": "string"
+          },
+          "scheduleDate": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "example": "DOP"
+          },
+          "conversionRate": {
+            "type": "number",
+            "example": 1
+          },
+          "taxesTemplate": {
+            "type": "string",
+            "example": "Dominican Republic Tax - JB",
+            "description": "ID del template de impuestos de compra. Si se omite, se usa el default del proveedor o de la compañía."
+          },
+          "setWarehouse": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte"
+          },
+          "department": {
+            "type": "string",
+            "example": "Compras - JBC"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrdenCompraItemDto"
+            }
+          }
+        },
+        "required": [
+          "supplier",
+          "transactionDate",
+          "items"
+        ]
+      },
+      "UpdateOrdenCompraDto": {
+        "type": "object",
+        "properties": {
+          "supplier": {
+            "type": "string"
+          },
+          "transactionDate": {
+            "type": "string"
+          },
+          "scheduleDate": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "example": "DOP"
+          },
+          "conversionRate": {
+            "type": "number",
+            "example": 1
+          },
+          "taxesTemplate": {
+            "type": "string",
+            "example": "Dominican Republic Tax - JB",
+            "description": "ID del template de impuestos de compra. Si se omite, se usa el default del proveedor o de la compañía."
+          },
+          "setWarehouse": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte"
+          },
+          "department": {
+            "type": "string",
+            "example": "Compras - JBC"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrdenCompraItemDto"
+            }
+          }
+        }
+      },
+      "ReceiptFromOrdenItemOverrideDto": {
+        "type": "object",
+        "properties": {
+          "purchaseOrderItem": {
+            "type": "string",
+            "description": "name (id) de la fila \"Purchase Order Item\" que se quiere recibir — no el itemCode. Viene en items[].id del GET de la orden."
+          },
+          "qty": {
+            "type": "number",
+            "description": "Cantidad a recibir de esta línea. Si se omite, se recibe todo el remanente. No puede superar el remanente disponible."
+          },
+          "warehouse": {
+            "type": "string"
+          },
+          "serials": {
+            "description": "Requerido si el artículo tiene tracking de serial activo — uno por unidad recibida.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "batches": {
+            "description": "Requerido si el artículo tiene tracking de lote activo.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchLineDto"
+            }
+          }
+        },
+        "required": [
+          "purchaseOrderItem"
+        ]
+      },
+      "CreateReceiptFromOrdenDto": {
+        "type": "object",
+        "properties": {
+          "supplierDeliveryNote": {
+            "type": "string",
+            "description": "Número de la nota de entrega/remisión del proveedor, si trae una."
+          },
+          "items": {
+            "description": "Líneas específicas a recibir. Si se omite, se recibe TODO el remanente pendiente de la orden.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptFromOrdenItemOverrideDto"
+            }
+          }
+        }
+      },
+      "InvoiceFromOrdenItemOverrideDto": {
+        "type": "object",
+        "properties": {
+          "purchaseOrderItem": {
+            "type": "string",
+            "description": "name (id) de la fila \"Purchase Order Item\" a facturar — no el itemCode. Viene en items[].id del GET de la orden."
+          },
+          "qty": {
+            "type": "number",
+            "description": "Cantidad a facturar. Si se omite, se factura todo el remanente de la línea."
+          }
+        }
+      },
+      "CreateInvoiceFromOrdenDto": {
+        "type": "object",
+        "properties": {
+          "dueDate": {
+            "type": "string"
+          },
+          "ncfProveedor": {
+            "type": "string",
+            "description": "NCF del comprobante del proveedor (B01, E31, etc.)"
+          },
+          "billNo": {
+            "type": "string",
+            "description": "Número o ID de la factura del vendedor/proveedor (mapea al campo nativo \"Supplier Invoice No\" de ERPNext)."
+          },
+          "tipoBienes606": {
+            "type": "string",
+            "description": "Tipo de bienes/servicios según categoría 606"
+          },
+          "formaPago606": {
+            "type": "string",
+            "description": "Forma de pago 606: 01=Efectivo, 02=Cheque, etc."
+          },
+          "retencionItbis": {
+            "type": "number"
+          },
+          "retencionIsr": {
+            "type": "number"
+          },
+          "tipoPago": {
+            "type": "string",
+            "enum": [
+              "Contado",
+              "Crédito"
+            ]
+          },
+          "taxesTemplate": {
+            "type": "string",
+            "example": "Dominican Republic Tax - JB",
+            "description": "ID del template de impuestos del documento. Si se omite, se usa el default de la compañía."
+          },
+          "items": {
+            "description": "Líneas específicas a facturar. Si se omite, se factura TODO el remanente pendiente.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceFromOrdenItemOverrideDto"
+            }
+          }
+        }
+      },
+      "SolicitudCompraItemDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "example": "PROD-001"
+          },
+          "description": {
+            "type": "string",
+            "description": "Si se omite, el BFF la obtiene automáticamente del artículo."
+          },
+          "qty": {
+            "type": "number"
+          },
+          "rate": {
+            "type": "number",
+            "description": "Precio estimado — una solicitud NO exige precio (es un pedido de intención, no una orden formal). Se pide recién al generar la orden de compra si no viene acá."
+          },
+          "uom": {
+            "type": "string"
+          },
+          "warehouse": {
+            "type": "string"
+          },
+          "scheduleDate": {
+            "type": "string",
+            "description": "Fecha en que se necesita este artículo. Si se omite, cae en cascada a `scheduleDate` de la solicitud y luego a `transactionDate`."
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Material Request no tiene sucursal en la cabecera (a diferencia de Purchase Order) — solo existe por línea. Si se omite, cae a `branch` de la solicitud."
+          },
+          "department": {
+            "type": "string",
+            "example": "Compras - JBC"
+          }
+        },
+        "required": [
+          "itemCode",
+          "qty"
+        ]
+      },
+      "CreateSolicitudCompraDto": {
+        "type": "object",
+        "properties": {
+          "transactionDate": {
+            "type": "string"
+          },
+          "scheduleDate": {
+            "type": "string",
+            "description": "Fecha por defecto en que se necesita la mercancía, aplicada a toda línea que no traiga la suya propia. Debe ser \u003E= transactionDate."
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal por defecto aplicada a toda línea que no traiga la suya (ver nota en SolicitudCompraItemDto.branch — no existe campo de sucursal en la cabecera nativa)."
+          },
+          "department": {
+            "type": "string",
+            "example": "Compras - JBC"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SolicitudCompraItemDto"
+            }
+          }
+        },
+        "required": [
+          "transactionDate",
+          "items"
+        ]
+      },
+      "UpdateSolicitudCompraDto": {
+        "type": "object",
+        "properties": {
+          "transactionDate": {
+            "type": "string"
+          },
+          "scheduleDate": {
+            "type": "string",
+            "description": "Fecha por defecto en que se necesita la mercancía, aplicada a toda línea que no traiga la suya propia. Debe ser \u003E= transactionDate."
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal por defecto aplicada a toda línea que no traiga la suya (ver nota en SolicitudCompraItemDto.branch — no existe campo de sucursal en la cabecera nativa)."
+          },
+          "department": {
+            "type": "string",
+            "example": "Compras - JBC"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SolicitudCompraItemDto"
+            }
+          }
+        }
+      },
+      "OrdenFromSolicitudItemOverrideDto": {
+        "type": "object",
+        "properties": {
+          "materialRequestItem": {
+            "type": "string",
+            "description": "name (id) de la fila \"Material Request Item\" de la solicitud que se quiere ordenar — no el itemCode. Viene en items[].id del GET de la solicitud."
+          },
+          "qty": {
+            "type": "number",
+            "description": "Cantidad a ordenar de esta línea. Si se omite, se ordena todo el remanente. No puede superar el remanente disponible."
+          },
+          "rate": {
+            "type": "number",
+            "description": "Precio acordado con el proveedor."
+          },
+          "warehouse": {
+            "type": "string"
+          },
+          "scheduleDate": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "materialRequestItem"
+        ]
+      },
+      "CreateOrdenFromSolicitudDto": {
+        "type": "object",
+        "properties": {
+          "supplier": {
+            "type": "string",
+            "description": "Proveedor a quien se le hace la orden — la solicitud de compra no tiene proveedor, es obligatorio indicarlo acá."
+          },
+          "transactionDate": {
+            "type": "string"
+          },
+          "scheduleDate": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "conversionRate": {
+            "type": "number"
+          },
+          "taxesTemplate": {
+            "type": "string",
+            "description": "ID del template de impuestos de compra. Si se omite, se usa el default."
+          },
+          "branch": {
+            "type": "string"
+          },
+          "department": {
+            "type": "string"
+          },
+          "items": {
+            "description": "Líneas específicas a ordenar (con posible cantidad/precio parcial). Si se omite, se ordena TODO el remanente pendiente de la solicitud — en ese caso, cada línea debe tener un `rate` para poder someterse (indíquelo en la solicitud o use este arreglo).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrdenFromSolicitudItemOverrideDto"
+            }
+          }
+        },
+        "required": [
+          "supplier"
+        ]
       },
       "CreatePermisoDto": {
         "type": "object",

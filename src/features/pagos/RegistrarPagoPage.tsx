@@ -169,12 +169,12 @@ export default function RegistrarPagoPage() {
     .map((m) => ({ value: m.name, label: m.name }))
 
   const metodoSeleccionado = (metodos ?? []).find((m) => m.name === modeOfPayment)
-  // Un método configurado como "es cheque" en su config (Config > Métodos de Pago) se trata
-  // siempre como cheque — el backend lo fuerza sin importar lo que envíe este formulario, así
-  // que la UI muestra/exige cuenta bancaria igual que si el usuario ya hubiera elegido una.
-  const metodoForzaCheque = !!metodoSeleccionado?.esCheque
-  const showBankAccountField = !!metodoSeleccionado?.requiresBankAccount || metodoForzaCheque
-  const requiresBankAccount = metodoForzaCheque || (metodoSeleccionado?.requiresBankAccount && !metodoSeleccionado.defaultBankAccount)
+  // Se infiere enteramente de la config del método de pago (Config > Métodos de Pago) — el
+  // backend lo fuerza sin importar lo que envíe este formulario. Elegir una cuenta bancaria por
+  // sí solo NO implica cheque — solo la config del método decide.
+  const esCheque = !!metodoSeleccionado?.esCheque
+  const showBankAccountField = !!metodoSeleccionado?.requiresBankAccount || esCheque
+  const requiresBankAccount = esCheque || (metodoSeleccionado?.requiresBankAccount && !metodoSeleccionado.defaultBankAccount)
 
   const { data: cuentasBancarias } = useQuery({
     queryKey: ['cuentas-bancarias-activas'],
@@ -183,15 +183,12 @@ export default function RegistrarPagoPage() {
   })
   const [bankAccountSearch, setBankAccountSearch] = useState('')
   const bankAccountOptions: SearchSelectOption[] = (cuentasBancarias?.items ?? [])
+    // Un cheque solo puede emitirse contra una cuenta corriente.
+    .filter((c) => !esCheque || c.tipoCuenta === 'Cuenta Corriente')
     .filter((c) => !bankAccountSearch || c.accountName.toLowerCase().includes(bankAccountSearch.toLowerCase()))
     .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))
 
-  // ── Cheque: se infiere de la cuenta bancaria elegida (o se fuerza por config del método) —
-  // toda cuenta bancaria trae su propia numeración (chequesManuales/ultimoCheque), sin
-  // depender de su tipoCuenta (campo opcional y de catálogo libre, no confiable para esto).
-
   const cuentaSeleccionada = cuentasBancarias?.items.find((c) => c.id === bankAccount)
-  const esCheque = metodoForzaCheque || (!!bankAccount && !!cuentaSeleccionada)
   const cuentaChequesManuales = cuentaSeleccionada?.chequesManuales ?? true
 
   const { data: siguienteCheque } = useQuery({
@@ -404,14 +401,9 @@ export default function RegistrarPagoPage() {
                     placeholder={metodoSeleccionado?.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
                     error={requiresBankAccount && !bankAccount}
                   />
-                  {metodoForzaCheque && (
+                  {esCheque && (
                     <p className="ff-hint">
                       Este método de pago está configurado como cheque — siempre se tratará como tal.
-                    </p>
-                  )}
-                  {esCheque && !metodoForzaCheque && (
-                    <p className="ff-hint">
-                      Esta cuenta participa de la numeración de cheques.
                     </p>
                   )}
                 </div>

@@ -25,6 +25,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
+import { QtyInput } from '@/shared/ui/QtyInput'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
@@ -291,6 +292,7 @@ export default function InvoiceForm() {
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
       const existingIndex = items.findIndex((row) => row.itemCode === item.id)
       if (existingIndex !== -1) {
+        updateItem(existingIndex, { qty: items[existingIndex].qty + 1 })
         flashRow(existingIndex)
         return
       }
@@ -1240,7 +1242,7 @@ const itemsDto = items.map((i) => ({
                         <input className="items-input" value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="Descripción" />
                       </td>
                       <td>
-                        <input className={`items-input${item.stockError ? ' items-input-error' : ''}`} type="number" min="0" step="1" value={item.qty} onChange={(e) => updateItem(index, { qty: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right' }} />
+                        <QtyInput className={`items-input${item.stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
                         {item.stockError && (
                           <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
                             {item.stockError}

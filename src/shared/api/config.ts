@@ -106,7 +106,7 @@ export async function createMetodoPago(data: Omit<MetodoPago, 'disabled'>) {
 }
 
 export async function updateMetodoPago(id: string, data: Partial<MetodoPago>) {
-  const res = await client.put<{ success: true; data: MetodoPago }>(`${ENDPOINTS.config.metodosPago}/${id}`, data)
+  const res = await client.put<{ success: true; data: MetodoPago }>(ENDPOINTS.config.metodosPagoById(id), data)
   return unwrap(res)
 }
 

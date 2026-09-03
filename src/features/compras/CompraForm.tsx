@@ -21,9 +21,12 @@ import { MultiSearchSelect } from '@/shared/ui/MultiSearchSelect'
 import type { MultiSearchSelectOption } from '@/shared/ui/MultiSearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
+import { QtyInput } from '@/shared/ui/QtyInput'
 import type { Item } from '@/shared/api/types'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
+import { SeleccionarOrdenCompraModal } from '@/components/shared/SeleccionarOrdenCompraModal'
+import type { OrdenCompraImportLine } from '@/components/shared/SeleccionarOrdenCompraModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { listItems, getItem } from '@/shared/api/catalog'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
@@ -60,6 +63,9 @@ interface ItemRow {
   /** Si tiene entradas, divide el monto de la línea (qty × rate) entre varias cuentas.
    *  No se puede combinar con seriales/lotes. */
   distribucionCuenta?: DistribucionCuentaDto[]
+  /** Enlace manual (caso excepcional) a una línea de Orden de Compra — ver SeleccionarOrdenCompraModal. */
+  ordenCompra?: string
+  ordenCompraItem?: string
 }
 
 function emptyItem(defaultWh?: string): ItemRow {
@@ -239,14 +245,12 @@ function SerialBatchRow({
           />
         </td>
         <td>
-          <input
+          <QtyInput
             className="items-input"
-            type="number"
-            // min="0.001"
-            step="0.001"
             style={{ textAlign: 'right' }}
             value={item.qty}
-            onChange={(e) => updateItem(idx, 'qty', parseFloat(e.target.value) || 0)}
+            uom={item.uom}
+            onChange={(v) => updateItem(idx, 'qty', v)}
           />
         </td>
         <td>
@@ -538,6 +542,7 @@ export default function CompraForm() {
   const [formaPago606Touched, setFormaPago606Touched] = useState(false)
   const [tipoPagoTouched, setTipoPagoTouched] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
+  const [showEnlazarOrden, setShowEnlazarOrden] = useState(false)
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
@@ -941,6 +946,7 @@ export default function CompraForm() {
         ...((i.distribucionCuenta ?? []).filter((d) => d.cuenta).length > 0
           ? { distribucionCuenta: i.distribucionCuenta!.filter((d) => d.cuenta) }
           : {}),
+        ...(i.ordenCompra && i.ordenCompraItem ? { ordenCompra: i.ordenCompra, ordenCompraItem: i.ordenCompraItem } : {}),
       })),
       ncfProveedor: ncfProveedor || undefined,
       tipoComprobante: (tipoComprobante as CreateCompraDto['tipoComprobante']) || undefined,
@@ -1021,6 +1027,58 @@ export default function CompraForm() {
       i === idx ? { ...row, itemCode: '', itemLabel: undefined, description: '', rate: 0, trackingType: 'none', serials: [], batches: [], _comboComponents: undefined, componentTracking: undefined } : row,
     ))
   }, [])
+
+  // Enlace manual (caso excepcional) a una Orden de Compra — trae sus líneas pendientes de
+  // facturar como filas nuevas, marcadas con ordenCompra/ordenCompraItem (ver §3 del doc de
+  // Solicitud/Orden de Compra). El camino normal sigue siendo /compras/ordenes/:id/facturar.
+  async function handleImportOrdenLines(
+    lines: OrdenCompraImportLine[],
+    orden: { id: string; supplier: string; supplierName: string },
+  ) {
+    if (esProveedorOcasional) {
+      toast.error('No se puede enlazar una orden de compra a un proveedor ocasional')
+      return
+    }
+    if (supplierId && supplierId !== orden.supplier) {
+      toast.error(`Esta orden es del proveedor ${orden.supplierName}, distinto al proveedor ya seleccionado`)
+      return
+    }
+    if (!supplierId) {
+      setSupplierId(orden.supplier)
+      setSupplierName(orden.supplierName)
+    }
+
+    const startIndex = items.length
+    setItems((prev) => [...prev, ...lines.map(() => emptyItem(defaultWh))])
+
+    const catalogItems = await Promise.all(lines.map((l) => getItem(l.itemCode).catch(() => null)))
+
+    setItems((prev) => prev.map((row, idx) => {
+      const li = idx - startIndex
+      if (li < 0 || li >= lines.length) return row
+      const line = lines[li]
+      const catalogItem = catalogItems[li]
+      const trackingType = catalogItem?.trackingType ?? 'none'
+      return {
+        ...row,
+        itemCode: line.itemCode,
+        itemLabel: catalogItem?.itemName ?? line.description,
+        description: catalogItem?.internalDescription ?? line.description ?? catalogItem?.itemName ?? '',
+        qty: line.qty,
+        rate: line.rate,
+        baseRate: line.rate,
+        uom: line.uom || catalogItem?.stockUom || row.uom,
+        warehouse: line.warehouse || row.warehouse,
+        trackingType,
+        purchaseTaxPct: catalogItem?.purchaseTaxPct ?? 0,
+        purchaseTaxTemplate: catalogItem?.purchaseTaxTemplate ?? '',
+        ordenCompra: line.ordenCompra,
+        ordenCompraItem: line.ordenCompraItem,
+      }
+    }))
+    setItems((prev) => [...prev, emptyItem(defaultWh)])
+    toast.success(`${lines.length} artículo(s) traído(s) de la orden ${orden.id}`)
+  }
 
   if (isEdit && loadingEdit) {
     return (
@@ -1247,14 +1305,24 @@ export default function CompraForm() {
           <div className="card">
             <div className="card-header">
               <span className="card-title">Artículos</span>
-              <button
-                type="button"
-                className="btn btn-secondary btn-size-sm"
-                onClick={() => setItems((prev) => [...prev, emptyItem(defaultWh)])}
-              >
-                <Plus size={14} />
-                Agregar
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-size-sm"
+                  onClick={() => setShowEnlazarOrden(true)}
+                  title="Traer los artículos pendientes de una Orden de Compra existente"
+                >
+                  Enlazar Orden de Compra
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-size-sm"
+                  onClick={() => setItems((prev) => [...prev, emptyItem(defaultWh)])}
+                >
+                  <Plus size={14} />
+                  Agregar
+                </button>
+              </div>
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               <div className="items-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
@@ -1327,7 +1395,15 @@ export default function CompraForm() {
                   className={`ff-input${!ncfValid ? ' ff-input-error' : ''}`}
                   placeholder="B01XXXXXXXXXX"
                   value={ncfProveedor}
-                  onChange={(e) => setNcfProveedor(e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase()
+                    setNcfProveedor(val)
+                    if (val.length >= 3) {
+                      setTipoComprobante(val.slice(0, 3))
+                    } else {
+                      setTipoComprobante('')
+                    }
+                  }}
                 />
                 {!ncfValid && (
                   <span className="ff-error">Formato inválido. Debe ser B o E seguido de 10 dígitos.</span>
@@ -1347,20 +1423,24 @@ export default function CompraForm() {
                 />
               </div>
 
-              {esProveedorOcasional && !ncfProveedor && (
-                <div className="ff-wrap">
-                  <label className="ff-label">Tipo de Comprobante</label>
-                  <SearchSelect
-                    value={tipoComprobante}
-                    onChange={setTipoComprobante}
-                    options={tipoComprobanteOptions}
-                    onSearch={setTipoComprobanteSearch}
-                    selectedLabel={catalogos?.ncfTypesCompra?.find((t) => t.value === tipoComprobante)?.label ?? ''}
-                    placeholder="B11 - Compras/Informal (default)"
-                  />
-                  <p className="ff-hint">Tipo de comprobante a generar automáticamente al someter (default B11 si no se elige).</p>
-                </div>
-              )}
+              <div className="ff-wrap">
+                <label className="ff-label">Tipo de Comprobante</label>
+                <SearchSelect
+                  value={tipoComprobante}
+                  onChange={setTipoComprobante}
+                  options={tipoComprobanteOptions}
+                  onSearch={setTipoComprobanteSearch}
+                  selectedLabel={catalogos?.ncfTypesCompra?.find((t) => t.value === tipoComprobante)?.label ?? ''}
+                  placeholder="B11 - Compras/Informal (default)"
+                />
+                <p className="ff-hint">
+                  {ncfProveedor
+                    ? 'Se deriva del NCF Proveedor escrito arriba.'
+                    : esProveedorOcasional
+                      ? 'Tipo de comprobante a generar automáticamente al someter (default B11 si no se elige).'
+                      : 'Solo aplica si el proveedor es ocasional — un proveedor registrado debe traer su propio NCF.'}
+                </p>
+              </div>
 
               <div className="ff-wrap">
                 <label className="ff-label">Tipo de Bienes 606</label>
@@ -1440,6 +1520,13 @@ export default function CompraForm() {
           onClose={() => setShowCreateSupplier(false)}
         />
       )}
+
+      <SeleccionarOrdenCompraModal
+        open={showEnlazarOrden}
+        onClose={() => setShowEnlazarOrden(false)}
+        mode="compra"
+        onImport={handleImportOrdenLines}
+      />
     </div>
   )
 }

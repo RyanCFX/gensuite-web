@@ -13,6 +13,18 @@ export const DOC_STATUS_LABELS: Record<string, string> = {
   available: 'Disponible',
   partially_used: 'Parcialmente usada',
   fully_used: 'Agotada',
+  // erpStatus nativo de Solicitud de Compra (Material Request):
+  Pending: 'Pendiente',
+  Stopped: 'Detenida',
+  'Partially Ordered': 'Parcialmente ordenada',
+  // erpStatus nativo de Orden de Compra (Purchase Order):
+  'On Hold': 'En espera',
+  'To Receive and Bill': 'Por recibir y facturar',
+  'To Bill': 'Por facturar',
+  'To Receive': 'Por recibir',
+  Completed: 'Completada',
+  Closed: 'Cerrada',
+  Delivered: 'Entregada',
 }
 
 export const DOC_STATUS_COLOR: Record<string, string> = {

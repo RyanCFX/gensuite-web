@@ -1939,6 +1939,25 @@ button {
   z-index: 2;
 }
 
+/* Misma animación que .row-flash, para filas que no son <td> (ej. una fila de
+   layout con flexbox, como la lista de códigos de barra de un artículo). */
+.row-flash-block {
+  position: relative;
+  border-radius: 6px;
+}
+
+.row-flash-block::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 6px;
+  background-color: var(--brand-primary);
+  opacity: 0;
+  animation: row-flash-anim 2.2s ease-out forwards;
+  pointer-events: none;
+  z-index: 2;
+}
+
 /* ─── SPINNER ─── */
 @keyframes spin { to { transform: rotate(360deg); } }
 
