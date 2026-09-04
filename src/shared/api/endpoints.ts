@@ -513,4 +513,7 @@ export const ENDPOINTS = {
     certificado: '/qz/certificado',
     firmar: '/qz/firmar',
   },
+  dgii: {
+    taxpayers: (rnc: string) => `/dgii/taxpayers/${encodeURIComponent(rnc)}`,
+  },
 } as const

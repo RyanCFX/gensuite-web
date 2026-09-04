@@ -16394,6 +16394,36 @@
         ]
       }
     },
+    "/api/v1/roles/perfiles": {
+      "get": {
+        "description": "Es la forma recomendada de asignar permisos al crear un usuario: en Frappe los roles son planos (no hay herencia), así que armar la lista a mano deja huecos silenciosos. Debe ir declarado ANTES de GET /roles/:name para que \"perfiles\" no se interprete como el nombre de un rol.",
+        "operationId": "RolesController_getPerfiles",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Perfiles de rol (Role Profile) disponibles, con los roles que agrupa cada uno",
+        "tags": [
+          "Usuarios"
+        ]
+      }
+    },
     "/api/v1/roles/{name}": {
       "get": {
         "operationId": "RolesController_getRoleDetail",
@@ -22948,6 +22978,84 @@
         ]
       }
     },
+    "/api/v1/me/permissions": {
+      "get": {
+        "description": "Devuelve `acciones` — el catálogo completo resuelto contra los permisos reales del usuario, un booleano por cada botón/pantalla — más `doctypes` con los flags crudos por si el frontend necesita razonar por su cuenta, y `roles`.\n\nNO refleja el estado del documento: `ventas.factura.someter` sale en `true` si el usuario tiene el permiso `submit`, sin importar si la factura que está viendo ya fue sometida. Para una pantalla de detalle, combinar con GET /me/permissions/:doctype/:name y con el `docstatus` del documento.",
+        "operationId": "MeController_getPermissions",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Permisos del usuario autenticado (nivel sesión)",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/me/permissions/{doctype}/{name}": {
+      "get": {
+        "description": "Evalúa `if_owner`, User Permissions y los controller permissions del doctype — cosas que dependen del documento y que el endpoint de nivel sesión no puede saber. Es lo que deben usar los botones de una pantalla de detalle.\n\n⚠️ No considera `docstatus`: sobre una factura ya sometida sigue devolviendo `submit: 1`, porque el permiso existe — lo que no aplica es el estado.",
+        "operationId": "MeController_getDocumentPermissions",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "doctype",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "example": "Sales Invoice",
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "example": "ACC-SINV-2026-00001",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Permisos del usuario sobre un documento concreto (nivel documento)",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
     "/api/v1/cuentas-bancarias": {
       "get": {
         "operationId": "CuentasBancariasController_findAll",
@@ -26291,6 +26399,51 @@
         "summary": "Firma un mensaje que QZ Tray pidió firmar (SHA512withRSA + base64)",
         "tags": [
           "QZ Tray"
+        ]
+      }
+    },
+    "/api/v1/dgii/taxpayers/{rnc}": {
+      "get": {
+        "operationId": "DgiiTaxpayersController_findByRnc",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "rnc",
+            "required": true,
+            "in": "path",
+            "description": "RNC (9 dígitos) o Cédula (11 dígitos)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DgiiTaxpayerResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Buscar un contribuyente en el padrón de la DGII por RNC/Cédula",
+        "tags": [
+          "DGII - Padrón de Contribuyentes"
         ]
       }
     }
@@ -31656,12 +31809,22 @@
             "type": "string",
             "example": "809-555-0100"
           },
+          "perfiles": {
+            "example": [
+              "Ventas"
+            ],
+            "description": "Perfiles de rol (`Role Profile`) a asignar — la forma recomendada. Cada perfil es un paquete de roles nativos coherente (ver localizacion_rd/provisioning/role_profiles.py); asignarlos evita los huecos silenciosos de armar la lista de roles a mano, porque en Frappe los roles son planos y \"Accounts Manager\" no implica \"Accounts User\". Excluyente con `roles`: los perfiles son autoritativos y Frappe elimina del usuario cualquier rol que no pertenezca a ellos. Ver GET /roles/perfiles.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "roles": {
             "example": [
               "Sales User",
               "Accounts User"
             ],
-            "description": "Lista de roles ERPNext",
+            "description": "Lista de roles ERPNext sueltos. Obligatoria solo si no se envía `perfiles`. Preferir `perfiles` salvo que se necesite una combinación que ningún perfil cubre.",
             "type": "array",
             "items": {
               "type": "string"
@@ -31697,8 +31860,7 @@
         },
         "required": [
           "email",
-          "firstName",
-          "roles"
+          "firstName"
         ]
       },
       "UpdateUsuarioDto": {
@@ -31712,6 +31874,16 @@
           },
           "mobileNo": {
             "type": "string"
+          },
+          "perfiles": {
+            "example": [
+              "Ventas"
+            ],
+            "description": "Perfiles de rol a asignar. Reemplaza por completo los roles del usuario: Frappe elimina los que no pertenezcan a los perfiles enviados. Excluyente con `roles`.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "roles": {
             "type": "array",
@@ -34847,6 +35019,43 @@
         },
         "required": [
           "request"
+        ]
+      },
+      "DgiiTaxpayerResponseDto": {
+        "type": "object",
+        "properties": {
+          "rnc": {
+            "type": "string",
+            "description": "RNC o cédula del contribuyente"
+          },
+          "name": {
+            "type": "string",
+            "description": "Razón social"
+          },
+          "tradeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "businessActivity": {
+            "type": "string",
+            "nullable": true
+          },
+          "registrationDate": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "rnc",
+          "name"
         ]
       }
     }

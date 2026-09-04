@@ -5210,3 +5210,17 @@ export interface SetSeleccionDto {
   /** `null` u omitido = "ninguna" (cae al diálogo de impresión del navegador). */
   impresoraId?: string | null;
 }
+
+// ─── DGII — Padrón de Contribuyentes ───────────────────────────────────────
+
+export interface DgiiTaxpayer {
+  /** RNC o cédula del contribuyente */
+  rnc: string;
+  /** Razón social */
+  name: string;
+  tradeName?: string | null;
+  businessActivity?: string | null;
+  registrationDate?: string | null;
+  status?: string | null;
+  type?: string | null;
+}

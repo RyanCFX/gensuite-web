@@ -8,8 +8,10 @@ import { createCustomer, updateCustomer, listCustomerGroups } from '@/shared/api
 import { listSucursales } from '@/shared/api/sucursales'
 import { listMetodosPago, listImpuestosVentas } from '@/shared/api/config'
 import { listUsuarios } from '@/shared/api/usuarios'
+import { getDgiiTaxpayer } from '@/shared/api/dgii'
 import type { ApiError, Customer } from '@/shared/api/types'
 import { validateRNCDetailed, validateCedulaDetailed, formatRNC, formatCedula } from '@/lib/validators/dgii'
+import { useDebounce } from '@/lib/useDebounce'
 import { SearchSelect, type SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { MultiSelectChecklist } from '@/shared/ui/MultiSelectChecklist'
 import { AccountSelect } from '@/components/shared/AccountSelect'
@@ -271,6 +273,50 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
   const rncValid = rncClean.length === 9 ? (rncDetail?.valid ?? null) : null
   const cedulaValid = cedulaClean.length === 11 ? (cedulaDetail?.valid ?? null) : null
 
+  // Búsqueda en el padrón de la DGII — solo se dispara si el usuario tecleó el RNC/cédula
+  // (no al cargar un cliente existente en modo edición) y una vez completó la longitud esperada.
+  const [idTouched, setIdTouched] = useState(false)
+  const debouncedRncClean = useDebounce(rncClean, 500)
+  const debouncedCedulaClean = useDebounce(cedulaClean, 500)
+  const dgiiLookupValue = idType === 'RNC' ? debouncedRncClean : idType === 'Cedula' ? debouncedCedulaClean : ''
+  const dgiiLookupEnabled = idTouched && (
+    (idType === 'RNC' && debouncedRncClean.length === 9) ||
+    (idType === 'Cedula' && debouncedCedulaClean.length === 11)
+  )
+
+  const { data: taxpayerData, error: taxpayerError, isFetching: isFetchingTaxpayer } = useQuery({
+    queryKey: ['dgii-taxpayer', idType, dgiiLookupValue],
+    queryFn: () => getDgiiTaxpayer(dgiiLookupValue),
+    enabled: dgiiLookupEnabled,
+    retry: false,
+    staleTime: 5 * 60_000,
+  })
+
+  useEffect(() => {
+    if (!dgiiLookupEnabled || !taxpayerData) return
+    setValue('customerName', taxpayerData.name, { shouldValidate: true, shouldDirty: true })
+    const suspended = `${taxpayerData.status ?? ''} ${taxpayerData.type ?? ''}`.toLowerCase().includes('suspend')
+    if (suspended) {
+      toast.warning(`El contribuyente "${taxpayerData.name}" figura SUSPENDIDO en el padrón de la DGII`)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taxpayerData, dgiiLookupEnabled])
+
+  useEffect(() => {
+    if (!dgiiLookupEnabled || !taxpayerError) return
+    const err = taxpayerError as ApiError
+    if (err.statusCode === 404) {
+      if (idType === 'RNC') {
+        toast.error(`El RNC ${formatRNC(dgiiLookupValue)} no existe en el padrón de la DGII`)
+      } else {
+        toast.error('No se encontró dicho documento en la base de datos de la DGII')
+      }
+      return
+    }
+    toast.error(err?.message ?? 'Error al consultar el padrón de la DGII')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taxpayerError, dgiiLookupEnabled])
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
       {isSystemManaged && (
@@ -288,20 +334,6 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
           <h2 className="card-title">Información General</h2>
         </div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-          {/* Nombre */}
-          <div className="ff-wrap">
-            <label className="ff-label" htmlFor="customerName">
-              Nombre <span className="ff-required">*</span>
-            </label>
-            <input
-              id="customerName"
-              className={`ff-input${errors.customerName ? ' ff-input-error' : ''}`}
-              placeholder="Nombre del cliente o empresa"
-              {...register('customerName')}
-            />
-            {errors.customerName && <p className="ff-error">{errors.customerName.message}</p>}
-          </div>
 
           {/* Tipo + Identificación selector */}
           <div className="form-row">
@@ -363,9 +395,15 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
                   value={rncValue}
                   onChange={(e) => {
                     setValue('rnc', formatRNC(e.target.value), { shouldValidate: true })
+                    setIdTouched(true)
                   }}
                 />
-                {rncValid !== null && (
+                {idType === 'RNC' && isFetchingTaxpayer && dgiiLookupEnabled && (
+                  <span className="ff-validation-icon">
+                    <span className="spinner spinner-brand spinner-sm" />
+                  </span>
+                )}
+                {idType === 'RNC' && !isFetchingTaxpayer && rncValid !== null && (
                   <span className="ff-validation-icon">
                     {rncValid
                       ? <CheckCircle2 size={15} style={{ color: 'var(--success-text)' }} />
@@ -393,9 +431,15 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
                   value={cedulaValue}
                   onChange={(e) => {
                     setValue('cedula', formatCedula(e.target.value), { shouldValidate: true })
+                    setIdTouched(true)
                   }}
                 />
-                {cedulaValid !== null && (
+                {idType === 'Cedula' && isFetchingTaxpayer && dgiiLookupEnabled && (
+                  <span className="ff-validation-icon">
+                    <span className="spinner spinner-brand spinner-sm" />
+                  </span>
+                )}
+                {idType === 'Cedula' && !isFetchingTaxpayer && cedulaValid !== null && (
                   <span className="ff-validation-icon">
                     {cedulaValid
                       ? <CheckCircle2 size={15} style={{ color: 'var(--success-text)' }} />
@@ -410,6 +454,20 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
                 )}
             </div>
           )}
+
+          {/* Nombre */}
+          <div className="ff-wrap">
+            <label className="ff-label" htmlFor="customerName">
+              Nombre <span className="ff-required">*</span>
+            </label>
+            <input
+              id="customerName"
+              className={`ff-input${errors.customerName ? ' ff-input-error' : ''}`}
+              placeholder="Nombre del cliente o empresa"
+              {...register('customerName')}
+            />
+            {errors.customerName && <p className="ff-error">{errors.customerName.message}</p>}
+          </div>
 
           {/* Email para facturas */}
           <div className="ff-wrap">
