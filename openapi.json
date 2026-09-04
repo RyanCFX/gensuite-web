@@ -130,6 +130,7 @@
     },
     "/api/v1/auth/verify-admin-pin": {
       "post": {
+        "description": "Requiere `usuario` (email del dueño del PIN — el PIN por sí solo no identifica a nadie porque varios usuarios pueden compartir el mismo código) y `accion` (determina qué rol se exige, ver ADMIN_PIN_ACTIONS). Cada intento queda auditado — ver GET /auth/admin-pin-log.",
         "operationId": "AuthController_verifyAdminPin",
         "parameters": [
           {
@@ -161,7 +162,55 @@
             "bearer": []
           }
         ],
-        "summary": "Verificar PIN de administrador para override de descuento",
+        "summary": "Autorizar una acción sensible (override de descuento, etc.) con PIN + usuario",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/admin-pin-log": {
+      "get": {
+        "operationId": "AuthController_listAdminPinLog",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Auditoría de autorizaciones con PIN de administrador (éxitos y fallos). Requiere rol System Manager o Auditor.",
         "tags": [
           "Auth"
         ]
@@ -12787,6 +12836,44 @@
         ]
       }
     },
+    "/api/v1/catalog/items/{id}/imagen": {
+      "post": {
+        "description": "multipart/form-data con el archivo en el campo \"file\" (máx 5MB, límite global del BFF). Devuelve la URL pública ya armada — la misma que trae `image` en las demás respuestas de este módulo.",
+        "operationId": "ItemsController_uploadImagen",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Subir/reemplazar la imagen del artículo",
+        "tags": [
+          "Catalog - Items"
+        ]
+      }
+    },
     "/api/v1/catalog/items/{id}/toggle": {
       "post": {
         "operationId": "ItemsController_toggle",
@@ -15879,6 +15966,43 @@
           }
         ],
         "summary": "Crear usuario en el tenant ERPNext",
+        "tags": [
+          "Usuarios"
+        ]
+      }
+    },
+    "/api/v1/usuarios/buscar-codigo/{codigo}": {
+      "get": {
+        "operationId": "UsuariosController_findByCode",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Buscar usuario por su código de carnet/QR/barcode — para escaneo rápido en POS, override de PIN de administrador, y cualquier otra vista que necesite resolver un usuario sin escribir su email",
         "tags": [
           "Usuarios"
         ]
@@ -26266,12 +26390,28 @@
         "properties": {
           "pin": {
             "type": "string",
-            "example": "1234",
-            "description": "PIN de administrador"
+            "example": "482913",
+            "description": "PIN de 6 dígitos del usuario autorizador"
+          },
+          "usuario": {
+            "type": "string",
+            "example": "gerente@empresa.com",
+            "description": "Email (name de User en ERPNext) del usuario dueño del PIN. Obligatorio si no se manda `codigoTarjeta` — el PIN por sí solo no identifica a nadie porque varios usuarios pueden compartir el mismo código."
+          },
+          "codigoTarjeta": {
+            "type": "string",
+            "example": "EMP-00231",
+            "description": "Código de carnet/QR/barcode (`custom_admin_code`) del usuario dueño del PIN — alternativa a `usuario` para resolverlo por escaneo. Obligatorio si no se manda `usuario`."
+          },
+          "accion": {
+            "type": "string",
+            "example": "override_descuento",
+            "description": "Acción que se está autorizando (ver ADMIN_PIN_ACTIONS en admin-pin-actions.ts). Determina qué rol se exige al usuario del PIN — nunca se exige ser Administrator, solo tener un rol habilitado para esa acción puntual."
           }
         },
         "required": [
-          "pin"
+          "pin",
+          "accion"
         ]
       },
       "ChangePasswordDto": {
@@ -31548,6 +31688,11 @@
             "type": "string",
             "example": "NuevaClave2026!",
             "description": "Contraseña inicial del usuario. Solo se usa (y es obligatoria) cuando el tenant tiene GET /config/facturacion → modoCreacionPassword=\"directo\" — el administrador la define aquí mismo y se la entrega en persona, en vez de mandar un correo con link. Se ignora si el tenant está en modo \"email\"."
+          },
+          "adminCode": {
+            "type": "string",
+            "example": "EMP-00231",
+            "description": "Código de identificación impreso/codificado en un carnet, QR o código de barras — permite buscar rápido a este usuario por escaneo (ver GET /usuarios/buscar-codigo/:codigo) en vez de escribir su email. No es secreto, único por tenant."
           }
         },
         "required": [
@@ -31613,6 +31758,16 @@
             "type": "number",
             "example": 15,
             "description": "Descuento máximo (%) que puede aplicar este usuario en ventas. 0 = sin permiso de descuento."
+          },
+          "adminPin": {
+            "type": "string",
+            "example": "482913",
+            "description": "PIN de 6 dígitos para autorizar acciones sensibles (ver POST /auth/verify-admin-pin). Se hashea antes de guardarse — nunca se puede leer de vuelta, solo reconfigurar. Varios usuarios pueden compartir el mismo PIN sin problema."
+          },
+          "adminCode": {
+            "type": "string",
+            "example": "EMP-00231",
+            "description": "Código de identificación impreso/codificado en un carnet, QR o código de barras — permite buscar rápido a este usuario por escaneo (ver GET /usuarios/buscar-codigo/:codigo) en vez de escribir su email. No es secreto, único por tenant."
           }
         }
       },

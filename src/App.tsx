@@ -113,6 +113,7 @@ const NotificacionesPage   = lazy(() => import('@/features/config/Notificaciones
 const PermisosPage         = lazy(() => import('@/features/config/PermisosPage'))
 const RolesPage            = lazy(() => import('@/features/config/RolesPage'))
 const RoleDetailPage       = lazy(() => import('@/features/config/RoleDetailPage'))
+const AdminPinLogPage      = lazy(() => import('@/features/config/AdminPinLogPage'))
 const InvoiceTemplateEditorPage = lazy(() => import('@/features/invoice-template-editor/InvoiceTemplateEditorPage'))
 const CostosImportacionPage = lazy(() => import('@/features/compras/CostosImportacionPage'))
 const CostoImportacionDetail = lazy(() => import('@/features/compras/CostoImportacionDetail'))
@@ -369,6 +370,7 @@ export default function App() {
             <Route path="/config/permisos" element={<Suspense fallback={<PageLoader />}><PermisosPage /></Suspense>} />
             <Route path="/config/roles" element={<Suspense fallback={<PageLoader />}><RolesPage /></Suspense>} />
             <Route path="/config/roles/:name" element={<Suspense fallback={<PageLoader />}><RoleDetailPage /></Suspense>} />
+            <Route path="/config/auditoria-pin" element={<Suspense fallback={<PageLoader />}><AdminPinLogPage /></Suspense>} />
             <Route path="/config/:seccion" element={<Suspense fallback={<PageLoader />}><ConfigPage /></Suspense>} />
             <Route path="/config" element={<Navigate to="/config/empresa" replace />} />
 

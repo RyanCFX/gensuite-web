@@ -20,6 +20,14 @@ export async function getUsuario(email: string) {
   return unwrap(res)
 }
 
+/** Resuelve un usuario por su código de carnet/QR/barcode (adminCode) — para cualquier pantalla
+ *  con lector conectado que necesite identificar a alguien sin escribir su email (selección de
+ *  cajero al abrir turno POS, override de PIN de administrador, etc.). 404 si no existe. */
+export async function buscarUsuarioPorCodigo(codigo: string) {
+  const res = await client.get<{ success: true; data: Usuario }>(ENDPOINTS.usuarios.buscarCodigo(codigo))
+  return unwrap(res)
+}
+
 export async function createUsuario(data: CreateUsuarioDto) {
   const res = await client.post<{ success: true; data: Usuario }>(ENDPOINTS.usuarios.list, data)
   return unwrap(res)

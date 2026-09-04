@@ -879,6 +879,7 @@ try {
       <PinModal
         open={pinModalOpen}
         onClose={() => setPinModalOpen(false)}
+        accion="override_descuento"
         onAuthorized={(userId) => {
           client.defaults.headers.common['X-Admin-Pin'] = userId
           setPinModalOpen(false)

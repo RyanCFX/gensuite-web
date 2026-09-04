@@ -43,6 +43,7 @@ import {
   ArrowRightLeft,
   Printer,
   Wrench,
+  ScrollText,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { CommandPalette } from "./CommandPalette";
@@ -584,13 +585,20 @@ const NAV_CONFIG: NavEntry = {
     // Administrativos — requieren System Manager en ERPNext, filtrados en el render (ver AppLayoutInner)
     { label: "Permisos", icon: <Lock size={14} />, path: "/config/permisos" },
     { label: "Roles", icon: <ShieldCheck size={14} />, path: "/config/roles" },
+    { label: "Auditoría de PIN", icon: <ScrollText size={14} />, path: "/config/auditoria-pin" },
     { label: "Mi Perfil", icon: <UserCog size={14} />, path: "/config/perfil" },
   ],
 };
 
+// Nota: esta pantalla también la puede ver el rol "Auditor" (así lo exige el backend), pero el
+// filtro de menú de abajo solo distingue System Manager — el frontend no rastrea roles finos
+// como Auditor todavía (ver plan/PERMISOS_POR_ROL.md). Un usuario Auditor sin System Manager no
+// verá el ítem en el menú aunque sí pueda abrir la ruta directamente; la propia página valida el
+// rol igual.
 const ADMIN_ONLY_PATHS = new Set([
   "/config/permisos",
   "/config/roles",
+  "/config/auditoria-pin",
   "/config/cajas",
   "/config/ecf/admin",
   "/config/ecf/certificacion",

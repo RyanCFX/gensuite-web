@@ -936,6 +936,8 @@ export interface Item {
   hasWarranty?: boolean;
   warrantyPeriod?: number;
   barcodes?: ItemBarcode[];
+  /** URL pública absoluta lista para `<img src>` — no requiere headers de auth ni transformación.
+   *  Se sube/reemplaza con POST /catalog/items/:id/imagen, ver uploadItemImagen() en catalog.ts. */
   image?: string;
   disabled: boolean;
   defaultWarehouse?: string;
@@ -960,6 +962,11 @@ export interface Item {
   autoDiscount?: AutoDiscount;
   /** Componentes del combo (cuando type === 'combo') */
   components?: { itemCode: string; qty: number }[];
+}
+
+export interface ItemImagenUploadResult {
+  /** Misma URL pública que después viene en `image` en el resto de las respuestas del módulo. */
+  image: string;
 }
 
 export interface AutoDiscount {
@@ -1277,6 +1284,40 @@ export interface VerifyPinResponse {
   valid: boolean;
   userId: string;
   canOverridePrice: boolean;
+}
+
+/** Acciones sensibles reconocidas hoy por POST /auth/verify-admin-pin (ADMIN_PIN_ACTIONS en el
+ *  backend). Un valor no listado aquí responde 400 — no asumir que una acción nueva ya está
+ *  soportada sin confirmarlo con el backend primero. */
+export type AdminPinAccion = "override_descuento" | "cambiar_clasificacion_cliente";
+
+// GET /auth/admin-pin-log no documenta un schema de respuesta en openapi.json — este shape
+// sigue la descripción del endpoint ("éxito o fallo, con motivo, quién lo pidió y quién
+// autorizó"), no un contrato generado. Verificar contra el endpoint real y ajustar si no calza.
+export interface AdminPinLogEntry {
+  id: string;
+  fecha: string;
+  accion: AdminPinAccion | string;
+  exito: boolean;
+  /** Motivo del resultado (ej. "PIN incorrecto", "usuario sin rol habilitado para esta acción").
+   *  Solo visible aquí, en la bitácora — la respuesta 401 al usuario nunca lo distingue. */
+  motivo?: string;
+  /** Email de quien inició la solicitud de autorización (el usuario que necesitaba el override). */
+  solicitadoPor?: string;
+  /** Email del dueño del PIN que autorizó — solo presente si `exito` es true. */
+  autorizadoPor?: string | null;
+}
+
+export interface VerifyPinDto {
+  /** PIN de 6 dígitos del usuario autorizador. */
+  pin: string;
+  /** Acción que se está autorizando — determina qué rol se exige al dueño del PIN. */
+  accion: AdminPinAccion;
+  /** Email del dueño del PIN. Obligatorio si no se manda `codigoTarjeta`. */
+  usuario?: string;
+  /** Código de carnet/QR/barcode (adminCode) del dueño del PIN — alternativa a `usuario` para
+   *  resolverlo por escaneo. Obligatorio si no se manda `usuario`. */
+  codigoTarjeta?: string;
 }
 
 export type CategoriaAplicaA = "Ambas" | "Productos" | "Servicios";
@@ -2393,6 +2434,8 @@ export interface Usuario {
   defaultBranch?: string;
   /** Caja (POS Profile) por defecto al abrir turno, id de src/shared/api/cajas.ts listCajas() */
   defaultPosProfile?: string;
+  /** Código de carnet/QR/barcode del empleado — único por tenant, no es secreto. null si no tiene uno asignado. */
+  adminCode?: string | null;
 }
 
 export interface CreateUsuarioDto {
@@ -2406,6 +2449,8 @@ export interface CreateUsuarioDto {
   sendWelcomeEmail?: boolean;
   warehouses?: string[];
   maxDiscountPct?: number;
+  /** Código de carnet/QR/barcode del empleado — permite buscarlo luego con GET /usuarios/buscar-codigo/:codigo. */
+  adminCode?: string;
 }
 
 export interface UpdateUsuarioDto {
@@ -2419,6 +2464,8 @@ export interface UpdateUsuarioDto {
   branches?: string[];
   defaultBranch?: string;
   defaultPosProfile?: string;
+  /** Código de carnet/QR/barcode del empleado — permite buscarlo luego con GET /usuarios/buscar-codigo/:codigo. */
+  adminCode?: string;
 }
 
 export interface Role {

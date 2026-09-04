@@ -7,13 +7,14 @@ import {
 } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listCajas } from '@/shared/api/cajas'
-import type { Usuario, CreateUsuarioDto, UpdateUsuarioDto } from '@/shared/api/types'
+import type { ApiError, Usuario, CreateUsuarioDto, UpdateUsuarioDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { formatDate } from '@/lib/formatters'
-import { Plus, Ban, KeyRound, UserCheck, Pencil, X } from 'lucide-react'
+import { Plus, Ban, KeyRound, UserCheck, Pencil, X, ScanLine } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -22,6 +23,10 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
+
+function apiMessage(err: unknown, fallback: string): string {
+  return (err as ApiError)?.message ?? fallback
+}
 
 type ConfirmType = { type: 'disable'; user: Usuario } | { type: 'enable'; user: Usuario } | null
 
@@ -37,6 +42,8 @@ export default function UsuariosPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [maxDiscountPct, setMaxDiscountPct] = useState(0)
+  const [adminCode, setAdminCode] = useState('')
+  const [scanningAdminCode, setScanningAdminCode] = useState(false)
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [selectedBranches, setSelectedBranches] = useState<string[]>([])
   const [defaultBranch, setDefaultBranch] = useState('')
@@ -44,6 +51,11 @@ export default function UsuariosPage() {
   const [defaultPosProfile, setDefaultPosProfile] = useState('')
   const [defaultPosProfileSearch, setDefaultPosProfileSearch] = useState('')
   const { orderBy, sort } = useSortState()
+
+  useBarcodeScanner({
+    enabled: showForm && scanningAdminCode,
+    onBarcode: (code) => { setAdminCode(code); setScanningAdminCode(false) },
+  })
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['usuarios', { orderBy }],
@@ -105,7 +117,7 @@ export default function UsuariosPage() {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] })
       resetForm()
     },
-    onError: () => toast.error('Error al crear el usuario'),
+    onError: (err) => toast.error(apiMessage(err, 'Error al crear el usuario')),
   })
 
   const updateMutation = useMutation({
@@ -115,7 +127,7 @@ export default function UsuariosPage() {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] })
       resetForm()
     },
-    onError: () => toast.error('Error al actualizar el usuario'),
+    onError: (err) => toast.error(apiMessage(err, 'Error al actualizar el usuario')),
   })
 
   const disableMutation = useMutation({
@@ -147,7 +159,7 @@ export default function UsuariosPage() {
   const isSystemManager = selectedRoles.includes(SYSTEM_MANAGER_ROLE)
 
   const formIsDirty = useDirtyCheck(
-    { email, firstName, lastName, maxDiscountPct, selectedRoles, selectedBranches, defaultBranch, defaultPosProfile },
+    { email, firstName, lastName, maxDiscountPct, adminCode, selectedRoles, selectedBranches, defaultBranch, defaultPosProfile },
     showForm && (!editingUser || (!!usuarioSucursales && !!editingUserDetail)),
   )
   const formClose = useConfirmClose(formIsDirty, resetForm)
@@ -158,6 +170,7 @@ export default function UsuariosPage() {
     setFirstName(user.firstName)
     setLastName(user.lastName ?? '')
     setMaxDiscountPct(user.maxDiscountPct ?? 0)
+    setAdminCode(user.adminCode ?? '')
     setSelectedRoles(user.roles)
     setSelectedBranches([])
     setDefaultBranch('')
@@ -170,6 +183,8 @@ export default function UsuariosPage() {
     setFirstName('')
     setLastName('')
     setMaxDiscountPct(0)
+    setAdminCode('')
+    setScanningAdminCode(false)
     setSelectedRoles([])
     setSelectedBranches([])
     setDefaultBranch('')
@@ -193,6 +208,7 @@ export default function UsuariosPage() {
         firstName,
         lastName: lastName || undefined,
         maxDiscountPct: maxDisc,
+        adminCode: adminCode || undefined,
         roles: selectedRoles,
         branches: isSystemManager ? undefined : selectedBranches,
         defaultBranch: isSystemManager ? undefined : (defaultBranch || undefined),
@@ -203,7 +219,7 @@ export default function UsuariosPage() {
         toast.success('Sucursal por defecto actualizada. Cierra sesión y vuelve a entrar para que los cambios tomen efecto.')
       }
     } else {
-      createMutation.mutate({ email, firstName, lastName: lastName || undefined, maxDiscountPct: maxDisc, roles: selectedRoles })
+      createMutation.mutate({ email, firstName, lastName: lastName || undefined, maxDiscountPct: maxDisc, adminCode: adminCode || undefined, roles: selectedRoles })
     }
   }
 
@@ -363,6 +379,32 @@ export default function UsuariosPage() {
                     style={{ maxWidth: 140 }}
                   />
                   <p className="ff-hint">{maxDiscountPct === 0 ? 'Sin restricción' : `El usuario no podrá aplicar descuentos mayores a ${maxDiscountPct}%`}</p>
+                </div>
+
+                {/* Código de carnet/QR/barcode — identificador rápido, no reemplaza PIN ni contraseña */}
+                <div className="ff-wrap">
+                  <label className="ff-label">Código de carnet</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      className="ff-input"
+                      value={adminCode}
+                      onChange={(e) => { setAdminCode(e.target.value); setScanningAdminCode(false) }}
+                      placeholder="EMP-00231"
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className={`btn btn-size-sm ${scanningAdminCode ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setScanningAdminCode((v) => !v)}
+                    >
+                      <ScanLine size={14} />
+                      {scanningAdminCode ? 'Escaneando…' : 'Escanear'}
+                    </button>
+                  </div>
+                  <p className="ff-hint">
+                    Código impreso/codificado en el carnet, QR o código de barras del empleado — permite
+                    identificarlo por escaneo. No es secreto ni reemplaza el PIN o la contraseña.
+                  </p>
                 </div>
 
                 <div className="ff-wrap">

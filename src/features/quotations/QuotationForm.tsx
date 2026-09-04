@@ -1095,6 +1095,7 @@ if (esClienteOcasional) {
       <PinModal
         open={pinModalOpen}
         onClose={() => setPinModalOpen(false)}
+        accion="override_descuento"
         onAuthorized={(userId) => { client.defaults.headers.common['X-Admin-Pin'] = userId; setPinModalOpen(false); submitDto() }}
         title="Autorización requerida"
         description="El descuento supera tu límite. Ingresa el PIN de un administrador."

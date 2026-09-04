@@ -2,6 +2,7 @@ export const ENDPOINTS = {
   auth: {
     login: '/auth/login',
     verifyAdminPin: '/auth/verify-admin-pin',
+    adminPinLog: '/auth/admin-pin-log',
     forgotPassword: '/auth/forgot-password',
     resetPassword: '/auth/reset-password',
     completeRegistration: '/auth/complete-registration',
@@ -90,6 +91,7 @@ export const ENDPOINTS = {
       variants: (id: string) => `/catalog/items/${id}/variants`,
       generateVariants: (id: string) => `/catalog/items/${id}/variants/generate`,
       precios: (id: string) => `/catalog/items/${id}/precios`,
+      imagen: (id: string) => `/catalog/items/${id}/imagen`,
     },
     bundles: {
       list: '/catalog/bundles',
@@ -225,6 +227,7 @@ export const ENDPOINTS = {
     resetPassword: (email: string) => `/usuarios/${email}/reset-password`,
     sucursales: (email: string) => `/usuarios/${encodeURIComponent(email)}/sucursales`,
     almacenesPermitidos: (email: string) => `/usuarios/${encodeURIComponent(email)}/almacenes-permitidos`,
+    buscarCodigo: (codigo: string) => `/usuarios/buscar-codigo/${encodeURIComponent(codigo)}`,
   },
   roles: {
     list: '/roles',
