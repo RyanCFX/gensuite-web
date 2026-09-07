@@ -959,11 +959,11 @@ function TabBar() {
               flexShrink: 0,
               cursor: "pointer",
               borderRight: "1px solid var(--border-default)",
-              background: isActive
-                ? "var(--surface-raised, var(--bg-surface))"
-                : "transparent",
+              borderBottom: "2px solid #208591",
+              borderTopRightRadius: 10,
+              background: "transparent",
               borderBottom: isActive
-                ? "2px solid var(--color-primary, #4f46e5)"
+                ? "none"
                 : "2px solid transparent",
               transition: "background 0.12s",
               userSelect: "none",
@@ -988,7 +988,7 @@ function TabBar() {
                 fontSize: 12,
                 fontWeight: isActive ? 500 : 400,
                 color: isActive
-                  ? "var(--text-primary)"
+                  ? "#208591"
                   : "var(--text-secondary)",
                 overflow: "hidden",
                 textOverflow: "ellipsis",

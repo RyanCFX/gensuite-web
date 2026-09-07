@@ -45,6 +45,13 @@ export interface RecentActivityItem {
   timestamp: string
 }
 
+/** Ingresos vs. gastos de los últimos 7 días — fijo, independiente del `period` de la query. */
+export interface IngresosGastosChart {
+  labels: string[]
+  ingresos: number[]
+  gastos: number[]
+}
+
 export interface DashboardData {
   period: string
   periodLabel: string
@@ -54,6 +61,11 @@ export interface DashboardData {
   topProducts: TopProduct[]
   topCustomers: TopCustomer[]
   recentActivity: RecentActivityItem[]
+  /** Puede faltar si el backend aún no lo expone — tratar como opcional. */
+  ingresosGastosChart?: IngresosGastosChart
+  totalGanancias?: number
+  ingresosEsteMes?: number
+  gastosEsteMes?: number
 }
 
 // ─── Single fetch — all data in one call ──────────────────────────────────────
