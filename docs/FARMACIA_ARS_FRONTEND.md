@@ -52,6 +52,24 @@ Estos son los mismos nombres de los **Role Profile** que el backend provisiona
 (`Dependiente`, `Cajera Farmacia`) — no son una convención libre del frontend, son roles reales de
 ERPNext que ya determinan qué puede hacer cada usuario (ver §7).
 
+### 1.2 Glosario rápido
+
+Para quien no conozca el contexto fiscal dominicano — el mínimo para entender el resto del
+documento sin tener que buscar cada término por separado:
+
+| Término | Qué es |
+|---|---|
+| **ARS** | Administradora de Riesgos de Salud — el seguro médico dominicano. La entidad que cubre parte del costo de la receta. En el sistema es un `Customer` normal (ver §4.7). |
+| **DGII** | Dirección General de Impuestos Internos — la autoridad fiscal dominicana. Quien recibe y aprueba/rechaza cada e-CF. |
+| **NCF / e-NCF** | Número de Comprobante Fiscal — el identificador fiscal obligatorio de cada factura (ej. `B0200000456`). El "e-" es la versión electrónica, firmada digitalmente. |
+| **e-CF** | Comprobante Fiscal Electrónico — el documento firmado y transmitido a la DGII detrás de cada NCF electrónico. Módulo aparte (`/ecf/*`), no exclusivo de farmacia. |
+| **B01 / B02** | Los dos tipos de e-NCF que usa este vertical. **B01 — Crédito Fiscal**: para quien lo va a usar como gasto deducible con su propio RNC (la factura de lote a la ARS siempre es B01). **B02 — Consumo**: venta a un consumidor final sin RNC (la factura de contado al paciente, salvo que el paciente pida crédito fiscal). |
+| **ITBIS** | Impuesto sobre Transferencias de Bienes Industrializados y Servicios — el IVA dominicano (18% estándar). La mayoría de los medicamentos están **exentos** por la Ley 253-12 — ver §3.4.1, es la causa más común de que `cobrar()` falle. |
+| **RNC** | Registro Nacional del Contribuyente — el identificador fiscal de una empresa (equivalente a un RUC/CUIT/RFC en otros países). |
+| **Cédula** | El identificador fiscal de una persona física (no una empresa). |
+| **Carnet de afiliado** | El identificador que la ARS le entrega al paciente para probar su cobertura — se imprime en la factura de contado (§4.8) junto al número de autorización. |
+| **Preaprobación** | La autorización que la ARS da POR ADELANTADO, antes de despachar, sobre cuánto va a cubrir de una receta puntual — no es lo mismo que tener seguro en general. |
+
 ---
 
 ## 2. Vertical gating — cómo saber si este tenant tiene el módulo
@@ -108,6 +126,70 @@ miedo a romper algo.
   facturarlo) y manejar el error si falla (ver §6.4). Esto es una limitación conocida — si hace
   falta un indicador de "configuración completa" en la UI, es un endpoint nuevo a pedir a backend,
   no algo que el frontend pueda inferir hoy.
+
+### 2.3 Qué mostrar solo a un tenant `farmacia` — y qué NO gatear por vertical
+
+Esta tabla es la referencia rápida para decidir, pantalla por pantalla, si algo va detrás de
+`vertical === "farmacia"` o si se muestra a **todos** los tenants. Es fácil equivocarse en el
+segundo grupo: varias de estas capacidades nacieron pensando en farmacia, pero terminaron siendo
+horizontales — gatearlas por vertical las escondería sin necesidad en un tenant general que sí
+podría usarlas (vencimiento de lotes, categorías restringidas, regenerar un e-CF rechazado no son
+problemas exclusivos de una farmacia).
+
+**Exclusivo de farmacia — mostrar solo si `vertical === "farmacia"` (el servidor además responde
+403 en cualquier otro caso, esto es UX, no la barrera real):**
+
+| Pantalla / elemento | Por qué es exclusivo |
+|---|---|
+| Menú "Farmacia ARS" completo (Preaprobaciones, Despachos, Cola de Cobro, Lotes de Facturación) | Rutas bajo `/farmacia/*` — `@RequiereVertical('farmacia')` en cada controller |
+| "Reportes Farmacia ARS" (§4.9) | Mismo prefijo `/farmacia/reportes/*`, mismo gate |
+| Botones "Imprimir factura de contado" / "Imprimir factura consolidada" (§4.8) | Viven dentro de las pantallas de Despachos/Lotes — ya están gateados por vivir ahí, no hace falta un chequeo aparte |
+| Configuración → sección "Farmacia ARS" (botón "Habilitar/Reparar", §2.2) | `POST /config/farmacia/habilitar` también exige `vertical === "farmacia"` |
+
+**General — mostrar a TODOS los tenants, sin mirar `vertical` (el motivo de negocio fue farmacia,
+pero la capacidad no depende de ese vertical y otro tenant puede necesitarla):**
+
+| Pantalla / elemento | Dónde vive | Por qué NO es exclusivo |
+|---|---|---|
+| `hasExpiryDate`/`shelfLifeInDays` en el formulario de ítem, filtros de vencimiento en Inventario, FEFO (§6) | Catálogo / Inventario, ya existentes | Cualquier tenant que trackee lotes por vencimiento se beneficia — la guarda de venta de lote vencido es una política de `Facturacion Config`, no del vertical |
+| `rolesPermitidosVenta` por categoría — "medicamentos controlados" (§8) | Pantalla de Categorías, ya existente | El hook de ERPNext corre para toda `Sales Invoice` de cualquier tenant; cualquier categoría regulada (no solo medicamentos) puede usarlo |
+| Botón "Regenerar" sobre un e-CF `REJECTED` (§4.6) | Bandeja e-CF Emitidos, ya existente | Aplica a cualquier `Sales Invoice` rechazada por la DGII, de cualquier tenant |
+| Convención de nombres de UOM por tamaño de empaque (§5) | `POST /config/uom`, ya existente | Es una convención de uso, no una pantalla ni un campo nuevo — nada que gatear |
+
+Si te llega un ticket pidiendo "ocultar esto en tenants que no son de farmacia" para algo de la
+segunda tabla, es casi seguro un error de alcance — confirmá primero si el pedido real es otro
+(por ejemplo, permisos del rol del usuario, no el vertical del tenant).
+
+### 2.4 Checklist de puesta en marcha (antes de operar de verdad)
+
+`POST /config/farmacia/habilitar` (§2.2) deja el tenant técnicamente listo, pero hay precondiciones
+que viven en OTROS lugares (Clientes, Catálogo, Configuración → NCF) y que, si faltan, no fallan al
+habilitar — fallan más tarde, a mitad de un cobro o una facturación real, con un usuario esperando.
+Vale la pena que la pantalla de onboarding de un tenant `farmacia` (o su checklist de soporte) las
+repase todas antes de dar por lista una farmacia nueva:
+
+1. **`tenant.vertical === "farmacia"`** — lo fija un operador al crear el tenant (§2.1). Sin esto,
+   nada de lo demás importa: toda ruta `/farmacia/*` da 403.
+2. **`POST /config/farmacia/habilitar` ejecutado** (§2.2) — cuenta puente, Mode of Payment
+   "Cobertura ARS", Customer Group "ARS", Role Profiles. Reintentable sin riesgo.
+3. **Cada ARS dada de alta como `Customer` con `custom_tiene_credito = true`** (§3.5.1) — si no,
+   `facturar()` rechaza el lote entero recién al final, con todos sus despachos ya vinculados.
+4. **Los medicamentos, sin plantilla de impuesto de venta (exentos de ITBIS, Ley 253-12)** — a
+   menos que el negocio deliberadamente venda algo gravado bajo este flujo. Si no, `cobrar()`
+   rechaza con el mensaje de §3.4.1 en el primer intento de cobro real.
+5. **Secuencias NCF configuradas para B01 y B02** (Configuración → NCF, endpoint general, no
+   documentado acá). Este vertical usa **ambos tipos**: B02 para la factura de contado del
+   paciente (default), B01 para la factura de lote a la ARS (fijo, no configurable). **Si falta la
+   secuencia del tipo pedido, el servidor no rechaza la operación — asigna igual un e-NCF, pero de
+   OTRO tipo disponible**, sin avisar que no coincide con lo solicitado (comportamiento verificado
+   contra un site de prueba real, no es específico de farmacia — es así para cualquier documento
+   del sistema). **Implicación para el frontend: nunca asumas que el `ncf`/`ncfType` que te
+   devuelve la respuesta es el que pediste — mostrá siempre el que realmente vino en la
+   respuesta/detalle del documento**, y si hace falta garantizar el tipo, la corrección es
+   configurar la secuencia faltante, no algo que el frontend pueda forzar.
+6. **Role Profiles asignados a cada usuario real** (`Dependiente`, `Cajera Farmacia`, y
+   `Dispensador Controlados` si aplica, §8) desde la pantalla de Usuarios — `habilitar()` los CREA
+   pero no se los asigna a nadie.
 
 ---
 
@@ -786,3 +868,114 @@ validación real y definitiva sigue siendo la del servidor al someter.
 - **No** asumir que la restricción de "medicamentos controlados" (§8) se refleja en `acciones` —
   depende de la categoría de cada línea de cada venta puntual, no es una acción del catálogo de
   permisos. La validación real vive en el servidor al someter.
+
+---
+
+## 10. Catálogo de errores del vertical
+
+Todos son `400 Bad Request` con `{ success: false, error: { message, ... } }` (ver el contrato de
+error de `PROMPT_PERMISOS_FRONTEND.md` §4) salvo que se indique otro código. "Mensaje" es un
+resumen — mostrá el `message` real de la respuesta, ya viene completo y específico. "Quién lo
+resuelve" te dice si conviene reintentar, corregir el formulario, o escalar a un administrador —
+útil para decidir el tono del error en la UI (uno accionable por el usuario vs. uno que necesita
+soporte).
+
+| Endpoint | Disparador | Quién lo resuelve |
+|---|---|---|
+| `POST .../preaprobaciones/:id/confirmar` | `diferencia !== 0` | Dependiente (recalcular o ajustar líneas) |
+| `PUT .../preaprobaciones/:id` | Una línea de `detalle` trae un `id` que no existe | Frontend — bug de referencia, no mostrar tal cual al usuario |
+| `PUT .../preaprobaciones/:id` | Una línea nueva (sin `id`) sin `item`/`cantidad`/`precioUnitario` | Frontend — validar antes de enviar |
+| `POST .../despachos` | La preaprobación referenciada no está "Confirmada" | Dependiente |
+| `POST .../despachos/:id/cobrar` | El despacho no está "Confirmado" (ya cobrado/facturado) | — (refrescar la pantalla, ya no aplica la acción) |
+| `POST .../despachos/:id/cobrar` | Suma de `payments` ≠ `montoPaciente` | Cajera (corregir el monto) — prevenible en el formulario, ver §3.4 |
+| `POST .../despachos/:id/cobrar` | Total de la factura ≠ cobertura + pago (ITBIS mal aplicado) | Administrador de Catálogo (revisar plantilla de impuesto del ítem) |
+| `POST .../despachos/:id/cobrar` | Tenant con POS habilitado y `flujoCobro="directo"` | Administrador (Configuración → Facturación) |
+| `POST .../despachos/:id/cobrar` | "ya tiene un cobro en curso" (dos intentos casi simultáneos) | Reintentar en unos segundos; si persiste, administrador del sistema |
+| `POST .../despachos/:id/cobrar` | Factura de un intento anterior quedó CANCELADA | Administrador del sistema — dato inconsistente, requiere revisión manual |
+| `POST .../lotes/:id/despachos` | El despacho ya tiene lote / ya está "Facturado" / no está "Cobrado" | — (elegir otro despacho) |
+| `POST .../lotes/:id/facturar` | El lote ya está "Facturado" | — (ya no aplica la acción) |
+| `POST .../lotes/:id/facturar` | El lote no tiene despachos vinculados | Quien arma el lote (agregar despachos primero) |
+| `POST .../lotes/:id/facturar` | Farmacia no completamente habilitada (falta cuenta puente/ítem) | Administrador — ejecutar `POST /config/farmacia/habilitar` |
+| `POST .../lotes/:id/facturar` | El cliente ARS no tiene `custom_tiene_credito` | Administrador — activarlo en el registro del cliente, ver §3.5.1 |
+| `POST .../lotes/:id/facturar` | "ya tiene una facturación en curso" | Igual que el análogo de despachos — reintentar, luego escalar |
+| `POST /invoices/:id/cancel` (factura de contado de un despacho) | El despacho ya está en un lote "Facturado" | Administrador — corrección contable manual, no soportado por este flujo (§4.8/C3) |
+| Cualquier `/farmacia/*` en un tenant `general` | `403` — falta `vertical === "farmacia"` | — (no debería llegar a mostrarse; ver §2) |
+| `GET /catalog/categories` / `Sales Invoice` con línea restringida | Usuario sin rol autorizado para la categoría (§8) | Quien vende (usar otro usuario) o administrador (agregar el rol a la categoría o al usuario) |
+
+---
+
+## 11. Ejemplos completos de extremo a extremo
+
+Fragmentos de request/response reales de punta a punta — útil para tipar sin ambigüedad o para
+armar fixtures de test. El shape exacto (tipos, opcionalidad) sigue siendo el de `openapi.json`;
+esto son valores de ejemplo coherentes entre sí a lo largo de todo el flujo.
+
+**1. Crear la preaprobación** — `POST /farmacia/preaprobaciones`
+
+```jsonc
+// Request
+{
+  "aseguradora": "ARS Humano",
+  "numeroAprobacion": "AUTH-2026-00981",
+  "cliente": "Juana Pérez",
+  "cedula": "00112345678",
+  "carnetAfiliado": "HUM-778899",
+  "valorCoberturaArs": 60,
+  "detalle": [
+    { "item": "MED-AMOX-500", "cantidad": 1, "precioUnitario": 70 },
+    { "item": "MED-IBUP-400", "cantidad": 1, "precioUnitario": 30 }
+  ]
+}
+// Response — antes de "Recalcular": montoAprobadoArs en 0, diferencia = 60
+{
+  "success": true,
+  "data": {
+    "id": "PREAPR-2026-00003", "estado": "Borrador", "confirmada": false,
+    "valorCoberturaArs": 60, "montoTotalReceta": 100, "montoDistribuido": 0, "diferencia": 60,
+    "detalle": [
+      { "id": "...", "item": "MED-AMOX-500", "cantidad": 1, "precioUnitario": 70,
+        "precioLinea": 70, "montoAprobadoArs": 0, "montoPaciente": 70, "lineaBloqueada": false },
+      { "id": "...", "item": "MED-IBUP-400", "cantidad": 1, "precioUnitario": 30,
+        "precioLinea": 30, "montoAprobadoArs": 0, "montoPaciente": 30, "lineaBloqueada": false }
+    ]
+  }
+}
+```
+
+**2. Recalcular** — `POST /farmacia/preaprobaciones/PREAPR-2026-00003/recalcular` — reparte los 60
+proporcionalmente; la segunda línea (precioLinea=30) topa contra su propio precio y se cierra en
+30, la primera se queda con los 30 restantes. Resultado: `montoDistribuido: 60, diferencia: 0` —
+ya se puede confirmar. Confirmar (`POST .../confirmar`) deja `estado: "Confirmada"`.
+
+**3. Despachar y cobrar** — `POST /farmacia/despachos` con `{ "preaprobacion": "PREAPR-2026-00003" }`
+devuelve un despacho con `montoArs: 60, montoPaciente: 40` (heredados). Cobrarlo:
+
+```jsonc
+// POST /farmacia/despachos/DESP-2026-00042/cobrar
+{ "payments": [{ "modeOfPayment": "Efectivo", "amount": 40 }] }
+// Response
+{
+  "success": true,
+  "data": { "despachoId": "DESP-2026-00042", "invoiceId": "ACC-SINV-2026-00123", "ncf": "B0200000456" }
+}
+```
+
+**4. Armar y facturar el lote** — tras cobrar varios despachos de la misma ARS:
+
+```jsonc
+// POST /farmacia/lotes  { "aseguradora": "ARS Humano", "periodoInicio": "2026-09-01", "periodoFin": "2026-09-30" }
+// POST /farmacia/lotes/LOTE-ARS-2026-05/despachos  { "despachoId": "DESP-2026-00042" }  (uno por cada despacho)
+// POST /farmacia/lotes/LOTE-ARS-2026-05/facturar
+{
+  "success": true,
+  "data": {
+    "id": "LOTE-ARS-2026-05", "estado": "Facturado", "aseguradora": "ARS Humano",
+    "cantidadDespachos": 1, "montoTotalLote": 60,
+    "facturaConsolidada": "ACC-SINV-2026-00145", "ncfAsignado": "B0100000012"
+    // "despachosNoMarcados" NO aparece acá — solo se incluye si el fan-out final falló parcialmente
+  }
+}
+```
+
+Notá el naming series real: `LOTE-ARS-.YYYY.-.##` (con "ARS-" en el medio, dos dígitos al final —
+confirmado contra un site real, no `LOTE-.YYYY.-.##`).
