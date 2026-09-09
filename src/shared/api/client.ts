@@ -94,6 +94,14 @@ client.interceptors.response.use(
       return Promise.reject(data.error)
     }
 
+    // La caché de permisos (docs/PROMPT_PERMISOS_FRONTEND.md §9) puede haber quedado vieja —
+    // refrescarla en segundo plano para que la UI se corrija sola sin recargar. Import dinámico
+    // a propósito: un import estático de vuelta crearía un ciclo real
+    // (client.ts → permissions.store.ts → me.ts → client.ts).
+    if (!isLoginRequest && data?.error?.code === 'PERMISO_INSUFICIENTE') {
+      import('@/stores/permissions.store').then((m) => m.usePermissionsStore.getState().fetch())
+    }
+
     // 5xx: falla real del backend (no un error de validación del usuario) — se reporta como
     // Issue y como log estructurado, con el tenant ya etiquetado en el scope global.
     if (status >= 500) {

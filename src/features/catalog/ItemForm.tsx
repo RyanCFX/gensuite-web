@@ -45,6 +45,8 @@ const schema = z.object({
   allowsDiscount: z.boolean().optional(),
   maxDiscountPct: z.number().min(0).max(100).optional().catch(undefined),
   trackingType: z.enum(['none', 'batch', 'serial']).optional(),
+  hasExpiryDate: z.boolean().optional(),
+  shelfLifeInDays: z.number().int().min(1).optional().catch(undefined),
   purchaseTaxTemplate: z.string().optional(),
   salesTaxTemplate: z.string().optional(),
 })
@@ -279,6 +281,8 @@ export default function ItemForm() {
       allowsDiscount: true,
       maxDiscountPct: 0,
       trackingType: 'none',
+      hasExpiryDate: false,
+      shelfLifeInDays: undefined,
       purchaseTaxTemplate: '',
       salesTaxTemplate: '',
     },
@@ -324,6 +328,8 @@ export default function ItemForm() {
       allowsDiscount: existingItem.allowsDiscount ?? true,
       maxDiscountPct: existingItem.maxDiscountPct ?? 0,
       trackingType: existingItem.trackingType ?? 'none',
+      hasExpiryDate: existingItem.hasExpiryDate ?? false,
+      shelfLifeInDays: existingItem.shelfLifeInDays,
       purchaseTaxTemplate: existingItem.purchaseTaxTemplate ?? '',
       salesTaxTemplate: existingItem.salesTaxTemplate ?? '',
     })
@@ -390,6 +396,11 @@ export default function ItemForm() {
       warrantyPeriod: data.warrantyPeriod || undefined,
       barcodes: barcodes.length > 0 ? barcodes : undefined,
       trackingType: data.trackingType === 'none' ? undefined : data.trackingType,
+      // El servidor rechaza estos dos campos (400) si trackingType no es "batch" — nunca
+      // enviarlos fuera de ese caso, aunque el formulario los haya tocado antes de cambiar de
+      // tipo de seguimiento (docs/FARMACIA_ARS_FRONTEND.md §6.1).
+      hasExpiryDate: data.trackingType === 'batch' ? data.hasExpiryDate : undefined,
+      shelfLifeInDays: data.trackingType === 'batch' ? (data.shelfLifeInDays || undefined) : undefined,
       purchaseTaxTemplate: noPurchaseTax ? undefined : data.purchaseTaxTemplate || undefined,
       salesTaxTemplate: noSalesTax ? undefined : data.salesTaxTemplate || undefined,
     }
@@ -1178,6 +1189,31 @@ export default function ItemForm() {
                   />
                 </div>
               </div>
+
+              {watch('trackingType') === 'batch' && (
+                <div className="form-row form-row-2" style={{ marginTop: 12 }}>
+                  <div className="ff-wrap">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                      <input type="checkbox" {...register('hasExpiryDate')} />
+                      Requiere fecha de vencimiento por lote
+                    </label>
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="shelfLifeInDays">Vida útil (días)</label>
+                    <input
+                      id="shelfLifeInDays"
+                      className="ff-input"
+                      type="number"
+                      min="1"
+                      step="1"
+                      {...register('shelfLifeInDays', { valueAsNumber: true })}
+                    />
+                    <p className="ff-hint">
+                      Si se omite la fecha de vencimiento al crear un lote, se calcula sumando estos días a la fecha de fabricación.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

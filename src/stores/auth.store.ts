@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { getToken, getTenant, getUser, clearSession } from '@/shared/api/storage'
 import { login as apiLogin, type AuthResult } from '@/shared/api/auth'
 import type { AuthUser, AuthTenant } from '@/shared/api/types'
+import { usePermissionsStore } from '@/stores/permissions.store'
 
 function decodeJwt(token: string): Record<string, unknown> {
   try {
@@ -64,6 +65,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     clearSession()
+    usePermissionsStore.getState().clear()
     set({ token: null, user: null, tenant: null, isAuthenticated: false })
   },
 }))

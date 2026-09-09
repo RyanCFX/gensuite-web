@@ -4,6 +4,7 @@ import type {
   VoucherEmitido,
   EcfEmitidoDetail,
   RefreshEcfEmitidoResult,
+  RegenerarEcfEmitidoResult,
   EcfStatusDgii,
   EcfTipoElectronico,
   EcfEnv,
@@ -47,6 +48,17 @@ export async function getEcfEmitido(voucherId: string) {
 export async function refreshEcfEmitido(voucherId: string) {
   const res = await client.post<{ success: true; data: RefreshEcfEmitidoResult }>(
     ENDPOINTS.ecfEmitidos.refresh(voucherId),
+  )
+  return unwrap(res)
+}
+
+// POST /ecf/emitidos/:voucherId/regenerar — solo aplica a un voucher REJECTED. Asigna un e-NCF
+// nuevo SOBRE EL MISMO documento (invoiceId no cambia). No es exclusivo de Farmacia (aplica a
+// cualquier Sales Invoice), pero el flujo de farmacia es el caso de uso que lo motivó — ver
+// docs/FARMACIA_ARS_FRONTEND.md §4.6. Response no documentada en openapi.json.
+export async function regenerarEcfEmitido(voucherId: string) {
+  const res = await client.post<{ success: true; data: RegenerarEcfEmitidoResult }>(
+    ENDPOINTS.ecfEmitidos.regenerar(voucherId),
   )
   return unwrap(res)
 }

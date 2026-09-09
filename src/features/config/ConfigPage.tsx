@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTabs } from '@/contexts/TabsContext'
 import { toast } from 'sonner'
+import { Permitido } from '@/components/shared/Permitido'
 import axios from 'axios'
 import {
   getCobrosConfig, updateCobrosConfig,
@@ -19,6 +20,7 @@ import {
   getFacturacionConfig, updateFacturacionConfig,
   listDenominaciones, createDenominacion, updateDenominacion,
   habilitarPos,
+  habilitarFarmacia,
   getEcfConfig, updateEcfConfig,
 } from '@/shared/api/config'
 import { listSucursales } from '@/shared/api/sucursales'
@@ -1992,6 +1994,36 @@ const PRICE_TIER_OPTIONS = [
   { value: 'C', label: 'C — Mayorista' },
 ]
 
+// Solo se registra en el menú si vertical === "farmacia" (ver AppLayout.tsx); si alguien entra
+// directo por URL en un tenant general, el propio POST responde 403 (docs/FARMACIA_ARS_FRONTEND.md §2.2).
+function FarmaciaArsConfigSection() {
+  const habilitarMutation = useMutation({
+    mutationFn: habilitarFarmacia,
+    onSuccess: () => toast.success('Farmacia ARS habilitada/reparada correctamente'),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al habilitar Farmacia ARS'),
+  })
+
+  return (
+    <div className="ff-wrap">
+      <label className="ff-label">Farmacia ARS</label>
+      <p className="ff-hint" style={{ marginBottom: 8 }}>
+        Provisiona (de forma idempotente) la cuenta puente contable, el modo de pago "Cobertura ARS",
+        el grupo de clientes "ARS" y los perfiles de rol Dependiente/Cajera Farmacia. Puede ejecutarse
+        varias veces sin riesgo — útil si algo quedó a medias en un intento anterior.
+      </p>
+      <Permitido accion="config.farmacia.habilitar">
+        <button
+          className="btn btn-secondary btn-size-sm"
+          onClick={() => habilitarMutation.mutate()}
+          disabled={habilitarMutation.isPending}
+        >
+          {habilitarMutation.isPending ? 'Procesando…' : 'Habilitar / Reparar'}
+        </button>
+      </Permitido>
+    </div>
+  )
+}
+
 function GruposClientesSection() {
   const queryClient = useQueryClient()
   const { data: grupos, isLoading } = useQuery({ queryKey: ['customer-groups'], queryFn: listCustomerGroups })
@@ -3278,6 +3310,7 @@ const SECTION_TITLES: Record<string, string> = {
   facturacion: 'Configuración de Facturación',
   denominaciones: 'Denominaciones',
   ecf: 'Facturación Electrónica',
+  farmacia: 'Farmacia ARS',
 }
 
 export default function ConfigPage() {
@@ -3301,6 +3334,7 @@ export default function ConfigPage() {
     facturacion: <FacturacionConfigSection />,
     denominaciones: <DenominacionesSection />,
     ecf: <EcfConfigSection />,
+    farmacia: <FarmaciaArsConfigSection />,
   }
 
   return (

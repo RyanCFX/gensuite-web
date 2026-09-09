@@ -1,3 +1,10 @@
+> ⚠️ **SUPERADO.** El backend implementó su propia versión de lo que este documento pedía en
+> `GET /api/v1/me/permissions` — ver `docs/PROMPT_PERMISOS_FRONTEND.md`. En particular, el campo
+> `doctypes` de esa respuesta ya es "los permisos efectivos del usuario autenticado" que este
+> documento pedía en su §5.3, y `acciones` ya resuelve el catálogo pantalla→DocType→ptype de la
+> §3 sin que el frontend tenga que mantenerlo. No se implementó nada de este documento y no debe
+> usarse como referencia para trabajo nuevo — se conserva solo como registro histórico.
+>
 > 📋 **PLAN — no implementado todavía.** Escrito para que un agente de IA (o una persona) lo lea
 > e implemente directamente. Complementa, no reemplaza, a [`roles.md`](../roles.md) (qué es cada
 > rol) y [`plan/PERMISOS_POR_ROL.md`](./PERMISOS_POR_ROL.md) (un hook de UI para ocultar/mostrar
