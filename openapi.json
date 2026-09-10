@@ -8103,7 +8103,7 @@
     },
     "/api/v1/config/seguridad": {
       "get": {
-        "description": "Un solo valor gobierna ambos casos: \"olvidé mi contraseña\" y \"crear contraseña\" de un usuario nuevo son el mismo mecanismo en ERPNext (mismo reset_password_key). Es configuración de nivel site — un valor por tenant.",
+        "description": "resetPasswordLinkExpiryMinutes: un solo valor gobierna ambos casos, \"olvidé mi contraseña\" y \"crear contraseña\" de un usuario nuevo, porque son el mismo mecanismo en ERPNext (mismo reset_password_key). modoCreacionPassword: si crear/resetear la contraseña de un usuario (POST /usuarios, POST /usuarios/:email/reset-password) manda un link por correo o la fija directo el administrador. Ambos son configuración de nivel site — un valor por tenant.",
         "operationId": "ConfigController_getSeguridadSettings",
         "parameters": [
           {
@@ -8125,7 +8125,7 @@
             "bearer": []
           }
         ],
-        "summary": "Vigencia del link de restablecer/crear contraseña por primera vez",
+        "summary": "Seguridad: vigencia del link de contraseña y modo de creación/reset de contraseña",
         "tags": [
           "Configuración"
         ]
@@ -8162,7 +8162,7 @@
             "bearer": []
           }
         ],
-        "summary": "Actualizar vigencia del link de contraseña",
+        "summary": "Actualizar vigencia del link y/o modo de creación de contraseña",
         "tags": [
           "Configuración"
         ]
@@ -16332,7 +16332,7 @@
             "bearer": []
           }
         ],
-        "summary": "Resetear contraseña — por correo (link propio al frontend) o directo, según GET /config/facturacion → modoCreacionPassword. En modo \"directo\" requiere `newPassword` en el body.",
+        "summary": "Resetear contraseña — por correo (link propio al frontend) o directo, según GET /config/seguridad → modoCreacionPassword. En modo \"directo\" requiere `newPassword` en el body.",
         "tags": [
           "Usuarios"
         ]
@@ -29154,15 +29154,6 @@
             "default": false,
             "description": "Si está activo, comprar un artículo con tracking de serial/lote (has_serial_no/has_batch_no) exige que la línea de compra incluya `serials`/`batches` — hoy es opcional. Además, al VENDER ese artículo el serial/lote debe existir YA en ERPNext (se asume que entró por una compra registrada); un serial inexistente se rechaza. Si está inactivo (default), la compra sigue siendo opcional y, al vender, un serial/lote que no existe se crea sobre la marcha en vez de rechazarse. En ambos casos ERPNext sigue exigiendo que se asigne algún serial/lote a la línea antes de someter el documento — eso no cambia."
           },
-          "modoCreacionPassword": {
-            "type": "string",
-            "enum": [
-              "email",
-              "directo"
-            ],
-            "default": "email",
-            "description": "\"email\": al crear un usuario (POST /usuarios) o resetear su contraseña (POST /usuarios/:email/reset-password) se genera un link y se manda por correo (comportamiento histórico). \"directo\": el administrador escribe la contraseña él mismo en el momento (`password` en la creación, `newPassword` en el reset) y se fija de una vez en ERPNext sin enviar ningún correo — útil si el tenant no tiene canal de email saliente confiable."
-          },
           "redondeoTotalDeshabilitado": {
             "type": "boolean",
             "default": false,
@@ -30075,6 +30066,15 @@
             "type": "number",
             "example": 10,
             "description": "Minutos de vigencia del link para restablecer contraseña y para crear la contraseña la primera vez (usuario nuevo) — es EL MISMO mecanismo en ERPNext, así que un solo valor gobierna ambos casos. `0` desactiva la expiración (el link nunca vence) — úsese con cuidado, no se recomienda en producción."
+          },
+          "modoCreacionPassword": {
+            "type": "string",
+            "enum": [
+              "email",
+              "directo"
+            ],
+            "default": "email",
+            "description": "\"email\": al crear un usuario (POST /usuarios) o resetear su contraseña (POST /usuarios/:email/reset-password) se genera un link y se manda por correo (comportamiento histórico). \"directo\": el administrador escribe la contraseña él mismo en el momento (`password` en la creación, `newPassword` en el reset) y se fija de una vez en ERPNext sin enviar ningún correo — útil si el tenant no tiene canal de email saliente confiable."
           }
         }
       },
@@ -33217,7 +33217,7 @@
           "password": {
             "type": "string",
             "example": "NuevaClave2026!",
-            "description": "Contraseña inicial del usuario. Solo se usa (y es obligatoria) cuando el tenant tiene GET /config/facturacion → modoCreacionPassword=\"directo\" — el administrador la define aquí mismo y se la entrega en persona, en vez de mandar un correo con link. Se ignora si el tenant está en modo \"email\"."
+            "description": "Contraseña inicial del usuario. Solo se usa (y es obligatoria) cuando el tenant tiene GET /config/seguridad → modoCreacionPassword=\"directo\" — el administrador la define aquí mismo y se la entrega en persona, en vez de mandar un correo con link. Se ignora si el tenant está en modo \"email\"."
           },
           "adminCode": {
             "type": "string",
@@ -33316,7 +33316,7 @@
           "newPassword": {
             "type": "string",
             "example": "NuevaClave2026!",
-            "description": "Nueva contraseña. Solo se usa (y es obligatoria) cuando el tenant tiene GET /config/facturacion → modoCreacionPassword=\"directo\" — el administrador la define aquí mismo y se la entrega en persona, en vez de mandar un correo con link. Se ignora si el tenant está en modo \"email\"."
+            "description": "Nueva contraseña. Solo se usa (y es obligatoria) cuando el tenant tiene GET /config/seguridad → modoCreacionPassword=\"directo\" — el administrador la define aquí mismo y se la entrega en persona, en vez de mandar un correo con link. Se ignora si el tenant está en modo \"email\"."
           }
         }
       },
