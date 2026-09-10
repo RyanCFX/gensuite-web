@@ -2,6 +2,9 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getFacturacionConfig } from '@/shared/api/config'
+import { usePermissionsStore } from '@/stores/permissions.store'
+import { useAuthStore } from '@/stores/auth.store'
+import { resolverRuta } from '@/shared/permissions/rutas'
 import {
   LayoutDashboard, Users, Package, FileText, Receipt, Warehouse,
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
@@ -129,8 +132,26 @@ function score(item: SearchItem, q: string): number {
 // Entradas que solo tienen sentido con el módulo POS habilitado (Facturacion Config.usaModuloPos).
 const POS_ONLY_IDS = new Set(['caja', 'r-caja'])
 
-function filterItems(q: string, usaModuloPos: boolean): SearchItem[] {
-  const base = usaModuloPos ? ALL_ITEMS : ALL_ITEMS.filter((item) => !POS_ONLY_IDS.has(item.id))
+interface PermCtx {
+  acciones: Record<string, boolean>
+  esFarmacia: boolean
+  isSystemManager: boolean
+}
+
+// Oculta del buscador global las entradas que el usuario no podría abrir
+// (docs/PROMPT_PERMISOS_FRONTEND.md §6) — misma fuente de verdad que el guard de router.
+function itemPermitido(item: SearchItem, perm: PermCtx): boolean {
+  const ruta = resolverRuta(item.path)
+  if (!ruta) return true
+  if (ruta.soloFarmacia && !perm.esFarmacia) return false
+  if (ruta.soloSystemManager && !perm.isSystemManager) return false
+  if (ruta.accion && perm.acciones[ruta.accion] !== true) return false
+  return true
+}
+
+function filterItems(q: string, usaModuloPos: boolean, perm: PermCtx): SearchItem[] {
+  const base = (usaModuloPos ? ALL_ITEMS : ALL_ITEMS.filter((item) => !POS_ONLY_IDS.has(item.id)))
+    .filter((item) => itemPermitido(item, perm))
   if (!q.trim()) return base
   return base
     .map((item) => ({ item, s: score(item, q) }))
@@ -160,7 +181,14 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   })
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false
 
-  const results = useMemo(() => filterItems(query, usaModuloPos), [query, usaModuloPos])
+  const acciones = usePermissionsStore((s) => s.acciones)
+  const esFarmacia = usePermissionsStore((s) => s.vertical) === 'farmacia'
+  const isSystemManager = useAuthStore((s) => s.user?.roles?.includes('System Manager') ?? false)
+
+  const results = useMemo(
+    () => filterItems(query, usaModuloPos, { acciones, esFarmacia, isSystemManager }),
+    [query, usaModuloPos, acciones, esFarmacia, isSystemManager],
+  )
 
   // Reset on open
   useEffect(() => {
