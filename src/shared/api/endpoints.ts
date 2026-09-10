@@ -1,7 +1,13 @@
 export const ENDPOINTS = {
+  me: {
+    permissions: '/me/permissions',
+    permissionsByDoc: (doctype: string, name: string) =>
+      `/me/permissions/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,
+  },
   auth: {
     login: '/auth/login',
     verifyAdminPin: '/auth/verify-admin-pin',
+    adminPinLog: '/auth/admin-pin-log',
     forgotPassword: '/auth/forgot-password',
     resetPassword: '/auth/reset-password',
     completeRegistration: '/auth/complete-registration',
@@ -66,6 +72,7 @@ export const ENDPOINTS = {
     list: '/ecf/emitidos',
     byId: (voucherId: string) => `/ecf/emitidos/${encodeURIComponent(voucherId)}`,
     refresh: (voucherId: string) => `/ecf/emitidos/${encodeURIComponent(voucherId)}/refresh`,
+    regenerar: (voucherId: string) => `/ecf/emitidos/${encodeURIComponent(voucherId)}/regenerar`,
   },
   debitNotes: {
     list: '/debit-notes',
@@ -90,6 +97,7 @@ export const ENDPOINTS = {
       variants: (id: string) => `/catalog/items/${id}/variants`,
       generateVariants: (id: string) => `/catalog/items/${id}/variants/generate`,
       precios: (id: string) => `/catalog/items/${id}/precios`,
+      imagen: (id: string) => `/catalog/items/${id}/imagen`,
     },
     bundles: {
       list: '/catalog/bundles',
@@ -117,6 +125,7 @@ export const ENDPOINTS = {
     history: '/inventory/history',
     historyByItem: (itemCode: string) => `/inventory/history/${itemCode}`,
     lotes: '/inventory/lotes',
+    lotesSugerido: '/inventory/lotes/sugerido',
     seriales: '/inventory/seriales',
     counts: {
       list: '/inventory/counts',
@@ -225,6 +234,7 @@ export const ENDPOINTS = {
     resetPassword: (email: string) => `/usuarios/${email}/reset-password`,
     sucursales: (email: string) => `/usuarios/${encodeURIComponent(email)}/sucursales`,
     almacenesPermitidos: (email: string) => `/usuarios/${encodeURIComponent(email)}/almacenes-permitidos`,
+    buscarCodigo: (codigo: string) => `/usuarios/buscar-codigo/${encodeURIComponent(codigo)}`,
   },
   roles: {
     list: '/roles',
@@ -262,6 +272,7 @@ export const ENDPOINTS = {
     cancel: (id: string) => `/journal-entry/${encodeURIComponent(id)}/cancel`,
   },
   config: {
+    farmaciaHabilitar: '/config/farmacia/habilitar',
     empresa: '/config/empresa',
     cobros: '/config/cobros',
     metodosPago: '/config/metodos-pago',
@@ -509,5 +520,37 @@ export const ENDPOINTS = {
   qz: {
     certificado: '/qz/certificado',
     firmar: '/qz/firmar',
+  },
+  dgii: {
+    taxpayers: (rnc: string) => `/dgii/taxpayers/${encodeURIComponent(rnc)}`,
+  },
+  farmacia: {
+    preaprobaciones: {
+      list: '/farmacia/preaprobaciones',
+      byId: (id: string) => `/farmacia/preaprobaciones/${encodeURIComponent(id)}`,
+      recalcular: (id: string) => `/farmacia/preaprobaciones/${encodeURIComponent(id)}/recalcular`,
+      confirmar: (id: string) => `/farmacia/preaprobaciones/${encodeURIComponent(id)}/confirmar`,
+    },
+    despachos: {
+      list: '/farmacia/despachos',
+      byId: (id: string) => `/farmacia/despachos/${encodeURIComponent(id)}`,
+      cobrar: (id: string) => `/farmacia/despachos/${encodeURIComponent(id)}/cobrar`,
+      pdf: (id: string) => `/farmacia/despachos/${encodeURIComponent(id)}/pdf`,
+    },
+    lotes: {
+      list: '/farmacia/lotes',
+      byId: (id: string) => `/farmacia/lotes/${encodeURIComponent(id)}`,
+      recalcular: (id: string) => `/farmacia/lotes/${encodeURIComponent(id)}/recalcular`,
+      despachos: (id: string) => `/farmacia/lotes/${encodeURIComponent(id)}/despachos`,
+      despachoById: (id: string, despachoId: string) =>
+        `/farmacia/lotes/${encodeURIComponent(id)}/despachos/${encodeURIComponent(despachoId)}`,
+      enRevision: (id: string) => `/farmacia/lotes/${encodeURIComponent(id)}/en-revision`,
+      facturar: (id: string) => `/farmacia/lotes/${encodeURIComponent(id)}/facturar`,
+      pdf: (id: string) => `/farmacia/lotes/${encodeURIComponent(id)}/pdf`,
+    },
+    reportes: {
+      lotes: '/farmacia/reportes/lotes',
+      despachosNcf: '/farmacia/reportes/despachos-ncf',
+    },
   },
 } as const

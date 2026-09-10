@@ -354,3 +354,30 @@ export async function downloadCorteCajaDiaPdf(params: CorteCajaDiaParams) {
   a.click()
   URL.revokeObjectURL(url)
 }
+
+// ─── Farmacia ARS — reportes de auditoría (docs/FARMACIA_ARS_FRONTEND.md §4.9) ─────────────
+// Prefijo real /farmacia/reportes/*, no /reportes — por eso viven bajo ENDPOINTS.farmacia.reportes,
+// no ENDPOINTS.reportes. Sin PDF: el doc no documenta un endpoint de descarga para estos dos.
+
+export interface ReporteFarmaciaLotesParams {
+  aseguradora?: string
+  estado?: string
+  desde?: string
+  hasta?: string
+}
+
+export async function getReporteFarmaciaLotes(params?: ReporteFarmaciaLotesParams) {
+  const res = await client.get(ENDPOINTS.farmacia.reportes.lotes, { params })
+  return res.data
+}
+
+export interface ReporteFarmaciaDespachosNcfParams {
+  aseguradora?: string
+  desde?: string
+  hasta?: string
+}
+
+export async function getReporteFarmaciaDespachosNcf(params?: ReporteFarmaciaDespachosNcfParams) {
+  const res = await client.get(ENDPOINTS.farmacia.reportes.despachosNcf, { params })
+  return res.data
+}

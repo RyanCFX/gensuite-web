@@ -1,9 +1,12 @@
-import { client, unwrap } from './client'
+import { client, unwrap, unwrapPaginated } from './client'
 import { ENDPOINTS } from './endpoints'
 import type {
   LoginRequest,
   LoginResponse,
   VerifyPinResponse,
+  VerifyPinDto,
+  AdminPinLogEntry,
+  PaginatedResponse,
   AuthUser,
   ForgotPasswordDto,
   ForgotPasswordResult,
@@ -75,9 +78,16 @@ export async function completeRegistration(data: ResetPasswordDto, tenant: strin
   return handleLoginPayload(unwrap(res))
 }
 
-export async function verifyAdminPin(pin: string) {
-  const res = await client.post<{ success: true; data: VerifyPinResponse }>('/auth/verify-admin-pin', { pin })
+export async function verifyAdminPin(dto: VerifyPinDto) {
+  const res = await client.post<{ success: true; data: VerifyPinResponse }>('/auth/verify-admin-pin', dto)
   return unwrap(res)
+}
+
+/** Bitácora de autorizaciones con PIN de administrador (éxitos y fallos). Requiere que el
+ *  usuario logueado tenga rol System Manager o Auditor — 403 si no. */
+export async function listAdminPinLog(params?: { limit?: number; offset?: number }) {
+  const res = await client.get<PaginatedResponse<AdminPinLogEntry>>(ENDPOINTS.auth.adminPinLog, { params })
+  return unwrapPaginated(res)
 }
 
 export function isApiError(error: unknown): error is ApiError {

@@ -16,6 +16,7 @@ import type {
   ItemStock,
   UpdateItemPricesDto,
   ItemPricesResult,
+  ItemImagenUploadResult,
   PricingRule,
   CreatePricingRuleDto,
   UpdatePricingRuleDto,
@@ -78,6 +79,21 @@ export async function updateItem(id: string, data: Partial<CreateItemDto>) {
 /** Atajo para actualizar solo precios de un artículo, sin mandar el payload completo de edición. */
 export async function updateItemPrices(id: string, data: UpdateItemPricesDto) {
   const res = await client.put<{ success: true; data: ItemPricesResult }>(ENDPOINTS.catalog.items.precios(id), data)
+  return unwrap(res)
+}
+
+/** Sube/reemplaza la foto del artículo (multipart, máx 5MB). Devuelve la misma URL pública que
+ *  luego viene en `Item.image`. El artículo debe existir ya — no se puede llamar antes de crear. */
+export async function uploadItemImagen(id: string, file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await client.post<{ success: true; data: ItemImagenUploadResult }>(
+    ENDPOINTS.catalog.items.imagen(id),
+    formData,
+    // El cliente fuerza `Content-Type: application/json` por default en toda request — hay que
+    // quitarlo para que el navegador ponga el `multipart/form-data; boundary=...` real.
+    { headers: { 'Content-Type': undefined } },
+  )
   return unwrap(res)
 }
 

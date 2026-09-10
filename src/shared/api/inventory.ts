@@ -6,6 +6,7 @@ import type {
   InventorySummary,
   InventoryHistory,
   InventoryLote,
+  LoteSugerido,
   InventorySerial,
   Warehouse,
   PaginatedResponse,
@@ -82,9 +83,22 @@ export async function listRepostsValuacion(params?: PaginationParams) {
 
 // ─── Lotes (Batches) ────────────────────────────────────────────────────────
 
-export async function listLotes(params?: PaginationParams & { itemCode?: string }) {
+export async function listLotes(params?: PaginationParams & {
+  itemCode?: string
+  /** Solo lotes con expiryDate hoy o antes. */
+  soloVencidos?: boolean
+  /** Lotes que vencen dentro de N días desde hoy (incluye los ya vencidos). */
+  venceEnDias?: number
+}) {
   const res = await client.get<PaginatedResponse<InventoryLote>>(ENDPOINTS.inventory.lotes, { params })
   return unwrapPaginated(res)
+}
+
+// FEFO real por almacén — a diferencia de listLotes (lista plana, sin cruzar con stock real de
+// un almacén concreto), delega en el nativo de ERPNext y ya excluye vencidos (docs/FARMACIA_ARS_FRONTEND.md §6.3).
+export async function getLoteSugerido(params: { itemCode: string; warehouse: string }) {
+  const res = await client.get<{ success: true; data: LoteSugerido[] }>(ENDPOINTS.inventory.lotesSugerido, { params })
+  return unwrap(res)
 }
 
 // ─── Seriales ───────────────────────────────────────────────────────────────

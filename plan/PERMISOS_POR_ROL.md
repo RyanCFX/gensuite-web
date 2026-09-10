@@ -1,3 +1,9 @@
+> ⚠️ **SUPERADO.** El backend implementó su propia versión de esto en
+> `GET /api/v1/me/permissions` — ver `docs/PROMPT_PERMISOS_FRONTEND.md`. Este documento describe
+> una arquitectura alternativa (matriz de roles hardcodeada en el cliente) que no se implementó y
+> no debe usarse como referencia para trabajo nuevo. Se conserva solo como registro histórico de
+> la discusión de diseño.
+>
 > 📋 **PLAN — no implementado todavía.** Escrito para que un agente de IA lo lea e implemente
 > directamente contra el frontend. No requiere conocimiento previo de la conversación que lo
 > originó — solo de este documento y de `roles.md` (raíz del repo), que es la fuente de verdad de

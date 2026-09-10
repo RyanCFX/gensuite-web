@@ -15,13 +15,15 @@ import {
   updateBuyingSettings,
   getSeguridadSettings,
   updateSeguridadSettings,
+  getFacturacionConfig,
+  updateFacturacionConfig,
   listGruposProveedores,
   listPaises,
 } from '@/shared/api/config'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listCustomerGroups } from '@/shared/api/customers'
 import { listUsuarios, listRoles } from '@/shared/api/usuarios'
-import type { AccountsSettings, StockSettings, SellingSettings, BuyingSettings, SeguridadSettings } from '@/shared/api/types'
+import type { AccountsSettings, StockSettings, SellingSettings, BuyingSettings, SeguridadSettings, FacturacionConfig } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -717,60 +719,135 @@ function SeguridadTab() {
   const minutesHint = formatMinutesHint(resetPasswordLinkExpiryMinutes)
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div className="card">
-        <div className="card-header">
-          <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ShieldCheck size={16} />
-            Ajustes de Seguridad
-          </span>
-        </div>
-        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="ff-wrap">
-            <label className="ff-label" htmlFor="resetPasswordLinkExpiryMinutes">Vigencia del link de contraseña (minutos)</label>
-            <Controller
-              name="resetPasswordLinkExpiryMinutes"
-              control={control}
-              render={({ field }) => (
-                <input
-                  id="resetPasswordLinkExpiryMinutes"
-                  type="number"
-                  min={0}
-                  step={1}
-                  className="ff-input"
-                  value={field.value ?? ''}
-                  onChange={(e) => {
-                    const raw = e.target.value
-                    if (raw === '') { field.onChange(undefined); return }
-                    // Solo enteros >= 0 — un valor negativo o con decimales no tiene sentido acá.
-                    field.onChange(Math.max(0, Math.floor(Number(raw))))
-                  }}
-                />
+    <div style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ShieldCheck size={16} />
+              Ajustes de Seguridad
+            </span>
+          </div>
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="ff-wrap">
+              <label className="ff-label" htmlFor="resetPasswordLinkExpiryMinutes">Vigencia del link de contraseña (minutos)</label>
+              <Controller
+                name="resetPasswordLinkExpiryMinutes"
+                control={control}
+                render={({ field }) => (
+                  <input
+                    id="resetPasswordLinkExpiryMinutes"
+                    type="number"
+                    min={0}
+                    step={1}
+                    className="ff-input"
+                    value={field.value ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value
+                      if (raw === '') { field.onChange(undefined); return }
+                      // Solo enteros >= 0 — un valor negativo o con decimales no tiene sentido acá.
+                      field.onChange(Math.max(0, Math.floor(Number(raw))))
+                    }}
+                  />
+                )}
+              />
+              <p className="ff-hint">
+                Tiempo que un usuario tiene para usar el link de correo antes de que caduque — aplica
+                tanto a "olvidé mi contraseña" como al link que recibe un usuario nuevo para crear su
+                contraseña por primera vez (son el mismo mecanismo, un solo valor cubre ambos casos).
+              </p>
+              {minutesHint && <p className="ff-hint">{minutesHint}</p>}
+              {resetPasswordLinkExpiryMinutes === 0 && (
+                <div className="inline-alert inline-alert-warn" style={{ marginTop: 4 }}>
+                  ⚠️ En 0, el link nunca expira — cualquier link de contraseña enviado queda utilizable
+                  indefinidamente. Es una configuración válida, pero de riesgo; se pedirá confirmación
+                  al guardar.
+                </div>
               )}
-            />
-            <p className="ff-hint">
-              Tiempo que un usuario tiene para usar el link de correo antes de que caduque — aplica
-              tanto a "olvidé mi contraseña" como al link que recibe un usuario nuevo para crear su
-              contraseña por primera vez (son el mismo mecanismo, un solo valor cubre ambos casos).
-            </p>
-            {minutesHint && <p className="ff-hint">{minutesHint}</p>}
-            {resetPasswordLinkExpiryMinutes === 0 && (
-              <div className="inline-alert inline-alert-warn" style={{ marginTop: 4 }}>
-                ⚠️ En 0, el link nunca expira — cualquier link de contraseña enviado queda utilizable
-                indefinidamente. Es una configuración válida, pero de riesgo; se pedirá confirmación
-                al guardar.
-              </div>
-            )}
+            </div>
           </div>
         </div>
-      </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button type="submit" className="btn btn-primary" disabled={saveMutation.isPending}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button type="submit" className="btn btn-primary" disabled={saveMutation.isPending}>
+            <Save size={16} />
+            {saveMutation.isPending ? 'Guardando…' : 'Guardar Cambios'}
+          </button>
+        </div>
+      </form>
+
+      <ModoCreacionPasswordCard />
+    </div>
+  )
+}
+
+// modoCreacionPassword vive en GET/PUT /config/facturacion (UpdateFacturacionConfigDto), no en
+// /config/seguridad — pero visualmente pertenece aquí, junto a la vigencia del link de contraseña.
+function ModoCreacionPasswordCard() {
+  const queryClient = useQueryClient()
+  const { data, isLoading } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+  })
+
+  const [modoCreacionPassword, setModoCreacionPassword] = useState<'email' | 'directo'>('email')
+
+  useEffect(() => {
+    if (data) setModoCreacionPassword(data.modoCreacionPassword ?? 'email')
+  }, [data])
+
+  const saveMutation = useMutation({
+    mutationFn: (dto: Partial<FacturacionConfig>) => updateFacturacionConfig(dto),
+    onSuccess: () => {
+      toast.success('Modo de creación de contraseña actualizado')
+      queryClient.invalidateQueries({ queryKey: ['facturacion-config'] })
+    },
+    onError: (err: any) => toast.error(err?.message || 'Error al guardar el modo de creación de contraseña'),
+  })
+
+  if (isLoading) {
+    return <div className="skeleton-box" style={{ height: 140 }} />
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ShieldCheck size={16} />
+          Creación de contraseñas
+        </span>
+      </div>
+      <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="ff-wrap">
+          <label className="ff-label">Cómo se asigna la contraseña de un usuario nuevo o restablecido</label>
+          <div style={{ maxWidth: 280 }}>
+            <Select
+              value={modoCreacionPassword}
+              onValueChange={(val) => setModoCreacionPassword(val as 'email' | 'directo')}
+            >
+              <SelectItem value="email">Por correo</SelectItem>
+              <SelectItem value="directo">Directo en pantalla</SelectItem>
+            </Select>
+          </div>
+          <p className="ff-hint">
+            "Por correo": al crear un usuario o resetear su contraseña se envía un link por correo
+            (comportamiento actual). "Directo en pantalla": el administrador escribe la contraseña él
+            mismo en el momento, sin enviar ningún correo — útil si el tenant no tiene un canal de
+            email saliente confiable.
+          </p>
+        </div>
+      </div>
+      <div className="card-footer" style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 20px' }}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={saveMutation.isPending}
+          onClick={() => saveMutation.mutate({ modoCreacionPassword })}
+        >
           <Save size={16} />
           {saveMutation.isPending ? 'Guardando…' : 'Guardar Cambios'}
         </button>
       </div>
-    </form>
+    </div>
   )
 }

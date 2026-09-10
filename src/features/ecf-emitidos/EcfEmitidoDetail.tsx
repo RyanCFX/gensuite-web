@@ -8,8 +8,9 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { QRCodeSVG } from 'qrcode.react'
 import { toast } from 'sonner'
-import { ArrowLeft, Receipt, RefreshCw, ExternalLink, AlertTriangle, Info, FileText } from 'lucide-react'
-import { getEcfEmitido, refreshEcfEmitido } from '@/shared/api/ecf-emitidos'
+import { ArrowLeft, Receipt, RefreshCw, RotateCcw, ExternalLink, AlertTriangle, Info, FileText } from 'lucide-react'
+import { getEcfEmitido, refreshEcfEmitido, regenerarEcfEmitido } from '@/shared/api/ecf-emitidos'
+import { Permitido } from '@/components/shared/Permitido'
 import { downloadInvoiceEcfPdfa } from '@/shared/api/invoices'
 import { formatDate, formatDateTime, formatDOP, formatNumber } from '@/lib/formatters'
 import {
@@ -56,6 +57,20 @@ export default function EcfEmitidoDetail() {
   const pdfaMutation = useMutation({
     mutationFn: (docname: string) => downloadInvoiceEcfPdfa(docname, `ecf-${docname}-pdfa.pdf`),
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo generar el PDF/A'),
+  })
+
+  // Solo aplica a un voucher REJECTED — asigna un e-NCF nuevo sobre el MISMO documento (el
+  // invoiceId no cambia). No es exclusivo de Farmacia, pero ese vertical fue el que lo motivó
+  // (docs/FARMACIA_ARS_FRONTEND.md §4.6): tanto "Cobrar despacho" como "Facturar lote" pueden
+  // terminar con un e-CF rechazado que hay que regenerar sin perder el documento ya sometido.
+  const regenerarMutation = useMutation({
+    mutationFn: () => regenerarEcfEmitido(voucherId),
+    onSuccess: (res) => {
+      toast.success(`e-NCF regenerado: ${res.ncf}`)
+      queryClient.invalidateQueries({ queryKey: ['ecf-emitido', voucherId] })
+      queryClient.invalidateQueries({ queryKey: ['ecf-emitidos'] })
+    },
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo regenerar el e-NCF'),
   })
 
   if (isLoading) {
@@ -108,6 +123,18 @@ export default function EcfEmitidoDetail() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {v.status === 'REJECTED' && (
+            <Permitido accion="ecf.emitidos.regenerar">
+              <button
+                className="btn btn-secondary btn-size-sm"
+                disabled={regenerarMutation.isPending}
+                onClick={() => regenerarMutation.mutate()}
+              >
+                <RotateCcw size={14} style={regenerarMutation.isPending ? { animation: 'spin 1s linear infinite' } : undefined} />
+                Regenerar
+              </button>
+            </Permitido>
+          )}
           {canRefresh && (
             <button
               className="btn btn-secondary btn-size-sm"

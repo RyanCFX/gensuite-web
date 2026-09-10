@@ -130,6 +130,7 @@
     },
     "/api/v1/auth/verify-admin-pin": {
       "post": {
+        "description": "Requiere `usuario` (email del dueño del PIN — el PIN por sí solo no identifica a nadie porque varios usuarios pueden compartir el mismo código) y `accion` (determina qué rol se exige, ver ADMIN_PIN_ACTIONS). Cada intento queda auditado — ver GET /auth/admin-pin-log.",
         "operationId": "AuthController_verifyAdminPin",
         "parameters": [
           {
@@ -161,7 +162,55 @@
             "bearer": []
           }
         ],
-        "summary": "Verificar PIN de administrador para override de descuento",
+        "summary": "Autorizar una acción sensible (override de descuento, etc.) con PIN + usuario",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/admin-pin-log": {
+      "get": {
+        "operationId": "AuthController_listAdminPinLog",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Auditoría de autorizaciones con PIN de administrador (éxitos y fallos). Requiere rol System Manager o Auditor.",
         "tags": [
           "Auth"
         ]
@@ -5650,6 +5699,36 @@
         ]
       }
     },
+    "/api/v1/config/farmacia/habilitar": {
+      "post": {
+        "description": "Solo disponible para un tenant cuyo tenants.vertical ya sea \"farmacia\" en el control-plane. Provisiona (idempotente) la cuenta puente CxC ARS - Provisional, el Mode of Payment \"Cobertura ARS\", el Customer Group \"ARS\" y los Role Profile \"Dependiente\"/\"Cajera Farmacia\". Ver docs/plans/PLAN_VERTICAL_FARMACIA_ARS.md Fase 3.",
+        "operationId": "ConfigController_enableFarmaciaVertical",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Terminar de aprovisionar el vertical Farmacia ARS para este tenant",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
     "/api/v1/config/apartados": {
       "get": {
         "operationId": "ConfigController_getLayawayConfig",
@@ -8694,6 +8773,22 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "soloVencidos",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "venceEnDias",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -8707,6 +8802,51 @@
           }
         ],
         "summary": "Listar lotes (batches) activos",
+        "tags": [
+          "Inventario"
+        ]
+      }
+    },
+    "/api/v1/inventory/lotes/sugerido": {
+      "get": {
+        "operationId": "InventoryController_getLoteSugerido",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sugerencia FEFO (First-Expired-First-Out) del lote a despachar para un artículo en un almacén — delega en el nativo `Batch.get_batches_by_oldest` de ERPNext.",
         "tags": [
           "Inventario"
         ]
@@ -11820,6 +11960,44 @@
         ]
       }
     },
+    "/api/v1/ecf/emitidos/{voucherId}/regenerar": {
+      "post": {
+        "description": "Solo aplica a un voucher con estado REJECTED — asigna un e_ncf nuevo sobre el MISMO documento (numero_factura no cambia). No toca montos, GL Entries, Payment Entries ni ningún vínculo del documento (lote, despacho, etc. si aplica). Ver §7.10 del plan de farmacia — general para cualquier Sales Invoice, no exclusivo de ese vertical.",
+        "operationId": "EcfEmitidosController_regenerate",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "voucherId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Regenerar el e-CF de un voucher rechazado por la DGII sobre el mismo documento",
+        "tags": [
+          "Facturación Electrónica (e-CF) — Emitidos"
+        ]
+      }
+    },
     "/api/v1/catalog/categories": {
       "get": {
         "operationId": "CategoriesController_findAll",
@@ -12782,6 +12960,44 @@
           }
         ],
         "summary": "Actualizar solo los precios del artículo (compra y/o venta), sin mandar el resto del payload del artículo",
+        "tags": [
+          "Catalog - Items"
+        ]
+      }
+    },
+    "/api/v1/catalog/items/{id}/imagen": {
+      "post": {
+        "description": "multipart/form-data con el archivo en el campo \"file\" (máx 5MB, límite global del BFF). Devuelve la URL pública ya armada — la misma que trae `image` en las demás respuestas de este módulo.",
+        "operationId": "ItemsController_uploadImagen",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Subir/reemplazar la imagen del artículo",
         "tags": [
           "Catalog - Items"
         ]
@@ -15884,6 +16100,43 @@
         ]
       }
     },
+    "/api/v1/usuarios/buscar-codigo/{codigo}": {
+      "get": {
+        "operationId": "UsuariosController_findByCode",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Buscar usuario por su código de carnet/QR/barcode — para escaneo rápido en POS, override de PIN de administrador, y cualquier otra vista que necesite resolver un usuario sin escribir su email",
+        "tags": [
+          "Usuarios"
+        ]
+      }
+    },
     "/api/v1/usuarios/{email}": {
       "get": {
         "operationId": "UsuariosController_findOne",
@@ -16265,6 +16518,36 @@
           }
         ],
         "summary": "Crear un rol nuevo",
+        "tags": [
+          "Usuarios"
+        ]
+      }
+    },
+    "/api/v1/roles/perfiles": {
+      "get": {
+        "description": "Es la forma recomendada de asignar permisos al crear un usuario: en Frappe los roles son planos (no hay herencia), así que armar la lista a mano deja huecos silenciosos. Debe ir declarado ANTES de GET /roles/:name para que \"perfiles\" no se interprete como el nombre de un rol.",
+        "operationId": "RolesController_getPerfiles",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Perfiles de rol (Role Profile) disponibles, con los roles que agrupa cada uno",
         "tags": [
           "Usuarios"
         ]
@@ -22824,6 +23107,84 @@
         ]
       }
     },
+    "/api/v1/me/permissions": {
+      "get": {
+        "description": "Devuelve `acciones` — el catálogo completo resuelto contra los permisos reales del usuario, un booleano por cada botón/pantalla — más `doctypes` con los flags crudos por si el frontend necesita razonar por su cuenta, y `roles`.\n\nNO refleja el estado del documento: `ventas.factura.someter` sale en `true` si el usuario tiene el permiso `submit`, sin importar si la factura que está viendo ya fue sometida. Para una pantalla de detalle, combinar con GET /me/permissions/:doctype/:name y con el `docstatus` del documento.",
+        "operationId": "MeController_getPermissions",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Permisos del usuario autenticado (nivel sesión)",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/me/permissions/{doctype}/{name}": {
+      "get": {
+        "description": "Evalúa `if_owner`, User Permissions y los controller permissions del doctype — cosas que dependen del documento y que el endpoint de nivel sesión no puede saber. Es lo que deben usar los botones de una pantalla de detalle.\n\n⚠️ No considera `docstatus`: sobre una factura ya sometida sigue devolviendo `submit: 1`, porque el permiso existe — lo que no aplica es el estado.",
+        "operationId": "MeController_getDocumentPermissions",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "doctype",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "example": "Sales Invoice",
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "example": "ACC-SINV-2026-00001",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Permisos del usuario sobre un documento concreto (nivel documento)",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
     "/api/v1/cuentas-bancarias": {
       "get": {
         "operationId": "CuentasBancariasController_findAll",
@@ -26169,6 +26530,1249 @@
           "QZ Tray"
         ]
       }
+    },
+    "/api/v1/dgii/taxpayers/{rnc}": {
+      "get": {
+        "operationId": "DgiiTaxpayersController_findByRnc",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "rnc",
+            "required": true,
+            "in": "path",
+            "description": "RNC (9 dígitos) o Cédula (11 dígitos)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DgiiTaxpayerResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Buscar un contribuyente en el padrón de la DGII por RNC/Cédula",
+        "tags": [
+          "DGII - Padrón de Contribuyentes"
+        ]
+      }
+    },
+    "/api/v1/farmacia/preaprobaciones": {
+      "get": {
+        "operationId": "PreaprobacionesController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Borrador",
+                "Confirmada",
+                "Despachado"
+              ]
+            }
+          },
+          {
+            "name": "aseguradora",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Customer de la ARS",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cliente",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Customer del paciente",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar preaprobaciones ARS",
+        "tags": [
+          "Farmacia ARS — Preaprobaciones"
+        ]
+      },
+      "post": {
+        "operationId": "PreaprobacionesController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePreaprobacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar una nueva preaprobación ARS",
+        "tags": [
+          "Farmacia ARS — Preaprobaciones"
+        ]
+      }
+    },
+    "/api/v1/farmacia/preaprobaciones/{id}": {
+      "get": {
+        "operationId": "PreaprobacionesController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una preaprobación ARS",
+        "tags": [
+          "Farmacia ARS — Preaprobaciones"
+        ]
+      },
+      "put": {
+        "description": "PUT parcial de verdad: `detalle` nunca reemplaza la tabla completa. Cada entrada con `id` (el que devuelve la API en `detalle[].id`) mergea sobre esa línea existente — los campos que no mandes conservan su valor actual — y cualquier línea existente que no aparezca en el array queda intacta. Sin `id`, la entrada crea una línea nueva.",
+        "operationId": "PreaprobacionesController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePreaprobacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar cabecera y/o detalle de la preaprobación",
+        "tags": [
+          "Farmacia ARS — Preaprobaciones"
+        ]
+      }
+    },
+    "/api/v1/farmacia/preaprobaciones/{id}/recalcular": {
+      "post": {
+        "description": "Proxy al método de servidor `recalcular()` del doctype — nunca reimplementado en el BFF. Respeta `lineaBloqueada` en cada línea (ajuste manual de la dependiente).",
+        "operationId": "PreaprobacionesController_recalcular",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Redistribuir la cobertura ARS entre las líneas no bloqueadas",
+        "tags": [
+          "Farmacia ARS — Preaprobaciones"
+        ]
+      }
+    },
+    "/api/v1/farmacia/preaprobaciones/{id}/confirmar": {
+      "post": {
+        "description": "Solo tiene efecto si `diferencia = 0` — el servidor lo exige en `validate()`, no solo este endpoint. Marca `confirmada=1` y el estado pasa a \"Confirmada\".",
+        "operationId": "PreaprobacionesController_confirmar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirmar la preaprobación",
+        "tags": [
+          "Farmacia ARS — Preaprobaciones"
+        ]
+      }
+    },
+    "/api/v1/farmacia/despachos": {
+      "get": {
+        "operationId": "DespachosController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Confirmado",
+                "Cobrado",
+                "Facturado"
+              ]
+            }
+          },
+          {
+            "name": "preaprobacion",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lote",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por lote ya asignado",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sinLote",
+            "required": false,
+            "in": "query",
+            "description": "Solo despachos que todavía NO tienen lote asignado — útil para elegir cuáles agregar a un Lote de Facturación ARS nuevo.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar despachos provisionales ARS",
+        "tags": [
+          "Farmacia ARS — Despachos"
+        ]
+      },
+      "post": {
+        "description": "La Preaprobación debe estar en estado \"Confirmada\" — el servidor lo exige al insertar.",
+        "operationId": "DespachosController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDespachoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Despachar una preaprobación ya confirmada",
+        "tags": [
+          "Farmacia ARS — Despachos"
+        ]
+      }
+    },
+    "/api/v1/farmacia/despachos/cola": {
+      "get": {
+        "description": "Server-Sent Events — reenvía cada 5s el snapshot de despachos en estado \"Confirmado\" (los que esperan cobro). No hay push real desde ERPNext: si la conexión SSE falla, el frontend debe caer a refresco manual (GET /farmacia/despachos?estado=Confirmado).",
+        "operationId": "DespachosController_cola",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cola de cobro de la cajera (SSE)",
+        "tags": [
+          "Farmacia ARS — Despachos"
+        ]
+      }
+    },
+    "/api/v1/farmacia/despachos/{id}": {
+      "get": {
+        "operationId": "DespachosController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un despacho provisional ARS",
+        "tags": [
+          "Farmacia ARS — Despachos"
+        ]
+      }
+    },
+    "/api/v1/farmacia/despachos/{id}/cobrar": {
+      "post": {
+        "description": "Une el monto a cargo del paciente (dto.payments) con la cobertura de la ARS en una sola Sales Invoice, pagada con dos líneas (\"Cobertura ARS\" + lo enviado). Marca el despacho como \"Cobrado\" y enlaza facturaContado.",
+        "operationId": "DespachosController_cobrar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CobrarDespachoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cobrar el despacho — crea y somete la factura de contado del paciente",
+        "tags": [
+          "Farmacia ARS — Despachos"
+        ]
+      }
+    },
+    "/api/v1/farmacia/despachos/{id}/pdf": {
+      "get": {
+        "description": "Solo existe una vez que el despacho fue cobrado. `formato`: \"a4\", \"carta\" o \"a6\" — no hay variante \"pos\" (ticket 80mm) para este documento.",
+        "operationId": "DespachosController_getPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "formato",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "a4",
+                "carta",
+                "a6"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de la factura de contado del paciente (con bloque \"Pago con seguro\")",
+        "tags": [
+          "Farmacia ARS — Despachos"
+        ]
+      }
+    },
+    "/api/v1/farmacia/lotes": {
+      "get": {
+        "operationId": "LotesController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Abierto",
+                "En Revisión",
+                "Facturado"
+              ]
+            }
+          },
+          {
+            "name": "aseguradora",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Customer de la ARS",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar lotes de facturación ARS",
+        "tags": [
+          "Farmacia ARS — Lotes de Facturación"
+        ]
+      },
+      "post": {
+        "operationId": "LotesController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Abrir un nuevo lote de facturación para una ARS",
+        "tags": [
+          "Farmacia ARS — Lotes de Facturación"
+        ]
+      }
+    },
+    "/api/v1/farmacia/lotes/{id}": {
+      "get": {
+        "operationId": "LotesController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un lote de facturación ARS",
+        "tags": [
+          "Farmacia ARS — Lotes de Facturación"
+        ]
+      }
+    },
+    "/api/v1/farmacia/lotes/{id}/recalcular": {
+      "post": {
+        "description": "Proxy al método de servidor — no-op si el lote ya está Facturado.",
+        "operationId": "LotesController_recalcular",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Recalcular cantidad_despachos y monto_total_lote",
+        "tags": [
+          "Farmacia ARS — Lotes de Facturación"
+        ]
+      }
+    },
+    "/api/v1/farmacia/lotes/{id}/despachos": {
+      "post": {
+        "operationId": "LotesController_vincularDespacho",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VincularDespachoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Agregar un despacho al lote",
+        "tags": [
+          "Farmacia ARS — Lotes de Facturación"
+        ]
+      }
+    },
+    "/api/v1/farmacia/lotes/{id}/despachos/{despachoId}": {
+      "delete": {
+        "operationId": "LotesController_desvincularDespacho",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "despachoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Quitar un despacho del lote (antes de facturarlo)",
+        "tags": [
+          "Farmacia ARS — Lotes de Facturación"
+        ]
+      }
+    },
+    "/api/v1/farmacia/lotes/{id}/en-revision": {
+      "put": {
+        "operationId": "LotesController_marcarEnRevision",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Marcar el lote como \"En Revisión\"",
+        "tags": [
+          "Farmacia ARS — Lotes de Facturación"
+        ]
+      }
+    },
+    "/api/v1/farmacia/lotes/{id}/facturar": {
+      "post": {
+        "description": "Irreversible: una vez Facturado, el lote es inmutable (§7.10 del plan). Recalcula cantidad_despachos/monto_total_lote antes de generar la factura.",
+        "operationId": "LotesController_facturar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cerrar el lote — genera la factura consolidada a la ARS",
+        "tags": [
+          "Farmacia ARS — Lotes de Facturación"
+        ]
+      }
+    },
+    "/api/v1/farmacia/lotes/{id}/pdf": {
+      "get": {
+        "description": "Solo existe una vez que el lote fue facturado (POST /:id/facturar).",
+        "operationId": "LotesController_getPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de la factura consolidada a la ARS (con anexo por despacho)",
+        "tags": [
+          "Farmacia ARS — Lotes de Facturación"
+        ]
+      }
+    },
+    "/api/v1/farmacia/reportes/lotes": {
+      "get": {
+        "description": "Filtros: aseguradora, período (desde/hasta), estado.",
+        "operationId": "ReportesFarmaciaController_getLotes",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "aseguradora",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Customer de la ARS",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Abierto",
+                "En Revisión",
+                "Facturado"
+              ]
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "periodo_inicio \u003E= desde (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "periodo_fin \u003C= hasta (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reporte §9.2 — Listado de Lotes",
+        "tags": [
+          "Farmacia ARS — Reportes"
+        ]
+      }
+    },
+    "/api/v1/farmacia/reportes/despachos-ncf": {
+      "get": {
+        "description": "Reporte de auditoría: en qué factura/NCF quedó un despacho específico cuando la ARS reclame o concilie pagos meses después. Solo incluye despachos ya vinculados a un lote.",
+        "operationId": "ReportesFarmaciaController_getDespachosNcf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "aseguradora",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Customer de la ARS",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "periodo_inicio del lote \u003E= desde (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "periodo_fin del lote \u003C= hasta (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reporte §9.3 — Relación Despacho / Lote / NCF",
+        "tags": [
+          "Farmacia ARS — Reportes"
+        ]
+      }
     }
   },
   "info": {
@@ -26182,7 +27786,7 @@
   "tags": [],
   "servers": [
     {
-      "url": "https://gensapi.ryancfx.click",
+      "url": "http://207.180.235.134:4000",
       "description": "API Server"
     }
   ],
@@ -26266,12 +27870,28 @@
         "properties": {
           "pin": {
             "type": "string",
-            "example": "1234",
-            "description": "PIN de administrador"
+            "example": "482913",
+            "description": "PIN de 6 dígitos del usuario autorizador"
+          },
+          "usuario": {
+            "type": "string",
+            "example": "gerente@empresa.com",
+            "description": "Email (name de User en ERPNext) del usuario dueño del PIN. Obligatorio si no se manda `codigoTarjeta` — el PIN por sí solo no identifica a nadie porque varios usuarios pueden compartir el mismo código."
+          },
+          "codigoTarjeta": {
+            "type": "string",
+            "example": "EMP-00231",
+            "description": "Código de carnet/QR/barcode (`custom_admin_code`) del usuario dueño del PIN — alternativa a `usuario` para resolverlo por escaneo. Obligatorio si no se manda `usuario`."
+          },
+          "accion": {
+            "type": "string",
+            "example": "override_descuento",
+            "description": "Acción que se está autorizando (ver ADMIN_PIN_ACTIONS en admin-pin-actions.ts). Determina qué rol se exige al usuario del PIN — nunca se exige ser Administrator, solo tener un rol habilitado para esa acción puntual."
           }
         },
         "required": [
-          "pin"
+          "pin",
+          "accion"
         ]
       },
       "ChangePasswordDto": {
@@ -29385,6 +31005,16 @@
             ],
             "default": "Ambas",
             "description": "Restringe qué tipo de artículo puede usar esta categoría/subcategoría. \"Ambas\" no restringe nada."
+          },
+          "rolesPermitidosVenta": {
+            "example": [
+              "Dispensador Controlados"
+            ],
+            "description": "Roles (nombres exactos de Frappe) autorizados a vender artículos de esta categoría. Vacío u omitido = cualquiera con permiso de venta puede vender artículos de esta categoría (default, sin restricción). Aplicado por ERPNext en cada línea de la Sales Invoice (ver localizacion_rd/permissions_hooks.py::sales_invoice_has_permission).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -29423,6 +31053,16 @@
             ],
             "default": "Ambas",
             "description": "Restringe qué tipo de artículo puede usar esta categoría/subcategoría. \"Ambas\" no restringe nada."
+          },
+          "rolesPermitidosVenta": {
+            "example": [
+              "Dispensador Controlados"
+            ],
+            "description": "Roles (nombres exactos de Frappe) autorizados a vender artículos de esta categoría. Vacío u omitido = cualquiera con permiso de venta puede vender artículos de esta categoría (default, sin restricción). Aplicado por ERPNext en cada línea de la Sales Invoice (ver localizacion_rd/permissions_hooks.py::sales_invoice_has_permission).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "incomeAccount": {
             "type": "string",
@@ -29646,6 +31286,16 @@
               "serial"
             ],
             "default": "none"
+          },
+          "hasExpiryDate": {
+            "type": "boolean",
+            "description": "Campo NATIVO de Item (has_expiry_date), no un custom field. Solo tiene efecto con `trackingType: 'batch'`: hace que ERPNext exija `expiryDate` al crear cada lote y calcule uno automático a partir de `shelfLifeInDays` si no se especifica. Ver docs/plans/PLAN_VERTICAL_FARMACIA_ARS.md Fase 1.",
+            "default": false
+          },
+          "shelfLifeInDays": {
+            "type": "number",
+            "description": "Campo NATIVO de Item (shelf_life_in_days). Días desde la fecha de fabricación del lote hasta su vencimiento — ERPNext lo usa para calcular `expiry_date` cuando el lote se crea sin uno explícito. Solo aplica con `hasExpiryDate: true`.",
+            "example": 730
           }
         },
         "required": [
@@ -29813,6 +31463,16 @@
               "serial"
             ],
             "default": "none"
+          },
+          "hasExpiryDate": {
+            "type": "boolean",
+            "description": "Campo NATIVO de Item (has_expiry_date), no un custom field. Solo tiene efecto con `trackingType: 'batch'`: hace que ERPNext exija `expiryDate` al crear cada lote y calcule uno automático a partir de `shelfLifeInDays` si no se especifica. Ver docs/plans/PLAN_VERTICAL_FARMACIA_ARS.md Fase 1.",
+            "default": false
+          },
+          "shelfLifeInDays": {
+            "type": "number",
+            "description": "Campo NATIVO de Item (shelf_life_in_days). Días desde la fecha de fabricación del lote hasta su vencimiento — ERPNext lo usa para calcular `expiry_date` cuando el lote se crea sin uno explícito. Solo aplica con `hasExpiryDate: true`.",
+            "example": 730
           }
         }
       },
@@ -31516,12 +33176,22 @@
             "type": "string",
             "example": "809-555-0100"
           },
+          "perfiles": {
+            "example": [
+              "Ventas"
+            ],
+            "description": "Perfiles de rol (`Role Profile`) a asignar — la forma recomendada. Cada perfil es un paquete de roles nativos coherente (ver localizacion_rd/provisioning/role_profiles.py); asignarlos evita los huecos silenciosos de armar la lista de roles a mano, porque en Frappe los roles son planos y \"Accounts Manager\" no implica \"Accounts User\". Excluyente con `roles`: los perfiles son autoritativos y Frappe elimina del usuario cualquier rol que no pertenezca a ellos. Ver GET /roles/perfiles.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "roles": {
             "example": [
               "Sales User",
               "Accounts User"
             ],
-            "description": "Lista de roles ERPNext",
+            "description": "Lista de roles ERPNext sueltos. Obligatoria solo si no se envía `perfiles`. Preferir `perfiles` salvo que se necesite una combinación que ningún perfil cubre.",
             "type": "array",
             "items": {
               "type": "string"
@@ -31548,12 +33218,16 @@
             "type": "string",
             "example": "NuevaClave2026!",
             "description": "Contraseña inicial del usuario. Solo se usa (y es obligatoria) cuando el tenant tiene GET /config/facturacion → modoCreacionPassword=\"directo\" — el administrador la define aquí mismo y se la entrega en persona, en vez de mandar un correo con link. Se ignora si el tenant está en modo \"email\"."
+          },
+          "adminCode": {
+            "type": "string",
+            "example": "EMP-00231",
+            "description": "Código de identificación impreso/codificado en un carnet, QR o código de barras — permite buscar rápido a este usuario por escaneo (ver GET /usuarios/buscar-codigo/:codigo) en vez de escribir su email. No es secreto, único por tenant."
           }
         },
         "required": [
           "email",
-          "firstName",
-          "roles"
+          "firstName"
         ]
       },
       "UpdateUsuarioDto": {
@@ -31567,6 +33241,16 @@
           },
           "mobileNo": {
             "type": "string"
+          },
+          "perfiles": {
+            "example": [
+              "Ventas"
+            ],
+            "description": "Perfiles de rol a asignar. Reemplaza por completo los roles del usuario: Frappe elimina los que no pertenezcan a los perfiles enviados. Excluyente con `roles`.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "roles": {
             "type": "array",
@@ -31613,6 +33297,16 @@
             "type": "number",
             "example": 15,
             "description": "Descuento máximo (%) que puede aplicar este usuario en ventas. 0 = sin permiso de descuento."
+          },
+          "adminPin": {
+            "type": "string",
+            "example": "482913",
+            "description": "PIN de 6 dígitos para autorizar acciones sensibles (ver POST /auth/verify-admin-pin). Se hashea antes de guardarse — nunca se puede leer de vuelta, solo reconfigurar. Varios usuarios pueden compartir el mismo PIN sin problema."
+          },
+          "adminCode": {
+            "type": "string",
+            "example": "EMP-00231",
+            "description": "Código de identificación impreso/codificado en un carnet, QR o código de barras — permite buscar rápido a este usuario por escaneo (ver GET /usuarios/buscar-codigo/:codigo) en vez de escribir su email. No es secreto, único por tenant."
           }
         }
       },
@@ -34692,6 +36386,296 @@
         },
         "required": [
           "request"
+        ]
+      },
+      "DgiiTaxpayerResponseDto": {
+        "type": "object",
+        "properties": {
+          "rnc": {
+            "type": "string",
+            "description": "RNC o cédula del contribuyente"
+          },
+          "name": {
+            "type": "string",
+            "description": "Razón social"
+          },
+          "tradeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "businessActivity": {
+            "type": "string",
+            "nullable": true
+          },
+          "registrationDate": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "rnc",
+          "name"
+        ]
+      },
+      "PreaprobacionDetalleItemDto": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "string",
+            "example": "MED-001",
+            "description": "Código del medicamento"
+          },
+          "cantidad": {
+            "type": "number"
+          },
+          "precioUnitario": {
+            "type": "number",
+            "description": "Precio unitario efectivo de esta línea — se sugiere desde el precio de venta del artículo en el frontend, pero el servidor no lo recalcula: el precio de una receta despachada puede diferir del precio de catálogo vigente."
+          },
+          "porcientoTeorico": {
+            "type": "number",
+            "description": "Sugerido según plan/regla de cobertura del ítem — puramente referencial, lo usa \"Recalcular\" para distribuir proporcionalmente. Si se omite, el reparto es simple (a partes iguales entre las líneas no bloqueadas)."
+          },
+          "montoAprobadoArs": {
+            "type": "number",
+            "description": "Monto que la ARS cubre de esta línea. Editable solo por el rol Dependiente en ERPNext (permlevel 1) — si se omite, \"Recalcular\" lo completa."
+          },
+          "lineaBloqueada": {
+            "type": "boolean",
+            "default": false,
+            "description": "Si es true, \"Recalcular\" no toca el `montoAprobadoArs` de esta línea — es el ajuste manual de la dependiente (F4+Enter en el cliente de referencia). Antes de esto era imposible de fijar vía API: el reparto proporcional siempre pisaba todas las líneas."
+          }
+        },
+        "required": [
+          "item",
+          "cantidad",
+          "precioUnitario"
+        ]
+      },
+      "CreatePreaprobacionDto": {
+        "type": "object",
+        "properties": {
+          "aseguradora": {
+            "type": "string",
+            "example": "ARS Humano",
+            "description": "Customer que representa a la ARS"
+          },
+          "numeroAprobacion": {
+            "type": "string",
+            "description": "Tal como lo da la plataforma de la ARS — no es el naming interno del documento."
+          },
+          "cliente": {
+            "type": "string",
+            "description": "Customer que representa al paciente"
+          },
+          "cedula": {
+            "type": "string"
+          },
+          "telefonoPaciente": {
+            "type": "string"
+          },
+          "numeroSeguridadSocial": {
+            "type": "string"
+          },
+          "carnetAfiliado": {
+            "type": "string",
+            "description": "Aparece impreso en la factura de contado junto al número de aprobación — permite a paciente y ARS verificar la venta contra la aprobación original."
+          },
+          "aprobadoPor": {
+            "type": "string"
+          },
+          "fechaAprobacion": {
+            "type": "string"
+          },
+          "valorCoberturaArs": {
+            "type": "number",
+            "description": "Dato FUENTE: lo que digita la dependiente tal cual aparece en la plataforma de la ARS."
+          },
+          "detalle": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreaprobacionDetalleItemDto"
+            }
+          }
+        },
+        "required": [
+          "aseguradora",
+          "numeroAprobacion",
+          "cliente",
+          "carnetAfiliado",
+          "valorCoberturaArs",
+          "detalle"
+        ]
+      },
+      "UpdatePreaprobacionDetalleItemDto": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "string",
+            "example": "MED-001",
+            "description": "Código del medicamento"
+          },
+          "cantidad": {
+            "type": "number"
+          },
+          "precioUnitario": {
+            "type": "number",
+            "description": "Precio unitario efectivo de esta línea — se sugiere desde el precio de venta del artículo en el frontend, pero el servidor no lo recalcula: el precio de una receta despachada puede diferir del precio de catálogo vigente."
+          },
+          "porcientoTeorico": {
+            "type": "number",
+            "description": "Sugerido según plan/regla de cobertura del ítem — puramente referencial, lo usa \"Recalcular\" para distribuir proporcionalmente. Si se omite, el reparto es simple (a partes iguales entre las líneas no bloqueadas)."
+          },
+          "montoAprobadoArs": {
+            "type": "number",
+            "description": "Monto que la ARS cubre de esta línea. Editable solo por el rol Dependiente en ERPNext (permlevel 1) — si se omite, \"Recalcular\" lo completa."
+          },
+          "lineaBloqueada": {
+            "type": "boolean",
+            "default": false,
+            "description": "Si es true, \"Recalcular\" no toca el `montoAprobadoArs` de esta línea — es el ajuste manual de la dependiente (F4+Enter en el cliente de referencia). Antes de esto era imposible de fijar vía API: el reparto proporcional siempre pisaba todas las líneas."
+          },
+          "id": {
+            "type": "string",
+            "description": "ID de una línea ya existente (viene de `detalle[].id` en la respuesta de la API). Si se omite, esta entrada se trata como una línea NUEVA — `item`, `cantidad` y `precioUnitario` pasan a ser obligatorios en ese caso (el servidor los exige igual, aunque el tipo los marque opcionales por heredar de `PartialType`)."
+          }
+        }
+      },
+      "UpdatePreaprobacionDto": {
+        "type": "object",
+        "properties": {
+          "aseguradora": {
+            "type": "string",
+            "example": "ARS Humano",
+            "description": "Customer que representa a la ARS"
+          },
+          "numeroAprobacion": {
+            "type": "string",
+            "description": "Tal como lo da la plataforma de la ARS — no es el naming interno del documento."
+          },
+          "cliente": {
+            "type": "string",
+            "description": "Customer que representa al paciente"
+          },
+          "cedula": {
+            "type": "string"
+          },
+          "telefonoPaciente": {
+            "type": "string"
+          },
+          "numeroSeguridadSocial": {
+            "type": "string"
+          },
+          "carnetAfiliado": {
+            "type": "string",
+            "description": "Aparece impreso en la factura de contado junto al número de aprobación — permite a paciente y ARS verificar la venta contra la aprobación original."
+          },
+          "aprobadoPor": {
+            "type": "string"
+          },
+          "fechaAprobacion": {
+            "type": "string"
+          },
+          "valorCoberturaArs": {
+            "type": "number",
+            "description": "Dato FUENTE: lo que digita la dependiente tal cual aparece en la plataforma de la ARS."
+          },
+          "detalle": {
+            "description": "Líneas a agregar o editar. Cada entrada con `id` mergea sobre esa línea existente (los campos que no mandes conservan su valor actual); sin `id`, se crea una línea nueva. Las líneas existentes que no aparezcan acá NO se tocan ni se eliminan.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpdatePreaprobacionDetalleItemDto"
+            }
+          }
+        }
+      },
+      "CreateDespachoDto": {
+        "type": "object",
+        "properties": {
+          "preaprobacion": {
+            "type": "string",
+            "description": "Preaprobacion ARS a despachar — debe estar en estado \"Confirmada\" (lo exige el servidor al insertar, no este DTO). monto_ars/monto_paciente se derivan de ella."
+          }
+        },
+        "required": [
+          "preaprobacion"
+        ]
+      },
+      "CobrarDespachoDto": {
+        "type": "object",
+        "properties": {
+          "payments": {
+            "description": "Pago(s) del PACIENTE por montoPaciente (efectivo, tarjeta, etc.) — la cobertura de la ARS (montoArs) se agrega sola como línea \"Cobertura ARS\" del lado del servidor, no se envía acá.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentLineDto"
+            }
+          },
+          "vuelto": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VueltoLineDto"
+            }
+          },
+          "tenderedCash": {
+            "type": "number"
+          },
+          "ncfType": {
+            "type": "string",
+            "enum": [
+              "B01",
+              "B02"
+            ],
+            "default": "B02",
+            "description": "B02 (Consumo) si el paciente es persona física sin RNC — el caso normal. B01 (Crédito Fiscal) si el paciente tiene RNC y lo necesita para su propia contabilidad."
+          }
+        },
+        "required": [
+          "payments"
+        ]
+      },
+      "CreateLoteDto": {
+        "type": "object",
+        "properties": {
+          "aseguradora": {
+            "type": "string",
+            "description": "Customer que representa a la ARS"
+          },
+          "periodoInicio": {
+            "type": "string"
+          },
+          "periodoFin": {
+            "type": "string"
+          },
+          "responsable": {
+            "type": "string",
+            "description": "Email de un User de ERPNext"
+          }
+        },
+        "required": [
+          "aseguradora",
+          "periodoInicio",
+          "periodoFin"
+        ]
+      },
+      "VincularDespachoDto": {
+        "type": "object",
+        "properties": {
+          "despachoId": {
+            "type": "string",
+            "description": "Despacho Provisional ARS a agregar a este lote. Debe estar en estado \"Cobrado\" y sin lote asignado todavía — un despacho \"Confirmado\" (sin cobrar) no tiene el asiento contable que sostiene la reclasificación de la factura de lote."
+          }
+        },
+        "required": [
+          "despachoId"
         ]
       }
     }

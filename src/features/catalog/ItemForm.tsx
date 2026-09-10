@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
-import { createItem, updateItem, getItem, listCategories, listBrands } from '@/shared/api/catalog'
+import { createItem, updateItem, getItem, listCategories, listBrands, uploadItemImagen } from '@/shared/api/catalog'
 import type { CreateItemDto } from '@/shared/api/types'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listUOMs, getEmpresa, listItemTaxTemplates } from '@/shared/api/config'
@@ -15,7 +15,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { AttributeSelect } from '@/components/shared/AttributeSelect'
-import { ArrowLeft, Plus, Trash2, HelpCircle } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, HelpCircle, ImagePlus, Loader2 } from 'lucide-react'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 
@@ -45,6 +45,8 @@ const schema = z.object({
   allowsDiscount: z.boolean().optional(),
   maxDiscountPct: z.number().min(0).max(100).optional().catch(undefined),
   trackingType: z.enum(['none', 'batch', 'serial']).optional(),
+  hasExpiryDate: z.boolean().optional(),
+  shelfLifeInDays: z.number().int().min(1).optional().catch(undefined),
   purchaseTaxTemplate: z.string().optional(),
   salesTaxTemplate: z.string().optional(),
 })
@@ -90,6 +92,13 @@ export default function ItemForm() {
   const [barcodes, setBarcodes] = useState<{ barcode: string; barcodeType: string }[]>([])
   const [noPurchaseTax, setNoPurchaseTax] = useState(false)
   const [noSalesTax, setNoSalesTax] = useState(false)
+
+  // ── Foto del artículo ─────────────────────────────────────────────────────
+  // En edición se sube de inmediato (el artículo ya existe). En creación no hay id todavía —
+  // se guarda el archivo y se sube justo después de que el POST de creación responda con el id.
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null)
+  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null)
+  const imageFileInputRef = useRef<HTMLInputElement>(null)
 
   // ── Escáner de código de barras ──────────────────────────────────────────
   // Mismo comportamiento que en facturas/compras: detecta la lectura aunque el foco
@@ -169,9 +178,41 @@ export default function ItemForm() {
     if (isEdit) queryClient.invalidateQueries({ queryKey: ['item', id] })
   }, [isEdit, id], true)
 
+  const uploadImageMutation = useMutation({
+    mutationFn: (file: File) => uploadItemImagen(id!, file),
+    onSuccess: (result) => {
+      setValue('image', result.image, { shouldDirty: false })
+      queryClient.invalidateQueries({ queryKey: ['item', id] })
+      queryClient.invalidateQueries({ queryKey: ['items'] })
+      toast.success('Foto actualizada')
+    },
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al subir la foto'),
+  })
+
+  function handleImageFileSelected(file: File | undefined) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { toast.error('Selecciona un archivo de imagen'); return }
+    if (file.size > 5 * 1024 * 1024) { toast.error('La imagen no puede superar 5MB'); return }
+    if (isEdit && id) {
+      uploadImageMutation.mutate(file)
+    } else {
+      setPendingImagePreview((prev) => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(file) })
+      setPendingImageFile(file)
+    }
+  }
+
   const createMutation = useMutation({
     mutationFn: (data: Parameters<typeof createItem>[0]) => createItem(data),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
+      // El item se crea sin foto (no hay id todavía para POST .../imagen) — si el usuario ya
+      // había elegido un archivo, se sube justo ahora que ya existe el id.
+      if (pendingImageFile) {
+        try {
+          await uploadItemImagen(result.id, pendingImageFile)
+        } catch {
+          toast.error(`${moduleLabel} creado, pero no se pudo subir la foto — agrégala editándolo`)
+        }
+      }
       toast.success(`${moduleLabel} creado con código ${result.id}`)
       const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['items'] })
@@ -240,12 +281,16 @@ export default function ItemForm() {
       allowsDiscount: true,
       maxDiscountPct: 0,
       trackingType: 'none',
+      hasExpiryDate: false,
+      shelfLifeInDays: undefined,
       purchaseTaxTemplate: '',
       salesTaxTemplate: '',
     },
   })
 
   useBeforeUnloadWarning(isDirty)
+
+  useEffect(() => () => { if (pendingImagePreview) URL.revokeObjectURL(pendingImagePreview) }, [pendingImagePreview])
 
   // Precarga el formulario al editar — se corre una sola vez cuando llega el artículo.
   useEffect(() => {
@@ -283,6 +328,8 @@ export default function ItemForm() {
       allowsDiscount: existingItem.allowsDiscount ?? true,
       maxDiscountPct: existingItem.maxDiscountPct ?? 0,
       trackingType: existingItem.trackingType ?? 'none',
+      hasExpiryDate: existingItem.hasExpiryDate ?? false,
+      shelfLifeInDays: existingItem.shelfLifeInDays,
       purchaseTaxTemplate: existingItem.purchaseTaxTemplate ?? '',
       salesTaxTemplate: existingItem.salesTaxTemplate ?? '',
     })
@@ -349,6 +396,11 @@ export default function ItemForm() {
       warrantyPeriod: data.warrantyPeriod || undefined,
       barcodes: barcodes.length > 0 ? barcodes : undefined,
       trackingType: data.trackingType === 'none' ? undefined : data.trackingType,
+      // El servidor rechaza estos dos campos (400) si trackingType no es "batch" — nunca
+      // enviarlos fuera de ese caso, aunque el formulario los haya tocado antes de cambiar de
+      // tipo de seguimiento (docs/FARMACIA_ARS_FRONTEND.md §6.1).
+      hasExpiryDate: data.trackingType === 'batch' ? data.hasExpiryDate : undefined,
+      shelfLifeInDays: data.trackingType === 'batch' ? (data.shelfLifeInDays || undefined) : undefined,
       purchaseTaxTemplate: noPurchaseTax ? undefined : data.purchaseTaxTemplate || undefined,
       salesTaxTemplate: noSalesTax ? undefined : data.salesTaxTemplate || undefined,
     }
@@ -620,13 +672,39 @@ export default function ItemForm() {
               </div>
 
               <div className="ff-wrap">
-                <label className="ff-label" htmlFor="image">Imagen (URL)</label>
-                <input
-                  id="image"
-                  className="ff-input"
-                  placeholder="https://…"
-                  {...register('image')}
-                />
+                <label className="ff-label">Foto</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{
+                    width: 72, height: 72, borderRadius: 'var(--radius-md)', overflow: 'hidden',
+                    border: '1px solid var(--border-default)', background: 'var(--bg-muted)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    {pendingImagePreview || watch('image')
+                      ? <img src={pendingImagePreview || watch('image')} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <ImagePlus size={20} style={{ color: 'var(--text-tertiary)' }} />}
+                  </div>
+                  <div>
+                    <input
+                      ref={imageFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => { handleImageFileSelected(e.target.files?.[0]); e.target.value = '' }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-size-sm"
+                      onClick={() => imageFileInputRef.current?.click()}
+                      disabled={uploadImageMutation.isPending}
+                    >
+                      {uploadImageMutation.isPending
+                        ? <Loader2 size={14} className="spin" />
+                        : <ImagePlus size={14} />}
+                      {watch('image') || pendingImagePreview ? 'Cambiar foto' : 'Subir foto'}
+                    </button>
+                    <p className="ff-hint">JPG o PNG, máx 5MB.</p>
+                  </div>
+                </div>
               </div>
 
               <div className="form-row">
@@ -1111,6 +1189,31 @@ export default function ItemForm() {
                   />
                 </div>
               </div>
+
+              {watch('trackingType') === 'batch' && (
+                <div className="form-row form-row-2" style={{ marginTop: 12 }}>
+                  <div className="ff-wrap">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                      <input type="checkbox" {...register('hasExpiryDate')} />
+                      Requiere fecha de vencimiento por lote
+                    </label>
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="shelfLifeInDays">Vida útil (días)</label>
+                    <input
+                      id="shelfLifeInDays"
+                      className="ff-input"
+                      type="number"
+                      min="1"
+                      step="1"
+                      {...register('shelfLifeInDays', { valueAsNumber: true })}
+                    />
+                    <p className="ff-hint">
+                      Si se omite la fecha de vencimiento al crear un lote, se calcula sumando estos días a la fecha de fabricación.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
