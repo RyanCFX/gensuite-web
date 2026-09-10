@@ -14,7 +14,9 @@ import {
   downloadBalanceGeneralPdf, downloadIngresosEgresosPdf, downloadVentasPdf,
   downloadInventarioValoracionPdf, downloadInventarioMovimientosPdf,
   downloadCxcAgingPdf, downloadCxpAgingPdf, downloadCajaCuadrePdf,
+  getReporteFarmaciaLotes, getReporteFarmaciaDespachosNcf,
 } from '@/shared/api/reportes'
+import { usePermissionsStore } from '@/stores/permissions.store'
 import type { LibroDiarioByDimension, CuadreTurnoRow, CorteCajaDiaTurno, AgingGroupBy } from '@/shared/api/types'
 import { CorteCajaView } from '@/components/shared/CorteCajaView'
 import { listSucursales } from '@/shared/api/sucursales'
@@ -110,6 +112,8 @@ const REPORT_META: Record<string, { label: string; description: string }> = {
   libroMayor:   { label: 'Libro Mayor',          description: 'Movimientos por cuenta con saldo inicial y final' },
   cuadreTurno:  { label: 'Cuadre por Turno',     description: 'Historial de turnos de caja cerrados y su cuadre' },
   corteCajaDia: { label: 'Corte de Caja del Día', description: 'Ventas, ingresos, egresos e importe a entregar del día, consolidado y por turno' },
+  'farmacia-lotes': { label: 'Farmacia ARS — Listado de Lotes', description: 'Lotes de facturación con sus totales y NCF asignado' },
+  'farmacia-despachos-ncf': { label: 'Farmacia ARS — Despacho / Lote / NCF', description: 'Relación entre cada despacho ya vinculado a un lote y el NCF de la consolidada' },
 }
 
 function thisYear() { return new Date().getFullYear() }
@@ -1156,6 +1160,116 @@ function LibroMayorReport() {
 
 // ─── Nav items ────────────────────────────────────────────────────────────────
 
+// ─── Farmacia ARS — reportes de auditoría ────────────────────────────────────
+
+function useAseguradoraFilter(aseguradoraId: string) {
+  const [query, setQuery] = useState('')
+  const { data, isLoading } = useQuery({
+    queryKey: ['customerSearch-ars', query],
+    queryFn: () => listCustomers({ search: query || undefined, limit: 15 }),
+  })
+  const options: SearchSelectOption[] = (data?.items ?? []).map((c) => ({ value: c.id, label: c.customerName }))
+  const label = data?.items.find((c) => c.id === aseguradoraId)?.customerName ?? ''
+  return { options, label, isLoading, onSearch: setQuery }
+}
+
+function FarmaciaLotesReport() {
+  const [aseguradora, setAseguradora] = useState('')
+  const [estado, setEstado] = useState('')
+  const [desde, setDesde] = useState('')
+  const [hasta, setHasta] = useState('')
+  const aseguradoraFilter = useAseguradoraFilter(aseguradora)
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reporte-farmacia-lotes', aseguradora, estado, desde, hasta],
+    queryFn: () => getReporteFarmaciaLotes({ aseguradora: aseguradora || undefined, estado: estado || undefined, desde: desde || undefined, hasta: hasta || undefined }),
+    retry: false,
+  })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <FilterField label="ARS" style={{ width: 200 }}>
+            <SearchSelect
+              value={aseguradora}
+              selectedLabel={aseguradoraFilter.label}
+              onChange={setAseguradora}
+              options={aseguradoraFilter.options}
+              onSearch={aseguradoraFilter.onSearch}
+              loading={aseguradoraFilter.isLoading}
+              placeholder="Todas las ARS"
+            />
+          </FilterField>
+          <FilterField label="Estado">
+            <Select value={estado || 'all'} onValueChange={(val) => setEstado(val === 'all' ? '' : val)}>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="Abierto">Abierto</SelectItem>
+              <SelectItem value="En Revisión">En Revisión</SelectItem>
+              <SelectItem value="Facturado">Facturado</SelectItem>
+            </Select>
+          </FilterField>
+          <FilterField label="Desde">
+            <DatePicker className="filter-select" clearable value={desde} onChange={setDesde} />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="filter-select" clearable value={hasta} onChange={setHasta} />
+          </FilterField>
+        </div>
+      </div>
+      <div className="card">
+        {isLoading && <LoadingRows />}
+        {error && <ErrorBanner err={error} />}
+        {!isLoading && !error && <AutoTable data={data} />}
+      </div>
+    </div>
+  )
+}
+
+function FarmaciaDespachosNcfReport() {
+  const [aseguradora, setAseguradora] = useState('')
+  const [desde, setDesde] = useState('')
+  const [hasta, setHasta] = useState('')
+  const aseguradoraFilter = useAseguradoraFilter(aseguradora)
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reporte-farmacia-despachos-ncf', aseguradora, desde, hasta],
+    queryFn: () => getReporteFarmaciaDespachosNcf({ aseguradora: aseguradora || undefined, desde: desde || undefined, hasta: hasta || undefined }),
+    retry: false,
+  })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="filter-bar">
+        <div className="filter-bar-left">
+          <FilterField label="ARS" style={{ width: 200 }}>
+            <SearchSelect
+              value={aseguradora}
+              selectedLabel={aseguradoraFilter.label}
+              onChange={setAseguradora}
+              options={aseguradoraFilter.options}
+              onSearch={aseguradoraFilter.onSearch}
+              loading={aseguradoraFilter.isLoading}
+              placeholder="Todas las ARS"
+            />
+          </FilterField>
+          <FilterField label="Desde">
+            <DatePicker className="filter-select" clearable value={desde} onChange={setDesde} />
+          </FilterField>
+          <FilterField label="Hasta">
+            <DatePicker className="filter-select" clearable value={hasta} onChange={setHasta} />
+          </FilterField>
+        </div>
+      </div>
+      <div className="card">
+        {isLoading && <LoadingRows />}
+        {error && <ErrorBanner err={error} />}
+        {!isLoading && !error && <AutoTable data={data} />}
+      </div>
+    </div>
+  )
+}
+
 const REPORT_NAV = [
   { key: '606',         group: 'DGII',       label: '606 – Compras' },
   { key: '607',         group: 'DGII',       label: '607 – Ventas' },
@@ -1172,10 +1286,21 @@ const REPORT_NAV = [
   { key: 'corteCajaDia', group: 'Caja',      label: 'Corte de Caja del Día' },
   { key: 'libroDiario', group: 'Contabilidad', label: 'Libro Diario' },
   { key: 'libroMayor',  group: 'Contabilidad', label: 'Libro Mayor' },
+  { key: 'farmacia-lotes', group: 'Farmacia ARS', label: 'Listado de Lotes' },
+  { key: 'farmacia-despachos-ncf', group: 'Farmacia ARS', label: 'Despacho / Lote / NCF' },
 ]
 
 // Reportes que solo tienen sentido con el módulo POS habilitado (Facturacion Config.usaModuloPos).
 const POS_ONLY_REPORT_KEYS = new Set(['caja', 'cuadreTurno', 'corteCajaDia'])
+
+// Solo visibles con tenant.vertical === "farmacia" (docs/FARMACIA_ARS_FRONTEND.md §2.3), y además
+// cada uno detrás de su propia acción del catálogo (§7.1) — a diferencia del resto de reportes,
+// que todavía no están migrados a `acciones`.
+const FARMACIA_REPORT_ACCIONES: Record<string, string> = {
+  'farmacia-lotes': 'farmacia.reportes.lotes.listar',
+  'farmacia-despachos-ncf': 'farmacia.reportes.despachos-ncf.listar',
+}
+const FARMACIA_ONLY_REPORT_KEYS = new Set(Object.keys(FARMACIA_REPORT_ACCIONES))
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -1191,15 +1316,27 @@ export default function ReportesPage() {
     staleTime: 5 * 60_000,
   })
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false
+  const esFarmacia = usePermissionsStore((s) => s.vertical) === 'farmacia'
+  const acciones = usePermissionsStore((s) => s.acciones)
+  const puedeVerReporteFarmacia = (key: string) => {
+    const accion = FARMACIA_REPORT_ACCIONES[key]
+    return !accion || acciones[accion] === true
+  }
 
-  const reportNav = usaModuloPos
-    ? REPORT_NAV
-    : REPORT_NAV.filter((n) => !POS_ONLY_REPORT_KEYS.has(n.key))
+  const reportNav = (usaModuloPos ? REPORT_NAV : REPORT_NAV.filter((n) => !POS_ONLY_REPORT_KEYS.has(n.key)))
+    .filter((n) => esFarmacia || !FARMACIA_ONLY_REPORT_KEYS.has(n.key))
+    .filter((n) => puedeVerReporteFarmacia(n.key))
   const groups = [...new Set(reportNav.map((n) => n.group))]
 
   function renderReport() {
     if (!usaModuloPos && POS_ONLY_REPORT_KEYS.has(active)) {
       return <ServiceUnavailable message="Este reporte requiere el módulo POS habilitado." />
+    }
+    if (FARMACIA_ONLY_REPORT_KEYS.has(active) && !puedeVerReporteFarmacia(active)) {
+      return <ServiceUnavailable message="No tenés permiso para ver este reporte." />
+    }
+    if (!esFarmacia && FARMACIA_ONLY_REPORT_KEYS.has(active)) {
+      return <ServiceUnavailable message="Este reporte requiere el vertical Farmacia ARS." />
     }
     switch (active) {
       case '606':        return <DgiiReport tipo="606" />
@@ -1217,6 +1354,8 @@ export default function ReportesPage() {
       case 'corteCajaDia': return <CorteCajaDiaReport />
       case 'libroDiario': return <LibroDiarioReport />
       case 'libroMayor':  return <LibroMayorReport />
+      case 'farmacia-lotes': return <FarmaciaLotesReport />
+      case 'farmacia-despachos-ncf': return <FarmaciaDespachosNcfReport />
       default:           return <ServiceUnavailable message="Reporte no encontrado." />
     }
   }

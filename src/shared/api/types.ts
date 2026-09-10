@@ -953,6 +953,10 @@ export interface Item {
   allowsDiscount?: boolean;
   maxDiscountPct?: number;
   trackingType?: "none" | "batch" | "serial";
+  /** Nativos de ERPNext (no custom fields), solo tienen efecto si trackingType === "batch" —
+   *  ver docs/FARMACIA_ARS_FRONTEND.md §6.1. Rechazado con 400 si se envían con otro trackingType. */
+  hasExpiryDate?: boolean;
+  shelfLifeInDays?: number;
   purchaseTaxTemplate?: string;
   purchaseTaxPct?: number;
   salesTaxTemplate?: string;
@@ -1008,6 +1012,8 @@ export interface CreateItemDto {
   allowsDiscount?: boolean;
   maxDiscountPct?: number;
   trackingType?: "none" | "batch" | "serial";
+  hasExpiryDate?: boolean;
+  shelfLifeInDays?: number;
   purchaseTaxTemplate?: string;
   salesTaxTemplate?: string;
 }
@@ -1257,6 +1263,13 @@ export interface InventoryLote {
   disabled: boolean;
 }
 
+/** Respuesta de GET /inventory/lotes/sugerido — FEFO real por almacén (docs/FARMACIA_ARS_FRONTEND.md §6.3). */
+export interface LoteSugerido {
+  batchId: string;
+  qtyDisponible: number;
+  expiryDate?: string;
+}
+
 export interface InventorySerial {
   id: string;
   itemCode: string;
@@ -1336,6 +1349,10 @@ export interface Category {
   /** Restringe a qué tipo de artículo puede asignarse esta categoría/subcategoría. Default "Ambas" */
   aplicaA?: CategoriaAplicaA;
   children?: Category[];
+  /** "Medicamentos controlados" (docs/FARMACIA_ARS_FRONTEND.md §8) — restringe la venta de esta
+   *  categoría a usuarios con al menos uno de estos roles. Solo viene en GET de una categoría
+   *  puntual, no en el listado paginado (mismo patrón que incomeAccount/defaultCogsAccount). */
+  rolesPermitidosVenta?: string[];
 }
 
 export interface CreateCategoryDto {
@@ -1344,6 +1361,7 @@ export interface CreateCategoryDto {
   isGroup?: boolean;
   image?: string;
   aplicaA?: CategoriaAplicaA;
+  rolesPermitidosVenta?: string[];
 }
 
 export interface UpdateCategoryDto {
@@ -1356,6 +1374,7 @@ export interface UpdateCategoryDto {
   defaultCogsAccount?: string;
   itemCodePrefix?: string;
   aplicaA?: CategoriaAplicaA;
+  rolesPermitidosVenta?: string[];
 }
 
 export interface Brand {
@@ -3180,6 +3199,17 @@ export interface RefreshEcfEmitidoResult extends EcfEmitidoDetail {
   statusPrevio: EcfStatusDgii;
   /** true si el estado cambió tras consultar a la DGII. */
   cambio: boolean;
+}
+
+/** Respuesta de POST /ecf/emitidos/:voucherId/regenerar — no documentada en openapi.json,
+ * sale de la prosa de docs/FARMACIA_ARS_FRONTEND.md §4.6. */
+export interface RegenerarEcfEmitidoResult {
+  docname: string;
+  ncf: string;
+  status: EcfStatusDgii;
+  qrUrl?: string;
+  securityCode?: string;
+  voucherId: string;
 }
 
 // POST /config/pos/habilitar
@@ -5212,6 +5242,168 @@ export interface SetSeleccionDto {
 }
 
 // ─── DGII — Padrón de Contribuyentes ───────────────────────────────────────
+
+// ─── Permisos (nivel 1/2) ───────────────────────────────────────────────────
+// Ver docs/PROMPT_PERMISOS_FRONTEND.md. Alcance acotado: solo se usa en el vertical Farmacia
+// ARS por ahora (ver docs/FARMACIA_ARS_FRONTEND.md §2) — no se migró el resto de la app.
+
+export type PermisoPtypeFlag = 0 | 1
+
+export interface MePermissions {
+  email: string;
+  roles: string[];
+  /** Flags crudos por DocType — solo aparecen los ptypes otorgados. */
+  doctypes: Record<string, Partial<Record<PermisoPtype, PermisoPtypeFlag>>>;
+  /** Catálogo de acciones con nombre, resuelto contra los permisos reales del usuario. */
+  acciones: Record<string, boolean>;
+  /** No documentado en openapi.json — "general" si el backend no lo envía o envía otra cosa. */
+  vertical: 'general' | 'farmacia';
+}
+
+export interface DocumentPermissions {
+  doctype: string;
+  name: string;
+  permisos: Partial<Record<PermisoPtype, PermisoPtypeFlag>>;
+}
+
+// ─── Farmacia ARS — Preaprobaciones ─────────────────────────────────────────
+// Ver docs/FARMACIA_ARS_FRONTEND.md §3.1. Los DTOs de request están confirmados contra
+// openapi.json; el shape de respuesta (Preaprobacion) no está documentado ahí — sale de los
+// ejemplos de prosa del doc §11, verificar campo por campo contra un backend real.
+
+export type PreaprobacionEstado = 'Borrador' | 'Confirmada' | 'Despachado';
+
+export interface CreatePreaprobacionDetalleItemDto {
+  item: string;
+  cantidad: number;
+  precioUnitario: number;
+  porcientoTeorico?: number;
+  montoAprobadoArs?: number;
+  lineaBloqueada?: boolean;
+}
+
+export interface CreatePreaprobacionDto {
+  aseguradora: string;
+  numeroAprobacion: string;
+  cliente: string;
+  cedula?: string;
+  telefonoPaciente?: string;
+  numeroSeguridadSocial?: string;
+  carnetAfiliado: string;
+  aprobadoPor?: string;
+  fechaAprobacion?: string;
+  valorCoberturaArs: number;
+  detalle: CreatePreaprobacionDetalleItemDto[];
+}
+
+export type UpdatePreaprobacionDto = Partial<Omit<CreatePreaprobacionDto, 'detalle'>> & {
+  detalle?: (Partial<CreatePreaprobacionDetalleItemDto> & { id?: string })[];
+};
+
+export interface PreaprobacionDetalleItem {
+  id: string;
+  item: string;
+  itemName?: string;
+  cantidad: number;
+  precioUnitario: number;
+  precioLinea: number;
+  montoAprobadoArs: number;
+  porcientoReal?: number;
+  montoPaciente: number;
+  lineaBloqueada: boolean;
+}
+
+export interface Preaprobacion {
+  id: string;
+  estado: PreaprobacionEstado;
+  confirmada: boolean;
+  aseguradora: string;
+  aseguradoraName?: string;
+  numeroAprobacion: string;
+  cliente: string;
+  clienteName?: string;
+  cedula?: string;
+  telefonoPaciente?: string;
+  numeroSeguridadSocial?: string;
+  carnetAfiliado: string;
+  aprobadoPor?: string;
+  fechaAprobacion?: string;
+  valorCoberturaArs: number;
+  montoTotalReceta: number;
+  montoDistribuido: number;
+  diferencia: number;
+  porcientoCobertura: number;
+  detalle: PreaprobacionDetalleItem[];
+}
+
+// ─── Farmacia ARS — Despachos ───────────────────────────────────────────────
+
+export type DespachoEstado = 'Confirmado' | 'Cobrado' | 'Facturado';
+
+export interface CreateDespachoDto {
+  preaprobacion: string;
+}
+
+export interface DespachoProvisionalArs {
+  id: string;
+  estado: DespachoEstado;
+  preaprobacion: string;
+  numeroAprobacion?: string;
+  aseguradora?: string;
+  aseguradoraName?: string;
+  cliente?: string;
+  clienteName?: string;
+  carnetAfiliado?: string;
+  montoArs: number;
+  montoPaciente: number;
+  facturaContado?: string;
+  lote?: string;
+}
+
+export interface CobrarDespachoDto {
+  payments: PaymentLine[];
+  vuelto?: VueltoLine[];
+  tenderedCash?: number;
+  ncfType?: 'B01' | 'B02';
+}
+
+export interface CobrarDespachoResult {
+  despachoId: string;
+  invoiceId: string;
+  ncf?: string;
+}
+
+// ─── Farmacia ARS — Lotes de Facturación ────────────────────────────────────
+
+export type LoteFarmaciaEstado = 'Abierto' | 'En Revisión' | 'Facturado';
+
+export interface CreateLoteDto {
+  aseguradora: string;
+  periodoInicio: string;
+  periodoFin: string;
+  responsable?: string;
+}
+
+export interface VincularDespachoDto {
+  despachoId: string;
+}
+
+export interface LoteFacturacionArs {
+  id: string;
+  estado: LoteFarmaciaEstado;
+  aseguradora: string;
+  aseguradoraName?: string;
+  periodoInicio: string;
+  periodoFin: string;
+  responsable?: string;
+  cantidadDespachos: number;
+  montoTotalLote: number;
+  facturaConsolidada?: string;
+  ncfAsignado?: string;
+  /** No existe en openapi.json (solo mencionado en prosa) — ausencia = caso normal. */
+  despachosNoMarcados?: string[];
+  despachos?: DespachoProvisionalArs[];
+}
 
 export interface DgiiTaxpayer {
   /** RNC o cédula del contribuyente */

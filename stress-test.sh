@@ -157,11 +157,15 @@ else
   trap 'rm -rf "$RESULTS_DIR"' EXIT
   END_TS=$(( $(date +%s) + DURATION ))
 
+  ERRORS_LOG="${RESULTS_DIR}/errors.log"
+  : > "$ERRORS_LOG"
+
   worker() {
     local id="$1" count=0 errors=0
     local out="${RESULTS_DIR}/worker_${id}.count"
+    local body_file="${RESULTS_DIR}/worker_${id}.body"
     while [[ "$(date +%s)" -lt "$END_TS" ]]; do
-      local curl_args=(-sS -o /dev/null -w "%{http_code}\n" -X "$METHOD"
+      local curl_args=(-sS -o "$body_file" -w "%{http_code}" -X "$METHOD"
         -H "Authorization: Bearer ${TOKEN}" -H "X-Tenant: ${TENANT}")
       if [[ -n "$BODY_FILE" ]]; then
         curl_args+=(-H "Content-Type: application/json" --data-binary "@${BODY_FILE}")
@@ -169,7 +173,14 @@ else
       local code
       code=$(curl "${curl_args[@]}" "$TARGET_URL" || echo "000")
       count=$((count + 1))
-      [[ "$code" =~ ^2 ]] || errors=$((errors + 1))
+      if [[ ! "$code" =~ ^2 ]]; then
+        errors=$((errors + 1))
+        {
+          echo "[worker ${id}] HTTP ${code} — $(date '+%H:%M:%S')"
+          sed 's/^/    /' "$body_file" 2>/dev/null
+          echo
+        } | tee -a "$ERRORS_LOG" >&2
+      fi
     done
     echo "${count} ${errors}" > "$out"
   }
@@ -193,6 +204,12 @@ else
   echo "Requests con error: ${TOTAL_ERR}"
   echo "Duración:           ${DURATION}s"
   echo "Throughput promedio: $(( TOTAL / DURATION )) req/s"
+
+  if [[ "$TOTAL_ERR" -gt 0 ]]; then
+    echo
+    echo "=== Errores del API ==="
+    cat "$ERRORS_LOG"
+  fi
 fi
 
 echo

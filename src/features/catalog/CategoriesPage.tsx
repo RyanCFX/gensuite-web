@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { listCategories, getCategory, createCategory, updateCategory, deleteCategory } from '@/shared/api/catalog'
+import { getPermisosCatalogo } from '@/shared/api/permisos'
 import type { Category, UpdateCategoryDto } from '@/shared/api/types'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -121,6 +122,14 @@ export default function CategoriesPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Category | null>(null)
   const [toDelete, setToDelete] = useState<Category | null>(null)
+  // Medicamentos controlados (docs/FARMACIA_ARS_FRONTEND.md §8) — vive fuera de react-hook-form,
+  // mismo criterio que `barcodes` en ItemForm.tsx: es un array libre, no un campo escalar.
+  const [rolesPermitidosVenta, setRolesPermitidosVenta] = useState<string[]>([])
+  const { data: permisosCatalogo } = useQuery({
+    queryKey: ['permisos-catalogo'],
+    queryFn: getPermisosCatalogo,
+    staleTime: 5 * 60_000,
+  })
   const [parentCatQuery, setParentCatQuery] = useState('')
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
@@ -222,6 +231,7 @@ export default function CategoriesPage() {
   function openCreate() {
     setEditTarget(null)
     reset({ name: '', parentCategory: '', itemCodePrefix: '', aplicaA: 'Ambas', incomeAccount: '', expenseAccount: '', defaultCogsAccount: '' })
+    setRolesPermitidosVenta([])
     setDialogOpen(true)
   }
 
@@ -236,9 +246,10 @@ export default function CategoriesPage() {
       expenseAccount: (cat as any).expenseAccount ?? '',
       defaultCogsAccount: (cat as any).defaultCogsAccount ?? '',
     })
+    setRolesPermitidosVenta(cat.rolesPermitidosVenta ?? [])
     setDialogOpen(true)
 
-    // La lista/árbol no traen incomeAccount/expenseAccount/defaultCogsAccount:
+    // La lista/árbol no traen incomeAccount/expenseAccount/defaultCogsAccount/rolesPermitidosVenta:
     // se cargan solo en el detalle. Hacemos fetch completo para precargarlos.
     setDetailLoading(true)
     try {
@@ -253,6 +264,7 @@ export default function CategoriesPage() {
         expenseAccount: (full as any).expenseAccount ?? '',
         defaultCogsAccount: (full as any).defaultCogsAccount ?? '',
       })
+      setRolesPermitidosVenta(full.rolesPermitidosVenta ?? [])
     } catch {
       toast.error('No se pudo cargar el detalle completo de la categoría')
     } finally {
@@ -281,6 +293,7 @@ export default function CategoriesPage() {
     // Un servicio nunca genera Costo de Mercancía Vendida (no hay movimiento de inventario que
     // valuar) — se omite aunque el campo tuviera un valor cargado de antes.
     basePayload.defaultCogsAccount = values.aplicaA === 'Servicios' ? undefined : (values.defaultCogsAccount || undefined)
+    basePayload.rolesPermitidosVenta = rolesPermitidosVenta.length > 0 ? rolesPermitidosVenta : undefined
     if (editTarget) {
       updateMutation.mutate({ id: editTarget.id, data: basePayload as UpdateCategoryDto })
     } else {
@@ -602,6 +615,31 @@ export default function CategoriesPage() {
                     <p className="ff-hint">Cuenta que controla el costo real en ventas — es el campo más importante de los tres.</p>
                   </div>
                 )}
+
+                <div className="ff-wrap">
+                  <label className="ff-label">Roles autorizados a vender (opcional)</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {(permisosCatalogo?.roles ?? []).map((role) => (
+                      <label key={role} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={rolesPermitidosVenta.includes(role)}
+                          onChange={(e) =>
+                            setRolesPermitidosVenta((prev) =>
+                              e.target.checked ? [...prev, role] : prev.filter((r) => r !== role),
+                            )
+                          }
+                        />
+                        {role}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="ff-hint">
+                    Vacío = cualquiera con permiso de venta puede vender artículos de esta categoría. Con roles
+                    elegidos, solo un usuario con al menos uno de ellos puede vender un artículo de esta categoría
+                    (ej. "Dispensador Controlados" para medicamentos controlados).
+                  </p>
+                </div>
               </div>
               <div className="modal-foot">
                 <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>

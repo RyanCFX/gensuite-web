@@ -44,8 +44,10 @@ import {
   Printer,
   Wrench,
   ScrollText,
+  Pill,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
+import { usePermissionsStore } from "@/stores/permissions.store";
 import { CommandPalette } from "./CommandPalette";
 import { Toaster } from "sonner";
 import { TabsProvider, useTabs } from "@/contexts/TabsContext";
@@ -269,6 +271,20 @@ const NAV_OPS: NavEntry[] = [
     path: "/proveedores",
   },
 ];
+
+// Solo visible con tenant.vertical === "farmacia" (docs/FARMACIA_ARS_FRONTEND.md §2.3) — se
+// completa a lo largo de las Fases 2-4 (Despachos, Cola de Cobro, Lotes).
+const NAV_FARMACIA: NavGroup = {
+  label: "Farmacia ARS",
+  icon: <Pill size={16} aria-hidden="true" />,
+  prefix: "/farmacia",
+  children: [
+    { label: "Preaprobaciones", icon: <FileText size={14} />, path: "/farmacia/preaprobaciones" },
+    { label: "Despachos", icon: <Truck size={14} />, path: "/farmacia/despachos" },
+    { label: "Cola de Cobro", icon: <DollarSign size={14} />, path: "/farmacia/despachos/cola" },
+    { label: "Lotes de Facturación", icon: <Receipt size={14} />, path: "/farmacia/lotes" },
+  ],
+};
 
 const NAV_FINANZAS: NavEntry[] = [
   {
@@ -581,6 +597,11 @@ const NAV_CONFIG: NavEntry = {
       icon: <Users size={14} />,
       path: "/config/grupos-clientes",
     },
+    {
+      label: "Farmacia ARS",
+      icon: <Pill size={14} />,
+      path: "/config/farmacia",
+    },
     { label: "Usuarios", icon: <UserCog size={14} />, path: "/usuarios" },
     // Administrativos — requieren System Manager en ERPNext, filtrados en el render (ver AppLayoutInner)
     { label: "Permisos", icon: <Lock size={14} />, path: "/config/permisos" },
@@ -605,17 +626,25 @@ const ADMIN_ONLY_PATHS = new Set([
   "/config/ecf/contingencia",
 ]);
 
-// Quita (recursivamente, incluidos los sub-grupos) los ítems de ADMIN_ONLY_PATHS para usuarios
-// sin el rol "System Manager". Un grupo que se queda sin hijos se elimina por completo.
-function stripAdminOnlyEntry(entry: NavEntry): NavEntry | null {
+// Quita (recursivamente, incluidos los sub-grupos) los ítems cuyo `path` está en `excluded`.
+// Un grupo que se queda sin hijos se elimina por completo. Genérica para poder aplicarla tanto
+// a ADMIN_ONLY_PATHS (rol System Manager) como a FARMACIA_ONLY_PATHS (tenant.vertical).
+function stripPathsFromEntry(entry: NavEntry, excluded: Set<string>): NavEntry | null {
   if (isGroup(entry)) {
     const children = entry.children
-      .map(stripAdminOnlyEntry)
+      .map((c) => stripPathsFromEntry(c, excluded))
       .filter((c): c is NavEntry => c !== null);
     return children.length ? { ...entry, children } : null;
   }
-  return ADMIN_ONLY_PATHS.has(entry.path) ? null : entry;
+  return excluded.has(entry.path) ? null : entry;
 }
+
+function stripAdminOnlyEntry(entry: NavEntry): NavEntry | null {
+  return stripPathsFromEntry(entry, ADMIN_ONLY_PATHS);
+}
+
+// Solo visible con tenant.vertical === "farmacia" (docs/FARMACIA_ARS_FRONTEND.md §2.3).
+const FARMACIA_ONLY_PATHS = new Set(["/config/farmacia"]);
 
 // Grupos/ítems de NAV_FINANZAS que solo tienen sentido con el módulo POS habilitado
 // (Facturacion Config.usaModuloPos) — identificados por su `prefix` (grupos) o `path` (ítems sueltos).
@@ -959,11 +988,11 @@ function TabBar() {
               flexShrink: 0,
               cursor: "pointer",
               borderRight: "1px solid var(--border-default)",
-              background: isActive
-                ? "var(--surface-raised, var(--bg-surface))"
-                : "transparent",
+              borderBottom: "2px solid #208591",
+              borderTopRightRadius: 10,
+              background: "transparent",
               borderBottom: isActive
-                ? "2px solid var(--color-primary, #4f46e5)"
+                ? "none"
                 : "2px solid transparent",
               transition: "background 0.12s",
               userSelect: "none",
@@ -988,7 +1017,7 @@ function TabBar() {
                 fontSize: 12,
                 fontWeight: isActive ? 500 : 400,
                 color: isActive
-                  ? "var(--text-primary)"
+                  ? "#208591"
                   : "var(--text-secondary)",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -1035,6 +1064,8 @@ function AppLayoutInner() {
   const userRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuthStore();
   const isSystemManager = user?.roles?.includes("System Manager") ?? false;
+  const vertical = usePermissionsStore((s) => s.vertical);
+  const esFarmacia = vertical === "farmacia";
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ["facturacion-config"],
@@ -1044,9 +1075,12 @@ function AppLayoutInner() {
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false;
   const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true;
 
-  const configNavAdminFiltered: NavEntry = isSystemManager
+  const configNavRoleFiltered: NavEntry = isSystemManager
     ? NAV_CONFIG
     : (stripAdminOnlyEntry(NAV_CONFIG) as NavGroup);
+  const configNavAdminFiltered: NavEntry = esFarmacia
+    ? configNavRoleFiltered
+    : (stripPathsFromEntry(configNavRoleFiltered, FARMACIA_ONLY_PATHS) as NavGroup);
 
   // Sin Impuesto de Documento, las plantillas de Ventas/Compras/Artículo dejan de tener sentido
   // en el menú — colapsa el grupo "Impuestos" a un único ítem plano que va directo al catálogo.
@@ -1182,6 +1216,14 @@ function AppLayoutInner() {
         {!collapsed && <div className="sb-label">Operaciones</div>}
         {NAV_OPS.map((entry) => renderEntry(entry, handleNav, collapsed))}
       </div>
+
+      {/* Farmacia ARS — solo tenants de este vertical */}
+      {esFarmacia && (
+        <div className="sb-section">
+          {!collapsed && <div className="sb-label">Farmacia ARS</div>}
+          {renderEntry(NAV_FARMACIA, handleNav, collapsed)}
+        </div>
+      )}
 
       {/* Finanzas */}
       <div className="sb-section">

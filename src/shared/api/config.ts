@@ -413,3 +413,9 @@ export async function listCurrencies(): Promise<CurrencyOption[]> {
   const res = await client.get<{ success: true; data: CurrencyOption[] }>(ENDPOINTS.config.currencies)
   return unwrap(res)
 }
+
+// POST /config/farmacia/habilitar — sin body, idempotente (docs/FARMACIA_ARS_FRONTEND.md §2.2).
+// Response no documentada en openapi.json.
+export async function habilitarFarmacia(): Promise<void> {
+  await client.post(ENDPOINTS.config.farmaciaHabilitar)
+}

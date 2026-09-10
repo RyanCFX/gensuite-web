@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { listSeriales, listLotes } from '@/shared/api/inventory'
+import { listSeriales, listLotes, getLoteSugerido } from '@/shared/api/inventory'
 import type { TrackedComponent } from './ComponentTrackingModal'
 import { Plus, Trash2 } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -30,9 +30,23 @@ export function TrackedComponentEditor({
     enabled: trackingType === 'batch',
   })
 
+  // FEFO real por almacén (docs/FARMACIA_ARS_FRONTEND.md §6.3) — solo cuando se conoce el
+  // almacén de origen; es una sugerencia (se preselecciona, el usuario igual puede elegir otro
+  // lote a mano), nunca una restricción.
+  const { data: lotesSugeridos } = useQuery({
+    queryKey: ['lotes-sugerido', itemCode, warehouse],
+    queryFn: () => getLoteSugerido({ itemCode, warehouse: warehouse! }),
+    enabled: trackingType === 'batch' && !!warehouse,
+  })
+  const loteSugeridoId = lotesSugeridos?.[0]?.batchId
+
   const [serialToAdd, setSerialToAdd] = useState('')
   const [batchToAdd, setBatchToAdd] = useState('')
   const [batchQtyToAdd, setBatchQtyToAdd] = useState(1)
+
+  useEffect(() => {
+    if (loteSugeridoId && !batchToAdd) setBatchToAdd(loteSugeridoId)
+  }, [loteSugeridoId, batchToAdd])
 
   const batchSum = batches.reduce((s, b) => s + Number(b.qty || 0), 0)
   const unusedSerials = (availableSerials?.items ?? []).filter((s) => !serials.includes(s.id))
@@ -43,9 +57,14 @@ export function TrackedComponentEditor({
     .map((s) => ({ value: s.id, label: s.id }))
 
   const [batchSearch, setBatchSearch] = useState('')
-  const batchOptions: SearchSelectOption[] = (availableLotes?.items ?? [])
+  const batchOptions: SearchSelectOption[] = [...(availableLotes?.items ?? [])]
+    .sort((a, b) => (a.expiryDate ?? '9999-99-99').localeCompare(b.expiryDate ?? '9999-99-99'))
     .filter((l) => !batchSearch || l.id.toLowerCase().includes(batchSearch.toLowerCase()))
-    .map((l) => ({ value: l.id, label: l.id, sublabel: `${l.qty} disp.` }))
+    .map((l) => ({
+      value: l.id,
+      label: l.id,
+      sublabel: `${l.qty} disp.${l.id === loteSugeridoId ? ' — sugerido (FEFO)' : ''}`,
+    }))
 
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 12 }}>
