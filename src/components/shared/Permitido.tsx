@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
-import { usePuede } from '@/shared/permissions/can'
+import { usePuede, type AccionId } from '@/shared/permissions/can'
 
 interface PermitidoProps {
-  accion: string | string[]
+  accion: AccionId | AccionId[]
   fallback?: ReactNode
   children: ReactNode
 }
