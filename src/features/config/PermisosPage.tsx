@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { usePermissionsStore } from '@/stores/permissions.store'
 import { toast } from 'sonner'
 import { ShieldOff, RotateCcw, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -25,6 +26,15 @@ function apiMessage(err: unknown, fallback: string): string {
 export default function PermisosPage() {
   const isSystemManager = useIsSystemManager()
   const queryClient = useQueryClient()
+
+  // Al salir de la pantalla de administración de permisos, refrescar los permisos de la sesión
+  // (docs/PROMPT_PERMISOS_FRONTEND.md §5.2 / §12.2): el administrador pudo haberse cambiado sus
+  // propios permisos y la UI debe reflejarlo sin recargar.
+  useEffect(() => {
+    return () => {
+      usePermissionsStore.getState().fetch()
+    }
+  }, [])
 
   const [doctype, setDoctype] = useState('')
   const [doctypeSearch, setDoctypeSearch] = useState('')

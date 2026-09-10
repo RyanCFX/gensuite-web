@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { usePermissionsStore } from '@/stores/permissions.store'
 import { toast } from 'sonner'
 import { ShieldOff, Ban, CheckCircle2, Trash2, Info } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -19,6 +20,13 @@ export default function RoleDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [confirmDelete, setConfirmDelete] = useState(false)
+
+  // Refrescar permisos de sesión al salir (docs/PROMPT_PERMISOS_FRONTEND.md §5.2 / §12.2).
+  useEffect(() => {
+    return () => {
+      usePermissionsStore.getState().fetch()
+    }
+  }, [])
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['role-detail', roleName],
