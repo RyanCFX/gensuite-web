@@ -32,7 +32,7 @@ export default function PermisosPage() {
   // propios permisos y la UI debe reflejarlo sin recargar.
   useEffect(() => {
     return () => {
-      usePermissionsStore.getState().fetch()
+      usePermissionsStore.getState().refreshSilencioso()
     }
   }, [])
 

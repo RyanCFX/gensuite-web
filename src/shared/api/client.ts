@@ -27,6 +27,16 @@ export function resolveFileUrl(url: string): string {
   return url
 }
 
+// Evita repetir el mismo toast de permiso dentro de una ventana corta (ráfagas de 403).
+const toastPermisoReciente = new Map<string, number>()
+function shouldToastPermiso(message: string): boolean {
+  const ahora = Date.now()
+  const previo = toastPermisoReciente.get(message) ?? 0
+  if (ahora - previo < 4000) return false
+  toastPermisoReciente.set(message, ahora)
+  return true
+}
+
 function normalizeOrderBy(orderBy: string): string {
   if (orderBy.startsWith('-')) return `${orderBy.slice(1)} desc`
   if (!orderBy.includes(' ')) return `${orderBy} asc`
@@ -104,9 +114,14 @@ client.interceptors.response.use(
     // (client.ts → permissions.store.ts → me.ts → client.ts).
     const permCode = data?.error?.code
     if (!isLoginRequest && (permCode === 'PERMISO_INSUFICIENTE' || permCode === 'FORBIDDEN')) {
-      if (data?.error?.message) toast.error(data.error.message)
+      // Toast throttleado: un mismo mensaje puede llegar en ráfaga (react-query reintenta,
+      // varias queries fallan a la vez) — no spamear al usuario con el mismo aviso.
+      const msg = data?.error?.message
+      if (msg && shouldToastPermiso(msg)) toast.error(msg)
       if (permCode === 'PERMISO_INSUFICIENTE') {
-        import('@/stores/permissions.store').then((m) => m.usePermissionsStore.getState().fetch())
+        // Refresco SILENCIOSO: no toca `status`, así ProtectedRoute no re-monta la app (evita el
+        // loop de re-render → re-request → 403 → refresh → ...). Deduplicado en el store.
+        import('@/stores/permissions.store').then((m) => m.usePermissionsStore.getState().refreshSilencioso())
       }
     }
 
