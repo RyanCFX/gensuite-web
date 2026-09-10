@@ -10,6 +10,7 @@ import { formatDOP } from '@/lib/formatters'
 import { X, DollarSign, Loader2 } from 'lucide-react'
 import { Select, SelectItem } from '@/components/ui/select'
 import { Permitido } from '@/components/shared/Permitido'
+import { useTabActiva } from '@/shared/hooks/useTabActiva'
 import type { DespachoProvisionalArs } from '@/shared/api/types'
 
 // El backend documenta esta cola como SSE, pero él mismo aclara que es polling cada 5s
@@ -20,6 +21,7 @@ const COLA_REFETCH_MS = 5_000
 
 export default function ColaCobroPage() {
   const queryClient = useQueryClient()
+  const tabActiva = useTabActiva()
   const [cobrando, setCobrando] = useState<DespachoProvisionalArs | null>(null)
   const [paymentsValue, setPaymentsValue] = useState<PaymentLinesValue>(EMPTY_PAYMENT_LINES_VALUE)
   const [ncfType, setNcfType] = useState<'B01' | 'B02'>('B02')
@@ -27,7 +29,7 @@ export default function ColaCobroPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['farmacia-cola-cobro'],
     queryFn: () => listDespachos({ estado: 'Confirmado', limit: 50 }),
-    refetchInterval: COLA_REFETCH_MS,
+    refetchInterval: tabActiva ? COLA_REFETCH_MS : false,
   })
   const despachos = data?.items ?? []
 

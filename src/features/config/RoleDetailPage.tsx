@@ -24,7 +24,7 @@ export default function RoleDetailPage() {
   // Refrescar permisos de sesión al salir (docs/PROMPT_PERMISOS_FRONTEND.md §5.2 / §12.2).
   useEffect(() => {
     return () => {
-      usePermissionsStore.getState().fetch()
+      usePermissionsStore.getState().refreshSilencioso()
     }
   }, [])
 

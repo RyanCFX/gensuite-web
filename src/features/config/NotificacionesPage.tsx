@@ -7,6 +7,7 @@ import { es } from 'date-fns/locale'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useTabActiva } from '@/shared/hooks/useTabActiva'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -674,6 +675,7 @@ function formatLogDate(iso?: string | null): string {
 }
 
 function HistorialTab() {
+  const tabActiva = useTabActiva()
   // Filters
   const [filtroTipo, setFiltroTipo] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<string>('Todos')
@@ -696,7 +698,9 @@ function HistorialTab() {
   const { data: resumen } = useQuery({
     queryKey: ['notificaciones', 'logs-resumen'],
     queryFn: () => getNotificacionLogResumen(7),
-    refetchInterval: 30_000,
+    // Solo mientras la pestaña está en primer plano — con multipestañas queda viva en caché
+    // (KeepAlive) al navegar a otra sección y un intervalo fijo pollearía para siempre.
+    refetchInterval: tabActiva ? 30_000 : false,
   })
 
   // Fetch logs
