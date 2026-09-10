@@ -304,7 +304,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
 
   useEffect(() => {
     if (!dgiiLookupEnabled || !taxpayerError) return
-    const err = taxpayerError as ApiError
+    const err = taxpayerError as unknown as ApiError
     if (err.statusCode === 404) {
       if (idType === 'RNC') {
         toast.error(`El RNC ${formatRNC(dgiiLookupValue)} no existe en el padrón de la DGII`)

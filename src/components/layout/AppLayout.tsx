@@ -988,7 +988,6 @@ function TabBar() {
               flexShrink: 0,
               cursor: "pointer",
               borderRight: "1px solid var(--border-default)",
-              borderBottom: "2px solid #208591",
               borderTopRightRadius: 10,
               background: "transparent",
               borderBottom: isActive
