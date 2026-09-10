@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { usePermissionsStore } from "@/stores/permissions.store";
+import { resolverRuta } from "@/shared/permissions/rutas";
 import { CommandPalette } from "./CommandPalette";
 import { Toaster } from "sonner";
 import { TabsProvider, useTabs } from "@/contexts/TabsContext";
@@ -643,6 +644,38 @@ function stripAdminOnlyEntry(entry: NavEntry): NavEntry | null {
   return stripPathsFromEntry(entry, ADMIN_ONLY_PATHS);
 }
 
+// Filtra el menú por los permisos del usuario actual (docs/PROMPT_PERMISOS_FRONTEND.md §6).
+// Fuente de verdad: el mismo mapa ruta→acción que usa el guard de router (`RUTAS_PERMISOS`).
+// - Ítem sin entrada en el mapa → se deja pasar (fail-open); la seguridad real la aplica el backend.
+// - `soloFarmacia` / `soloSystemManager` se evalúan antes que `acciones` (§6 / §15).
+// - Un grupo cuyos hijos quedan todos ocultos no se renderiza (no dejar carpetas vacías).
+function filtrarNavPorPermisos(
+  entry: NavEntry,
+  ctx: { acciones: Record<string, boolean>; esFarmacia: boolean; isSystemManager: boolean },
+): NavEntry | null {
+  if (isGroup(entry)) {
+    const children = entry.children
+      .map((c) => filtrarNavPorPermisos(c, ctx))
+      .filter((c): c is NavEntry => c !== null);
+    return children.length ? { ...entry, children } : null;
+  }
+  const ruta = resolverRuta(entry.path);
+  if (!ruta) return entry;
+  if (ruta.soloFarmacia && !ctx.esFarmacia) return null;
+  if (ruta.soloSystemManager && !ctx.isSystemManager) return null;
+  if (ruta.accion && ctx.acciones[ruta.accion] !== true) return null;
+  return entry;
+}
+
+function filtrarNavList(
+  entries: NavEntry[],
+  ctx: { acciones: Record<string, boolean>; esFarmacia: boolean; isSystemManager: boolean },
+): NavEntry[] {
+  return entries
+    .map((e) => filtrarNavPorPermisos(e, ctx))
+    .filter((e): e is NavEntry => e !== null);
+}
+
 // Solo visible con tenant.vertical === "farmacia" (docs/FARMACIA_ARS_FRONTEND.md §2.3).
 const FARMACIA_ONLY_PATHS = new Set(["/config/farmacia"]);
 
@@ -1065,6 +1098,8 @@ function AppLayoutInner() {
   const isSystemManager = user?.roles?.includes("System Manager") ?? false;
   const vertical = usePermissionsStore((s) => s.vertical);
   const esFarmacia = vertical === "farmacia";
+  const acciones = usePermissionsStore((s) => s.acciones);
+  const permCtx = { acciones, esFarmacia, isSystemManager };
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ["facturacion-config"],
@@ -1093,11 +1128,22 @@ function AppLayoutInner() {
             : item,
         ),
       };
-  const financeNav: NavEntry[] = usaModuloPos
+  const financeNavPos: NavEntry[] = usaModuloPos
     ? NAV_FINANZAS
     : NAV_FINANZAS.filter(
         (entry) => !POS_ONLY_NAV_KEYS.has(isGroup(entry) ? entry.prefix : entry.path),
       );
+
+  // Filtrado final por permisos del usuario (docs/PROMPT_PERMISOS_FRONTEND.md §6). Se aplica
+  // después de los filtros de negocio (POS, Impuesto de Documento) y de rol/vertical.
+  const mainNav = filtrarNavList(NAV_MAIN, permCtx);
+  const ventasNav = filtrarNavList(NAV_VENTAS, permCtx);
+  const opsNav = filtrarNavList(NAV_OPS, permCtx);
+  const farmaciaNav = filtrarNavPorPermisos(NAV_FARMACIA, permCtx);
+  const financeNav = filtrarNavList(financeNavPos, permCtx);
+  const contabilidadNav = filtrarNavList(NAV_CONTABILIDAD, permCtx);
+  const reportesNav = filtrarNavPorPermisos(NAV_REPORTES, permCtx);
+  const configNavPermFiltered = filtrarNavPorPermisos(configNav, permCtx);
   const { tabs, activeId, closeTab, multiTab, keepAliveRef } = useTabs();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1193,62 +1239,59 @@ function AppLayoutInner() {
   const sidebarContent = (
     <>
       {/* Menú principal */}
-      <div className="sb-section">
-        {NAV_MAIN.map((item) => (
-          <NavItemBtn
-            key={item.path}
-            item={item}
-            onNav={handleNav}
-            collapsed={collapsed}
-          />
-        ))}
-      </div>
+      {mainNav.length > 0 && (
+        <div className="sb-section">
+          {mainNav.map((entry) => renderEntry(entry, handleNav, collapsed))}
+        </div>
+      )}
 
       {/* Ventas */}
-      <div className="sb-section">
-        {!collapsed && <div className="sb-label">Ventas</div>}
-        {NAV_VENTAS.map((entry) => renderEntry(entry, handleNav, collapsed))}
-      </div>
+      {ventasNav.length > 0 && (
+        <div className="sb-section">
+          {!collapsed && <div className="sb-label">Ventas</div>}
+          {ventasNav.map((entry) => renderEntry(entry, handleNav, collapsed))}
+        </div>
+      )}
 
       {/* Operaciones */}
-      <div className="sb-section">
-        {!collapsed && <div className="sb-label">Operaciones</div>}
-        {NAV_OPS.map((entry) => renderEntry(entry, handleNav, collapsed))}
-      </div>
+      {opsNav.length > 0 && (
+        <div className="sb-section">
+          {!collapsed && <div className="sb-label">Operaciones</div>}
+          {opsNav.map((entry) => renderEntry(entry, handleNav, collapsed))}
+        </div>
+      )}
 
       {/* Farmacia ARS — solo tenants de este vertical */}
-      {esFarmacia && (
+      {esFarmacia && farmaciaNav && (
         <div className="sb-section">
           {!collapsed && <div className="sb-label">Farmacia ARS</div>}
-          {renderEntry(NAV_FARMACIA, handleNav, collapsed)}
+          {renderEntry(farmaciaNav, handleNav, collapsed)}
         </div>
       )}
 
       {/* Finanzas */}
-      <div className="sb-section">
-        {!collapsed && <div className="sb-label">Finanzas</div>}
-        {financeNav.map((entry) => renderEntry(entry, handleNav, collapsed))}
-      </div>
+      {financeNav.length > 0 && (
+        <div className="sb-section">
+          {!collapsed && <div className="sb-label">Finanzas</div>}
+          {financeNav.map((entry) => renderEntry(entry, handleNav, collapsed))}
+        </div>
+      )}
 
       {/* Contabilidad */}
-      <div className="sb-section">
-        {!collapsed && <div className="sb-label">Contabilidad</div>}
-        {NAV_CONTABILIDAD.map((item) => (
-          <NavItemBtn
-            key={item.path}
-            item={item}
-            onNav={handleNav}
-            collapsed={collapsed}
-          />
-        ))}
-      </div>
+      {contabilidadNav.length > 0 && (
+        <div className="sb-section">
+          {!collapsed && <div className="sb-label">Contabilidad</div>}
+          {contabilidadNav.map((entry) => renderEntry(entry, handleNav, collapsed))}
+        </div>
+      )}
 
       {/* Footer */}
       <div className="sb-footer">
-        {renderEntry(NAV_REPORTES, handleNav, collapsed, {
-          floatWhenCollapsed: true,
-        })}
-        {renderEntry(configNav, handleNav, collapsed)}
+        {reportesNav &&
+          renderEntry(reportesNav, handleNav, collapsed, {
+            floatWhenCollapsed: true,
+          })}
+        {configNavPermFiltered && renderEntry(configNavPermFiltered, handleNav, collapsed)}
       </div>
     </>
   );

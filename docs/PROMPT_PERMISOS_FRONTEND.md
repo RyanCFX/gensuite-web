@@ -42,7 +42,8 @@ Hay tres capas. El frontend solo consume la tercera.
 | **Catálogo de acciones** | El BFF, expuesto vía API | Traduce "permiso sobre un documento" a **identificadores de botón** que el frontend entiende |
 
 El frontend nunca razona sobre DocTypes ni sobre roles. Razona sobre **acciones**:
-`ventas.factura.someter`, `catalogo.items.crear`, `tesoreria.emision.anular`. Hay **226**.
+`ventas.factura.someter`, `catalogo.items.crear`, `tesoreria.emision.anular`. Hay **368**, sobre
+113 pantallas.
 
 ---
 
@@ -54,7 +55,7 @@ Esta es la parte que hay que entender bien, porque usar el nivel equivocado prod
 
 `GET /api/v1/me/permissions`
 
-Devuelve, para el usuario autenticado, **un booleano por cada una de las 226 acciones**. Se pide
+Devuelve, para el usuario autenticado, **un booleano por cada una de las 368 acciones**. Se pide
 **una vez al iniciar sesión** y se guarda en memoria.
 
 Sirve para todo lo que no depende de un documento concreto:
@@ -130,6 +131,7 @@ X-Tenant: <slug del tenant>
   "success": true,
   "data": {
     "email": "maria@empresa.com",
+    "vertical": "general",
     "roles": ["Accounts User", "All", "Desk User", "Gastos RD", "Purchase User"],
     "doctypes": {
       "Purchase Invoice": { "read": 1, "write": 1, "create": 1, "submit": 1, "cancel": 1, "amend": 1, "print": 1 },
@@ -150,13 +152,22 @@ X-Tenant: <slug del tenant>
 **Campos:**
 
 - `email` — usuario autenticado.
-- `roles` — roles de ERPNext. **No los uses para decidir la UI.** Están para depurar y para
-  pantallas de administración. Decidir por rol es exactamente el error que este sistema viene a
-  eliminar: los roles de ERPNext no heredan entre sí y razonar sobre ellos produce huecos.
+- `vertical` — `"general"` o `"farmacia"`. **No es parte del sistema de permisos** — es una
+  propiedad del TENANT, no del usuario, y no varía según quién pregunte. Gatea pantallas
+  enteras que solo existen para el vertical de farmacia (venta de medicamentos, cobertura ARS):
+  si `vertical !== "farmacia"`, ni siquiera mostrés esas rutas en el menú, sin importar qué diga
+  `acciones` — el backend las rechaza con un mecanismo aparte (`VerticalGuard`) que no tiene
+  nada que ver con roles ni con `DocPerm`.
+- `roles` — roles de ERPNext. **No los uses para decidir la UI de negocio.** Decidir por rol
+  es exactamente el error que este sistema viene a eliminar: los roles de ERPNext no heredan
+  entre sí y razonar sobre ellos produce huecos. La ÚNICA excepción legítima son las pantallas de
+  **meta-administración** (§15) que el propio backend gatea por rol y no por acción — ej.
+  mostrar "Administrar roles y permisos" o "Conectar Aura (e-CF)" solo si `roles` incluye
+  `'System Manager'`. Fuera de esos casos puntuales, no lo uses.
 - `doctypes` — flags crudos por tipo de documento. Solo aparecen los flags **otorgados**; un
   flag ausente significa "no". Un DocType ausente significa "ningún permiso". Úsalo solo si
   necesitás una regla que el catálogo no cubre.
-- `acciones` — **esto es lo que se usa el 99% del tiempo.** Siempre trae las 226 claves, cada
+- `acciones` — **esto es lo que se usa el 99% del tiempo.** Siempre trae las 368 claves, cada
   una `true` o `false`. Nunca falta una: si no aparece, es un bug del backend, no un permiso
   denegado.
 
@@ -290,6 +301,13 @@ const puedeVerCompras =
 
 Un módulo cuyas sub-pantallas están todas denegadas no debe aparecer como carpeta vacía.
 
+Las pantallas exclusivas del vertical Farmacia se esconden con una condición aparte, **antes**
+de siquiera consultar `acciones`:
+
+```ts
+const puedeVerFarmacia = data.vertical === 'farmacia'; // no es un permiso, es del tenant
+```
+
 ---
 
 ## 7. Esconder botones
@@ -399,6 +417,12 @@ Distinguí dos códigos distintos:
 | `FORBIDDEN` | Vino de ERPNext, más abajo | Mostrar el mensaje; puede ser un permiso más fino |
 
 Un `401` con token expirado es otra cosa: ahí se cierra sesión.
+
+> **Corrección post-entrega (2026-09-10):** la primera versión de este documento describía el
+> endpoint de nivel 2 correctamente, pero el servidor tenía un defecto que lo hacía mentir en la
+> práctica — devolvía `write: 1`/`submit: 1` para restricciones como Compras/Gastos, sin
+> evaluarlas. Ya está corregido en el backend; si tu implementación es anterior a esta fecha y
+> viste botones habilitados que el servidor después rechazaba, no era un bug del frontend.
 
 ---
 
@@ -516,8 +540,11 @@ Cosas que este sistema **no** cubre. No intentes suplirlas en el cliente.
    cliente: duplicarías lógica y la tuya sería la incorrecta.
 4. **Esconder no es proteger.** Todo lo que el frontend esconde sigue siendo alcanzable por API.
    Está bien: el servidor lo bloquea.
-5. **179 rutas del API todavía no declaran permiso** (§15). Sus pantallas no se pueden esconder
-   con este mecanismo todavía.
+5. **Un puñado de rutas son autoservicio puro y no tienen acción en el catálogo** — ej.
+   `GET/PUT /config/perfil` (el usuario edita su propio perfil) o
+   `GET/PUT /impresoras/mi-seleccion` (qué impresora eligió para sí mismo). No busques un id de
+   acción para ellas en `acciones`: no existe, a propósito. Mostralas siempre a cualquier usuario
+   autenticado — el servidor ya las resuelve sin depender de rol. Ver §15.
 
 ---
 
@@ -531,6 +558,7 @@ Cosas que este sistema **no** cubre. No intentes suplirlas en el cliente.
 - [ ] Validación ruidosa de identificadores inexistentes en desarrollo
 - [ ] Tipos generados a partir de las claves de `acciones`
 - [ ] Mapa ruta → acción de lectura, aplicado al menú **y** al router
+- [ ] Pantallas del vertical Farmacia gateadas por `data.vertical`, no por `acciones`
 - [ ] Módulos del menú visibles si al menos una sub-pantalla lo está
 - [ ] Botón "Nuevo" de cada listado detrás de su acción `.crear`
 - [ ] Pantallas de detalle: pedir nivel 2 junto con el documento
@@ -542,57 +570,71 @@ Cosas que este sistema **no** cubre. No intentes suplirlas en el cliente.
 - [ ] Refrescar permisos al salir de la pantalla de administración
 - [ ] No filtrar listados por permisos en el cliente
 - [ ] No persistir permisos en `localStorage`
+- [ ] Pantallas de meta-administración (roles, permisos, e-CF admin) gateadas por
+      `roles.includes('System Manager')`, no por una acción del catálogo — no existe una
 
 ---
 
-## 15. Rutas del API sin permiso declarado
+## 15. Cobertura del backend
 
-**179 de 523 rutas** todavía no declaran permiso en el backend (65.8% de cobertura). Sus
-pantallas **no se pueden esconder** con este mecanismo por ahora; mostralas a todo el mundo y
-dejá que el servidor rechace lo que corresponda.
+**Cobertura completa: 540/540 rutas (100%).** Toda ruta del API está en uno de estos tres
+estados — no queda ninguna sin resolver:
 
-Módulos afectados, de mayor a menor:
-
-| Módulo | Rutas |
+| Estado | Qué significa para el frontend |
 |---|---|
-| Configuración | 81 |
-| Reportes (606/607/608) | 27 |
-| Ubicaciones de inventario | 13 |
-| Notificaciones | 10 |
-| Centros de costo | 6 |
-| Departamentos | 6 |
-| Impresoras | 6 |
-| Zonas de inventario | 5 |
-| Perfiles POS | 5 |
-| Sucursales | 5 |
-| Dashboard | 4 |
-| Administración e-CF | 4 |
-| Bancos | 3 |
-| Archivos | 2 |
-| QZ Tray | 2 |
+| **Declara una acción** | Aparece en `acciones` de `/me/permissions` (§4.1). Es la inmensa mayoría — las 368 acciones del §16 |
+| **Exenta** | No aparece en `acciones` porque no lo necesita: autoservicio (`config/perfil`, `impresoras/mi-seleccion`), infraestructura pública (login, health check, el certificado de QZ Tray, el webhook de la DGII) o los adjuntos servidos por URL directa (`files/*`) |
+| **Meta-administración** | Gatea con rol (`System Manager`), no con una acción del catálogo — la administración de permisos/roles/e-CF y los triggers manuales de cron. Si tu pantalla es "administrar roles" o "conectar Aura", no busques una acción: es binario, la tiene o no la tiene un `System Manager` |
 
-Cuando el backend las cubra, aparecerán acciones nuevas en `acciones` sin romper nada: el
-frontend solo tendrá que agregarlas a su mapa de rutas y botones.
-
-Hay además **12 rutas exentas por diseño** (login, health check, autoservicio de permisos,
-webhook de la DGII) que nunca van a exigir permiso.
+Para el frontend esto quiere decir: **cualquier pantalla del sistema ya se puede esconder con
+lo que describe este documento.** No hay ningún módulo pendiente de que el backend lo cubra.
 
 ---
 
 ## 16. Catálogo completo de acciones
 
-**226 acciones sobre 59 pantallas.** Esta es la lista definitiva de identificadores. La columna
+**368 acciones sobre 113 pantallas.** Esta es la lista definitiva de identificadores. La columna
 "Permiso ERPNext" es informativa —el frontend no la necesita— pero ayuda a entender por qué dos
 botones distintos a veces se habilitan juntos.
 
 La columna "Marcador" indica que además del permiso se exige un rol marcador; ya viene resuelto
-en `acciones` (§11).
+en `acciones` (§11). Solo dos acciones lo usan: `Compras RD` y `Gastos RD`, sobre las pantallas
+de Compras/Gastos — el resto del catálogo (incluidas todas las pantallas de Configuración,
+Reportes y catálogos horizontales agregadas en esta revisión) no lo necesita.
 
 #### Aging de Cobros/Proveedores
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
 |---|---|---|---|
 | `cobros.aging.exportar` | Descargar PDF | `Payment Entry.report` | — |
+
+#### Ajustes de Compras
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.buying-settings.ver` | Ver | `Buying Settings.read` | — |
+| `config.buying-settings.editar` | Editar | `Buying Settings.write` | — |
+
+#### Ajustes de Contabilidad
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.accounts-settings.ver` | Ver | `Accounts Settings.read` | — |
+| `config.accounts-settings.editar` | Editar | `Accounts Settings.write` | — |
+
+#### Ajustes de Inventario
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.stock-settings.ver` | Ver | `Stock Settings.read` | — |
+| `config.stock-settings.editar` | Editar | `Stock Settings.write` | — |
+
+#### Ajustes de Ventas
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.selling-settings.ver` | Ver | `Selling Settings.read` | — |
+| `config.selling-settings.editar` | Editar | `Selling Settings.write` | — |
 
 #### Asientos
 
@@ -611,6 +653,21 @@ en `acciones` (§11).
 | `catalogo.atributos.crear` | Nuevo | `Item Attribute.create` | — |
 | `catalogo.atributos.editar` | Editar | `Item Attribute.write` | — |
 
+#### Balance General
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.contabilidad.balance-general.ver` | Ver | `Account.report` | — |
+| `reportes.contabilidad.balance-general.imprimir` | Descargar PDF | `Account.print` | — |
+
+#### Bancos
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `tesoreria.bancos.listar` | Ver | `Bank.read` | — |
+| `tesoreria.bancos.crear` | Nuevo | `Bank.create` | — |
+| `tesoreria.bancos.editar` | Editar | `Bank.write` | — |
+
 #### Caja — Pendientes de Cobro
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
@@ -618,6 +675,46 @@ en `acciones` (§11).
 | `caja.cobrar` | Cobrar | `Payment Entry.create` | — |
 | `caja.listar` | Ver | `Sales Invoice.read` | — |
 | `caja.descartar` | Descartar | `Payment Entry.write` | — |
+
+#### Cajas POS
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `pos.cajas.listar` | Ver | `POS Profile.read` | — |
+| `pos.cajas.crear` | Nueva | `POS Profile.create` | — |
+| `pos.cajas.editar` | Editar | `POS Profile.write` | — |
+| `pos.cajas.eliminar` | Eliminar | `POS Profile.delete` | — |
+
+#### Canal de Email
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `notificaciones.canales-email.ver` | Ver | `Email Account.read` | — |
+| `notificaciones.canales-email.editar` | Editar | `Email Account.write` | — |
+
+#### Catálogo de Bancos
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.bancos.ver` | Ver | `Bank.read` | — |
+
+#### Catálogo de Monedas
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.currencies.ver` | Ver | `Currency.read` | — |
+
+#### Catálogo de Países
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.paises.ver` | Ver | `Country.read` | — |
+
+#### Catálogos Fiscales
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.catalogos-fiscales.ver` | Ver | `Facturacion Config.read` | — |
 
 #### Categorías
 
@@ -627,6 +724,15 @@ en `acciones` (§11).
 | `catalogo.categorias.crear` | Nueva | `Item Group.create` | — |
 | `catalogo.categorias.editar` | Editar | `Item Group.write` | — |
 | `catalogo.categorias.eliminar` | Eliminar | `Item Group.delete` | — |
+
+#### Centros de Costo
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `contabilidad.centros-costo.listar` | Ver | `Cost Center.read` | — |
+| `contabilidad.centros-costo.crear` | Nuevo | `Cost Center.create` | — |
+| `contabilidad.centros-costo.editar` | Editar | `Cost Center.write` | — |
+| `contabilidad.centros-costo.eliminar` | Eliminar | `Cost Center.delete` | — |
 
 #### Cheques
 
@@ -667,6 +773,14 @@ en `acciones` (§11).
 | `cobros.pago.listar` | Ver | `Payment Entry.read` | — |
 | `cobros.pago.editar` | Editar / Aplicar saldo a favor | `Payment Entry.write` | — |
 
+#### Cola de Cobro (Cajera)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `farmacia.despachos.cola` | Ver | `Despacho Provisional ARS.read` | — |
+| `farmacia.despachos.cobrar` | Cobrar | `Despacho Provisional ARS.write + Sales Invoice.create + Sales Invoice.submit` | — |
+| `farmacia.despachos.imprimir` | Imprimir factura de contado | `Sales Invoice.read` | — |
+
 #### Combos
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
@@ -682,6 +796,34 @@ en `acciones` (§11).
 |---|---|---|---|
 | `compras.factura.listar` | Ver | `Purchase Invoice.read` | — |
 | `compras.factura.crear` | Nueva | `Purchase Invoice.create` | Compras RD |
+
+#### Configuración de Apartados
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.apartados.ver` | Ver | `Layaway Config.read` | — |
+| `config.apartados.editar` | Editar | `Layaway Config.write` | — |
+
+#### Configuración de Cobros
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.cobros.ver` | Ver | `Cobros Config.read` | — |
+| `config.cobros.editar` | Editar | `Cobros Config.write` | — |
+
+#### Configuración de Facturación
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.facturacion.ver` | Ver | `Facturacion Config.read` | — |
+| `config.facturacion.editar` | Editar | `Facturacion Config.write` | — |
+| `config.pos.habilitar` | Habilitar módulo POS | `Facturacion Config.write` | — |
+
+#### Configuración de Farmacia
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.farmacia.habilitar` | Habilitar vertical Farmacia ARS | `Farmacia Config.write` | — |
 
 #### Configuración e-CF
 
@@ -704,6 +846,13 @@ en `acciones` (§11).
 |---|---|---|---|
 | `config.ecf.contingencia.administrar` | Activar / Desactivar / Transmitir diferidos | `Facturacion Electronica Config.write` | — |
 
+#### Corte de Caja del Día
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.pos.corte-caja-dia.ver` | Ver | `POS Closing Entry.report` | — |
+| `reportes.pos.corte-caja-dia.imprimir` | Descargar PDF | `POS Closing Entry.print` | — |
+
 #### Costos de Importación
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
@@ -712,6 +861,20 @@ en `acciones` (§11).
 | `compras.costos-importacion.crear` | Nuevo | `Landed Cost Voucher.create` | — |
 | `compras.costos-importacion.someter` | Someter | `Landed Cost Voucher.submit` | — |
 | `compras.costos-importacion.anular` | Anular | `Landed Cost Voucher.cancel` | — |
+
+#### Cuadre de Caja
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.caja.cuadre.ver` | Ver | `Payment Entry.report` | — |
+| `reportes.caja.cuadre.imprimir` | Descargar PDF | `Payment Entry.print` | — |
+
+#### Cuadre de Turno POS
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.pos.cuadre-turno.ver` | Ver | `POS Closing Entry.report` | — |
+| `reportes.pos.cuadre-turno.imprimir` | Descargar PDF | `POS Closing Entry.print` | — |
 
 #### Cuentas Bancarias
 
@@ -731,6 +894,36 @@ en `acciones` (§11).
 | `catalogo.cuentas-pagar.eliminar` | Eliminar | `Account.delete` | — |
 | `catalogo.cuentas-pagar.editar` | Editar / Deshabilitar | `Account.write` | — |
 
+#### Dashboard
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `dashboard.ver` | Ver resumen, actividad reciente, top productos/clientes | `Sales Invoice.report` | — |
+
+#### Datos de la Empresa
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.empresa.ver` | Ver | `Company.read` | — |
+| `config.empresa.editar` | Editar | `Company.write` | — |
+
+#### Denominaciones de Billetes
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.denominaciones.listar` | Ver | `Denominacion Billete.read` | — |
+| `config.denominaciones.crear` | Nueva | `Denominacion Billete.create` | — |
+| `config.denominaciones.editar` | Editar | `Denominacion Billete.write` | — |
+
+#### Departamentos
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `departamentos.listar` | Ver | `Department.read` | — |
+| `departamentos.crear` | Nuevo | `Department.create` | — |
+| `departamentos.editar` | Editar | `Department.write` | — |
+| `departamentos.eliminar` | Eliminar | `Department.delete` | — |
+
 #### Depósito (ingreso)
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
@@ -748,6 +941,13 @@ en `acciones` (§11).
 | `catalogo.descuentos.listar` | Ver | `Pricing Rule.read` | — |
 | `catalogo.descuentos.crear` | Nueva regla | `Pricing Rule.create` | — |
 | `catalogo.descuentos.editar` | Editar / Activar-Desactivar | `Pricing Rule.write` | — |
+
+#### Despachos ARS
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `farmacia.despachos.listar` | Ver | `Despacho Provisional ARS.read` | — |
+| `farmacia.despachos.crear` | Despachar preaprobación confirmada | `Despacho Provisional ARS.create` | — |
 
 #### Detalle de Artículo
 
@@ -837,6 +1037,7 @@ en `acciones` (§11).
 | `ecf.emitidos.listar` | Ver | `Sales Invoice.read` | — |
 | `ecf.emitidos.refrescar` | Refrescar estado | `Sales Invoice.report` | — |
 | `ecf.emitidos.imprimir` | Descargar PDF-A | `Sales Invoice.print` | — |
+| `ecf.emitidos.regenerar` | Regenerar e-CF rechazado | `Sales Invoice.write` | — |
 
 #### e-CF Recibidos
 
@@ -845,6 +1046,16 @@ en `acciones` (§11).
 | `ecf.recibidos.listar` | Ver | `Purchase Invoice.read` | — |
 | `ecf.recibidos.cargar-xml` | Cargar XML / Vincular | `Purchase Invoice.write` | Compras RD |
 | `ecf.recibidos.aceptar-rechazar` | Aceptar / Rechazar | `Purchase Invoice.write` | Compras RD |
+
+#### Ejercicios Fiscales
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.ejercicio-fiscal.listar` | Ver | `Fiscal Year.read` | — |
+| `config.ejercicio-fiscal.crear` | Nuevo | `Fiscal Year.create` | — |
+| `config.ejercicio-fiscal.editar` | Editar | `Fiscal Year.write` | — |
+| `config.ejercicio-fiscal.cerrar` | Cerrar | `Fiscal Year.write` | — |
+| `config.ejercicio-fiscal.reabrir` | Reabrir | `Fiscal Year.write` | — |
 
 #### Emisión (egreso)
 
@@ -888,7 +1099,49 @@ en `acciones` (§11).
 |---|---|---|---|
 | `clientes.grupos.listar` | Ver | `Customer Group.read` | — |
 | `clientes.grupos.crear` | Nuevo | `Customer Group.create` | — |
+| `clientes.grupos.editar` | Editar | `Customer Group.write` | — |
 | `clientes.grupos.eliminar` | Eliminar | `Customer Group.delete` | — |
+
+#### Grupos de Proveedores
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.grupos-proveedores.listar` | Ver | `Supplier Group.read` | — |
+| `config.grupos-proveedores.crear` | Nuevo | `Supplier Group.create` | — |
+| `config.grupos-proveedores.editar` | Editar | `Supplier Group.write` | — |
+| `config.grupos-proveedores.eliminar` | Eliminar | `Supplier Group.delete` | — |
+
+#### Historial de Notificaciones
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `notificaciones.logs.listar` | Ver | `Notificacion Log.read` | — |
+
+#### Impresoras
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `impresoras.listar` | Ver | `POS Profile.read` | — |
+| `impresoras.administrar` | Nueva / Editar / Eliminar | `POS Profile.write` | — |
+
+#### Impuestos de Compras
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.impuestos-compras.ver` | Ver | `Purchase Taxes and Charges Template.read` | — |
+
+#### Impuestos de Ventas
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.impuestos-ventas.ver` | Ver | `Sales Taxes and Charges Template.read` | — |
+
+#### Ingresos y Egresos
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.contabilidad.ingresos-egresos.ver` | Ver | `Journal Entry.report` | — |
+| `reportes.contabilidad.ingresos-egresos.imprimir` | Descargar PDF | `Journal Entry.print` | — |
 
 #### Inventario
 
@@ -929,6 +1182,27 @@ en `acciones` (§11).
 | `catalogo.items.crear` | Nuevo | `Item.create` | — |
 | `catalogo.items.activar` | Activar/Desactivar | `Item.write` | — |
 
+#### Listas de Precio
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.listas-precio.listar` | Ver | `Price List.read` | — |
+| `config.listas-precio.crear` | Nueva | `Price List.create` | — |
+| `config.listas-precio.editar` | Editar | `Price List.write` | — |
+| `config.listas-precio.eliminar` | Eliminar | `Price List.delete` | — |
+
+#### Lotes de Facturación ARS
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `farmacia.lotes.listar` | Ver | `Lote de Facturacion ARS.read` | — |
+| `farmacia.lotes.crear` | Nuevo | `Lote de Facturacion ARS.create` | — |
+| `farmacia.lotes.recalcular` | Recalcular totales | `Lote de Facturacion ARS.write` | — |
+| `farmacia.lotes.marcar-en-revision` | Marcar "En Revisión" | `Lote de Facturacion ARS.write` | — |
+| `farmacia.lotes.vincular-despacho` | Agregar / Quitar despacho | `Lote de Facturacion ARS.write + Despacho Provisional ARS.write` | — |
+| `farmacia.lotes.facturar` | Facturar (cerrar lote) | `Lote de Facturacion ARS.write + Sales Invoice.create + Sales Invoice.submit + Despacho Provisional ARS.write` | — |
+| `farmacia.lotes.imprimir` | Imprimir factura consolidada | `Sales Invoice.read` | — |
+
 #### Marcas
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
@@ -938,11 +1212,26 @@ en `acciones` (§11).
 | `catalogo.marcas.editar` | Editar | `Brand.write` | — |
 | `catalogo.marcas.eliminar` | Eliminar | `Brand.delete` | — |
 
+#### Métodos de Pago
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.metodos-pago.listar` | Ver | `Mode of Payment.read` | — |
+| `config.metodos-pago.crear` | Nuevo | `Mode of Payment.create` | — |
+| `config.metodos-pago.editar` | Editar | `Mode of Payment.write` | — |
+
 #### Movimientos de Banco
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
 |---|---|---|---|
 | `tesoreria.movimientos-banco.listar` | Ver | `Bank Account.read` | — |
+
+#### Movimientos de Inventario
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.inventario.movimientos.ver` | Ver | `Stock Ledger Entry.report` | — |
+| `reportes.inventario.movimientos.imprimir` | Descargar PDF | `Stock Ledger Entry.print` | — |
 
 #### Notas de Crédito
 
@@ -1002,6 +1291,22 @@ en `acciones` (§11).
 | `plantillas.impresion.eliminar` | Eliminar | `Plantilla Impresion RD.delete` | — |
 | `plantillas.impresion.editar` | Guardar / Usar plantilla | `Plantilla Impresion RD.write` | — |
 
+#### Plantillas de Impuesto por Artículo
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.item-tax-templates.ver` | Ver | `Item Tax Template.read` | — |
+
+#### Preaprobaciones ARS
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `farmacia.preaprobaciones.listar` | Ver | `Preaprobacion ARS.read` | — |
+| `farmacia.preaprobaciones.crear` | Nueva | `Preaprobacion ARS.create` | — |
+| `farmacia.preaprobaciones.editar` | Editar detalle / Distribuir cobertura | `Preaprobacion ARS.write` | — |
+| `farmacia.preaprobaciones.recalcular` | Recalcular distribución | `Preaprobacion ARS.write` | — |
+| `farmacia.preaprobaciones.confirmar` | Confirmar | `Preaprobacion ARS.write` | — |
+
 #### Proveedores
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
@@ -1036,11 +1341,67 @@ en `acciones` (§11).
 |---|---|---|---|
 | `cobros.pago.crear` | Guardar | `Payment Entry.create` | — |
 
+#### Reporte de Ventas
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.ventas.ver` | Ver | `Sales Invoice.report` | — |
+| `reportes.ventas.imprimir` | Descargar PDF | `Sales Invoice.print` | — |
+
+#### Reporte DGII 606
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.dgii606.ver` | Ver / Exportar | `Purchase Invoice.report` | — |
+
+#### Reporte DGII 607
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.dgii607.ver` | Ver / Exportar | `Sales Invoice.report` | — |
+
+#### Reporte DGII 608
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.dgii608.ver` | Ver / Exportar | `Sales Invoice.report` | — |
+
+#### Reportes Farmacia ARS
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `farmacia.reportes.lotes.listar` | Ver — Listado de Lotes | `Lote de Facturacion ARS.read` | — |
+| `farmacia.reportes.despachos-ncf.listar` | Ver — Relación Despacho/Lote/NCF | `Despacho Provisional ARS.read + Preaprobacion ARS.read + Lote de Facturacion ARS.read` | — |
+
+#### Retenciones
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.retenciones.listar` | Ver | `Tax Withholding Category.read` | — |
+| `config.retenciones.crear` | Nueva | `Tax Withholding Category.create` | — |
+| `config.retenciones.editar` | Editar | `Tax Withholding Category.write` | — |
+| `config.retenciones.eliminar` | Eliminar | `Tax Withholding Category.delete` | — |
+
 #### Secuencias e-CF
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
 |---|---|---|---|
 | `config.ecf.secuencias.administrar` | Crear / Editar / Anular rangos | `Facturacion Electronica Config.write` | — |
+
+#### Secuencias NCF (físico)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.ncf.listar` | Ver | `Secuencia NCF.read` | — |
+| `config.ncf.crear` | Nueva | `Secuencia NCF.create` | — |
+| `config.ncf.editar` | Editar / Habilitar / Deshabilitar | `Secuencia NCF.write` | — |
+
+#### Seguridad
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.seguridad.ver` | Ver | `System Settings.read` | — |
+| `config.seguridad.editar` | Editar | `System Settings.write` | — |
 
 #### Solicitud de Compra
 
@@ -1056,6 +1417,24 @@ en `acciones` (§11).
 | `compras.solicitud.anular` | Anular | `Material Request.cancel` | — |
 | `compras.solicitud.enmendar` | Enmendar | `Material Request.amend` | — |
 
+#### Sucursales
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `sucursales.listar` | Ver | `Branch.read` | — |
+| `sucursales.crear` | Nueva | `Branch.create` | — |
+| `sucursales.editar` | Editar | `Branch.write` | — |
+| `sucursales.eliminar` | Eliminar | `Branch.delete` | — |
+
+#### Tasas de Impuesto
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.tasas-impuesto.listar` | Ver | `Tasa Impuesto RD.read` | — |
+| `config.tasas-impuesto.crear` | Nueva | `Tasa Impuesto RD.create` | — |
+| `config.tasas-impuesto.editar` | Editar | `Tasa Impuesto RD.write` | — |
+| `config.tasas-impuesto.eliminar` | Eliminar | `Tasa Impuesto RD.delete` | — |
+
 #### Tipos de Documento
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
@@ -1063,6 +1442,14 @@ en `acciones` (§11).
 | `tesoreria.tipos-documento.crear` | Nuevo | `Bank Document Type.create` | — |
 | `tesoreria.tipos-documento.listar` | Ver | `Bank Document Type.read` | — |
 | `tesoreria.tipos-documento.editar` | Editar / Deshabilitar | `Bank Document Type.write` | — |
+
+#### Tipos de Notificación
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `notificaciones.tipos.listar` | Ver | `Notificacion Tipo.read` | — |
+| `notificaciones.tipos.editar` | Editar | `Notificacion Tipo.write` | — |
+| `notificaciones.tipos.probar` | Probar | `Notificacion Tipo.write` | — |
 
 #### Transferencia Interna
 
@@ -1092,6 +1479,29 @@ en `acciones` (§11).
 | `pos.turno.imprimir-cierre` | Descargar PDF (cierre) | `POS Closing Entry.print` | — |
 | `pos.turno.abrir` | Abrir turno | `POS Opening Entry.create` | — |
 
+#### Ubicaciones de Inventario
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `inventario.ubicaciones.listar` | Ver | `Almacen Ubicacion.read` | — |
+| `inventario.ubicaciones.crear` | Nueva | `Almacen Ubicacion.create` | — |
+| `inventario.ubicaciones.editar` | Editar | `Almacen Ubicacion.write` | — |
+| `inventario.ubicaciones.eliminar` | Eliminar | `Almacen Ubicacion.delete` | — |
+| `inventario.ubicaciones.asignar` | Asignar artículo | `Item Ubicacion.create` | — |
+| `inventario.ubicaciones.editar-asignacion` | Editar asignación | `Item Ubicacion.write` | — |
+| `inventario.ubicaciones.quitar-asignacion` | Quitar asignación | `Item Ubicacion.delete` | — |
+| `inventario.ubicaciones.mover` | Mover artículos entre ubicaciones | `Item Ubicacion.write + Stock Entry.create` | — |
+| `inventario.ubicaciones.distribuir` | Distribuir entre ubicaciones | `Item Ubicacion.write` | — |
+
+#### Unidades de Medida
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.uom.listar` | Ver | `UOM.read` | — |
+| `config.uom.crear` | Nueva | `UOM.create` | — |
+| `config.uom.editar` | Editar | `UOM.write` | — |
+| `config.uom.eliminar` | Eliminar | `UOM.delete` | — |
+
 #### Usuarios
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
@@ -1099,6 +1509,22 @@ en `acciones` (§11).
 | `usuarios.crear` | Nuevo | `User.create` | — |
 | `usuarios.listar` | Ver | `User.read` | — |
 | `usuarios.editar` | Editar / Deshabilitar / Restablecer contraseña | `User.write` | — |
+
+#### Valoración de Inventario
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.inventario.valoracion.ver` | Ver | `Item.report` | — |
+| `reportes.inventario.valoracion.imprimir` | Descargar PDF | `Item.print` | — |
+
+#### Zonas de Almacén
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `inventario.zonas.listar` | Ver | `Almacen Zona.read` | — |
+| `inventario.zonas.crear` | Nueva | `Almacen Zona.create` | — |
+| `inventario.zonas.editar` | Editar | `Almacen Zona.write` | — |
+| `inventario.zonas.eliminar` | Eliminar | `Almacen Zona.delete` | — |
 
 #### Zonas y Ubicaciones
 

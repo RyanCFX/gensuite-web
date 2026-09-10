@@ -1,5 +1,6 @@
 import axios from 'axios'
 import * as Sentry from '@sentry/react'
+import { toast } from 'sonner'
 import { getToken, getTenant, clearSession } from './storage'
 import type { ApiError, ApiErrorResponse, ApiResponse, PaginatedResponse } from './types'
 
@@ -94,12 +95,19 @@ client.interceptors.response.use(
       return Promise.reject(data.error)
     }
 
-    // La caché de permisos (docs/PROMPT_PERMISOS_FRONTEND.md §9) puede haber quedado vieja —
-    // refrescarla en segundo plano para que la UI se corrija sola sin recargar. Import dinámico
-    // a propósito: un import estático de vuelta crearía un ciclo real
+    // Errores de permiso (docs/PROMPT_PERMISOS_FRONTEND.md §9). Ambos códigos muestran el
+    // `message` del backend TAL CUAL (ya viene en español y nombra el botón y la pantalla; no se
+    // reescribe). Solo `PERMISO_INSUFICIENTE` implica que la caché de permisos pudo quedar vieja
+    // — se refresca en segundo plano para que la UI se corrija sola sin recargar. `FORBIDDEN`
+    // viene de ERPNext más abajo y puede ser un permiso más fino: solo se informa.
+    // Import dinámico a propósito: un import estático de vuelta crearía un ciclo real
     // (client.ts → permissions.store.ts → me.ts → client.ts).
-    if (!isLoginRequest && data?.error?.code === 'PERMISO_INSUFICIENTE') {
-      import('@/stores/permissions.store').then((m) => m.usePermissionsStore.getState().fetch())
+    const permCode = data?.error?.code
+    if (!isLoginRequest && (permCode === 'PERMISO_INSUFICIENTE' || permCode === 'FORBIDDEN')) {
+      if (data?.error?.message) toast.error(data.error.message)
+      if (permCode === 'PERMISO_INSUFICIENTE') {
+        import('@/stores/permissions.store').then((m) => m.usePermissionsStore.getState().fetch())
+      }
     }
 
     // 5xx: falla real del backend (no un error de validación del usuario) — se reporta como
