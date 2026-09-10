@@ -18,6 +18,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { formatDateTime, formatDate } from '@/lib/formatters'
+import { useTabActiva } from '@/shared/hooks/useTabActiva'
 
 const PAGE_SIZE = 20
 
@@ -40,6 +41,7 @@ const STATUS_LABEL: Record<RepostValuacionStatus, string> = {
 export default function RepostValuacionPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const tabActiva = useTabActiva()
 
   // ── Formulario ──────────────────────────────────────────────────────────
   const [itemCode, setItemCode] = useState('')
@@ -91,7 +93,15 @@ export default function RepostValuacionPage() {
     queryFn: () => listRepostsValuacion({ limit: PAGE_SIZE, offset }),
     // Trabajo de background que puede tardar minutos — un refresco espaciado (no agresivo) más
     // el botón "Actualizar" es suficiente; no tiene sentido pollear cada pocos segundos.
-    refetchInterval: 45_000,
+    // Solo se pollea mientras haya un recálculo en curso: con multipestañas la pantalla queda
+    // viva en caché (KeepAlive) al navegar a otra sección, y un intervalo fijo seguiría
+    // disparando llamadas para siempre en segundo plano aunque no haya nada que seguir.
+    refetchInterval: (query) => {
+      if (!tabActiva) return false
+      const rows = query.state.data?.items ?? []
+      const enCurso = rows.some((r) => r.status === 'Queued' || r.status === 'In Progress')
+      return enCurso ? 45_000 : false
+    },
   })
 
   const items = data?.items ?? []
