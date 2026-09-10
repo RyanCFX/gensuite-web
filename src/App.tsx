@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Navigate } from 'react-router-dom'
 import { SentryRoutes as Routes } from '@/lib/sentry'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { RequireAccion } from '@/components/RequireAccion'
 import AppLayout from '@/components/layout/AppLayout'
 import LoginPage from '@/pages/LoginPage'
 import NotFoundPage from '@/pages/NotFoundPage'
@@ -173,6 +174,7 @@ export default function App() {
 
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
+           <Route element={<RequireAccion />}>
             <Route path="/dashboard" element={<Suspense fallback={<PageLoader />}><DashboardPage /></Suspense>} />
             <Route path="/inicio" element={<StartPage />} />
 
@@ -389,6 +391,7 @@ export default function App() {
             <Route path="/config/auditoria-pin" element={<Suspense fallback={<PageLoader />}><AdminPinLogPage /></Suspense>} />
             <Route path="/config/:seccion" element={<Suspense fallback={<PageLoader />}><ConfigPage /></Suspense>} />
             <Route path="/config" element={<Navigate to="/config/empresa" replace />} />
+           </Route>
 
           </Route>
         </Route>
