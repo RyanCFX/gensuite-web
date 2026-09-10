@@ -2470,6 +2470,11 @@ export interface CreateUsuarioDto {
   maxDiscountPct?: number;
   /** Código de carnet/QR/barcode del empleado — permite buscarlo luego con GET /usuarios/buscar-codigo/:codigo. */
   adminCode?: string;
+  /** Contraseña inicial del usuario. Solo se usa (y es obligatoria) cuando el tenant tiene
+   *  GET /config/facturacion → modoCreacionPassword="directo" — el administrador la define aquí
+   *  mismo y se la entrega en persona, en vez de mandar un correo con link. Se ignora si el
+   *  tenant está en modo "email". */
+  password?: string;
 }
 
 export interface UpdateUsuarioDto {
@@ -2485,6 +2490,14 @@ export interface UpdateUsuarioDto {
   defaultPosProfile?: string;
   /** Código de carnet/QR/barcode del empleado — permite buscarlo luego con GET /usuarios/buscar-codigo/:codigo. */
   adminCode?: string;
+}
+
+export interface ResetPasswordUsuarioDto {
+  /** Nueva contraseña. Solo se usa (y es obligatoria) cuando el tenant tiene
+   *  GET /config/facturacion → modoCreacionPassword="directo" — el administrador la define aquí
+   *  mismo y se la entrega en persona, en vez de mandar un correo con link. Se ignora si el
+   *  tenant está en modo "email". */
+  newPassword?: string;
 }
 
 export interface Role {
@@ -2741,6 +2754,11 @@ export interface FacturacionConfig {
   requiereUbicacionVenta?: boolean;
   /** Si está activo, al comprar un artículo con tracking de serial/lote exige capturar los mismos en la línea de compra. */
   requiereSerialLoteCompra?: boolean;
+  /** "email" (default): al crear un usuario (POST /usuarios) o resetear su contraseña (POST /usuarios/:email/reset-password)
+   *  se genera un link y se manda por correo (comportamiento histórico). "directo": el administrador escribe la contraseña
+   *  él mismo en el momento (`password` en la creación, `newPassword` en el reset) y se fija de una vez en ERPNext sin
+   *  enviar ningún correo — útil si el tenant no tiene canal de email saliente confiable. */
+  modoCreacionPassword?: "email" | "directo";
   /** Si está en false, oculta el selector de Departamento (opcional, análogo a Sucursal) en los formularios de Factura, Cotización, Pedido, Cobro, Compra y Gasto. Puramente de presentación — no afecta documentos ya guardados con departamento. Default true. */
   usaDepartamentos?: boolean;
   /** Si está en false, oculta el selector de plantilla de Impuesto de Documento en Factura, Cotización y Compra. Puramente de presentación. Default true. */

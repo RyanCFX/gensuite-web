@@ -8,6 +8,7 @@ import type {
   PaginationParams,
   UsuarioSucursales,
   UsuarioAlmacenesPermitidos,
+  ResetPasswordUsuarioDto,
 } from './types'
 
 export async function listUsuarios(params?: PaginationParams) {
@@ -47,8 +48,8 @@ export async function enableUsuario(email: string) {
   return unwrap(res)
 }
 
-export async function resetPasswordUsuario(email: string) {
-  await client.post(ENDPOINTS.usuarios.resetPassword(email))
+export async function resetPasswordUsuario(email: string, data?: ResetPasswordUsuarioDto) {
+  await client.post(ENDPOINTS.usuarios.resetPassword(email), data)
 }
 
 export async function listRoles(): Promise<Array<{ id: string; label: string; }>> {

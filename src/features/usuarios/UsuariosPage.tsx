@@ -7,9 +7,11 @@ import {
 } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listCajas } from '@/shared/api/cajas'
+import { getFacturacionConfig } from '@/shared/api/config'
+import { getNotificacionCanalEmail } from '@/shared/api/notificaciones'
 import type { ApiError, Usuario, CreateUsuarioDto, UpdateUsuarioDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { ConfirmModal } from '@/shared/ui/Modal'
+import { ConfirmModal, Modal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
@@ -30,6 +32,28 @@ function apiMessage(err: unknown, fallback: string): string {
 
 type ConfirmType = { type: 'disable'; user: Usuario } | { type: 'enable'; user: Usuario } | null
 
+// mostrarPasswordEnPantalla = (modoCreacionPassword === "directo") || (canal de email deshabilitado/no
+// configurado) — si no se puede mandar correo, no importa lo que diga modoCreacionPassword, la
+// contraseña se tiene que capturar en pantalla igual.
+function useMostrarPasswordEnPantalla() {
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+  })
+  const { data: canalEmail } = useQuery({
+    queryKey: ['notificaciones', 'canal-email'],
+    queryFn: getNotificacionCanalEmail,
+  })
+
+  const emailDeshabilitado = !canalEmail?.configurado || canalEmail?.habilitado === false
+  const modoDirecto = facturacionConfig?.modoCreacionPassword === 'directo'
+
+  return {
+    mostrarPassword: modoDirecto || emailDeshabilitado,
+    emailDeshabilitado,
+  }
+}
+
 export default function UsuariosPage() {
   const queryClient = useQueryClient()
   const authUser = useAuthStore((s) => s.user)
@@ -41,6 +65,7 @@ export default function UsuariosPage() {
   const [email, setEmail] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
+  const [password, setPassword] = useState('')
   const [maxDiscountPct, setMaxDiscountPct] = useState(0)
   const [adminCode, setAdminCode] = useState('')
   const [scanningAdminCode, setScanningAdminCode] = useState(false)
@@ -50,7 +75,10 @@ export default function UsuariosPage() {
   const [defaultBranchSearch, setDefaultBranchSearch] = useState('')
   const [defaultPosProfile, setDefaultPosProfile] = useState('')
   const [defaultPosProfileSearch, setDefaultPosProfileSearch] = useState('')
+  const [resetPasswordTarget, setResetPasswordTarget] = useState<Usuario | null>(null)
+  const [resetPasswordValue, setResetPasswordValue] = useState('')
   const { orderBy, sort } = useSortState()
+  const { mostrarPassword, emailDeshabilitado } = useMostrarPasswordEnPantalla()
 
   useBarcodeScanner({
     enabled: showForm && scanningAdminCode,
@@ -151,15 +179,29 @@ export default function UsuariosPage() {
   })
 
   const resetPasswordMutation = useMutation({
-    mutationFn: (email: string) => resetPasswordUsuario(email),
-    onSuccess: () => toast.success('Email de restablecimiento enviado'),
-    onError: () => toast.error('Error al enviar el email'),
+    mutationFn: ({ email, newPassword }: { email: string; newPassword?: string }) =>
+      resetPasswordUsuario(email, newPassword ? { newPassword } : undefined),
+    onSuccess: (_data, variables) => {
+      toast.success(variables.newPassword ? 'Contraseña actualizada' : 'Email de restablecimiento enviado')
+      setResetPasswordTarget(null)
+      setResetPasswordValue('')
+    },
+    onError: (err) => toast.error(apiMessage(err, 'Error al restablecer la contraseña')),
   })
+
+  function handleResetPasswordClick(user: Usuario) {
+    if (mostrarPassword) {
+      setResetPasswordTarget(user)
+      setResetPasswordValue('')
+    } else {
+      resetPasswordMutation.mutate({ email: user.email })
+    }
+  }
 
   const isSystemManager = selectedRoles.includes(SYSTEM_MANAGER_ROLE)
 
   const formIsDirty = useDirtyCheck(
-    { email, firstName, lastName, maxDiscountPct, adminCode, selectedRoles, selectedBranches, defaultBranch, defaultPosProfile },
+    { email, firstName, lastName, password, maxDiscountPct, adminCode, selectedRoles, selectedBranches, defaultBranch, defaultPosProfile },
     showForm && (!editingUser || (!!usuarioSucursales && !!editingUserDetail)),
   )
   const formClose = useConfirmClose(formIsDirty, resetForm)
@@ -182,6 +224,7 @@ export default function UsuariosPage() {
     setEmail('')
     setFirstName('')
     setLastName('')
+    setPassword('')
     setMaxDiscountPct(0)
     setAdminCode('')
     setScanningAdminCode(false)
@@ -219,7 +262,11 @@ export default function UsuariosPage() {
         toast.success('Sucursal por defecto actualizada. Cierra sesión y vuelve a entrar para que los cambios tomen efecto.')
       }
     } else {
-      createMutation.mutate({ email, firstName, lastName: lastName || undefined, maxDiscountPct: maxDisc, adminCode: adminCode || undefined, roles: selectedRoles })
+      if (mostrarPassword && !password) { toast.error('La contraseña inicial es requerida'); return }
+      createMutation.mutate({
+        email, firstName, lastName: lastName || undefined, maxDiscountPct: maxDisc, adminCode: adminCode || undefined, roles: selectedRoles,
+        password: mostrarPassword ? password : undefined,
+      })
     }
   }
 
@@ -317,7 +364,7 @@ export default function UsuariosPage() {
                                         <UserCheck size={14} /> Reactivar
                                       </ActionsMenuItem>
                                     )}
-                                <ActionsMenuItem onClick={() => resetPasswordMutation.mutate(u.email)}>
+                                <ActionsMenuItem onClick={() => handleResetPasswordClick(u)}>
                                   <KeyRound size={14} /> Restablecer contraseña
                                 </ActionsMenuItem>
                               </ActionsMenu>
@@ -355,6 +402,27 @@ export default function UsuariosPage() {
                     placeholder="usuario@empresa.com"
                   />
                 </div>
+
+                {!editingUser && mostrarPassword && (
+                  <div className="ff-wrap">
+                    <label className="ff-label">Contraseña inicial <span className="ff-required">*</span></label>
+                    <input
+                      type="password"
+                      className="ff-input"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      placeholder="••••••••"
+                    />
+                    {emailDeshabilitado && (
+                      <div className="inline-alert inline-alert-warn" style={{ marginTop: 8 }}>
+                        Las notificaciones por correo están desactivadas — debe ingresar la contraseña
+                        manualmente.
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="form-row">
                   <div className="ff-wrap">
                     <label className="ff-label">Nombre <span className="ff-required">*</span></label>
@@ -594,6 +662,52 @@ export default function UsuariosPage() {
           </div>
         </div>
       )}
+
+      <Modal
+        open={!!resetPasswordTarget}
+        onClose={() => setResetPasswordTarget(null)}
+        title="Restablecer contraseña"
+        subtitle={resetPasswordTarget ? `Nueva contraseña para ${resetPasswordTarget.email}` : undefined}
+        size="sm"
+        footer={
+          <>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => setResetPasswordTarget(null)}
+              disabled={resetPasswordMutation.isPending}
+            >
+              Cancelar
+            </button>
+            <button
+              className="btn btn-primary btn-size-sm"
+              disabled={resetPasswordMutation.isPending || !resetPasswordValue}
+              onClick={() =>
+                resetPasswordTarget &&
+                resetPasswordMutation.mutate({ email: resetPasswordTarget.email, newPassword: resetPasswordValue })
+              }
+            >
+              {resetPasswordMutation.isPending ? <span className="spinner spinner-white spinner-sm" /> : 'Guardar'}
+            </button>
+          </>
+        }
+      >
+        {emailDeshabilitado && (
+          <div className="inline-alert inline-alert-warn" style={{ marginBottom: 12 }}>
+            Las notificaciones por correo están desactivadas — debe ingresar la contraseña manualmente.
+          </div>
+        )}
+        <div className="ff-wrap">
+          <label className="ff-label">Nueva contraseña <span className="ff-required">*</span></label>
+          <input
+            type="password"
+            className="ff-input"
+            value={resetPasswordValue}
+            onChange={(e) => setResetPasswordValue(e.target.value)}
+            autoFocus
+            placeholder="••••••••"
+          />
+        </div>
+      </Modal>
     </div>
   )
 }
