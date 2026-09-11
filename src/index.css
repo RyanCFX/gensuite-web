@@ -145,6 +145,17 @@
   --on-dark-ink:   oklch(96% 0.006 228);
   --on-dark-sub:   oklch(74% 0.020 228);
   --teal-accent:   oklch(60% 0.090 203);
+
+  /* Sidebar — same navy brand surface, theme-invariant like the dashboard hero */
+  --sidebar-bg:          var(--ink-deep);
+  --sidebar-border:      oklch(27% 0.034 228 / 60%);
+  --sidebar-text:        var(--on-dark-sub);
+  --sidebar-text-hover:  var(--on-dark-ink);
+  --sidebar-hover-bg:    oklch(24% 0.034 228 / 70%);
+  --sidebar-label:       oklch(76% 0.12 70);
+  --sidebar-active-bg:   oklch(83% 0.11 155);
+  --sidebar-active-text: var(--ink-deep);
+  --sidebar-connector:   oklch(40% 0.02 228);
 }
 
 [data-theme='dark'] {
@@ -434,8 +445,8 @@ button {
 /* ─── SIDEBAR ─── */
 .sidebar {
   grid-area: sidebar;
-  background: var(--surface-app);
-  border-right: 1px solid var(--border-default);
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -452,16 +463,16 @@ button {
 }
 
 .sb-section + .sb-section {
-  border-top: 1px solid var(--border-default);
+  border-top: 1px solid var(--sidebar-border);
 }
 
 .sb-label {
-  padding: 8px 8px 4px;
+  padding: 12px 8px 6px;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-tertiary);
+  color: var(--sidebar-label);
   white-space: nowrap;
   overflow: hidden;
 }
@@ -470,10 +481,10 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 32px;
-  padding: 0 8px;
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: var(--sidebar-text);
   font-size: 13px;
   font-weight: 400;
   cursor: pointer;
@@ -489,14 +500,14 @@ button {
 }
 
 .nav-item:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
+  background: var(--sidebar-hover-bg);
+  color: var(--sidebar-text-hover);
 }
 
 .nav-item.active {
-  background: var(--surface-selected);
-  color: var(--text-brand);
-  font-weight: 500;
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-active-text);
+  font-weight: 600;
 }
 
 .nav-item svg {
@@ -510,7 +521,7 @@ button {
 .nav-group-chevron {
   margin-left: auto;
   flex-shrink: 0;
-  color: var(--text-tertiary);
+  color: var(--sidebar-text);
   transition: transform 200ms var(--ease-in-out);
 }
 
@@ -534,7 +545,7 @@ button {
   top: 4px;
   bottom: 4px;
   width: 1px;
-  background: var(--border-strong);
+  background: var(--sidebar-connector);
 }
 
 .nav-child {
@@ -556,23 +567,21 @@ button {
   /* connect from the vertical bar (7px) to just before the icon (26px) */
   width: 10px;
   height: 10px;
-  /* background: var(--border-strong); */
-  border-bottom: 1.8px solid var(--border-strong);
-  border-left: 1.8px solid var(--border-strong);
+  border-bottom: 1.8px solid var(--sidebar-connector);
+  border-left: 1.8px solid var(--sidebar-connector);
   border-radius: 0 0 0 7px;
-  /* border-color: var(--border-strong); */
   pointer-events: none;
 }
 
 .nav-child:hover {
   background: transparent;
-  color: var(--text-primary);
+  color: var(--sidebar-text-hover);
 }
 
 .nav-child.active {
   background: transparent;
-  color: var(--text-brand);
-  font-weight: 500;
+  color: var(--sidebar-active-bg);
+  font-weight: 600;
 }
 
 .nav-pip {
@@ -593,7 +602,7 @@ button {
 .sb-footer {
   margin-top: auto;
   padding: 8px;
-  border-top: 1px solid var(--border-default);
+  border-top: 1px solid var(--sidebar-border);
 }
 
 /* Collapsed sidebar */
@@ -610,6 +619,15 @@ button {
 .app-shell.collapsed .nav-float-panel .nav-label { display: block; }
 .app-shell.collapsed .nav-float-panel .nav-item { justify-content: flex-start; padding: 0 8px; width: 100%; margin: 0; }
 .app-shell.collapsed .nav-float-panel .nav-group-chevron { display: none; }
+
+/* Floating panel sits on a regular theme surface, not the navy sidebar — use theme text colors */
+.nav-float-panel .nav-item { color: var(--text-secondary); border-radius: var(--radius-md); }
+.nav-float-panel .nav-item:hover { background: var(--surface-hover); color: var(--text-primary); }
+.nav-float-panel .nav-item.active { background: var(--surface-selected); color: var(--text-brand); }
+.nav-float-panel .nav-group-chevron { color: var(--text-tertiary); }
+.nav-float-panel .nav-children::before { background: var(--border-strong); }
+.nav-float-panel .nav-child::before { border-color: var(--border-strong); }
+.nav-float-panel .nav-child.active { color: var(--text-brand); }
 
 /* ─── MAIN CONTENT ─── */
 .main {
