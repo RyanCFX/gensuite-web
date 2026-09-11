@@ -366,7 +366,27 @@ function AddRoleModal({
               />
             </div>
             <div>
-              <label className="ff-label" style={{ display: 'block', marginBottom: 8 }}>Permisos iniciales</label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <label className="ff-label" style={{ margin: 0 }}>Permisos iniciales</label>
+                {(() => {
+                  const todosSeleccionados = PERMISO_PTYPES.every((pt) => flags[pt])
+                  return (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-size-sm"
+                      onClick={() =>
+                        setFlags(() =>
+                          Object.fromEntries(
+                            PERMISO_PTYPES.map((pt) => [pt, !todosSeleccionados]),
+                          ) as Record<PermisoPtype, boolean>,
+                        )
+                      }
+                    >
+                      {todosSeleccionados ? 'Quitar todos' : 'Seleccionar todos'}
+                    </button>
+                  )
+                })()}
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                 {PERMISO_PTYPES.map((pt) => (
                   <label key={pt} className="ff-check-wrap" style={{ fontSize: 13 }}>
