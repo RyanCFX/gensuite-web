@@ -1376,8 +1376,8 @@ export default function ReportesPage() {
             {reportNav.filter((n) => n.group === group).map((n) => (
               <button
                 key={n.key}
-                className={`nav-item${active === n.key ? ' active' : ''}`}
-                style={{ height: 30, padding: '0 12px', fontSize: 12, width:'100%', justifyContent:'flex-start' }}
+                className={`report-nav-item${active === n.key ? ' active' : ''}`}
+                style={{ width: '100%', justifyContent: 'flex-start' }}
                 onClick={() => navigate(`/reportes/${n.key}`)}
                 aria-current={active === n.key ? 'page' : undefined}
               >

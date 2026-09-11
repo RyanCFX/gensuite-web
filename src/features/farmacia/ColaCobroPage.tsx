@@ -3,8 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { cobrarDespacho, listDespachos } from '@/shared/api/farmacia'
 import { listMetodosPago, listDenominaciones } from '@/shared/api/config'
+import { getTurnoActual } from '@/shared/api/pos'
 import { PaymentLinesEditor } from '@/components/shared/PaymentLinesEditor'
-import { EMPTY_PAYMENT_LINES_VALUE, buildSubmitPayload, isPaymentLinesValid } from '@/lib/paymentLines'
+import { EMPTY_PAYMENT_LINES_VALUE, buildSubmitPayload, isPaymentLinesValid, emptyPaymentLine, sumPayments } from '@/lib/paymentLines'
 import type { PaymentLinesValue } from '@/lib/paymentLines'
 import { formatDOP } from '@/lib/formatters'
 import { X, DollarSign, Loader2 } from 'lucide-react'
@@ -35,10 +36,21 @@ export default function ColaCobroPage() {
 
   const { data: metodos } = useQuery({ queryKey: ['metodos-pago'], queryFn: listMetodosPago, staleTime: 5 * 60_000 })
   const { data: denominaciones } = useQuery({ queryKey: ['denominaciones'], queryFn: listDenominaciones, staleTime: 5 * 60_000 })
+  // Igual que en Caja > Por Cobrar: se usa para prellenar la línea de pago por defecto con el
+  // método de pago en efectivo del turno abierto, en vez de dejar el formulario vacío.
+  const { data: turno } = useQuery({ queryKey: ['turno-actual'], queryFn: getTurnoActual, staleTime: 30_000 })
 
   function abrirCobro(despacho: DespachoProvisionalArs) {
     setCobrando(despacho)
-    setPaymentsValue(EMPTY_PAYMENT_LINES_VALUE)
+    const cashMethod = turno?.modeOfPayment ?? turno?.modoPagoCaja ?? ''
+    setPaymentsValue({
+      ...EMPTY_PAYMENT_LINES_VALUE,
+      payments: [{
+        ...emptyPaymentLine(),
+        modeOfPayment: cashMethod,
+        amount: String(despacho.montoPaciente),
+      }],
+    })
     setNcfType('B02')
   }
 
@@ -133,16 +145,28 @@ export default function ColaCobroPage() {
 
       {cobrando && (
         <div className="modal-overlay" onClick={cerrarCobro}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-box" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h2 className="modal-title">Cobrar despacho {cobrando.id}</h2>
               <button className="modal-close" onClick={cerrarCobro}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                La cobertura de la ARS ({formatDOP(cobrando.montoArs)}) se registra sola — este formulario
-                es solo por lo que el paciente entrega.
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 13 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Paciente:</span>
+                <span style={{ fontWeight: 500 }}>{cobrando.clienteName ?? cobrando.cliente ?? '—'}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>ARS:</span>
+                <span style={{ fontWeight: 500 }}>{cobrando.aseguradoraName ?? cobrando.aseguradora ?? '—'}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>Cobertura ARS:</span>
+                <span>{formatDOP(cobrando.montoArs)}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>Monto a cobrar:</span>
+                <span style={{ fontWeight: 700, color: 'var(--color-error)' }}>{formatDOP(cobrando.montoPaciente)}</span>
+              </div>
+              <p className="ff-hint" style={{ margin: 0 }}>
+                La cobertura de la ARS se registra sola — este formulario es solo por lo que el paciente entrega.
               </p>
+
+              <div className="divider" />
+
               <PaymentLinesEditor amountDue={cobrando.montoPaciente} value={paymentsValue} onChange={setPaymentsValue} />
               <div className="ff-wrap">
                 <label className="ff-label">Tipo de comprobante</label>
@@ -155,8 +179,10 @@ export default function ColaCobroPage() {
             <div className="modal-foot">
               <button className="btn btn-secondary" onClick={cerrarCobro}>Cancelar</button>
               <button className="btn btn-primary" onClick={() => cobrarMutation.mutate()} disabled={!canSubmit || cobrarMutation.isPending}>
-                {cobrarMutation.isPending ? <Loader2 size={14} className="spinner" /> : <DollarSign size={14} />}
-                Cobrar
+                {cobrarMutation.isPending
+                  ? <Loader2 size={14} className="spinner" />
+                  : <DollarSign size={14} />}
+                {cobrarMutation.isPending ? 'Procesando…' : `Cobrar ${formatDOP(sumPayments(paymentsValue.payments))}`}
               </button>
             </div>
           </div>

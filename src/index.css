@@ -139,6 +139,7 @@
    whether the app is in light or dark mode — it's a brand surface, not
    a UI surface. */
 :root {
+  --color-navy:    #0E3D51;
   --ink-deep:      oklch(16% 0.030 228);
   --ink-deep-2:    oklch(21% 0.033 228);
   --ink-deep-3:    oklch(27% 0.034 228);
@@ -147,13 +148,13 @@
   --teal-accent:   oklch(60% 0.090 203);
 
   /* Sidebar — same navy brand surface, theme-invariant like the dashboard hero */
-  --sidebar-bg:          #0E3D51;
+  --sidebar-bg:          var(--color-navy);
   --sidebar-border:      oklch(27% 0.034 228 / 60%);
   --sidebar-text:        var(--on-dark-sub);
   --sidebar-text-hover:  var(--on-dark-ink);
   --sidebar-hover-bg:    oklch(24% 0.034 228 / 70%);
   --sidebar-label:       oklch(76% 0.12 70);
-  --sidebar-active-bg:   oklch(83% 0.11 155);
+  --sidebar-active-bg:   #84CDBA;
   --sidebar-active-text: var(--ink-deep);
   --sidebar-connector:   #ffffff;
 }
@@ -520,6 +521,46 @@ button {
   display: none;
 }
 
+/* ─── REPORT NAV — variante de .nav-item para fondo claro (sidebar de Reportes) ─── */
+.report-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  transition:
+    background-color 150ms var(--ease-in-out),
+    color 150ms var(--ease-in-out);
+}
+
+.report-nav-item:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.report-nav-item.active {
+  background: var(--brand-primary-subtle);
+  color: var(--text-brand);
+  font-weight: 600;
+}
+
+.report-nav-item svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
 .nav-label { flex: 1; }
 
 .nav-group-chevron {
@@ -768,6 +809,10 @@ button {
 .btn-link { background: transparent; color: var(--text-link); border-color: transparent; padding: 0; height: auto; }
 .btn-link:hover { text-decoration: underline; }
 
+.btn-navy { background: var(--color-navy); color: #fff; border-color: var(--color-navy); }
+.btn-navy:hover { background: var(--ink-deep-2); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.btn-navy:active { transform: scale(0.98); box-shadow: none; }
+
 /* Sizes */
 .btn-size-xs { height: 26px; padding: 0 10px; font-size: 11px; }
 .btn-size-sm { height: 30px; padding: 0 12px; font-size: 12px; }
@@ -970,6 +1015,51 @@ button {
 
 .td-muted { color: var(--text-tertiary); font-size: 12px; }
 .td-dim { color: var(--text-secondary); }
+
+/* ─── LISTADOS NAVY — header de tabla navy + dot de acento + card de filtros, reutilizado
+   por las pantallas de listado rediseñadas (Clientes, Cotizaciones, …) ─── */
+.page-title-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--brand-primary);
+  margin-right: 7px;
+  vertical-align: middle;
+  margin-bottom: 3px;
+}
+
+.filter-card-navy .ff-label-sm {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.navy-table-card { overflow: hidden; }
+
+.navy-table thead tr {
+  background: var(--color-navy);
+  border-bottom: none;
+}
+
+.navy-table th {
+  position: relative;
+  color: var(--on-dark-ink);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.navy-table th:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 30%;
+  bottom: 30%;
+  right: 0;
+  width: 2px;
+  background: #ffffff;
+  opacity: 0.25;
+}
 
 /* Hallmark · component: turno-strip · genre: modern-minimal · branding: preserved (brand-red, JetBrains Mono)
  * states: default · hover · focus · active · disabled · loading · error · success
@@ -1642,6 +1732,74 @@ button {
   background: var(--surface-sunken);
   flex-shrink: 0;
 }
+
+/* ─── DRAWER ─── */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 500;
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px;
+  animation: fade-in 150ms var(--ease-out);
+}
+
+.drawer-panel {
+  background: var(--surface-page);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  width: 100%;
+  max-width: 420px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slide-in-drawer 220ms var(--ease-spring);
+}
+
+@keyframes slide-in-drawer {
+  from { transform: translateX(calc(100% + 10px)); }
+  to { transform: translateX(0); }
+}
+
+/* ─── TOGGLE ─── */
+.ff-toggle-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.ff-toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+.ff-toggle input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+.ff-toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--border-strong);
+  border-radius: var(--radius-full);
+  transition: background-color 150ms var(--ease-in-out);
+}
+.ff-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: var(--shadow-xs);
+  transition: transform 150ms var(--ease-in-out);
+}
+.ff-toggle input:checked ~ .ff-toggle-track { background: var(--ink-deep); }
+.ff-toggle input:checked ~ .ff-toggle-track .ff-toggle-thumb { transform: translateX(16px); }
 
 /* ─── CONFIRM MODAL ─── */
 .confirm-icon {

@@ -274,55 +274,59 @@ export default function CuentasBancariasPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Cuentas Bancarias"
+        title={<><span className="page-title-dot" />Cuentas Bancarias</>}
         description={data ? `${data.meta.total ?? 0} cuentas bancarias` : undefined}
         action={
-          <button className="btn btn-primary" onClick={openCreate}>
+          <button className="btn btn-navy" onClick={openCreate}>
             <Plus size={16} />
             Nueva Cuenta Bancaria
           </button>
         }
       />
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={14} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por nombre…"
-              value={search}
-              onChange={handleSearchChange}
-            />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div className="search-input-wrap">
+                <Search size={14} className="search-input-icon" />
+                <input
+                  className="search-input"
+                  placeholder="Buscar por nombre…"
+                  value={search}
+                  onChange={handleSearchChange}
+                />
+              </div>
+              <FilterField label="Estado">
+                <select
+                  className="ff-select"
+                  value={estadoFilter}
+                  onChange={(e) => { setEstadoFilter(e.target.value as CuentaBancariaEstado | ''); setPage(1) }}
+                  style={{ width: 160 }}
+                >
+                  <option value="">Todos los estados</option>
+                  {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
+                </select>
+              </FilterField>
+              <FilterField label="Tipo de cuenta">
+                <select
+                  className="ff-select"
+                  value={tipoCuentaFilter}
+                  onChange={(e) => { setTipoCuentaFilter(e.target.value); setPage(1) }}
+                  style={{ width: 200 }}
+                >
+                  <option value="">Todos los tipos</option>
+                  {(tiposCuenta ?? []).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </FilterField>
+            </div>
           </div>
-          <FilterField label="Estado">
-            <select
-              className="ff-select"
-              value={estadoFilter}
-              onChange={(e) => { setEstadoFilter(e.target.value as CuentaBancariaEstado | ''); setPage(1) }}
-              style={{ width: 160 }}
-            >
-              <option value="">Todos los estados</option>
-              {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
-            </select>
-          </FilterField>
-          <FilterField label="Tipo de cuenta">
-            <select
-              className="ff-select"
-              value={tipoCuentaFilter}
-              onChange={(e) => { setTipoCuentaFilter(e.target.value); setPage(1) }}
-              style={{ width: 200 }}
-            >
-              <option value="">Todos los tipos</option>
-              {(tiposCuenta ?? []).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-          </FilterField>
         </div>
       </div>
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <th>Nombre</th>

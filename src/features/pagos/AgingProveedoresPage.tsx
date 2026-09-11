@@ -53,7 +53,7 @@ export default function AgingProveedoresPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Antiguedad de saldos por Pagar"
+        title={<><span className="page-title-dot" />Antiguedad de saldos por Pagar</>}
         description="Análisis de saldos vencidos a proveedores, según fecha de vencimiento"
         action={
           <button
@@ -74,39 +74,46 @@ export default function AgingProveedoresPage() {
         </div>
       )}
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div style={{ width: 260 }}>
-            <SearchSelect
-              value={supplierId}
-              selectedLabel={supplierLabel}
-              onChange={(val, opt) => { setSupplierId(val); setSupplierLabel(opt?.label ?? '') }}
-              options={supplierOptions}
-              onSearch={setSupplierQuery}
-              loading={suppliersLoading}
-              placeholder="Todos los proveedores"
-            />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div style={{ width: 260 }}>
+                <SearchSelect
+                  value={supplierId}
+                  selectedLabel={supplierLabel}
+                  onChange={(val, opt) => { setSupplierId(val); setSupplierLabel(opt?.label ?? '') }}
+                  options={supplierOptions}
+                  onSearch={setSupplierQuery}
+                  loading={suppliersLoading}
+                  placeholder="Todos los proveedores"
+                />
+              </div>
+              <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
+                <SelectItem value="party">Agrupar por Proveedor</SelectItem>
+                <SelectItem value="invoice">Agrupar por Factura</SelectItem>
+              </Select>
+            </div>
           </div>
-          <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
-            <SelectItem value="party">Agrupar por Proveedor</SelectItem>
-            <SelectItem value="invoice">Agrupar por Factura</SelectItem>
-          </Select>
-          <label className="ff-check-wrap">
-            <input
-              type="checkbox"
-              className="ff-check"
-              checked={showCurrent}
-              onChange={(e) => setShowCurrent(e.target.checked)}
-            />
+
+          <label className="ff-toggle-wrap">
+            <span className="ff-toggle">
+              <input
+                type="checkbox"
+                checked={showCurrent}
+                onChange={(e) => setShowCurrent(e.target.checked)}
+              />
+              <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+            </span>
             Mostrar balances sin vencer
           </label>
         </div>
       </div>
 
       <div>
-        <div className="card">
+        <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table navy-table">
               <thead>
                 <tr>
                   <th>Proveedor</th>

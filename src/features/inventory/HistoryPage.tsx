@@ -73,67 +73,71 @@ export default function HistoryPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Historial de Movimientos"
+        title={<><span className="page-title-dot" />Historial de Movimientos</>}
         description="Entradas y salidas de inventario"
       />
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Almacén" style={{ width: 200 }}>
-            <SearchSelect
-              value={warehouse === 'all' ? '' : warehouse}
-              onChange={(val) => { setWarehouse(val || 'all'); setPage(1); if (val) setBranch('') }}
-              options={warehouseOptions}
-              onSearch={setWarehouseSearch}
-              selectedLabel={warehouse === 'all' ? '' : warehouse}
-              placeholder="Todos los almacenes"
-            />
-          </FilterField>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Almacén" style={{ width: 200 }}>
+                <SearchSelect
+                  value={warehouse === 'all' ? '' : warehouse}
+                  onChange={(val) => { setWarehouse(val || 'all'); setPage(1); if (val) setBranch('') }}
+                  options={warehouseOptions}
+                  onSearch={setWarehouseSearch}
+                  selectedLabel={warehouse === 'all' ? '' : warehouse}
+                  placeholder="Todos los almacenes"
+                />
+              </FilterField>
 
-          {warehouse === 'all' && (
-            <FilterField label="Sucursal" style={{ width: 200 }}>
-              <SearchSelect
-                value={branch}
-                onChange={(val) => { setBranch(val); setPage(1) }}
-                options={branchOptions}
-                onSearch={setBranchSearch}
-                selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
-                placeholder="Todas las sucursales"
-              />
-            </FilterField>
-          )}
+              {warehouse === 'all' && (
+                <FilterField label="Sucursal" style={{ width: 200 }}>
+                  <SearchSelect
+                    value={branch}
+                    onChange={(val) => { setBranch(val); setPage(1) }}
+                    options={branchOptions}
+                    onSearch={setBranchSearch}
+                    selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
+                    placeholder="Todas las sucursales"
+                  />
+                </FilterField>
+              )}
 
-          <FilterField label="Tipo de documento">
-            <Select value={voucherType} onValueChange={(val) => { setVoucherType(val); setPage(1) }}>
-              <SelectItem value="all">Todos los tipos</SelectItem>
-              {VOUCHER_TYPES.map((t) => (
-                <SelectItem key={t} value={t}>{t}</SelectItem>
-              ))}
-            </Select>
-          </FilterField>
+              <FilterField label="Tipo de documento">
+                <Select value={voucherType} onValueChange={(val) => { setVoucherType(val); setPage(1) }}>
+                  <SelectItem value="all">Todos los tipos</SelectItem>
+                  {VOUCHER_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </Select>
+              </FilterField>
 
-          <FilterField label="Desde">
-            <DatePicker
-              className="filter-select"
-              value={fromDate}
-              onChange={(v) => { setFromDate(v); setPage(1) }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker
-              className="filter-select"
-              value={toDate}
-              onChange={(v) => { setToDate(v); setPage(1) }}
-              clearable
-            />
-          </FilterField>
+              <FilterField label="Desde">
+                <DatePicker
+                  className="filter-select"
+                  value={fromDate}
+                  onChange={(v) => { setFromDate(v); setPage(1) }}
+                  clearable
+                />
+              </FilterField>
+              <FilterField label="Hasta">
+                <DatePicker
+                  className="filter-select"
+                  value={toDate}
+                  onChange={(v) => { setToDate(v); setPage(1) }}
+                  clearable
+                />
+              </FilterField>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <SortableTh label="Artículo" sortKey="itemCode" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />

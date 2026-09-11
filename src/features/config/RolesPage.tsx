@@ -59,17 +59,18 @@ export default function RolesPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Roles"
+        title={<><span className="page-title-dot" />Roles</>}
         description="Roles del sistema y usuarios asignados"
         action={
-          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+          <button className="btn btn-navy" onClick={() => setShowCreate(true)}>
             <Plus size={16} /> Nuevo Rol
           </button>
         }
       />
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <th>Rol</th>
@@ -117,6 +118,7 @@ export default function RolesPage() {
                     ))}
           </tbody>
         </table>
+      </div>
       </div>
 
       {showCreate && (

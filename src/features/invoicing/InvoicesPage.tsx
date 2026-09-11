@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { listInvoices } from '@/shared/api/invoices'
 import type { ListInvoicesParams } from '@/shared/api/invoices'
 import { listSucursales } from '@/shared/api/sucursales'
-import { Plus, Eye, Search, GitBranch } from 'lucide-react'
+import { Plus, Eye, Search, GitBranch, SlidersHorizontal } from 'lucide-react'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { getCatalogosFiscales } from '@/shared/api/config'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -14,6 +14,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
+import { Drawer } from '@/shared/ui/Drawer'
 
 type StatusFilter = 'draft' | 'submitted' | 'cancelled' | 'all'
 type PaymentFilter = 'paid' | 'unpaid' | 'partly_paid' | 'all'
@@ -54,6 +55,7 @@ export default function InvoicesPage() {
   const [ncf, setNcf] = useState('')
   const [grandTotalMin, setGrandTotalMin] = useState('')
   const [grandTotalMax, setGrandTotalMax] = useState('')
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
 
   const { data: sucursalesData } = useQuery({
@@ -98,6 +100,17 @@ export default function InvoicesPage() {
 
   const invoices = data?.items ?? []
 
+  const activeMoreFiltersCount = [ncfType, fromDate, toDate, ncf, grandTotalMin, grandTotalMax].filter((v) => v !== '').length
+
+  function clearMoreFilters() {
+    setNcfType('')
+    setFromDate('')
+    setToDate('')
+    setNcf('')
+    setGrandTotalMin('')
+    setGrandTotalMax('')
+  }
+
   function statusBadge(inv: { status: string; paymentStatus?: string | null; isPos?: boolean | null }) {
     if (inv.status === 'submitted') {
       // isPos ya no implica pago completo (módulo POS permite turno + pago parcial) —
@@ -125,114 +138,72 @@ export default function InvoicesPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Facturas</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Facturas</h1>
           <p className="page-sub">Gestiona tus facturas de venta y comprobantes fiscales</p>
         </div>
-        <button className="btn btn-primary" onClick={() => navigate('/facturas/nueva')}>
+        <button className="btn btn-navy" onClick={() => navigate('/facturas/nueva')}>
           <Plus size={16} />
           Nueva Factura
         </button>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={15} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por cliente..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <FilterField label="Estado">
-            <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="draft">Borrador</SelectItem>
-              <SelectItem value="submitted">Sometido</SelectItem>
-              <SelectItem value="cancelled">Cancelado</SelectItem>
-            </Select>
-          </FilterField>
-          <FilterField label="Estado de pago">
-            <Select value={paymentStatus} onValueChange={(val) => setPaymentStatus(val as PaymentFilter)}>
-              <SelectItem value="all">Todo estado pago</SelectItem>
-              <SelectItem value="unpaid">Pendiente</SelectItem>
-              <SelectItem value="partly_paid">Parcial</SelectItem>
-              <SelectItem value="paid">Pagado</SelectItem>
-            </Select>
-          </FilterField>
-          <FilterField label="Tipo NCF" style={{ width: 200 }}>
-            <SearchSelect
-              value={ncfType}
-              onChange={setNcfType}
-              options={ncfTypeOptions}
-              onSearch={setNcfTypeSearch}
-              selectedLabel={catalogos?.ncfTypes?.find((t) => t.value === ncfType)?.label ?? ''}
-              placeholder="Todos los tipos NCF"
-            />
-          </FilterField>
-          <FilterField label="Sucursal" style={{ width: 200 }}>
-            <SearchSelect
-              value={branch}
-              onChange={setBranch}
-              options={branchOptions}
-              onSearch={setBranchSearch}
-              selectedLabel={branch}
-              placeholder="Todas las sucursales"
-            />
-          </FilterField>
-          <FilterField label="Desde">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={fromDate}
-              onChange={setFromDate}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={toDate}
-              onChange={setToDate}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="NCF">
-            <input
-              className="ff-input ff-input-sm"
-              placeholder="Buscar NCF…"
-              value={ncf}
-              onChange={(e) => setNcf(e.target.value)}
-            />
-          </FilterField>
-          <FilterField label="Total">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Total mín."
-                value={grandTotalMin}
-                onChange={(e) => setGrandTotalMin(e.target.value)}
-              />
-              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Total máx."
-                value={grandTotalMax}
-                onChange={(e) => setGrandTotalMax(e.target.value)}
-              />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div className="search-input-wrap">
+                <Search size={15} className="search-input-icon" />
+                <input
+                  className="search-input"
+                  placeholder="Buscar por cliente..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <FilterField label="Estado">
+                <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="draft">Borrador</SelectItem>
+                  <SelectItem value="submitted">Sometido</SelectItem>
+                  <SelectItem value="cancelled">Cancelado</SelectItem>
+                </Select>
+              </FilterField>
+              <FilterField label="Estado de pago">
+                <Select value={paymentStatus} onValueChange={(val) => setPaymentStatus(val as PaymentFilter)}>
+                  <SelectItem value="all">Todo estado pago</SelectItem>
+                  <SelectItem value="unpaid">Pendiente</SelectItem>
+                  <SelectItem value="partly_paid">Parcial</SelectItem>
+                  <SelectItem value="paid">Pagado</SelectItem>
+                </Select>
+              </FilterField>
+              <FilterField label="Sucursal" style={{ width: 200 }}>
+                <SearchSelect
+                  value={branch}
+                  onChange={setBranch}
+                  options={branchOptions}
+                  onSearch={setBranchSearch}
+                  selectedLabel={branch}
+                  placeholder="Todas las sucursales"
+                />
+              </FilterField>
             </div>
-          </FilterField>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+              <SlidersHorizontal size={13} />
+              Más filtros
+              {activeMoreFiltersCount > 0 && (
+                <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} />
@@ -261,7 +232,7 @@ export default function InvoicesPage() {
                   <div className="empty-state">
                     <div className="empty-title">Sin facturas</div>
                     <p className="empty-sub">Crea tu primera factura para comenzar.</p>
-                    <button className="btn btn-primary btn-size-sm" onClick={() => navigate('/facturas/nueva')}>
+                    <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/facturas/nueva')}>
                       <Plus size={14} /> Nueva Factura
                     </button>
                   </div>
@@ -305,6 +276,7 @@ export default function InvoicesPage() {
           </tbody>
         </table>
       </div>
+      </div>
 
       {data?.meta && (
         <div className="pagination">
@@ -313,6 +285,71 @@ export default function InvoicesPage() {
           </span>
         </div>
       )}
+
+      <Drawer
+        open={moreFiltersOpen}
+        onClose={() => setMoreFiltersOpen(false)}
+        title="Más filtros"
+        subtitle="Refina la búsqueda de facturas"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={clearMoreFilters}>Limpiar</button>
+            <button className="btn btn-navy" onClick={() => setMoreFiltersOpen(false)}>Aplicar</button>
+          </>
+        }
+      >
+        <div className="ff-wrap">
+          <label className="ff-label">Tipo NCF</label>
+          <SearchSelect
+            value={ncfType}
+            onChange={setNcfType}
+            options={ncfTypeOptions}
+            onSearch={setNcfTypeSearch}
+            selectedLabel={catalogos?.ncfTypes?.find((t) => t.value === ncfType)?.label ?? ''}
+            placeholder="Todos los tipos NCF"
+          />
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Fecha</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} clearable />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker className="ff-input" value={toDate} onChange={setToDate} clearable />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">NCF</label>
+          <input
+            className="ff-input"
+            placeholder="Buscar NCF…"
+            value={ncf}
+            onChange={(e) => setNcf(e.target.value)}
+          />
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Total</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Total mín."
+              value={grandTotalMin}
+              onChange={(e) => setGrandTotalMin(e.target.value)}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Total máx."
+              value={grandTotalMax}
+              onChange={(e) => setGrandTotalMax(e.target.value)}
+            />
+          </div>
+        </div>
+      </Drawer>
     </div>
   )
 }

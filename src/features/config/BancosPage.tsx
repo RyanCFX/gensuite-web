@@ -99,33 +99,37 @@ export default function BancosPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Bancos"
+        title={<><span className="page-title-dot" />Bancos</>}
         description={data ? `${data.length} bancos` : undefined}
         action={
-          <button className="btn btn-primary" onClick={openCreate}>
+          <button className="btn btn-navy" onClick={openCreate}>
             <Plus size={16} />
             Nuevo Banco
           </button>
         }
       />
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={14} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por nombre…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div className="search-input-wrap">
+                <Search size={14} className="search-input-icon" />
+                <input
+                  className="search-input"
+                  placeholder="Buscar por nombre…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <th>Nombre</th>

@@ -136,29 +136,33 @@ export default function PermisosPage() {
 
   return (
     <div className="page-container">
-      <PageHeader title="Permisos" description="Control fino de permisos por DocType y Rol" />
+      <PageHeader title={<><span className="page-title-dot" />Permisos</>} description="Control fino de permisos por DocType y Rol" />
 
-      <div className="filter-bar">
-        <div className="filter-bar-left" style={{ minWidth: 340 }}>
-          <SearchSelect
-            value={doctype}
-            onChange={(v) => setDoctype(v)}
-            options={doctypeOptions}
-            onSearch={setDoctypeSearch}
-            loading={catalogoQuery.isLoading}
-            placeholder="Elegir DocType…"
-          />
-        </div>
-        {doctype && (
-          <div className="filter-bar-right">
-            <button className="btn btn-secondary btn-size-sm" onClick={() => setShowAddRole(true)}>
-              <Plus size={14} /> Agregar rol
-            </button>
-            <button className="btn btn-ghost btn-size-sm" onClick={() => setConfirmReset(true)}>
-              <RotateCcw size={14} /> Restablecer a estándar
-            </button>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left" style={{ minWidth: 340 }}>
+              <SearchSelect
+                value={doctype}
+                onChange={(v) => setDoctype(v)}
+                options={doctypeOptions}
+                onSearch={setDoctypeSearch}
+                loading={catalogoQuery.isLoading}
+                placeholder="Elegir DocType…"
+              />
+            </div>
+            {doctype && (
+              <div className="filter-bar-right">
+                <button className="btn btn-secondary btn-size-sm" onClick={() => setShowAddRole(true)}>
+                  <Plus size={14} /> Agregar rol
+                </button>
+                <button className="btn btn-ghost btn-size-sm" onClick={() => setConfirmReset(true)}>
+                  <RotateCcw size={14} /> Restablecer a estándar
+                </button>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {!doctype && (
@@ -169,7 +173,7 @@ export default function PermisosPage() {
       )}
 
       {doctype && (
-        <div className="card">
+        <div className="card navy-table-card">
           {permisosQuery.isLoading && (
             <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {Array.from({ length: 4 }).map((_, i) => (
@@ -190,7 +194,7 @@ export default function PermisosPage() {
           )}
           {!permisosQuery.isLoading && !permisosQuery.isError && rows.length > 0 && (
             <div className="table-scroll">
-              <table className="data-table permisos-matrix">
+              <table className="data-table navy-table permisos-matrix">
                 <thead>
                   <tr>
                     <th>Rol</th>

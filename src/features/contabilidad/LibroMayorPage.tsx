@@ -65,12 +65,12 @@ export default function LibroMayorPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Libro Mayor</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Libro Mayor</h1>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
         <div className="card-body">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
             <div className="ff-wrap">
@@ -100,7 +100,7 @@ export default function LibroMayorPage() {
                 placeholder="Filtrar por cuenta…"
               />
             </div>
-            <button className="btn btn-primary btn-size-sm" onClick={handleGenerar}>
+            <button className="btn btn-navy btn-size-sm" onClick={handleGenerar}>
               <BookText size={14} />
               Generar
             </button>
@@ -153,7 +153,7 @@ export default function LibroMayorPage() {
       {!isLoading && data && data.accounts.length > 0 && (
         <>
           {data.accounts.map((cuenta) => (
-            <div key={cuenta.account} className="card" style={{ marginBottom: 16 }}>
+            <div key={cuenta.account} className="card navy-table-card" style={{ marginBottom: 16 }}>
               <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span className="card-title" style={{ fontWeight: 700 }}>{cuenta.account}</span>
                 <span className="td-muted" style={{ fontSize: 13 }}>
@@ -161,7 +161,7 @@ export default function LibroMayorPage() {
                 </span>
               </div>
               <div className="table-scroll">
-                <table className="data-table">
+                <table className="data-table navy-table">
                   <thead>
                     <tr>
                       <th>Fecha</th>

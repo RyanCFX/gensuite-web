@@ -737,12 +737,12 @@ export default function NcfPage() {
     <div className='page-container'>
       <PageHeader
         overline="Configuración"
-        title="Secuencias NCF"
+        title={<><span className="page-title-dot" />Secuencias NCF</>}
         description="Números de Comprobante Fiscal — DGII República Dominicana"
         action={
           tab === 'fisico'
             ? (
-                <button className="btn btn-primary" onClick={() => setModal({ type: 'create' })}>
+                <button className="btn btn-navy" onClick={() => setModal({ type: 'create' })}>
                   <Plus size={14} aria-hidden="true" /> Nueva Secuencia
                 </button>
               )
@@ -805,9 +805,9 @@ export default function NcfPage() {
         )}
 
         {/* Main table */}
-        <div className="card">
+        <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table navy-table">
               <thead>
                 <tr>
                   <th>Tipo</th>

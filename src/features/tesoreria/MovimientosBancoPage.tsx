@@ -68,28 +68,32 @@ export default function MovimientosBancoPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Movimientos Bancarios"
+        title={<><span className="page-title-dot" />Movimientos Bancarios</>}
         description="Estado de cuenta / kardex con saldo corrido — se alimenta de todo lo que afecta la cuenta, no solo lo registrado desde Tesorería"
       />
 
-      <div className="filter-bar">
-        <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
-          <FilterField label="Cuenta bancaria" style={{ minWidth: 260 }}>
-            <CuentaBancariaSelect
-              value={cuentaBancaria}
-              onChange={(id) => { setCuentaBancaria(id); setPage(1) }}
-              placeholder="Selecciona una cuenta bancaria…"
-            />
-          </FilterField>
-          <FilterField label="Desde">
-            <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} clearable />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker className="ff-input" value={toDate} onChange={setToDate} clearable />
-          </FilterField>
-          <button className="btn btn-primary btn-size-sm" onClick={handleBuscar} disabled={!cuentaBancaria}>
-            <Search size={13} /> Buscar
-          </button>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
+              <FilterField label="Cuenta bancaria" style={{ minWidth: 260 }}>
+                <CuentaBancariaSelect
+                  value={cuentaBancaria}
+                  onChange={(id) => { setCuentaBancaria(id); setPage(1) }}
+                  placeholder="Selecciona una cuenta bancaria…"
+                />
+              </FilterField>
+              <FilterField label="Desde">
+                <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} clearable />
+              </FilterField>
+              <FilterField label="Hasta">
+                <DatePicker className="ff-input" value={toDate} onChange={setToDate} clearable />
+              </FilterField>
+              <button className="btn btn-navy btn-size-sm" onClick={handleBuscar} disabled={!cuentaBancaria}>
+                <Search size={13} /> Buscar
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -131,9 +135,9 @@ export default function MovimientosBancoPage() {
             </div>
           </div>
 
-          <div className="card">
+          <div className="card navy-table-card">
             <div className="table-scroll">
-              <table className="data-table">
+              <table className="data-table navy-table">
                 <thead>
                   <tr>
                     <th>Fecha</th>

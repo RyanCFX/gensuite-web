@@ -124,33 +124,37 @@ export default function SucursalesPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Sucursales"
+        title={<><span className="page-title-dot" />Sucursales</>}
         description={data ? `${data.meta.total ?? 0} sucursales` : undefined}
         action={
-          <button className="btn btn-primary" onClick={openCreate}>
+          <button className="btn btn-navy" onClick={openCreate}>
             <Plus size={16} />
             Nueva Sucursal
           </button>
         }
       />
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={14} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por nombre…"
-              value={search}
-              onChange={handleSearchChange}
-            />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div className="search-input-wrap">
+                <Search size={14} className="search-input-icon" />
+                <input
+                  className="search-input"
+                  placeholder="Buscar por nombre…"
+                  value={search}
+                  onChange={handleSearchChange}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <SortableTh label="Nombre" sortKey="name" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />

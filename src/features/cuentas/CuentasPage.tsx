@@ -189,12 +189,12 @@ export default function CuentasPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Plan de Cuentas</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Plan de Cuentas</h1>
           {data && activeTab === 'lista' && (
             <p className="page-sub">{data.meta.total} cuentas en total</p>
           )}
         </div>
-        <button className="btn btn-primary" onClick={() => navigate('/cuentas/nueva')}>
+        <button className="btn btn-navy" onClick={() => navigate('/cuentas/nueva')}>
           <Plus size={16} />
           Nueva Cuenta
         </button>
@@ -219,49 +219,57 @@ export default function CuentasPage() {
       {/* ── Lista Tab ── */}
       {activeTab === 'lista' && (
         <>
-          <div className="filter-bar">
-            <div className="filter-bar-left">
-              <div className="search-input-wrap">
-                <Search size={15} className="search-input-icon" />
-                <input
-                  className="search-input"
-                  placeholder="Buscar por nombre o código…"
-                  value={search}
-                  onChange={handleSearchChange}
-                />
+          <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="filter-bar" style={{ margin: 0 }}>
+                <div className="filter-bar-left">
+                  <div className="search-input-wrap">
+                    <Search size={15} className="search-input-icon" />
+                    <input
+                      className="search-input"
+                      placeholder="Buscar por nombre o código…"
+                      value={search}
+                      onChange={handleSearchChange}
+                    />
+                  </div>
+
+                  <Select
+                    value={rootTypeFilter}
+                    onValueChange={(val) => {
+                      setRootTypeFilter(val as RootTypeFilter)
+                      setPage(1)
+                    }}
+                    placeholder="Todos los tipos"
+                  >
+                    <SelectItem value="Asset">Activos</SelectItem>
+                    <SelectItem value="Liability">Pasivos</SelectItem>
+                    <SelectItem value="Equity">Patrimonio</SelectItem>
+                    <SelectItem value="Income">Ingresos</SelectItem>
+                    <SelectItem value="Expense">Gastos</SelectItem>
+                  </Select>
+                </div>
               </div>
 
-              <Select
-                value={rootTypeFilter}
-                onValueChange={(val) => {
-                  setRootTypeFilter(val as RootTypeFilter)
-                  setPage(1)
-                }}
-                placeholder="Todos los tipos"
-              >
-                <SelectItem value="Asset">Activos</SelectItem>
-                <SelectItem value="Liability">Pasivos</SelectItem>
-                <SelectItem value="Equity">Patrimonio</SelectItem>
-                <SelectItem value="Income">Ingresos</SelectItem>
-                <SelectItem value="Expense">Gastos</SelectItem>
-              </Select>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
-                <input
-                  type="checkbox"
-                  checked={includeDisabled}
-                  onChange={(e) => {
-                    setIncludeDisabled(e.target.checked)
-                    setPage(1)
-                  }}
-                />
+              <label className="ff-toggle-wrap">
+                <span className="ff-toggle">
+                  <input
+                    type="checkbox"
+                    checked={includeDisabled}
+                    onChange={(e) => {
+                      setIncludeDisabled(e.target.checked)
+                      setPage(1)
+                    }}
+                  />
+                  <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+                </span>
                 Incluir deshabilitadas
               </label>
             </div>
           </div>
 
+          <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table navy-table">
               <thead>
                 <tr>
                   <th>Código</th>
@@ -368,6 +376,7 @@ export default function CuentasPage() {
               </div>
             </div>
           )}
+          </div>
         </>
       )}
 

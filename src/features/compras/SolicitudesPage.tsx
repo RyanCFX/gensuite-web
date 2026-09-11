@@ -51,10 +51,10 @@ export default function SolicitudesPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Solicitudes de Compra"
+        title={<><span className="page-title-dot" />Solicitudes de Compra</>}
         description="Pedidos internos de intención — sin proveedor ni precio obligatorios. Se generan órdenes de compra a partir de ellas."
         action={
-          <button className="btn btn-primary" onClick={() => navigate('/compras/solicitudes/nueva')}>
+          <button className="btn btn-navy" onClick={() => navigate('/compras/solicitudes/nueva')}>
             <Plus size={16} />
             Nueva Solicitud
           </button>
@@ -62,36 +62,40 @@ export default function SolicitudesPage() {
       />
 
       <div>
-        <div className="filter-bar">
-          <div className="filter-bar-left">
-            <FilterField label="Estado">
-              <Select value={status} onValueChange={(val) => { setStatus(val); setPage(1) }}>
-                <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="draft">Borrador</SelectItem>
-                <SelectItem value="submitted">Sometida</SelectItem>
-                <SelectItem value="cancelled">Anulada</SelectItem>
-              </Select>
-            </FilterField>
-            <FilterField label="Ordenamiento">
-              <Select value={orderingStatus} onValueChange={(val) => { setOrderingStatus(val); setPage(1) }}>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="pending">Sin ordenar</SelectItem>
-                <SelectItem value="partial">Parcialmente ordenadas</SelectItem>
-                <SelectItem value="ordered">Completamente ordenadas</SelectItem>
-              </Select>
-            </FilterField>
-            <FilterField label="Desde">
-              <DatePicker className="filter-select" value={fromDate} onChange={(v) => { setFromDate(v); setPage(1) }} clearable />
-            </FilterField>
-            <FilterField label="Hasta">
-              <DatePicker className="filter-select" value={toDate} onChange={(v) => { setToDate(v); setPage(1) }} clearable />
-            </FilterField>
+        <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+          <div className="card-body">
+            <div className="filter-bar" style={{ margin: 0 }}>
+              <div className="filter-bar-left">
+                <FilterField label="Estado">
+                  <Select value={status} onValueChange={(val) => { setStatus(val); setPage(1) }}>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    <SelectItem value="draft">Borrador</SelectItem>
+                    <SelectItem value="submitted">Sometida</SelectItem>
+                    <SelectItem value="cancelled">Anulada</SelectItem>
+                  </Select>
+                </FilterField>
+                <FilterField label="Ordenamiento">
+                  <Select value={orderingStatus} onValueChange={(val) => { setOrderingStatus(val); setPage(1) }}>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="pending">Sin ordenar</SelectItem>
+                    <SelectItem value="partial">Parcialmente ordenadas</SelectItem>
+                    <SelectItem value="ordered">Completamente ordenadas</SelectItem>
+                  </Select>
+                </FilterField>
+                <FilterField label="Desde">
+                  <DatePicker className="filter-select" value={fromDate} onChange={(v) => { setFromDate(v); setPage(1) }} clearable />
+                </FilterField>
+                <FilterField label="Hasta">
+                  <DatePicker className="filter-select" value={toDate} onChange={(v) => { setToDate(v); setPage(1) }} clearable />
+                </FilterField>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="card">
+        <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table navy-table">
               <thead>
                 <tr>
                   <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
@@ -130,7 +134,7 @@ export default function SolicitudesPage() {
                                 </div>
                                 <p className="empty-title">Sin solicitudes</p>
                                 <p className="empty-sub">No hay solicitudes de compra registradas.</p>
-                                <button className="btn btn-primary btn-size-sm" onClick={() => navigate('/compras/solicitudes/nueva')}>
+                                <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/compras/solicitudes/nueva')}>
                                   <Plus size={14} />Nueva Solicitud
                                 </button>
                               </div>

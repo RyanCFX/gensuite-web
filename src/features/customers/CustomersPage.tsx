@@ -6,13 +6,14 @@ import { listCustomers, deleteCustomer } from '@/shared/api/customers'
 import { downloadEstadoCuentaPdf } from '@/shared/api/cobros'
 import type { Customer, ApiError } from '@/shared/api/types'
 import { useDebounce } from '@/lib/useDebounce'
-import { Plus, Pencil, Ban, ChevronLeft, ChevronRight, Download } from 'lucide-react'
+import { Plus, Pencil, Ban, ChevronLeft, ChevronRight, Download, SlidersHorizontal } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
+import { Drawer } from '@/shared/ui/Drawer'
 import { TIPO_IDENTIFICACION } from '@/lib/constants'
 
 const PAGE_SIZE = 20
@@ -35,6 +36,7 @@ export default function CustomersPage() {
   const [creditDaysMax, setCreditDaysMax] = useState('')
   const [page, setPage] = useState(1)
   const [toDisable, setToDisable] = useState<Customer | null>(null)
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
 
   const debouncedCustomerName = useDebounce(customerName, 300)
@@ -92,6 +94,20 @@ export default function CustomersPage() {
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
 
+  const activeMoreFiltersCount = [
+    createdAtFrom, createdAtTo, creditLimitMin, creditLimitMax, creditDaysMin, creditDaysMax,
+  ].filter((v) => v !== '').length
+
+  function clearMoreFilters() {
+    setCreatedAtFrom('')
+    setCreatedAtTo('')
+    setCreditLimitMin('')
+    setCreditLimitMax('')
+    setCreditDaysMin('')
+    setCreditDaysMax('')
+    setPage(1)
+  }
+
   function getIdentifier(c: Customer) {
     if (c.rnc) return c.rnc
     if (c.cedula) return c.cedula
@@ -102,143 +118,94 @@ export default function CustomersPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Clientes</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Clientes</h1>
           {data && <p className="page-sub">{data.meta.total} clientes en total</p>}
         </div>
-        <button className="btn btn-primary" onClick={() => navigate('/clientes/nuevo')}>
+        <button className="btn btn-navy" onClick={() => navigate('/clientes/nuevo')}>
           <Plus size={16} />
           Nuevo Cliente
         </button>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Cliente" style={{ width: 200 }}>
-            <input
-              className="ff-input ff-input-sm"
-              placeholder="Nombre del cliente…"
-              value={customerName}
-              onChange={(e) => { setCustomerName(e.target.value); setPage(1) }}
-            />
-          </FilterField>
-          <FilterField label="Tipo">
-            <Select value={customerType} onValueChange={(val) => { setCustomerType(val); setPage(1) }}>
-              <SelectItem value="all">Todos los tipos</SelectItem>
-              <SelectItem value="Company">Empresa</SelectItem>
-              <SelectItem value="Individual">Individual</SelectItem>
-            </Select>
-          </FilterField>
-          <FilterField label="Identificación">
-            <Select value={tipoIdentificacion} onValueChange={(val) => { setTipoIdentificacion(val); setPage(1) }}>
-              <SelectItem value="all">Todas las identificaciones</SelectItem>
-              {TIPO_IDENTIFICACION.map((t) => (
-                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-              ))}
-            </Select>
-          </FilterField>
-          <FilterField label="RNC/Cédula" style={{ width: 180 }}>
-            <input
-              className="ff-input ff-input-sm"
-              placeholder="RNC o Cédula…"
-              value={identificacion}
-              onChange={(e) => { setIdentificacion(e.target.value); setPage(1) }}
-            />
-          </FilterField>
-          <FilterField label="Crédito">
-            <Select value={hasCredit} onValueChange={(val) => { setHasCredit(val); setPage(1) }}>
-              <SelectItem value="all">Crédito: Todos</SelectItem>
-              <SelectItem value="true">Con crédito</SelectItem>
-              <SelectItem value="false">Sin crédito</SelectItem>
-            </Select>
-          </FilterField>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
-            <input
-              type="checkbox"
-              checked={showDisabled}
-              onChange={(e) => {
-                setShowDisabled(e.target.checked)
-                setPage(1)
-              }}
-            />
-            Mostrar desactivados
-          </label>
-        </div>
-      </div>
-
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span className="td-muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>Fecha creación</span>
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={createdAtFrom}
-              onChange={(val) => { setCreatedAtFrom(val); setPage(1) }}
-              style={{ width: 140 }}
-              clearable
-            />
-            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={createdAtTo}
-              onChange={(val) => { setCreatedAtTo(val); setPage(1) }}
-              style={{ width: 140 }}
-              clearable
-            />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Cliente" style={{ width: 200 }}>
+                <input
+                  className="ff-input ff-input-sm"
+                  placeholder="Nombre del cliente…"
+                  value={customerName}
+                  onChange={(e) => { setCustomerName(e.target.value); setPage(1) }}
+                />
+              </FilterField>
+              <FilterField label="Tipo">
+                <Select value={customerType} onValueChange={(val) => { setCustomerType(val); setPage(1) }}>
+                  <SelectItem value="all">Todos los tipos</SelectItem>
+                  <SelectItem value="Company">Empresa</SelectItem>
+                  <SelectItem value="Individual">Individual</SelectItem>
+                </Select>
+              </FilterField>
+              <FilterField label="Identificación">
+                <Select value={tipoIdentificacion} onValueChange={(val) => { setTipoIdentificacion(val); setPage(1) }}>
+                  <SelectItem value="all">Todas las identificaciones</SelectItem>
+                  {TIPO_IDENTIFICACION.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </Select>
+              </FilterField>
+              <FilterField label="RNC/Cédula" style={{ width: 180 }}>
+                <input
+                  className="ff-input ff-input-sm"
+                  placeholder="RNC o Cédula…"
+                  value={identificacion}
+                  onChange={(e) => { setIdentificacion(e.target.value); setPage(1) }}
+                />
+              </FilterField>
+              <FilterField label="Crédito">
+                <Select value={hasCredit} onValueChange={(val) => { setHasCredit(val); setPage(1) }}>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="true">Con crédito</SelectItem>
+                  <SelectItem value="false">Sin crédito</SelectItem>
+                </Select>
+              </FilterField>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span className="td-muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>Límite de crédito</span>
-            <input
-              type="number"
-              className="ff-input ff-input-sm"
-              style={{ width: 96 }}
-              placeholder="Mín."
-              value={creditLimitMin}
-              onChange={(e) => { setCreditLimitMin(e.target.value); setPage(1) }}
-            />
-            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-            <input
-              type="number"
-              className="ff-input ff-input-sm"
-              style={{ width: 96 }}
-              placeholder="Máx."
-              value={creditLimitMax}
-              onChange={(e) => { setCreditLimitMax(e.target.value); setPage(1) }}
-            />
-          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <label className="ff-toggle-wrap">
+              <span className="ff-toggle">
+                <input
+                  type="checkbox"
+                  checked={showDisabled}
+                  onChange={(e) => { setShowDisabled(e.target.checked); setPage(1) }}
+                />
+                <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+              </span>
+              Mostrar Clientes desactivados
+            </label>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span className="td-muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>Días de crédito</span>
-            <input
-              type="number"
-              className="ff-input ff-input-sm"
-              style={{ width: 80 }}
-              placeholder="Mín."
-              value={creditDaysMin}
-              onChange={(e) => { setCreditDaysMin(e.target.value); setPage(1) }}
-            />
-            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-            <input
-              type="number"
-              className="ff-input ff-input-sm"
-              style={{ width: 80 }}
-              placeholder="Máx."
-              value={creditDaysMax}
-              onChange={(e) => { setCreditDaysMax(e.target.value); setPage(1) }}
-            />
+            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+              <SlidersHorizontal size={13} />
+              Más filtros
+              {activeMoreFiltersCount > 0 && (
+                <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+              )}
+            </button>
           </div>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <SortableTh label="Nombre" sortKey="customerName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
               <th>RNC / Cédula</th>
               <th>Tipo</th>
               <th>Grupo</th>
-              <th>Tiene Crédito</th>
+              <th>Crédito</th>
               <th>Estado</th>
               <th style={{ width: 48 }} />
             </tr>
@@ -313,6 +280,7 @@ export default function CustomersPage() {
           </tbody>
         </table>
       </div>
+      </div>
 
       {data && data.meta.total > PAGE_SIZE && (
         <div className="pagination">
@@ -364,6 +332,80 @@ export default function CustomersPage() {
           </div>
         </div>
       )}
+
+      <Drawer
+        open={moreFiltersOpen}
+        onClose={() => setMoreFiltersOpen(false)}
+        title="Más filtros"
+        subtitle="Refina la búsqueda de clientes"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={clearMoreFilters}>Limpiar</button>
+            <button className="btn btn-navy" onClick={() => setMoreFiltersOpen(false)}>Aplicar</button>
+          </>
+        }
+      >
+        <div className="ff-wrap">
+          <label className="ff-label">Fecha de creación</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DatePicker
+              className="ff-input"
+              value={createdAtFrom}
+              onChange={(val) => { setCreatedAtFrom(val); setPage(1) }}
+              clearable
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker
+              className="ff-input"
+              value={createdAtTo}
+              onChange={(val) => { setCreatedAtTo(val); setPage(1) }}
+              clearable
+            />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Límite de crédito (RD$)</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Mín."
+              value={creditLimitMin}
+              onChange={(e) => { setCreditLimitMin(e.target.value); setPage(1) }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Máx."
+              value={creditLimitMax}
+              onChange={(e) => { setCreditLimitMax(e.target.value); setPage(1) }}
+            />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Días de crédito</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Mín."
+              value={creditDaysMin}
+              onChange={(e) => { setCreditDaysMin(e.target.value); setPage(1) }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Máx."
+              value={creditDaysMax}
+              onChange={(e) => { setCreditDaysMax(e.target.value); setPage(1) }}
+            />
+          </div>
+        </div>
+      </Drawer>
     </div>
   )
 }

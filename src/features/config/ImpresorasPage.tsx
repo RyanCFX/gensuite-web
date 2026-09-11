@@ -147,23 +147,23 @@ export default function ImpresorasPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Impresoras"
+        title={<><span className="page-title-dot" />Impresoras</>}
         description="Configura impresoras para imprimir directo (sin diálogo del navegador) vía QZ Tray — cada usuario elige cuál usar."
         action={
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-secondary" onClick={() => setCertModalOpen(true)}>
               <ShieldCheck size={16} /> Certificado QZ Tray
             </button>
-            <button className="btn btn-primary" onClick={openCreate}>
+            <button className="btn btn-navy" onClick={openCreate}>
               <Plus size={16} /> Nueva Impresora
             </button>
           </div>
         }
       />
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <th style={{ width: 40 }} />

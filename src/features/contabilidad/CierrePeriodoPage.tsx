@@ -163,13 +163,13 @@ export default function CierrePeriodoPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Cierre de Período"
+        title={<><span className="page-title-dot" />Cierre de Período</>}
         description="Gestión de cierres contables por ejercicio fiscal"
       />
 
       {/* Filter bar */}
-      <div className="filter-bar" style={{ marginBottom: 16 }}>
-        <div className="filter-bar-left">
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ width: 200 }}>
             <SearchSelect
               value={fyFilter}
@@ -180,16 +180,16 @@ export default function CierrePeriodoPage() {
               placeholder="Todos los ejercicios"
             />
           </div>
+          <button className="btn btn-navy btn-size-sm" onClick={openWizard}>
+            <Plus size={14} /> Nuevo cierre
+          </button>
         </div>
-        <button className="btn btn-primary btn-size-sm" onClick={openWizard}>
-          <Plus size={14} /> Nuevo cierre
-        </button>
       </div>
 
       {/* Table */}
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <th>ID</th>

@@ -20,7 +20,7 @@ import { listDepartamentos } from '@/shared/api/departamentos'
 import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo, EcfModificationCode } from '@/shared/api/types'
 import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
 import { Select, SelectItem } from '@/components/ui/select'
-import { Plus, Loader2, Wallet, ArrowRightLeft, ChevronDown, ChevronRight, Download } from 'lucide-react'
+import { Plus, Loader2, Wallet, ArrowRightLeft, ChevronDown, ChevronRight, Download, SlidersHorizontal } from 'lucide-react'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
@@ -34,6 +34,7 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
+import { Drawer } from '@/shared/ui/Drawer'
 
 interface NoteItem {
   itemCode: string
@@ -116,6 +117,7 @@ export default function CreditNotesPage() {
   const [grandTotalMax, setGrandTotalMax] = useState('')
   const [refundedAmountMin, setRefundedAmountMin] = useState('')
   const [refundedAmountMax, setRefundedAmountMax] = useState('')
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
@@ -282,6 +284,23 @@ export default function CreditNotesPage() {
     sublabel: (inv.ncf ?? inv.id) + ' — ' + formatDate(inv.postingDate),
   }))
   const notes = (Array.isArray(notesData) ? notesData : []) as unknown as CreditNoteRow[]
+
+  const activeMoreFiltersCount = [
+    ncfType, createdAtFrom, createdAtTo, postingDateFrom, postingDateTo,
+    grandTotalMin, grandTotalMax, refundedAmountMin, refundedAmountMax,
+  ].filter((v) => v !== '').length
+
+  function clearMoreFilters() {
+    setNcfType('')
+    setCreatedAtFrom('')
+    setCreatedAtTo('')
+    setPostingDateFrom('')
+    setPostingDateTo('')
+    setGrandTotalMin('')
+    setGrandTotalMax('')
+    setRefundedAmountMin('')
+    setRefundedAmountMax('')
+  }
 
   // Artículos de la factura original que aún no están en la nota (para poder re-agregarlos tras quitarlos)
   const availableToAdd = (selectedInvoiceDetail?.items ?? []).filter(
@@ -498,149 +517,76 @@ export default function CreditNotesPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Notas de Crédito</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Notas de Crédito</h1>
           <p className="page-sub">Gestiona devoluciones y ajustes (NCF B04)</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
+        <button className="btn btn-navy" onClick={() => setModalOpen(true)}>
           <Plus size={16} /> Nueva Nota de Crédito
         </button>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Cliente" style={{ width: 260 }}>
-            <SearchSelect
-              value={customerId}
-              selectedLabel={customerLabel}
-              onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
-              options={customerOptions}
-              onSearch={setCustomerQuery}
-              loading={customersLoading}
-              placeholder="Filtrar por cliente…"
-            />
-          </FilterField>
-          <FilterField label="Sucursal" style={{ width: 200 }}>
-            <SearchSelect
-              value={branch}
-              onChange={setBranch}
-              options={branchOptions}
-              onSearch={setBranchSearch}
-              selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
-              placeholder="Todas las sucursales"
-            />
-          </FilterField>
-          <FilterField label="Departamento" style={{ width: 200 }}>
-            <SearchSelect
-              value={department}
-              onChange={setDepartment}
-              options={departmentOptions}
-              onSearch={setDepartmentSearch}
-              selectedLabel={departamentos?.items.find((d) => d.id === department)?.name ?? ''}
-              placeholder="Todos los departamentos"
-            />
-          </FilterField>
-          <FilterField label="NCF">
-            <input
-              className="ff-input ff-input-sm"
-              style={{ width: 160 }}
-              placeholder="Buscar NCF…"
-              value={ncf}
-              onChange={(e) => setNcf(e.target.value)}
-            />
-          </FilterField>
-          <FilterField label="Tipo NCF" style={{ width: 200 }}>
-            <SearchSelect
-              value={ncfType}
-              onChange={setNcfType}
-              options={ncfTypeOptions}
-              onSearch={setNcfTypeSearch}
-              selectedLabel={catalogos?.ncfTypes?.find((t) => t.value === ncfType)?.label ?? ''}
-              placeholder="Todos los tipos NCF"
-            />
-          </FilterField>
-          <FilterField label="Creada desde">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={createdAtFrom}
-              onChange={setCreatedAtFrom}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Creada hasta">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={createdAtTo}
-              onChange={setCreatedAtTo}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Fecha desde">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={postingDateFrom}
-              onChange={setPostingDateFrom}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Fecha hasta">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={postingDateTo}
-              onChange={setPostingDateTo}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Total">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Total mín."
-                value={grandTotalMin}
-                onChange={(e) => setGrandTotalMin(e.target.value)}
-              />
-              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Total máx."
-                value={grandTotalMax}
-                onChange={(e) => setGrandTotalMax(e.target.value)}
-              />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Cliente" style={{ width: 260 }}>
+                <SearchSelect
+                  value={customerId}
+                  selectedLabel={customerLabel}
+                  onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
+                  options={customerOptions}
+                  onSearch={setCustomerQuery}
+                  loading={customersLoading}
+                  placeholder="Filtrar por cliente…"
+                />
+              </FilterField>
+              <FilterField label="Sucursal" style={{ width: 200 }}>
+                <SearchSelect
+                  value={branch}
+                  onChange={setBranch}
+                  options={branchOptions}
+                  onSearch={setBranchSearch}
+                  selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
+                  placeholder="Todas las sucursales"
+                />
+              </FilterField>
+              <FilterField label="Departamento" style={{ width: 200 }}>
+                <SearchSelect
+                  value={department}
+                  onChange={setDepartment}
+                  options={departmentOptions}
+                  onSearch={setDepartmentSearch}
+                  selectedLabel={departamentos?.items.find((d) => d.id === department)?.name ?? ''}
+                  placeholder="Todos los departamentos"
+                />
+              </FilterField>
+              <FilterField label="NCF">
+                <input
+                  className="ff-input ff-input-sm"
+                  style={{ width: 160 }}
+                  placeholder="Buscar NCF…"
+                  value={ncf}
+                  onChange={(e) => setNcf(e.target.value)}
+                />
+              </FilterField>
             </div>
-          </FilterField>
-          <FilterField label="Monto reembolsado">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Reemb. mín."
-                value={refundedAmountMin}
-                onChange={(e) => setRefundedAmountMin(e.target.value)}
-              />
-              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Reemb. máx."
-                value={refundedAmountMax}
-                onChange={(e) => setRefundedAmountMax(e.target.value)}
-              />
-            </div>
-          </FilterField>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+              <SlidersHorizontal size={13} />
+              Más filtros
+              {activeMoreFiltersCount > 0 && (
+                <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <th style={{ width: 28 }} />
@@ -671,7 +617,7 @@ export default function CreditNotesPage() {
                   <div className="empty-state">
                     <div className="empty-title">Sin notas de crédito</div>
                     <p className="empty-sub">Crea una nota de crédito para procesar una devolución.</p>
-                    <button className="btn btn-primary btn-size-sm" onClick={() => setModalOpen(true)}>
+                    <button className="btn btn-navy btn-size-sm" onClick={() => setModalOpen(true)}>
                       <Plus size={14} /> Nueva Nota de Crédito
                     </button>
                   </div>
@@ -785,6 +731,92 @@ export default function CreditNotesPage() {
           </tbody>
         </table>
       </div>
+      </div>
+
+      <Drawer
+        open={moreFiltersOpen}
+        onClose={() => setMoreFiltersOpen(false)}
+        title="Más filtros"
+        subtitle="Refina la búsqueda de notas de crédito"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={clearMoreFilters}>Limpiar</button>
+            <button className="btn btn-navy" onClick={() => setMoreFiltersOpen(false)}>Aplicar</button>
+          </>
+        }
+      >
+        <div className="ff-wrap">
+          <label className="ff-label">Tipo NCF</label>
+          <SearchSelect
+            value={ncfType}
+            onChange={setNcfType}
+            options={ncfTypeOptions}
+            onSearch={setNcfTypeSearch}
+            selectedLabel={catalogos?.ncfTypes?.find((t) => t.value === ncfType)?.label ?? ''}
+            placeholder="Todos los tipos NCF"
+          />
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Fecha de creación</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DatePicker className="ff-input" value={createdAtFrom} onChange={setCreatedAtFrom} clearable />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker className="ff-input" value={createdAtTo} onChange={setCreatedAtTo} clearable />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Fecha de emisión</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DatePicker className="ff-input" value={postingDateFrom} onChange={setPostingDateFrom} clearable />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker className="ff-input" value={postingDateTo} onChange={setPostingDateTo} clearable />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Total</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Total mín."
+              value={grandTotalMin}
+              onChange={(e) => setGrandTotalMin(e.target.value)}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Total máx."
+              value={grandTotalMax}
+              onChange={(e) => setGrandTotalMax(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Monto reembolsado</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Reemb. mín."
+              value={refundedAmountMin}
+              onChange={(e) => setRefundedAmountMin(e.target.value)}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Reemb. máx."
+              value={refundedAmountMax}
+              onChange={(e) => setRefundedAmountMax(e.target.value)}
+            />
+          </div>
+        </div>
+      </Drawer>
 
       {modalOpen && (
         <div className="modal-overlay" onClick={crearClose.requestClose}>

@@ -138,16 +138,19 @@ function ZonasSection({
   })
 
   return (
-    <div className="card">
+    <div className="card navy-table-card">
       <div className="card-header">
         <span className="card-title">Zonas</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer' }}>
-            <input type="checkbox" checked={includeDisabled} onChange={(e) => setIncludeDisabled(e.target.checked)} />
+          <label className="ff-toggle-wrap">
+            <span className="ff-toggle">
+              <input type="checkbox" checked={includeDisabled} onChange={(e) => setIncludeDisabled(e.target.checked)} />
+              <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+            </span>
             Mostrar deshabilitadas
           </label>
           {!readOnly && (
-            <button className="btn btn-primary btn-size-sm" onClick={openCreate}>
+            <button className="btn btn-navy btn-size-sm" onClick={openCreate}>
               <Plus size={14} /> Nueva Zona
             </button>
           )}
@@ -168,7 +171,7 @@ function ZonasSection({
           </div>
         </div>
       ) : (
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <th>Nombre</th>
@@ -384,16 +387,19 @@ function UbicacionesSection({ zona }: { zona: ZonaResponseDto }) {
   })
 
   return (
-    <div className="card">
+    <div className="card navy-table-card">
       <div className="card-header">
         <span className="card-title">Ubicaciones — {zona.zonaName}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer' }}>
-            <input type="checkbox" checked={includeDisabled} onChange={(e) => setIncludeDisabled(e.target.checked)} />
+          <label className="ff-toggle-wrap">
+            <span className="ff-toggle">
+              <input type="checkbox" checked={includeDisabled} onChange={(e) => setIncludeDisabled(e.target.checked)} />
+              <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+            </span>
             Mostrar deshabilitadas
           </label>
           {!readOnly && (
-            <button className="btn btn-primary btn-size-sm" onClick={openCreate}>
+            <button className="btn btn-navy btn-size-sm" onClick={openCreate}>
               <Plus size={14} /> Nueva Ubicación
             </button>
           )}
@@ -414,7 +420,7 @@ function UbicacionesSection({ zona }: { zona: ZonaResponseDto }) {
           </div>
         </div>
       ) : (
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <th>Nombre</th>
@@ -647,7 +653,7 @@ function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
   }).length
 
   return (
-    <div className="card">
+    <div className="card navy-table-card">
       <div className="card-header">
         <span className="card-title">Artículos pendientes de ubicar</span>
       </div>
@@ -667,7 +673,7 @@ function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
         </div>
       ) : (
         <>
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <th>Artículo</th>
@@ -782,7 +788,7 @@ function HistorialMovimientosSection({ warehouse }: { warehouse: string }) {
     .map((u) => ({ value: u.id, label: u.ubicacionName }))
 
   return (
-    <div className="card">
+    <div className="card navy-table-card">
       <div className="card-header">
         <span className="card-title">Historial de movimientos</span>
       </div>
@@ -828,7 +834,7 @@ function HistorialMovimientosSection({ warehouse }: { warehouse: string }) {
         </div>
       ) : (
         <>
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <th>Fecha</th>
@@ -927,7 +933,7 @@ export default function ZonasPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Zonas y Ubicaciones"
+        title={<><span className="page-title-dot" />Zonas y Ubicaciones</>}
         description="Organiza físicamente cada almacén en zonas y ubicaciones/racks, y distribuye el stock sin ubicar."
       />
 
@@ -955,17 +961,21 @@ export default function ZonasPage() {
         </button>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div style={{ width: 260 }}>
-            <SearchSelect
-              value={warehouse}
-              selectedLabel={warehouseLabel}
-              onChange={handleWarehouseChange}
-              options={warehouseOptions}
-              onSearch={setWarehouseQuery}
-              placeholder="Selecciona un almacén…"
-            />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Almacén" style={{ width: 260 }}>
+                <SearchSelect
+                  value={warehouse}
+                  selectedLabel={warehouseLabel}
+                  onChange={handleWarehouseChange}
+                  options={warehouseOptions}
+                  onSearch={setWarehouseQuery}
+                  placeholder="Selecciona un almacén…"
+                />
+              </FilterField>
+            </div>
           </div>
         </div>
       </div>

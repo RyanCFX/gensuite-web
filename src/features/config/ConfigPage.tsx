@@ -20,6 +20,7 @@ import {
   getFacturacionConfig, updateFacturacionConfig,
   listDenominaciones, createDenominacion, updateDenominacion,
   habilitarPos,
+  deshabilitarPos,
   habilitarFarmacia,
   getEcfConfig, updateEcfConfig,
 } from '@/shared/api/config'
@@ -27,10 +28,10 @@ import { listSucursales } from '@/shared/api/sucursales'
 import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { listCustomerGroups, createCustomerGroup, deleteCustomerGroup } from '@/shared/api/customers'
 import { listRoles } from '@/shared/api/usuarios'
-import type { CobrosConfig, MetodoPago, TaxLineCategory, TasaImpuesto, TasaImpuestoComponente, CreateTasaImpuestoDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError, UpdateAlmacenDto, FormatoImpresion, EcfTipoElectronico } from '@/shared/api/types'
+import type { CobrosConfig, MetodoPago, TaxLineCategory, TasaImpuesto, TasaImpuestoComponente, CreateTasaImpuestoDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError, UpdateAlmacenDto, FormatoImpresion, EcfTipoElectronico, PosDeshabilitarBloqueos } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
-import { ConfirmModal } from '@/shared/ui/Modal'
+import { ConfirmModal, Modal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -2238,6 +2239,8 @@ function FacturacionConfigSection() {
   const [plantillaImpuestoComprasDefault, setPlantillaImpuestoComprasDefault] = useState('')
   const [showPosActivar, setShowPosActivar] = useState(false)
   const [posWarehouse, setPosWarehouse] = useState('')
+  const [showDeshabilitarPosConfirm, setShowDeshabilitarPosConfirm] = useState(false)
+  const [posBloqueos, setPosBloqueos] = useState<PosDeshabilitarBloqueos | null>(null)
    const [arqueoEfectivoRequerido, setArqueoEfectivoRequerido] = useState(false)
    const [formatoImpresionDefault, setFormatoImpresionDefault] = useState<FormatoImpresion>("a4")
    const [formatosPermitidos, setFormatosPermitidos] = useState<FormatoImpresion[]>(ALL_FORMATOS_IMPRESION)
@@ -2320,6 +2323,23 @@ function FacturacionConfigSection() {
     },
     onError: (err: ApiError) => {
       toast.error(err?.message ?? 'Error al activar el módulo POS')
+    },
+  })
+
+  const deshabilitarPosMutation = useMutation({
+    mutationFn: () => deshabilitarPos(),
+    onSuccess: () => {
+      toast.success('Módulo POS desactivado')
+      setShowDeshabilitarPosConfirm(false)
+      queryClient.invalidateQueries({ queryKey: ['facturacion-config'] })
+    },
+    onError: (err: ApiError) => {
+      setShowDeshabilitarPosConfirm(false)
+      if (err?.statusCode === 409 && err.details) {
+        setPosBloqueos(err.details as unknown as PosDeshabilitarBloqueos)
+        return
+      }
+      toast.error(err?.message ?? 'Error al desactivar el módulo POS')
     },
   })
 
@@ -2503,15 +2523,22 @@ function FacturacionConfigSection() {
           </p>
 
           {data?.usaModuloPos ? (
-            <div className="inline-alert inline-alert-success" style={{ alignItems: 'flex-start' }}>
-              <span>
-                Módulo POS activo.
-                {data.posProfileDefault && (
-                  <>
-                    {' '}Perfil: <strong>{data.posProfileDefault}</strong>
-                  </>
-                )}
-              </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
+              <div className="inline-alert inline-alert-success" style={{ alignItems: 'flex-start' }}>
+                <span>
+                  Módulo POS activo.
+                  {data.posProfileDefault && (
+                    <>
+                      {' '}Perfil: <strong>{data.posProfileDefault}</strong>
+                    </>
+                  )}
+                </span>
+              </div>
+              <Permitido accion="config.pos.deshabilitar">
+                <button className="btn btn-secondary btn-size-sm" onClick={() => setShowDeshabilitarPosConfirm(true)}>
+                  Desactivar módulo POS
+                </button>
+              </Permitido>
             </div>
           ) : !showPosActivar ? (
             <button className="btn btn-secondary btn-size-sm" onClick={() => setShowPosActivar(true)}>
@@ -2779,7 +2806,92 @@ function FacturacionConfigSection() {
           </button>
         </div>
       </div>
+
+      <ConfirmModal
+        open={showDeshabilitarPosConfirm}
+        onClose={() => setShowDeshabilitarPosConfirm(false)}
+        onConfirm={() => deshabilitarPosMutation.mutate()}
+        title="¿Desactivar el módulo POS?"
+        description="Se desactivarán los turnos de caja y la cola de cobro para este tenant. Los turnos y facturas ya registrados se conservan."
+        confirmLabel="Desactivar módulo POS"
+        loading={deshabilitarPosMutation.isPending}
+      />
+
+      <PosBloqueosModal bloqueos={posBloqueos} onClose={() => setPosBloqueos(null)} />
     </div>
+  )
+}
+
+// Lista los documentos que bloquean POST /config/pos/deshabilitar (409), agrupados con enlaces
+// a la pantalla donde el usuario debe resolver cada uno.
+function PosBloqueosModal({ bloqueos, onClose }: { bloqueos: PosDeshabilitarBloqueos | null; onClose: () => void }) {
+  if (!bloqueos) return null
+  const { turnosAbiertos, cierresBorrador, colaCaja, posConSaldo } = bloqueos
+  const nada = turnosAbiertos.length === 0 && cierresBorrador.length === 0 && colaCaja.length === 0 && posConSaldo.length === 0
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="No se puede desactivar el módulo POS"
+      subtitle="Resuelve estos pendientes y vuelve a intentarlo."
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {nada && <p className="ff-hint" style={{ margin: 0 }}>No hay detalle de los documentos que bloquean la desactivación.</p>}
+        {turnosAbiertos.length > 0 && (
+          <div>
+            <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>Cajas abiertas ({turnosAbiertos.length})</p>
+            <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {turnosAbiertos.map((t) => (
+                <li key={t.id} style={{ fontSize: 13 }}>
+                  <Link to={`/turnos/${encodeURIComponent(t.id)}`}>{t.id}</Link> — {t.cajero}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {cierresBorrador.length > 0 && (
+          <div>
+            <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>Cierres de turno sin someter ({cierresBorrador.length})</p>
+            <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {cierresBorrador.map((t) => (
+                <li key={t.id} style={{ fontSize: 13 }}>
+                  <Link to={`/turnos/${encodeURIComponent(t.id)}`}>{t.id}</Link> — {t.cajero}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {colaCaja.length > 0 && (
+          <div>
+            <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
+              Facturas en la cola de caja sin cobrar ({colaCaja.length}) — <Link to="/caja/por-cobrar">ir a Cola de Caja</Link>
+            </p>
+            <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {colaCaja.map((id) => (
+                <li key={id} style={{ fontSize: 13 }}>
+                  <Link to={`/facturas/${encodeURIComponent(id)}`}>{id}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {posConSaldo.length > 0 && (
+          <div>
+            <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
+              Facturas POS con saldo pendiente ({posConSaldo.length}) — <Link to="/caja/pendientes">ir a Cobros Pendientes</Link>
+            </p>
+            <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {posConSaldo.map((id) => (
+                <li key={id} style={{ fontSize: 13 }}>
+                  <Link to={`/facturas/${encodeURIComponent(id)}`}>{id}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Modal>
   )
 }
 
@@ -2799,7 +2911,7 @@ function EcfConfigSection() {
   const [adjuntarPdfa, setAdjuntarPdfa] = useState(false)
   const [umbralAlertaSecuencia, setUmbralAlertaSecuencia] = useState(50)
   const [emitirAlSometer, setEmitirAlSometer] = useState(true)
-  const [bloquearSubmitSiAuraCaido, setBloquearSubmitSiAuraCaido] = useState(true)
+  const [bloquearSubmitSiVegaCaido, setBloquearSubmitSiVegaCaido] = useState(true)
   const [showAdvanced, setShowAdvanced] = useState(false)
   // 400 al habilitar e-CF en modo live sin certificación DGII completa (F9 §3.1).
   const [certRequiredMsg, setCertRequiredMsg] = useState('')
@@ -2814,7 +2926,7 @@ function EcfConfigSection() {
       setAdjuntarPdfa(data.adjuntarPdfa ?? false)
       setUmbralAlertaSecuencia(data.umbralAlertaSecuencia ?? 50)
       setEmitirAlSometer(data.emitirAlSometer ?? true)
-      setBloquearSubmitSiAuraCaido(data.bloquearSubmitSiAuraCaido ?? true)
+      setBloquearSubmitSiVegaCaido(data.bloquearSubmitSiVegaCaido ?? true)
     }
   }, [data])
 
@@ -2828,7 +2940,7 @@ function EcfConfigSection() {
       adjuntarPdfa,
       umbralAlertaSecuencia,
       emitirAlSometer,
-      bloquearSubmitSiAuraCaido,
+      bloquearSubmitSiVegaCaido,
     }),
     onSuccess: () => {
       toast.success('Configuración de facturación electrónica actualizada')
@@ -3038,14 +3150,14 @@ function EcfConfigSection() {
                   <input
                     type="checkbox"
                     className="ff-check"
-                    checked={bloquearSubmitSiAuraCaido}
+                    checked={bloquearSubmitSiVegaCaido}
                     disabled={!habilitado}
-                    onChange={(e) => setBloquearSubmitSiAuraCaido(e.target.checked)}
+                    onChange={(e) => setBloquearSubmitSiVegaCaido(e.target.checked)}
                   />
-                  <span style={{ fontSize: 13 }}>Bloquear sometimiento si Aura no responde</span>
+                  <span style={{ fontSize: 13 }}>Bloquear sometimiento si Vega no responde</span>
                 </label>
                 <p className="ff-hint" style={{ marginTop: 4 }}>
-                  Si Aura/DGII no responde: activo = se bloquea la facturación (default seguro); inactivo =
+                  Si Vega/DGII no responde: activo = se bloquea la facturación (default seguro); inactivo =
                   se activa contingencia automáticamente y se sigue facturando.
                 </p>
               </div>
@@ -3063,16 +3175,16 @@ function EcfConfigSection() {
           </button>
         </div>
 
-        {/* Estado de conexión con Aura — solo lectura */}
+        {/* Estado de conexión con Vega — solo lectura */}
         <div style={{ borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
-          <label className="ff-label">Estado de conexión con Aura</label>
+          <label className="ff-label">Estado de conexión con Vega</label>
           <p className="ff-hint" style={{ marginBottom: 8 }}>
-            Gestionado por soporte — todavía no hay un flujo de auto-servicio para conectar este tenant a Aura
+            Gestionado por soporte — todavía no hay un flujo de auto-servicio para conectar este tenant a Vega
             desde aquí.
           </p>
           {!provisioning?.provisionado ? (
             <div className="empty-state" style={{ padding: '20px 0' }}>
-              <p className="empty-title">Este tenant aún no está conectado a Aura</p>
+              <p className="empty-title">Este tenant aún no está conectado a Vega</p>
               <p className="empty-sub">Contacta a soporte para activar la facturación electrónica.</p>
             </div>
           ) : (

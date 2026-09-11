@@ -7,12 +7,13 @@ import type { Supplier } from '@/shared/api/types'
 import { formatDOP } from '@/lib/formatters'
 import { useDebounce } from '@/lib/useDebounce'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { Plus, ChevronLeft, ChevronRight, Search, Pencil, Ban } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Search, Pencil, Ban, SlidersHorizontal } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
 import { FilterField } from '@/shared/ui/FilterField'
+import { Drawer } from '@/shared/ui/Drawer'
 
 const PAGE_SIZE = 20
 
@@ -28,6 +29,7 @@ export default function SuppliersPage() {
   const [diasCreditoMax, setDiasCreditoMax] = useState('')
   const [page, setPage] = useState(1)
   const [toDisable, setToDisable] = useState<Supplier | null>(null)
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
 
   const debouncedSearch = useDebounce(search, 300)
@@ -69,6 +71,14 @@ export default function SuppliersPage() {
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
 
+  const activeMoreFiltersCount = [diasCreditoMin, diasCreditoMax].filter((v) => v !== '').length
+
+  function clearMoreFilters() {
+    setDiasCreditoMin('')
+    setDiasCreditoMax('')
+    setPage(1)
+  }
+
   function getIdentifier(s: Supplier) {
     if (s.rnc) return s.rnc
     if (s.cedula) return s.cedula
@@ -78,10 +88,10 @@ export default function SuppliersPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Proveedores"
+        title={<><span className="page-title-dot" />Proveedores</>}
         description={data ? `${data.meta.total} proveedores en total` : ''}
         action={
-          <button className="btn btn-primary" onClick={() => navigate('/proveedores/nuevo')}>
+          <button className="btn btn-navy" onClick={() => navigate('/proveedores/nuevo')}>
             <Plus size={16} />
             Nuevo Proveedor
           </button>
@@ -89,69 +99,65 @@ export default function SuppliersPage() {
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div className="filter-bar">
-          <div className="filter-bar-left">
-            <div className="search-input-wrap">
-              <Search size={14} className="search-input-icon" />
-              <input
-                className="search-input"
-                placeholder="Buscar por nombre, RNC…"
-                value={search}
-                onChange={handleSearchChange}
-              />
-            </div>
-            <label className="ff-check-wrap">
-              <input
-                type="checkbox"
-                className="ff-check"
-                checked={showExterior}
-                onChange={(e) => { setShowExterior(e.target.checked); setPage(1) }}
-              />
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Solo proveedores exterior</span>
-            </label>
-            <div className="search-input-wrap">
-              <Search size={14} className="search-input-icon" />
-              <input
-                className="search-input"
-                placeholder="Buscar RNC…"
-                value={rnc}
-                onChange={(e) => { setRnc(e.target.value); setPage(1) }}
-              />
-            </div>
-            <FilterField label="Tipo">
-              <Select value={supplierType} onValueChange={(val) => { setSupplierType(val); setPage(1) }}>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="Company">Empresa</SelectItem>
-                <SelectItem value="Individual">Individual</SelectItem>
-              </Select>
-            </FilterField>
-            <FilterField label="Días de crédito">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input
-                  type="number"
-                  className="ff-input ff-input-sm"
-                  style={{ width: 100 }}
-                  placeholder="Días crédito min"
-                  value={diasCreditoMin}
-                  onChange={(e) => { setDiasCreditoMin(e.target.value); setPage(1) }}
-                />
-                <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-                <input
-                  type="number"
-                  className="ff-input ff-input-sm"
-                  style={{ width: 100 }}
-                  placeholder="Días crédito max"
-                  value={diasCreditoMax}
-                  onChange={(e) => { setDiasCreditoMax(e.target.value); setPage(1) }}
-                />
+        <div className="card filter-card-navy">
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="filter-bar" style={{ margin: 0 }}>
+              <div className="filter-bar-left">
+                <div className="search-input-wrap">
+                  <Search size={14} className="search-input-icon" />
+                  <input
+                    className="search-input"
+                    placeholder="Buscar por nombre, RNC…"
+                    value={search}
+                    onChange={handleSearchChange}
+                  />
+                </div>
+                <div className="search-input-wrap">
+                  <Search size={14} className="search-input-icon" />
+                  <input
+                    className="search-input"
+                    placeholder="Buscar RNC…"
+                    value={rnc}
+                    onChange={(e) => { setRnc(e.target.value); setPage(1) }}
+                  />
+                </div>
+                <FilterField label="Tipo">
+                  <Select value={supplierType} onValueChange={(val) => { setSupplierType(val); setPage(1) }}>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="Company">Empresa</SelectItem>
+                    <SelectItem value="Individual">Individual</SelectItem>
+                  </Select>
+                </FilterField>
               </div>
-            </FilterField>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+              <label className="ff-toggle-wrap">
+                <span className="ff-toggle">
+                  <input
+                    type="checkbox"
+                    checked={showExterior}
+                    onChange={(e) => { setShowExterior(e.target.checked); setPage(1) }}
+                  />
+                  <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+                </span>
+                Solo proveedores exterior
+              </label>
+
+              <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+                <SlidersHorizontal size={13} />
+                Más filtros
+                {activeMoreFiltersCount > 0 && (
+                  <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="card">
+        <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table navy-table">
               <thead>
                 <tr>
                   <SortableTh label="Nombre" sortKey="supplierName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
@@ -249,6 +255,40 @@ export default function SuppliersPage() {
           )}
         </div>
       </div>
+
+      <Drawer
+        open={moreFiltersOpen}
+        onClose={() => setMoreFiltersOpen(false)}
+        title="Más filtros"
+        subtitle="Refina la búsqueda de proveedores"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={clearMoreFilters}>Limpiar</button>
+            <button className="btn btn-navy" onClick={() => setMoreFiltersOpen(false)}>Aplicar</button>
+          </>
+        }
+      >
+        <div className="ff-wrap">
+          <label className="ff-label">Días de crédito</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Mín."
+              value={diasCreditoMin}
+              onChange={(e) => { setDiasCreditoMin(e.target.value); setPage(1) }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Máx."
+              value={diasCreditoMax}
+              onChange={(e) => { setDiasCreditoMax(e.target.value); setPage(1) }}
+            />
+          </div>
+        </div>
+      </Drawer>
 
       {/* Disable confirm modal */}
       {toDisable && (

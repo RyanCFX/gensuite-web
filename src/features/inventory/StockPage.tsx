@@ -83,7 +83,7 @@ export default function StockPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Stock Actual"
+        title={<><span className="page-title-dot" />Stock Actual</>}
         description="Vista del inventario por almacén"
       />
 
@@ -130,57 +130,65 @@ export default function StockPage() {
         </div>
       )}
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Almacén" style={{ width: 200 }}>
-            <SearchSelect
-              value={warehouse === 'all' ? '' : warehouse}
-              onChange={(val) => { setWarehouse(val || 'all'); if (val) setBranch('') }}
-              options={warehouseOptions}
-              onSearch={setWarehouseSearch}
-              selectedLabel={warehouse === 'all' ? '' : warehouse}
-              placeholder="Todos los almacenes"
-            />
-          </FilterField>
-          {warehouse === 'all' && (
-            <FilterField label="Sucursal" style={{ width: 200 }}>
-              <SearchSelect
-                value={branch}
-                onChange={setBranch}
-                options={branchOptions}
-                onSearch={setBranchSearch}
-                selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
-                placeholder="Todas las sucursales"
-              />
-            </FilterField>
-          )}
-          <input
-            className="ff-input ff-input-sm"
-            placeholder="Categoría / nombre"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            style={{ width: 180 }}
-          />
-          <input
-            className="ff-input ff-input-sm"
-            placeholder="Marca"
-            value={brand}
-            onChange={(e) => setBrand(e.target.value)}
-            style={{ width: 160 }}
-          />
-          <FilterField label="Estado">
-            <Select value={stockFilter} onValueChange={setStockFilter}>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="in_stock">En stock</SelectItem>
-              <SelectItem value="out_of_stock">Sin stock</SelectItem>
-            </Select>
-          </FilterField>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Almacén" style={{ width: 200 }}>
+                <SearchSelect
+                  value={warehouse === 'all' ? '' : warehouse}
+                  onChange={(val) => { setWarehouse(val || 'all'); if (val) setBranch('') }}
+                  options={warehouseOptions}
+                  onSearch={setWarehouseSearch}
+                  selectedLabel={warehouse === 'all' ? '' : warehouse}
+                  placeholder="Todos los almacenes"
+                />
+              </FilterField>
+              {warehouse === 'all' && (
+                <FilterField label="Sucursal" style={{ width: 200 }}>
+                  <SearchSelect
+                    value={branch}
+                    onChange={setBranch}
+                    options={branchOptions}
+                    onSearch={setBranchSearch}
+                    selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
+                    placeholder="Todas las sucursales"
+                  />
+                </FilterField>
+              )}
+              <FilterField label="Categoría / nombre">
+                <input
+                  className="ff-input ff-input-sm"
+                  placeholder="Categoría / nombre"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  style={{ width: 180 }}
+                />
+              </FilterField>
+              <FilterField label="Marca">
+                <input
+                  className="ff-input ff-input-sm"
+                  placeholder="Marca"
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                  style={{ width: 160 }}
+                />
+              </FilterField>
+              <FilterField label="Estado">
+                <Select value={stockFilter} onValueChange={setStockFilter}>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="in_stock">En stock</SelectItem>
+                  <SelectItem value="out_of_stock">Sin stock</SelectItem>
+                </Select>
+              </FilterField>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <SortableTh label="Código" sortKey="itemCode" orderBy={orderBy} onSort={sort} />

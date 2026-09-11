@@ -21,36 +21,43 @@ export default function PendientesPagoPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Facturas Pendientes de Pago"
+        title={<><span className="page-title-dot" />Facturas Pendientes de Pago</>}
         description="Facturas de compra con saldo pendiente a proveedores"
       />
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={15} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por proveedor…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div className="search-input-wrap">
+                <Search size={15} className="search-input-icon" />
+                <input
+                  className="search-input"
+                  placeholder="Buscar por proveedor…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
-            <input
-              type="checkbox"
-              checked={overdueOnly}
-              onChange={(e) => setOverdueOnly(e.target.checked)}
-            />
+          <label className="ff-toggle-wrap">
+            <span className="ff-toggle">
+              <input
+                type="checkbox"
+                checked={overdueOnly}
+                onChange={(e) => setOverdueOnly(e.target.checked)}
+              />
+              <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+            </span>
             Solo vencidas
           </label>
         </div>
       </div>
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <th>Factura</th>

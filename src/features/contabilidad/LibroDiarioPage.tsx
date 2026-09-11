@@ -105,12 +105,12 @@ export default function LibroDiarioPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Libro Diario</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Libro Diario</h1>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
         <div className="card-body">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
             <div className="ff-wrap">
@@ -165,7 +165,7 @@ export default function LibroDiarioPage() {
                 <SelectItem value="">Sin agrupar</SelectItem>
               </Select>
             </div>
-            <button className="btn btn-primary" onClick={handleSearch}>
+            <button className="btn btn-navy" onClick={handleSearch}>
               <Search size={14} />
               Buscar
             </button>
@@ -182,9 +182,9 @@ export default function LibroDiarioPage() {
       </div>
 
       {/* Table */}
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <th>Identificador</th>

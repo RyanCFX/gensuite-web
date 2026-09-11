@@ -63,17 +63,17 @@ export default function BundlesPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Combos / Paquetes"
+        title={<><span className="page-title-dot" />Combos / Paquetes</>}
         description="Agrupaciones de artículos que se venden como un solo producto"
         action={
-          <button className="btn btn-primary btn-size-sm" onClick={() => { setEditId(null); setShowForm(true) }}>
+          <button className="btn btn-navy btn-size-sm" onClick={() => { setEditId(null); setShowForm(true) }}>
             <Plus size={14} /> Nuevo Combo
           </button>
         }
       />
 
-      <div className="card">
-        <div style={{ display: 'flex', gap: 8, padding: '12px 16px', borderBottom: '1px solid var(--border-default)' }}>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', gap: 8 }}>
           <div className="search-input-wrap">
             <Search size={14} className="search-input-icon" />
             <input
@@ -89,8 +89,11 @@ export default function BundlesPage() {
             <SelectItem value="disabled">Desactivados</SelectItem>
           </Select>
         </div>
+      </div>
+
+      <div className="card navy-table-card">
         <div className="table-wrap">
-          <table className="table-config">
+          <table className="table-config navy-table">
             <thead>
               <tr>
                 <SortableTh label="Nombre" sortKey="itemName" orderBy={orderBy} onSort={sort} />

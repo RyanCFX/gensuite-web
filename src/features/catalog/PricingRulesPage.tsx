@@ -387,52 +387,56 @@ export default function PricingRulesPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Descuentos por Producto</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Descuentos por Producto</h1>
           {data && <p className="page-sub">{data.meta.total} reglas</p>}
           <p className="page-sub" style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4 }}>
             <Info size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
             Estos descuentos se aplican automáticamente en cada factura o cotización — el vendedor no necesita tocarlos.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={openCreate}>
+        <button className="btn btn-navy" onClick={openCreate}>
           <Plus size={16} />
           Nueva Regla
         </button>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Aplica a">
-            <Select
-              value={applyOnFilter || '_all'}
-              onValueChange={(val) => { setApplyOnFilter(val === '_all' ? '' : val); setPage(1) }}
-            >
-              <SelectItem value="_all">Todos los tipos de aplicación</SelectItem>
-              {applyOnOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
-            </Select>
-          </FilterField>
-          <FilterField label="Estado">
-            <Select
-              value={disabledFilter || '_all'}
-              onValueChange={(val) => { setDisabledFilter(val === '_all' ? '' : val); setPage(1) }}
-            >
-              <SelectItem value="_all">Todos los estados</SelectItem>
-              <SelectItem value="false">Activas</SelectItem>
-              <SelectItem value="true">Desactivadas</SelectItem>
-            </Select>
-          </FilterField>
-          <div className="search-input-wrap">
-            <Search size={14} className="search-input-icon" />
-            <input className="search-input" placeholder="Buscar por título…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Aplica a">
+                <Select
+                  value={applyOnFilter || '_all'}
+                  onValueChange={(val) => { setApplyOnFilter(val === '_all' ? '' : val); setPage(1) }}
+                >
+                  <SelectItem value="_all">Todos los tipos de aplicación</SelectItem>
+                  {applyOnOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </Select>
+              </FilterField>
+              <FilterField label="Estado">
+                <Select
+                  value={disabledFilter || '_all'}
+                  onValueChange={(val) => { setDisabledFilter(val === '_all' ? '' : val); setPage(1) }}
+                >
+                  <SelectItem value="_all">Todos los estados</SelectItem>
+                  <SelectItem value="false">Activas</SelectItem>
+                  <SelectItem value="true">Desactivadas</SelectItem>
+                </Select>
+              </FilterField>
+              <div className="search-input-wrap">
+                <Search size={14} className="search-input-icon" />
+                <input className="search-input" placeholder="Buscar por título…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <SortableTh label="Título" sortKey="title" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />

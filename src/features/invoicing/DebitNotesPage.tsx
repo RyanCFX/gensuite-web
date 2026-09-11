@@ -14,7 +14,7 @@ import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import type { Invoice, CreateDebitNoteDto, EcfModificationCode } from '@/shared/api/types'
 import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
 import { Select, SelectItem } from '@/components/ui/select'
-import { Plus, Loader2, Trash2, Download } from 'lucide-react'
+import { Plus, Loader2, Trash2, Download, SlidersHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -26,6 +26,7 @@ import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
+import { Drawer } from '@/shared/ui/Drawer'
 
 interface NoteItem {
   itemCode: string
@@ -93,6 +94,7 @@ export default function DebitNotesPage() {
   const [grandTotalMax, setGrandTotalMax] = useState('')
   const [refundedAmountMin, setRefundedAmountMin] = useState('')
   const [refundedAmountMax, setRefundedAmountMax] = useState('')
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
 
   const { data: sucursalesData } = useQuery({
     queryKey: ['sucursales-all'],
@@ -151,6 +153,22 @@ export default function DebitNotesPage() {
     sublabel: (inv.ncf ?? inv.id) + ' — ' + formatDate(inv.postingDate),
   }))
   const notes = (Array.isArray(notesData) ? notesData : []) as DebitNote[]
+
+  const activeMoreFiltersCount = [
+    createdAtFrom, createdAtTo, postingDateFrom, postingDateTo,
+    grandTotalMin, grandTotalMax, refundedAmountMin, refundedAmountMax,
+  ].filter((v) => v !== '').length
+
+  function clearMoreFilters() {
+    setCreatedAtFrom('')
+    setCreatedAtTo('')
+    setPostingDateFrom('')
+    setPostingDateTo('')
+    setGrandTotalMin('')
+    setGrandTotalMax('')
+    setRefundedAmountMin('')
+    setRefundedAmountMax('')
+  }
 
   const downloadPdfMutation = useMutation({
     mutationFn: (id: string) => downloadDebitNotePdf(id, `nota-debito-${id}.pdf`),
@@ -235,121 +253,58 @@ export default function DebitNotesPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Notas de Débito</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Notas de Débito</h1>
           <p className="page-sub">Gestiona cargos adicionales y ajustes al alza (NCF B03)</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
+        <button className="btn btn-navy" onClick={() => setModalOpen(true)}>
           <Plus size={16} /> Nueva Nota de Débito
         </button>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Sucursal" style={{ width: 200 }}>
-            <SearchSelect
-              value={filterBranch}
-              onChange={setFilterBranch}
-              options={filterBranchOptions}
-              onSearch={setFilterBranchSearch}
-              selectedLabel={filterBranch}
-              placeholder="Todas las sucursales"
-            />
-          </FilterField>
-          <FilterField label="Departamento" style={{ minWidth: 220 }}>
-            <DepartmentSelect value={filterDepartment} onChange={setFilterDepartment} placeholder="Todos los departamentos" />
-          </FilterField>
-          <FilterField label="NCF">
-            <input
-              className="ff-input ff-input-sm"
-              style={{ width: 160 }}
-              placeholder="Buscar NCF…"
-              value={ncf}
-              onChange={(e) => setNcf(e.target.value)}
-            />
-          </FilterField>
-          <FilterField label="Creada desde">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={createdAtFrom}
-              onChange={setCreatedAtFrom}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Creada hasta">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={createdAtTo}
-              onChange={setCreatedAtTo}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Fecha desde">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={postingDateFrom}
-              onChange={setPostingDateFrom}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Fecha hasta">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={postingDateTo}
-              onChange={setPostingDateTo}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Total">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Total mín."
-                value={grandTotalMin}
-                onChange={(e) => setGrandTotalMin(e.target.value)}
-              />
-              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Total máx."
-                value={grandTotalMax}
-                onChange={(e) => setGrandTotalMax(e.target.value)}
-              />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Sucursal" style={{ width: 200 }}>
+                <SearchSelect
+                  value={filterBranch}
+                  onChange={setFilterBranch}
+                  options={filterBranchOptions}
+                  onSearch={setFilterBranchSearch}
+                  selectedLabel={filterBranch}
+                  placeholder="Todas las sucursales"
+                />
+              </FilterField>
+              <FilterField label="Departamento" style={{ minWidth: 220 }}>
+                <DepartmentSelect value={filterDepartment} onChange={setFilterDepartment} placeholder="Todos los departamentos" />
+              </FilterField>
+              <FilterField label="NCF">
+                <input
+                  className="ff-input ff-input-sm"
+                  style={{ width: 160 }}
+                  placeholder="Buscar NCF…"
+                  value={ncf}
+                  onChange={(e) => setNcf(e.target.value)}
+                />
+              </FilterField>
             </div>
-          </FilterField>
-          <FilterField label="Monto reembolsado">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Reemb. mín."
-                value={refundedAmountMin}
-                onChange={(e) => setRefundedAmountMin(e.target.value)}
-              />
-              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Reemb. máx."
-                value={refundedAmountMax}
-                onChange={(e) => setRefundedAmountMax(e.target.value)}
-              />
-            </div>
-          </FilterField>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+              <SlidersHorizontal size={13} />
+              Más filtros
+              {activeMoreFiltersCount > 0 && (
+                <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} />
@@ -378,7 +333,7 @@ export default function DebitNotesPage() {
                   <div className="empty-state">
                     <div className="empty-title">Sin notas de débito</div>
                     <p className="empty-sub">Crea una nota de débito para agregar cargos adicionales a una factura.</p>
-                    <button className="btn btn-primary btn-size-sm" onClick={() => setModalOpen(true)}>
+                    <button className="btn btn-navy btn-size-sm" onClick={() => setModalOpen(true)}>
                       <Plus size={14} /> Nueva Nota de Débito
                     </button>
                   </div>
@@ -421,6 +376,80 @@ export default function DebitNotesPage() {
           </tbody>
         </table>
       </div>
+      </div>
+
+      <Drawer
+        open={moreFiltersOpen}
+        onClose={() => setMoreFiltersOpen(false)}
+        title="Más filtros"
+        subtitle="Refina la búsqueda de notas de débito"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={clearMoreFilters}>Limpiar</button>
+            <button className="btn btn-navy" onClick={() => setMoreFiltersOpen(false)}>Aplicar</button>
+          </>
+        }
+      >
+        <div className="ff-wrap">
+          <label className="ff-label">Fecha de creación</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DatePicker className="ff-input" value={createdAtFrom} onChange={setCreatedAtFrom} clearable />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker className="ff-input" value={createdAtTo} onChange={setCreatedAtTo} clearable />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Fecha de emisión</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DatePicker className="ff-input" value={postingDateFrom} onChange={setPostingDateFrom} clearable />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker className="ff-input" value={postingDateTo} onChange={setPostingDateTo} clearable />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Total</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Total mín."
+              value={grandTotalMin}
+              onChange={(e) => setGrandTotalMin(e.target.value)}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Total máx."
+              value={grandTotalMax}
+              onChange={(e) => setGrandTotalMax(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Monto reembolsado</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Reemb. mín."
+              value={refundedAmountMin}
+              onChange={(e) => setRefundedAmountMin(e.target.value)}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Reemb. máx."
+              value={refundedAmountMax}
+              onChange={(e) => setRefundedAmountMax(e.target.value)}
+            />
+          </div>
+        </div>
+      </Drawer>
 
       {modalOpen && (
         <div className="modal-overlay" onClick={requestClose}>
@@ -453,7 +482,7 @@ export default function DebitNotesPage() {
                   />
                   <p className="ff-hint">
                     La nota de débito queda vinculada a esta factura. Obligatoria para notas electrónicas
-                    (Aura exige el comprobante afectado).
+                    (Vega exige el comprobante afectado).
                   </p>
                   {selectedInvoice && (
                     <div style={{ marginTop: 4, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface-sunken)', fontSize: 13 }}>

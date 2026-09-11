@@ -3,14 +3,14 @@
 // La emisión ocurre en el ciclo de la factura; la anulación, desde el flujo de cancelación de la
 // factura (documento #50) — aquí no hay acciones de emitir/anular.
 //
-// CONSTANCIA: las pruebas end-to-end con datos reales quedan pendientes — ningún tenant tiene Aura
-// conectado en producción. Contra el sandbox de Aura sí hay datos.
+// CONSTANCIA: las pruebas end-to-end con datos reales quedan pendientes — ningún tenant tiene Vega
+// conectado en producción. Contra el sandbox de Vega sí hay datos.
 
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ChevronLeft, ChevronRight, Search, RefreshCw, ExternalLink } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, RefreshCw, ExternalLink, SlidersHorizontal } from 'lucide-react'
 import { listEcfEmitidos, refreshEcfEmitido } from '@/shared/api/ecf-emitidos'
 import type { VoucherEmitido, EcfStatusDgii, EcfTipoElectronico, EcfEnv } from '@/shared/api/types'
 import { useDebounce } from '@/lib/useDebounce'
@@ -20,6 +20,7 @@ import {
 } from '@/lib/dgii'
 import { FilterField } from '@/shared/ui/FilterField'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { Drawer } from '@/shared/ui/Drawer'
 import { Select, SelectItem } from '@/components/ui/select'
 
 const PAGE_SIZE = 20
@@ -55,6 +56,7 @@ export default function EcfEmitidosPage() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [archived, setArchived] = useState(false)
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
 
   const debouncedSearch = useDebounce(search, 300)
   const debouncedRnc = useDebounce(rnc, 300)
@@ -99,11 +101,21 @@ export default function EcfEmitidosPage() {
   const items = (data?.items ?? []) as VoucherEmitido[]
   const totalPages = data ? Math.max(1, Math.ceil(data.meta.total / PAGE_SIZE)) : 1
 
+  const activeMoreFiltersCount = [env, from, to].filter((v) => v !== '').length + (archived ? 1 : 0)
+
+  function clearMoreFilters() {
+    setEnv('')
+    setFrom('')
+    setTo('')
+    setArchived(false)
+    setPage(1)
+  }
+
   return (
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">e-CF Emitidos</h1>
+          <h1 className="page-title"><span className="page-title-dot" />e-CF Emitidos</h1>
           {data && <p className="page-sub">{data.meta.total} comprobantes electrónicos emitidos</p>}
         </div>
       </div>
@@ -114,68 +126,60 @@ export default function EcfEmitidosPage() {
         </div>
       )}
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={15} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por e-NCF exacto…"
-              value={search}
-              onChange={handleSearchChange}
-            />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div className="search-input-wrap">
+                <Search size={15} className="search-input-icon" />
+                <input
+                  className="search-input"
+                  placeholder="Buscar por e-NCF exacto…"
+                  value={search}
+                  onChange={handleSearchChange}
+                />
+              </div>
+              <FilterField label="RNC comprador">
+                <input
+                  className="ff-input ff-input-sm"
+                  style={{ width: 160 }}
+                  placeholder="RNC / Cédula"
+                  value={rnc}
+                  onChange={(e) => { setRnc(e.target.value); setPage(1) }}
+                />
+              </FilterField>
+              <FilterField label="Estado DGII" style={{ width: 220 }}>
+                <Select value={estado} onValueChange={(v) => { setEstado(v); setPage(1) }} placeholder="Todos los estados">
+                  {ESTADOS_DGII.map((s) => (
+                    <SelectItem key={s} value={s}>{ecfStatusLabel(s)}</SelectItem>
+                  ))}
+                </Select>
+              </FilterField>
+              <FilterField label="Tipo" style={{ width: 220 }}>
+                <Select value={typeId} onValueChange={(v) => { setTypeId(v); setPage(1) }} placeholder="Todos los tipos">
+                  {ECF_TIPOS.map((t) => (
+                    <SelectItem key={t.typeId} value={t.typeId}>{ecfTipoLabel(t.typeId)}</SelectItem>
+                  ))}
+                </Select>
+              </FilterField>
+            </div>
           </div>
-          <FilterField label="RNC comprador">
-            <input
-              className="ff-input ff-input-sm"
-              style={{ width: 160 }}
-              placeholder="RNC / Cédula"
-              value={rnc}
-              onChange={(e) => { setRnc(e.target.value); setPage(1) }}
-            />
-          </FilterField>
-          <FilterField label="Estado DGII" style={{ width: 220 }}>
-            <Select value={estado} onValueChange={(v) => { setEstado(v); setPage(1) }} placeholder="Todos los estados">
-              {ESTADOS_DGII.map((s) => (
-                <SelectItem key={s} value={s}>{ecfStatusLabel(s)}</SelectItem>
-              ))}
-            </Select>
-          </FilterField>
-          <FilterField label="Tipo" style={{ width: 220 }}>
-            <Select value={typeId} onValueChange={(v) => { setTypeId(v); setPage(1) }} placeholder="Todos los tipos">
-              {ECF_TIPOS.map((t) => (
-                <SelectItem key={t.typeId} value={t.typeId}>{ecfTipoLabel(t.typeId)}</SelectItem>
-              ))}
-            </Select>
-          </FilterField>
-          <FilterField label="Ambiente" style={{ width: 200 }}>
-            <Select value={env} onValueChange={(v) => { setEnv(v); setPage(1) }} placeholder="Todos">
-              {ENVS.map((e) => (
-                <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
-              ))}
-            </Select>
-          </FilterField>
-          <FilterField label="Desde">
-            <DatePicker className="ff-input ff-input-sm" value={from} onChange={(v) => { setFrom(v); setPage(1) }} style={{ width: 144 }} clearable />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker className="ff-input ff-input-sm" value={to} onChange={(v) => { setTo(v); setPage(1) }} style={{ width: 144 }} clearable />
-          </FilterField>
-          <FilterField label="Archivados">
-            <label className="ff-checkbox-inline" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, whiteSpace: 'nowrap' }}>
-              <input
-                type="checkbox"
-                checked={archived}
-                onChange={(e) => { setArchived(e.target.checked); setPage(1) }}
-              />
-              Incluir archivados
-            </label>
-          </FilterField>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+              <SlidersHorizontal size={13} />
+              Más filtros
+              {activeMoreFiltersCount > 0 && (
+                <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <th>e-NCF</th>
@@ -283,6 +287,7 @@ export default function EcfEmitidosPage() {
           </tbody>
         </table>
       </div>
+      </div>
 
       {data && data.meta.total > PAGE_SIZE && (
         <div className="pagination">
@@ -300,6 +305,49 @@ export default function EcfEmitidosPage() {
           </div>
         </div>
       )}
+
+      <Drawer
+        open={moreFiltersOpen}
+        onClose={() => setMoreFiltersOpen(false)}
+        title="Más filtros"
+        subtitle="Refina la búsqueda de e-CF emitidos"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={clearMoreFilters}>Limpiar</button>
+            <button className="btn btn-navy" onClick={() => setMoreFiltersOpen(false)}>Aplicar</button>
+          </>
+        }
+      >
+        <div className="ff-wrap">
+          <label className="ff-label">Ambiente</label>
+          <Select value={env} onValueChange={(v) => { setEnv(v); setPage(1) }} placeholder="Todos">
+            {ENVS.map((e) => (
+              <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
+            ))}
+          </Select>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Fecha</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DatePicker className="ff-input" value={from} onChange={(v) => { setFrom(v); setPage(1) }} clearable />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker className="ff-input" value={to} onChange={(v) => { setTo(v); setPage(1) }} clearable />
+          </div>
+        </div>
+
+        <label className="ff-toggle-wrap">
+          <span className="ff-toggle">
+            <input
+              type="checkbox"
+              checked={archived}
+              onChange={(e) => { setArchived(e.target.checked); setPage(1) }}
+            />
+            <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+          </span>
+          Incluir archivados
+        </label>
+      </Drawer>
     </div>
   )
 }

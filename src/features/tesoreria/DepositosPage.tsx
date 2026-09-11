@@ -68,48 +68,52 @@ export default function DepositosPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Depósitos"
+        title={<><span className="page-title-dot" />Depósitos</>}
         description="Depósitos bancarios, cobros de clientes, liquidaciones de tarjeta y reembolsos de proveedores"
         action={
-          <button className="btn btn-primary" onClick={() => navigate('/tesoreria/depositos/nuevo')}>
+          <button className="btn btn-navy" onClick={() => navigate('/tesoreria/depositos/nuevo')}>
             <Plus size={16} />
             Nuevo Depósito
           </button>
         }
       />
 
-      <div className="filter-bar">
-        <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
-          <FilterField label="Cuenta bancaria" style={{ width: 220 }}>
-            <CuentaBancariaSelect value={cuentaBancaria} onChange={setCuentaBancaria} placeholder="Todas las cuentas" />
-          </FilterField>
-          <FilterField label="Tipo de documento">
-            <Select value={tipoDocumento} onValueChange={setTipoDocumento} placeholder="Todos los tipos">
-              {tipos.map((t) => (
-                <SelectItem key={t.id} value={t.code}>{t.code} — {t.description}</SelectItem>
-              ))}
-            </Select>
-          </FilterField>
-          <FilterField label="Estado">
-            <Select value={estado} onValueChange={(v) => setEstado(v as EstadoFilter)} clearable={false}>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="draft">Borrador</SelectItem>
-              <SelectItem value="submitted">Sometido</SelectItem>
-              <SelectItem value="cancelled">Cancelado</SelectItem>
-            </Select>
-          </FilterField>
-          <FilterField label="Desde">
-            <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} clearable />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker className="ff-input" value={toDate} onChange={setToDate} clearable />
-          </FilterField>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
+              <FilterField label="Cuenta bancaria" style={{ width: 220 }}>
+                <CuentaBancariaSelect value={cuentaBancaria} onChange={setCuentaBancaria} placeholder="Todas las cuentas" />
+              </FilterField>
+              <FilterField label="Tipo de documento">
+                <Select value={tipoDocumento} onValueChange={setTipoDocumento} placeholder="Todos los tipos">
+                  {tipos.map((t) => (
+                    <SelectItem key={t.id} value={t.code}>{t.code} — {t.description}</SelectItem>
+                  ))}
+                </Select>
+              </FilterField>
+              <FilterField label="Estado">
+                <Select value={estado} onValueChange={(v) => setEstado(v as EstadoFilter)} clearable={false}>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="draft">Borrador</SelectItem>
+                  <SelectItem value="submitted">Sometido</SelectItem>
+                  <SelectItem value="cancelled">Cancelado</SelectItem>
+                </Select>
+              </FilterField>
+              <FilterField label="Desde">
+                <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} clearable />
+              </FilterField>
+              <FilterField label="Hasta">
+                <DatePicker className="ff-input" value={toDate} onChange={setToDate} clearable />
+              </FilterField>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <SortableTh label="Fecha" sortKey="fecha" orderBy={orderBy} onSort={sort} />
