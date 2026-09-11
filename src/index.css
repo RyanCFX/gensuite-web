@@ -147,7 +147,7 @@
   --teal-accent:   oklch(60% 0.090 203);
 
   /* Sidebar — same navy brand surface, theme-invariant like the dashboard hero */
-  --sidebar-bg:          var(--ink-deep);
+  --sidebar-bg:          #0E3D51;
   --sidebar-border:      oklch(27% 0.034 228 / 60%);
   --sidebar-text:        var(--on-dark-sub);
   --sidebar-text-hover:  var(--on-dark-ink);
@@ -155,7 +155,7 @@
   --sidebar-label:       oklch(76% 0.12 70);
   --sidebar-active-bg:   oklch(83% 0.11 155);
   --sidebar-active-text: var(--ink-deep);
-  --sidebar-connector:   oklch(40% 0.02 228);
+  --sidebar-connector:   #ffffff;
 }
 
 [data-theme='dark'] {
@@ -484,7 +484,7 @@ button {
   height: 34px;
   padding: 0 10px;
   border-radius: 10px;
-  color: var(--sidebar-text);
+  color: #ffffff;
   font-size: 13px;
   font-weight: 400;
   cursor: pointer;
@@ -516,6 +516,10 @@ button {
   height: 16px;
 }
 
+.nav-child svg {
+  display: none;
+}
+
 .nav-label { flex: 1; }
 
 .nav-group-chevron {
@@ -542,8 +546,8 @@ button {
   content: '';
   position: absolute;
   left: 19px;
-  top: 4px;
-  bottom: 4px;
+  top: 14px;
+  bottom: 14px;
   width: 1px;
   background: var(--sidebar-connector);
 }
@@ -555,21 +559,19 @@ button {
   position: relative;
 }
 
-/* Horizontal connector from vertical bar to the item icon */
+/* Dot marking each submenu item along the vertical line */
 .nav-child::before {
   content: '';
   position: absolute;
   /* vertical bar is at left:19px on .nav-children (padding-left:12px),
      so from .nav-child's own left edge: 19 - 12 = 7px */
-  left: 6.5px;
-  top: 40%;
+  left: 4.5px;
+  top: 50%;
   transform: translateY(-50%);
-  /* connect from the vertical bar (7px) to just before the icon (26px) */
-  width: 10px;
-  height: 10px;
-  border-bottom: 1.8px solid var(--sidebar-connector);
-  border-left: 1.8px solid var(--sidebar-connector);
-  border-radius: 0 0 0 7px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--sidebar-connector);
   pointer-events: none;
 }
 
@@ -626,7 +628,7 @@ button {
 .nav-float-panel .nav-item.active { background: var(--surface-selected); color: var(--text-brand); }
 .nav-float-panel .nav-group-chevron { color: var(--text-tertiary); }
 .nav-float-panel .nav-children::before { background: var(--border-strong); }
-.nav-float-panel .nav-child::before { border-color: var(--border-strong); }
+.nav-float-panel .nav-child::before { background: var(--border-strong); }
 .nav-float-panel .nav-child.active { color: var(--text-brand); }
 
 /* ─── MAIN CONTENT ─── */

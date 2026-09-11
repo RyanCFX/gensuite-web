@@ -265,7 +265,7 @@ export default function DashboardPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="kpi-grid">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="kpi-card" style={{ '--i': i } as React.CSSProperties}>
+              <div key={i} className="kpi-card gap-50 w-200" style={{ '--i': i } as React.CSSProperties}>
                 <div className="dash-skeleton" style={{ width: '55%', height: 10, marginBottom: 14 }} />
                 <div className="dash-skeleton" style={{ width: '75%', height: 22, marginBottom: 10 }} />
                 <div className="dash-skeleton" style={{ width: '60%', height: 10 }} />
@@ -285,7 +285,7 @@ export default function DashboardPage() {
         <>
           {/* ── KPI cards — reales, sin deltas inventados ── */}
           <div className="kpi-grid">
-            <div className="kpi-card" style={{ '--i': 0 } as React.CSSProperties}>
+            <div className="kpi-card gap-50 w-200" style={{ '--i': 0 } as React.CSSProperties}>
               <div className="kpi-top">
                 <span className="kpi-icon"><TrendingUp size={14} /></span>
                 <span className="kpi-label">Total Ventas</span>
@@ -297,7 +297,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="kpi-card" style={{ '--i': 1 } as React.CSSProperties}>
+            <div className="kpi-card gap-50 w-200" style={{ '--i': 1 } as React.CSSProperties}>
               <div className="kpi-top">
                 <span className="kpi-icon"><ShoppingCart size={14} /></span>
                 <span className="kpi-label">Ingresos</span>
@@ -309,7 +309,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="kpi-card" style={{ '--i': 2 } as React.CSSProperties}>
+            <div className="kpi-card gap-50 w-200" style={{ '--i': 2 } as React.CSSProperties}>
               <div className="kpi-top">
                 <span className="kpi-icon" style={{ fontSize: 12, fontWeight: 700, lineHeight: 1, padding: '5px 6px' }}>$</span>
                 <span className="kpi-label">Gastos</span>
@@ -321,7 +321,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="kpi-card" style={{ '--i': 3 } as React.CSSProperties}>
+            <div className="kpi-card gap-50 w-200" style={{ '--i': 3 } as React.CSSProperties}>
               <div className="kpi-top">
                 <span className="kpi-icon" style={{ fontSize: 12, fontWeight: 700, lineHeight: 1, padding: '5px 6px' }}>$</span>
                 <span className="kpi-label">Cuentas por Cobrar</span>
@@ -333,7 +333,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="kpi-card" style={{ '--i': 4 } as React.CSSProperties}>
+            <div className="kpi-card gap-50 w-200" style={{ '--i': 4 } as React.CSSProperties}>
               <div className="kpi-top">
                 <span className="kpi-icon"><Box size={14} /></span>
                 <span className="kpi-label">Utilidad</span>

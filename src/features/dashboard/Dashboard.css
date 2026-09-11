@@ -92,6 +92,7 @@
   text-transform: uppercase;
   color: var(--dash-rose);
   margin-bottom: 2px;
+  padding-left: 18px; /* alinea con el texto del h1, que empieza después del cuadrito ::before (10px + 8px gap) */
 }
 
 .dashboard-title {
