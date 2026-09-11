@@ -350,10 +350,6 @@ export default function ItemForm() {
   const watchedPriceC = watch('priceC')
 
   const onSubmit = (data: FormValues) => {
-    if (isProduct && !data.category) {
-      toast.error('Selecciona una categoría')
-      return
-    }
     if (subcategoryOptions.length > 0 && !data.subcategory) {
       toast.error('Selecciona una subcategoría')
       return
@@ -709,7 +705,7 @@ export default function ItemForm() {
 
               <div className="form-row">
                 <div className="ff-wrap">
-                  <label className={`ff-label${isProduct ? ' ff-required' : ''}`} htmlFor="category">Categoría</label>
+                  <label className="ff-label" htmlFor="category">Categoría</label>
                   <Controller
                     name="category"
                     control={control}
