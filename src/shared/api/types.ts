@@ -4,6 +4,8 @@ export interface ApiError {
   code: string;
   message: string;
   statusCode: number;
+  /** Presente en algunos 409 (ej. Client de Vega duplicado, bloqueos al desactivar el módulo POS). */
+  details?: Record<string, unknown>;
 }
 
 export interface ApiResponse<T> {
@@ -893,7 +895,7 @@ export interface CreateDebitNoteDto {
   }[];
   notes?: string;
   /** Factura que esta nota de débito afecta. Solo obligatorio si se emite como e-CF (E33) —
-   *  Aura exige el e-NCF afectado. Sin efecto en el flujo físico (NCF B03). */
+   *  Vega exige el e-NCF afectado. Sin efecto en el flujo físico (NCF B03). */
   referenceInvoice?: string;
   /** Ver CreateCreditNoteDto.modificationCode — mismas reglas (obligatorio solo para e-CF E33). */
   modificationCode?: EcfModificationCode;
@@ -2843,7 +2845,7 @@ export interface FacturacionConfig {
 
 export type EcfTipoElectronico = "31" | "32" | "33" | "34" | "41" | "43" | "44" | "45" | "46" | "47";
 
-/** Uno por RNC emisor conectado a Aura — solo lectura, gestionado por soporte/backend. */
+/** Uno por RNC emisor conectado a Vega — solo lectura, gestionado por soporte/backend. */
 export interface EcfProvisioningCliente {
   company: string;
   rnc: string;
@@ -2852,9 +2854,9 @@ export interface EcfProvisioningCliente {
   contingencyMode?: boolean;
 }
 
-/** Estado de la conexión del tenant con Aura. Para el tenant promedio hoy `provisionado`
+/** Estado de la conexión del tenant con Vega. Para el tenant promedio hoy `provisionado`
  *  es false y el resto viene vacío/null — es normal, no un error. Solo lectura: no hay
- *  todavía un flujo de auto-servicio para conectar un tenant a Aura desde la UI. */
+ *  todavía un flujo de auto-servicio para conectar un tenant a Vega desde la UI. */
 export interface EcfProvisioning {
   provisionado: boolean;
   activeMode: "test" | "live" | null;
@@ -2869,14 +2871,14 @@ export interface EcfConfig {
   /** typeId de e-CF habilitados para esta compañía. Un tipo NO listado sigue emitiéndose
    *  como NCF físico aunque `habilitado` esté activo — migración por tipo, no big-bang. */
   tiposElectronicos: EcfTipoElectronico[];
-  auraClientId?: string | null;
+  vegaClientId?: string | null;
   ambiente?: string | null;
   contingenciaActiva: boolean;
   /** Si está activo, la emisión del e-CF ocurre automáticamente al someter el documento. */
   emitirAlSometer: boolean;
-  /** Si Aura/DGII no responde: true = se bloquea la facturación (default seguro); false =
+  /** Si Vega/DGII no responde: true = se bloquea la facturación (default seguro); false =
    *  se activa contingencia automáticamente. */
-  bloquearSubmitSiAuraCaido: boolean;
+  bloquearSubmitSiVegaCaido: boolean;
   /** 1=Contado, 2=Crédito, 3=Gratuito. */
   tipoPagoDefault: 1 | 2 | 3;
   /** 01=Habituales, 02=Financieros, 03=Extraordinarios, 04=Arrendamientos, 05=Venta de
@@ -2900,7 +2902,7 @@ export interface UpdateEcfConfigDto {
   habilitado?: boolean;
   tiposElectronicos?: EcfTipoElectronico[];
   emitirAlSometer?: boolean;
-  bloquearSubmitSiAuraCaido?: boolean;
+  bloquearSubmitSiVegaCaido?: boolean;
   tipoPagoDefault?: 1 | 2 | 3;
   tipoIngresosDefault?: "01" | "02" | "03" | "04" | "05" | "06";
   diasLimiteAprobacionComercial?: number;
@@ -2987,16 +2989,36 @@ export interface CreateEcfClientDto {
   mode?: EcfMode;
 }
 
-/** Objeto Client de Aura (respuesta de POST /config/ecf/admin/clients). Laxo a propósito. */
+/** Objeto Client de Vega (respuesta de POST /config/ecf/admin/clients, y de cada item de
+ *  GET /config/ecf/admin/clients). Laxo a propósito. */
 export interface EcfClient {
   id: string;
   rnc: string;
   legalName: string;
+  tradeName?: string | null;
   activeEnv?: string;
   hasCertificate?: boolean;
   certificationStage?: string | null;
   certificateExpiresAt?: string | null;
+  contingencyMode?: boolean;
+  /** Solo en GET /clients — Company de este tenant a la que ya está vinculado, o null si
+   *  está libre para vincular con POST /clients/link. */
+  linkedCompany?: string | null;
   [key: string]: unknown;
+}
+
+export interface EcfClientsListResult {
+  clients: EcfClient[];
+  mode: EcfMode;
+}
+
+/** POST /config/ecf/admin/clients/link — vincula un Client que ya existe en Vega sin crearlo. */
+export interface LinkEcfClientDto {
+  /** Nombre EXACTO de la Company en ERPNext. */
+  company: string;
+  vegaClientId: string;
+  /** Opcional — si se omite usa el ambiente activo ya conectado. */
+  mode?: EcfMode;
 }
 
 export interface UploadEcfCertificateDto {
@@ -3029,7 +3051,7 @@ export interface EcfSubmitResult {
   status: string;
   qrUrl?: string | null;
   securityCode?: string | null;
-  /** true = emitido en modo contingencia (caída de Aura/DGII). Caso muy raro. */
+  /** true = emitido en modo contingencia (caída de Vega/DGII). Caso muy raro. */
   deferred?: boolean;
   message?: string;
 }
@@ -3094,7 +3116,7 @@ export interface FlushContingenciaResult {
   queued: number;
   /** Cuántos superaron las 72h legales sin transmitirse (requieren anulación manual + 608). */
   expired: number;
-  /** Cuántos son de tipos que Aura no permite reenviar en contingencia (E41/E43/E45/E46/E47). */
+  /** Cuántos son de tipos que Vega no permite reenviar en contingencia (E41/E43/E45/E46/E47). */
   disallowed: number;
 }
 
@@ -3284,6 +3306,25 @@ export interface HabilitarPosDto {
 export interface HabilitarPosResult {
   posProfile: string;
   cajeroRole: string;
+}
+
+// POST /config/pos/deshabilitar
+export interface DeshabilitarPosResult {
+  message: string;
+}
+
+export interface PosTurnoBloqueante {
+  id: string;
+  cajero: string;
+}
+
+/** `error.details` del 409 de POST /config/pos/deshabilitar — las cuatro listas siempre vienen
+ *  (vacías si no aplican). `colaCaja` y `posConSaldo` son docnames de factura (ver /facturas/:id). */
+export interface PosDeshabilitarBloqueos {
+  turnosAbiertos: PosTurnoBloqueante[];
+  cierresBorrador: PosTurnoBloqueante[];
+  colaCaja: string[];
+  posConSaldo: string[];
 }
 
 // GET /pos/turnos/actual — null si el cajero no tiene turno abierto

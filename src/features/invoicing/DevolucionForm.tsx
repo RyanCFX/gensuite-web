@@ -105,7 +105,7 @@ export default function DevolucionForm() {
   })
 
   // e-CF: si la Nota de Crédito (typeId 34) se emite como comprobante electrónico para este
-  // tenant, el modificationCode (Tabla VI DGII) es obligatorio para poder someterla en Aura.
+  // tenant, el modificationCode (Tabla VI DGII) es obligatorio para poder someterla en Vega.
   const { data: ecfTipos } = useQuery({ queryKey: ['ecf-tipos'], queryFn: getEcfTipos, staleTime: 60 * 60_000 })
   const notaCreditoEsEcf = ecfTipoElectronicoHabilitado(ecfTipos, '34')
 

@@ -830,6 +830,7 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 | `config.facturacion.ver` | Ver | `Facturacion Config.read` | — |
 | `config.facturacion.editar` | Editar | `Facturacion Config.write` | — |
 | `config.pos.habilitar` | Habilitar módulo POS | `Facturacion Config.write` | — |
+| `config.pos.deshabilitar` | Desactivar módulo POS | `Facturacion Config.write` | — |
 
 #### Configuración de Farmacia
 

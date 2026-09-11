@@ -1,5 +1,5 @@
 // GENERADO automáticamente por scripts/gen-acciones.mjs — NO editar a mano.
-// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (372 acciones). Regenerar: node scripts/gen-acciones.mjs
+// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (373 acciones). Regenerar: node scripts/gen-acciones.mjs
 
 export type AccionId =
   | 'aseguradoras.crear'
@@ -147,6 +147,7 @@ export type AccionId =
   | 'config.ncf.editar'
   | 'config.ncf.listar'
   | 'config.paises.ver'
+  | 'config.pos.deshabilitar'
   | 'config.pos.habilitar'
   | 'config.retenciones.crear'
   | 'config.retenciones.editar'
@@ -521,6 +522,7 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'config.ncf.editar',
   'config.ncf.listar',
   'config.paises.ver',
+  'config.pos.deshabilitar',
   'config.pos.habilitar',
   'config.retenciones.crear',
   'config.retenciones.editar',

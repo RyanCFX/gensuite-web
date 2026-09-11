@@ -5435,7 +5435,7 @@
     },
     "/api/v1/invoices/{id}/ecf/pdfa": {
       "get": {
-        "description": "Proxy de Aura — solo disponible si la factura se emitió electrónicamente (custom_ecf_voucher_id). 404 si no.",
+        "description": "Proxy de Vega — solo disponible si la factura se emitió electrónicamente (custom_ecf_voucher_id). 404 si no.",
         "operationId": "InvoicesController_getEcfPdfA",
         "parameters": [
           {
@@ -5694,6 +5694,36 @@
           }
         ],
         "summary": "Activar el módulo POS (turnos de caja) para este tenant",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/pos/deshabilitar": {
+      "post": {
+        "description": "Marca Facturacion Config.usa_modulo_pos=0. Responde 409 si hay cajas abiertas, cierres de turno sin someter, facturas en la cola de caja sin cobrar o facturas POS con saldo pendiente — `details` lista los documentos que bloquean.",
+        "operationId": "ConfigController_disablePosModule",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Desactivar el módulo POS (turnos de caja) para este tenant",
         "tags": [
           "Configuración"
         ]
@@ -10728,7 +10758,7 @@
             "bearer": []
           }
         ],
-        "summary": "Configuración de facturación electrónica: tipos habilitados, defaults y estado de provisioning en Aura",
+        "summary": "Configuración de facturación electrónica: tipos habilitados, defaults y estado de provisioning en Vega",
         "tags": [
           "Facturación Electrónica (e-CF)"
         ]
@@ -10802,7 +10832,7 @@
             "bearer": []
           }
         ],
-        "summary": "Rangos e-NCF del tenant (proxy de Aura Sequences)",
+        "summary": "Rangos e-NCF del tenant (proxy de Vega Sequences)",
         "tags": [
           "Facturación Electrónica (e-CF)"
         ]
@@ -10953,7 +10983,7 @@
     },
     "/api/v1/config/ecf/secuencias/anular-rangos": {
       "post": {
-        "description": "Aura salta automáticamente cualquier e-CF ya ACCEPTED dentro del rango — no anula un comprobante aceptado por la DGII.",
+        "description": "Vega salta automáticamente cualquier e-CF ya ACCEPTED dentro del rango — no anula un comprobante aceptado por la DGII.",
         "operationId": "EcfController_voidRanges",
         "parameters": [
           {
@@ -11030,7 +11060,7 @@
     },
     "/api/v1/config/ecf/certificacion": {
       "get": {
-        "description": "La certificación real se opera desde el panel de Aura — esto es solo consulta.",
+        "description": "La certificación real se opera desde el panel de Vega — esto es solo consulta.",
         "operationId": "EcfController_getCertificacion",
         "parameters": [
           {
@@ -11267,14 +11297,55 @@
             "bearer": []
           }
         ],
-        "summary": "Conectar la API Key de Aura del tenant (creada manualmente en el panel de Aura)",
+        "summary": "Conectar la API Key de Vega del tenant (creada manualmente en el panel de Vega)",
         "tags": [
           "Facturación Electrónica (e-CF) — Administración"
         ]
       }
     },
     "/api/v1/config/ecf/admin/clients": {
+      "get": {
+        "description": "Cada uno trae `linkedCompany` (Company de este tenant a la que ya está vinculado, o null). Úselo para \"seleccionar\" un emisor existente vía POST /clients/link en vez de crearlo — Vega rechaza con 409 un RNC que ya exista en el proyecto.",
+        "operationId": "EcfAdminController_listClients",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "test",
+                "live"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar los Clients (RNC emisores) que ya existen en el proyecto Vega del tenant",
+        "tags": [
+          "Facturación Electrónica (e-CF) — Administración"
+        ]
+      },
       "post": {
+        "description": "Si el RNC ya existe en el proyecto Vega responde 409 con `details.existingClientId` — en ese caso use POST /clients/link.",
         "operationId": "EcfAdminController_createClient",
         "parameters": [
           {
@@ -11306,7 +11377,46 @@
             "bearer": []
           }
         ],
-        "summary": "Crear el Client de Aura (RNC emisor) para una compañía",
+        "summary": "Crear el Client de Vega (RNC emisor) para una compañía",
+        "tags": [
+          "Facturación Electrónica (e-CF) — Administración"
+        ]
+      }
+    },
+    "/api/v1/config/ecf/admin/clients/link": {
+      "post": {
+        "operationId": "EcfAdminController_linkClient",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkEcfClientDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vincular a una compañía un Client que ya existe en Vega (sin crearlo)",
         "tags": [
           "Facturación Electrónica (e-CF) — Administración"
         ]
@@ -11353,7 +11463,7 @@
             "bearer": []
           }
         ],
-        "summary": "Subir el certificado de firma (.p12, base64) del Client de Aura",
+        "summary": "Subir el certificado de firma (.p12, base64) del Client de Vega",
         "tags": [
           "Facturación Electrónica (e-CF) — Administración"
         ]
@@ -11392,7 +11502,7 @@
             "bearer": []
           }
         ],
-        "summary": "Registrar el webhook del BFF en Aura para este tenant",
+        "summary": "Registrar el webhook del BFF en Vega para este tenant",
         "tags": [
           "Facturación Electrónica (e-CF) — Administración"
         ]
@@ -11449,7 +11559,7 @@
             "name": "estado",
             "required": false,
             "in": "query",
-            "description": "Estado DGII del voucher en Aura.",
+            "description": "Estado DGII del voucher en Vega.",
             "schema": {
               "type": "string",
               "enum": [
@@ -11517,7 +11627,7 @@
             "name": "company",
             "required": false,
             "in": "query",
-            "description": "Compañía (si el tenant tiene más de un Client de Aura).",
+            "description": "Compañía (si el tenant tiene más de un Client de Vega).",
             "schema": {
               "type": "string"
             }
@@ -11760,7 +11870,7 @@
             "name": "estado",
             "required": false,
             "in": "query",
-            "description": "Estado DGII del voucher en Aura.",
+            "description": "Estado DGII del voucher en Vega.",
             "schema": {
               "type": "string",
               "enum": [
@@ -11819,7 +11929,7 @@
             "name": "env",
             "required": false,
             "in": "query",
-            "description": "Ambiente Aura/DGII.",
+            "description": "Ambiente Vega/DGII.",
             "schema": {
               "type": "string",
               "enum": [
@@ -11864,7 +11974,7 @@
             "name": "company",
             "required": false,
             "in": "query",
-            "description": "Compañía (si el tenant tiene más de un Client de Aura).",
+            "description": "Compañía (si el tenant tiene más de un Client de Vega).",
             "schema": {
               "type": "string"
             }
@@ -30840,7 +30950,7 @@
           "habilitado": {
             "type": "boolean",
             "default": false,
-            "description": "Si está inactivo, todos los comprobantes se emiten como NCF físico (comportamiento actual) sin llamar a Aura, sin importar tiposElectronicos."
+            "description": "Si está inactivo, todos los comprobantes se emiten como NCF físico (comportamiento actual) sin llamar a Vega, sin importar tiposElectronicos."
           },
           "tiposElectronicos": {
             "type": "array",
@@ -30866,10 +30976,10 @@
             "default": true,
             "description": "Si está activo, la emisión del e-CF ocurre automáticamente al someter el documento."
           },
-          "bloquearSubmitSiAuraCaido": {
+          "bloquearSubmitSiVegaCaido": {
             "type": "boolean",
             "default": true,
-            "description": "Si Aura/DGII no responde: activo = se bloquea la facturación (default seguro); inactivo = se activa contingencia automáticamente."
+            "description": "Si Vega/DGII no responde: activo = se bloquea la facturación (default seguro); inactivo = se activa contingencia automáticamente."
           },
           "tipoPagoDefault": {
             "type": "number",
@@ -31014,7 +31124,7 @@
         "properties": {
           "ranges": {
             "maxItems": 10,
-            "description": "Hasta 10 rangos contiguos por llamada. Los e-CF ya ACCEPTED dentro del rango se saltan automáticamente (Aura no anula un comprobante aceptado por la DGII).",
+            "description": "Hasta 10 rangos contiguos por llamada. Los e-CF ya ACCEPTED dentro del rango se saltan automáticamente (Vega no anula un comprobante aceptado por la DGII).",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/EcfVoidRangeDto"
@@ -31071,12 +31181,37 @@
           },
           "apiKey": {
             "type": "string",
-            "description": "API Key completa generada en el panel de Aura (formato aura_\u003Cmode\u003E_\u003Chex\u003E_\u003Csecret\u003E). Se valida contra Aura y se cifra antes de persistirse — nunca se devuelve de vuelta."
+            "description": "API Key completa generada en el panel de Vega (formato vega_\u003Cmode\u003E_\u003Chex\u003E_\u003Csecret\u003E). Se valida contra Vega y se cifra antes de persistirse — nunca se devuelve de vuelta."
           }
         },
         "required": [
           "mode",
           "apiKey"
+        ]
+      },
+      "LinkEcfClientDto": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "string",
+            "description": "Nombre exacto de la Company en ERPNext a la que se vincula el Client existente."
+          },
+          "vegaClientId": {
+            "type": "string",
+            "description": "ID del Client que ya existe en el proyecto Vega (ver GET /config/ecf/admin/clients). El RNC y demás datos se toman de Vega, no se envían."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "test",
+              "live"
+            ],
+            "description": "Ambiente en el que existe el Client. Si se omite, usa el activeMode ya conectado para el tenant."
+          }
+        },
+        "required": [
+          "company",
+          "vegaClientId"
         ]
       },
       "CreateEcfClientDto": {
@@ -31179,7 +31314,7 @@
           },
           "company": {
             "type": "string",
-            "description": "Compañía (si el tenant tiene más de un Client de Aura)."
+            "description": "Compañía (si el tenant tiene más de un Client de Vega)."
           }
         },
         "required": [
@@ -32687,7 +32822,7 @@
           },
           "ncfProveedor": {
             "type": "string",
-            "description": "NCF del comprobante del proveedor (B01, E31, etc.). Obligatorio si el proveedor está registrado (no ocasional). Para un proveedor ocasional puede omitirse: el sistema genera el comprobante automáticamente al someter (POST /compras/:id/submit) usando `tipoComprobante` — electrónico vía Aura si el tenant emite e-CF para ese tipo, o el siguiente NCF físico disponible si no."
+            "description": "NCF del comprobante del proveedor (B01, E31, etc.). Obligatorio si el proveedor está registrado (no ocasional). Para un proveedor ocasional puede omitirse: el sistema genera el comprobante automáticamente al someter (POST /compras/:id/submit) usando `tipoComprobante` — electrónico vía Vega si el tenant emite e-CF para ese tipo, o el siguiente NCF físico disponible si no."
           },
           "tipoComprobante": {
             "type": "string",
@@ -32825,7 +32960,7 @@
           },
           "ncfProveedor": {
             "type": "string",
-            "description": "NCF del comprobante del proveedor (B01, E31, etc.). Obligatorio si el proveedor está registrado (no ocasional). Para un proveedor ocasional puede omitirse: el sistema genera el comprobante automáticamente al someter (POST /compras/:id/submit) usando `tipoComprobante` — electrónico vía Aura si el tenant emite e-CF para ese tipo, o el siguiente NCF físico disponible si no."
+            "description": "NCF del comprobante del proveedor (B01, E31, etc.). Obligatorio si el proveedor está registrado (no ocasional). Para un proveedor ocasional puede omitirse: el sistema genera el comprobante automáticamente al someter (POST /compras/:id/submit) usando `tipoComprobante` — electrónico vía Vega si el tenant emite e-CF para ese tipo, o el siguiente NCF físico disponible si no."
           },
           "tipoComprobante": {
             "type": "string",
@@ -33833,7 +33968,7 @@
           "referenceInvoice": {
             "type": "string",
             "example": "SINV-0042",
-            "description": "Factura que esta nota de débito afecta — a diferencia de la nota de crédito (que siempre deriva de una factura vía return_against), la de débito se crea desde cero. Solo obligatorio si el tenant emite esta nota como e-CF (E33): Aura exige referenceNcf/referenceDate del comprobante afectado. Sin efecto en el flujo físico (NCF B03)."
+            "description": "Factura que esta nota de débito afecta — a diferencia de la nota de crédito (que siempre deriva de una factura vía return_against), la de débito se crea desde cero. Solo obligatorio si el tenant emite esta nota como e-CF (E33): Vega exige referenceNcf/referenceDate del comprobante afectado. Sin efecto en el flujo físico (NCF B03)."
           },
           "modificationCode": {
             "type": "number",

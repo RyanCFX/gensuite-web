@@ -9,6 +9,9 @@ import type {
   EcfConnectResult,
   CreateEcfClientDto,
   EcfClient,
+  EcfClientsListResult,
+  LinkEcfClientDto,
+  EcfMode,
   UploadEcfCertificateDto,
   UploadEcfCertificateResult,
   RegisterEcfWebhookDto,
@@ -22,7 +25,7 @@ import type {
 } from './types'
 
 /** Mensaje para el 503 al someter un documento cuando la DGII está caída y el tenant tiene
- *  `bloquearSubmitSiAuraCaido` activo (default). Ver F9 §3.2. */
+ *  `bloquearSubmitSiVegaCaido` activo (default). Ver F9 §3.2. */
 export const ECF_SUBMIT_UNAVAILABLE_MSG =
   'El servicio de facturación electrónica no está disponible en este momento. Reintenta en unos ' +
   'minutos, o pide a un administrador que active contingencia manualmente.'
@@ -88,6 +91,24 @@ export async function connectEcfApiKey(data: EcfConnectApiKeyDto) {
 export async function createEcfClient(data: CreateEcfClientDto) {
   const res = await client.post<{ success: true; data: EcfClient }>(
     ENDPOINTS.config.ecfAdminClients,
+    data,
+  )
+  return unwrap(res)
+}
+
+// Emisores (Clients) que ya existen en el proyecto Vega del tenant — para "seleccionar
+// emisor existente" en vez de crear uno nuevo (Vega rechaza un RNC duplicado con 409).
+export async function listEcfClients(mode?: EcfMode): Promise<EcfClientsListResult> {
+  const res = await client.get<{ success: true; data: EcfClient[]; meta: { mode: EcfMode } }>(
+    ENDPOINTS.config.ecfAdminClients,
+    mode ? { params: { mode } } : undefined,
+  )
+  return { clients: res.data.data, mode: res.data.meta.mode }
+}
+
+export async function linkEcfClient(data: LinkEcfClientDto) {
+  const res = await client.post<{ success: true; data: EcfClient }>(
+    ENDPOINTS.config.ecfAdminClientsLink,
     data,
   )
   return unwrap(res)

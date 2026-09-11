@@ -13,7 +13,7 @@ import type {
 } from './types'
 
 export interface ListEcfEmitidosParams extends PaginationParams {
-  /** Estado DGII del voucher en Aura. */
+  /** Estado DGII del voucher en Vega. */
   estado?: EcfStatusDgii
   /** RNC/Cédula del comprador (contraparte). */
   rnc?: string
@@ -27,7 +27,7 @@ export interface ListEcfEmitidosParams extends PaginationParams {
   to?: string
   /** Incluir comprobantes archivados. */
   archived?: boolean
-  /** Solo si el tenant tiene más de un Client de Aura; normalmente se omite. */
+  /** Solo si el tenant tiene más de un Client de Vega; normalmente se omite. */
   company?: string
 }
 

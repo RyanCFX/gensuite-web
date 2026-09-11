@@ -1,5 +1,5 @@
 // Progreso de certificación DGII (F9) — pantalla de solo lectura. La certificación real se opera
-// desde el panel de Aura/DGII; aquí solo se consulta el avance del trámite de 14 pasos.
+// desde el panel de Vega/DGII; aquí solo se consulta el avance del trámite de 14 pasos.
 //
 // CONSTANCIA: construido contra la API; las pruebas end-to-end con un tenant en trámite de
 // certificación siguen pendientes.
@@ -80,7 +80,7 @@ function CertificacionContent({ company, activeMode }: { company: string; active
               )
             )}
             <p className="ff-hint" style={{ margin: 0 }}>
-              La certificación se completa desde el panel de Aura/DGII, no desde aquí. Esta pantalla es solo de consulta.
+              La certificación se completa desde el panel de Vega/DGII, no desde aquí. Esta pantalla es solo de consulta.
             </p>
           </>
         )}
@@ -125,7 +125,7 @@ export default function EcfCertificacionPage() {
           <div className="inline-alert inline-alert-info">
             <Info size={15} aria-hidden="true" style={{ flexShrink: 0 }} />
             <span>
-              Este tenant todavía no está conectado a Aura. Conéctalo desde{' '}
+              Este tenant todavía no está conectado a Vega. Conéctalo desde{' '}
               <Link to="/config/ecf/admin">Provisioning</Link> para consultar la certificación.
             </span>
           </div>

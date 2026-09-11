@@ -24,6 +24,7 @@ import type {
   FacturacionConfig,
   HabilitarPosDto,
   HabilitarPosResult,
+  DeshabilitarPosResult,
   LayawayConfig,
   AlmacenListItem,
   CreateAlmacenDto,
@@ -82,6 +83,11 @@ export async function updateFacturacionConfig(data: Partial<FacturacionConfig>) 
 // Idempotente: activa el módulo POS (o reintenta si algo falló a mitad de camino).
 export async function habilitarPos(data: HabilitarPosDto) {
   const res = await client.post<{ success: true; data: HabilitarPosResult }>(ENDPOINTS.config.posHabilitar, data)
+  return unwrap(res)
+}
+
+export async function deshabilitarPos() {
+  const res = await client.post<{ success: true; data: DeshabilitarPosResult }>(ENDPOINTS.config.posDeshabilitar)
   return unwrap(res)
 }
 

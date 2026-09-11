@@ -3,7 +3,7 @@ import type { EcfFlujo, EcfFlujoPaso } from '@/shared/api/types'
 import { formatDateTime } from '@/lib/formatters'
 
 // Stepper horizontal del flujo de estado de un e-CF ante la DGII. El BFF **deriva** los pasos
-// del estado actual (Aura no publica un log de eventos); solo algunos traen `at` real — los que
+// del estado actual (Vega no publica un log de eventos); solo algunos traen `at` real — los que
 // no, se muestran como "completado, sin fecha" sin inventar timestamps.
 
 type Tone = 'done' | 'current' | 'error' | 'warn' | 'pending'

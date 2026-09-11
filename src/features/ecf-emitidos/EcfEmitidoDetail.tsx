@@ -1,7 +1,7 @@
 // Detalle de un e-CF emitido (origin: ISSUED): flujo de estado ante la DGII, líneas, totales,
 // timbre (QR) y enlace al documento de ERPNext. Solo lectura + "Refrescar estado".
 //
-// CONSTANCIA: las pruebas end-to-end con datos reales quedan pendientes — ningún tenant tiene Aura
+// CONSTANCIA: las pruebas end-to-end con datos reales quedan pendientes — ningún tenant tiene Vega
 // conectado en producción.
 
 import { useParams, useNavigate, Link } from 'react-router-dom'
