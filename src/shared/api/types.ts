@@ -175,6 +175,52 @@ export type UpdateCustomerDto = Partial<
   customerType?: "Company" | "Individual";
 };
 
+// ─── Aseguradora (ARS) ────────────────────────────────────────────────────────
+// Vertical Farmacia: una ARS es, por debajo, el mismo doctype `Customer` que un cliente, pero el
+// BFF la expone en un CRUD aparte (`/aseguradoras`). Siempre es una empresa (RNC obligatorio, sin
+// opción Individual). `hasCredit` viene `true` por defecto al crear — es precondición para poder
+// facturar un lote consolidado a la ARS. Ver docs/PROMPT_ASEGURADORAS.md y docs/FARMACIA_ARS_FRONTEND.md §4.7.1.
+// NOTA: `openapi.json` no documenta un schema de respuesta; los nombres de campo se confirmaron
+// contra una respuesta real. `customerName` se deja como fallback tolerante de `nombre`.
+
+export interface Aseguradora {
+  id: string;
+  nombre: string;
+  /** Fallback si el backend devuelve `customerName` en vez de `nombre`. */
+  customerName?: string;
+  rnc?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  hasCredit: boolean;
+  creditLimit: number;
+  creditDays: number;
+  cuentaCxcDefault?: string;
+  encargadoCxc?: string;
+  telefonos?: TelefonoCliente[];
+  disabled: boolean;
+  createdAt?: string;
+  modifiedAt?: string;
+}
+
+export interface CreateAseguradoraDto {
+  nombre: string;
+  /** Obligatorio — una aseguradora siempre es una empresa. */
+  rnc: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  /** El formulario lo sugiere `true` por defecto (a diferencia de Clientes). */
+  hasCredit?: boolean;
+  creditLimit?: number;
+  creditDays?: number;
+  cuentaCxcDefault?: string;
+  encargadoCxc?: string;
+  telefonos?: TelefonoCliente[];
+}
+
+export type UpdateAseguradoraDto = Partial<CreateAseguradoraDto>;
+
 // ─── Supplier ─────────────────────────────────────────────────────────────────
 // tipoIdentificacion IS required for suppliers.
 

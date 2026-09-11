@@ -29,6 +29,8 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'dashboard',    label: 'Dashboard',           group: 'Principal',    path: '/dashboard',                      icon: <LayoutDashboard size={15} />, keywords: 'inicio home resumen kpi' },
   { id: 'clientes',     label: 'Clientes',             group: 'Principal',    path: '/clientes',                       icon: <Users size={15} />, keywords: 'customers' },
   { id: 'cliente-nuevo',label: 'Nuevo Cliente',        group: 'Principal',    path: '/clientes/nuevo',                 icon: <Users size={15} />, keywords: 'crear cliente customer' },
+  { id: 'aseguradoras', label: 'Aseguradoras',         group: 'Farmacia ARS', path: '/farmacia/aseguradoras',           icon: <Shield size={15} />, keywords: 'ars seguro medico administradora riesgos salud farmacia' },
+  { id: 'aseguradora-nueva', label: 'Nueva Aseguradora', group: 'Farmacia ARS', path: '/farmacia/aseguradoras/nueva',   icon: <Shield size={15} />, keywords: 'crear ars aseguradora seguro farmacia' },
 
   // ── Catálogo ───────────────────────────────────────────────────────────────
   { id: 'categorias',   label: 'Categorías',           group: 'Catálogo',     path: '/catalogo/categorias',            icon: <Package size={15} />, keywords: 'catalog categories grupos' },

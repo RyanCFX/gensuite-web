@@ -27773,6 +27773,251 @@
           "Farmacia ARS — Reportes"
         ]
       }
+    },
+    "/api/v1/aseguradoras": {
+      "get": {
+        "operationId": "AseguradorasController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "disabled",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "nombre",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda aproximada por nombre",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasCredit",
+            "required": false,
+            "in": "query",
+            "description": "true = solo aseguradoras con crédito habilitado (custom_tiene_credito)",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar aseguradoras (ARS)",
+        "tags": [
+          "Farmacia ARS — Aseguradoras"
+        ]
+      },
+      "post": {
+        "operationId": "AseguradorasController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAseguradoraDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar una nueva aseguradora",
+        "tags": [
+          "Farmacia ARS — Aseguradoras"
+        ]
+      }
+    },
+    "/api/v1/aseguradoras/{id}": {
+      "get": {
+        "operationId": "AseguradorasController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obtener una aseguradora por ID",
+        "tags": [
+          "Farmacia ARS — Aseguradoras"
+        ]
+      },
+      "put": {
+        "operationId": "AseguradorasController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAseguradoraDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar una aseguradora",
+        "tags": [
+          "Farmacia ARS — Aseguradoras"
+        ]
+      },
+      "delete": {
+        "operationId": "AseguradorasController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar/desactivar una aseguradora",
+        "tags": [
+          "Farmacia ARS — Aseguradoras"
+        ]
+      }
     }
   },
   "info": {
@@ -36677,6 +36922,110 @@
         "required": [
           "despachoId"
         ]
+      },
+      "CreateAseguradoraDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "example": "ARS Humano"
+          },
+          "rnc": {
+            "type": "string",
+            "example": "130123456"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "example": "809-555-0100"
+          },
+          "address": {
+            "type": "string"
+          },
+          "hasCredit": {
+            "type": "boolean",
+            "default": true,
+            "description": "Precondición para poder facturar un lote a esta ARS (§3.5.1 del contrato de frontend) — por eso el default acá es `true`, a diferencia de Clientes donde es `false`."
+          },
+          "creditLimit": {
+            "type": "number",
+            "example": 500000
+          },
+          "creditDays": {
+            "type": "number",
+            "example": 30
+          },
+          "cuentaCxcDefault": {
+            "type": "string",
+            "description": "Cuenta contable por defecto al facturar el lote consolidado a esta ARS. Si se omite, ERPNext usa el default de la compañía."
+          },
+          "encargadoCxc": {
+            "type": "string",
+            "description": "Email del usuario (User) responsable de la cobranza a esta ARS."
+          },
+          "telefonos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelefonoClienteDto"
+            }
+          }
+        },
+        "required": [
+          "nombre",
+          "rnc"
+        ]
+      },
+      "UpdateAseguradoraDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "example": "ARS Humano"
+          },
+          "rnc": {
+            "type": "string",
+            "example": "130123456"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "example": "809-555-0100"
+          },
+          "address": {
+            "type": "string"
+          },
+          "hasCredit": {
+            "type": "boolean",
+            "default": true,
+            "description": "Precondición para poder facturar un lote a esta ARS (§3.5.1 del contrato de frontend) — por eso el default acá es `true`, a diferencia de Clientes donde es `false`."
+          },
+          "creditLimit": {
+            "type": "number",
+            "example": 500000
+          },
+          "creditDays": {
+            "type": "number",
+            "example": 30
+          },
+          "cuentaCxcDefault": {
+            "type": "string",
+            "description": "Cuenta contable por defecto al facturar el lote consolidado a esta ARS. Si se omite, ERPNext usa el default de la compañía."
+          },
+          "encargadoCxc": {
+            "type": "string",
+            "description": "Email del usuario (User) responsable de la cobranza a esta ARS."
+          },
+          "telefonos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelefonoClienteDto"
+            }
+          }
+        }
       }
     }
   }

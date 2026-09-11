@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { listPreaprobaciones } from '@/shared/api/farmacia'
 import type { ListPreaprobacionesParams } from '@/shared/api/farmacia'
 import { listCustomers } from '@/shared/api/customers'
+import { listAseguradoras, nombreAseguradora } from '@/shared/api/aseguradoras'
 import { Plus, Eye } from 'lucide-react'
 import { formatDOP } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -35,12 +36,12 @@ export default function PreaprobacionesPage() {
   const { orderBy, sort } = useSortState()
 
   const { data: aseguradorasData, isLoading: aseguradorasLoading } = useQuery({
-    queryKey: ['customerSearch-ars', aseguradoraQuery],
-    queryFn: () => listCustomers({ search: aseguradoraQuery || undefined, limit: 15 }),
+    queryKey: ['aseguradoraSearch', aseguradoraQuery],
+    queryFn: () => listAseguradoras({ search: aseguradoraQuery || undefined, limit: 15 }),
   })
-  const aseguradoraOptions: SearchSelectOption[] = (aseguradorasData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
+  const aseguradoraOptions: SearchSelectOption[] = (aseguradorasData?.items ?? []).map((a) => ({
+    value: a.id,
+    label: nombreAseguradora(a),
   }))
 
   const { data: clientesData, isLoading: clientesLoading } = useQuery({

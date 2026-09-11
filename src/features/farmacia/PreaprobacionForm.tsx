@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { createPreaprobacion } from '@/shared/api/farmacia'
 import { listCustomers } from '@/shared/api/customers'
+import { listAseguradoras, nombreAseguradora } from '@/shared/api/aseguradoras'
 import type { CreatePreaprobacionDto } from '@/shared/api/types'
 import type { Item } from '@/shared/api/types'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
@@ -43,12 +44,12 @@ export default function PreaprobacionForm() {
   const [submitted, setSubmitted] = useState(false)
 
   const { data: aseguradorasData, isLoading: aseguradorasLoading } = useQuery({
-    queryKey: ['customerSearch-ars', aseguradoraQuery],
-    queryFn: () => listCustomers({ search: aseguradoraQuery || undefined, limit: 15 }),
+    queryKey: ['aseguradoraSearch', aseguradoraQuery],
+    queryFn: () => listAseguradoras({ search: aseguradoraQuery || undefined, limit: 15 }),
   })
-  const aseguradoraOptions: SearchSelectOption[] = (aseguradorasData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
+  const aseguradoraOptions: SearchSelectOption[] = (aseguradorasData?.items ?? []).map((a) => ({
+    value: a.id,
+    label: nombreAseguradora(a),
   }))
 
   const { data: clientesData, isLoading: clientesLoading } = useQuery({

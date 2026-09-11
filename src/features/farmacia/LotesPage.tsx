@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { listLotesFarmacia } from '@/shared/api/farmacia'
 import type { ListLotesFarmaciaParams } from '@/shared/api/farmacia'
-import { listCustomers } from '@/shared/api/customers'
+import { listAseguradoras, nombreAseguradora } from '@/shared/api/aseguradoras'
 import { Plus, Eye } from 'lucide-react'
 import { formatDOP, formatDate } from '@/lib/formatters'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -31,12 +31,12 @@ export default function LotesPage() {
   const [showCreate, setShowCreate] = useState(false)
 
   const { data: aseguradorasData, isLoading: aseguradorasLoading } = useQuery({
-    queryKey: ['customerSearch-ars', aseguradoraQuery],
-    queryFn: () => listCustomers({ search: aseguradoraQuery || undefined, limit: 15 }),
+    queryKey: ['aseguradoraSearch', aseguradoraQuery],
+    queryFn: () => listAseguradoras({ search: aseguradoraQuery || undefined, limit: 15 }),
   })
-  const aseguradoraOptions: SearchSelectOption[] = (aseguradorasData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
+  const aseguradoraOptions: SearchSelectOption[] = (aseguradorasData?.items ?? []).map((a) => ({
+    value: a.id,
+    label: nombreAseguradora(a),
   }))
 
   const params: ListLotesFarmaciaParams = {

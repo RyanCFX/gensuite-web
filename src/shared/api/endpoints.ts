@@ -21,6 +21,10 @@ export const ENDPOINTS = {
       delete: (name: string) => `/customers/groups/${encodeURIComponent(name)}`,
     },
   },
+  aseguradoras: {
+    list: '/aseguradoras',
+    byId: (id: string) => `/aseguradoras/${encodeURIComponent(id)}`,
+  },
   invoices: {
     list: '/invoices',
     byId: (id: string) => `/invoices/${id}`,

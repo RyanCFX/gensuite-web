@@ -1,7 +1,11 @@
 // GENERADO automáticamente por scripts/gen-acciones.mjs — NO editar a mano.
-// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (368 acciones). Regenerar: node scripts/gen-acciones.mjs
+// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (372 acciones). Regenerar: node scripts/gen-acciones.mjs
 
 export type AccionId =
+  | 'aseguradoras.crear'
+  | 'aseguradoras.editar'
+  | 'aseguradoras.eliminar'
+  | 'aseguradoras.listar'
   | 'caja.cobrar'
   | 'caja.descartar'
   | 'caja.listar'
@@ -372,6 +376,10 @@ export type AccionId =
   | 'ventas.nota-debito.imprimir'
 
 export const ACCIONES_CATALOGO: readonly AccionId[] = [
+  'aseguradoras.crear',
+  'aseguradoras.editar',
+  'aseguradoras.eliminar',
+  'aseguradoras.listar',
   'caja.cobrar',
   'caja.descartar',
   'caja.listar',

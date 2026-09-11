@@ -584,6 +584,38 @@ pantallas de Farmacia sepa que ya existen:
 - **Inventario** (`/inventory/lotes`, `/inventory/lotes/sugerido`) — ver §6 (vencimiento y FEFO),
   compartido con cualquier tenant que trackee lotes, no exclusivo de farmacia.
 
+### 4.7.1 Aseguradoras (ARS) — CRUD separado de Clientes
+
+> **Cambio de contrato posterior a la primera versión de este documento.** Ver
+> `docs/PROMPT_ASEGURADORAS.md` para el detalle y `openapi.json` (`/aseguradoras`,
+> `/aseguradoras/{id}`, `CreateAseguradoraDto` / `UpdateAseguradoraDto`) para el shape exacto.
+
+Por debajo, en ERPNext, una ARS **sigue siendo el mismo doctype `Customer`** (no se duplica el
+maestro fiscal). Lo que cambió es que el BFF ya no lo expone como un solo concepto:
+
+- `GET /customers` **ya no incluye las ARS** en tenants con el vertical Farmacia habilitado.
+- Hay un CRUD nuevo y separado: `GET/POST/PUT/DELETE /aseguradoras`, gateado por
+  `data.vertical === 'farmacia'` y los permisos `aseguradoras.listar` / `.crear` / `.editar` /
+  `.eliminar`.
+- El servidor **valida** que el campo `aseguradora` de una Preaprobación o un Lote sea realmente
+  una aseguradora: si el frontend manda el ID de un paciente responde `400` (no un guardado
+  silencioso). El `error.message` ya viene en español y se muestra tal cual.
+
+En el frontend esto se traduce en:
+
+- Pantalla nueva **Aseguradoras** (`/farmacia/aseguradoras`), calcada en estructura a Clientes
+  (listado paginado con filtros `nombre` / `hasCredit` / desactivadas + formulario de alta/edición
+  + detalle + desactivar con manejo de `409`). Campos: `nombre`, `rnc` (obligatorio — siempre
+  empresa), `email`, `phone`, `address`, `hasCredit` (**sugerido `true`** — es precondición de
+  §3.5.1), `creditLimit`, `creditDays`, `cuentaCxcDefault`, `encargadoCxc`, `telefonos[]`.
+- El picker de "aseguradora" en **Nueva Preaprobación** y **Nuevo Lote** (y los filtros de esos
+  listados) consume `/aseguradoras` en vez de `/customers`. Los payloads de
+  `POST /farmacia/preaprobaciones` y `POST /farmacia/lotes` no cambian.
+- La advertencia temprana de crédito antes de facturar un lote (§3.5.1) lee `hasCredit` de
+  `/aseguradoras`, no de `/customers/:id`.
+- La migración de las ARS ya existentes la hace un patch de backend (`bench migrate`); sus IDs no
+  cambian y el frontend no dispara nada.
+
 ### 4.8 Impresión (PDF)
 
 Dos documentos imprimibles, cada uno con un Print Format propio del vertical — nunca genera el

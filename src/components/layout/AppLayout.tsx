@@ -280,6 +280,7 @@ const NAV_FARMACIA: NavGroup = {
   icon: <Pill size={16} aria-hidden="true" />,
   prefix: "/farmacia",
   children: [
+    { label: "Aseguradoras", icon: <Shield size={14} />, path: "/farmacia/aseguradoras" },
     { label: "Preaprobaciones", icon: <FileText size={14} />, path: "/farmacia/preaprobaciones" },
     { label: "Despachos", icon: <Truck size={14} />, path: "/farmacia/despachos" },
     { label: "Cola de Cobro", icon: <DollarSign size={14} />, path: "/farmacia/despachos/cola" },

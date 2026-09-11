@@ -24,6 +24,9 @@ const ItemsPage       = lazy(() => import('@/features/catalog/ItemsPage'))
 const AttributesPage  = lazy(() => import('@/features/catalog/AttributesPage'))
 const ItemDetail      = lazy(() => import('@/features/catalog/ItemDetail'))
 const ItemForm         = lazy(() => import('@/features/catalog/ItemForm'))
+const AseguradorasPage = lazy(() => import('@/features/aseguradoras/AseguradorasPage'))
+const AseguradoraDetail = lazy(() => import('@/features/aseguradoras/AseguradoraDetail'))
+const AseguradoraForm = lazy(() => import('@/features/aseguradoras/AseguradoraForm'))
 const PreaprobacionesPage = lazy(() => import('@/features/farmacia/PreaprobacionesPage'))
 const PreaprobacionForm   = lazy(() => import('@/features/farmacia/PreaprobacionForm'))
 const PreaprobacionDetail = lazy(() => import('@/features/farmacia/PreaprobacionDetail'))
@@ -192,6 +195,10 @@ export default function App() {
             <Route path="/catalogo/descuentos" element={<Suspense fallback={<PageLoader />}><PricingRulesPage /></Suspense>} />
 
             {/* Cotizaciones */}
+            <Route path="/farmacia/aseguradoras" element={<Suspense fallback={<PageLoader />}><AseguradorasPage /></Suspense>} />
+            <Route path="/farmacia/aseguradoras/nueva" element={<Suspense fallback={<PageLoader />}><AseguradoraForm /></Suspense>} />
+            <Route path="/farmacia/aseguradoras/:id" element={<Suspense fallback={<PageLoader />}><AseguradoraDetail /></Suspense>} />
+            <Route path="/farmacia/aseguradoras/:id/editar" element={<Suspense fallback={<PageLoader />}><AseguradoraForm /></Suspense>} />
             <Route path="/farmacia/preaprobaciones" element={<Suspense fallback={<PageLoader />}><PreaprobacionesPage /></Suspense>} />
             <Route path="/farmacia/preaprobaciones/nueva" element={<Suspense fallback={<PageLoader />}><PreaprobacionForm /></Suspense>} />
             <Route path="/farmacia/preaprobaciones/:id" element={<Suspense fallback={<PageLoader />}><PreaprobacionDetail /></Suspense>} />

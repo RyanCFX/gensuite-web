@@ -39,6 +39,8 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/catalogo/atributos', accion: 'catalogo.atributos.listar' },
 
   // Farmacia ARS (vertical)
+  { pattern: '/farmacia/aseguradoras/*', accion: 'aseguradoras.listar', soloFarmacia: true },
+  { pattern: '/farmacia/aseguradoras', accion: 'aseguradoras.listar', soloFarmacia: true },
   { pattern: '/farmacia/preaprobaciones/*', accion: 'farmacia.preaprobaciones.listar', soloFarmacia: true },
   { pattern: '/farmacia/preaprobaciones', accion: 'farmacia.preaprobaciones.listar', soloFarmacia: true },
   { pattern: '/farmacia/despachos/cola', accion: 'farmacia.despachos.cola', soloFarmacia: true },

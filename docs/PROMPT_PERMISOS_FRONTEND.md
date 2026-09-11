@@ -766,6 +766,18 @@ Reportes y catálogos horizontales agregadas en esta revisión) no lo necesita.
 | `clientes.estado-cuenta.ver` | Estado de Cuenta | `Customer.report` | — |
 | `clientes.estado-cuenta.imprimir` | Descargar Estado de Cuenta | `Customer.print` | — |
 
+#### Aseguradoras (ARS — vertical Farmacia)
+
+Además del permiso, estas pantallas exigen `data.vertical === 'farmacia'` (§10). Por debajo la ARS
+es un `Customer`, así que los permisos ERPNext son los de `Customer`.
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `aseguradoras.listar` | Ver | `Customer.read` | — |
+| `aseguradoras.crear` | Nueva | `Customer.create` | — |
+| `aseguradoras.editar` | Editar / Desactivar | `Customer.write` | — |
+| `aseguradoras.eliminar` | Eliminar | `Customer.delete` | — |
+
 #### Cobros y Pagos
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
