@@ -14,6 +14,9 @@ const CATEGORY_LABELS: Record<string, string> = {
   pagos: 'Pagos',
   items: 'Items',
   producto: 'Producto',
+  // Solo lo devuelve `campos-disponibles` en tenants del vertical farmacia, y cada valor es
+  // `null` en una factura sin aseguradora (docs/PROMPT_FARMACIA_V2_FRONTEND.md §8.2).
+  seguro: 'Seguro (ARS)',
 }
 
 function categoryLabel(key: string): string {

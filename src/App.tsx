@@ -27,12 +27,6 @@ const ItemForm         = lazy(() => import('@/features/catalog/ItemForm'))
 const AseguradorasPage = lazy(() => import('@/features/aseguradoras/AseguradorasPage'))
 const AseguradoraDetail = lazy(() => import('@/features/aseguradoras/AseguradoraDetail'))
 const AseguradoraForm = lazy(() => import('@/features/aseguradoras/AseguradoraForm'))
-const PreaprobacionesPage = lazy(() => import('@/features/farmacia/PreaprobacionesPage'))
-const PreaprobacionForm   = lazy(() => import('@/features/farmacia/PreaprobacionForm'))
-const PreaprobacionDetail = lazy(() => import('@/features/farmacia/PreaprobacionDetail'))
-const DespachosPage = lazy(() => import('@/features/farmacia/DespachosPage'))
-const DespachoDetail = lazy(() => import('@/features/farmacia/DespachoDetail'))
-const ColaCobroPage = lazy(() => import('@/features/farmacia/ColaCobroPage'))
 const LotesPage = lazy(() => import('@/features/farmacia/LotesPage'))
 const LoteDetail = lazy(() => import('@/features/farmacia/LoteDetail'))
 const QuotationsPage  = lazy(() => import('@/features/quotations/QuotationsPage'))
@@ -199,12 +193,6 @@ export default function App() {
             <Route path="/farmacia/aseguradoras/nueva" element={<Suspense fallback={<PageLoader />}><AseguradoraForm /></Suspense>} />
             <Route path="/farmacia/aseguradoras/:id" element={<Suspense fallback={<PageLoader />}><AseguradoraDetail /></Suspense>} />
             <Route path="/farmacia/aseguradoras/:id/editar" element={<Suspense fallback={<PageLoader />}><AseguradoraForm /></Suspense>} />
-            <Route path="/farmacia/preaprobaciones" element={<Suspense fallback={<PageLoader />}><PreaprobacionesPage /></Suspense>} />
-            <Route path="/farmacia/preaprobaciones/nueva" element={<Suspense fallback={<PageLoader />}><PreaprobacionForm /></Suspense>} />
-            <Route path="/farmacia/preaprobaciones/:id" element={<Suspense fallback={<PageLoader />}><PreaprobacionDetail /></Suspense>} />
-            <Route path="/farmacia/despachos" element={<Suspense fallback={<PageLoader />}><DespachosPage /></Suspense>} />
-            <Route path="/farmacia/despachos/cola" element={<Suspense fallback={<PageLoader />}><ColaCobroPage /></Suspense>} />
-            <Route path="/farmacia/despachos/:id" element={<Suspense fallback={<PageLoader />}><DespachoDetail /></Suspense>} />
             <Route path="/farmacia/lotes" element={<Suspense fallback={<PageLoader />}><LotesPage /></Suspense>} />
             <Route path="/farmacia/lotes/:id" element={<Suspense fallback={<PageLoader />}><LoteDetail /></Suspense>} />
             <Route path="/cotizaciones" element={<Suspense fallback={<PageLoader />}><QuotationsPage /></Suspense>} />

@@ -8,7 +8,7 @@ import {
 import {
   TrendingUp, TrendingDown, ShoppingCart, Box, Zap, Package, BarChart3, ArrowUp,
 } from 'lucide-react'
-import { formatDOP, formatDate, formatShortDate, formatDateTime, formatNumber, daysSince, displayId } from '@/lib/formatters'
+import { formatDOP, formatShortDate, formatDateTime, formatNumber, daysSince, displayId } from '@/lib/formatters'
 import {
   getDashboardData,
   type DashboardPeriod,

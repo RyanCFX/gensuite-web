@@ -41,11 +41,6 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   // Farmacia ARS (vertical)
   { pattern: '/farmacia/aseguradoras/*', accion: 'aseguradoras.listar', soloFarmacia: true },
   { pattern: '/farmacia/aseguradoras', accion: 'aseguradoras.listar', soloFarmacia: true },
-  { pattern: '/farmacia/preaprobaciones/*', accion: 'farmacia.preaprobaciones.listar', soloFarmacia: true },
-  { pattern: '/farmacia/preaprobaciones', accion: 'farmacia.preaprobaciones.listar', soloFarmacia: true },
-  { pattern: '/farmacia/despachos/cola', accion: 'farmacia.despachos.cola', soloFarmacia: true },
-  { pattern: '/farmacia/despachos/*', accion: 'farmacia.despachos.listar', soloFarmacia: true },
-  { pattern: '/farmacia/despachos', accion: 'farmacia.despachos.listar', soloFarmacia: true },
   { pattern: '/farmacia/lotes/*', accion: 'farmacia.lotes.listar', soloFarmacia: true },
   { pattern: '/farmacia/lotes', accion: 'farmacia.lotes.listar', soloFarmacia: true },
 
@@ -149,7 +144,7 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/reportes/caja', accion: 'reportes.caja.cuadre.ver' },
   { pattern: '/reportes/corteCajaDia', accion: 'reportes.pos.corte-caja-dia.ver' },
   { pattern: '/reportes/farmacia-lotes', accion: 'farmacia.reportes.lotes.listar', soloFarmacia: true },
-  { pattern: '/reportes/farmacia-despachos-ncf', accion: 'farmacia.reportes.despachos-ncf.listar', soloFarmacia: true },
+  { pattern: '/reportes/farmacia-facturas-ars', accion: 'farmacia.reportes.facturas-ars.listar', soloFarmacia: true },
   { pattern: '/reportes/*', accion: null },
   { pattern: '/reportes', accion: null },
 

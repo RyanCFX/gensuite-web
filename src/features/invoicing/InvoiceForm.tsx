@@ -2,6 +2,16 @@ import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'rea
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createInvoice, updateInvoice, getInvoice } from '@/shared/api/invoices'
+import { usePermissionsStore } from '@/stores/permissions.store'
+import { AseguradoraPanel, CoberturaArsResumen } from './AseguradoraPanel'
+import {
+  EMPTY_ASEGURADORA_FORM,
+  aseguradoraFormFromInvoice,
+  aseguradoraFormToDto,
+  validarAseguradoraForm,
+  type AseguradoraFormState,
+} from './aseguradoraForm'
+import { esCoberturaCompleta } from '@/shared/api/types'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
 import { listItems, getDefaultPriceTier, getItem } from '@/shared/api/catalog'
@@ -13,7 +23,7 @@ import type { TrackedComponent } from '@/components/shared/ComponentTrackingModa
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP, round2 } from '@/lib/formatters'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus, Lock, LockOpen } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
@@ -79,6 +89,16 @@ interface LineItem {
   /** Componentes del combo con tracking de serial/lote activo (solo si itemType === 'combo') */
   _comboComponents?: { itemCode: string; itemName?: string; trackingType: 'serial' | 'batch'; qtyPerCombo: number }[]
   componentTracking?: ComponentTracking[]
+  // ── Cobertura ARS por línea (vertical farmacia, §3.3). Editables: los tres primeros.
+  /** Peso (%) para el reparto automático. Vacío en TODAS = reparto en partes iguales. */
+  porcientoTeoricoArs?: number
+  /** Cobertura ARS de la línea en RD$. Si ninguna línea lo trae, el servidor la reparte al guardar. */
+  montoAprobadoArs?: number
+  lineaBloqueadaArs?: boolean
+  /** Solo respuesta del servidor (`amount − montoAprobadoArs`). */
+  montoPacienteArs?: number
+  /** Solo respuesta del servidor. */
+  porcientoRealArs?: number
 }
 
 function validateLineStock(row: LineItem): string | undefined {
@@ -261,6 +281,16 @@ export default function InvoiceForm() {
   const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
 
+  // ── Cobertura ARS (vertical farmacia, docs/PROMPT_FARMACIA_V2_FRONTEND.md §3) ──────────────
+  // El vertical no cambia en caliente (§11): se lee una vez de los permisos de la sesión.
+  const esFarmacia = usePermissionsStore((s) => s.vertical) === 'farmacia'
+  const [arsEnabled, setArsEnabled] = useState(false)
+  const [ars, setArs] = useState<AseguradoraFormState>(EMPTY_ASEGURADORA_FORM)
+  /** Bloque calculado por el servidor del borrador que se está editando — nunca se recalcula acá. */
+  const arsServidor = esCoberturaCompleta(editingInvoice?.aseguradora) ? editingInvoice.aseguradora : null
+  /** `Facturado` = bloque inmutable; el resto de los estados de un borrador son editables. */
+  const arsSoloLectura = arsServidor?.estadoArs === 'Facturado'
+
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
@@ -268,6 +298,8 @@ export default function InvoiceForm() {
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
   const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
+  /** Una factura con cobertura ARS no puede llevar impuestos (§3.7): se oculta el selector. */
+  const mostrarImpuestoDocumento = usaImpuestoDocumento && !(esFarmacia && arsEnabled)
   // Si está inactivo, se permite capturar un serial/lote nuevo al vender en vez de exigir que ya exista.
   const requiereSerialLoteCompra = facturacionConfig?.requiereSerialLoteCompra ?? false
 
@@ -582,6 +614,8 @@ export default function InvoiceForm() {
     branch,
     department,
     taxesTemplate,
+    arsEnabled,
+    ars,
   }, hydrationDone)
   useBeforeUnloadWarning(isDirty)
 
@@ -605,6 +639,10 @@ export default function InvoiceForm() {
     } else if (inv.customer) {
       setCustomerId(inv.customer)
       getCustomer(inv.customer).then(setSelectedCustomer).catch(() => {})
+    }
+    if (inv.aseguradora) {
+      setArsEnabled(true)
+      setArs(aseguradoraFormFromInvoice(inv.aseguradora))
     }
     // El impuesto del documento (taxesTemplate) no viene en GET /invoices/:id; si se deja sin tocar
     // el PATCH reusa el default de la compañía. El usuario puede re-seleccionarlo si aplica.
@@ -651,6 +689,11 @@ export default function InvoiceForm() {
             _prices: cat?.prices,
             _stockByWarehouse: cat?.stockByWarehouse,
             ubicacion: it.ubicacion || undefined,
+            porcientoTeoricoArs: it.porcientoTeoricoArs,
+            montoAprobadoArs: it.montoAprobadoArs,
+            lineaBloqueadaArs: it.lineaBloqueadaArs,
+            montoPacienteArs: it.montoPacienteArs,
+            porcientoRealArs: it.porcientoRealArs,
           }
         }),
       )
@@ -881,6 +924,35 @@ export default function InvoiceForm() {
   const taxTotal = items.reduce((s, i) => s + (i.amount * i.salesTaxPct / 100), 0)
   const total = subtotal + taxTotal
 
+  // ── Cobertura ARS: armado del payload (§3.2/§3.3) ─────────────────────────
+  const arsActiva = esFarmacia && arsEnabled
+  /** 11 columnas base + las 5 de cobertura ARS — para los `colSpan` de las filas especiales. */
+  const columnCount = arsActiva ? 16 : 11
+
+  /**
+   * Campos ARS de una línea. Solo se envían si el usuario realmente los tocó: si NINGUNA línea
+   * trae `montoAprobadoArs`/`lineaBloqueadaArs`, el servidor reparte la cobertura solo al
+   * guardar — mandar ceros lo desactivaría y dejaría todo el importe a cargo del paciente (§3.3).
+   */
+  function arsLineaDto(i: LineItem) {
+    if (!arsActiva) return {}
+    return {
+      porcientoTeoricoArs: i.porcientoTeoricoArs,
+      montoAprobadoArs: i.montoAprobadoArs,
+      lineaBloqueadaArs: i.lineaBloqueadaArs || undefined,
+    }
+  }
+
+  /**
+   * Bloque `aseguradora` del body. En edición, con el toggle apagado se envía `null` explícito
+   * para QUITAR una cobertura que ya estaba en el borrador; al crear simplemente se omite (§3.1).
+   */
+  function arsBloqueDto() {
+    if (!esFarmacia) return {}
+    if (arsEnabled) return { aseguradora: aseguradoraFormToDto(ars) }
+    return isEdit && editingInvoice?.aseguradora ? { aseguradora: null } : {}
+  }
+
   // ── Submit ────────────────────────────────────────────────────────────────
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -925,6 +997,25 @@ if (esClienteOcasional) {
         toast.error(`Línea ${i + 1}: selecciona las series/lotes de los componentes del combo antes de continuar`)
         return
       }
+      // §3.7: "Línea N: la cobertura ARS (X) supera el importe de la línea (Y)".
+      if (arsActiva && item.montoAprobadoArs != null && item.montoAprobadoArs > item.amount + 0.005) {
+        toast.error(`Línea ${i + 1}: la cobertura ARS (${formatDOP(item.montoAprobadoArs)}) supera el importe de la línea (${formatDOP(item.amount)})`)
+        return
+      }
+    }
+
+    if (arsActiva) {
+      const arsError = validarAseguradoraForm(ars, { customerId: esClienteOcasional ? undefined : customerId })
+      if (arsError) {
+        toast.error(arsError)
+        return
+      }
+      // §3.7: "La cobertura ARS (X) no puede superar el total de la factura (Y)".
+      const coberturaRD = ars.tipoCobertura === 'monto' ? Number(ars.valorCobertura) : 0
+      if (coberturaRD > subtotal + 0.005) {
+        toast.error(`La cobertura ARS (${formatDOP(coberturaRD)}) no puede superar el total de la factura (${formatDOP(subtotal)})`)
+        return
+      }
     }
 
 const itemsDto = items.map((i) => ({
@@ -937,6 +1028,7 @@ const itemsDto = items.map((i) => ({
        warehouse: i.warehouse || undefined,
        ubicacion: i.ubicacion || undefined,
        componentTracking: i.componentTracking,
+       ...arsLineaDto(i),
      }))
 
      const baseDto = {
@@ -954,7 +1046,8 @@ const itemsDto = items.map((i) => ({
        ncfType,
        items: itemsDto,
         notes: notes || undefined,
-        taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
+        taxesTemplate: mostrarImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
+        ...arsBloqueDto(),
       }
 
      persistInvoice(baseDto as CreateInvoiceDto)
@@ -1160,7 +1253,16 @@ const itemsDto = items.map((i) => ({
                 </div>
               )}
 
-              {usaImpuestoDocumento && (
+              {usaImpuestoDocumento && !mostrarImpuestoDocumento && (
+                <div className="ff-wrap">
+                  <label className="ff-label">Impuesto del Documento</label>
+                  <p className="ff-hint" style={{ marginTop: 6 }}>
+                    No aplica: una factura con cobertura ARS no puede llevar impuestos (Ley 253-12).
+                    Los medicamentos deben estar configurados como exentos de ITBIS en el catálogo.
+                  </p>
+                </div>
+              )}
+              {mostrarImpuestoDocumento && (
                 <div className="ff-wrap">
                   <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
                   <SearchSelect
@@ -1187,6 +1289,24 @@ const itemsDto = items.map((i) => ({
           </div>
         </div>
 
+        {esFarmacia && (
+          <AseguradoraPanel
+            enabled={arsEnabled}
+            onEnabledChange={setArsEnabled}
+            value={ars}
+            onChange={setArs}
+            submitted={submitted}
+            customerId={esClienteOcasional ? undefined : customerId}
+            readOnly={arsSoloLectura}
+            footer={arsServidor ? <CoberturaArsResumen ars={arsServidor} /> : (
+              <p className="ff-hint" style={{ margin: 0 }}>
+                La cobertura en RD$, el reparto por línea y lo que queda a cargo del paciente los
+                calcula el servidor al guardar el borrador.
+              </p>
+            )}
+          />
+        )}
+
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">Artículos</h2>
@@ -1208,13 +1328,24 @@ const itemsDto = items.map((i) => ({
                   <th style={{ width: 56 }}>UDM</th>
                   <th style={{ width: 140 }}>Almacén</th>
                   <th style={{ width: 140 }}>Ubicación</th>
+                  {arsActiva && (
+                    <>
+                      <th style={{ textAlign: 'right', width: 80 }} title="Peso de esta línea en el reparto automático de la cobertura. Vacío en todas = partes iguales.">
+                        % teórico ARS
+                      </th>
+                      <th style={{ textAlign: 'right', width: 120 }}>Cobertura ARS</th>
+                      <th style={{ width: 44, textAlign: 'center' }} title="Ajuste manual protegido: Recalcular no toca la línea.">🔒</th>
+                      <th style={{ textAlign: 'right', width: 110 }}>Paciente</th>
+                      <th style={{ textAlign: 'right', width: 72 }}>% real</th>
+                    </>
+                  )}
                   <th style={{ width: 40 }} />
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={11} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+                    <td colSpan={columnCount} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
                       No hay artículos. Agrega uno con el botón de abajo.
                     </td>
                   </tr>
@@ -1351,6 +1482,64 @@ const itemsDto = items.map((i) => ({
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                         )}
                       </td>
+                      {arsActiva && (
+                        <>
+                          <td>
+                            <input
+                              className="items-input"
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              style={{ textAlign: 'right' }}
+                              value={item.porcientoTeoricoArs ?? ''}
+                              disabled={arsSoloLectura}
+                              onChange={(e) => updateItem(index, {
+                                porcientoTeoricoArs: e.target.value === '' ? undefined : Number(e.target.value),
+                              })}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className={`items-input${(item.montoAprobadoArs ?? 0) > item.amount + 0.005 ? ' items-input-error' : ''}`}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              style={{ textAlign: 'right' }}
+                              value={item.montoAprobadoArs ?? ''}
+                              disabled={arsSoloLectura}
+                              placeholder="auto"
+                              onChange={(e) => updateItem(index, {
+                                montoAprobadoArs: e.target.value === '' ? undefined : Number(e.target.value),
+                              })}
+                            />
+                            {(item.montoAprobadoArs ?? 0) > item.amount + 0.005 && (
+                              <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                Supera el importe de la línea
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-size-icon-sm"
+                              disabled={arsSoloLectura}
+                              title={item.lineaBloqueadaArs ? 'Línea bloqueada: Recalcular no la toca' : 'Bloquear esta línea al recalcular'}
+                              onClick={() => updateItem(index, { lineaBloqueadaArs: !item.lineaBloqueadaArs })}
+                            >
+                              {item.lineaBloqueadaArs
+                                ? <Lock size={14} style={{ color: 'var(--color-brand)' }} />
+                                : <LockOpen size={14} style={{ color: 'var(--text-tertiary)' }} />}
+                            </button>
+                          </td>
+                          <td style={{ textAlign: 'right' }} className="td-muted">
+                            {item.montoPacienteArs != null ? formatDOP(item.montoPacienteArs, { trimZeros: true }) : '—'}
+                          </td>
+                          <td style={{ textAlign: 'right' }} className="td-muted">
+                            {item.porcientoRealArs != null ? `${item.porcientoRealArs.toFixed(1)}%` : '—'}
+                          </td>
+                        </>
+                      )}
                       <td onClick={(e) => e.stopPropagation()} className="actions-cell">
                         <ActionsMenu>
                           <ActionsMenuItem
@@ -1367,7 +1556,7 @@ const itemsDto = items.map((i) => ({
                     </tr>
                     {item.itemType === 'combo' && item._comboComponents && item._comboComponents.length > 0 && (
                       <tr>
-                        <td colSpan={11} style={{ padding: '4px 12px 10px' }}>
+                        <td colSpan={columnCount} style={{ padding: '4px 12px 10px' }}>
                           {useInlineSerialBatch ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                               {getTrackingRequirement(item).map((req) => {
@@ -1438,6 +1627,18 @@ const itemsDto = items.map((i) => ({
                 <span>Total</span>
                 <span>{formatDOP(total)}</span>
               </div>
+              {arsActiva && arsServidor && (
+                <>
+                  <div className="items-total-line" style={{ color: 'var(--color-brand)' }}>
+                    <span>Cubre la ARS</span>
+                    <span>-{formatDOP(arsServidor.montoCobertura)}</span>
+                  </div>
+                  <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
+                    <span>A cargo del paciente</span>
+                    <span>{formatDOP(arsServidor.montoPaciente)}</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1486,6 +1687,7 @@ onAuthorized={(userId) => {
              discountPct: i.discountPct || undefined, uom: i.uom || undefined, warehouse: i.warehouse || undefined,
              ubicacion: i.ubicacion || undefined,
              componentTracking: i.componentTracking,
+             ...arsLineaDto(i),
            }))
            const baseDto = {
              ...(esClienteOcasional
@@ -1498,7 +1700,8 @@ onAuthorized={(userId) => {
              postingDate, dueDate, branch: branch || undefined, department: usaDepartamentos ? (department || undefined) : undefined, ncfType,
              items: itemsDto,
              notes: notes || undefined,
-             taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
+             taxesTemplate: mostrarImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
+             ...arsBloqueDto(),
            }
 persistInvoice(baseDto as CreateInvoiceDto)
          }}

@@ -1,5 +1,5 @@
 // GENERADO automáticamente por scripts/gen-acciones.mjs — NO editar a mano.
-// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (373 acciones). Regenerar: node scripts/gen-acciones.mjs
+// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (365 acciones). Regenerar: node scripts/gen-acciones.mjs
 
 export type AccionId =
   | 'aseguradoras.crear'
@@ -205,24 +205,15 @@ export type AccionId =
   | 'ecf.recibidos.aceptar-rechazar'
   | 'ecf.recibidos.cargar-xml'
   | 'ecf.recibidos.listar'
-  | 'farmacia.despachos.cobrar'
-  | 'farmacia.despachos.cola'
-  | 'farmacia.despachos.crear'
-  | 'farmacia.despachos.imprimir'
-  | 'farmacia.despachos.listar'
   | 'farmacia.lotes.crear'
   | 'farmacia.lotes.facturar'
+  | 'farmacia.lotes.facturas-elegibles'
   | 'farmacia.lotes.imprimir'
   | 'farmacia.lotes.listar'
   | 'farmacia.lotes.marcar-en-revision'
   | 'farmacia.lotes.recalcular'
-  | 'farmacia.lotes.vincular-despacho'
-  | 'farmacia.preaprobaciones.confirmar'
-  | 'farmacia.preaprobaciones.crear'
-  | 'farmacia.preaprobaciones.editar'
-  | 'farmacia.preaprobaciones.listar'
-  | 'farmacia.preaprobaciones.recalcular'
-  | 'farmacia.reportes.despachos-ncf.listar'
+  | 'farmacia.lotes.vincular-facturas'
+  | 'farmacia.reportes.facturas-ars.listar'
   | 'farmacia.reportes.lotes.listar'
   | 'gastos.anular'
   | 'gastos.aplicar-saldo'
@@ -365,6 +356,7 @@ export type AccionId =
   | 'ventas.factura.imprimir'
   | 'ventas.factura.imprimir-pos'
   | 'ventas.factura.listar'
+  | 'ventas.factura.recalcular-cobertura'
   | 'ventas.factura.someter'
   | 'ventas.factura.ver-asientos'
   | 'ventas.nota-credito.aplicar'
@@ -580,24 +572,15 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'ecf.recibidos.aceptar-rechazar',
   'ecf.recibidos.cargar-xml',
   'ecf.recibidos.listar',
-  'farmacia.despachos.cobrar',
-  'farmacia.despachos.cola',
-  'farmacia.despachos.crear',
-  'farmacia.despachos.imprimir',
-  'farmacia.despachos.listar',
   'farmacia.lotes.crear',
   'farmacia.lotes.facturar',
+  'farmacia.lotes.facturas-elegibles',
   'farmacia.lotes.imprimir',
   'farmacia.lotes.listar',
   'farmacia.lotes.marcar-en-revision',
   'farmacia.lotes.recalcular',
-  'farmacia.lotes.vincular-despacho',
-  'farmacia.preaprobaciones.confirmar',
-  'farmacia.preaprobaciones.crear',
-  'farmacia.preaprobaciones.editar',
-  'farmacia.preaprobaciones.listar',
-  'farmacia.preaprobaciones.recalcular',
-  'farmacia.reportes.despachos-ncf.listar',
+  'farmacia.lotes.vincular-facturas',
+  'farmacia.reportes.facturas-ars.listar',
   'farmacia.reportes.lotes.listar',
   'gastos.anular',
   'gastos.aplicar-saldo',
@@ -740,6 +723,7 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'ventas.factura.imprimir',
   'ventas.factura.imprimir-pos',
   'ventas.factura.listar',
+  'ventas.factura.recalcular-cobertura',
   'ventas.factura.someter',
   'ventas.factura.ver-asientos',
   'ventas.nota-credito.aplicar',

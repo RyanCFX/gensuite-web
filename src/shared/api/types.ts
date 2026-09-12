@@ -181,7 +181,7 @@ export type UpdateCustomerDto = Partial<
 // Vertical Farmacia: una ARS es, por debajo, el mismo doctype `Customer` que un cliente, pero el
 // BFF la expone en un CRUD aparte (`/aseguradoras`). Siempre es una empresa (RNC obligatorio, sin
 // opción Individual). `hasCredit` viene `true` por defecto al crear — es precondición para poder
-// facturar un lote consolidado a la ARS. Ver docs/PROMPT_ASEGURADORAS.md y docs/FARMACIA_ARS_FRONTEND.md §4.7.1.
+// facturar un lote consolidado a la ARS. Ver docs/PROMPT_ASEGURADORAS.md y docs/PROMPT_FARMACIA_V2_FRONTEND.md §6.
 // NOTA: `openapi.json` no documenta un schema de respuesta; los nombres de campo se confirmaron
 // contra una respuesta real. `customerName` se deja como fallback tolerante de `nombre`.
 
@@ -326,6 +326,18 @@ export interface InvoiceItem {
   /** Ubicación/rack específico dentro del almacén desde donde se descontó el stock, si se especificó. */
   ubicacion?: string;
   notes?: string;
+  // ── Cobertura ARS por línea (solo vertical farmacia, y solo si la factura tiene
+  //    `aseguradora`; ausentes en una factura sin cobertura). Ver §3.3 del doc v2.
+  /** Peso (%) de esta línea para el reparto automático de la cobertura. */
+  porcientoTeoricoArs?: number;
+  /** Cobertura ARS de esta línea en RD$. */
+  montoAprobadoArs?: number;
+  /** Ajuste manual protegido: "Recalcular" no toca esta línea. */
+  lineaBloqueadaArs?: boolean;
+  /** Calculado por el servidor: `amount − montoAprobadoArs`. Solo lectura. */
+  montoPacienteArs?: number;
+  /** Calculado por el servidor. Solo lectura. */
+  porcientoRealArs?: number;
 }
 
 export interface Invoice {
@@ -392,6 +404,10 @@ export interface Invoice {
   ecf?: EcfSubmitResult;
   /** ID del Pedido de venta del que se originó esta factura, si aplica. */
   salesOrder?: string;
+  /** Cobertura de la ARS sobre esta factura (vertical farmacia). `null` en una factura sin
+   *  cobertura — en ese caso las líneas tampoco traen los campos `*Ars`. Ver §3.5 del doc v2.
+   *  En los elementos de `GET /invoices` viene la versión reducida (§3.8). */
+  aseguradora?: InvoiceAseguradora | InvoiceAseguradoraResumen | null;
 }
 
 export interface PendingTrackingEntry {
@@ -439,10 +455,21 @@ export interface CreateInvoiceDto {
     ubicacion?: string;
     /** Solo cuando itemCode es un Combo y algún componente tiene tracking de serial/lote. */
     componentTracking?: ComponentTracking[];
+    /** Peso (%) de la línea para el reparto automático de la cobertura ARS (0–100). */
+    porcientoTeoricoArs?: number;
+    /** Cobertura ARS de esta línea en RD$. Si NINGUNA línea lo envía, el servidor la reparte solo;
+     *  si alguna lo envía, se respeta tal cual lo enviado. */
+    montoAprobadoArs?: number;
+    /** Ajuste manual protegido: el recálculo no toca esta línea. */
+    lineaBloqueadaArs?: boolean;
   }[];
   notes?: string;
   /** ID de un Sales Taxes and Charges Template (/config/impuestos-ventas). Si se omite, se usa el default de la compañía si existe. */
   taxesTemplate?: string;
+  /** Solo tenants del vertical farmacia. Ausente = sin cobertura; `null` en el PATCH quita una
+   *  cobertura que ya estaba en el borrador. Una factura con cobertura NO puede llevar
+   *  `taxesTemplate` (el servidor responde 400). */
+  aseguradora?: AseguradoraInvoiceDto | null;
 }
 
 /**
@@ -671,6 +698,11 @@ export interface DevolucionDto {
    *  el tenant emite esta nota como e-CF (E34): 1=Anula, 2=Corrige texto, 3=Corrige montos,
    *  4=Reemplazo contingencia, 5=Referencia a Factura de Consumo. Sin efecto en el flujo físico (NCF B04). */
   modificationCode?: EcfModificationCode;
+  /** Solo facturas con cobertura ARS. Obligatorio cuando la devolución deja la cobertura en cero
+   *  (total, o parcial que devuelve toda la cobertura restante) y `estadoArs ≠ "Facturado"`. */
+  motivoAnulacionArs?: MotivoAnulacionArs;
+  /** Texto 5–500 — obligatorio si `motivoAnulacionArs === "Otro"`. */
+  motivoAnulacionDetalle?: string;
 }
 
 // POST /devoluciones/:id/cancelar — solo devoluciones en borrador. El documento no se elimina:
@@ -700,7 +732,44 @@ export interface DevolucionResult {
   remainingAvailable: number;
   /** Solo presente si resolution === 'refund' tuvo éxito (sin pendiente en la factura) */
   paymentEntryId?: string;
+  /** Solo viene cuando la factura original tenía cobertura ARS (§5.3). */
+  aseguradora?: {
+    parteArs: number;
+    partePaciente: number;
+    /** true si la devolución dejó la aprobación ARS anulada. */
+    aprobacionAnulada: boolean;
+    estadoArsOriginal: EstadoArs | null;
+    /** Solo cuando se emitió la NC a la ARS (`estadoArsOriginal === 'Facturado'`). */
+    creditNoteAseguradoraId?: string | null;
+    ncfAseguradora?: string | null;
+  } | null;
   message?: string;
+}
+
+/** Bloque `aseguradora` de `GET /devoluciones/:id` y `GET /credit-notes/:id` (§5.4).
+ *  `null` si la nota no tiene cobertura. */
+export interface DevolucionAseguradora {
+  aseguradora: string;
+  aseguradoraName?: string;
+  numeroAutorizacion: string;
+  parteArsDevuelta: number;
+  /** Estado ARS que tenía la factura original CUANDO se devolvió — no el actual. */
+  estadoArsAlDevolver: EstadoArs | null;
+  /** NC emitida a la aseguradora, o `null` si todavía no se emitió. */
+  ncAseguradoraId?: string | null;
+  /** Solo en la NC a la aseguradora: la factura de paciente que la originó. */
+  facturaPacienteRef?: string | null;
+}
+
+/** Body (opcional) de `POST /devoluciones/:id/emitir-nc-aseguradora` — idempotente. */
+export interface EmitirNcAseguradoraDto {
+  modificationCode?: EcfModificationCode;
+}
+
+export interface EmitirNcAseguradoraResult {
+  creditNoteId: string;
+  creditNoteAseguradoraId: string;
+  ncfAseguradora?: string | null;
 }
 
 // GET /devoluciones (lista) — mismo shape que GET /credit-notes
@@ -717,6 +786,8 @@ export interface DevolucionOriginalInvoice {
   grandTotal: number;
   outstandingAmount: number;
   status: "draft" | "submitted" | "cancelled";
+  /** Estado ARS ACTUAL de la factura original — informativo (§5.4). */
+  estadoArs?: EstadoArs | null;
 }
 
 export interface DevolucionItem {
@@ -750,6 +821,8 @@ export interface DevolucionDetail {
   usageStatus?: "available" | "partially_used" | "fully_used";
   /** null solo si falló traer la factura original (raro) */
   originalInvoice: DevolucionOriginalInvoice | null;
+  /** `null` si la nota no tiene cobertura ARS. */
+  aseguradora?: DevolucionAseguradora | null;
   createdAt: string;
   modifiedAt: string;
 }
@@ -3719,6 +3792,11 @@ export interface PendienteCobroItem {
    postingDate: string;
    esClienteOcasional: boolean;
    clienteOcasionalNombre?: string;
+   /** Cobertura de la ARS, o `null` en una venta sin cobertura (vertical farmacia, §4.3). */
+   aseguradora?: InvoiceAseguradoraResumen | null;
+   /** `roundedTotal − montoCobertura` (igual a `roundedTotal` sin cobertura). **Este** es el
+    *  importe a cobrar y contra el que se validan los métodos de pago — nunca `roundedTotal`. */
+   montoACobrar?: number;
  }
 
 /** Respuesta de POST /caja/facturas/:id/completar-cobro. */
@@ -5350,7 +5428,7 @@ export interface SetSeleccionDto {
 
 // ─── Permisos (nivel 1/2) ───────────────────────────────────────────────────
 // Ver docs/PROMPT_PERMISOS_FRONTEND.md. Alcance acotado: solo se usa en el vertical Farmacia
-// ARS por ahora (ver docs/FARMACIA_ARS_FRONTEND.md §2) — no se migró el resto de la app.
+// ARS por ahora (ver docs/PROMPT_FARMACIA_V2_FRONTEND.md §1) — no se migró el resto de la app.
 
 export type PermisoPtypeFlag = 0 | 1
 
@@ -5371,114 +5449,100 @@ export interface DocumentPermissions {
   permisos: Partial<Record<PermisoPtype, PermisoPtypeFlag>>;
 }
 
-// ─── Farmacia ARS — Preaprobaciones ─────────────────────────────────────────
-// Ver docs/FARMACIA_ARS_FRONTEND.md §3.1. Los DTOs de request están confirmados contra
-// openapi.json; el shape de respuesta (Preaprobacion) no está documentado ahí — sale de los
-// ejemplos de prosa del doc §11, verificar campo por campo contra un backend real.
+// ─── Farmacia ARS v2 — cobertura dentro de la factura ───────────────────────
+// La v1 (Preaprobaciones / Despachos / Cola de Cobro) se eliminó: la cobertura de la ARS ahora
+// vive en el bloque `aseguradora` de la factura de venta normal. Ver
+// docs/PROMPT_FARMACIA_V2_FRONTEND.md §3 y el schema `AseguradoraInvoiceDto` de openapi.json.
 
-export type PreaprobacionEstado = 'Borrador' | 'Confirmada' | 'Despachado';
+export type TipoCoberturaArs = 'monto' | 'porciento';
 
-export interface CreatePreaprobacionDetalleItemDto {
-  item: string;
-  cantidad: number;
-  precioUnitario: number;
-  porcientoTeorico?: number;
-  montoAprobadoArs?: number;
-  lineaBloqueada?: boolean;
-}
+/** Estado de la aprobación ARS de una factura. `null` mientras es borrador (§3.8). */
+export type EstadoArs = 'Pendiente' | 'En Lote' | 'Facturado' | 'Anulada';
 
-export interface CreatePreaprobacionDto {
+export const MOTIVOS_ANULACION_ARS = [
+  'Rechazo de la ARS',
+  'Medicamento incorrecto',
+  'Error de digitación',
+  'Paciente desistió',
+  'Producto defectuoso/vencido',
+  'Otro',
+] as const;
+
+export type MotivoAnulacionArs = (typeof MOTIVOS_ANULACION_ARS)[number];
+
+/** Lo que el frontend ENVÍA en `aseguradora` de POST /invoices y PATCH /invoices/:id.
+ *  Ausente (o `null` en el PATCH) = factura sin cobertura. */
+export interface AseguradoraInvoiceDto {
+  /** Customer registrado como aseguradora — el picker debe consumir `GET /aseguradoras`. */
   aseguradora: string;
-  numeroAprobacion: string;
-  cliente: string;
-  cedula?: string;
-  telefonoPaciente?: string;
-  numeroSeguridadSocial?: string;
-  carnetAfiliado: string;
-  aprobadoPor?: string;
-  fechaAprobacion?: string;
-  valorCoberturaArs: number;
-  detalle: CreatePreaprobacionDetalleItemDto[];
-}
-
-export type UpdatePreaprobacionDto = Partial<Omit<CreatePreaprobacionDto, 'detalle'>> & {
-  detalle?: (Partial<CreatePreaprobacionDetalleItemDto> & { id?: string })[];
-};
-
-export interface PreaprobacionDetalleItem {
-  id: string;
-  item: string;
-  itemName?: string;
-  cantidad: number;
-  precioUnitario: number;
-  precioLinea: number;
-  montoAprobadoArs: number;
-  porcientoReal?: number;
-  montoPaciente: number;
-  lineaBloqueada: boolean;
-}
-
-export interface Preaprobacion {
-  id: string;
-  estado: PreaprobacionEstado;
-  confirmada: boolean;
-  aseguradora: string;
-  aseguradoraName?: string;
-  numeroAprobacion: string;
-  cliente: string;
-  clienteName?: string;
-  cedula?: string;
-  telefonoPaciente?: string;
-  numeroSeguridadSocial?: string;
-  carnetAfiliado: string;
-  aprobadoPor?: string;
-  fechaAprobacion?: string;
-  valorCoberturaArs: number;
-  montoTotalReceta: number;
-  montoDistribuido: number;
-  diferencia: number;
-  porcientoCobertura: number;
-  detalle: PreaprobacionDetalleItem[];
-}
-
-// ─── Farmacia ARS — Despachos ───────────────────────────────────────────────
-
-export type DespachoEstado = 'Confirmado' | 'Cobrado' | 'Facturado';
-
-export interface CreateDespachoDto {
-  preaprobacion: string;
-}
-
-export interface DespachoProvisionalArs {
-  id: string;
-  estado: DespachoEstado;
-  preaprobacion: string;
-  numeroAprobacion?: string;
-  aseguradora?: string;
-  aseguradoraName?: string;
-  cliente?: string;
-  clienteName?: string;
+  numeroAutorizacion: string;
+  tipoCobertura: TipoCoberturaArs;
+  /** RD$ si `tipoCobertura = 'monto'`; porcentaje (0, 100] si `'porciento'`. */
+  valorCobertura: number;
   carnetAfiliado?: string;
-  montoArs: number;
+  /** Cédula del paciente (11 dígitos, validada con el algoritmo JCE en el servidor). */
+  cedula?: string;
+  numeroSeguroSocial?: string;
+  telefonoPaciente?: string;
+  nombreDoctor?: string;
+  /** `YYYY-MM-DD` */
+  fechaAprobacion?: string;
+  /** `YYYY-MM-DD` */
+  fechaIndicacionReceta?: string;
+  aprobadoPor?: string;
+}
+
+/** Bloque `aseguradora` que DEVUELVE la factura (§3.5). Los campos calculados son del servidor:
+ *  nunca recalcularlos en el cliente, solo mostrarlos. */
+export interface InvoiceAseguradora extends AseguradoraInvoiceDto {
+  aseguradoraName?: string;
+  /** Cobertura en RD$ resuelta por el servidor (si es `porciento`, `subtotal × valor / 100`). */
+  montoCobertura: number;
+  /** Σ `montoAprobadoArs` de las líneas. */
+  montoDistribuido: number;
+  /** `montoCobertura − montoDistribuido` — debe ser 0 para poder someter. */
+  diferencia: number;
+  /** `grandTotal − montoCobertura` — lo que paga el paciente. */
   montoPaciente: number;
-  facturaContado?: string;
-  lote?: string;
+  estadoArs: EstadoArs | null;
+  /** Id del lote de facturación que la tomó, o `null`. */
+  lote?: string | null;
+  montoCoberturaDevuelta: number;
+  montoCoberturaNeta: number;
+  motivoAnulacion?: MotivoAnulacionArs | null;
+  motivoAnulacionDetalle?: string | null;
 }
 
-export interface CobrarDespachoDto {
-  payments: PaymentLine[];
-  vuelto?: VueltoLine[];
-  tenderedCash?: number;
-  ncfType?: 'B01' | 'B02';
+/** Versión reducida que traen los elementos de `GET /invoices` y `GET /caja/por-cobrar`. */
+export interface InvoiceAseguradoraResumen {
+  aseguradora: string;
+  aseguradoraName?: string;
+  numeroAutorizacion: string;
+  montoCobertura: number;
+  montoPaciente: number;
+  estadoArs: EstadoArs | null;
+  lote?: string | null;
 }
 
-export interface CobrarDespachoResult {
-  despachoId: string;
-  invoiceId: string;
-  ncf?: string;
+/** Narrowing entre el bloque completo (detalle de factura) y el reducido (listados): solo el
+ *  completo trae los campos calculados del reparto. */
+export function esCoberturaCompleta(
+  a: InvoiceAseguradora | InvoiceAseguradoraResumen | null | undefined,
+): a is InvoiceAseguradora {
+  return !!a && 'montoDistribuido' in a;
 }
 
-// ─── Farmacia ARS — Lotes de Facturación ────────────────────────────────────
+/** Respuesta de `POST /config/farmacia/habilitar` (§9) — todos los campos son informativos. */
+export interface HabilitarFarmaciaResult {
+  cuentaCxcArsProvisional?: string;
+  modoPagoCoberturaArs?: string;
+  customerGroupArs?: string;
+  itemCoberturaLote?: string;
+  rolDispensadorControlados?: string;
+  plantillaFactura?: string;
+}
+
+// ─── Farmacia ARS v2 — Lotes de Facturación ─────────────────────────────────
 
 export type LoteFarmaciaEstado = 'Abierto' | 'En Revisión' | 'Facturado';
 
@@ -5486,11 +5550,46 @@ export interface CreateLoteDto {
   aseguradora: string;
   periodoInicio: string;
   periodoFin: string;
+  /** Email de un User de ERPNext. */
   responsable?: string;
 }
 
-export interface VincularDespachoDto {
-  despachoId: string;
+/** Factura de paciente candidata o vinculada a un lote — mismo shape en
+ *  `GET /farmacia/lotes/facturas-elegibles` y en `LoteFacturacionArs.facturas` (§6.3). */
+export interface FacturaElegibleArs {
+  id: string;
+  customer: string;
+  customerName: string;
+  postingDate: string;
+  ncf?: string;
+  grandTotal: number;
+  outstandingAmount: number;
+  numeroAutorizacion: string;
+  carnetAfiliado?: string;
+  montoCobertura: number;
+  montoCoberturaNeta: number;
+  estadoArs: EstadoArs | null;
+}
+
+export interface FacturasElegiblesResult {
+  items: FacturaElegibleArs[];
+  total: number;
+  montoTotal: number;
+}
+
+export interface VincularFacturasDto {
+  /** 1–100 ids de facturas de paciente. */
+  facturaIds: string[];
+}
+
+/** Fila congelada al facturar el lote — el anexo oficial de la consolidada. */
+export interface LoteFacturaSnapshot {
+  factura: string;
+  ncf?: string;
+  paciente?: string;
+  numeroAutorizacion?: string;
+  carnetAfiliado?: string;
+  montoCobertura: number;
 }
 
 export interface LoteFacturacionArs {
@@ -5501,13 +5600,26 @@ export interface LoteFacturacionArs {
   periodoInicio: string;
   periodoFin: string;
   responsable?: string;
-  cantidadDespachos: number;
+  cantidadFacturas: number;
   montoTotalLote: number;
   facturaConsolidada?: string;
   ncfAsignado?: string;
-  /** No existe en openapi.json (solo mencionado en prosa) — ausencia = caso normal. */
-  despachosNoMarcados?: string[];
-  despachos?: DespachoProvisionalArs[];
+  /** Congelado al facturar: usar como anexo cuando `estado === 'Facturado'`. */
+  facturasSnapshot?: LoteFacturaSnapshot[];
+  /** Lista viva (solo en `GET /farmacia/lotes/:id`). Usar mientras el lote está abierto. */
+  facturas?: FacturaElegibleArs[];
+}
+
+/** Respuesta de `POST /farmacia/lotes/:id/facturas` — vincular en bloque nunca aborta por las
+ *  rechazadas: el lote vuelve actualizado junto con el detalle de cada caso (§6.3). */
+export interface VincularFacturasResult extends LoteFacturacionArs {
+  vinculadas: string[];
+  rechazadas: { factura: string; motivo: string }[];
+}
+
+/** Respuesta de `POST /farmacia/lotes/:id/facturar`. */
+export interface FacturarLoteResult extends LoteFacturacionArs {
+  facturasMarcadas?: string[];
 }
 
 export interface DgiiTaxpayer {

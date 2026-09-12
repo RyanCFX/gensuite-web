@@ -13,6 +13,7 @@ import type {
   PaginationParams,
   ComponentTracking,
   FormatoImpresion,
+  EstadoArs,
 } from './types'
 
 export interface ListInvoicesParams extends PaginationParams {
@@ -26,6 +27,12 @@ export interface ListInvoicesParams extends PaginationParams {
   ncf?: string
   grandTotalMin?: number
   grandTotalMax?: number
+  // ── Vertical farmacia (docs/PROMPT_FARMACIA_V2_FRONTEND.md §3.8)
+  /** Id del Customer aseguradora. */
+  aseguradora?: string
+  estadoArs?: EstadoArs
+  /** `true` = con cobertura ARS y todavía sin lote. */
+  sinLote?: boolean
 }
 
 export async function listInvoices(params?: ListInvoicesParams) {
@@ -95,6 +102,17 @@ export async function aplicarSaldoFavor(id: string, data: AplicarSaldoFavorDto) 
 // DELETE /invoices/:id/aplicar-saldo-favor/:paymentEntryId — deshace la aplicación de un saldo a favor
 export async function removerSaldoFavor(id: string, paymentEntryId: string) {
   await client.delete(ENDPOINTS.invoices.removerSaldoFavor(id, paymentEntryId))
+}
+
+/**
+ * POST /invoices/:id/recalcular-cobertura — reparte `montoCobertura − Σ líneas bloqueadas` entre
+ * las líneas NO bloqueadas, proporcional a `porcientoTeoricoArs` (o en partes iguales), topando
+ * cada línea en su `amount`. Sin body. Solo borradores con `aseguradora` (400 si no).
+ * Devuelve la factura completa.
+ */
+export async function recalcularCoberturaFactura(id: string) {
+  const res = await client.post<{ success: true; data: Invoice }>(ENDPOINTS.invoices.recalcularCobertura(id))
+  return unwrap(res)
 }
 
 /**

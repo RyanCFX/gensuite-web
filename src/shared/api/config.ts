@@ -48,6 +48,7 @@ import type {
   UpdateUOMResult,
   EcfConfig,
   UpdateEcfConfigDto,
+  HabilitarFarmaciaResult,
 } from './types'
 
 export async function getEmpresa() {
@@ -420,8 +421,15 @@ export async function listCurrencies(): Promise<CurrencyOption[]> {
   return unwrap(res)
 }
 
-// POST /config/farmacia/habilitar — sin body, idempotente (docs/FARMACIA_ARS_FRONTEND.md §2.2).
+// POST /config/farmacia/habilitar — sin body, idempotente (docs/PROMPT_FARMACIA_V2_FRONTEND.md §9).
 // Response no documentada en openapi.json.
-export async function habilitarFarmacia(): Promise<void> {
-  await client.post(ENDPOINTS.config.farmaciaHabilitar)
+/**
+ * Idempotente: crea en ERPNext todo lo que el vertical Farmacia ARS necesita — cuenta puente,
+ * modo de pago "Cobertura ARS", grupo de clientes "ARS", perfiles, ítem de reclasificación del
+ * lote y la plantilla de impresión "Factura Farmacia"
+ * (docs/PROMPT_FARMACIA_V2_FRONTEND.md §9). Devuelve lo que quedó provisionado.
+ */
+export async function habilitarFarmacia(): Promise<HabilitarFarmaciaResult> {
+  const res = await client.post<{ success: true; data?: HabilitarFarmaciaResult }>(ENDPOINTS.config.farmaciaHabilitar)
+  return res.data?.data ?? {}
 }

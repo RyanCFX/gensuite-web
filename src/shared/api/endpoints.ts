@@ -37,6 +37,7 @@ export const ENDPOINTS = {
     aplicarSaldoFavor: (id: string) => `/invoices/${id}/aplicar-saldo-favor`,
     removerSaldoFavor: (id: string, paymentEntryId: string) => `/invoices/${id}/aplicar-saldo-favor/${paymentEntryId}`,
     asignarTracking: (id: string) => `/invoices/${id}/asignar-tracking`,
+    recalcularCobertura: (id: string) => `/invoices/${id}/recalcular-cobertura`,
   },
   quotations: {
     list: '/quotations',
@@ -64,6 +65,7 @@ export const ENDPOINTS = {
     list: '/devoluciones',
     byId: (id: string) => `/devoluciones/${id}`,
     cancelar: (id: string) => `/devoluciones/${id}/cancelar`,
+    emitirNcAseguradora: (id: string) => `/devoluciones/${id}/emitir-nc-aseguradora`,
   },
   ecfRecibidos: {
     list: '/ecf/recibidos',
@@ -531,32 +533,22 @@ export const ENDPOINTS = {
     taxpayers: (rnc: string) => `/dgii/taxpayers/${encodeURIComponent(rnc)}`,
   },
   farmacia: {
-    preaprobaciones: {
-      list: '/farmacia/preaprobaciones',
-      byId: (id: string) => `/farmacia/preaprobaciones/${encodeURIComponent(id)}`,
-      recalcular: (id: string) => `/farmacia/preaprobaciones/${encodeURIComponent(id)}/recalcular`,
-      confirmar: (id: string) => `/farmacia/preaprobaciones/${encodeURIComponent(id)}/confirmar`,
-    },
-    despachos: {
-      list: '/farmacia/despachos',
-      byId: (id: string) => `/farmacia/despachos/${encodeURIComponent(id)}`,
-      cobrar: (id: string) => `/farmacia/despachos/${encodeURIComponent(id)}/cobrar`,
-      pdf: (id: string) => `/farmacia/despachos/${encodeURIComponent(id)}/pdf`,
-    },
     lotes: {
       list: '/farmacia/lotes',
+      // OJO: va ANTES de `byId` en cualquier matcheo por prefijo — es una ruta literal, no un :id.
+      facturasElegibles: '/farmacia/lotes/facturas-elegibles',
       byId: (id: string) => `/farmacia/lotes/${encodeURIComponent(id)}`,
       recalcular: (id: string) => `/farmacia/lotes/${encodeURIComponent(id)}/recalcular`,
-      despachos: (id: string) => `/farmacia/lotes/${encodeURIComponent(id)}/despachos`,
-      despachoById: (id: string, despachoId: string) =>
-        `/farmacia/lotes/${encodeURIComponent(id)}/despachos/${encodeURIComponent(despachoId)}`,
+      facturas: (id: string) => `/farmacia/lotes/${encodeURIComponent(id)}/facturas`,
+      facturaById: (id: string, facturaId: string) =>
+        `/farmacia/lotes/${encodeURIComponent(id)}/facturas/${encodeURIComponent(facturaId)}`,
       enRevision: (id: string) => `/farmacia/lotes/${encodeURIComponent(id)}/en-revision`,
       facturar: (id: string) => `/farmacia/lotes/${encodeURIComponent(id)}/facturar`,
       pdf: (id: string) => `/farmacia/lotes/${encodeURIComponent(id)}/pdf`,
     },
     reportes: {
       lotes: '/farmacia/reportes/lotes',
-      despachosNcf: '/farmacia/reportes/despachos-ncf',
+      facturasArs: '/farmacia/reportes/facturas-ars',
     },
   },
 } as const

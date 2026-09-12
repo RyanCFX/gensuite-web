@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { usePermissionsStore } from '@/stores/permissions.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTabs } from '@/contexts/TabsContext'
 import { toast } from 'sonner'
@@ -28,7 +29,7 @@ import { listSucursales } from '@/shared/api/sucursales'
 import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { listCustomerGroups, createCustomerGroup, deleteCustomerGroup } from '@/shared/api/customers'
 import { listRoles } from '@/shared/api/usuarios'
-import type { CobrosConfig, MetodoPago, TaxLineCategory, TasaImpuesto, TasaImpuestoComponente, CreateTasaImpuestoDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError, UpdateAlmacenDto, FormatoImpresion, EcfTipoElectronico, PosDeshabilitarBloqueos } from '@/shared/api/types'
+import type { CobrosConfig, MetodoPago, TaxLineCategory, TasaImpuesto, TasaImpuestoComponente, CreateTasaImpuestoDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError, UpdateAlmacenDto, FormatoImpresion, EcfTipoElectronico, PosDeshabilitarBloqueos, HabilitarFarmaciaResult } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { ConfirmModal, Modal } from '@/shared/ui/Modal'
@@ -38,7 +39,7 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { formatDate } from '@/lib/formatters'
-import { Plus, Trash2, Save, FileWarning, X, Pencil, ChevronLeft, ChevronRight, Info, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, Save, FileWarning, X, Pencil, ChevronLeft, ChevronRight, Info, ChevronDown, Check } from 'lucide-react'
 import EjercicioFiscalSection from './EjercicioFiscalSection'
 import { DGII_UOM_CODES, dgiiUomLabel, ECF_TIPOS, TIPO_PAGO_DEFAULT_OPTIONS, TIPO_INGRESOS_DEFAULT_OPTIONS } from '@/lib/dgii'
 
@@ -1996,31 +1997,124 @@ const PRICE_TIER_OPTIONS = [
 ]
 
 // Solo se registra en el menú si vertical === "farmacia" (ver AppLayout.tsx); si alguien entra
-// directo por URL en un tenant general, el propio POST responde 403 (docs/FARMACIA_ARS_FRONTEND.md §2.2).
+// directo por URL en un tenant general, el propio POST responde 403.
+// El backend NO expone un GET de estado del vertical (docs/PROMPT_FARMACIA_V2_FRONTEND.md §9):
+// el checklist es una lista de tareas para el admin, no un diagnóstico en vivo.
+const LINK_STYLE: React.CSSProperties = { color: 'var(--color-brand)', textDecoration: 'underline' }
+
+/** Fila de resultado del provisionamiento — se omite si el backend no devolvió ese campo. */
+function ResultadoFarmacia({ label, valor }: { label: string; valor?: string }) {
+  if (!valor) return null
+  return (
+    <div className="detail-field">
+      <span className="detail-label">{label}</span>
+      <span className="detail-value" style={{ fontFamily: 'monospace', fontSize: 12 }}>{valor}</span>
+    </div>
+  )
+}
+
 function FarmaciaArsConfigSection() {
+  const esFarmacia = usePermissionsStore((s) => s.vertical) === 'farmacia'
+  const [resultado, setResultado] = useState<HabilitarFarmaciaResult | null>(null)
+
   const habilitarMutation = useMutation({
     mutationFn: habilitarFarmacia,
-    onSuccess: () => toast.success('Farmacia ARS habilitada/reparada correctamente'),
+    onSuccess: (data) => {
+      setResultado(data)
+      toast.success('Farmacia ARS habilitada/reparada correctamente')
+    },
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al habilitar Farmacia ARS'),
   })
 
+  const checklist: { texto: React.ReactNode; hecho?: boolean }[] = [
+    {
+      texto: <>Vertical <strong>farmacia</strong> fijado por el operador para este tenant.</>,
+      hecho: esFarmacia,
+    },
+    {
+      texto: <>Ejecutar <strong>Habilitar / Reparar</strong> (el botón de abajo) — idempotente.</>,
+      hecho: habilitarMutation.isSuccess || undefined,
+    },
+    {
+      texto: (
+        <>
+          Dar de alta las ARS en{' '}
+          <Link to="/farmacia/aseguradoras" style={LINK_STYLE}>Aseguradoras</Link>{' '}
+          (nacen con crédito fiscal, precondición para facturar el lote consolidado).
+        </>
+      ),
+    },
+    {
+      texto: (
+        <>
+          Medicamentos con plantilla de impuesto <strong>exenta</strong> (Ley 253-12) y creados como{' '}
+          <em>producto</em> desde el catálogo del sistema — nunca a mano en ERPNext, o no aparecen en
+          los selectores.
+        </>
+      ),
+    },
+    {
+      texto: (
+        <>
+          Rangos NCF/e-NCF para <strong>B02/E32</strong> (paciente), <strong>B01/E31</strong>{' '}
+          (consolidada a la ARS) y <strong>B04/E34</strong> (notas de crédito) en{' '}
+          <Link to="/config/ecf" style={LINK_STYLE}>Configuración → e-CF</Link>
+          .
+        </>
+      ),
+    },
+    {
+      texto: <>Usuarios con sus perfiles normales (Ventas, Cajero POS, Contabilidad).</>,
+    },
+  ]
+
   return (
-    <div className="ff-wrap">
-      <label className="ff-label">Farmacia ARS</label>
-      <p className="ff-hint" style={{ marginBottom: 8 }}>
-        Provisiona (de forma idempotente) la cuenta puente contable, el modo de pago "Cobertura ARS",
-        el grupo de clientes "ARS" y los perfiles de rol Dependiente/Cajera Farmacia. Puede ejecutarse
-        varias veces sin riesgo — útil si algo quedó a medias en un intento anterior.
-      </p>
-      <Permitido accion="config.farmacia.habilitar">
-        <button
-          className="btn btn-secondary btn-size-sm"
-          onClick={() => habilitarMutation.mutate()}
-          disabled={habilitarMutation.isPending}
-        >
-          {habilitarMutation.isPending ? 'Procesando…' : 'Habilitar / Reparar'}
-        </button>
-      </Permitido>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="ff-wrap">
+        <label className="ff-label">Puesta en marcha de Farmacia ARS</label>
+        <p className="ff-hint" style={{ marginBottom: 10 }}>
+          La cobertura de la aseguradora vive dentro de la factura de venta normal: no hay pantallas
+          de preaprobación ni de despacho. Esta es la lista de tareas para dejar el vertical operativo.
+        </p>
+        <ol style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+          {checklist.map((item, i) => (
+            <li key={i} style={{ lineHeight: 1.5 }}>
+              {item.hecho === true && <Check size={13} style={{ color: 'var(--success-text)', marginRight: 4, verticalAlign: 'middle' }} />}
+              {item.texto}
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div className="ff-wrap">
+        <label className="ff-label">Habilitar / Reparar configuración</label>
+        <p className="ff-hint" style={{ marginBottom: 8 }}>
+          Provisiona (de forma idempotente) la cuenta puente contable, el modo de pago "Cobertura ARS",
+          el grupo de clientes "ARS", los perfiles de rol, el ítem de reclasificación del lote y la
+          plantilla de impresión "Factura Farmacia". Puede ejecutarse varias veces sin riesgo — útil
+          si algo quedó a medias en un intento anterior.
+        </p>
+        <Permitido accion="config.farmacia.habilitar">
+          <button
+            className="btn btn-secondary btn-size-sm"
+            onClick={() => habilitarMutation.mutate()}
+            disabled={habilitarMutation.isPending}
+          >
+            {habilitarMutation.isPending ? 'Procesando…' : 'Habilitar / Reparar'}
+          </button>
+        </Permitido>
+
+        {resultado && Object.values(resultado).some(Boolean) && (
+          <div className="fields-grid" style={{ marginTop: 14 }}>
+            <ResultadoFarmacia label="Cuenta CxC ARS provisional" valor={resultado.cuentaCxcArsProvisional} />
+            <ResultadoFarmacia label='Modo de pago "Cobertura ARS"' valor={resultado.modoPagoCoberturaArs} />
+            <ResultadoFarmacia label='Grupo de clientes "ARS"' valor={resultado.customerGroupArs} />
+            <ResultadoFarmacia label="Ítem de cobertura del lote" valor={resultado.itemCoberturaLote} />
+            <ResultadoFarmacia label="Rol dispensador de controlados" valor={resultado.rolDispensadorControlados} />
+            <ResultadoFarmacia label="Plantilla de factura" valor={resultado.plantillaFactura} />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

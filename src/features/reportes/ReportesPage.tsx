@@ -14,13 +14,14 @@ import {
   downloadBalanceGeneralPdf, downloadIngresosEgresosPdf, downloadVentasPdf,
   downloadInventarioValoracionPdf, downloadInventarioMovimientosPdf,
   downloadCxcAgingPdf, downloadCxpAgingPdf, downloadCajaCuadrePdf,
-  getReporteFarmaciaLotes, getReporteFarmaciaDespachosNcf,
+  getReporteFarmaciaLotes, getReporteFacturasArs,
 } from '@/shared/api/reportes'
 import { usePermissionsStore } from '@/stores/permissions.store'
 import type { LibroDiarioByDimension, CuadreTurnoRow, CorteCajaDiaTurno, AgingGroupBy } from '@/shared/api/types'
 import { CorteCajaView } from '@/components/shared/CorteCajaView'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listCustomers } from '@/shared/api/customers'
+import { listAseguradoras, nombreAseguradora } from '@/shared/api/aseguradoras'
 import { listSuppliers } from '@/shared/api/suppliers'
 import { listUsuarios } from '@/shared/api/usuarios'
 import { getFacturacionConfig } from '@/shared/api/config'
@@ -113,7 +114,7 @@ const REPORT_META: Record<string, { label: string; description: string }> = {
   cuadreTurno:  { label: 'Cuadre por Turno',     description: 'Historial de turnos de caja cerrados y su cuadre' },
   corteCajaDia: { label: 'Corte de Caja del Día', description: 'Ventas, ingresos, egresos e importe a entregar del día, consolidado y por turno' },
   'farmacia-lotes': { label: 'Farmacia ARS — Listado de Lotes', description: 'Lotes de facturación con sus totales y NCF asignado' },
-  'farmacia-despachos-ncf': { label: 'Farmacia ARS — Despacho / Lote / NCF', description: 'Relación entre cada despacho ya vinculado a un lote y el NCF de la consolidada' },
+  'farmacia-facturas-ars': { label: 'Farmacia ARS — Facturas con cobertura ARS', description: 'Qué coberturas siguen pendientes, qué lote/NCF consolidado tomó cada factura y qué se devolvió' },
 }
 
 function thisYear() { return new Date().getFullYear() }
@@ -170,7 +171,7 @@ function ReportTable({
 
   return (
     <div className="table-scroll">
-      <table className="data-table">
+      <table className="data-table navy-table">
         <thead>
           <tr>
             {colDefs.map((c) => (
@@ -274,37 +275,41 @@ function DgiiReport({ tipo }: { tipo: '606' | '607' | '608' }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-            Año:
-            <Select value={String(year)} onValueChange={(val) => setYear(Number(val))}>
-              {[thisYear(), thisYear() - 1, thisYear() - 2].map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-            </Select>
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-            Mes:
-            <Select value={String(month)} onValueChange={(val) => setMonth(Number(val))}>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <SelectItem key={m} value={String(m)}>
-                  {new Date(2000, m - 1, 1).toLocaleString('es-DO', { month: 'long' })}
-                </SelectItem>
-              ))}
-            </Select>
-          </label>
-          <BranchDepartmentFilters
-            branch={branch} onBranchChange={setBranch}
-            department={department} onDepartmentChange={setDepartment}
-          />
-        </div>
-        <div className="filter-bar-right">
-          <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadExcel} disabled={downloadingExcel}>
-            {downloadingExcel ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
-            {' '}Descargar Excel
-          </button>
+      <div className="card filter-card-navy">
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                Año:
+                <Select value={String(year)} onValueChange={(val) => setYear(Number(val))}>
+                  {[thisYear(), thisYear() - 1, thisYear() - 2].map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                </Select>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                Mes:
+                <Select value={String(month)} onValueChange={(val) => setMonth(Number(val))}>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <SelectItem key={m} value={String(m)}>
+                      {new Date(2000, m - 1, 1).toLocaleString('es-DO', { month: 'long' })}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </label>
+              <BranchDepartmentFilters
+                branch={branch} onBranchChange={setBranch}
+                department={department} onDepartmentChange={setDepartment}
+              />
+            </div>
+            <div className="filter-bar-right">
+              <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadExcel} disabled={downloadingExcel}>
+                {downloadingExcel ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
+                {' '}Descargar Excel
+              </button>
+            </div>
+          </div>
         </div>
       </div>
-      <div className="card">
+      <div className="card navy-table-card">
         {isLoading && <LoadingRows />}
         {error && <ErrorBanner err={error} />}
         {!isLoading && !error && <AutoTable data={data} />}
@@ -367,33 +372,37 @@ function FinancialReport({ tipo }: { tipo: 'balance' | 'pl' }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Desde">
-            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
-          </FilterField>
-          <FilterField label="Periodicidad">
-            <Select value={periodicity} onValueChange={(val) => setPeriodicity(val as typeof periodicity)}>
-              <SelectItem value="monthly">Mensual</SelectItem>
-              <SelectItem value="quarterly">Trimestral</SelectItem>
-              <SelectItem value="yearly">Anual</SelectItem>
-            </Select>
-          </FilterField>
-          <BranchDepartmentFilters
-            branch={branch} onBranchChange={setBranch}
-            department={department} onDepartmentChange={setDepartment}
-          />
-        </div>
-        <div className="filter-bar-right">
-          <DownloadPdfButton
-            onDownload={() => downloadPdf({ fromDate, toDate, periodicity, branch: branch || undefined, department: department || undefined })}
-          />
+      <div className="card filter-card-navy">
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Desde">
+                <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+              </FilterField>
+              <FilterField label="Hasta">
+                <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+              </FilterField>
+              <FilterField label="Periodicidad">
+                <Select value={periodicity} onValueChange={(val) => setPeriodicity(val as typeof periodicity)}>
+                  <SelectItem value="monthly">Mensual</SelectItem>
+                  <SelectItem value="quarterly">Trimestral</SelectItem>
+                  <SelectItem value="yearly">Anual</SelectItem>
+                </Select>
+              </FilterField>
+              <BranchDepartmentFilters
+                branch={branch} onBranchChange={setBranch}
+                department={department} onDepartmentChange={setDepartment}
+              />
+            </div>
+            <div className="filter-bar-right">
+              <DownloadPdfButton
+                onDownload={() => downloadPdf({ fromDate, toDate, periodicity, branch: branch || undefined, department: department || undefined })}
+              />
+            </div>
+          </div>
         </div>
       </div>
-      <div className="card">
+      <div className="card navy-table-card">
         {isLoading && <LoadingRows />}
         {error && <ErrorBanner err={error} />}
         {!isLoading && !error && (
@@ -426,33 +435,37 @@ function VentasReport() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Desde">
-            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
-          </FilterField>
-          <FilterField label="Agrupar por">
-            <Select value={groupBy} onValueChange={(val) => setGroupBy(val as typeof groupBy)}>
-              <SelectItem value="day">Por día</SelectItem>
-              <SelectItem value="week">Por semana</SelectItem>
-              <SelectItem value="month">Por mes</SelectItem>
-            </Select>
-          </FilterField>
-          <BranchDepartmentFilters
-            branch={branch} onBranchChange={setBranch}
-            department={department} onDepartmentChange={setDepartment}
-          />
-        </div>
-        <div className="filter-bar-right">
-          <DownloadPdfButton
-            onDownload={() => downloadVentasPdf({ fromDate, toDate, groupBy, branch: branch || undefined, department: department || undefined })}
-          />
+      <div className="card filter-card-navy">
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Desde">
+                <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+              </FilterField>
+              <FilterField label="Hasta">
+                <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+              </FilterField>
+              <FilterField label="Agrupar por">
+                <Select value={groupBy} onValueChange={(val) => setGroupBy(val as typeof groupBy)}>
+                  <SelectItem value="day">Por día</SelectItem>
+                  <SelectItem value="week">Por semana</SelectItem>
+                  <SelectItem value="month">Por mes</SelectItem>
+                </Select>
+              </FilterField>
+              <BranchDepartmentFilters
+                branch={branch} onBranchChange={setBranch}
+                department={department} onDepartmentChange={setDepartment}
+              />
+            </div>
+            <div className="filter-bar-right">
+              <DownloadPdfButton
+                onDownload={() => downloadVentasPdf({ fromDate, toDate, groupBy, branch: branch || undefined, department: department || undefined })}
+              />
+            </div>
+          </div>
         </div>
       </div>
-      <div className="card">
+      <div className="card navy-table-card">
         {isLoading && <LoadingRows />}
         {error && <ErrorBanner err={error} />}
         {!isLoading && !error && <AutoTable data={data} />}
@@ -479,26 +492,30 @@ function InventarioReport({ tipo }: { tipo: 'stock' | 'movimientos' }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Desde">
-            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
-          </FilterField>
-          <BranchDepartmentFilters
-            branch={branch} onBranchChange={setBranch}
-            department={department} onDepartmentChange={setDepartment}
-          />
-        </div>
-        <div className="filter-bar-right">
-          <DownloadPdfButton
-            onDownload={() => downloadPdf({ fromDate, toDate, branch: branch || undefined, department: department || undefined })}
-          />
+      <div className="card filter-card-navy">
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Desde">
+                <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+              </FilterField>
+              <FilterField label="Hasta">
+                <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+              </FilterField>
+              <BranchDepartmentFilters
+                branch={branch} onBranchChange={setBranch}
+                department={department} onDepartmentChange={setDepartment}
+              />
+            </div>
+            <div className="filter-bar-right">
+              <DownloadPdfButton
+                onDownload={() => downloadPdf({ fromDate, toDate, branch: branch || undefined, department: department || undefined })}
+              />
+            </div>
+          </div>
         </div>
       </div>
-      <div className="card">
+      <div className="card navy-table-card">
         {isLoading && <LoadingRows />}
         {isGenerating && (
           <div className="inline-alert inline-alert-info" style={{ margin: 16 }}>
@@ -540,31 +557,35 @@ function CxcAgingReport() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Cliente" style={{ width: 240 }}>
-            <SearchSelect
-              value={customer}
-              selectedLabel={customerLabel}
-              onChange={(val, opt) => { setCustomer(val); setCustomerLabel(opt?.label ?? '') }}
-              options={customerOptions}
-              onSearch={setCustomerQuery}
-              loading={customersLoading}
-              placeholder="Todos los clientes"
-            />
-          </FilterField>
-          <FilterField label="Agrupar por">
-            <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
-              <SelectItem value="party">Agrupar por Cliente</SelectItem>
-              <SelectItem value="invoice">Agrupar por Factura</SelectItem>
-            </Select>
-          </FilterField>
-        </div>
-        <div className="filter-bar-right">
-          <DownloadPdfButton onDownload={() => downloadCxcAgingPdf({ customer: customer || undefined, groupBy })} />
+      <div className="card filter-card-navy">
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Cliente" style={{ width: 240 }}>
+                <SearchSelect
+                  value={customer}
+                  selectedLabel={customerLabel}
+                  onChange={(val, opt) => { setCustomer(val); setCustomerLabel(opt?.label ?? '') }}
+                  options={customerOptions}
+                  onSearch={setCustomerQuery}
+                  loading={customersLoading}
+                  placeholder="Todos los clientes"
+                />
+              </FilterField>
+              <FilterField label="Agrupar por">
+                <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
+                  <SelectItem value="party">Agrupar por Cliente</SelectItem>
+                  <SelectItem value="invoice">Agrupar por Factura</SelectItem>
+                </Select>
+              </FilterField>
+            </div>
+            <div className="filter-bar-right">
+              <DownloadPdfButton onDownload={() => downloadCxcAgingPdf({ customer: customer || undefined, groupBy })} />
+            </div>
+          </div>
         </div>
       </div>
-      <div className="card">
+      <div className="card navy-table-card">
         {isLoading && <LoadingRows />}
         {error && <ErrorBanner err={error} />}
         {!isLoading && !error && <ReportTable data={rows} columns={columns} />}
@@ -600,31 +621,35 @@ function CxpAgingReport() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Proveedor" style={{ width: 240 }}>
-            <SearchSelect
-              value={supplier}
-              selectedLabel={supplierLabel}
-              onChange={(val, opt) => { setSupplier(val); setSupplierLabel(opt?.label ?? '') }}
-              options={supplierOptions}
-              onSearch={setSupplierQuery}
-              loading={suppliersLoading}
-              placeholder="Todos los proveedores"
-            />
-          </FilterField>
-          <FilterField label="Agrupar por">
-            <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
-              <SelectItem value="party">Agrupar por Proveedor</SelectItem>
-              <SelectItem value="invoice">Agrupar por Factura</SelectItem>
-            </Select>
-          </FilterField>
-        </div>
-        <div className="filter-bar-right">
-          <DownloadPdfButton onDownload={() => downloadCxpAgingPdf({ supplier: supplier || undefined, groupBy })} />
+      <div className="card filter-card-navy">
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Proveedor" style={{ width: 240 }}>
+                <SearchSelect
+                  value={supplier}
+                  selectedLabel={supplierLabel}
+                  onChange={(val, opt) => { setSupplier(val); setSupplierLabel(opt?.label ?? '') }}
+                  options={supplierOptions}
+                  onSearch={setSupplierQuery}
+                  loading={suppliersLoading}
+                  placeholder="Todos los proveedores"
+                />
+              </FilterField>
+              <FilterField label="Agrupar por">
+                <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
+                  <SelectItem value="party">Agrupar por Proveedor</SelectItem>
+                  <SelectItem value="invoice">Agrupar por Factura</SelectItem>
+                </Select>
+              </FilterField>
+            </div>
+            <div className="filter-bar-right">
+              <DownloadPdfButton onDownload={() => downloadCxpAgingPdf({ supplier: supplier || undefined, groupBy })} />
+            </div>
+          </div>
         </div>
       </div>
-      <div className="card">
+      <div className="card navy-table-card">
         {isLoading && <LoadingRows />}
         {error && <ErrorBanner err={error} />}
         {!isLoading && !error && <ReportTable data={rows} columns={columns} />}
@@ -659,20 +684,24 @@ function CajaCuadreReport() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Filtro */}
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Fecha">
-            <DatePicker className="filter-select" clearable value={date} onChange={setDate} />
-          </FilterField>
-          <BranchDepartmentFilters
-            branch={branch} onBranchChange={setBranch}
-            department={department} onDepartmentChange={setDepartment}
-          />
-        </div>
-        <div className="filter-bar-right">
-          <DownloadPdfButton
-            onDownload={() => downloadCajaCuadrePdf({ date, branch: branch || undefined, department: department || undefined })}
-          />
+      <div className="card filter-card-navy">
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Fecha">
+                <DatePicker className="filter-select" clearable value={date} onChange={setDate} />
+              </FilterField>
+              <BranchDepartmentFilters
+                branch={branch} onBranchChange={setBranch}
+                department={department} onDepartmentChange={setDepartment}
+              />
+            </div>
+            <div className="filter-bar-right">
+              <DownloadPdfButton
+                onDownload={() => downloadCajaCuadrePdf({ date, branch: branch || undefined, department: department || undefined })}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -698,7 +727,7 @@ function CajaCuadreReport() {
           </div>
 
           {/* Desglose por método de pago */}
-          <div className="card">
+          <div className="card navy-table-card">
             <div style={{ padding: '14px 16px 10px', fontWeight: 600, fontSize: 13, borderBottom: '1px solid var(--border-default)' }}>
               Desglose por método de pago
             </div>
@@ -712,7 +741,7 @@ function CajaCuadreReport() {
               )
               : (
                 <div className="table-scroll">
-                  <table className="data-table">
+                  <table className="data-table navy-table">
                     <thead>
                       <tr>
                         <th>Método de pago</th>
@@ -803,34 +832,38 @@ function CuadreTurnoReport() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Desde">
-            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
-          </FilterField>
-          <FilterField label="Cajero" style={{ width: 200 }}>
-            <SearchSelect
-              value={cajero}
-              onChange={setCajero}
-              options={cajeroOptions}
-              onSearch={setCajeroSearch}
-              selectedLabel={cajeros.find((u) => u.email === cajero)?.fullName ?? ''}
-              placeholder="Todos los cajeros"
-            />
-          </FilterField>
-        </div>
-        <div className="filter-bar-right">
-          <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadExcel} disabled={downloadingExcel}>
-            {downloadingExcel ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
-            {' '}Descargar Excel
-          </button>
-          {/* Acción separada — /pdf ignora cualquier `format`, no es un tercer valor del selector de Excel */}
-          <DownloadPdfButton
-            onDownload={() => downloadCuadreTurnoPdf({ fromDate, toDate, cajero: cajero || undefined })}
-          />
+      <div className="card filter-card-navy">
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Desde">
+                <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+              </FilterField>
+              <FilterField label="Hasta">
+                <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+              </FilterField>
+              <FilterField label="Cajero" style={{ width: 200 }}>
+                <SearchSelect
+                  value={cajero}
+                  onChange={setCajero}
+                  options={cajeroOptions}
+                  onSearch={setCajeroSearch}
+                  selectedLabel={cajeros.find((u) => u.email === cajero)?.fullName ?? ''}
+                  placeholder="Todos los cajeros"
+                />
+              </FilterField>
+            </div>
+            <div className="filter-bar-right">
+              <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadExcel} disabled={downloadingExcel}>
+                {downloadingExcel ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
+                {' '}Descargar Excel
+              </button>
+              {/* Acción separada — /pdf ignora cualquier `format`, no es un tercer valor del selector de Excel */}
+              <DownloadPdfButton
+                onDownload={() => downloadCuadreTurnoPdf({ fromDate, toDate, cajero: cajero || undefined })}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -857,7 +890,7 @@ function CuadreTurnoReport() {
         </div>
       )}
 
-      <div className="card">
+      <div className="card navy-table-card">
         {isLoading && <LoadingRows />}
         {error && <ErrorBanner err={error} />}
         {!isLoading && !error && rows.length === 0 && (
@@ -869,7 +902,7 @@ function CuadreTurnoReport() {
         )}
         {!isLoading && !error && rows.length > 0 && (
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table navy-table">
               <thead>
                 <tr>
                   <th>Turno</th>
@@ -948,27 +981,31 @@ function CorteCajaDiaReport() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Fecha">
-            <DatePicker className="filter-select" value={date} onChange={setDate} />
-          </FilterField>
-          <FilterField label="Cajero" style={{ width: 200 }}>
-            <SearchSelect
-              value={cajero}
-              onChange={setCajero}
-              options={cajeroOptions}
-              onSearch={setCajeroSearch}
-              selectedLabel={cajeros.find((u) => u.email === cajero)?.fullName ?? ''}
-              placeholder="Todos los cajeros"
-            />
-          </FilterField>
-        </div>
-        <div className="filter-bar-right">
-          <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadPdf} disabled={downloadingPdf || !date}>
-            {downloadingPdf ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
-            {' '}Descargar PDF
-          </button>
+      <div className="card filter-card-navy">
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Fecha">
+                <DatePicker className="filter-select" value={date} onChange={setDate} />
+              </FilterField>
+              <FilterField label="Cajero" style={{ width: 200 }}>
+                <SearchSelect
+                  value={cajero}
+                  onChange={setCajero}
+                  options={cajeroOptions}
+                  onSearch={setCajeroSearch}
+                  selectedLabel={cajeros.find((u) => u.email === cajero)?.fullName ?? ''}
+                  placeholder="Todos los cajeros"
+                />
+              </FilterField>
+            </div>
+            <div className="filter-bar-right">
+              <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadPdf} disabled={downloadingPdf || !date}>
+                {downloadingPdf ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
+                {' '}Descargar PDF
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -990,12 +1027,12 @@ function CorteCajaDiaReport() {
               <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Consolidado del día</h2>
               <CorteCajaView corteCaja={result.consolidado} />
 
-              <div className="card">
+              <div className="card navy-table-card">
                 <div className="card-header">
                   <span className="card-title">Turnos del día</span>
                 </div>
                 <div className="table-scroll">
-                  <table className="data-table">
+                  <table className="data-table navy-table">
                     <thead>
                       <tr>
                         <th>Turno</th>
@@ -1034,7 +1071,7 @@ function CorteCajaDiaReport() {
 function ByDimensionTable({ rows }: { rows: LibroDiarioByDimension[] }) {
   return (
     <div className="table-scroll">
-      <table className="data-table">
+      <table className="data-table navy-table">
         <thead>
           <tr>
             <th>Dimensión</th>
@@ -1079,32 +1116,36 @@ function LibroDiarioReport() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Desde">
-            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
-          </FilterField>
-          <FilterField label="Agrupar por">
-            <Select value={groupBy} onValueChange={(val) => setGroupBy(val as typeof groupBy)}>
-              <SelectItem value="Group by Voucher">Agrupar por Voucher</SelectItem>
-              <SelectItem value="Group by Voucher (Consolidated)">Agrupar por Voucher (Consolidado)</SelectItem>
-              <SelectItem value="Group by Account">Agrupar por Cuenta</SelectItem>
-              <SelectItem value="Group by Sucursal">Agrupar por Sucursal</SelectItem>
-              <SelectItem value="Group by Departamento">Agrupar por Departamento</SelectItem>
-            </Select>
-          </FilterField>
-          <BranchDepartmentFilters
-            branch={branch} onBranchChange={setBranch}
-            department={department} onDepartmentChange={setDepartment}
-          />
+      <div className="card filter-card-navy">
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Desde">
+                <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+              </FilterField>
+              <FilterField label="Hasta">
+                <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+              </FilterField>
+              <FilterField label="Agrupar por">
+                <Select value={groupBy} onValueChange={(val) => setGroupBy(val as typeof groupBy)}>
+                  <SelectItem value="Group by Voucher">Agrupar por Voucher</SelectItem>
+                  <SelectItem value="Group by Voucher (Consolidated)">Agrupar por Voucher (Consolidado)</SelectItem>
+                  <SelectItem value="Group by Account">Agrupar por Cuenta</SelectItem>
+                  <SelectItem value="Group by Sucursal">Agrupar por Sucursal</SelectItem>
+                  <SelectItem value="Group by Departamento">Agrupar por Departamento</SelectItem>
+                </Select>
+              </FilterField>
+              <BranchDepartmentFilters
+                branch={branch} onBranchChange={setBranch}
+                department={department} onDepartmentChange={setDepartment}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
       {byDimension && byDimension.length > 0 && (
-        <div className="card">
+        <div className="card navy-table-card">
           <div style={{ padding: '14px 16px 10px', fontWeight: 600, fontSize: 13, borderBottom: '1px solid var(--border-default)' }}>
             Resumen por {groupBy === 'Group by Sucursal' ? 'Sucursal' : 'Departamento'}
           </div>
@@ -1112,7 +1153,7 @@ function LibroDiarioReport() {
         </div>
       )}
 
-      <div className="card">
+      <div className="card navy-table-card">
         {isLoading && <LoadingRows />}
         {error && <ErrorBanner err={error} />}
         {!isLoading && !error && <ReportTable data={rows} columns={columns} />}
@@ -1135,21 +1176,25 @@ function LibroMayorReport() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Desde">
-            <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
-          </FilterField>
-          <BranchDepartmentFilters
-            branch={branch} onBranchChange={setBranch}
-            department={department} onDepartmentChange={setDepartment}
-          />
+      <div className="card filter-card-navy">
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Desde">
+                <DatePicker className="filter-select" clearable value={fromDate} onChange={setFromDate} />
+              </FilterField>
+              <FilterField label="Hasta">
+                <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
+              </FilterField>
+              <BranchDepartmentFilters
+                branch={branch} onBranchChange={setBranch}
+                department={department} onDepartmentChange={setDepartment}
+              />
+            </div>
+          </div>
         </div>
       </div>
-      <div className="card">
+      <div className="card navy-table-card">
         {isLoading && <LoadingRows />}
         {error && <ErrorBanner err={error} />}
         {!isLoading && !error && <AutoTable data={data} />}
@@ -1162,14 +1207,17 @@ function LibroMayorReport() {
 
 // ─── Farmacia ARS — reportes de auditoría ────────────────────────────────────
 
+// Nunca `/customers`: el vertical expone las ARS en su propio CRUD y el backend rechaza un
+// Customer que no sea aseguradora (docs/PROMPT_FARMACIA_V2_FRONTEND.md §3.2).
 function useAseguradoraFilter(aseguradoraId: string) {
   const [query, setQuery] = useState('')
   const { data, isLoading } = useQuery({
-    queryKey: ['customerSearch-ars', query],
-    queryFn: () => listCustomers({ search: query || undefined, limit: 15 }),
+    queryKey: ['aseguradoras-filtro-reportes', query],
+    queryFn: () => listAseguradoras({ nombre: query || undefined, limit: 15 }),
   })
-  const options: SearchSelectOption[] = (data?.items ?? []).map((c) => ({ value: c.id, label: c.customerName }))
-  const label = data?.items.find((c) => c.id === aseguradoraId)?.customerName ?? ''
+  const options: SearchSelectOption[] = (data?.items ?? []).map((a) => ({ value: a.id, label: nombreAseguradora(a) }))
+  const encontrada = data?.items.find((a) => a.id === aseguradoraId)
+  const label = encontrada ? nombreAseguradora(encontrada) : ''
   return { options, label, isLoading, onSearch: setQuery }
 }
 
@@ -1188,36 +1236,40 @@ function FarmaciaLotesReport() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="ARS" style={{ width: 200 }}>
-            <SearchSelect
-              value={aseguradora}
-              selectedLabel={aseguradoraFilter.label}
-              onChange={setAseguradora}
-              options={aseguradoraFilter.options}
-              onSearch={aseguradoraFilter.onSearch}
-              loading={aseguradoraFilter.isLoading}
-              placeholder="Todas las ARS"
-            />
-          </FilterField>
-          <FilterField label="Estado">
-            <Select value={estado || 'all'} onValueChange={(val) => setEstado(val === 'all' ? '' : val)}>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="Abierto">Abierto</SelectItem>
-              <SelectItem value="En Revisión">En Revisión</SelectItem>
-              <SelectItem value="Facturado">Facturado</SelectItem>
-            </Select>
-          </FilterField>
-          <FilterField label="Desde">
-            <DatePicker className="filter-select" clearable value={desde} onChange={setDesde} />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker className="filter-select" clearable value={hasta} onChange={setHasta} />
-          </FilterField>
+      <div className="card filter-card-navy">
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="ARS" style={{ width: 200 }}>
+                <SearchSelect
+                  value={aseguradora}
+                  selectedLabel={aseguradoraFilter.label}
+                  onChange={setAseguradora}
+                  options={aseguradoraFilter.options}
+                  onSearch={aseguradoraFilter.onSearch}
+                  loading={aseguradoraFilter.isLoading}
+                  placeholder="Todas las ARS"
+                />
+              </FilterField>
+              <FilterField label="Estado">
+                <Select value={estado || 'all'} onValueChange={(val) => setEstado(val === 'all' ? '' : val)}>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="Abierto">Abierto</SelectItem>
+                  <SelectItem value="En Revisión">En Revisión</SelectItem>
+                  <SelectItem value="Facturado">Facturado</SelectItem>
+                </Select>
+              </FilterField>
+              <FilterField label="Desde">
+                <DatePicker className="filter-select" clearable value={desde} onChange={setDesde} />
+              </FilterField>
+              <FilterField label="Hasta">
+                <DatePicker className="filter-select" clearable value={hasta} onChange={setHasta} />
+              </FilterField>
+            </div>
+          </div>
         </div>
       </div>
-      <div className="card">
+      <div className="card navy-table-card">
         {isLoading && <LoadingRows />}
         {error && <ErrorBanner err={error} />}
         {!isLoading && !error && <AutoTable data={data} />}
@@ -1226,42 +1278,61 @@ function FarmaciaLotesReport() {
   )
 }
 
-function FarmaciaDespachosNcfReport() {
+function FarmaciaFacturasArsReport() {
   const [aseguradora, setAseguradora] = useState('')
+  const [estadoArs, setEstadoArs] = useState('')
   const [desde, setDesde] = useState('')
   const [hasta, setHasta] = useState('')
   const aseguradoraFilter = useAseguradoraFilter(aseguradora)
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['reporte-farmacia-despachos-ncf', aseguradora, desde, hasta],
-    queryFn: () => getReporteFarmaciaDespachosNcf({ aseguradora: aseguradora || undefined, desde: desde || undefined, hasta: hasta || undefined }),
+    queryKey: ['reporte-farmacia-facturas-ars', aseguradora, estadoArs, desde, hasta],
+    queryFn: () => getReporteFacturasArs({
+      aseguradora: aseguradora || undefined,
+      estadoArs: estadoArs || undefined,
+      desde: desde || undefined,
+      hasta: hasta || undefined,
+    }),
     retry: false,
   })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="ARS" style={{ width: 200 }}>
-            <SearchSelect
-              value={aseguradora}
-              selectedLabel={aseguradoraFilter.label}
-              onChange={setAseguradora}
-              options={aseguradoraFilter.options}
-              onSearch={aseguradoraFilter.onSearch}
-              loading={aseguradoraFilter.isLoading}
-              placeholder="Todas las ARS"
-            />
-          </FilterField>
-          <FilterField label="Desde">
-            <DatePicker className="filter-select" clearable value={desde} onChange={setDesde} />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker className="filter-select" clearable value={hasta} onChange={setHasta} />
-          </FilterField>
+      <div className="card filter-card-navy">
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="ARS" style={{ width: 200 }}>
+                <SearchSelect
+                  value={aseguradora}
+                  selectedLabel={aseguradoraFilter.label}
+                  onChange={setAseguradora}
+                  options={aseguradoraFilter.options}
+                  onSearch={aseguradoraFilter.onSearch}
+                  loading={aseguradoraFilter.isLoading}
+                  placeholder="Todas las ARS"
+                />
+              </FilterField>
+              <FilterField label="Estado ARS">
+                <Select value={estadoArs || 'all'} onValueChange={(val) => setEstadoArs(val === 'all' ? '' : val)}>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="Pendiente">Pendiente</SelectItem>
+                  <SelectItem value="En Lote">En Lote</SelectItem>
+                  <SelectItem value="Facturado">Facturado</SelectItem>
+                  <SelectItem value="Anulada">Anulada</SelectItem>
+                </Select>
+              </FilterField>
+              <FilterField label="Desde">
+                <DatePicker className="filter-select" clearable value={desde} onChange={setDesde} />
+              </FilterField>
+              <FilterField label="Hasta">
+                <DatePicker className="filter-select" clearable value={hasta} onChange={setHasta} />
+              </FilterField>
+            </div>
+          </div>
         </div>
       </div>
-      <div className="card">
+      <div className="card navy-table-card">
         {isLoading && <LoadingRows />}
         {error && <ErrorBanner err={error} />}
         {!isLoading && !error && <AutoTable data={data} />}
@@ -1287,18 +1358,18 @@ const REPORT_NAV = [
   { key: 'libroDiario', group: 'Contabilidad', label: 'Libro Diario' },
   { key: 'libroMayor',  group: 'Contabilidad', label: 'Libro Mayor' },
   { key: 'farmacia-lotes', group: 'Farmacia ARS', label: 'Listado de Lotes' },
-  { key: 'farmacia-despachos-ncf', group: 'Farmacia ARS', label: 'Despacho / Lote / NCF' },
+  { key: 'farmacia-facturas-ars', group: 'Farmacia ARS', label: 'Facturas con cobertura ARS' },
 ]
 
 // Reportes que solo tienen sentido con el módulo POS habilitado (Facturacion Config.usaModuloPos).
 const POS_ONLY_REPORT_KEYS = new Set(['caja', 'cuadreTurno', 'corteCajaDia'])
 
-// Solo visibles con tenant.vertical === "farmacia" (docs/FARMACIA_ARS_FRONTEND.md §2.3), y además
+// Solo visibles con tenant.vertical === "farmacia" (docs/PROMPT_FARMACIA_V2_FRONTEND.md §1), y además
 // cada uno detrás de su propia acción del catálogo (§7.1) — a diferencia del resto de reportes,
 // que todavía no están migrados a `acciones`.
 const FARMACIA_REPORT_ACCIONES: Record<string, string> = {
   'farmacia-lotes': 'farmacia.reportes.lotes.listar',
-  'farmacia-despachos-ncf': 'farmacia.reportes.despachos-ncf.listar',
+  'farmacia-facturas-ars': 'farmacia.reportes.facturas-ars.listar',
 }
 const FARMACIA_ONLY_REPORT_KEYS = new Set(Object.keys(FARMACIA_REPORT_ACCIONES))
 
@@ -1355,7 +1426,7 @@ export default function ReportesPage() {
       case 'libroDiario': return <LibroDiarioReport />
       case 'libroMayor':  return <LibroMayorReport />
       case 'farmacia-lotes': return <FarmaciaLotesReport />
-      case 'farmacia-despachos-ncf': return <FarmaciaDespachosNcfReport />
+      case 'farmacia-facturas-ars': return <FarmaciaFacturasArsReport />
       default:           return <ServiceUnavailable message="Reporte no encontrado." />
     }
   }
@@ -1393,7 +1464,7 @@ export default function ReportesPage() {
       <div style={{ flex: 1, minWidth: 0, padding: '24px 28px', overflowY: 'auto' }}>
         <PageHeader
           overline="Reportes"
-          title={meta?.label ?? active}
+          title={<><span className="page-title-dot" />{meta?.label ?? active}</>}
           description={meta?.description}
         />
         {renderReport()}

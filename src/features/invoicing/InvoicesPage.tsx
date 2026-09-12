@@ -15,8 +15,13 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
+import { usePermissionsStore } from '@/stores/permissions.store'
+import { listAseguradoras, nombreAseguradora } from '@/shared/api/aseguradoras'
+import { EstadoArsBadge } from './EstadoArsBadge'
+import type { EstadoArs } from '@/shared/api/types'
 
 type StatusFilter = 'draft' | 'submitted' | 'cancelled' | 'all'
+type EstadoArsFilter = EstadoArs | 'all' | 'sinLote'
 type PaymentFilter = 'paid' | 'unpaid' | 'partly_paid' | 'all'
 
 const STATUS_BADGE: Record<string, string> = {
@@ -58,6 +63,23 @@ export default function InvoicesPage() {
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
 
+  // ── Filtros del vertical farmacia (docs/PROMPT_FARMACIA_V2_FRONTEND.md §3.8) ────────────────
+  const esFarmacia = usePermissionsStore((s) => s.vertical) === 'farmacia'
+  const [aseguradora, setAseguradora] = useState('')
+  const [aseguradoraLabel, setAseguradoraLabel] = useState('')
+  const [aseguradoraSearch, setAseguradoraSearch] = useState('')
+  const [estadoArs, setEstadoArs] = useState<EstadoArsFilter>('all')
+
+  const { data: aseguradorasData, isLoading: aseguradorasLoading } = useQuery({
+    queryKey: ['aseguradoras-filtro-facturas', aseguradoraSearch],
+    queryFn: () => listAseguradoras({ nombre: aseguradoraSearch || undefined, limit: 15 }),
+    enabled: esFarmacia,
+  })
+  const aseguradoraOptions: SearchSelectOption[] = (aseguradorasData?.items ?? []).map((a) => ({
+    value: a.id,
+    label: nombreAseguradora(a),
+  }))
+
   const { data: sucursalesData } = useQuery({
     queryKey: ['sucursales-all'],
     queryFn: () => listSucursales({ limit: 100 }),
@@ -81,6 +103,15 @@ export default function InvoicesPage() {
     grandTotalMax: grandTotalMax !== '' ? Number(grandTotalMax) : undefined,
     orderBy: orderBy || undefined,
     limit: 50,
+    // `sinLote` y `estadoArs` son mutuamente excluyentes en la UI: "Sin lote" ya implica
+    // "con cobertura y todavía sin lote", así que no se manda también un estadoArs.
+    ...(esFarmacia
+      ? {
+          aseguradora: aseguradora || undefined,
+          estadoArs: estadoArs !== 'all' && estadoArs !== 'sinLote' ? estadoArs : undefined,
+          sinLote: estadoArs === 'sinLote' ? true : undefined,
+        }
+      : {}),
   }
 
   const { data, isLoading } = useQuery({
@@ -99,6 +130,8 @@ export default function InvoicesPage() {
     .map((t) => ({ value: t.value, label: t.label }))
 
   const invoices = data?.items ?? []
+  /** 9 columnas base + "Estado ARS" en tenants de farmacia. */
+  const columnCount = esFarmacia ? 10 : 9
 
   const activeMoreFiltersCount = [ncfType, fromDate, toDate, ncf, grandTotalMin, grandTotalMax].filter((v) => v !== '').length
 
@@ -186,6 +219,31 @@ export default function InvoicesPage() {
                   placeholder="Todas las sucursales"
                 />
               </FilterField>
+              {esFarmacia && (
+                <>
+                  <FilterField label="Aseguradora" style={{ width: 200 }}>
+                    <SearchSelect
+                      value={aseguradora}
+                      selectedLabel={aseguradoraLabel}
+                      onChange={(val, opt) => { setAseguradora(val); setAseguradoraLabel(opt?.label ?? '') }}
+                      options={aseguradoraOptions}
+                      onSearch={setAseguradoraSearch}
+                      loading={aseguradorasLoading}
+                      placeholder="Todas las ARS"
+                    />
+                  </FilterField>
+                  <FilterField label="Estado ARS">
+                    <Select value={estadoArs} onValueChange={(val) => setEstadoArs(val as EstadoArsFilter)}>
+                      <SelectItem value="all">Todo estado ARS</SelectItem>
+                      <SelectItem value="Pendiente">Pendiente</SelectItem>
+                      <SelectItem value="En Lote">En Lote</SelectItem>
+                      <SelectItem value="Facturado">Facturado</SelectItem>
+                      <SelectItem value="Anulada">Anulada</SelectItem>
+                      <SelectItem value="sinLote">Con cobertura, sin lote</SelectItem>
+                    </Select>
+                  </FilterField>
+                </>
+              )}
             </div>
           </div>
 
@@ -214,6 +272,7 @@ export default function InvoicesPage() {
               <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={sort} align="right" />
               <th style={{ textAlign: 'right' }}>Pendiente</th>
               <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
+              {esFarmacia && <th>Estado ARS</th>}
               <th style={{ textAlign: 'right', width: 64 }}>Ver</th>
             </tr>
           </thead>
@@ -221,14 +280,14 @@ export default function InvoicesPage() {
             {isLoading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 9 }).map((__, j) => (
+                  {Array.from({ length: columnCount }).map((__, j) => (
                     <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                   ))}
                 </tr>
               ))
             ) : invoices.length === 0 ? (
               <tr>
-                <td colSpan={9}>
+                <td colSpan={columnCount}>
                   <div className="empty-state">
                     <div className="empty-title">Sin facturas</div>
                     <p className="empty-sub">Crea tu primera factura para comenzar.</p>
@@ -262,6 +321,13 @@ export default function InvoicesPage() {
                   <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(inv.grandTotal)}</td>
                   <td style={{ textAlign: 'right' }}>{formatDOP(inv.outstandingAmount)}</td>
                   <td>{statusBadge(inv)}</td>
+                  {esFarmacia && (
+                    <td>
+                      {inv.aseguradora?.estadoArs
+                        ? <EstadoArsBadge estado={inv.aseguradora.estadoArs} />
+                        : <span className="td-dim">—</span>}
+                    </td>
+                  )}
                   <td style={{ textAlign: 'right' }}>
                     <button
                       className="btn btn-ghost btn-size-icon-sm"

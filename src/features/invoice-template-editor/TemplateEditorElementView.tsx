@@ -128,9 +128,15 @@ interface ItemRow {
   cantidad?: number
   precio?: number
   monto?: number
+  /** Solo con cobertura ARS; `null` en cualquier otra factura (§8.2 del doc de Farmacia v2). */
+  coberturaArs?: number | null
+  montoPaciente?: number | null
 }
 
 function formatMoney(value: unknown): string {
+  // `null`/`undefined` deben quedar en blanco, no en "0.00": es lo que traen los campos ARS en
+  // una factura sin aseguradora (Number(null) daría 0).
+  if (value == null || value === '') return ''
   const num = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(num) ? num.toFixed(2) : ''
 }
@@ -332,7 +338,12 @@ export function TemplateEditorElementView({ element, fields, values }: Props) {
                           ? formatMoney(row.precio)
                           : c.key === 'total'
                             ? formatMoney(row.monto)
-                            : /* itbis: no existe en items.tabla real (§2.3 del doc) */ ''}
+                            : c.key === 'coberturaArs'
+                              // `null` = factura sin aseguradora: la celda queda vacía, no en 0.00.
+                              ? formatMoney(row.coberturaArs)
+                              : c.key === 'montoPaciente'
+                                ? formatMoney(row.montoPaciente)
+                                : /* itbis: no existe en items.tabla real (§2.3 del doc) */ ''}
                   </td>
                 ))}
               </tr>

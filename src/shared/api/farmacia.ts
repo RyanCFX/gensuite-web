@@ -1,104 +1,19 @@
 import { client, unwrap, unwrapPaginated } from './client'
 import { ENDPOINTS } from './endpoints'
 import type {
-  CobrarDespachoDto,
-  CobrarDespachoResult,
-  CreateDespachoDto,
   CreateLoteDto,
-  CreatePreaprobacionDto,
-  DespachoEstado,
-  DespachoProvisionalArs,
+  FacturaElegibleArs,
+  FacturarLoteResult,
+  FacturasElegiblesResult,
   LoteFacturacionArs,
   LoteFarmaciaEstado,
   PaginatedResponse,
   PaginationParams,
-  Preaprobacion,
-  PreaprobacionEstado,
-  UpdatePreaprobacionDto,
-  VincularDespachoDto,
+  VincularFacturasDto,
+  VincularFacturasResult,
 } from './types'
 
-// ─── Preaprobaciones ────────────────────────────────────────────────────────
-
-export interface ListPreaprobacionesParams extends PaginationParams {
-  estado?: PreaprobacionEstado
-  aseguradora?: string
-  cliente?: string
-}
-
-export async function listPreaprobaciones(params?: ListPreaprobacionesParams) {
-  const res = await client.get<PaginatedResponse<Preaprobacion>>(ENDPOINTS.farmacia.preaprobaciones.list, { params })
-  return unwrapPaginated(res)
-}
-
-export async function getPreaprobacion(id: string) {
-  const res = await client.get<{ success: true; data: Preaprobacion }>(ENDPOINTS.farmacia.preaprobaciones.byId(id))
-  return unwrap(res)
-}
-
-export async function createPreaprobacion(data: CreatePreaprobacionDto) {
-  const res = await client.post<{ success: true; data: Preaprobacion }>(ENDPOINTS.farmacia.preaprobaciones.list, data)
-  return unwrap(res)
-}
-
-export async function updatePreaprobacion(id: string, data: UpdatePreaprobacionDto) {
-  const res = await client.put<{ success: true; data: Preaprobacion }>(ENDPOINTS.farmacia.preaprobaciones.byId(id), data)
-  return unwrap(res)
-}
-
-export async function recalcularPreaprobacion(id: string) {
-  const res = await client.post<{ success: true; data: Preaprobacion }>(ENDPOINTS.farmacia.preaprobaciones.recalcular(id))
-  return unwrap(res)
-}
-
-export async function confirmarPreaprobacion(id: string) {
-  const res = await client.post<{ success: true; data: Preaprobacion }>(ENDPOINTS.farmacia.preaprobaciones.confirmar(id))
-  return unwrap(res)
-}
-
-// ─── Despachos ──────────────────────────────────────────────────────────────
-
-export interface ListDespachosParams extends PaginationParams {
-  estado?: DespachoEstado
-  preaprobacion?: string
-  lote?: string
-  sinLote?: boolean
-}
-
-export async function listDespachos(params?: ListDespachosParams) {
-  const res = await client.get<PaginatedResponse<DespachoProvisionalArs>>(ENDPOINTS.farmacia.despachos.list, { params })
-  return unwrapPaginated(res)
-}
-
-export async function getDespacho(id: string) {
-  const res = await client.get<{ success: true; data: DespachoProvisionalArs }>(ENDPOINTS.farmacia.despachos.byId(id))
-  return unwrap(res)
-}
-
-export async function createDespacho(data: CreateDespachoDto) {
-  const res = await client.post<{ success: true; data: DespachoProvisionalArs }>(ENDPOINTS.farmacia.despachos.list, data)
-  return unwrap(res)
-}
-
-export async function cobrarDespacho(id: string, data: CobrarDespachoDto) {
-  const res = await client.post<{ success: true; data: CobrarDespachoResult }>(ENDPOINTS.farmacia.despachos.cobrar(id), data)
-  return unwrap(res)
-}
-
-export async function downloadDespachoPdf(id: string, formato?: 'a4' | 'carta' | 'a6', filename?: string): Promise<void> {
-  const res = await client.get<Blob>(ENDPOINTS.farmacia.despachos.pdf(id), {
-    params: formato ? { formato } : undefined,
-    responseType: 'blob',
-  })
-  const url = URL.createObjectURL(res.data)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename ?? `despacho-${id}.pdf`
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-// ─── Lotes de Facturación ───────────────────────────────────────────────────
+// ─── Lotes de Facturación ARS (docs/PROMPT_FARMACIA_V2_FRONTEND.md §6) ──────
 // Nombradas explícitamente con sufijo "Farmacia" — `listLotes`/`getLote` ya existen en
 // `./inventory.ts` para lotes de inventario (batch), un concepto completamente distinto.
 
@@ -127,13 +42,48 @@ export async function recalcularLoteFarmacia(id: string) {
   return unwrap(res)
 }
 
-export async function vincularDespachoALote(id: string, data: VincularDespachoDto) {
-  const res = await client.post<{ success: true; data: LoteFacturacionArs }>(ENDPOINTS.farmacia.lotes.despachos(id), data)
+export interface FacturasElegiblesParams {
+  aseguradora: string
+  periodoInicio: string
+  periodoFin: string
+}
+
+/**
+ * Facturas de paciente que el lote puede tomar: sometidas, `estadoArs = "Pendiente"`, sin lote,
+ * con `montoCoberturaNeta > 0` y con la cobertura ya cobrada/posteada. Es exactamente lo que
+ * acepta `vincularFacturasALote` — el backend devuelve `meta: { total, montoTotal }` además de
+ * `data`, así que no se puede usar `unwrapPaginated` (que asume `meta.hasMore`).
+ */
+export async function listFacturasElegibles(params: FacturasElegiblesParams): Promise<FacturasElegiblesResult> {
+  const res = await client.get<{
+    success: true
+    data: FacturaElegibleArs[]
+    meta?: { total?: number; montoTotal?: number }
+  }>(ENDPOINTS.farmacia.lotes.facturasElegibles, { params })
+  const items = res.data.data ?? []
+  return {
+    items,
+    total: res.data.meta?.total ?? items.length,
+    montoTotal: res.data.meta?.montoTotal ?? items.reduce((s, f) => s + (f.montoCoberturaNeta ?? 0), 0),
+  }
+}
+
+/**
+ * Vincula facturas en bloque (1–100). NO aborta por las rechazadas: la respuesta trae
+ * `vinculadas` y `rechazadas: [{ factura, motivo }]` — la UI debe mostrar ambas listas.
+ */
+export async function vincularFacturasALote(id: string, data: VincularFacturasDto) {
+  const res = await client.post<{ success: true; data: VincularFacturasResult }>(
+    ENDPOINTS.farmacia.lotes.facturas(id),
+    data,
+  )
   return unwrap(res)
 }
 
-export async function desvincularDespachoDeLote(id: string, despachoId: string) {
-  const res = await client.delete<{ success: true; data: LoteFacturacionArs }>(ENDPOINTS.farmacia.lotes.despachoById(id, despachoId))
+export async function desvincularFacturaDeLote(id: string, facturaId: string) {
+  const res = await client.delete<{ success: true; data: LoteFacturacionArs }>(
+    ENDPOINTS.farmacia.lotes.facturaById(id, facturaId),
+  )
   return unwrap(res)
 }
 
@@ -142,11 +92,16 @@ export async function marcarLoteEnRevision(id: string) {
   return unwrap(res)
 }
 
+/**
+ * Irreversible: emite la consolidada B01/E31 a la ARS y cierra el lote. Reintentar tras un error
+ * de red es seguro — nunca emite dos consolidadas; si ya se creó, la retoma y cierra el lote.
+ */
 export async function facturarLoteFarmacia(id: string) {
-  const res = await client.post<{ success: true; data: LoteFacturacionArs }>(ENDPOINTS.farmacia.lotes.facturar(id))
+  const res = await client.post<{ success: true; data: FacturarLoteResult }>(ENDPOINTS.farmacia.lotes.facturar(id))
   return unwrap(res)
 }
 
+/** Solo A4, y solo con el lote ya `Facturado` (400 en cualquier otro estado). */
 export async function downloadLoteFarmaciaPdf(id: string, filename?: string): Promise<void> {
   const res = await client.get<Blob>(ENDPOINTS.farmacia.lotes.pdf(id), { responseType: 'blob' })
   const url = URL.createObjectURL(res.data)

@@ -273,18 +273,19 @@ const NAV_OPS: NavEntry[] = [
   },
 ];
 
-// Solo visible con tenant.vertical === "farmacia" (docs/FARMACIA_ARS_FRONTEND.md §2.3) — se
-// completa a lo largo de las Fases 2-4 (Despachos, Cola de Cobro, Lotes).
+// Solo visible con tenant.vertical === "farmacia" (docs/PROMPT_FARMACIA_V2_FRONTEND.md §1).
+// La v2 eliminó Preaprobaciones, Despachos y Cola de Cobro (§2.1): la cobertura de la ARS vive
+// dentro de la factura de venta normal y la cajera cobra desde la pantalla de Caja de siempre.
 const NAV_FARMACIA: NavGroup = {
   label: "Farmacia ARS",
   icon: <Pill size={16} aria-hidden="true" />,
   prefix: "/farmacia",
   children: [
     { label: "Aseguradoras", icon: <Shield size={14} />, path: "/farmacia/aseguradoras" },
-    { label: "Preaprobaciones", icon: <FileText size={14} />, path: "/farmacia/preaprobaciones" },
-    { label: "Despachos", icon: <Truck size={14} />, path: "/farmacia/despachos" },
-    { label: "Cola de Cobro", icon: <DollarSign size={14} />, path: "/farmacia/despachos/cola" },
     { label: "Lotes de Facturación", icon: <Receipt size={14} />, path: "/farmacia/lotes" },
+    // Vive en la pantalla de Reportes (/reportes/:tipo), no bajo /farmacia — el permiso igual se
+    // resuelve por ruta (`farmacia.reportes.lotes.listar`) como cualquier otra entrada del menú.
+    { label: "Reportes", icon: <FileText size={14} />, path: "/reportes/farmacia-lotes" },
   ],
 };
 
@@ -677,7 +678,7 @@ function filtrarNavList(
     .filter((e): e is NavEntry => e !== null);
 }
 
-// Solo visible con tenant.vertical === "farmacia" (docs/FARMACIA_ARS_FRONTEND.md §2.3).
+// Solo visible con tenant.vertical === "farmacia" (docs/PROMPT_FARMACIA_V2_FRONTEND.md §1).
 const FARMACIA_ONLY_PATHS = new Set(["/config/farmacia"]);
 
 // Grupos/ítems de NAV_FINANZAS que solo tienen sentido con el módulo POS habilitado

@@ -31,6 +31,15 @@ import type { CobrarFacturaDto, PendienteCobroItem } from '@/shared/api/types'
 
 const PAGE_SIZE = 20
 
+/**
+ * Importe que realmente se le cobra al paciente/cliente. El backend lo manda resuelto en
+ * `montoACobrar`; el fallback a `roundedTotal ?? grandTotal` cubre respuestas sin el campo
+ * (tenant general o backend viejo), donde no hay cobertura que descontar.
+ */
+function montoACobrarDe(inv: PendienteCobroItem): number {
+  return inv.montoACobrar ?? inv.roundedTotal ?? inv.grandTotal
+}
+
 export default function PorCobrarPage() {
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -40,10 +49,13 @@ export default function PorCobrarPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<PendienteCobroItem | null>(null)
   const [confirmDescartar, setConfirmDescartar] = useState<PendienteCobroItem | null>(null)
 
-  // Monto real a cobrar (con redondeo de moneda aplicado) — usar en vez de grandTotal para
-  // prellenar, validar y someter el cobro.
-  const selectedRoundedTotal = selectedInvoice ? selectedInvoice.roundedTotal ?? selectedInvoice.grandTotal : 0
+  // Monto real a cobrar — usar en vez de grandTotal para prellenar, validar y someter el cobro.
+  // Con cobertura ARS el backend ya antepone la fila de pago "Cobertura ARS": el cajero cobra
+  // SOLO `montoACobrar` (= roundedTotal − montoCobertura) y nunca manda esa fila
+  // (docs/PROMPT_FARMACIA_V2_FRONTEND.md §4.1/§4.3).
+  const selectedRoundedTotal = selectedInvoice ? montoACobrarDe(selectedInvoice) : 0
   const selectedRoundingAdjustment = selectedInvoice?.roundingAdjustment ?? 0
+  const selectedCobertura = selectedInvoice?.aseguradora?.montoCobertura ?? 0
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
@@ -219,7 +231,7 @@ function openModal(invoice: PendienteCobroItem) {
          payments: [{
            ...emptyPaymentLine(),
            modeOfPayment: cashMethod,
-           amount: String(invoice.roundedTotal ?? invoice.grandTotal),
+           amount: String(montoACobrarDe(invoice)),
          }],
        })
      }
@@ -356,6 +368,8 @@ function validateAndSubmit() {
                 <th>Cliente</th>
                 <th>Fecha</th>
                 <th style={{ textAlign: 'right' }}>Total</th>
+                <th style={{ textAlign: 'right' }}>Cubre ARS</th>
+                <th style={{ textAlign: 'right' }}>A cobrar</th>
                 <th style={{ width: 180 }} />
               </tr>
             </thead>
@@ -363,7 +377,7 @@ function validateAndSubmit() {
               {isLoading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 5 }).map((__, j) => (
+                      {Array.from({ length: 7 }).map((__, j) => (
                         <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                       ))}
                     </tr>
@@ -371,7 +385,7 @@ function validateAndSubmit() {
                 : pendientes.length === 0
                   ? (
                       <tr>
-                        <td colSpan={5}>
+                        <td colSpan={7}>
                           <div className="empty-state">
                             <p className="empty-title">Sin pendientes por cobrar</p>
                             <p className="empty-sub">No hay facturas en espera de completar cobro.</p>
@@ -391,8 +405,14 @@ function validateAndSubmit() {
                            inv.customerName
                          )}</td>
                         <td className="td-muted">{formatDate(inv.postingDate)}</td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600 }}>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
                           {formatDOP(inv.roundedTotal ?? inv.grandTotal)}
+                        </td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--color-brand)' }}>
+                          {inv.aseguradora ? formatDOP(inv.aseguradora.montoCobertura) : <span className="td-dim">—</span>}
+                        </td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600 }}>
+                          {formatDOP(montoACobrarDe(inv))}
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 6 }}>
@@ -447,9 +467,28 @@ function validateAndSubmit() {
                  <span style={{ fontWeight: 500 }}>{selectedInvoice.customerName}</span>
                  <span style={{ color: 'var(--text-secondary)' }}>NCF:</span>
                  <span style={{ fontStyle: 'italic', color: 'var(--text-tertiary)' }}>Se asignará al cobrar</span>
+                 {selectedInvoice.aseguradora && (
+                   <>
+                     <span style={{ color: 'var(--text-secondary)' }}>Total de la factura:</span>
+                     <span>{formatDOP(selectedInvoice.roundedTotal ?? selectedInvoice.grandTotal)}</span>
+                     <span style={{ color: 'var(--text-secondary)' }}>Cubre la ARS:</span>
+                     <span style={{ color: 'var(--color-brand)', fontWeight: 500 }}>
+                       {formatDOP(selectedCobertura)}
+                       <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 6 }}>
+                         ({selectedInvoice.aseguradora.aseguradoraName ?? selectedInvoice.aseguradora.aseguradora})
+                       </span>
+                     </span>
+                   </>
+                 )}
                  <span style={{ color: 'var(--text-secondary)' }}>Monto a cobrar:</span>
                  <span style={{ fontWeight: 700, color: 'var(--color-error)' }}>{formatDOP(selectedRoundedTotal)}</span>
                </div>
+               {selectedInvoice.aseguradora && (
+                 <p style={{ margin: 0, fontSize: 11, color: 'var(--text-tertiary)' }}>
+                   La fila de pago "Cobertura ARS" la agrega el sistema — acá solo se registra lo
+                   que entrega el paciente.
+                 </p>
+               )}
                {selectedRoundingAdjustment !== 0 && (
                  <p style={{ margin: 0, fontSize: 11, color: 'var(--text-tertiary)' }}>
                    Incluye ajuste por redondeo: {selectedRoundingAdjustment > 0 ? '+' : ''}{formatDOP(selectedRoundingAdjustment)}
@@ -587,6 +626,12 @@ function validateAndSubmit() {
                  <span>{confirmDescartar.customerName}</span>
                  <span style={{ color: 'var(--text-secondary)' }}>Total:</span>
                  <span>{formatDOP(confirmDescartar.roundedTotal ?? confirmDescartar.grandTotal)}</span>
+                 {confirmDescartar.aseguradora && (
+                   <>
+                     <span style={{ color: 'var(--text-secondary)' }}>Cubre la ARS:</span>
+                     <span>{formatDOP(confirmDescartar.aseguradora.montoCobertura)}</span>
+                   </>
+                 )}
                </div>
              </div>
              <div className="modal-foot">

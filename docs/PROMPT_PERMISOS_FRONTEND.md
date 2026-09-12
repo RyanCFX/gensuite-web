@@ -42,7 +42,7 @@ Hay tres capas. El frontend solo consume la tercera.
 | **Catálogo de acciones** | El BFF, expuesto vía API | Traduce "permiso sobre un documento" a **identificadores de botón** que el frontend entiende |
 
 El frontend nunca razona sobre DocTypes ni sobre roles. Razona sobre **acciones**:
-`ventas.factura.someter`, `catalogo.items.crear`, `tesoreria.emision.anular`. Hay **368**, sobre
+`ventas.factura.someter`, `catalogo.items.crear`, `tesoreria.emision.anular`. Hay **365**, sobre
 113 pantallas.
 
 ---
@@ -785,14 +785,6 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 | `cobros.pago.listar` | Ver | `Payment Entry.read` | — |
 | `cobros.pago.editar` | Editar / Aplicar saldo a favor | `Payment Entry.write` | — |
 
-#### Cola de Cobro (Cajera)
-
-| Acción | Botón / control | Permiso ERPNext | Marcador |
-|---|---|---|---|
-| `farmacia.despachos.cola` | Ver | `Despacho Provisional ARS.read` | — |
-| `farmacia.despachos.cobrar` | Cobrar | `Despacho Provisional ARS.write + Sales Invoice.create + Sales Invoice.submit` | — |
-| `farmacia.despachos.imprimir` | Imprimir factura de contado | `Sales Invoice.read` | — |
-
 #### Combos
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
@@ -955,13 +947,6 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 | `catalogo.descuentos.crear` | Nueva regla | `Pricing Rule.create` | — |
 | `catalogo.descuentos.editar` | Editar / Activar-Desactivar | `Pricing Rule.write` | — |
 
-#### Despachos ARS
-
-| Acción | Botón / control | Permiso ERPNext | Marcador |
-|---|---|---|---|
-| `farmacia.despachos.listar` | Ver | `Despacho Provisional ARS.read` | — |
-| `farmacia.despachos.crear` | Despachar preaprobación confirmada | `Despacho Provisional ARS.create` | — |
-
 #### Detalle de Artículo
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
@@ -1016,6 +1001,7 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 | `ventas.factura.editar` | Editar / Cancelar borrador | `Sales Invoice.write` | — |
 | `ventas.factura.someter` | Someter | `Sales Invoice.submit` | — |
 | `ventas.factura.aplicar-saldo` | Aplicar/remover saldo a favor o Nota de Crédito | `Sales Invoice.write` | — |
+| `ventas.factura.recalcular-cobertura` | Recalcular (panel Aseguradora, vertical farmacia) | `Sales Invoice.write` | — |
 | `ventas.factura.imprimir` | Ver / Descargar PDF / PDF-A (e-CF) | `Sales Invoice.print` | — |
 | `ventas.factura.imprimir-pos` | Imprimir POS | `Sales Invoice.print` | — |
 | `ventas.factura.devolver` | Devolver producto(s) / Emitir Nota de Crédito | `Sales Invoice.create + Sales Invoice.write` | — |
@@ -1212,8 +1198,9 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 | `farmacia.lotes.crear` | Nuevo | `Lote de Facturacion ARS.create` | — |
 | `farmacia.lotes.recalcular` | Recalcular totales | `Lote de Facturacion ARS.write` | — |
 | `farmacia.lotes.marcar-en-revision` | Marcar "En Revisión" | `Lote de Facturacion ARS.write` | — |
-| `farmacia.lotes.vincular-despacho` | Agregar / Quitar despacho | `Lote de Facturacion ARS.write + Despacho Provisional ARS.write` | — |
-| `farmacia.lotes.facturar` | Facturar (cerrar lote) | `Lote de Facturacion ARS.write + Sales Invoice.create + Sales Invoice.submit + Despacho Provisional ARS.write` | — |
+| `farmacia.lotes.facturas-elegibles` | Pestaña/diálogo "Facturas elegibles" | `Sales Invoice.read` | — |
+| `farmacia.lotes.vincular-facturas` | Agregar facturas / Quitar factura | `Lote de Facturacion ARS.write + Sales Invoice.write` | — |
+| `farmacia.lotes.facturar` | Facturar (cerrar lote) | `Lote de Facturacion ARS.write + Sales Invoice.create + Sales Invoice.submit` | — |
 | `farmacia.lotes.imprimir` | Imprimir factura consolidada | `Sales Invoice.read` | — |
 
 #### Marcas
@@ -1310,16 +1297,6 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 |---|---|---|---|
 | `config.item-tax-templates.ver` | Ver | `Item Tax Template.read` | — |
 
-#### Preaprobaciones ARS
-
-| Acción | Botón / control | Permiso ERPNext | Marcador |
-|---|---|---|---|
-| `farmacia.preaprobaciones.listar` | Ver | `Preaprobacion ARS.read` | — |
-| `farmacia.preaprobaciones.crear` | Nueva | `Preaprobacion ARS.create` | — |
-| `farmacia.preaprobaciones.editar` | Editar detalle / Distribuir cobertura | `Preaprobacion ARS.write` | — |
-| `farmacia.preaprobaciones.recalcular` | Recalcular distribución | `Preaprobacion ARS.write` | — |
-| `farmacia.preaprobaciones.confirmar` | Confirmar | `Preaprobacion ARS.write` | — |
-
 #### Proveedores
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
@@ -1384,7 +1361,7 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 | Acción | Botón / control | Permiso ERPNext | Marcador |
 |---|---|---|---|
 | `farmacia.reportes.lotes.listar` | Ver — Listado de Lotes | `Lote de Facturacion ARS.read` | — |
-| `farmacia.reportes.despachos-ncf.listar` | Ver — Relación Despacho/Lote/NCF | `Despacho Provisional ARS.read + Preaprobacion ARS.read + Lote de Facturacion ARS.read` | — |
+| `farmacia.reportes.facturas-ars.listar` | Ver — Facturas con cobertura ARS | `Sales Invoice.read + Lote de Facturacion ARS.read` | — |
 
 #### Retenciones
 

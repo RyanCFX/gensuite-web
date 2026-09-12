@@ -50,7 +50,7 @@ export default function AseguradorasPage() {
       setToDisable(null)
     },
     onError: (err: ApiError) => {
-      // 409 = la ARS ya tiene preaprobaciones/lotes/facturas. El mensaje del backend ya viene en
+      // 409 = la ARS ya tiene lotes o facturas con cobertura. El mensaje del backend ya viene en
       // español y explica el motivo — se muestra tal cual.
       toast.error(err?.message ?? 'Error al desactivar la aseguradora')
     },
@@ -62,47 +62,56 @@ export default function AseguradorasPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Aseguradoras</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Aseguradoras</h1>
           {data && <p className="page-sub">{data.meta.total} aseguradoras en total</p>}
         </div>
         <Permitido accion="aseguradoras.crear">
-          <button className="btn btn-primary" onClick={() => navigate('/farmacia/aseguradoras/nueva')}>
+          <button className="btn btn-navy" onClick={() => navigate('/farmacia/aseguradoras/nueva')}>
             <Plus size={16} />
             Nueva Aseguradora
           </button>
         </Permitido>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Nombre" style={{ width: 220 }}>
-            <input
-              className="ff-input ff-input-sm"
-              placeholder="Nombre de la aseguradora…"
-              value={nombre}
-              onChange={(e) => { setNombre(e.target.value); setPage(1) }}
-            />
-          </FilterField>
-          <FilterField label="Crédito">
-            <Select value={hasCredit} onValueChange={(val) => { setHasCredit(val); setPage(1) }}>
-              <SelectItem value="all">Crédito: Todos</SelectItem>
-              <SelectItem value="true">Con crédito</SelectItem>
-              <SelectItem value="false">Sin crédito</SelectItem>
-            </Select>
-          </FilterField>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
-            <input
-              type="checkbox"
-              checked={showDisabled}
-              onChange={(e) => { setShowDisabled(e.target.checked); setPage(1) }}
-            />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Nombre" style={{ width: 220 }}>
+                <input
+                  className="ff-input ff-input-sm"
+                  placeholder="Nombre de la aseguradora…"
+                  value={nombre}
+                  onChange={(e) => { setNombre(e.target.value); setPage(1) }}
+                />
+              </FilterField>
+              <FilterField label="Crédito">
+                <Select value={hasCredit} onValueChange={(val) => { setHasCredit(val); setPage(1) }}>
+                  <SelectItem value="all">Crédito: Todos</SelectItem>
+                  <SelectItem value="true">Con crédito</SelectItem>
+                  <SelectItem value="false">Sin crédito</SelectItem>
+                </Select>
+              </FilterField>
+            </div>
+          </div>
+
+          <label className="ff-toggle-wrap">
+            <span className="ff-toggle">
+              <input
+                type="checkbox"
+                checked={showDisabled}
+                onChange={(e) => { setShowDisabled(e.target.checked); setPage(1) }}
+              />
+              <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+            </span>
             Mostrar desactivadas
           </label>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <SortableTh label="Nombre" sortKey="nombre" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
@@ -175,6 +184,7 @@ export default function AseguradorasPage() {
                     ))}
           </tbody>
         </table>
+      </div>
       </div>
 
       {data && data.meta.total > PAGE_SIZE && (

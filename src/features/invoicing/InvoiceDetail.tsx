@@ -12,6 +12,7 @@ import {
   aplicarSaldoFavor,
   removerSaldoFavor,
   asignarTrackingFactura,
+  recalcularCoberturaFactura,
 } from "@/shared/api/invoices";
 import { getCustomer } from "@/shared/api/customers";
 import { getSaldoFavor } from "@/shared/api/cobros";
@@ -29,6 +30,10 @@ import { ECF_SUBMIT_UNAVAILABLE_MSG } from "@/shared/api/ecf";
 import { usePosTicketPrinter } from "@/shared/hooks/usePosTicketPrinter";
 import { useAuthStore } from "@/stores/auth.store";
 import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion, EcfSubmitResult } from "@/shared/api/types";
+import { esCoberturaCompleta } from "@/shared/api/types";
+import { usePuede } from "@/shared/permissions/can";
+import { CoberturaArsResumen } from "./AseguradoraPanel";
+import { EstadoArsBadge } from "./EstadoArsBadge";
 import { MOTIVOS_ANULACION_DGII } from "@/lib/constants";
 import { ConfirmModal } from "@/shared/ui/Modal";
 import { useConfirmClose } from "@/shared/hooks/useConfirmClose";
@@ -46,6 +51,8 @@ import {
   XCircle,
   FileEdit,
   AlertTriangle,
+  ShieldCheck,
+  Lock,
   Ban,
   Wallet,
   RotateCcw,
@@ -399,6 +406,24 @@ export default function InvoiceDetail() {
   const pendingAmount = invoice
     ? Math.max(0, roundedTotal - creditoAplicado)
     : 0;
+
+  // ── Cobertura ARS (vertical farmacia, docs/PROMPT_FARMACIA_V2_FRONTEND.md §3.5/§3.8) ──────
+  const arsCobertura = esCoberturaCompleta(invoice?.aseguradora) ? invoice.aseguradora : null;
+  const estadoArs = invoice?.aseguradora?.estadoArs ?? null;
+  /** `Facturado` = incluida en una consolidada emitida: el bloque ARS es inmutable y cancelar
+   *  la factura responde 409/400. La única salida es una devolución (§3.8). */
+  const arsFacturado = estadoArs === "Facturado";
+  const puedeRecalcularCobertura = usePuede("ventas.factura.recalcular-cobertura");
+
+  const recalcularCoberturaMutation = useMutation({
+    mutationFn: () => recalcularCoberturaFactura(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      toast.success("Cobertura redistribuida entre las líneas");
+    },
+    onError: (err: { message?: string }) =>
+      toast.error(err?.message ?? "No se pudo recalcular la cobertura"),
+  });
 
   const noCredit = invoice?.status === "draft" && customer?.hasCredit === false;
   // Cubierta al 100% por crédito ya aplicado (saldo a favor y/o notas de crédito) — no hace falta preguntar forma de pago.
@@ -955,6 +980,7 @@ export default function InvoiceDetail() {
             >
               {STATUS_LABEL[invoice.status] ?? invoice.status}
             </span>
+            <EstadoArsBadge estado={estadoArs} />
             {invoice.sequence > 0 && (
               <span
                 className="badge badge-info"
@@ -1254,6 +1280,9 @@ export default function InvoiceDetail() {
               >
                 <RotateCcw size={14} /> Emitir Nota de Crédito
               </button>
+            ) : arsFacturado ? (
+              // La cobertura ya se facturó a la ARS: cancelar responde 409/400 — solo devolución.
+              null
             ) : (
               <button
                 className="btn btn-danger btn-size-sm"
@@ -2053,6 +2082,76 @@ export default function InvoiceDetail() {
           </div>
         )}
 
+      {arsCobertura && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ShieldCheck size={16} style={{ color: "var(--icon-muted)" }} />
+            <h2 className="card-title" style={{ flex: 1 }}>Cobertura de seguro (ARS)</h2>
+            <EstadoArsBadge estado={arsCobertura.estadoArs} />
+          </div>
+          <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {arsFacturado && (
+              <div className="inline-alert">
+                Esta cobertura ya fue facturada a la ARS — el bloque es solo de lectura y la
+                factura no se puede cancelar. La única salida es una devolución.
+              </div>
+            )}
+            {arsCobertura.estadoArs === "Anulada" && (
+              <div className="inline-alert inline-alert-warn">
+                <AlertTriangle size={16} />
+                <span>
+                  Aprobación anulada por una devolución total
+                  {arsCobertura.motivoAnulacion ? `: ${arsCobertura.motivoAnulacion}` : ""}
+                  {arsCobertura.motivoAnulacionDetalle ? ` — ${arsCobertura.motivoAnulacionDetalle}` : ""}
+                </span>
+              </div>
+            )}
+            <div className="fields-grid">
+              <DetalleArs label="Aseguradora" valor={arsCobertura.aseguradoraName ?? arsCobertura.aseguradora} />
+              <DetalleArs label="Nro. de autorización" valor={arsCobertura.numeroAutorizacion} mono />
+              <DetalleArs
+                label="Tipo de cobertura"
+                valor={arsCobertura.tipoCobertura === "porciento"
+                  ? `${arsCobertura.valorCobertura}%`
+                  : formatDOP(arsCobertura.valorCobertura)}
+              />
+              <DetalleArs label="Carnet de afiliado" valor={arsCobertura.carnetAfiliado} />
+              <DetalleArs label="Cédula del paciente" valor={arsCobertura.cedula} mono />
+              <DetalleArs label="Nro. de seguro social" valor={arsCobertura.numeroSeguroSocial} />
+              <DetalleArs label="Teléfono del paciente" valor={arsCobertura.telefonoPaciente} />
+              <DetalleArs label="Nombre del doctor" valor={arsCobertura.nombreDoctor} />
+              <DetalleArs label="Aprobado por" valor={arsCobertura.aprobadoPor} />
+              <DetalleArs label="Fecha de aprobación" valor={arsCobertura.fechaAprobacion ? formatDate(arsCobertura.fechaAprobacion) : undefined} />
+              <DetalleArs label="Indicación de la receta" valor={arsCobertura.fechaIndicacionReceta ? formatDate(arsCobertura.fechaIndicacionReceta) : undefined} />
+              {arsCobertura.lote && (
+                <div className="detail-field">
+                  <span className="detail-label">Lote de facturación</span>
+                  <span className="detail-value">
+                    <button
+                      style={{ fontFamily: "monospace", color: "var(--color-brand)", background: "none", border: "none", padding: 0, cursor: "pointer", textDecoration: "underline" }}
+                      onClick={() => navigate(`/farmacia/lotes/${arsCobertura.lote}`)}
+                    >
+                      {arsCobertura.lote}
+                    </button>
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <CoberturaArsResumen
+              ars={arsCobertura}
+              // Solo borradores: `recalcular-cobertura` responde 400 en una factura sometida.
+              onRecalcular={
+                invoice.status === "draft" && puedeRecalcularCobertura
+                  ? () => recalcularCoberturaMutation.mutate()
+                  : undefined
+              }
+              recalculando={recalcularCoberturaMutation.isPending}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Artículos</h2>
@@ -2069,6 +2168,13 @@ export default function InvoiceDetail() {
                 <th style={{ textAlign: "right", width: 72 }}>Dto. %</th>
                 <th style={{ textAlign: "right" }}>Importe</th>
                 <th>UDM</th>
+                {arsCobertura && (
+                  <>
+                    <th style={{ textAlign: "right" }}>Cubre ARS</th>
+                    <th style={{ textAlign: "right" }}>Paciente</th>
+                    <th style={{ textAlign: "right" }}>% real</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -2117,6 +2223,24 @@ export default function InvoiceDetail() {
                     {formatDOP(item.amount)}
                   </td>
                   <td>{item.uom || "—"}</td>
+                  {arsCobertura && (
+                    <>
+                      <td style={{ textAlign: "right" }}>
+                        {item.montoAprobadoArs != null ? formatDOP(item.montoAprobadoArs) : "—"}
+                        {item.lineaBloqueadaArs && (
+                          <span title="Línea bloqueada: el recálculo no la toca">
+                            <Lock size={11} style={{ marginLeft: 4, verticalAlign: "middle", color: "var(--color-brand)" }} />
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        {item.montoPacienteArs != null ? formatDOP(item.montoPacienteArs) : "—"}
+                      </td>
+                      <td style={{ textAlign: "right" }} className="td-muted">
+                        {item.porcientoRealArs != null ? `${item.porcientoRealArs.toFixed(1)}%` : "—"}
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -2718,6 +2842,18 @@ export default function InvoiceDetail() {
       />
       <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
       {printTargetNode}
+    </div>
+  );
+}
+
+/** Campo del bloque ARS — se omite por completo si el valor viene vacío, para no llenar la
+ *  grilla de guiones (la mayoría de los campos del panel son opcionales). */
+function DetalleArs({ label, valor, mono = false }: { label: string; valor?: string | null; mono?: boolean }) {
+  if (!valor) return null;
+  return (
+    <div className="detail-field">
+      <span className="detail-label">{label}</span>
+      <span className="detail-value" style={mono ? { fontFamily: "monospace" } : undefined}>{valor}</span>
     </div>
   );
 }

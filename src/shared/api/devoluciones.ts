@@ -7,6 +7,8 @@ import type {
   DevolucionListItem,
   CancelDevolucionDto,
   CancelDevolucionResult,
+  EmitirNcAseguradoraDto,
+  EmitirNcAseguradoraResult,
   PaginatedResponse,
   PaginationParams,
 } from './types'
@@ -54,6 +56,20 @@ export async function getDevolucion(id: string) {
 export async function cancelDevolucion(id: string, data: CancelDevolucionDto) {
   const res = await client.post<{ success: true; data: CancelDevolucionResult }>(
     ENDPOINTS.devoluciones.cancelar(id),
+    data,
+  )
+  return unwrap(res)
+}
+
+/**
+ * POST /devoluciones/:id/emitir-nc-aseguradora — reintento idempotente del paso ARS cuando el
+ * `POST /devoluciones` devolvió 500 tras haber emitido ya la NC del paciente. Emite la NC a la
+ * ARS si no existe, o devuelve la existente. NUNCA reintentar el POST /devoluciones en ese caso:
+ * duplicaría la nota de crédito del paciente (§5.4).
+ */
+export async function emitirNcAseguradora(id: string, data?: EmitirNcAseguradoraDto) {
+  const res = await client.post<{ success: true; data: EmitirNcAseguradoraResult }>(
+    ENDPOINTS.devoluciones.emitirNcAseguradora(id),
     data,
   )
   return unwrap(res)

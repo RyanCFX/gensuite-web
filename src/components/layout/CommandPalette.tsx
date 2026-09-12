@@ -31,6 +31,8 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'cliente-nuevo',label: 'Nuevo Cliente',        group: 'Principal',    path: '/clientes/nuevo',                 icon: <Users size={15} />, keywords: 'crear cliente customer' },
   { id: 'aseguradoras', label: 'Aseguradoras',         group: 'Farmacia ARS', path: '/farmacia/aseguradoras',           icon: <Shield size={15} />, keywords: 'ars seguro medico administradora riesgos salud farmacia' },
   { id: 'aseguradora-nueva', label: 'Nueva Aseguradora', group: 'Farmacia ARS', path: '/farmacia/aseguradoras/nueva',   icon: <Shield size={15} />, keywords: 'crear ars aseguradora seguro farmacia' },
+  { id: 'farmacia-lotes', label: 'Lotes de Facturación ARS', group: 'Farmacia ARS', path: '/farmacia/lotes', icon: <Receipt size={15} />, keywords: 'lote consolidada ars facturar aseguradora farmacia cobertura' },
+  { id: 'farmacia-facturas-ars', label: 'Reporte — Facturas con cobertura ARS', group: 'Farmacia ARS', path: '/reportes/farmacia-facturas-ars', icon: <Receipt size={15} />, keywords: 'reporte facturas cobertura ars pendiente lote ncf farmacia' },
 
   // ── Catálogo ───────────────────────────────────────────────────────────────
   { id: 'categorias',   label: 'Categorías',           group: 'Catálogo',     path: '/catalogo/categorias',            icon: <Package size={15} />, keywords: 'catalog categories grupos' },

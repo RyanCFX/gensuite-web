@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { getDevolucion, cancelDevolucion } from '@/shared/api/devoluciones'
+import { getDevolucion, cancelDevolucion, emitirNcAseguradora } from '@/shared/api/devoluciones'
 import { downloadCreditNotePdf } from '@/shared/api/notes'
-import { ArrowLeft, Receipt, Wallet, Download, Ban } from 'lucide-react'
+import { ArrowLeft, Receipt, Wallet, Download, Ban, ShieldCheck, Send } from 'lucide-react'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { getCatalogosFiscales } from '@/shared/api/config'
 import { Modal } from '@/shared/ui/Modal'
 import type { ApiError } from '@/shared/api/types'
+import { EstadoArsBadge } from './EstadoArsBadge'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -58,6 +59,22 @@ export default function DevolucionDetail() {
     // El backend valida estado (400 si ya fue sometida), permisos (403), existencia (404)
     // y doble cancelación (409). En todos los casos se muestra su `message` tal cual.
     onError: (err: ApiError) => toast.error(err?.message ?? 'No se pudo cancelar la devolución'),
+  })
+
+  // Reintento idempotente del paso ARS cuando el POST /devoluciones devolvió 500 con la NC del
+  // paciente ya emitida (docs/PROMPT_FARMACIA_V2_FRONTEND.md §5.4).
+  const emitirNcArsMutation = useMutation({
+    mutationFn: () => emitirNcAseguradora(id!),
+    onSuccess: (res) => {
+      toast.success(
+        `Nota de crédito a la aseguradora emitida: ${res.creditNoteAseguradoraId}` +
+          (res.ncfAseguradora ? ` (NCF ${res.ncfAseguradora})` : ''),
+        { duration: 10000 },
+      )
+      queryClient.invalidateQueries({ queryKey: ['devolucion', id] })
+      queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
+    },
+    onError: (err: ApiError) => toast.error(err?.message ?? 'No se pudo emitir la nota de crédito a la aseguradora'),
   })
 
   const cancelReasonValid =
@@ -224,6 +241,99 @@ export default function DevolucionDetail() {
                 </span>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {devolucion.aseguradora && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ShieldCheck size={16} style={{ color: 'var(--icon-muted)' }} />
+            <h2 className="card-title" style={{ flex: 1 }}>Cobertura ARS revertida</h2>
+            <EstadoArsBadge estado={devolucion.aseguradora.estadoArsAlDevolver} />
+          </div>
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="fields-grid">
+              <div className="detail-field">
+                <span className="detail-label">Aseguradora</span>
+                <span className="detail-value">
+                  {devolucion.aseguradora.aseguradoraName ?? devolucion.aseguradora.aseguradora}
+                </span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">Nro. de autorización</span>
+                <span className="detail-value" style={{ fontFamily: 'monospace' }}>
+                  {devolucion.aseguradora.numeroAutorizacion}
+                </span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label">Parte ARS devuelta</span>
+                <span className="detail-value" style={{ fontWeight: 600 }}>
+                  {formatDOP(devolucion.aseguradora.parteArsDevuelta)}
+                </span>
+              </div>
+              <div className="detail-field">
+                <span className="detail-label" title="Estado ARS que tenía la factura original al momento de devolverla — no el actual">
+                  Estado ARS al devolver
+                </span>
+                <span className="detail-value">{devolucion.aseguradora.estadoArsAlDevolver ?? '—'}</span>
+              </div>
+              {devolucion.aseguradora.ncAseguradoraId && (
+                <div className="detail-field">
+                  <span className="detail-label">NC a la aseguradora</span>
+                  <span className="detail-value">
+                    <button
+                      style={{ fontFamily: 'monospace', color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+                      onClick={() => navigate(`/devoluciones/${devolucion.aseguradora!.ncAseguradoraId}`)}
+                    >
+                      {devolucion.aseguradora.ncAseguradoraId}
+                    </button>
+                  </span>
+                </div>
+              )}
+              {devolucion.aseguradora.facturaPacienteRef && (
+                <div className="detail-field">
+                  <span className="detail-label">Factura del paciente que la originó</span>
+                  <span className="detail-value">
+                    <button
+                      style={{ fontFamily: 'monospace', color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+                      onClick={() => navigate(`/facturas/${devolucion.aseguradora!.facturaPacienteRef}`)}
+                    >
+                      {devolucion.aseguradora.facturaPacienteRef}
+                    </button>
+                  </span>
+                </div>
+              )}
+              {devolucion.originalInvoice?.estadoArs && (
+                <div className="detail-field">
+                  <span className="detail-label" title="Estado ARS actual de la factura original — solo informativo">
+                    Estado ARS actual de la factura
+                  </span>
+                  <span className="detail-value">{devolucion.originalInvoice.estadoArs}</span>
+                </div>
+              )}
+            </div>
+
+            {/* La NC a la ARS solo aplica si la cobertura ya estaba facturada y todavía no se
+                emitió — el servidor responde 400 en cualquier otro caso (§5.4). */}
+            {devolucion.aseguradora.estadoArsAlDevolver === 'Facturado' && !devolucion.aseguradora.ncAseguradoraId && (
+              <div className="inline-alert inline-alert-warn" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ flex: 1 }}>
+                  Falta la nota de crédito a la aseguradora. El reintento es idempotente: no duplica
+                  la nota del paciente ni la de la ARS.
+                </span>
+                <button
+                  className="btn btn-primary btn-size-sm"
+                  onClick={() => emitirNcArsMutation.mutate()}
+                  disabled={emitirNcArsMutation.isPending}
+                >
+                  {emitirNcArsMutation.isPending
+                    ? <span className="spinner spinner-white spinner-sm" />
+                    : <Send size={14} />}
+                  Emitir NC a la aseguradora
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
