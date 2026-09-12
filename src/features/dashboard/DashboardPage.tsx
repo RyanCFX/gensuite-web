@@ -6,9 +6,9 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import {
-  TrendingUp, TrendingDown, ShoppingCart, Box, Zap, Clipboard, BarChart3, ArrowUp,
+  TrendingUp, TrendingDown, ShoppingCart, Box, Zap, Package, BarChart3, ArrowUp,
 } from 'lucide-react'
-import { formatDOP, formatDate, formatDateTime, formatNumber, daysSince, displayId } from '@/lib/formatters'
+import { formatDOP, formatDate, formatShortDate, formatDateTime, formatNumber, daysSince, displayId } from '@/lib/formatters'
 import {
   getDashboardData,
   type DashboardPeriod,
@@ -134,7 +134,7 @@ function DivergingBarChart({ data, height = 220 }: {
 interface PendingAction {
   id: string
   date?: string
-  tone: 'warning' | 'danger' | 'info'
+  tone: 'warning' | 'danger'
   label: string
   sublabel: string
   href: string
@@ -173,7 +173,7 @@ export default function DashboardPage() {
       const abs = Math.abs(diff)
       return {
         id: `due-${inv.id}`,
-        date: formatDate(inv.dueDate),
+        date: formatShortDate(inv.dueDate),
         tone: overdue ? 'danger' : 'warning',
         label: `#${displayId(inv.id, inv.sequence)}`,
         sublabel: overdue
@@ -184,14 +184,14 @@ export default function DashboardPage() {
     })
     const drafts: PendingAction[] = (draftRes?.items ?? []).map((inv) => ({
       id: `draft-${inv.id}`,
-      date: formatDate(inv.postingDate),
-      tone: 'info',
+      date: formatShortDate(inv.postingDate),
+      tone: 'warning',
       label: `#${displayId(inv.id, inv.sequence)}`,
       sublabel: 'Factura pendiente de aprobación',
       href: `/facturas/${inv.id}`,
     }))
     const lowStock: PendingAction[] = (lowStockRes?.items ?? []).map((item) => ({
-      id: `stock-${item.itemCode}`,
+      id: `stock-${item.itemCode}-${item.warehouse}`,
       tone: 'danger',
       label: item.itemCode,
       sublabel: `Stock crítico · ${formatNumber(item.actualQty)} unid. de ${item.itemName}`,
@@ -558,7 +558,7 @@ export default function DashboardPage() {
             <div className="list-card dash-col-pending">
               <div className="list-card-header">
                 <div className="list-card-heading">
-                  <span className="chart-icon chart-icon-sm"><Clipboard size={16} /></span>
+                  <span className="chart-icon chart-icon-sm"><Package size={16} /></span>
                   <h3 className="card-title-sm">Acciones Pendientes</h3>
                 </div>
               </div>

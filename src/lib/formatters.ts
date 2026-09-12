@@ -10,6 +10,16 @@ export function formatDate(isoDate?: string | null): string {
   }
 }
 
+/** Fecha compacta sin año (dd/MM) — para listas angostas como Acciones Pendientes del dashboard. */
+export function formatShortDate(isoDate?: string | null): string {
+  if (!isoDate) return ''
+  try {
+    return format(parseISO(isoDate), 'dd/MM', { locale: es })
+  } catch {
+    return ''
+  }
+}
+
 /** Días calendario transcurridos entre una fecha ISO y hoy — null si no se pudo parsear. */
 export function daysSince(isoDate?: string | null): number | null {
   if (!isoDate) return null

@@ -109,6 +109,8 @@ export default function LoteDetail() {
     },
   })
 
+  const puedeVincular = usePuede('farmacia.lotes.vincular-despacho')
+
   async function handleDescargarPdf() {
     if (!id) return
     setDescargandoPdf(true)
@@ -132,7 +134,6 @@ export default function LoteDetail() {
 
   const esAbierto = lote.estado === 'Abierto'
   const editable = lote.estado !== 'Facturado'
-  const puedeVincular = usePuede('farmacia.lotes.vincular-despacho')
   const mostrarAccionesDespacho = editable && puedeVincular
 
   return (

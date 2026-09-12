@@ -388,7 +388,7 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 8px 0;
+  padding: 0;
   color: inherit;
   text-decoration: none;
   animation: activity-in 320ms var(--ease-out) both;
@@ -426,7 +426,6 @@
 }
 .pending-row-dot[data-tone='warning'] { border-color: var(--dash-amber); }
 .pending-row-dot[data-tone='danger']  { border-color: var(--dash-rose); }
-.pending-row-dot[data-tone='info']    { border-color: var(--dash-teal); }
 
 .pending-row-main { flex: 1; min-width: 0; padding-bottom: 4px; }
 .pending-row-label { font-size: 12px; font-weight: 700; color: var(--dash-teal); }
