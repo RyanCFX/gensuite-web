@@ -145,7 +145,7 @@ export function TurnoCajaIndicator() {
                   options={posProfileOptions}
                   onSearch={setPosProfileSearch}
                   selectedLabel={cajasHabilitadas.find((c) => c.id === posProfile)?.label ?? ''}
-                  placeholder="Usar la caja default del tenant"
+                  placeholder="Usar la caja default de la empresa"
                 />
               </div>
               <div className="ff-wrap">

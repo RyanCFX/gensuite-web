@@ -342,7 +342,7 @@ export default function CuentasPorPagarPage() {
                       />
                     )}
                   />
-                  <p className="ff-hint">Si se omite, ERPNext usa el default de la compañía.</p>
+                  <p className="ff-hint">Si se omite, se usa el default de la compañía.</p>
                 </div>
 
                 <div className="ff-wrap">

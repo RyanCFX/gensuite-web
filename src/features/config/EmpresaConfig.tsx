@@ -267,7 +267,7 @@ export default function EmpresaConfig() {
                         disabled
                         placeholder="Mi Empresa SRL"
                       />
-                      <p className="ff-hint">El nombre proviene del tenant y no se edita desde esta pantalla.</p>
+                      <p className="ff-hint">El nombre se toma del registro de tu empresa y no se edita desde esta pantalla.</p>
                     </div>
                     <div className="ff-wrap">
                       <label className="ff-label">RNC</label>

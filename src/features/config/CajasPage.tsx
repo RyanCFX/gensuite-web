@@ -285,7 +285,7 @@ export default function CajasPage() {
                     selectedLabel={form.branch}
                     placeholder="Sin especificar"
                   />
-                  <p className="ff-hint">Requerida solo si tu tenant tiene la dimensión "Sucursal" activada.</p>
+                  <p className="ff-hint">Requerida solo si tu empresa tiene la dimensión "Sucursal" activada.</p>
                 </div>
               </div>
               <div className="modal-foot">
