@@ -52,6 +52,11 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/pedidos/*', accion: 'pedidos.listar' },
   { pattern: '/pedidos', accion: 'pedidos.listar' },
 
+  // Despachos (Delivery Note) — docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md §2.
+  // Gateado también por el flag despachoHabilitado en el menú (AppLayout) — acá solo el permiso.
+  { pattern: '/despachos/*', accion: 'despachos.ver' },
+  { pattern: '/despachos', accion: 'despachos.ver' },
+
   // Transferencias entre almacenes
   { pattern: '/transferencias/*', accion: 'inventario.transferencias.listar' },
   { pattern: '/transferencias', accion: 'inventario.transferencias.listar' },
@@ -143,10 +148,38 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/reportes/cuadreTurno', accion: 'reportes.pos.cuadre-turno.ver' },
   { pattern: '/reportes/caja', accion: 'reportes.caja.cuadre.ver' },
   { pattern: '/reportes/corteCajaDia', accion: 'reportes.pos.corte-caja-dia.ver' },
+  { pattern: '/reportes/facturacion-fiscal', accion: 'reportes.dgii.facturacion-fiscal.ver' },
+  { pattern: '/reportes/flujo-efectivo', accion: 'reportes.contabilidad.flujo-efectivo.ver' },
+  { pattern: '/reportes/compras-analitica', accion: 'reportes.compras.analitica.ver' },
+  { pattern: '/reportes/compras-registro', accion: 'reportes.compras.registro.ver' },
+  { pattern: '/reportes/compras-item-wise', accion: 'reportes.compras.item-wise.ver' },
+  { pattern: '/reportes/compras-ordenes-analitica', accion: 'reportes.compras.ordenes-analitica.ver' },
+  { pattern: '/reportes/ventas-item-wise', accion: 'reportes.ventas.item-wise.ver' },
+  { pattern: '/reportes/pedidos-analitica', accion: 'reportes.pedidos.analitica.ver' },
+  { pattern: '/reportes/inventario-antiguedad', accion: 'reportes.inventario.antiguedad.ver' },
+  { pattern: '/reportes/inventario-proyeccion', accion: 'reportes.inventario.proyeccion.ver' },
+  { pattern: '/reportes/despacho-margen', accion: 'reportes.despacho.margen.ver' },
+  { pattern: '/reportes/despacho-reservas', accion: 'reportes.despacho.reservas.ver' },
+  { pattern: '/reportes/despacho-faltantes', accion: 'reportes.despacho.faltantes.ver' },
+  { pattern: '/reportes/despacho-pendientes-compra', accion: 'reportes.despacho.pendientes-compra.ver' },
+  { pattern: '/reportes/solicitudes', accion: 'reportes.solicitudes.ver' },
   { pattern: '/reportes/farmacia-lotes', accion: 'farmacia.reportes.lotes.listar', soloFarmacia: true },
   { pattern: '/reportes/farmacia-facturas-ars', accion: 'farmacia.reportes.facturas-ars.listar', soloFarmacia: true },
   { pattern: '/reportes/*', accion: null },
   { pattern: '/reportes', accion: null },
+
+  // Facturas de Apertura (Migración de Saldos) — docs/tasks/PROMPT_APERTURA_FRONTEND.md §2.
+  // Las rutas específicas (nueva/importar) van antes que el catch-all /apertura/ventas/* (detalle).
+  { pattern: '/apertura/diagnostico', accion: 'apertura.preparar.ver' },
+  { pattern: '/apertura/ventas/nueva', accion: 'apertura.ventas.crear' },
+  { pattern: '/apertura/ventas/importar', accion: 'apertura.ventas.crear' },
+  { pattern: '/apertura/ventas/*', accion: 'apertura.ventas.listar' },
+  { pattern: '/apertura/ventas', accion: 'apertura.ventas.listar' },
+  { pattern: '/apertura/compras/nueva', accion: 'apertura.compras.crear' },
+  { pattern: '/apertura/compras/importar', accion: 'apertura.compras.crear' },
+  { pattern: '/apertura/compras/*', accion: 'apertura.compras.listar' },
+  { pattern: '/apertura/compras', accion: 'apertura.compras.listar' },
+  { pattern: '/apertura/resumen', accion: 'apertura.resumen.ver' },
 
   // Contabilidad
   { pattern: '/cuentas/*', accion: 'contabilidad.cuentas.listar' },
@@ -182,6 +215,7 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/config/ecf', accion: 'config.ecf.ver' },
   { pattern: '/config/cobros', accion: 'config.cobros.ver' },
   { pattern: '/config/facturacion', accion: 'config.facturacion.ver' },
+  { pattern: '/config/monedas', accion: 'monedas.ver' },
   { pattern: '/config/metodos-pago', accion: 'config.metodos-pago.listar' },
   { pattern: '/config/denominaciones', accion: 'config.denominaciones.listar' },
   { pattern: '/config/uom', accion: 'config.uom.listar' },

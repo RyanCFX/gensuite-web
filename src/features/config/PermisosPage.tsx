@@ -110,7 +110,7 @@ export default function PermisosPage() {
         <div className="empty-state">
           <span className="empty-icon"><ShieldOff size={20} /></span>
           <p className="empty-title">Acceso restringido</p>
-          <p className="empty-sub">Esta sección requiere el rol System Manager en ERPNext.</p>
+          <p className="empty-sub">Esta sección requiere el rol System Manager.</p>
         </div>
       </div>
     )
@@ -128,7 +128,7 @@ export default function PermisosPage() {
         <div className="empty-state">
           <span className="empty-icon"><ShieldOff size={20} /></span>
           <p className="empty-title">Acceso restringido</p>
-          <p className="empty-sub">Tu usuario no tiene el rol System Manager en ERPNext.</p>
+          <p className="empty-sub">Tu usuario no tiene el rol System Manager.</p>
         </div>
       </div>
     )
@@ -262,7 +262,7 @@ export default function PermisosPage() {
             <div className="modal-body">
               <p style={{ fontSize: 14 }}>
                 Se borrarán TODAS las reglas personalizadas de <strong>{doctype}</strong> y se
-                restaurarán los permisos de fábrica de ERPNext para todos los roles. Esta acción
+                restaurarán los permisos de fábrica para todos los roles. Esta acción
                 afecta a todos los roles de golpe y no se puede deshacer.
               </p>
             </div>
@@ -290,8 +290,8 @@ export default function PermisosPage() {
             <div className="modal-body">
               <p style={{ fontSize: 14 }}>
                 Se eliminará la regla de permiso de <strong>{rowToDelete.role}</strong> (nivel{' '}
-                {rowToDelete.permlevel}) sobre <strong>{doctype}</strong>. ERPNext puede rechazar
-                esta acción si es la única regla de permiso del DocType.
+                {rowToDelete.permlevel}) sobre <strong>{doctype}</strong>. Esta acción puede
+                rechazarse si es la única regla de permiso del DocType.
               </p>
             </div>
             <div className="modal-foot">

@@ -815,6 +815,13 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 | `config.cobros.ver` | Ver | `Cobros Config.read` | — |
 | `config.cobros.editar` | Editar | `Cobros Config.write` | — |
 
+#### Configuración de Despacho
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `config.despacho.habilitar` | Botón "Activar" (sección Despacho) | `Facturacion Config.write` | — |
+| `config.despacho.deshabilitar` | Botón "Desactivar" (sección Despacho) | `Facturacion Config.write` | — |
+
 #### Configuración de Facturación
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
@@ -823,6 +830,19 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 | `config.facturacion.editar` | Editar | `Facturacion Config.write` | — |
 | `config.pos.habilitar` | Habilitar módulo POS | `Facturacion Config.write` | — |
 | `config.pos.deshabilitar` | Desactivar módulo POS | `Facturacion Config.write` | — |
+
+#### Configuración de Monedas (Multimoneda)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `monedas.ver` | Ver catálogo de monedas y tasas | `Currency.read` | — |
+| `monedas.habilitar` | Habilitar/deshabilitar USD/EUR | `Currency.write` | — |
+| `monedas.tasas.ver` | Ver listado de tasas y "tasa vigente" | `Currency Exchange.read` | — |
+| `monedas.tasas.crear` | Cargar tasa | `Currency Exchange.create` | — |
+| `monedas.tasas.editar` | Editar tasa | `Currency Exchange.write` | — |
+| `monedas.tasas.eliminar` | Eliminar tasa | `Currency Exchange.delete` | — |
+| `monedas.tasas.sincronizar` | Sincronizar ahora | `Currency Exchange.write` | — |
+| `monedas.preview.ver` | (Interno — sin pantalla dedicada en esta fase) | `Currency Exchange.read` | — |
 
 #### Configuración de Farmacia
 
@@ -946,6 +966,19 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 | `catalogo.descuentos.listar` | Ver | `Pricing Rule.read` | — |
 | `catalogo.descuentos.crear` | Nueva regla | `Pricing Rule.create` | — |
 | `catalogo.descuentos.editar` | Editar / Activar-Desactivar | `Pricing Rule.write` | — |
+
+#### Despachos (Delivery Note)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `despachos.ver` | Ver listado/detalle, pantalla "Pendientes de despachar" | `Delivery Note.read` | — |
+| `despachos.crear` | "Nuevo despacho" (directo) + botón "Despachar" (desde factura/pedido) | `Delivery Note.create` | — |
+| `despachos.editar` | Editar Borrador + "Asignar serial/lote" | `Delivery Note.write` | — |
+| `despachos.someter` | Someter | `Delivery Note.submit` | — |
+| `despachos.cancelar` | Cancelar | `Delivery Note.cancel` | — |
+| `despachos.facturar` | Facturar un despacho sometido | `Sales Invoice.create` | — |
+| `despachos.devolver` | Crear Devolución | `Delivery Note.create` | — |
+| `despachos.imprimir` | Descargar PDF | `Delivery Note.print` | — |
 
 #### Detalle de Artículo
 
@@ -1073,6 +1106,20 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 |---|---|---|---|
 | `ventas.factura.crear` | Nueva | `Sales Invoice.create` | — |
 | `ventas.factura.listar` | Ver | `Sales Invoice.read` | — |
+
+#### Facturas de Apertura (Migración de Saldos)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `apertura.preparar.ver` | Ver sección de Diagnóstico | `Sales Invoice.read` | — |
+| `apertura.preparar.ejecutar` | Botón "Preparar tenant" | `Sales Invoice.create` | — |
+| `apertura.ventas.listar` | Ver pantalla "Ventas" (listado + detalle) | `Sales Invoice.read` | — |
+| `apertura.ventas.crear` | "Cargar saldo de cliente" + "Importar" (ventas) | `Sales Invoice.create` | — |
+| `apertura.ventas.anular` | Anular factura de venta de apertura | `Sales Invoice.cancel` | — |
+| `apertura.compras.listar` | Ver pantalla "Compras" | `Purchase Invoice.read` | — |
+| `apertura.compras.crear` | "Cargar saldo de proveedor" + "Importar" (compras) | `Purchase Invoice.create` | — |
+| `apertura.compras.anular` | Anular factura de compra de apertura | `Purchase Invoice.cancel` | — |
+| `apertura.resumen.ver` | Ver pantalla "Cuadre" | `Sales Invoice.report` | — |
 
 #### Gasto — detalle
 
@@ -1355,6 +1402,94 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 | Acción | Botón / control | Permiso ERPNext | Marcador |
 |---|---|---|---|
 | `reportes.dgii608.ver` | Ver / Exportar | `Sales Invoice.report` | — |
+
+#### Reporte de Facturación Fiscal
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.dgii.facturacion-fiscal.ver` | Ver | `Sales Invoice.report` | — |
+| `reportes.dgii.facturacion-fiscal.imprimir` | Descargar PDF | `Sales Invoice.print` | — |
+
+#### Reporte de Flujo de Efectivo (Cash Flow)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.contabilidad.flujo-efectivo.ver` | Ver | `Journal Entry.report` | — |
+| `reportes.contabilidad.flujo-efectivo.imprimir` | Descargar PDF | `Journal Entry.print` | — |
+
+#### Reporte de Analítica de Compras (Purchase Analytics)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.compras.analitica.ver` | Ver | `Purchase Invoice.report` | — |
+| `reportes.compras.analitica.imprimir` | Descargar PDF | `Purchase Invoice.print` | — |
+
+#### Reporte de Registro de Compras (Purchase Register)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.compras.registro.ver` | Ver | `Purchase Invoice.report` | — |
+| `reportes.compras.registro.imprimir` | Descargar PDF | `Purchase Invoice.print` | — |
+
+#### Reporte de Registro de Ventas por Artículo (Item-wise Sales Register)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.ventas.item-wise.ver` | Ver | `Sales Invoice.report` | — |
+| `reportes.ventas.item-wise.imprimir` | Descargar PDF | `Sales Invoice.print` | — |
+
+#### Reporte de Registro de Compras por Artículo (Item-wise Purchase Register)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.compras.item-wise.ver` | Ver | `Purchase Invoice.report` | — |
+| `reportes.compras.item-wise.imprimir` | Descargar PDF | `Purchase Invoice.print` | — |
+
+#### Reporte de Analítica de Pedidos (Sales Order Analysis)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.pedidos.analitica.ver` | Ver | `Sales Order.report` | — |
+| `reportes.pedidos.analitica.imprimir` | Descargar PDF | `Sales Order.print` | — |
+
+#### Reporte de Analítica de Órdenes de Compra (Purchase Order Analysis)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.compras.ordenes-analitica.ver` | Ver | `Purchase Order.report` | — |
+| `reportes.compras.ordenes-analitica.imprimir` | Descargar PDF | `Purchase Order.print` | — |
+
+#### Reporte de Antigüedad de Inventario (Stock Ageing)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.inventario.antiguedad.ver` | Ver | `Item.report` | — |
+| `reportes.inventario.antiguedad.imprimir` | Descargar PDF | `Item.print` | — |
+
+#### Reporte de Proyección de Inventario (Stock Projected Qty)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.inventario.proyeccion.ver` | Ver | `Item.report` | — |
+| `reportes.inventario.proyeccion.imprimir` | Descargar PDF | `Item.print` | — |
+
+#### Reportes de Despacho
+
+Grupo de 4 reportes nativos de ERPNext expuestos tal cual (sin PDF) — gateados además, en conjunto,
+por `despachoHabilitado` en el menú.
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.despacho.margen.ver` | Ver — Margen real (Gross Profit) | `Sales Invoice.report` | — |
+| `reportes.despacho.reservas.ver` | Ver — Reservas de stock (Reserved Stock) | `Stock Reservation Entry.report` | — |
+| `reportes.despacho.faltantes.ver` | Ver — Faltantes (Item Shortage Report) | `Item.report` | — |
+| `reportes.despacho.pendientes-compra.ver` | Ver — Pendientes de comprar (Pending SO Items For Purchase Request) | `Sales Order.report` | — |
+
+#### Reportes Solicitados (ejecución en background)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `reportes.solicitudes.ver` | Ver pantalla "Reportes Solicitados" (listado y consulta puntual) | — (no hay doctype ERPNext dedicado; gatea solo la pantalla) | — |
 
 #### Reportes Farmacia ARS
 
