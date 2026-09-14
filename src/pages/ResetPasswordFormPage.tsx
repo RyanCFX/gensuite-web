@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label'
 
 const schema = z
   .object({
-    tenant: z.string().min(1, 'El tenant es obligatorio'),
+    tenant: z.string().min(1, 'La empresa es obligatoria'),
     newPassword: z.string().min(1, 'La contraseña es obligatoria'),
     confirmPassword: z.string().min(1, 'Confirma la contraseña'),
   })
@@ -45,7 +45,7 @@ export default function ResetPasswordFormPage({ mode }: Props) {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { tenant: 'tenant1' },
+    defaultValues: { tenant: '' },
   })
 
   const missingLinkData = !key || !email
@@ -136,11 +136,11 @@ export default function ResetPasswordFormPage({ mode }: Props) {
           </div>
 
           <div className="form-field">
-            <Label htmlFor="tenant">Tenant</Label>
+            <Label htmlFor="tenant">Empresa</Label>
             <Input
               id="tenant"
               type="text"
-              placeholder="tenant1"
+              placeholder="mi-empresa"
               autoComplete="organization"
               {...register('tenant')}
               data-error={!!errors.tenant}

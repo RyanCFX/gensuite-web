@@ -91,6 +91,7 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'r606',         label: 'Reporte DGII 606',     group: 'Reportes',     path: '/reportes/606',                   icon: <BarChart3 size={15} />, keywords: 'dgii compras reporte fiscal 606' },
   { id: 'r607',         label: 'Reporte DGII 607',     group: 'Reportes',     path: '/reportes/607',                   icon: <BarChart3 size={15} />, keywords: 'dgii retenciones reporte fiscal 607' },
   { id: 'r608',         label: 'Reporte DGII 608',     group: 'Reportes',     path: '/reportes/608',                   icon: <BarChart3 size={15} />, keywords: 'dgii ventas reporte fiscal 608' },
+  { id: 'r-facturacion-fiscal', label: 'Facturación Fiscal', group: 'Reportes', path: '/reportes/facturacion-fiscal', icon: <BarChart3 size={15} />, keywords: 'dgii e31 e32 credito fiscal consumidor final forma de pago itbis' },
   { id: 'r-ventas',     label: 'Reporte de Ventas',    group: 'Reportes',     path: '/reportes/ventas',                icon: <BarChart3 size={15} />, keywords: 'ventas sales reporte' },
   { id: 'r-balance',    label: 'Balance General',      group: 'Reportes',     path: '/reportes/balance',               icon: <BarChart3 size={15} />, keywords: 'balance general contabilidad financiero' },
   { id: 'r-pl',         label: 'Estado de Resultados', group: 'Reportes',     path: '/reportes/pl',                    icon: <BarChart3 size={15} />, keywords: 'pl ingresos egresos resultados' },

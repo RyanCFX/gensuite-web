@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, Fragment } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useLocation, useOutlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getFacturacionConfig } from "@/shared/api/config";
+import { getFacturacionConfig, getEcfConfig } from "@/shared/api/config";
 import {
   LayoutDashboard,
   Users,
@@ -45,6 +45,7 @@ import {
   Wrench,
   ScrollText,
   Pill,
+  History,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { usePermissionsStore } from "@/stores/permissions.store";
@@ -66,6 +67,11 @@ interface NavItem {
   /** Si es true, el ítem solo se marca activo en la ruta exacta (no en sub-rutas). Útil cuando
    *  un hermano usa una sub-ruta del mismo path (ej. /config/ecf y /config/ecf/admin). */
   exact?: boolean;
+  /** Para ítems "aplanados" que representan varias pantallas relacionadas mostradas como tabs
+   *  dentro de la pantalla (ver RouteTabs) en vez de submenú expandible: rutas hermanas que no
+   *  comparten prefijo con `path` pero deben marcar este ítem como activo igual (ej. Plantillas:
+   *  /config/plantillas-facturas, /config/plantillas-etiquetas, /config/tesoreria/plantillas-cheque). */
+  activePrefixes?: string[];
 }
 
 interface NavGroup {
@@ -120,6 +126,11 @@ const NAV_VENTAS: NavEntry[] = [
     label: "Facturas",
     icon: <Receipt size={16} aria-hidden="true" />,
     path: "/facturas",
+  },
+  {
+    label: "Despachos",
+    icon: <Truck size={16} aria-hidden="true" />,
+    path: "/despachos",
   },
   {
     label: "Notas de Crédito",
@@ -237,6 +248,11 @@ const NAV_OPS: NavEntry[] = [
         label: "Órdenes de Compra",
         icon: <ShoppingCart size={14} />,
         path: "/compras/ordenes",
+      },
+      {
+        label: "Abastecimiento",
+        icon: <Truck size={14} />,
+        path: "/compras/ordenes/abastecimiento",
       },
       { label: "Devoluciones de Compras", icon: <Receipt size={14} />, path: "/devoluciones-compras" },
       {
@@ -387,6 +403,7 @@ const NAV_REPORTES: NavEntry = {
     { label: "DGII 606", icon: <FileText size={14} />, path: "/reportes/606" },
     { label: "DGII 607", icon: <FileText size={14} />, path: "/reportes/607" },
     { label: "DGII 608", icon: <FileText size={14} />, path: "/reportes/608" },
+    { label: "Facturación Fiscal", icon: <FileText size={14} />, path: "/reportes/facturacion-fiscal" },
     {
       label: "Balance General",
       icon: <BarChart3 size={14} />,
@@ -397,6 +414,17 @@ const NAV_REPORTES: NavEntry = {
       label: "Stock Balance",
       icon: <BarChart3 size={14} />,
       path: "/reportes/stock",
+    },
+    {
+      label: "Despacho",
+      icon: <Truck size={14} />,
+      prefix: "/reportes/despacho-margen|/reportes/despacho-reservas|/reportes/despacho-faltantes|/reportes/despacho-pendientes-compra",
+      children: [
+        { label: "Margen Real", icon: <BarChart3 size={12} />, path: "/reportes/despacho-margen" },
+        { label: "Reservas de Stock", icon: <BarChart3 size={12} />, path: "/reportes/despacho-reservas" },
+        { label: "Faltantes", icon: <BarChart3 size={12} />, path: "/reportes/despacho-faltantes" },
+        { label: "Pendientes de Comprar", icon: <BarChart3 size={12} />, path: "/reportes/despacho-pendientes-compra" },
+      ],
     },
   ],
 };
@@ -464,53 +492,26 @@ const NAV_CONFIG: NavEntry = {
       path: "/config/facturacion",
     },
     {
+      label: "Monedas",
+      icon: <DollarSign size={14} />,
+      path: "/config/monedas",
+    },
+    // Facturación Electrónica y Plantillas son ítems "aplanados": en vez de submenú expandible,
+    // el sidebar lleva directo a la primera pantalla y esta muestra las demás como tabs (RouteTabs)
+    // dentro de la propia pantalla — mismo patrón que Físico/Electrónico en Secuencias NCF.
+    {
       label: "Facturación Electrónica",
       icon: <ShieldCheck size={14} />,
-      prefix: "/config/ecf",
-      children: [
-        {
-          label: "Administración",
-          icon: <ShieldCheck size={14} />,
-          path: "/config/ecf",
-          exact: true,
-        },
-        {
-          label: "Avanzado",
-          icon: <Settings size={14} />,
-          path: "/config/ecf/admin",
-        },
-        {
-          label: "Certificación DGII",
-          icon: <Shield size={14} />,
-          path: "/config/ecf/certificacion",
-        },
-        {
-          label: "Contingencia",
-          icon: <Clock size={14} />,
-          path: "/config/ecf/contingencia",
-        },
-      ],
+      path: "/config/ecf",
     },
     {
       label: "Plantillas",
       icon: <LayoutTemplate size={14} />,
-      prefix: "/config/plantillas-facturas|/config/plantillas-etiquetas|/config/tesoreria/plantillas-cheque",
-      children: [
-        {
-          label: "Facturas",
-          icon: <LayoutTemplate size={14} />,
-          path: "/config/plantillas-facturas",
-        },
-        {
-          label: "Etiquetas",
-          icon: <Tag size={14} />,
-          path: "/config/plantillas-etiquetas",
-        },
-        {
-          label: "Cheques",
-          icon: <Printer size={14} />,
-          path: "/config/tesoreria/plantillas-cheque",
-        },
+      path: "/config/plantillas-facturas",
+      activePrefixes: [
+        "/config/plantillas-facturas",
+        "/config/plantillas-etiquetas",
+        "/config/tesoreria/plantillas-cheque",
       ],
     },
     {
@@ -543,37 +544,33 @@ const NAV_CONFIG: NavEntry = {
       icon: <Shield size={14} />,
       path: "/config/ncf",
     },
+    // Ítem "aplanado" (ver nota arriba, junto a Facturación Electrónica) — las otras 3 pantallas
+    // se muestran como tabs (RouteTabs) dentro de /config/tasas-impuesto y hermanas.
     {
       label: "Impuestos",
       icon: <Percent size={14} />,
-      prefix: IMPUESTOS_GROUP_PREFIX,
-      children: [
-        {
-          label: "Tasas de Impuesto",
-          icon: <Percent size={14} />,
-          path: "/config/tasas-impuesto",
-        },
-        {
-          label: "Impuestos Ventas",
-          icon: <Percent size={14} />,
-          path: "/config/impuestos-ventas",
-        },
-        {
-          label: "Impuestos Compras",
-          icon: <Percent size={14} />,
-          path: "/config/impuestos-compras",
-        },
-        {
-          label: "Impuestos Artículo",
-          icon: <Percent size={14} />,
-          path: "/config/impuestos-articulo",
-        },
-      ],
+      path: "/config/tasas-impuesto",
+      activePrefixes: IMPUESTOS_GROUP_PREFIX.split("|"),
     },
     {
       label: "Ejercicio Fiscal",
       icon: <Calendar size={14} />,
       path: "/config/ejercicio-fiscal",
+    },
+    // Migración de Saldos (Facturas de Apertura) — docs/tasks/PROMPT_APERTURA_FRONTEND.md §2.
+    // Grupo anidado (soportado por NavGroupBtn/filtrarNavPorPermisos de forma recursiva) para que
+    // sus 4 pantallas queden agrupadas; si el usuario no tiene ninguna acción "ver" de este
+    // módulo, filtrarNavPorPermisos oculta cada hijo y el grupo entero desaparece del menú.
+    {
+      label: "Migración de Saldos",
+      icon: <History size={14} />,
+      prefix: "/apertura",
+      children: [
+        { label: "Diagnóstico", icon: <Wrench size={14} />, path: "/apertura/diagnostico" },
+        { label: "Ventas", icon: <Receipt size={14} />, path: "/apertura/ventas" },
+        { label: "Compras", icon: <ShoppingCart size={14} />, path: "/apertura/compras" },
+        { label: "Cuadre", icon: <BarChart3 size={14} />, path: "/apertura/resumen" },
+      ],
     },
     {
       label: "Retenciones",
@@ -634,6 +631,9 @@ const ADMIN_ONLY_PATHS = new Set([
 // a ADMIN_ONLY_PATHS (rol System Manager) como a FARMACIA_ONLY_PATHS (tenant.vertical).
 function stripPathsFromEntry(entry: NavEntry, excluded: Set<string>): NavEntry | null {
   if (isGroup(entry)) {
+    // Un grupo entero también puede estar excluido por su `prefix` (ej. un subgrupo de reportes
+    // gateado por un flag de negocio, no solo ítems sueltos) — se chequea antes de recursar.
+    if (excluded.has(entry.prefix)) return null;
     const children = entry.children
       .map((c) => stripPathsFromEntry(c, excluded))
       .filter((c): c is NavEntry => c !== null);
@@ -689,6 +689,20 @@ const POS_ONLY_NAV_KEYS = new Set([
   "/reportes/cuadreTurno|/reportes/caja|/reportes/corteCajaDia",
 ]);
 
+// Ítems de NAV_VENTAS / NAV_OPS que solo tienen sentido con la facturación electrónica
+// habilitada (EcfConfig.habilitado) — identificados por su `path`.
+const ECF_ONLY_NAV_KEYS = new Set(["/ecf-emitidos", "/ecf-recibidos"]);
+
+// Ítems que solo tienen sentido con el despacho activo (FacturacionConfig.despachoHabilitado) —
+// docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md §1.2. El flag puede cambiar en
+// caliente: no lo cacheamos más allá de la query de facturacion-config (staleTime 5min, se
+// refresca explícitamente después de habilitar/deshabilitar desde Configuración).
+const DESPACHO_ONLY_NAV_KEYS = new Set([
+  "/despachos",
+  "/compras/ordenes/abastecimiento",
+  "/reportes/despacho-margen|/reportes/despacho-reservas|/reportes/despacho-faltantes|/reportes/despacho-pendientes-compra",
+]);
+
 // ─── NavItem component ────────────────────────────────────────────────────────
 
 function NavItemBtn({
@@ -701,7 +715,9 @@ function NavItemBtn({
   collapsed: boolean;
 }) {
   const { pathname } = useLocation();
-  const active = pathname === item.path || pathname.startsWith(item.path + "/");
+  const active = item.activePrefixes
+    ? item.activePrefixes.some((p) => pathname === p || pathname.startsWith(p + "/"))
+    : pathname === item.path || pathname.startsWith(item.path + "/");
   return (
     <button
       className={`nav-item${active ? " active" : ""}`}
@@ -726,9 +742,11 @@ function NavChildBtn({
   pathname: string;
   style?: React.CSSProperties;
 }) {
-  const active = child.exact
-    ? pathname === child.path
-    : pathname === child.path || pathname.startsWith(child.path + "/");
+  const active = child.activePrefixes
+    ? child.activePrefixes.some((p) => pathname === p || pathname.startsWith(p + "/"))
+    : child.exact
+      ? pathname === child.path
+      : pathname === child.path || pathname.startsWith(child.path + "/");
   return (
     <button
       className={`nav-item nav-child${active ? " active" : ""}`}
@@ -1083,11 +1101,17 @@ function TabBar() {
 
 // ─── AppLayout inner (uses TabsContext) ───────────────────────────────────────
 
+// Modo oscuro deshabilitado temporalmente hasta que se definan sus colores — la lógica queda
+// intacta (localStorage, preferencia del sistema, botón) detrás de este flag para reactivarla
+// después sin tener que reconstruirla.
+const DARK_MODE_ENABLED = false;
+
 function AppLayoutInner() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (!DARK_MODE_ENABLED) return "light";
     const saved = localStorage.getItem("gensuite-theme");
     if (saved === "dark" || saved === "light") return saved;
     return window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -1111,6 +1135,14 @@ function AppLayoutInner() {
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false;
   const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true;
 
+  const { data: ecfConfig } = useQuery({
+    queryKey: ["ecf-config"],
+    queryFn: getEcfConfig,
+    staleTime: 5 * 60_000,
+  });
+  const ecfHabilitado = ecfConfig?.habilitado ?? false;
+  const despachoHabilitado = facturacionConfig?.despachoHabilitado ?? false;
+
   const configNavRoleFiltered: NavEntry = isSystemManager
     ? NAV_CONFIG
     : (stripAdminOnlyEntry(NAV_CONFIG) as NavGroup);
@@ -1125,7 +1157,7 @@ function AppLayoutInner() {
     : {
         ...(configNavAdminFiltered as NavGroup),
         children: (configNavAdminFiltered as NavGroup).children.map((item) =>
-          isGroup(item) && item.prefix === IMPUESTOS_GROUP_PREFIX
+          !isGroup(item) && item.path === "/config/tasas-impuesto"
             ? { label: "Impuestos", icon: <Percent size={14} />, path: "/config/tasas-impuesto" }
             : item,
         ),
@@ -1138,13 +1170,33 @@ function AppLayoutInner() {
 
   // Filtrado final por permisos del usuario (docs/PROMPT_PERMISOS_FRONTEND.md §6). Se aplica
   // después de los filtros de negocio (POS, Impuesto de Documento) y de rol/vertical.
+  const navEcfFiltered = (entries: NavEntry[]): NavEntry[] =>
+    ecfHabilitado
+      ? entries
+      : entries.filter(
+          (entry) => !ECF_ONLY_NAV_KEYS.has(isGroup(entry) ? entry.prefix : entry.path),
+        );
+
+  // A diferencia de POS/ECF (siempre ítems de nivel superior), los ítems de despacho pueden estar
+  // anidados dentro de otro grupo (Abastecimiento dentro de "Compras", el subgrupo "Despacho"
+  // dentro de "Reportes") — stripPathsFromEntry recorre recursivamente, así que alcanza ambos casos.
+  const navDespachoFiltered = (entries: NavEntry[]): NavEntry[] =>
+    despachoHabilitado
+      ? entries
+      : entries
+          .map((entry) => stripPathsFromEntry(entry, DESPACHO_ONLY_NAV_KEYS))
+          .filter((e): e is NavEntry => e !== null);
+
   const mainNav = filtrarNavList(NAV_MAIN, permCtx);
-  const ventasNav = filtrarNavList(NAV_VENTAS, permCtx);
-  const opsNav = filtrarNavList(NAV_OPS, permCtx);
+  const ventasNav = filtrarNavList(navDespachoFiltered(navEcfFiltered(NAV_VENTAS)), permCtx);
+  const opsNav = filtrarNavList(navDespachoFiltered(navEcfFiltered(NAV_OPS)), permCtx);
   const farmaciaNav = filtrarNavPorPermisos(NAV_FARMACIA, permCtx);
   const financeNav = filtrarNavList(financeNavPos, permCtx);
   const contabilidadNav = filtrarNavList(NAV_CONTABILIDAD, permCtx);
-  const reportesNav = filtrarNavPorPermisos(NAV_REPORTES, permCtx);
+  const reportesNavDespachoFiltered: NavEntry = despachoHabilitado
+    ? NAV_REPORTES
+    : (stripPathsFromEntry(NAV_REPORTES, DESPACHO_ONLY_NAV_KEYS) as NavGroup);
+  const reportesNav = filtrarNavPorPermisos(reportesNavDespachoFiltered, permCtx);
   const configNavPermFiltered = filtrarNavPorPermisos(configNav, permCtx);
   const { tabs, activeId, closeTab, multiTab, keepAliveRef } = useTabs();
   const navigate = useNavigate();
@@ -1372,18 +1424,20 @@ function AppLayoutInner() {
           <div className="topbar-right">
             <TurnoCajaIndicator />
 
-            {/* Theme toggle */}
-            <button
-              className="icon-btn"
-              aria-label="Cambiar tema"
-              onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-            >
-              {theme === "dark" ? (
-                <Sun size={16} aria-hidden="true" />
-              ) : (
-                <Moon size={16} aria-hidden="true" />
-              )}
-            </button>
+            {/* Theme toggle — oculto mientras DARK_MODE_ENABLED sea false */}
+            {DARK_MODE_ENABLED && (
+              <button
+                className="icon-btn"
+                aria-label="Cambiar tema"
+                onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+              >
+                {theme === "dark" ? (
+                  <Sun size={16} aria-hidden="true" />
+                ) : (
+                  <Moon size={16} aria-hidden="true" />
+                )}
+              </button>
+            )}
 
             <span className="divider-v" aria-hidden="true" />
 

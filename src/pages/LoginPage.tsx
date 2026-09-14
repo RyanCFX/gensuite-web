@@ -26,13 +26,13 @@ const schema = z.object({
     .min(1, 'La contraseña es obligatoria'),
   tenant: IS_PRODUCTION
     ? z.string().optional()
-    : z.string().min(1, 'El tenant es obligatorio'),
+    : z.string().min(1, 'La empresa es obligatoria'),
 })
 
 type FormValues = z.infer<typeof schema>
 
 const TENANT_ERROR_MESSAGES: Record<string, string> = {
-  TENANT_NOT_FOUND: 'El tenant no existe. Verifica el slug e intenta de nuevo.',
+  TENANT_NOT_FOUND: 'La empresa no existe. Verifica el slug e intenta de nuevo.',
   TENANT_INACTIVE: 'Esta organización se encuentra desactivada.',
   TENANT_DISABLED: 'Esta organización se encuentra desactivada.',
   TENANT_SUSPENDED: 'Esta organización está suspendida. Contacta a soporte.',
@@ -162,11 +162,11 @@ export default function LoginPage() {
 
         {!IS_PRODUCTION && (
           <div className="form-field">
-            <Label htmlFor="tenant">Tenant</Label>
+            <Label htmlFor="tenant">Empresa</Label>
             <Input
               id="tenant"
               type="text"
-              placeholder="tenant1"
+              placeholder="mi-empresa"
               autoComplete="organization"
               {...register('tenant')}
               data-error={!!errors.tenant}

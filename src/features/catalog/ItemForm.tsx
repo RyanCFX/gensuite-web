@@ -15,7 +15,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { AttributeSelect } from '@/components/shared/AttributeSelect'
-import { ArrowLeft, Plus, Trash2, HelpCircle, ImagePlus, Loader2 } from 'lucide-react'
+import { ArrowLeft, Plus, Minus, Trash2, HelpCircle, ImagePlus, Loader2 } from 'lucide-react'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 
@@ -89,6 +89,7 @@ export default function ItemForm() {
   const [hasVariants, setHasVariants] = useState(false)
   const [selectedAttributes, setSelectedAttributes] = useState<string[]>([])
   const [showWarranty, setShowWarranty] = useState(false)
+  const [showBarcodes, setShowBarcodes] = useState(false)
   const [barcodes, setBarcodes] = useState<{ barcode: string; barcodeType: string }[]>([])
   const [noPurchaseTax, setNoPurchaseTax] = useState(false)
   const [noSalesTax, setNoSalesTax] = useState(false)
@@ -334,6 +335,7 @@ export default function ItemForm() {
       salesTaxTemplate: existingItem.salesTaxTemplate ?? '',
     })
     setBarcodes(existingItem.barcodes ?? [])
+    setShowBarcodes((existingItem.barcodes?.length ?? 0) > 0)
     setShowWarranty(!!existingItem.hasWarranty)
     setNoPurchaseTax(!existingItem.purchaseTaxTemplate)
     setNoSalesTax(!existingItem.salesTaxTemplate)
@@ -593,70 +595,102 @@ export default function ItemForm() {
 
           {/* ── Información básica ─────────────────────────────────────── */}
           <div className="card">
-            <div className="card-header"><h2 className="card-title">Información General</h2></div>
+            <div className="card-header navy-card-header"><h2 className="card-title">Información General</h2></div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-              <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="itemCode">
-                    Código {!isEdit && !isAutoCode && <span className="ff-required">*</span>}
-                  </label>
-                  {isEdit ? (
-                    <div className="ff-input" style={{ color: 'var(--text-secondary)', cursor: 'default', background: 'var(--bg-muted)', fontFamily: 'var(--font-mono)' }}>
-                      {existingItem?.id}
-                    </div>
-                  ) : isAutoCode ? (
-                    <div className="ff-input" style={{ color: 'var(--text-secondary)', cursor: 'default', background: 'var(--bg-muted)', fontFamily: codePreviewPrefix ? 'var(--font-mono)' : undefined }}>
-                      {codePreviewPrefix
-                        ? `${codePreviewPrefix}-XXXX`
-                        : 'El código se asignará automáticamente'}
-                    </div>
+              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div
+                  className="item-image-upload"
+                  onClick={() => imageFileInputRef.current?.click()}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') imageFileInputRef.current?.click() }}
+                >
+                  <input
+                    ref={imageFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => { handleImageFileSelected(e.target.files?.[0]); e.target.value = '' }}
+                  />
+                  {uploadImageMutation.isPending ? (
+                    <Loader2 size={22} className="spin item-image-upload-icon" />
+                  ) : pendingImagePreview || watch('image') ? (
+                    <img src={pendingImagePreview || watch('image')} alt="" />
                   ) : (
+                    <>
+                      <ImagePlus size={26} className="item-image-upload-icon" />
+                      <span className="item-image-upload-label">Subir imagen</span>
+                    </>
+                  )}
+                </div>
+
+                <div style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div className="form-row">
+                    <div className="ff-wrap">
+                      <label className="ff-label" htmlFor="itemCode">
+                        Código {!isEdit && !isAutoCode && <span className="ff-required">*</span>}
+                      </label>
+                      {isEdit ? (
+                        <div className="ff-input" style={{ color: 'var(--text-secondary)', cursor: 'default', background: 'var(--bg-muted)', fontFamily: 'var(--font-mono)' }}>
+                          {existingItem?.id}
+                        </div>
+                      ) : isAutoCode ? (
+                        <div className="ff-input" style={{ color: 'var(--text-secondary)', cursor: 'default', background: 'var(--bg-muted)', fontFamily: codePreviewPrefix ? 'var(--font-mono)' : undefined }}>
+                          {codePreviewPrefix
+                            ? `${codePreviewPrefix}-XXXX`
+                            : 'El código se asignará automáticamente'}
+                        </div>
+                      ) : (
+                        <input
+                          id="itemCode"
+                          className={`ff-input${errors.itemCode ? ' ff-input-error' : ''}`}
+                          placeholder="Ej: PROD-001"
+                          {...register('itemCode')}
+                        />
+                      )}
+                      {!isEdit && codePreviewPrefix && (
+                        <p className="ff-hint">
+                          Se usará el prefijo de la{subcategoryOptions.length > 0 && watchedSubcategory ? ' subcategoría' : ' categoría'}: <strong style={{ fontFamily: 'var(--font-mono)' }}>{codePreviewPrefix}-XXXX</strong>
+                        </p>
+                      )}
+                      {isEdit && <p className="ff-hint">El código del artículo no se puede modificar.</p>}
+                      {!isEdit && errors.itemCode && <span className="ff-error">{errors.itemCode.message}</span>}
+                    </div>
+
+                    <div className="ff-wrap">
+                      <label className="ff-label" htmlFor="itemName">Nombre <span className="ff-required">*</span></label>
+                      <input
+                        id="itemName"
+                        className={`ff-input${errors.itemName ? ' ff-input-error' : ''}`}
+                        placeholder="Nombre del artículo"
+                        {...register('itemName')}
+                      />
+                      {errors.itemName && <span className="ff-error">{errors.itemName.message}</span>}
+                    </div>
+                  </div>
+
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="shortName">
+                      Referencia
+                      <span className="ff-tooltip-icon" title="Nombre corto — se usa internamente para búsquedas rápidas"><HelpCircle size={13} /></span>
+                    </label>
                     <input
-                      id="itemCode"
-                      className={`ff-input${errors.itemCode ? ' ff-input-error' : ''}`}
-                      placeholder="Ej: PROD-001"
-                      {...register('itemCode')}
+                      id="shortName"
+                      className="ff-input"
+                      placeholder="Nombre corto (máx 50)"
+                      {...register('shortName')}
                     />
-                  )}
-                  {!isEdit && codePreviewPrefix && (
-                    <p className="ff-hint">
-                      Se usará el prefijo de la{subcategoryOptions.length > 0 && watchedSubcategory ? ' subcategoría' : ' categoría'}: <strong style={{ fontFamily: 'var(--font-mono)' }}>{codePreviewPrefix}-XXXX</strong>
-                    </p>
-                  )}
-                  {isEdit && <p className="ff-hint">El código del artículo no se puede modificar.</p>}
-                  {!isEdit && errors.itemCode && <span className="ff-error">{errors.itemCode.message}</span>}
-              </div>
-
-              <div className="ff-wrap">
-                <label className="ff-label" htmlFor="itemName">Nombre <span className="ff-required">*</span></label>
-                <input
-                  id="itemName"
-                  className={`ff-input${errors.itemName ? ' ff-input-error' : ''}`}
-                  placeholder="Nombre del artículo"
-                  {...register('itemName')}
-                />
-                {errors.itemName && <span className="ff-error">{errors.itemName.message}</span>}
-              </div>
-
-              <div className="ff-wrap">
-                <label className="ff-label" htmlFor="shortName">
-                  Nombre Corto
-                  <span className="ff-tooltip-icon" title="Se usa internamente para búsquedas rápidas"><HelpCircle size={13} /></span>
-                </label>
-                <input
-                  id="shortName"
-                  className="ff-input"
-                  placeholder="Nombre corto (máx 50 caracteres)"
-                  {...register('shortName')}
-                />
+                  </div>
+                </div>
               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="description">
-                  Descripción interna
+                  Descripción
                   <span className="ff-tooltip-icon" title="Solo visible en la ficha del artículo, no aparece en facturas ni cotizaciones"><HelpCircle size={13} /></span>
                 </label>
-                <textarea id="description" className="ff-textarea" rows={2} placeholder="Descripción interna — solo visible en la ficha del artículo" {...register('description')} />
+                <textarea id="description" className="ff-textarea" rows={2} placeholder="Descripción interna, solo visible en la ficha del artículo." {...register('description')} />
               </div>
 
               <div className="ff-wrap">
@@ -664,48 +698,12 @@ export default function ItemForm() {
                   Notas
                   <span className="ff-tooltip-icon" title="Aparece en cotizaciones y facturas"><HelpCircle size={13} /></span>
                 </label>
-                <textarea id="notes" className="ff-textarea" rows={2} placeholder="Notas que aparecen en documentos" {...register('notes')} />
-              </div>
-
-              <div className="ff-wrap">
-                <label className="ff-label">Foto</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{
-                    width: 72, height: 72, borderRadius: 'var(--radius-md)', overflow: 'hidden',
-                    border: '1px solid var(--border-default)', background: 'var(--bg-muted)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}>
-                    {pendingImagePreview || watch('image')
-                      ? <img src={pendingImagePreview || watch('image')} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : <ImagePlus size={20} style={{ color: 'var(--text-tertiary)' }} />}
-                  </div>
-                  <div>
-                    <input
-                      ref={imageFileInputRef}
-                      type="file"
-                      accept="image/*"
-                      style={{ display: 'none' }}
-                      onChange={(e) => { handleImageFileSelected(e.target.files?.[0]); e.target.value = '' }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-size-sm"
-                      onClick={() => imageFileInputRef.current?.click()}
-                      disabled={uploadImageMutation.isPending}
-                    >
-                      {uploadImageMutation.isPending
-                        ? <Loader2 size={14} className="spin" />
-                        : <ImagePlus size={14} />}
-                      {watch('image') || pendingImagePreview ? 'Cambiar foto' : 'Subir foto'}
-                    </button>
-                    <p className="ff-hint">JPG o PNG, máx 5MB.</p>
-                  </div>
-                </div>
+                <textarea id="notes" className="ff-textarea" rows={2} placeholder="Notas que aparecen en documentos." {...register('notes')} />
               </div>
 
               <div className="form-row">
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="category">Categoría</label>
+                  <label className="ff-label" htmlFor="category">Categoria</label>
                   <Controller
                     name="category"
                     control={control}
@@ -723,7 +721,7 @@ export default function ItemForm() {
                         onSearch={setCatSearch}
                         onOpen={() => refetchCategories()}
                         selectedLabel={selectedCategoryLabel}
-                        placeholder="Seleccionar categoría"
+                        placeholder="Seleccionar"
                         error={!!errors.category}
                       />
                     )}
@@ -746,7 +744,7 @@ export default function ItemForm() {
                           onSearch={setBrandSearch}
                           onOpen={() => refetchBrands()}
                           selectedLabel={selectedBrandLabel}
-                          placeholder="Seleccionar marca"
+                          placeholder="Seleccionar"
                           loading={false}
                         />
                       )}
@@ -778,318 +776,180 @@ export default function ItemForm() {
                   {errors.subcategory && <span className="ff-error">{errors.subcategory.message}</span>}
                 </div>
               )}
-            </div>
-          </div>
 
-          {/* ── Unidad de Medida ─────────────────────────────────────── */}
-          {fixedType === 'product' && (
-            <div className="card">
-              <div className="card-header"><h2 className="card-title">Unidad de Medida</h2></div>
-              <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div className="form-row">
+              {fixedType === 'product' && (
+                <div className="form-row form-row-3">
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="defaultWarehouse">Almacen por defecto</label>
+                    <Controller
+                      name="defaultWarehouse"
+                      control={control}
+                      render={({ field }) => (
+                        <SearchSelect
+                          id="defaultWarehouse"
+                          value={field.value ?? ''}
+                          onChange={(val) => field.onChange(val)}
+                          options={warehouseOptions}
+                          onSearch={setWarehouseSearch}
+                          onOpen={() => refetchWarehouses()}
+                          selectedLabel={warehouses.find((w) => w.id === field.value)?.name ?? ''}
+                          placeholder="Sin asignar"
+                        />
+                      )}
+                    />
+                  </div>
                   <div className="ff-wrap">
                     <label className="ff-label" htmlFor="stockUom">UDM de Stock</label>
                     <Controller
                       name="stockUom"
                       control={control}
                       render={({ field }) => (
-                          <SearchSelect
-                            id="stockUom"
-                            value={field.value ?? ''}
-                            onChange={(val) => field.onChange(val)}
-                            options={uomOptions}
-                            onSearch={setUomSearch}
-                            onOpen={() => refetchUoms()}
-                            placeholder="Seleccionar UDM"
-                          />
+                        <SearchSelect
+                          id="stockUom"
+                          value={field.value ?? ''}
+                          onChange={(val) => field.onChange(val)}
+                          options={uomOptions}
+                          onSearch={setUomSearch}
+                          onOpen={() => refetchUoms()}
+                          placeholder="Seleccionar UDM"
+                        />
                       )}
                     />
-                    <p className="ff-hint">
-                      Unidad base del artículo. Las conversiones se gestionan desde Configuración → Unidades de medida.
-                    </p>
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="trackingType">Seguimiento</label>
+                    <Controller
+                      name="trackingType"
+                      control={control}
+                      render={({ field }) => (
+                        <SearchSelect
+                          id="trackingType"
+                          value={field.value ?? 'none'}
+                          onChange={(val) => field.onChange(val)}
+                          options={trackingOptions}
+                          onSearch={setTrackingSearch}
+                          selectedLabel={TRACKING_OPTIONS_ALL.find((o) => o.value === (field.value ?? 'none'))?.label ?? ''}
+                        />
+                      )}
+                    />
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
+              )}
 
-          {/* ── Variantes (opcional) — solo al crear; editar variantes/atributos
-                de un template ya existente no está soportado por este formulario ── */}
-          {!isEdit && fixedType === 'product' && (
-            <>
-              <button
-                type="button"
-                onClick={() => setShowVariants((s) => !s)}
-                className="btn btn-ghost btn-size-sm"
-                style={{ alignSelf: 'flex-start' }}
-              >
-                {showVariants ? '▾' : '▸'} Variantes (opcional)
-              </button>
-
-              {showVariants && (
-                <div className="card">
-                  <div className="card-header"><h2 className="card-title">Variantes</h2></div>
-                  <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    <label className="ff-check-wrap">
-                      <input
-                        type="checkbox"
-                        className="ff-check"
-                        checked={hasVariants}
-                        onChange={(e) => setHasVariants(e.target.checked)}
-                      />
-                      <span style={{ fontSize: 13 }}>Este artículo tiene variantes</span>
+              {fixedType === 'product' && watch('trackingType') === 'batch' && (
+                <div className="form-row">
+                  <div className="ff-wrap">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                      <input type="checkbox" className="ff-check" {...register('hasExpiryDate')} />
+                      Requiere fecha de vencimiento por lote
                     </label>
-
-                    {hasVariants && (
-                      <>
-                        <div className="inline-alert inline-alert-info" style={{ fontSize: 12 }}>
-                          Al guardar, las variantes se generarán en la pantalla de detalle del artículo.
-                        </div>
-                        <div className="ff-wrap">
-                          <label className="ff-label">Atributos de variantes</label>
-                          <AttributeSelect
-                            selected={selectedAttributes}
-                            onChange={setSelectedAttributes}
-                          />
-                          <p className="ff-hint">Ej: Color, Talla. Selecciona todos los atributos que diferencian las variantes.</p>
-                        </div>
-                        <p className="ff-hint" style={{ fontSize: 11 }}>
-                          El precio de venta se configura en cada variante individual.
-                        </p>
-                      </>
-                    )}
                   </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* ════════════════ COLUMNA DERECHA ════════════════ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-          {/* ── COMPRA ────────────────────────────────────────────────── */}
-          <div className="card">
-            <div className="card-header"><h2 className="card-title">Compra</h2></div>
-            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div className="ff-wrap">
-                <label className="ff-label" htmlFor="valuationRate">Costo de Valoración</label>
-                <input
-                  id="valuationRate"
-                  type="number" step="0.01" min="0"
-                  className="ff-input"
-                  placeholder="0.00"
-                  {...register('valuationRate', { valueAsNumber: true })}
-                />
-                <p className="ff-hint">
-                  Costo unitario del artículo (base para calcular márgenes). Opcional — requerido solo si
-                  usas el modo de precio "Sobre costo".
-                </p>
-              </div>
-              <div className="ff-wrap">
-                <label className="ff-label" htmlFor="purchaseTaxTemplate">
-                  Impuesto de Compra {!noPurchaseTax && <span className="ff-required">*</span>}
-                </label>
-                <Controller
-                  name="purchaseTaxTemplate"
-                  control={control}
-                  render={({ field }) => (
-                    <SearchSelect
-                      id="purchaseTaxTemplate"
-                      value={field.value ?? ''}
-                      onChange={(val) => field.onChange(val)}
-                      options={purchaseTaxOptions}
-                      onSearch={setPurchaseTaxSearch}
-                      onOpen={() => refetchItemTaxTemplates()}
-                      selectedLabel={itemTaxTemplates?.find((t) => String(t.id) === field.value)?.title ?? ''}
-                      placeholder="Seleccionar impuesto"
-                      disabled={noPurchaseTax}
-                    />
-                  )}
-                />
-                <label className="ff-check-wrap" style={{ marginTop: 8 }}>
-                  <input
-                    type="checkbox"
-                    className="ff-check"
-                    checked={noPurchaseTax}
-                    onChange={(e) => setNoPurchaseTax(e.target.checked)}
-                  />
-                  <span style={{ fontSize: 13 }}>No lleva impuesto de compra</span>
-                </label>
-                <p className="ff-hint">Excepción de impuesto para este artículo en compras y gastos (Item Tax Template)</p>
-              </div>
-            </div>
-          </div>
-
-          {/* ── VENTA ──────────────────────────────────────────────────── */}
-          <div className="card">
-            <div className="card-header"><h2 className="card-title">Venta</h2></div>
-            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-              <div className="ff-wrap">
-                <label className="ff-label" htmlFor="priceMode">Modo de precio</label>
-                <Controller
-                  name="priceMode"
-                  control={control}
-                  render={({ field }) => (
-                    <SearchSelect
-                      id="priceMode"
-                      value={field.value ?? ''}
-                      onChange={(val) => {
-                        if (val === 'cost_plus' && !watchedValuationRate) {
-                          toast.error('Ingresa el Costo de Valoración para poder seleccionar "Sobre costo"')
-                          return
-                        }
-                        field.onChange(val)
-                      }}
-                      options={priceModeOptions}
-                      onSearch={setPriceModeSearch}
-                      selectedLabel={PRICE_MODE_OPTIONS_ALL.find((o) => o.value === field.value)?.label ?? ''}
-                    />
-                  )}
-                />
-              </div>
-
-              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <span className="ff-label-sm">Precios de venta</span>
-                {watchedPriceMode === 'cost_plus' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <div className="ff-wrap">
-                      <label className="ff-label">Margen A (%)</label>
-                      <input type="number" step="0.1" min="0" max="100" className="ff-input" placeholder="Ej: 40" {...register('marginA', { valueAsNumber: true })} />
-                      {priceLabel(calcTotalFromMargin(watchedMarginA))}
-                    </div>
-                    <div className="ff-wrap">
-                      <label className="ff-label">Margen B (%) <span className="ff-required">*</span></label>
-                      <input type="number" step="0.1" min="0" max="100" className="ff-input" placeholder="Ej: 25" {...register('marginB', { valueAsNumber: true })} />
-                      {priceLabel(calcTotalFromMargin(watchedMarginB))}
-                    </div>
-                    <div className="ff-wrap">
-                      <label className="ff-label">Margen C (%)</label>
-                      <input type="number" step="0.1" min="0" max="100" className="ff-input" placeholder="Ej: 10" {...register('marginC', { valueAsNumber: true })} />
-                      {priceLabel(calcTotalFromMargin(watchedMarginC))}
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <div className="ff-wrap">
-                      <label className="ff-label" style={{ color: 'var(--text-secondary)' }}>Precio A — Máximo</label>
-                      <input type="number" step="0.01" min="0" className="ff-input" placeholder="0.00" {...register('priceA', { valueAsNumber: true })} />
-                      {priceLabel(watchedPriceA)}
-                      <p className="ff-hint">Clientes VIP / venta especial</p>
-                    </div>
-                    <div className="ff-wrap">
-                      <label className="ff-label">Precio B — Promedio <span className="ff-required">*</span></label>
-                      <input
-                        type="number" step="0.01" min="0"
-                        className={`ff-input${errors.priceB ? ' ff-input-error' : ''}`}
-                        placeholder="0.00"
-                        {...register('priceB', { valueAsNumber: true })}
-                      />
-                      {errors.priceB && <span className="ff-error">{errors.priceB.message}</span>}
-                      {priceLabel(watchedPriceB)}
-                      <p className="ff-hint">Precio estándar (el más usado)</p>
-                    </div>
-                    <div className="ff-wrap">
-                      <label className="ff-label" style={{ color: 'var(--text-secondary)' }}>Precio C — Mínimo</label>
-                      <input type="number" step="0.01" min="0" className="ff-input" placeholder="0.00" {...register('priceC', { valueAsNumber: true })} />
-                      {priceLabel(watchedPriceC)}
-                      <p className="ff-hint">Precio al por mayor</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="salesTaxTemplate">
-                    Impuesto de Venta {!noSalesTax && <span className="ff-required">*</span>}
-                  </label>
-                  <Controller
-                    name="salesTaxTemplate"
-                    control={control}
-                    render={({ field }) => (
-                      <SearchSelect
-                        id="salesTaxTemplate"
-                        value={field.value ?? ''}
-                        onChange={(val) => field.onChange(val)}
-                        options={salesTaxOptions}
-                        onSearch={setSalesTaxSearch}
-                        onOpen={() => refetchItemTaxTemplates()}
-                        selectedLabel={itemTaxTemplates?.find((t) => String(t.id) === field.value)?.title ?? ''}
-                        placeholder="Seleccionar impuesto"
-                        disabled={noSalesTax}
-                      />
-                    )}
-                  />
-                  {!noSalesTax && taxRate > 0 && (
-                    <p className="ff-hint" style={{ marginTop: 4 }}>
-                      Tasa de impuesto: {taxRate}%
-                    </p>
-                  )}
-                  <label className="ff-check-wrap" style={{ marginTop: 8 }}>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="shelfLifeInDays">Vida útil (días)</label>
                     <input
-                      type="checkbox"
-                      className="ff-check"
-                      checked={noSalesTax}
-                      onChange={(e) => setNoSalesTax(e.target.checked)}
-                    />
-                    <span style={{ fontSize: 13 }}>No lleva impuesto de venta</span>
-                  </label>
-                  <p className="ff-hint">Excepción de impuesto para este artículo en cotizaciones, pedidos y facturas (Item Tax Template)</p>
-                </div>
-              </div>
-
-              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
-                <label className="ff-check-wrap">
-                  <input type="checkbox" className="ff-check" {...register('allowsDiscount')} />
-                  <span style={{ fontSize: 13 }}>Acepta descuento</span>
-                </label>
-                {watch('allowsDiscount') && (
-                  <div className="ff-wrap" style={{ marginTop: 8 }}>
-                    <label className="ff-label" htmlFor="maxDiscountPct">% máximo de descuento permitido</label>
-                    <input
-                      id="maxDiscountPct"
-                      type="number" min="0" max="100" step="0.1"
+                      id="shelfLifeInDays"
                       className="ff-input"
-                      style={{ width: 120 }}
-                      {...register('maxDiscountPct', { valueAsNumber: true })}
+                      type="number"
+                      min="1"
+                      step="1"
+                      {...register('shelfLifeInDays', { valueAsNumber: true })}
                     />
-                    <p className="ff-hint">Descuento máximo permitido para este artículo en documentos</p>
+                    <p className="ff-hint">
+                      Si se omite la fecha de vencimiento al crear un lote, se calcula sumando estos días a la fecha de fabricación.
+                    </p>
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* ── Garantía y Códigos de Barras ───────────────────────────── */}
-          <div className="card">
-            <div className="card-header"><h2 className="card-title">Garantía y Códigos</h2></div>
-            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <label className="ff-check-wrap">
-                <input
-                  type="checkbox"
-                  className="ff-check"
-                  checked={showWarranty}
-                  onChange={(e) => setShowWarranty(e.target.checked)}
-                />
-                <span style={{ fontSize: 13 }}>Tiene garantía</span>
-              </label>
-
-              {showWarranty && (
-                <div className="ff-wrap" style={{ width: 200 }}>
-                  <label className="ff-label">Período de garantía (días)</label>
-                  <input
-                    type="number" min="0"
-                    className="ff-input"
-                    placeholder="365"
-                    {...register('warrantyPeriod', { valueAsNumber: true })}
-                  />
                 </div>
               )}
 
-              {fixedType === 'product' && (
-                <div>
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', paddingTop: 4 }}>
+                {!isEdit && fixedType === 'product' && (
+                  <button
+                    type="button"
+                    className="pill-plus-trigger"
+                    aria-expanded={showVariants}
+                    onClick={() => setShowVariants((s) => {
+                      const next = !s
+                      setHasVariants(next)
+                      return next
+                    })}
+                  >
+                    Agregar Variantes
+                    <span key={showVariants ? 'open' : 'closed'} className="pill-plus-trigger-icon">
+                      {showVariants ? <Minus size={14} /> : <Plus size={14} />}
+                    </span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="pill-plus-trigger"
+                  aria-expanded={showWarranty}
+                  onClick={() => setShowWarranty((s) => !s)}
+                >
+                  Agregar Garantía
+                  <span key={showWarranty ? 'open' : 'closed'} className="pill-plus-trigger-icon">
+                    {showWarranty ? <Minus size={14} /> : <Plus size={14} />}
+                  </span>
+                </button>
+                {fixedType === 'product' && (
+                  <button
+                    type="button"
+                    className="pill-plus-trigger"
+                    aria-expanded={showBarcodes}
+                    onClick={() => setShowBarcodes((s) => {
+                      const next = !s
+                      if (next) {
+                        setBarcodes((prev) => prev.length > 0 ? prev : [{ barcode: '', barcodeType: 'EAN' }])
+                      }
+                      return next
+                    })}
+                  >
+                    Agregar Códigos de barras
+                    <span key={showBarcodes ? 'open' : 'closed'} className="pill-plus-trigger-icon">
+                      {showBarcodes ? <Minus size={14} /> : <Plus size={14} />}
+                    </span>
+                  </button>
+                )}
+              </div>
+
+              {/* ── Variantes (opcional) — solo al crear; editar variantes/atributos
+                    de un template ya existente no está soportado por este formulario ── */}
+              {!isEdit && fixedType === 'product' && showVariants && (
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div className="inline-alert inline-alert-info" style={{ fontSize: 12 }}>
+                    Al guardar, las variantes se generarán en la pantalla de detalle del artículo.
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">Atributos de variantes</label>
+                    <AttributeSelect
+                      selected={selectedAttributes}
+                      onChange={setSelectedAttributes}
+                    />
+                    <p className="ff-hint">Ej: Color, Talla. Selecciona todos los atributos que diferencian las variantes.</p>
+                  </div>
+                  <p className="ff-hint" style={{ fontSize: 11 }}>
+                    El precio de venta se configura en cada variante individual.
+                  </p>
+                </div>
+              )}
+
+              {/* ── Garantía (opcional) ─────────────────────────────────────── */}
+              {showWarranty && (
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14 }}>
+                  <div className="ff-wrap" style={{ width: 200 }}>
+                    <label className="ff-label">Período de garantía (días)</label>
+                    <input
+                      type="number" min="0"
+                      className="ff-input"
+                      placeholder="365"
+                      {...register('warrantyPeriod', { valueAsNumber: true })}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ── Códigos de barras (opcional) ────────────────────────────── */}
+              {fixedType === 'product' && showBarcodes && (
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span className="ff-label" style={{ margin: 0 }}>Códigos de barras</span>
                     <button
@@ -1142,76 +1002,227 @@ export default function ItemForm() {
               )}
             </div>
           </div>
+        </div>
 
-          {/* ── Inventario / Seguimiento ────────────────────────────────── */}
-          {fixedType === 'product' && (
-            <div className="card">
-              <div className="card-header"><h2 className="card-title">Inventario</h2></div>
-              <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* ════════════════ COLUMNA DERECHA ════════════════ */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+          {/* ── COMPRA ────────────────────────────────────────────────── */}
+          <div className="card">
+            <div className="card-header navy-card-header"><h2 className="card-title">Compra</h2></div>
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="form-row">
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="defaultWarehouse">Almacén por defecto</label>
-                  <Controller
-                    name="defaultWarehouse"
-                    control={control}
-                    render={({ field }) => (
-                      <SearchSelect
-                        id="defaultWarehouse"
-                        value={field.value ?? ''}
-                        onChange={(val) => field.onChange(val)}
-                        options={warehouseOptions}
-                        onSearch={setWarehouseSearch}
-                        onOpen={() => refetchWarehouses()}
-                        selectedLabel={warehouses.find((w) => w.id === field.value)?.name ?? ''}
-                        placeholder="Sin asignar"
-                      />
-                    )}
+                  <label className="ff-label" htmlFor="valuationRate">Costo de Valoración</label>
+                  <input
+                    id="valuationRate"
+                    type="number" step="0.01" min="0"
+                    className="ff-input"
+                    placeholder="0.00"
+                    {...register('valuationRate', { valueAsNumber: true })}
                   />
+                  <p className="ff-hint">
+                    Costo unitario del artículo (base para calcular márgenes). Opcional — requerido solo si
+                    usas el modo de precio "Sobre costo".
+                  </p>
                 </div>
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="trackingType">Seguimiento</label>
+                  <label className="ff-label" htmlFor="purchaseTaxTemplate">
+                    Impuesto de Compra {!noPurchaseTax && <span className="ff-required">*</span>}
+                  </label>
                   <Controller
-                    name="trackingType"
+                    name="purchaseTaxTemplate"
                     control={control}
                     render={({ field }) => (
                       <SearchSelect
-                        id="trackingType"
-                        value={field.value ?? 'none'}
+                        id="purchaseTaxTemplate"
+                        value={field.value ?? ''}
                         onChange={(val) => field.onChange(val)}
-                        options={trackingOptions}
-                        onSearch={setTrackingSearch}
-                        selectedLabel={TRACKING_OPTIONS_ALL.find((o) => o.value === (field.value ?? 'none'))?.label ?? ''}
+                        options={purchaseTaxOptions}
+                        onSearch={setPurchaseTaxSearch}
+                        onOpen={() => refetchItemTaxTemplates()}
+                        selectedLabel={itemTaxTemplates?.find((t) => String(t.id) === field.value)?.title ?? ''}
+                        placeholder="Seleccionar impuesto"
+                        disabled={noPurchaseTax}
                       />
                     )}
                   />
                 </div>
               </div>
+              <label className="ff-toggle-wrap">
+                <span className="ff-toggle">
+                  <input
+                    type="checkbox"
+                    checked={noPurchaseTax}
+                    onChange={(e) => setNoPurchaseTax(e.target.checked)}
+                  />
+                  <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+                </span>
+                Sin impuesto de compra
+              </label>
+              <p className="ff-hint" style={{ marginTop: -8 }}>Excepción de impuesto para este artículo en compras y gastos (Item Tax Template)</p>
+            </div>
+          </div>
 
-              {watch('trackingType') === 'batch' && (
-                <div className="form-row form-row-2" style={{ marginTop: 12 }}>
+          {/* ── VENTA ──────────────────────────────────────────────────── */}
+          <div className="card">
+            <div className="card-header navy-card-header"><h2 className="card-title">Venta</h2></div>
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="priceMode">Modo de precio</label>
+                <Controller
+                  name="priceMode"
+                  control={control}
+                  render={({ field }) => (
+                    <SearchSelect
+                      id="priceMode"
+                      value={field.value ?? ''}
+                      onChange={(val) => {
+                        if (val === 'cost_plus' && !watchedValuationRate) {
+                          toast.error('Ingresa el Costo de Valoración para poder seleccionar "Sobre costo"')
+                          return
+                        }
+                        field.onChange(val)
+                      }}
+                      options={priceModeOptions}
+                      onSearch={setPriceModeSearch}
+                      selectedLabel={PRICE_MODE_OPTIONS_ALL.find((o) => o.value === field.value)?.label ?? ''}
+                    />
+                  )}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <span className="ff-section-divider">Precio de venta</span>
+                <div className="form-row" style={{ alignItems: 'start' }}>
                   <div className="ff-wrap">
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-                      <input type="checkbox" {...register('hasExpiryDate')} />
-                      Requiere fecha de vencimiento por lote
+                    {watchedPriceMode === 'cost_plus' ? (
+                      <>
+                        <label className="ff-label">Margen A (%)</label>
+                        <input type="number" step="0.1" min="0" max="100" className="ff-input" placeholder="Ej: 40" {...register('marginA', { valueAsNumber: true })} />
+                        {priceLabel(calcTotalFromMargin(watchedMarginA))}
+                      </>
+                    ) : (
+                      <>
+                        <label className="ff-label" style={{ color: 'var(--text-secondary)' }}>Precio A — Máximo</label>
+                        <input type="number" step="0.01" min="0" className="ff-input" placeholder="0.00" {...register('priceA', { valueAsNumber: true })} />
+                        {priceLabel(watchedPriceA)}
+                        <p className="ff-hint">Clientes VIP / venta especial</p>
+                      </>
+                    )}
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="salesTaxTemplate">
+                      Impuesto de Venta {!noSalesTax && <span className="ff-required">*</span>}
+                    </label>
+                    <Controller
+                      name="salesTaxTemplate"
+                      control={control}
+                      render={({ field }) => (
+                        <SearchSelect
+                          id="salesTaxTemplate"
+                          value={field.value ?? ''}
+                          onChange={(val) => field.onChange(val)}
+                          options={salesTaxOptions}
+                          onSearch={setSalesTaxSearch}
+                          onOpen={() => refetchItemTaxTemplates()}
+                          selectedLabel={itemTaxTemplates?.find((t) => String(t.id) === field.value)?.title ?? ''}
+                          placeholder="Seleccionar impuesto"
+                          disabled={noSalesTax}
+                        />
+                      )}
+                    />
+                    {!noSalesTax && taxRate > 0 && (
+                      <p className="ff-hint" style={{ marginTop: 4 }}>
+                        Tasa de impuesto: {taxRate}%
+                      </p>
+                    )}
+                    <label className="ff-toggle-wrap" style={{ marginTop: 8 }}>
+                      <span className="ff-toggle">
+                        <input
+                          type="checkbox"
+                          checked={noSalesTax}
+                          onChange={(e) => setNoSalesTax(e.target.checked)}
+                        />
+                        <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+                      </span>
+                      Sin impuesto de venta
                     </label>
                   </div>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="shelfLifeInDays">Vida útil (días)</label>
-                    <input
-                      id="shelfLifeInDays"
-                      className="ff-input"
-                      type="number"
-                      min="1"
-                      step="1"
-                      {...register('shelfLifeInDays', { valueAsNumber: true })}
-                    />
-                    <p className="ff-hint">
-                      Si se omite la fecha de vencimiento al crear un lote, se calcula sumando estos días a la fecha de fabricación.
-                    </p>
-                  </div>
                 </div>
-              )}
+
+                {watchedPriceMode === 'cost_plus' ? (
+                  <>
+                    <div className="ff-wrap">
+                      <label className="ff-label">Margen B (%) <span className="ff-required">*</span></label>
+                      <input type="number" step="0.1" min="0" max="100" className="ff-input" placeholder="Ej: 25" {...register('marginB', { valueAsNumber: true })} />
+                      {priceLabel(calcTotalFromMargin(watchedMarginB))}
+                    </div>
+                    <div className="ff-wrap">
+                      <label className="ff-label">Margen C (%)</label>
+                      <input type="number" step="0.1" min="0" max="100" className="ff-input" placeholder="Ej: 10" {...register('marginC', { valueAsNumber: true })} />
+                      {priceLabel(calcTotalFromMargin(watchedMarginC))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="ff-wrap">
+                      <label className="ff-label">Precio B — Promedio <span className="ff-required">*</span></label>
+                      <input
+                        type="number" step="0.01" min="0"
+                        className={`ff-input${errors.priceB ? ' ff-input-error' : ''}`}
+                        placeholder="0.00"
+                        {...register('priceB', { valueAsNumber: true })}
+                      />
+                      {errors.priceB && <span className="ff-error">{errors.priceB.message}</span>}
+                      {priceLabel(watchedPriceB)}
+                      <p className="ff-hint">Precio estándar (el más usado)</p>
+                    </div>
+                    <div className="ff-wrap">
+                      <label className="ff-label" style={{ color: 'var(--text-secondary)' }}>Precio C — Mínimo</label>
+                      <input type="number" step="0.01" min="0" className="ff-input" placeholder="0.00" {...register('priceC', { valueAsNumber: true })} />
+                      {priceLabel(watchedPriceC)}
+                      <p className="ff-hint">Precio al por mayor</p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <span className="ff-section-divider">Descuento</span>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 40, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 15 }}>Acepta descuento</span>
+                    <button
+                      type="button"
+                      className="ff-toggle-square"
+                      aria-pressed={watch('allowsDiscount')}
+                      aria-label="Acepta descuento"
+                      onClick={() => setValue('allowsDiscount', !watch('allowsDiscount'), { shouldDirty: true })}
+                    >
+                      {watch('allowsDiscount') ? <Minus size={14} /> : <Plus size={14} />}
+                    </button>
+                  </div>
+                  {watch('allowsDiscount') && (
+                    <div className="ff-wrap" style={{ minWidth: 180 }}>
+                      <label className="ff-label" htmlFor="maxDiscountPct">Máximo % de descuento</label>
+                      <div className="ff-input-suffix-wrap">
+                        <input
+                          id="maxDiscountPct"
+                          type="number" min="0" max="100" step="0.1"
+                          className="ff-input"
+                          {...register('maxDiscountPct', { valueAsNumber: true })}
+                        />
+                        <span className="ff-input-suffix">%</span>
+                      </div>
+                      <p className="ff-hint">Descuento máximo permitido para este artículo en documentos</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          )}
+          </div>
 
         </div>
 

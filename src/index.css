@@ -906,6 +906,7 @@ button {
   background: var(--surface-page);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
+  overflow: hidden;
   transition:
     border-color 150ms var(--ease-in-out),
     background-color var(--duration-normal) var(--ease-in-out);
@@ -1761,6 +1762,8 @@ button {
   animation: slide-in-drawer 220ms var(--ease-spring);
 }
 
+.drawer-panel-lg { max-width: min(92vw, 1180px); }
+
 @keyframes slide-in-drawer {
   from { transform: translateX(calc(100% + 10px)); }
   to { transform: translateX(0); }
@@ -1943,6 +1946,68 @@ button {
 .items-input-error { border-color: var(--error-text) !important; background: rgba(196, 30, 19, 0.04) !important; }
 .items-input-error:focus { border-color: var(--error-text); box-shadow: 0 0 0 2px rgba(196, 30, 19, 0.12); }
 
+/* ─── Combo de modo de descuento por línea ("%"/"RD$" + monto) — Factura/Cotización/Pedido ───
+   Select de modo pegado a la izquierda de un input numérico, como un único control. ─── */
+.disc-combo {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md, 6px);
+  overflow: hidden;
+  background: var(--surface-page);
+  transition: border-color 150ms var(--ease-in-out);
+}
+
+.disc-combo:focus-within { border-color: var(--border-focus); }
+.disc-combo.disc-combo-error { border-color: var(--error-text); }
+
+.disc-combo-select-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--surface-sunken);
+  border-right: 1px solid var(--border-default);
+  flex-shrink: 0;
+}
+
+.disc-combo-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  height: 32px;
+  padding: 0 20px 0 10px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  outline: none;
+}
+
+.disc-combo-chevron {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-tertiary);
+}
+
+.disc-combo-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  height: 32px;
+  padding: 0 8px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-primary);
+  text-align: center;
+  outline: none;
+}
+
 .items-total-row {
   display: flex;
   flex-direction: column;
@@ -1967,6 +2032,189 @@ button {
   color: var(--text-primary);
   min-width: 100px;
   text-align: right;
+}
+
+/* ─── Variantes navy — usadas puntualmente (ej. InvoiceForm) para calzar con el
+   resto de pantallas rediseñadas, sin tocar el estilo por defecto de .card-header,
+   .items-table ni .items-total-row que comparten decenas de otros formularios ─── */
+.card-header.navy-card-header {
+  background: var(--color-navy);
+  border-bottom: none;
+}
+
+.card-header.navy-card-header .card-title {
+  color: var(--on-dark-ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.navy-header-hint {
+  font-size: 12px;
+  color: var(--on-dark-sub);
+}
+
+.navy-header-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: var(--radius-sm, 4px);
+  background: #F2A93B;
+  color: var(--color-navy);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 150ms var(--ease-in-out);
+}
+
+.navy-header-toggle-btn[aria-expanded="true"] { transform: rotate(45deg); }
+
+/* ─── Item image upload box (ItemForm) — cuadro con borde + icono, no botón separado ─── */
+.item-image-upload {
+  width: 128px;
+  height: 148px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-page);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  overflow: hidden;
+  padding: 8px;
+  text-align: center;
+  transition: border-color 150ms var(--ease-in-out), background-color 150ms var(--ease-in-out);
+}
+
+.item-image-upload:hover { border-color: var(--teal-accent); background: var(--surface-sunken); }
+.item-image-upload img { width: 100%; height: 100%; object-fit: cover; border-radius: calc(var(--radius-lg) - 1px); }
+.item-image-upload .item-image-upload-icon { color: var(--teal-accent); }
+.item-image-upload .item-image-upload-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+
+/* ─── Pill "+" — disparadores de secciones opcionales (Variantes, Garantía, Códigos) ─── */
+.pill-plus-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.pill-plus-trigger-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-md, 6px);
+  background: var(--teal-accent);
+  border: 1.5px solid var(--teal-accent);
+  color: var(--on-dark-ink);
+  flex-shrink: 0;
+  animation: pill-plus-icon-pop 200ms var(--ease-in-out);
+  transition: background-color 150ms var(--ease-in-out), color 150ms var(--ease-in-out);
+}
+
+.pill-plus-trigger[aria-expanded="true"] .pill-plus-trigger-icon {
+  background: transparent;
+  color: var(--teal-accent);
+}
+
+@keyframes pill-plus-icon-pop {
+  0% { transform: scale(0.55); opacity: 0.3; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ─── Separador de subsección con etiqueta (ej. "PRECIO DE VENTA", "DESCUENTO") ─── */
+.ff-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.ff-section-divider::after { content: ''; flex: 1; height: 1px; background: var(--border-default); }
+
+/* ─── Toggle cuadrado (ej. "Acepta descuento") — check/uncheck de un booleano destacado,
+   más visible que un checkbox nativo dentro de una fila de formulario ─── */
+.ff-toggle-square {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--teal-accent);
+  background: transparent;
+  color: var(--teal-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 150ms var(--ease-out);
+}
+.ff-toggle-square:hover { background: color-mix(in oklch, var(--teal-accent) 14%, transparent); }
+
+/* ─── Sufijo dentro de un input (ej. "%") ─── */
+.ff-input-suffix-wrap { position: relative; display: flex; }
+.ff-input-suffix-wrap .ff-input { padding-right: 28px; }
+.ff-input-suffix {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+.items-table.navy-table thead tr { background: var(--color-navy); }
+
+.items-table.navy-table th {
+  position: relative;
+  background: transparent;
+  color: var(--on-dark-ink);
+  border-bottom: none;
+}
+
+.items-table.navy-table th:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 30%;
+  bottom: 30%;
+  right: 0;
+  width: 2px;
+  background: #ffffff;
+  opacity: 0.25;
+}
+
+.items-total-row.navy-totals {
+  background: var(--color-navy);
+  border-top: none;
+}
+
+.items-total-row.navy-totals .items-total-line { color: var(--on-dark-sub); }
+.items-total-row.navy-totals .items-total-line > span:last-child { color: var(--on-dark-ink); }
+
+.items-total-row.navy-totals .total-row-highlight,
+.items-total-row.navy-totals .total-row-highlight > span:last-child {
+  color: var(--sidebar-label);
+  font-size: 18px;
+  font-weight: 700;
 }
 
 /* ─── SEMAFORO DE CRÉDITO ─── */
