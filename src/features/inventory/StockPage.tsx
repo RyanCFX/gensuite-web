@@ -196,6 +196,7 @@ export default function StockPage() {
                 <th>Almacén</th>
                 <th>Categoría</th>
                 <SortableTh label="Stock" sortKey="currentStock" orderBy={orderBy} onSort={sort} align="right" />
+                <th style={{ textAlign: 'right' }} title="Stock físico menos lo reservado nativamente para pedidos concretos — lo que realmente se le puede prometer a un cliente nuevo ahora mismo">Disponible</th>
                 <th>Ubicación</th>
                 <th style={{ textAlign: 'right' }}>Costo Unit.</th>
                 <th style={{ textAlign: 'right' }}>Precio Venta</th>
@@ -209,7 +210,7 @@ export default function StockPage() {
               {isLoading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 12 }).map((__, j) => (
+                      {Array.from({ length: 13 }).map((__, j) => (
                         <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                       ))}
                     </tr>
@@ -217,7 +218,7 @@ export default function StockPage() {
                 : isError
                   ? (
                       <tr>
-                        <td colSpan={12} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
+                        <td colSpan={13} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
                           Error al cargar el inventario
                         </td>
                       </tr>
@@ -225,7 +226,7 @@ export default function StockPage() {
                   : items.length === 0
                     ? (
                         <tr>
-                          <td colSpan={12}>
+                          <td colSpan={13}>
                             <div className="empty-state">
                               <div className="empty-title">Sin artículos</div>
                               <p className="empty-sub">No hay artículos en inventario con los filtros seleccionados.</p>
@@ -242,6 +243,12 @@ export default function StockPage() {
                             <td className="td-muted">{item.warehouse}</td>
                             <td className="td-muted">{item.category ?? '—'}</td>
                             <td style={{ textAlign: 'right' }}>{formatNumber(item.actualQty)}</td>
+                            <td style={{ textAlign: 'right' }}>
+                              {item.disponibleParaVender != null ? formatNumber(item.disponibleParaVender) : '—'}
+                              {item.reservedStock != null && item.reservedStock > 0 && (
+                                <div className="td-muted" style={{ fontSize: 11 }}>{item.reservedStock} reservado</div>
+                              )}
+                            </td>
                             <td className="td-muted" title={item.ubicaciones && item.ubicaciones.length > 1 ? item.ubicaciones.join(', ') : undefined}>
                               {!item.ubicaciones || item.ubicaciones.length === 0
                                 ? 'Sin asignar'

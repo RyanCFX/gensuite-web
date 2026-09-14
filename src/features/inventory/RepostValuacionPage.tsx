@@ -111,7 +111,7 @@ export default function RepostValuacionPage() {
     <div className="page-container">
       <PageHeader
         title="Recálculo de Valuación de Inventario"
-        description="Repara la cola de valuación (FIFO/Moving Average) de un artículo cuando queda corrupta por movimientos retroactivos o stock negativo — usa el mecanismo nativo de ERPNext (Repost Item Valuation). Herramienta de soporte técnico, no del flujo normal de inventario."
+        description="Repara la cola de valuación (FIFO/Moving Average) de un artículo cuando queda corrupta por movimientos retroactivos o stock negativo — usa el mecanismo nativo de recálculo de valuación del sistema. Herramienta de soporte técnico, no del flujo normal de inventario."
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -150,7 +150,7 @@ export default function RepostValuacionPage() {
                   placeholder="Todos los almacenes del artículo"
                 />
                 <p className="ff-hint">
-                  Si no eliges ninguno, ERPNext recalcula el artículo en todos los almacenes donde tiene movimientos.
+                  Si no eliges ninguno, se recalcula el artículo en todos los almacenes donde tiene movimientos.
                 </p>
               </div>
             </div>

@@ -92,6 +92,18 @@ export const STOCK_STATUS_COLOR: Record<string, string> = {
   out_of_stock: 'badge--red',
 }
 
+// `voucherType` de un Stock Ledger Entry (GET /inventory/history) — los tipos de documento nativos
+// de ERPNext que sí mueven inventario. Se usa como opciones del filtro "Tipo de documento" tanto
+// en HistoryPage como en ItemHistoryDrawer — mantenerlos en un solo lugar para que no diverjan.
+export const STOCK_VOUCHER_TYPES = [
+  'Sales Invoice',
+  'Delivery Note',
+  'Purchase Invoice',
+  'Purchase Receipt',
+  'Stock Entry',
+  'Stock Reconciliation',
+] as const
+
 export const SEMAFORO_COLOR: Record<string, string> = {
   verde: 'semaforo--verde',
   amarillo: 'semaforo--amarillo',

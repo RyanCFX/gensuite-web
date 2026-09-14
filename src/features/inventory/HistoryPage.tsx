@@ -12,15 +12,10 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
+import { ItemHistoryDrawer } from './ItemHistoryDrawer'
+import { STOCK_VOUCHER_TYPES } from '@/lib/constants'
 
 const PAGE_SIZE = 30
-
-const VOUCHER_TYPES = [
-  'Stock Entry',
-  'Purchase Receipt',
-  'Delivery Note',
-  'Stock Reconciliation',
-]
 
 export default function HistoryPage() {
   const [warehouse, setWarehouse] = useState<string>('all')
@@ -30,6 +25,7 @@ export default function HistoryPage() {
   const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
+  const [selectedItem, setSelectedItem] = useState<{ itemCode: string; itemName: string; warehouse: string } | null>(null)
 
   const offset = (page - 1) * PAGE_SIZE
 
@@ -108,7 +104,7 @@ export default function HistoryPage() {
               <FilterField label="Tipo de documento">
                 <Select value={voucherType} onValueChange={(val) => { setVoucherType(val); setPage(1) }}>
                   <SelectItem value="all">Todos los tipos</SelectItem>
-                  {VOUCHER_TYPES.map((t) => (
+                  {STOCK_VOUCHER_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>{t}</SelectItem>
                   ))}
                 </Select>
@@ -178,7 +174,11 @@ export default function HistoryPage() {
                         </tr>
                       )
                     : data?.items.map((entry, i) => (
-                        <tr key={i}>
+                        <tr
+                          key={i}
+                          className="data-table-row-link"
+                          onClick={() => setSelectedItem({ itemCode: entry.itemCode, itemName: entry.itemName, warehouse: entry.warehouse })}
+                        >
                           <td>
                             <span style={{ fontWeight: 500 }}>{entry.itemName}</span>
                             <span className="td-muted" style={{ marginLeft: 6 }}>({entry.itemCode})</span>
@@ -232,6 +232,16 @@ export default function HistoryPage() {
           </div>
         )}
       </div>
+
+      {selectedItem && (
+        <ItemHistoryDrawer
+          key={selectedItem.itemCode}
+          itemCode={selectedItem.itemCode}
+          itemName={selectedItem.itemName}
+          initialWarehouse={selectedItem.warehouse}
+          onClose={() => setSelectedItem(null)}
+        />
+      )}
     </div>
   )
 }
