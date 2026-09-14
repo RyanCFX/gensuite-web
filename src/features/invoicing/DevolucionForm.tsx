@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
@@ -45,6 +45,11 @@ export default function DevolucionForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { multiTab, activeId, closeTab } = useTabs()
+  const [searchParams] = useSearchParams()
+  // Precarga desde ?invoiceId=... — usado por Despachos (§2.10) cuando el operador intenta
+  // devolver un despacho ya facturado: el servidor rechaza esa devolución y redirige acá con la
+  // factura correcta ya identificada, en vez de dejar que el usuario la busque de nuevo a mano.
+  const prefillInvoiceId = searchParams.get('invoiceId') ?? ''
 
   // ── Paso 1/2: selección de cliente → factura sometida (pagada o pendiente) ──
   // Todo vive en esta misma vista — elegir la factura no navega a otra pantalla,
@@ -80,6 +85,21 @@ export default function DevolucionForm() {
       label: i.ncf ?? i.id,
       sublabel: `${formatDate(i.postingDate)} — ${formatDOP(i.grandTotal)} — ${PAYMENT_STATUS_LABEL[i.paymentStatus ?? ''] ?? 'Sin cobro registrado'}`,
     }))
+
+  const { data: prefillInvoice } = useQuery({
+    queryKey: ['invoice', prefillInvoiceId],
+    queryFn: () => getInvoice(prefillInvoiceId),
+    enabled: !!prefillInvoiceId && !customerId,
+  })
+  useEffect(() => {
+    if (prefillInvoice && !customerId) {
+      setCustomerId(prefillInvoice.customer)
+      setCustomerLabel(prefillInvoice.customerName)
+      setInvoiceId(prefillInvoice.id)
+      setInvoiceLabel(prefillInvoice.ncf ?? prefillInvoice.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillInvoice])
 
   function changeCustomer() {
     setCustomerId('')

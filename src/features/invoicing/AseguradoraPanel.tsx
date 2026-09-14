@@ -84,13 +84,16 @@ export function AseguradoraPanel({
         </button>
         <ShieldCheck size={15} style={{ color: 'var(--icon-muted)' }} />
         <h2 className="card-title" style={{ flex: 1 }}>Aseguradora (ARS)</h2>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: readOnly ? 'default' : 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={enabled}
-            disabled={readOnly}
-            onChange={(e) => { onEnabledChange(e.target.checked); if (e.target.checked) setOpen(true) }}
-          />
+        <label className="ff-toggle-wrap" style={{ cursor: readOnly ? 'default' : 'pointer', opacity: readOnly ? 0.6 : 1 }}>
+          <span className="ff-toggle">
+            <input
+              type="checkbox"
+              checked={enabled}
+              disabled={readOnly}
+              onChange={(e) => { onEnabledChange(e.target.checked); if (e.target.checked) setOpen(true) }}
+            />
+            <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+          </span>
           Esta venta tiene cobertura de seguro
         </label>
       </div>

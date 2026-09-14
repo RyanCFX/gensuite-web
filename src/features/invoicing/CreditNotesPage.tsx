@@ -26,7 +26,8 @@ import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { esClienteEmisorNoEncontrado } from '@/lib/ecfErrors'
+import { formatDate, formatMoney } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -65,6 +66,10 @@ interface CreditNoteRow {
   appliedAmount?: number
   availableAmount?: number
   appliedTo?: CreditNoteAppliedTo[]
+  /** Heredada automáticamente de la factura original — no hay selector de moneda en este
+   *  formulario (docs/tasks/64_multimoneda_completo.md §3.4). */
+  currency?: string
+  conversionRate?: number
 }
 
 interface NoteLineItem {
@@ -317,15 +322,34 @@ export default function CreditNotesPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (dto: CreateCreditNoteDto) => createCreditNote(dto) as unknown as Promise<CreditNoteRow>,
-    onSuccess: async (note: CreditNoteRow) => {
+    // Se combinan crear+someter en un solo mutationFn (en vez de llamar submitCreditNote() dentro
+    // de onSuccess) porque un error lanzado en onSuccess de TanStack Query NO dispara onError —
+    // quedaría como una promesa rechazada sin manejar y la nota creada-pero-no-sometida no
+    // mostraría ningún error al usuario (bug encontrado durante las pruebas E2E de doc 72).
+    mutationFn: async (dto: CreateCreditNoteDto) => {
+      const note = (await createCreditNote(dto)) as unknown as CreditNoteRow
       await submitCreditNote(note.id)
-      queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
+      return note
+    },
+    onSuccess: () => {
       toast.success('Nota de crédito creada y sometida (NCF B04 asignado)')
       handleCloseModal()
     },
-    onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al crear la nota de crédito')
+    onError: (err: ApiError) => {
+      const msg = err?.message ?? 'Error al crear la nota de crédito'
+      if (esClienteEmisorNoEncontrado(msg)) {
+        toast.error(msg, {
+          duration: 10000,
+          action: { label: 'Ir a administración de e-CF', onClick: () => navigate('/config/ecf/admin') },
+        })
+        return
+      }
+      toast.error(msg)
+    },
+    onSettled: () => {
+      // También cuando falla el submit: la nota ya quedó creada (en Borrador) y debe verse en la
+      // lista aunque no se haya podido someter.
+      queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
     },
   })
 
@@ -397,7 +421,7 @@ export default function CreditNotesPage() {
   const applyInvoiceOptions: SearchSelectOption[] = (applyInvoicesData?.items ?? []).map((inv) => ({
     value: inv.id,
     label: inv.ncf ?? inv.id,
-    sublabel: `${formatDate(inv.postingDate)} — ${formatDOP(inv.grandTotal)} (${inv.status})`,
+    sublabel: `${formatDate(inv.postingDate)} — ${formatMoney(inv.grandTotal, inv.currency)} (${inv.status})`,
   }))
 
   // Para saber si applyTarget ya está aplicada a la factura seleccionada (evita el 409 del backend)
@@ -655,7 +679,7 @@ export default function CreditNotesPage() {
                   <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.returnAgainst}</td>
                   <td>{note.customerName ?? '—'}</td>
                   <td>{formatDate(note.postingDate)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(Math.abs(note.grandTotal ?? 0))}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(Math.abs(note.grandTotal ?? 0), note.currency)}</td>
                   <td>
                     <span className={`badge ${STATUS_BADGE[statusLower] ?? 'badge-neutral'}`}>
                       {STATUS_LABEL[statusLower] ?? note.status}
@@ -667,7 +691,7 @@ export default function CreditNotesPage() {
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         {note.refunded && (
-                          <span className="badge badge-success">Reembolsada: {formatDOP(note.refundedAmount ?? 0)}</span>
+                          <span className="badge badge-success">Reembolsada: {formatMoney(note.refundedAmount ?? 0, note.currency)}</span>
                         )}
                         {canAct && (
                           <>
@@ -714,7 +738,7 @@ export default function CreditNotesPage() {
                             >
                               {a.invoiceId}
                             </button>
-                            <span>— {formatDOP(a.amount)}</span>
+                            <span>— {formatMoney(a.amount, note.currency)}</span>
                             <span className={`badge ${a.status === 'reconciled' ? 'badge-success' : 'badge-warning'}`}>
                               {a.status === 'reconciled' ? 'Reconciliada' : 'Pendiente'}
                             </span>
@@ -847,7 +871,7 @@ export default function CreditNotesPage() {
                     <div style={{ marginTop: 4, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface-sunken)', fontSize: 13 }}>
                       <span style={{ fontWeight: 500 }}>{selectedInvoice.customerName}</span>
                       <span style={{ color: 'var(--text-secondary)', fontSize: 11, marginLeft: 8 }}>
-                        {selectedInvoice.ncf ?? selectedInvoice.id} — {formatDate(selectedInvoice.postingDate)} — {formatDOP(selectedInvoice.grandTotal)}
+                        {selectedInvoice.ncf ?? selectedInvoice.id} — {formatDate(selectedInvoice.postingDate)} — {formatMoney(selectedInvoice.grandTotal, selectedInvoice.currency)}
                       </span>
                     </div>
                   )}
@@ -935,8 +959,8 @@ export default function CreditNotesPage() {
                                   style={{ textAlign: 'right' }}
                                 />
                               </td>
-                              <td style={{ textAlign: 'right' }}>{formatDOP(item.rate)}</td>
-                              <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.qty * item.rate)}</td>
+                              <td style={{ textAlign: 'right' }}>{formatMoney(item.rate, selectedInvoice?.currency)}</td>
+                              <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.qty * item.rate, selectedInvoice?.currency)}</td>
                               <td>
                                 <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeNoteItem(index)}>✕</button>
                               </td>
@@ -947,7 +971,7 @@ export default function CreditNotesPage() {
                       <div className="items-total-row">
                         <div className="items-total-line" style={{ fontWeight: 700 }}>
                           <span>Total crédito</span>
-                          <span>{formatDOP(noteItems.reduce((s, i) => s + i.qty * i.rate, 0))}</span>
+                          <span>{formatMoney(noteItems.reduce((s, i) => s + i.qty * i.rate, 0), selectedInvoice?.currency)}</span>
                         </div>
                       </div>
                     </div>
@@ -987,7 +1011,7 @@ export default function CreditNotesPage() {
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                {refundTarget.id} — Total disponible: {formatDOP(Math.abs(refundTarget.grandTotal ?? 0))}
+                {refundTarget.id} — Total disponible: {formatMoney(Math.abs(refundTarget.grandTotal ?? 0), refundTarget.currency)}
               </p>
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="refundAmount">Monto a reembolsar</label>
@@ -1002,7 +1026,7 @@ export default function CreditNotesPage() {
                   onChange={(e) => setRefundAmount(parseFloat(e.target.value) || 0)}
                 />
                 {!refundAmountValid && (
-                  <p className="ff-hint" style={{ color: 'red' }}>El monto debe ser mayor a 0 y no exceder {formatDOP(Math.abs(refundTarget.grandTotal ?? 0))}</p>
+                  <p className="ff-hint" style={{ color: 'red' }}>El monto debe ser mayor a 0 y no exceder {formatMoney(Math.abs(refundTarget.grandTotal ?? 0), refundTarget.currency)}</p>
                 )}
               </div>
               <div className="ff-wrap">
@@ -1072,7 +1096,7 @@ export default function CreditNotesPage() {
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                {applyTarget.id} — Total de la nota: {formatDOP(Math.abs(applyTarget.grandTotal ?? 0))}
+                {applyTarget.id} — Total de la nota: {formatMoney(Math.abs(applyTarget.grandTotal ?? 0), applyTarget.currency)}
               </p>
 
               <div className="ff-wrap">
@@ -1102,7 +1126,7 @@ export default function CreditNotesPage() {
                 <div className="inline-alert" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Wallet size={16} />
                   <span>
-                    Esta nota ya está aplicada a esta factura por {formatDOP(alreadyAppliedToSelected.amount)}
+                    Esta nota ya está aplicada a esta factura por {formatMoney(alreadyAppliedToSelected.amount, applyTarget?.currency)}
                     {' '}
                     <span className={`badge ${alreadyAppliedToSelected.status === 'reconciled' ? 'badge-success' : 'badge-warning'}`}>
                       {alreadyAppliedToSelected.status === 'reconciled' ? 'Reconciliada' : 'Pendiente'}

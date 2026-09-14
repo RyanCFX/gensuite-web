@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   listDebitNotes,
@@ -16,7 +17,8 @@ import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii
 import { Select, SelectItem } from '@/components/ui/select'
 import { Plus, Loader2, Trash2, Download, SlidersHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { esClienteEmisorNoEncontrado } from '@/lib/ecfErrors'
+import { formatDate, formatMoney } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -49,6 +51,10 @@ interface DebitNote {
   ncf?: string
   /** NCF de la factura original afectada — distinto de `ncf`, que es el propio de la nota */
   ncfAfectado?: string | null
+  /** Con `referenceInvoice` (este formulario siempre lo manda), hereda estrictamente la moneda
+   *  de esa factura — no hay selector de moneda propio (docs/tasks/64_multimoneda_completo.md §3.5). */
+  currency?: string
+  conversionRate?: number
 }
 
 interface NoteLineItem {
@@ -69,6 +75,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export default function DebitNotesPage() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
   const { orderBy, sort } = useSortState()
@@ -176,20 +183,37 @@ export default function DebitNotesPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (dto: CreateDebitNoteDto) => createDebitNote(dto) as Promise<DebitNote>,
-    onSuccess: async (note: DebitNote) => {
+    // Crear+someter combinados en un solo mutationFn: un error lanzado dentro de onSuccess de
+    // TanStack Query NO dispara onError, así que un fallo de submitDebitNote quedaría sin mostrar
+    // ningún error al usuario (bug encontrado durante las pruebas E2E de doc 72 — mismo caso que
+    // CreditNotesPage.tsx).
+    mutationFn: async (dto: CreateDebitNoteDto) => {
+      const note = (await createDebitNote(dto)) as DebitNote
       await submitDebitNote(note.id)
-      queryClient.invalidateQueries({ queryKey: ['debit-notes'] })
+      return note
+    },
+    onSuccess: () => {
       toast.success('Nota de débito creada y sometida (NCF B03 asignado)')
       handleCloseModal()
     },
-    onError: (err: { message?: string }) => {
+    onError: (err: { message?: string; statusCode?: number; code?: string }) => {
       if (isApiErrorCode(err, ERROR_CODES.BRANCH_REQUIRED)) {
         setBranchError(true)
         toast.error(err?.message ?? 'Selecciona una sucursal')
         return
       }
-      toast.error(err?.message ?? 'Error al crear la nota de débito')
+      const msg = err?.message ?? 'Error al crear la nota de débito'
+      if (esClienteEmisorNoEncontrado(msg)) {
+        toast.error(msg, {
+          duration: 10000,
+          action: { label: 'Ir a administración de e-CF', onClick: () => navigate('/config/ecf/admin') },
+        })
+        return
+      }
+      toast.error(msg)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['debit-notes'] })
     },
   })
 
@@ -352,7 +376,7 @@ export default function DebitNotesPage() {
                   <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.customer}</td>
                   <td>{note.customerName ?? '—'}</td>
                   <td>{formatDate(note.date)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(note.grandTotal)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(note.grandTotal, note.currency)}</td>
                   <td>
                     <span className={`badge ${STATUS_BADGE[note.status] ?? 'badge-neutral'}`}>
                       {STATUS_LABEL[note.status] ?? note.status}
@@ -488,7 +512,7 @@ export default function DebitNotesPage() {
                     <div style={{ marginTop: 4, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface-sunken)', fontSize: 13 }}>
                       <span style={{ fontWeight: 500 }}>{selectedInvoice.customerName}</span>
                       <span style={{ color: 'var(--text-secondary)', fontSize: 11, marginLeft: 8 }}>
-                        {selectedInvoice.ncf ?? selectedInvoice.id} — {formatDate(selectedInvoice.postingDate)} — {formatDOP(selectedInvoice.grandTotal)}
+                        {selectedInvoice.ncf ?? selectedInvoice.id} — {formatDate(selectedInvoice.postingDate)} — {formatMoney(selectedInvoice.grandTotal, selectedInvoice.currency)}
                       </span>
                     </div>
                   )}
@@ -594,7 +618,7 @@ export default function DebitNotesPage() {
                               />
                             </td>
                             <td style={{ textAlign: 'right', fontWeight: 500 }}>
-                              {formatDOP(item.qty * item.rate)}
+                              {formatMoney(item.qty * item.rate, selectedInvoice?.currency)}
                             </td>
                             <td>
                               <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeNoteItem(index)}>
@@ -613,7 +637,7 @@ export default function DebitNotesPage() {
                     <div className="items-total-row">
                       <div className="items-total-line" style={{ fontWeight: 700 }}>
                         <span>Total débito</span>
-                        <span>{formatDOP(noteItems.reduce((s, i) => s + i.qty * i.rate, 0))}</span>
+                        <span>{formatMoney(noteItems.reduce((s, i) => s + i.qty * i.rate, 0), selectedInvoice?.currency)}</span>
                       </div>
                     </div>
                   </div>
