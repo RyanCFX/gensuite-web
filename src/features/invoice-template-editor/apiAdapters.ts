@@ -3,8 +3,9 @@
 // TemplateEditorRightPanel/TemplateEditorElementView. La API no agrupa ni da un "sample" — se
 // derivan aquí a partir del prefijo de la key (antes del primer punto).
 
-import type { CampoDisponiblePlantilla } from '@/shared/api/types'
-import type { TemplateFieldCategory } from './types'
+import type { CampoDisponiblePlantilla, GaleriaPlantillaDto } from '@/shared/api/types'
+import { fromApiType } from './typeMapping'
+import type { TemplateDocument, TemplateFieldCategory, TemplateGalleryItem } from './types'
 
 const CATEGORY_LABELS: Record<string, string> = {
   empresa: 'Empresa',
@@ -55,4 +56,22 @@ export function mapCamposToFieldCategories(campos: CampoDisponiblePlantilla[]): 
     })
   }
   return Array.from(byCategory.values())
+}
+
+// `document` viaja como blob opaco (`Record<string, unknown>` en el DTO) — mismo cast directo
+// que ya se usa para `documentJson` en el resto del módulo (ver `getPlantillaDefault` en
+// store.ts). OJO: a diferencia de `documentJson` (que siempre lo trae, porque lo escribió el
+// propio editor), el `document` del catálogo fijo de galería viene SIN `type` interno — se
+// fuerza aquí desde el `type` ya mapeado del DTO, que sí es confiable. Sin esto, `applyDocument`
+// (que usa `document.type` para decidir a qué formato aplicar la plantilla) rompe el store
+// entero al recibir `type: undefined`.
+export function mapGaleriaItemToTemplateGalleryItem(dto: GaleriaPlantillaDto): TemplateGalleryItem {
+  const type = fromApiType(dto.type)
+  return {
+    id: dto.id,
+    type,
+    name: dto.name,
+    description: dto.description,
+    document: { ...(dto.document as unknown as TemplateDocument), type },
+  }
 }

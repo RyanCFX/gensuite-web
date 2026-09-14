@@ -3,6 +3,7 @@ import { ENDPOINTS } from './endpoints'
 import type {
   CampoDisponiblePlantilla,
   CreatePlantillaImpresionDto,
+  GaleriaPlantillaDto,
   LogoPlantillaUploadResult,
   PaginatedResponse,
   PaginationParams,
@@ -64,6 +65,16 @@ export async function marcarPlantillaDefault(id: string) {
     undefined,
     NO_BODY_CONFIG,
   )
+  return unwrap(res)
+}
+
+// Catálogo fijo de diseños de referencia, igual para todos los tenants — no está paginado (sin
+// `?type=` trae todos los tipos mezclados). El ítem de farmacia (cobertura ARS) solo viene si el
+// vertical del tenant es "farmacia"; el servidor lo filtra, no hay nada que hacer del lado cliente.
+export async function getGaleriaPlantillas(type?: PlantillaApiType) {
+  const res = await client.get<{ success: true; data: GaleriaPlantillaDto[] }>(ENDPOINTS.plantillas.galeria, {
+    params: type ? { type } : undefined,
+  })
   return unwrap(res)
 }
 

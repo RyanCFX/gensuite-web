@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Plus, Pencil, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { listChequePrintTemplates } from '@/shared/api/tesoreria'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { PlantillasTabs } from '@/shared/ui/PlantillasTabs'
 
 export default function PlantillasChequePage() {
   const navigate = useNavigate()
@@ -18,7 +19,7 @@ export default function PlantillasChequePage() {
     <div className="page-container">
       <PageHeader
         title="Plantillas de Cheque"
-        description="Coordenadas para imprimir cheques sobre el papel pre-impreso de un talonario, usando el motor nativo de ERPNext"
+        description="Coordenadas para imprimir cheques sobre el papel pre-impreso de un talonario, usando el motor nativo de generación de PDF del sistema"
         action={
           <button className="btn btn-primary" onClick={() => navigate('/config/tesoreria/plantillas-cheque/nueva')}>
             <Plus size={16} />
@@ -26,11 +27,12 @@ export default function PlantillasChequePage() {
           </button>
         }
       />
+      <PlantillasTabs />
 
       <div className="inline-alert inline-alert-warn" style={{ marginBottom: 16 }}>
         <p style={{ margin: 0, fontSize: 13 }}>
-          La generación de PDF con el motor nativo de ERPNext puede fallar por un problema de
-          infraestructura conocido (resolución de assets del lado de ERPNext) — no está confirmado
+          La generación de PDF con el motor nativo del sistema puede fallar por un problema de
+          infraestructura conocido (resolución de assets del lado del servidor) — no está confirmado
           que funcione en producción. Si falla al imprimir un cheque, el mensaje de error lo
           indicará explícitamente.
         </p>
