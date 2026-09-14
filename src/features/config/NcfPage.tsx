@@ -5,7 +5,7 @@ import {
   getNcfSeries, getNcfSerie,
   createNcfSerie, updateNcfSerie,
   disableNcfSerie, enableNcfSerie,
-  getCatalogosFiscales,
+  getCatalogosFiscales, getEcfConfig,
 } from '@/shared/api/config'
 import type { NcfSerie, CreateNcfSerieDto, UpdateNcfSerieDto } from '@/shared/api/types'
 
@@ -150,7 +150,7 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
     queryFn: getCatalogosFiscales,
     staleTime: 60 * 60_000,
   })
-  const ncfTypeOptions = catalogos?.ncfTypes ?? []
+  const ncfTypeOptions = catalogos?.ncfTypesFisicos ?? []
 
   const qc = useQueryClient()
   const createMutation = useMutation({
@@ -306,7 +306,7 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
     queryFn: getCatalogosFiscales,
     staleTime: 60 * 60_000,
   })
-  const ncfTypeOptions = catalogos?.ncfTypes ?? []
+  const ncfTypeOptions = catalogos?.ncfTypesFisicos ?? []
 
   const qc = useQueryClient()
   const updateMutation = useMutation({
@@ -505,7 +505,7 @@ function DetailDrawer({ serieId }: { serieId: number; onClose?: () => void }) {
         <NcfTypeBadge type={data.ncfType} />
         <StatusBadgePill serie={data} />
         {(() => {
-          const label = catalogos?.ncfTypes.find((t) => t.value === data.ncfType)?.label
+          const label = catalogos?.ncfTypesFisicos.find((t) => t.value === data.ncfType)?.label
           return label && (
             <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
               {label}
@@ -561,7 +561,7 @@ function DetailDrawer({ serieId }: { serieId: number; onClose?: () => void }) {
         <div className="inline-alert inline-alert-warn">
           <AlertTriangle size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
           <span>
-            Esta secuencia fue <strong>agotada automáticamente</strong> por ERPNext al emitir el último número disponible.
+            Esta secuencia fue <strong>agotada automáticamente</strong> al emitir el último número disponible.
             No puede reactivarse. Crea una nueva secuencia del mismo tipo.
           </span>
         </div>
@@ -596,7 +596,7 @@ function DisableConfirmModal({
           </div>
           <p style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 12, textAlign: 'center' }}>
             Se deshabilitará la secuencia <strong>{serie.ncfType} #{serie.id}</strong>.
-            ERPNext dejará de usarla para emitir comprobantes fiscales.
+            Dejará de usarse para emitir comprobantes fiscales.
           </p>
           {warning && (
             <div className="inline-alert inline-alert-warn" style={{ fontSize: 12 }}>
@@ -643,7 +643,7 @@ function EnableConfirmModal({
         </div>
         <div className="modal-body">
           <p style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: warning ? 12 : 0, textAlign: 'center' }}>
-            Se reactivará la secuencia <strong>{serie.ncfType} #{serie.id}</strong> y ERPNext volverá a usarla.
+            Se reactivará la secuencia <strong>{serie.ncfType} #{serie.id}</strong> y volverá a usarse.
           </p>
           {warning && (
             <div className="inline-alert inline-alert-info" style={{ fontSize: 12 }}>
@@ -677,12 +677,22 @@ type ModalState =
 export default function NcfPage() {
   const qc = useQueryClient()
   const [modal, setModal] = useState<ModalState>({ type: 'none' })
-  const [tab, setTab] = useState<'fisico' | 'ecf'>('fisico')
+  const [tabOverride, setTabOverride] = useState<'fisico' | 'ecf' | null>(null)
 
   const { data: series, isLoading, isError } = useQuery({
     queryKey: ['ncf-series'],
     queryFn: getNcfSeries,
   })
+
+  const { data: ecfConfig } = useQuery({
+    queryKey: ['ecf-config'],
+    queryFn: getEcfConfig,
+    staleTime: 5 * 60_000,
+  })
+  const ecfHabilitado = ecfConfig?.habilitado ?? false
+  // Si la facturación electrónica está habilitada, "Electrónico" es la pestaña por defecto.
+  const tab = tabOverride ?? (ecfHabilitado ? 'ecf' : 'fisico')
+  const setTab = setTabOverride
 
   // ── Disable ────────────────────────────────────────────────────────────────
   const disableMutation = useMutation({
@@ -751,11 +761,13 @@ export default function NcfPage() {
       />
 
       <div className="tabs-bar" style={{ marginBottom: 16 }}>
+        {ecfHabilitado && (
+          <button type="button" className={`tab-btn${tab === 'ecf' ? ' on' : ''}`} onClick={() => setTab('ecf')}>
+            Electrónico (e-NCF)
+          </button>
+        )}
         <button type="button" className={`tab-btn${tab === 'fisico' ? ' on' : ''}`} onClick={() => setTab('fisico')}>
           Físico
-        </button>
-        <button type="button" className={`tab-btn${tab === 'ecf' ? ' on' : ''}`} onClick={() => setTab('ecf')}>
-          Electrónico (e-NCF)
         </button>
       </div>
 
@@ -781,7 +793,7 @@ export default function NcfPage() {
             <AlertCircle size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
             <span>
               La secuencia <strong>{s.ncfType} #{s.id}</strong> está vencida (venció el {formatDate(s.expirationDate)}).
-              ERPNext no bloquea la emisión, pero puede representar incumplimiento con la DGII.
+              No se bloquea la emisión, pero puede representar incumplimiento con la DGII.
             </span>
           </div>
         ))}
@@ -936,7 +948,7 @@ export default function NcfPage() {
                                   {/* Exhausted tooltip */}
                                   {status === 'exhausted' && (
                                     <span
-                                      title="Agotada automáticamente por ERPNext. No puede reactivarse."
+                                      title="Agotada automáticamente. No puede reactivarse."
                                       style={{ display: 'flex', alignItems: 'center', color: 'var(--text-tertiary)', padding: '0 4px', fontSize: 12 }}
                                     >
                                       ⚫

@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, Info, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { EcfTabs } from '@/shared/ui/EcfTabs'
 import { getEcfConfig } from '@/shared/api/config'
 import { getEcfCertificacion } from '@/shared/api/ecf'
 import type { EcfMode } from '@/shared/api/types'
@@ -44,7 +45,7 @@ function CertificacionContent({ company, activeMode }: { company: string; active
               <div className="inline-alert inline-alert-warn">
                 <AlertTriangle size={15} aria-hidden="true" style={{ flexShrink: 0 }} />
                 <span>
-                  Este tenant está en modo Producción pero aún no está certificado — no podrá habilitar
+                  Tu empresa está en modo Producción pero aún no está certificada — no podrá habilitar
                   facturación electrónica <code>live</code> hasta completar la certificación.
                 </span>
               </div>
@@ -97,10 +98,11 @@ export default function EcfCertificacionPage() {
     return (
       <div className="page-container">
         <PageHeader overline="Facturación Electrónica" title="Certificación DGII" />
+        <EcfTabs />
         <div className="empty-state" style={{ padding: '48px 0' }}>
           <span className="empty-icon" aria-hidden="true" style={{ fontSize: 24 }}>🔒</span>
           <p className="empty-title">No tienes acceso a esta sección</p>
-          <p className="empty-sub">Requiere el rol «System Manager» en este tenant.</p>
+          <p className="empty-sub">Requiere el rol «System Manager» en esta empresa.</p>
         </div>
       </div>
     )
@@ -117,6 +119,7 @@ export default function EcfCertificacionPage() {
         description="Progreso del trámite de certificación (solo lectura)"
         action={<Link className="btn btn-ghost btn-size-sm" to="/config/ecf/admin"><ShieldCheck size={14} /> Provisioning</Link>}
       />
+      <EcfTabs />
 
       <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {isLoading ? (
@@ -125,7 +128,7 @@ export default function EcfCertificacionPage() {
           <div className="inline-alert inline-alert-info">
             <Info size={15} aria-hidden="true" style={{ flexShrink: 0 }} />
             <span>
-              Este tenant todavía no está conectado a Vega. Conéctalo desde{' '}
+              Tu empresa todavía no está conectada a Vega. Conéctala desde{' '}
               <Link to="/config/ecf/admin">Provisioning</Link> para consultar la certificación.
             </span>
           </div>

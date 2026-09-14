@@ -420,7 +420,7 @@ export function EcfSequencesPanel() {
       <div className="inline-alert inline-alert-info">
         <Info size={15} aria-hidden="true" style={{ flexShrink: 0 }} />
         <span>
-          Este tenant todavía no está conectado a Vega. Conéctalo desde{' '}
+          Tu empresa todavía no está conectada a Vega. Conéctala desde{' '}
           <Link to="/config/ecf/admin">Facturación Electrónica → Avanzado</Link> para gestionar rangos e-NCF.
         </span>
       </div>

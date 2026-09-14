@@ -16,6 +16,7 @@ import type {
   UploadEcfCertificateResult,
   RegisterEcfWebhookDto,
   RegisterEcfWebhookResult,
+  UnlinkEcfClientResult,
   VoidEcfRangesDto,
   EcfCertificacion,
   EcfDiferidoItem,
@@ -119,6 +120,17 @@ export async function uploadEcfCertificate(data: UploadEcfCertificateDto, compan
     ENDPOINTS.config.ecfAdminCertificate,
     data,
     company ? { params: { company } } : undefined,
+  )
+  return unwrap(res)
+}
+
+// Desvincula el Client de Vega de una Company (borra solo el puente local — no toca nada en
+// Vega). Úsalo cuando el `vegaClientId` guardado quedó apuntando a un Client que ya no existe
+// allá ("Cliente no encontrado" al emitir un e-CF) — después de esto, createEcfClient/linkEcfClient
+// vuelven a estar disponibles para esa Company.
+export async function unlinkEcfClient(company: string) {
+  const res = await client.delete<{ success: true; data: UnlinkEcfClientResult }>(
+    ENDPOINTS.config.ecfAdminClientsByCompany(company),
   )
   return unwrap(res)
 }

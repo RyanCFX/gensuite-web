@@ -15,13 +15,15 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Check, ChevronDown, Eye, EyeOff, Info, Lock, ShieldCheck } from 'lucide-react'
+import { Check, ChevronDown, Eye, EyeOff, Info, Lock, ShieldCheck, Unlink } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { EcfTabs } from '@/shared/ui/EcfTabs'
 import { Select, SelectItem } from '@/components/ui/select'
+import { ConfirmModal } from '@/shared/ui/Modal'
 import { getEcfConfig, getEmpresa } from '@/shared/api/config'
 import {
   connectEcfApiKey, createEcfClient, uploadEcfCertificate, registerEcfWebhook,
-  listEcfClients, linkEcfClient,
+  listEcfClients, linkEcfClient, unlinkEcfClient,
 } from '@/shared/api/ecf'
 import type { ApiError, EcfClient, EcfMode } from '@/shared/api/types'
 import { useAuthStore } from '@/stores/auth.store'
@@ -41,7 +43,7 @@ function fileToBase64(file: File): Promise<string> {
 
 function handleMutationError(err: ApiError) {
   if (err?.statusCode === 403) {
-    toast.error('No tienes el rol "System Manager" en este tenant.')
+    toast.error('No tienes el rol "System Manager" en esta empresa.')
     return
   }
   toast.error(err?.message ?? 'Ocurrió un error')
@@ -432,6 +434,64 @@ function ConflictLinkPrompt({
   )
 }
 
+// "Desvincular" — DELETE /config/ecf/admin/clients/{company}. Rompe el puente local (Company ↔
+// Client de Vega) sin tocar nada en Vega — se usa cuando el vegaClientId guardado quedó apuntando
+// a un Client que ya no existe allá ("Cliente no encontrado" al intentar emitir un e-CF).
+function UnlinkClientButton({ company, rnc }: { company: string; rnc: string }) {
+  const qc = useQueryClient()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  const mutation = useMutation({
+    mutationFn: () => unlinkEcfClient(company),
+    onSuccess: (res) => {
+      toast.success(res.message)
+      setConfirmOpen(false)
+      qc.invalidateQueries({ queryKey: ['ecf-config'] })
+      qc.invalidateQueries({ queryKey: ['ecf-clients'] })
+    },
+    onError: (err: ApiError) => {
+      setConfirmOpen(false)
+      // 404 = ya estaba desvinculado (doble-click, estado desincronizado) — no-op benigno,
+      // simplemente refrescar para que la UI se corrija sola.
+      if (err?.statusCode === 404) {
+        qc.invalidateQueries({ queryKey: ['ecf-config'] })
+        qc.invalidateQueries({ queryKey: ['ecf-clients'] })
+        return
+      }
+      handleMutationError(err)
+    },
+  })
+
+  return (
+    <>
+      <button
+        type="button"
+        className="btn btn-ghost btn-size-sm"
+        style={{ color: 'var(--warning-text)' }}
+        onClick={() => setConfirmOpen(true)}
+      >
+        <Unlink size={14} /> Desvincular
+      </button>
+      <ConfirmModal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => mutation.mutate()}
+        title={`Desvincular emisor de ${company}`}
+        description={
+          `Esto va a desconectar el emisor (RNC ${rnc}) de esta compañía en el sistema. ` +
+          'No se borra nada en Vega — el Client sigue existiendo allá si todavía es válido. ' +
+          'Úsalo cuando el sistema no puede emitir comprobantes porque la conexión con Vega quedó rota ' +
+          '(por ejemplo, si el mensaje de error menciona "Cliente no encontrado"). Después de desvincular ' +
+          'vas a poder volver a conectar el emisor correcto.'
+        }
+        confirmLabel="Desvincular"
+        variant="danger"
+        loading={mutation.isPending}
+      />
+    </>
+  )
+}
+
 function CreateClientStep({
   done, locked, defaultCompany, companyRnc, existing,
 }: {
@@ -471,6 +531,9 @@ function CreateClientStep({
           </tbody>
         </table>
         <p className="ff-hint" style={{ margin: 0 }}>El emisor ya está conectado. No se puede crear un segundo emisor para la misma compañía.</p>
+        <div>
+          <UnlinkClientButton company={existing.company} rnc={existing.rnc} />
+        </div>
       </StepCard>
     )
   }
@@ -611,10 +674,11 @@ export default function EcfAdminPage() {
     return (
       <div className="page-container">
         <PageHeader overline="Facturación Electrónica" title="Avanzado" />
+        <EcfTabs />
         <div className="empty-state" style={{ padding: '48px 0' }}>
           <span className="empty-icon" aria-hidden="true" style={{ fontSize: 24 }}>🔒</span>
           <p className="empty-title">No tienes acceso a esta sección</p>
-          <p className="empty-sub">La administración de Facturación Electrónica requiere el rol «System Manager» en este tenant.</p>
+          <p className="empty-sub">La administración de Facturación Electrónica requiere el rol «System Manager» en esta empresa.</p>
         </div>
       </div>
     )
@@ -633,9 +697,10 @@ export default function EcfAdminPage() {
       <PageHeader
         overline="Facturación Electrónica"
         title={<><span className="page-title-dot" />Avanzado</>}
-        description="Conexión de este tenant con Vega — provisioning de Facturación Electrónica"
+        description="Conexión de esta empresa con Vega — provisioning de Facturación Electrónica"
         action={<Link className="btn btn-ghost btn-size-sm" to="/config/ecf"><ShieldCheck size={14} /> Ir a Administración</Link>}
       />
+      <EcfTabs />
 
       <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div className="inline-alert inline-alert-info" style={{ alignItems: 'flex-start' }}>
@@ -643,7 +708,7 @@ export default function EcfAdminPage() {
           <span>
             Pantalla de <strong>setup único</strong>, más técnica que la configuración general. Requiere que el
             operador ya tenga el RNC certificado y el archivo <code>.p12</code> firmado (proceso que se hace en el
-            panel de Vega, no aquí). <strong>Las pruebas end-to-end siguen pendientes</strong>: ningún tenant real
+            panel de Vega, no aquí). <strong>Las pruebas end-to-end siguen pendientes</strong>: ninguna empresa real
             tiene todavía una cuenta de Vega conectada.
           </span>
         </div>
