@@ -1,45 +1,47 @@
 import { client } from './client'
 import { ENDPOINTS } from './endpoints'
 
-export interface LibroDiarioRow {
-  glEntryId: string
-  postingDate: string
-  account: string
-  voucherType: string
-  voucherNo: string
-  debit: number
-  credit: number
-  balance: number
-  remarks?: string | null
-  party?: string | null
-  partyType?: string | null
-  costCenter?: string | null
+// Reporte nativo `General Ledger` de ERPNext — shape genérico `{columns, rows}`, no camelCase
+// propio (docs/tasks/61_migracion_libro_diario_mayor_general_ledger.md §2.1). Cada fila trae
+// los campos que el backend haya incluido en `columns` (snake_case, ej. `posting_date`,
+// `voucher_no`, `debit`); tratarla como bolsa genérica en vez de tipar cada fieldname.
+export interface GlReportColumn {
+  fieldname: string
+  label: string
 }
 
+export type GlReportRow = Record<string, unknown>
+
 export interface LibroDiarioData {
-  fromDate: string
-  toDate: string
-  rows: LibroDiarioRow[]
-  totalDebit: number
-  totalCredit: number
-  closingBalance: number
+  columns: GlReportColumn[]
+  rows: GlReportRow[]
   totalRows: number
 }
 
 export interface LibroDiarioResponse {
   success: true
   data: LibroDiarioData
-  meta: { fromDate: string; toDate: string }
 }
 
 export interface LibroDiarioParams {
   fromDate?: string
   toDate?: string
+  branch?: string
+  department?: string
   account?: string
   voucherNo?: string
   voucherType?: string
+  /** Requiere valor exacto (no substring) y va siempre acompañado de `partyType` — el reporte
+   *  nativo no filtra bien sin ambos (docs/tasks/61_migracion_libro_diario_mayor_general_ledger.md §3). */
   party?: string
-  groupBy?: string
+  /** "Customer" | "Supplier" — valores en inglés, no traducir. */
+  partyType?: 'Customer' | 'Supplier'
+  groupBy?:
+    | 'Group by Voucher'
+    | 'Group by Voucher (Consolidated)'
+    | 'Group by Account'
+    | 'Group by Sucursal'
+    | 'Group by Departamento'
 }
 
 export async function getLibroDiario(params?: LibroDiarioParams): Promise<LibroDiarioData> {

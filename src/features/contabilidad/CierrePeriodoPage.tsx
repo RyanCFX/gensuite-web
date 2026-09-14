@@ -317,7 +317,7 @@ export default function CierrePeriodoPage() {
                       onChange={(e) => setFormAccountHead(e.target.value)}
                       placeholder="Utilidades Retenidas - EMP"
                     />
-                    <p className="ff-hint">Cuenta de Ganancias Retenidas en ERPNext</p>
+                    <p className="ff-hint">Cuenta de Ganancias Retenidas del sistema</p>
                   </div>
 
                   <div className="ff-wrap">
@@ -359,7 +359,7 @@ export default function CierrePeriodoPage() {
                   }}>
                     <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
                     <p style={{ fontSize: 13, margin: 0, lineHeight: 1.5 }}>
-                      Al confirmar el cierre contable, ERPNext generará <strong>asientos GL irreversibles</strong> que transferirán el resultado neto del período a la cuenta de Ganancias Retenidas. <strong>Esta acción no puede deshacerse.</strong>
+                      Al confirmar el cierre contable, se generarán <strong>asientos GL irreversibles</strong> que transferirán el resultado neto del período a la cuenta de Ganancias Retenidas. <strong>Esta acción no puede deshacerse.</strong>
                     </p>
                   </div>
 
@@ -428,7 +428,7 @@ export default function CierrePeriodoPage() {
               }}>
                 <p style={{ margin: 0 }}>
                   ¿Confirmar el cierre del período <strong>{confirmTarget.closingFiscalYear}</strong>?
-                  ERPNext ejecutará los asientos contables que transfieren el resultado neto a{' '}
+                  Se ejecutarán los asientos contables que transfieren el resultado neto a{' '}
                   <strong>{confirmTarget.closingAccountHead}</strong>.{' '}
                   <strong>Esta operación NO puede deshacerse.</strong>
                 </p>
