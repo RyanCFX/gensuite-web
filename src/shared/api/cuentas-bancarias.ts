@@ -9,6 +9,7 @@ import type {
   UpdateCuentaBancariaDto,
   CuentaBancariaBalance,
   TipoCuentaBancariaOption,
+  CuentaBancariaInconsistenciaMoneda,
   PaginatedResponse,
   PaginationParams,
 } from './types'
@@ -71,4 +72,13 @@ export async function updateCuentaBancaria(id: string, data: UpdateCuentaBancari
 
 export async function deleteCuentaBancaria(id: string) {
   await client.delete(ENDPOINTS.cuentasBancarias.byId(id))
+}
+
+// Pantalla informativa/de solo lectura para administradores — ver
+// CuentaBancariaInconsistenciaMoneda en types.ts. Reeditar la cuenta con PUT la resincroniza sola.
+export async function listInconsistenciasMoneda() {
+  const res = await client.get<{ success: true; data: CuentaBancariaInconsistenciaMoneda[] }>(
+    ENDPOINTS.cuentasBancarias.inconsistenciasMoneda,
+  )
+  return unwrap(res)
 }

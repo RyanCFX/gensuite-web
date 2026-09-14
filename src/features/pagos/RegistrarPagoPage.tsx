@@ -58,12 +58,19 @@ export default function RegistrarPagoPage() {
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
 
+  // ── Multimoneda (docs/tasks/64_multimoneda_completo.md Fase 4) ─────────────
+  const [showMonedaOptions, setShowMonedaOptions] = useState(false)
+  const [conversionRate, setConversionRate] = useState<number | ''>('')
+  const [receivedAmount, setReceivedAmount] = useState<number | ''>('')
+  const [bankConversionRate, setBankConversionRate] = useState<number | ''>('')
+
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
     staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
+  const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
 
   const currentUserEmail = getUser()?.email
   const { data: currentUser } = useQuery({
@@ -262,6 +269,21 @@ export default function RegistrarPagoPage() {
   const totalAllocated = checkedRefs.reduce((s, r) => s + (computedAllocation[r.invoiceId] ?? 0), 0)
   const diff = Math.round((paidAmount - totalAllocated) * 100) / 100
 
+  // "Caso triangular" (doc 64 §4.1): si la moneda del proveedor y la del banco son ambas
+  // distintas a la base Y distintas entre sí, el backend no puede derivar un equivalente
+  // correcto sin `bankConversionRate` explícito — sin él, degrada silenciosamente a un monto
+  // sin convertir. `GET /pagos/pendientes` no expone la moneda de la factura (gap de API), así
+  // que se aproxima con `Supplier.defaultCurrency` del proveedor seleccionado (Fase 2 del doc).
+  const monedaBase = facturacionConfig?.monedaBase
+  const pagoCurrency = suppliersData?.items.find((s) => s.id === supplierId)?.defaultCurrency ?? undefined
+  const bankCurrency = cuentaSeleccionada?.currency
+  const triangularCase = !!monedaBase && !!pagoCurrency && !!bankCurrency
+    && pagoCurrency !== monedaBase && bankCurrency !== monedaBase && bankCurrency !== pagoCurrency
+  const bankConversionRateMissing = triangularCase && bankConversionRate === ''
+  // Se fuerza visible en cuanto se detecta el caso triangular, sin esperar a que el usuario
+  // pulse "Mostrar opciones de moneda" — deriva del render en vez de un efecto con setState.
+  const monedaOptionsVisible = showMonedaOptions || triangularCase
+
   // Preseleccionar el monto del pago con el pendiente de la factura pre-marcada
   // la primera vez que llegan las facturas (evita que el cajero tenga que calcularlo).
   useEffect(() => {
@@ -288,11 +310,14 @@ export default function RegistrarPagoPage() {
       // navegar (ya se navegó arriba) para no arrastrar su estado/cache si el usuario la reabre.
       if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
-    onError: (err: { message?: string }) => {
+    onError: (err: { message?: string; code?: string }) => {
       if (isApiErrorCode(err, ERROR_CODES.BRANCH_REQUIRED)) {
         setBranchError(true)
         toast.error(err?.message ?? 'Selecciona una sucursal')
         return
+      }
+      if (isApiErrorCode(err, ERROR_CODES.EXCHANGE_RATE_REQUIRED)) {
+        setShowMonedaOptions(true)
       }
       toast.error(err?.message ?? 'Error al registrar el pago')
     },
@@ -307,6 +332,11 @@ export default function RegistrarPagoPage() {
     if (!modeOfPayment) { toast.error('Selecciona un método de pago'); return }
     if (requiresBankAccount && !bankAccount) { toast.error('Selecciona una cuenta bancaria'); return }
     if (esCheque && cuentaChequesManuales && !referenceNo) { toast.error('Ingresa el número de cheque'); return }
+    if (bankConversionRateMissing) {
+      setShowMonedaOptions(true)
+      toast.error('El proveedor y el banco están en monedas distintas entre sí (y ambas distintas a la base) — ingresa la tasa de cambio al banco para poder convertir correctamente')
+      return
+    }
     if (!advancePayment && diff !== 0) {
       toast.error(
         diff > 0
@@ -331,6 +361,9 @@ export default function RegistrarPagoPage() {
       branch: branch || undefined,
       department: usaDepartamentos ? (department || undefined) : undefined,
       esCheque: esCheque || undefined,
+      conversionRate: conversionRate === '' ? undefined : conversionRate,
+      receivedAmount: receivedAmount === '' ? undefined : receivedAmount,
+      bankConversionRate: bankConversionRate === '' ? undefined : bankConversionRate,
     })
   }
 
@@ -465,6 +498,68 @@ export default function RegistrarPagoPage() {
                 onChange={(e) => setRemarks(e.target.value)}
               />
             </div>
+
+            {multimonedaHabilitada && (
+              <div className="ff-wrap">
+                {!monedaOptionsVisible ? (
+                  <button type="button" className="btn btn-ghost btn-size-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setShowMonedaOptions(true)}>
+                    Mostrar opciones de moneda
+                  </button>
+                ) : (
+                  <>
+                    <label className="ff-label">Opciones de moneda (avanzado)</label>
+                    {triangularCase && (
+                      <div className="ff-hint" style={{ color: 'var(--color-danger)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <AlertTriangle size={13} />
+                        El proveedor está en {pagoCurrency} y el banco en {bankCurrency} (ninguna es la moneda base {monedaBase}) —
+                        la tasa de cambio al banco es obligatoria para evitar un monto incorrecto.
+                      </div>
+                    )}
+                    <div className="form-row form-row-3">
+                      <div className="ff-wrap">
+                        <label className="ff-label">Tasa de cambio</label>
+                        <input
+                          type="number"
+                          min="0.0001"
+                          step="0.0001"
+                          className="ff-input"
+                          placeholder="Tasa del día (déjelo vacío para usar la configurada)"
+                          value={conversionRate}
+                          onChange={(e) => setConversionRate(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        />
+                      </div>
+                      <div className="ff-wrap">
+                        <label className="ff-label">Monto recibido en el banco</label>
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          className="ff-input"
+                          placeholder="Solo si la cuenta bancaria opera en otra moneda"
+                          value={receivedAmount}
+                          onChange={(e) => setReceivedAmount(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        />
+                      </div>
+                      <div className="ff-wrap">
+                        <label className="ff-label">
+                          Tasa de cambio al banco {triangularCase && <span className="ff-required">*</span>}
+                        </label>
+                        <input
+                          type="number"
+                          min="0.0001"
+                          step="0.0001"
+                          className="ff-input"
+                          placeholder="Solo si no hay tasa cargada"
+                          value={bankConversionRate}
+                          onChange={(e) => setBankConversionRate(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                          style={bankConversionRateMissing ? { borderColor: 'var(--color-danger)' } : undefined}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             <hr style={{ border: 'none', borderTop: '1px solid var(--border-default)', margin: '4px 0' }} />
 

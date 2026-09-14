@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { createTransferenciaInterna, listTiposDocumento } from '@/shared/api/tesoreria'
+import { getFacturacionConfig } from '@/shared/api/config'
 import type { CreateTransferenciaInternaDto, CuentaBancaria, TesoreriaLinea } from '@/shared/api/types'
 import { CuentaBancariaSelect } from './components/CuentaBancariaSelect'
 import { DistribucionCuentasEditor } from './components/DistribucionCuentasEditor'
@@ -11,7 +12,7 @@ import { CuentaContableOverrideSection } from './components/CuentaContableOverri
 import { PageHeader } from '@/components/shared/PageHeader'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
-import { formatDOP } from '@/lib/formatters'
+import { formatMoney } from '@/lib/formatters'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
@@ -39,6 +40,20 @@ export default function TransferenciaInternaForm() {
   const [cuentaBancoOrigenOverride, setCuentaBancoOrigenOverride] = useState('')
   const [cuentaBancoDestinoOverride, setCuentaBancoDestinoOverride] = useState('')
 
+  // ── Multimoneda (docs/tasks/64_multimoneda_completo.md §5.3) ──────────────
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
+  const [montoDestino, setMontoDestino] = useState<number | ''>('')
+  const [conversionRateOrigen, setConversionRateOrigen] = useState<number | ''>('')
+  const [conversionRateDestino, setConversionRateDestino] = useState<number | ''>('')
+  // Origen y destino en monedas distintas — el backend exige `montoDestino` explícito en ese
+  // caso (nunca lo calcula solo a partir de una tasa).
+  const monedasDistintas = !!cuentaOrigenObj && !!cuentaDestinoObj && cuentaOrigenObj.currency !== cuentaDestinoObj.currency
+
   // tipoDocumento es opcional acá — nunca hay ambigüedad de contrapartida, solo categoriza el listado.
   const { data: tiposData } = useQuery({
     queryKey: ['tesoreria-tipos-documento-form-transferencia'],
@@ -62,6 +77,9 @@ export default function TransferenciaInternaForm() {
       nota,
       cuentaBancoOrigenOverride,
       cuentaBancoDestinoOverride,
+      montoDestino,
+      conversionRateOrigen,
+      conversionRateDestino,
     },
     true,
   )
@@ -96,6 +114,10 @@ export default function TransferenciaInternaForm() {
       toast.error('La cuenta contable de origen y la de destino quedarían iguales — ese asiento no significaría nada. Reasigna una de las dos.')
       return
     }
+    if (monedasDistintas && !montoDestino) {
+      toast.error(`Origen (${cuentaOrigenObj?.currency}) y destino (${cuentaDestinoObj?.currency}) están en monedas distintas — indica el monto exacto que llega a destino.`)
+      return
+    }
 
     const dto: CreateTransferenciaInternaDto = {
       fecha,
@@ -104,6 +126,9 @@ export default function TransferenciaInternaForm() {
       cuentaDestino,
       descripcion: descripcion || undefined,
       monto,
+      montoDestino: monedasDistintas && montoDestino !== '' ? montoDestino : undefined,
+      conversionRateOrigen: conversionRateOrigen === '' ? undefined : conversionRateOrigen,
+      conversionRateDestino: conversionRateDestino === '' ? undefined : conversionRateDestino,
       referencias: numeroReferencia ? { numeroReferencia } : undefined,
       deducciones: deducciones.length > 0 ? deducciones : undefined,
       nota: nota || undefined,
@@ -181,6 +206,56 @@ export default function TransferenciaInternaForm() {
                 <input className="ff-input" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
               </div>
             </div>
+
+            {monedasDistintas && (
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <div className="ff-wrap" style={{ flex: 1, minWidth: 200 }}>
+                  <label className="ff-label ff-required">
+                    Monto que llega a destino ({cuentaDestinoObj?.currency})
+                  </label>
+                  <input
+                    className="ff-input"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={montoDestino}
+                    onChange={(e) => setMontoDestino(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                  />
+                  <p className="ff-hint">
+                    Origen ({cuentaOrigenObj?.currency}) y destino ({cuentaDestinoObj?.currency}) están en monedas
+                    distintas — el sistema nunca calcula esta conversión solo, indica el monto exacto acreditado.
+                  </p>
+                </div>
+                {multimonedaHabilitada && (
+                  <>
+                    <div className="ff-wrap" style={{ flex: 1, minWidth: 160 }}>
+                      <label className="ff-label">Tasa de cambio — origen</label>
+                      <input
+                        className="ff-input"
+                        type="number"
+                        min="0.0001"
+                        step="0.0001"
+                        placeholder="Solo si no hay tasa cargada"
+                        value={conversionRateOrigen}
+                        onChange={(e) => setConversionRateOrigen(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                      />
+                    </div>
+                    <div className="ff-wrap" style={{ flex: 1, minWidth: 160 }}>
+                      <label className="ff-label">Tasa de cambio — destino</label>
+                      <input
+                        className="ff-input"
+                        type="number"
+                        min="0.0001"
+                        step="0.0001"
+                        placeholder="Solo si no hay tasa cargada"
+                        value={conversionRateDestino}
+                        onChange={(e) => setConversionRateDestino(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -193,13 +268,17 @@ export default function TransferenciaInternaForm() {
               monto={monto}
               sumaExacta={false}
               label="Deducciones"
-              helpText="Reducen lo que efectivamente llega a la cuenta destino respecto a lo que sale de la cuenta origen."
+              helpText={
+                monedasDistintas
+                  ? `Reducen lo que efectivamente llega a la cuenta destino. Se asumen siempre en la moneda de ORIGEN (${cuentaOrigenObj?.currency}) — el backend rechaza una cuenta que no esté en esa moneda.`
+                  : 'Reducen lo que efectivamente llega a la cuenta destino respecto a lo que sale de la cuenta origen.'
+              }
             />
-            {monto > 0 && (
+            {monto > 0 && !monedasDistintas && (
               <p style={{ fontSize: 13, marginTop: 10 }}>
-                Sale de origen: <strong>{formatDOP(monto)}</strong>
-                {totalDeducciones > 0 && <> — Comisión: <strong>{formatDOP(totalDeducciones)}</strong></>}
-                {' '}— Llega a destino: <strong>{formatDOP(montoLlega)}</strong>
+                Sale de origen: <strong>{formatMoney(monto, cuentaOrigenObj?.currency)}</strong>
+                {totalDeducciones > 0 && <> — Comisión: <strong>{formatMoney(totalDeducciones, cuentaOrigenObj?.currency)}</strong></>}
+                {' '}— Llega a destino: <strong>{formatMoney(montoLlega, cuentaOrigenObj?.currency)}</strong>
               </p>
             )}
           </div>

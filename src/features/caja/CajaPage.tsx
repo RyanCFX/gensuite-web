@@ -1,12 +1,14 @@
 import { useState, useCallback, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { esClienteEmisorNoEncontrado, ECF_ADMIN_ROUTE } from '@/lib/ecfErrors'
 import { Search, DollarSign, ChevronLeft, ChevronRight, X, Clock } from 'lucide-react'
 import { listPendientes, cobrarFactura } from '@/shared/api/caja'
 import { getFacturacionConfig, listMetodosPago } from '@/shared/api/config'
 import { getTurnoActual } from '@/shared/api/pos'
 import { downloadInvoicePdf } from '@/shared/api/invoices'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { formatDate, formatMoney } from '@/lib/formatters'
 import { useDebounce } from '@/lib/useDebounce'
 import { PaymentLinesEditor } from '@/components/shared/PaymentLinesEditor'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -16,6 +18,8 @@ import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { usePosTicketPrinter } from '@/shared/hooks/usePosTicketPrinter'
+import { useMetodoPagoCurrencies } from '@/shared/hooks/useMetodoPagoCurrencies'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import {
   EMPTY_PAYMENT_LINES_VALUE,
   buildSubmitPayload,
@@ -30,6 +34,7 @@ import type { Invoice, CobrarFacturaDto } from '@/shared/api/types'
 const PAGE_SIZE = 20
 
 export default function CajaPage() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -58,11 +63,17 @@ export default function CajaPage() {
 
    const usaModuloPos = facturacion?.usaModuloPos ?? false
    const flujoCobro = facturacion?.flujoCobro ?? 'directo'
+   const monedaBase = facturacion?.monedaBase ?? 'DOP'
    const { tryPrintPosTicket, printTargetNode } = usePosTicketPrinter()
    const metodosActivos = (metodos ?? []).filter((m) => !m.disabled)
+   // Caja/POS nunca convierte moneda (docs/tasks/70_caja_pos_sin_soporte_multimoneda.md) — el
+   // método de pago debe operar en la MISMA moneda de la factura que se está cobrando.
+   const metodoCurrencies = useMetodoPagoCurrencies(metodosActivos, monedaBase)
+   const selectedInvoiceCurrency = selectedInvoice?.currency ?? monedaBase
+   const metodosCompatibles = metodosActivos.filter((m) => (metodoCurrencies[m.name] ?? monedaBase) === selectedInvoiceCurrency)
    const pendientes = data?.items ?? []
    const [directoMopSearch, setDirectoMopSearch] = useState('')
-   const directoMopOptions: SearchSelectOption[] = metodosActivos
+   const directoMopOptions: SearchSelectOption[] = metodosCompatibles
      .filter((m) => !directoMopSearch || m.name.toLowerCase().includes(directoMopSearch.toLowerCase()))
      .map((m) => ({ value: m.name, label: m.name }))
    const totalPages = data?.meta ? Math.ceil((data.meta.total ?? 0) / PAGE_SIZE) : 1
@@ -119,7 +130,7 @@ const [directoMop, setDirectoMop] = useState('')
       if (res.fullyPaid) {
         toast.success(`Factura ${invoiceId} saldada`)
       } else {
-        toast.success(`Cobro parcial: nuevo saldo ${formatDOP(res.outstandingAmount)}`)
+        toast.success(`Cobro parcial: nuevo saldo ${formatMoney(res.outstandingAmount, selectedInvoiceCurrency)}`)
       }
       closeModal()
       queryClient.invalidateQueries({ queryKey: ['caja-pendientes'] })
@@ -144,7 +155,22 @@ const [directoMop, setDirectoMop] = useState('')
       }
     },
     onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al procesar el cobro')
+      // El mensaje del backend ya es específico y accionable para este código (doc 70) — no hace
+      // falta un texto genérico distinto, solo asegurarse de mostrarlo tal cual en vez de caer al
+      // fallback genérico de otros errores.
+      if (isApiErrorCode(err, ERROR_CODES.POS_PAYMENT_CURRENCY_MISMATCH)) {
+        toast.error(err.message, { duration: 8000 })
+        return
+      }
+      const msg = err?.message ?? 'Error al procesar el cobro'
+      if (esClienteEmisorNoEncontrado(msg)) {
+        toast.error(msg, {
+          duration: 10000,
+          action: { label: 'Ir a administración de e-CF', onClick: () => navigate(ECF_ADMIN_ROUTE) },
+        })
+        return
+      }
+      toast.error(msg)
     },
   })
 
@@ -164,12 +190,17 @@ function openModal(invoice: Invoice) {
        setDirectoMop('')
        setDirectoAmount(String(invoice.outstandingAmount))
      } else {
+       // El método de caja por defecto del turno solo se prellena si opera en la misma moneda
+       // que esta factura — si no (ej. turno en DOP, factura en USD), se deja en blanco para que
+       // el cajero elija un método compatible en vez de mostrar una selección inválida.
        const cashMethod = turno?.modeOfPayment ?? turno?.modoPagoCaja ?? ''
+       const invoiceCurrency = invoice.currency ?? monedaBase
+       const cashMethodCurrency = metodoCurrencies[cashMethod] ?? monedaBase
        setPaymentsValue({
          ...EMPTY_PAYMENT_LINES_VALUE,
          payments: [{
            ...emptyPaymentLine(),
-           modeOfPayment: cashMethod,
+           modeOfPayment: cashMethodCurrency === invoiceCurrency ? cashMethod : '',
            amount: String(invoice.outstandingAmount),
          }],
        })
@@ -197,7 +228,7 @@ function validateAndSubmit() {
        if (!directoMop) { toast.error('Selecciona un método de pago'); return }
        const amount = Number(directoAmount)
        if (!amount || amount <= 0) { toast.error('El monto debe ser mayor a 0'); return }
-       if (amount > outstanding) { toast.error(`El monto no puede exceder ${formatDOP(outstanding)}`); return }
+       if (amount > outstanding) { toast.error(`El monto no puede exceder ${formatMoney(outstanding, selectedInvoiceCurrency)}`); return }
        const dto: CobrarFacturaDto = {
          payments: [{ modeOfPayment: directoMop, amount }],
          condicionFiscal,
@@ -212,7 +243,7 @@ function validateAndSubmit() {
      if (validLines.length === 0) { toast.error('Agrega al menos una línea de pago válida'); return }
      const total = sumPayments(paymentsValue.payments)
      if (total > outstanding + PAYMENT_LINES_TOLERANCE) {
-       toast.error(`La suma de pagos (${formatDOP(total)}) excede el saldo pendiente (${formatDOP(outstanding)})`)
+       toast.error(`La suma de pagos (${formatMoney(total, selectedInvoiceCurrency)}) excede el saldo pendiente (${formatMoney(outstanding, selectedInvoiceCurrency)})`)
        return
      }
 
@@ -222,7 +253,7 @@ function validateAndSubmit() {
        if (tenderedCash <= 0) { toast.error('Indica el efectivo entregado por el cliente'); return }
        if (cash <= 0) { toast.error('No hay pagos en efectivo para registrar vuelto'); return }
        if (tenderedCash < cash - PAYMENT_LINES_TOLERANCE) {
-         toast.error('El efectivo entregado (RD$' + String(tenderedCash.toFixed(2)) + ') es menor al total de pagos en efectivo (RD$' + String(cash.toFixed(2)) + ')'); return
+         toast.error(`El efectivo entregado (${formatMoney(tenderedCash, selectedInvoiceCurrency)}) es menor al total de pagos en efectivo (${formatMoney(cash, selectedInvoiceCurrency)})`); return
        }
      }
 
@@ -253,7 +284,7 @@ function validateAndSubmit() {
     const total = sumPayments(paymentsValue.payments)
     const remaining = outstanding - total
     if (Math.abs(remaining) < PAYMENT_LINES_TOLERANCE) return 'No quedará saldo pendiente'
-    if (remaining > 0) return `Quedará un saldo pendiente de ${formatDOP(remaining)}`
+    if (remaining > 0) return `Quedará un saldo pendiente de ${formatMoney(remaining, selectedInvoiceCurrency)}`
     return ''
   }
 
@@ -345,10 +376,10 @@ function validateAndSubmit() {
                         <td className="td-muted">{inv.ncf || '—'}</td>
                         <td className="td-muted">{formatDate(inv.postingDate)}</td>
                         <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-                          {formatDOP(inv.grandTotal)}
+                          {formatMoney(inv.grandTotal, inv.currency ?? monedaBase)}
                         </td>
                         <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--color-error)' }}>
-                          {formatDOP(inv.outstandingAmount)}
+                          {formatMoney(inv.outstandingAmount, inv.currency ?? monedaBase)}
                         </td>
                         <td>
                           <button className="btn btn-primary btn-size-xs" onClick={() => openModal(inv)}>
@@ -398,13 +429,13 @@ function validateAndSubmit() {
                  <span style={{ color: 'var(--text-secondary)' }}>NCF:</span>
                  <span>{selectedInvoice.ncf || '—'}</span>
                  <span style={{ color: 'var(--text-secondary)' }}>Total factura:</span>
-                 <span>{formatDOP(selectedInvoice.grandTotal)}</span>
+                 <span>{formatMoney(selectedInvoice.grandTotal, selectedInvoiceCurrency)}</span>
                  <span style={{ color: 'var(--color-error)', fontWeight: 600 }}>Saldo pendiente:</span>
-                 <span style={{ color: 'var(--color-error)', fontWeight: 600 }}>{formatDOP(selectedInvoice.outstandingAmount)}</span>
+                 <span style={{ color: 'var(--color-error)', fontWeight: 600 }}>{formatMoney(selectedInvoice.outstandingAmount, selectedInvoiceCurrency)}</span>
                </div>
                {!!selectedInvoice.roundingAdjustment && (
                  <p style={{ margin: 0, fontSize: 11, color: 'var(--text-tertiary)' }}>
-                   El saldo pendiente incluye un ajuste por redondeo de {selectedInvoice.roundingAdjustment > 0 ? '+' : ''}{formatDOP(selectedInvoice.roundingAdjustment)}.
+                   El saldo pendiente incluye un ajuste por redondeo de {selectedInvoice.roundingAdjustment > 0 ? '+' : ''}{formatMoney(selectedInvoice.roundingAdjustment, selectedInvoiceCurrency)}.
                  </p>
                )}
 
@@ -436,7 +467,7 @@ function validateAndSubmit() {
                      />
                      {Number(directoAmount) > 0 && Number(directoAmount) < selectedInvoice.outstandingAmount && (
                        <p className="ff-hint" style={{ marginTop: 4 }}>
-                         Cobro parcial — quedará un saldo pendiente de {formatDOP(selectedInvoice.outstandingAmount - Number(directoAmount))}
+                         Cobro parcial — quedará un saldo pendiente de {formatMoney(selectedInvoice.outstandingAmount - Number(directoAmount), selectedInvoiceCurrency)}
                        </p>
                      )}
                    </div>
@@ -447,12 +478,13 @@ function validateAndSubmit() {
                    <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: 0, lineHeight: 1.5 }}>
                      El monto de cada línea de pago es lo que se aplica a la factura.
                      Si el cliente entrega más efectivo del que se aplica, registra el excedente en <strong>"Efectivo entregado"</strong> más abajo.
-                     La suma no puede exceder <strong>{formatDOP(selectedInvoice.outstandingAmount)}</strong> (saldo pendiente).
+                     La suma no puede exceder <strong>{formatMoney(selectedInvoice.outstandingAmount, selectedInvoiceCurrency)}</strong> (saldo pendiente).
                    </p>
                    <PaymentLinesEditor
                      amountDue={selectedInvoice.outstandingAmount}
                      value={paymentsValue}
                      onChange={setPaymentsValue}
+                     currency={selectedInvoiceCurrency}
                    />
                    {sumPayments(paymentsValue.payments) > 0 && (
                      <p style={{ fontSize: 13, margin: 0, color: 'var(--text-secondary)' }}>
@@ -470,10 +502,11 @@ function validateAndSubmit() {
                  onClick={validateAndSubmit}
                  disabled={cobrarMutation.isPending || (flujoCobro === 'caja' && !canSubmitCaja)}
                >
-                 {cobrarMutation.isPending ? 'Procesando…' : `Cobrar ${formatDOP(
+                 {cobrarMutation.isPending ? 'Procesando…' : `Cobrar ${formatMoney(
                    flujoCobro === 'directo'
                      ? Number(directoAmount) || 0
-                     : sumPayments(paymentsValue.payments)
+                     : sumPayments(paymentsValue.payments),
+                   selectedInvoiceCurrency,
                  )}`}
                 </button>
               </div>

@@ -8,7 +8,7 @@ import {
 import {
   TrendingUp, TrendingDown, ShoppingCart, Box, Zap, Package, BarChart3, ArrowUp,
 } from 'lucide-react'
-import { formatDOP, formatShortDate, formatDateTime, formatNumber, daysSince, displayId } from '@/lib/formatters'
+import { formatMoney, formatShortDate, formatDateTime, formatNumber, daysSince, displayId } from '@/lib/formatters'
 import {
   getDashboardData,
   type DashboardPeriod,
@@ -39,10 +39,12 @@ function pct(numerator: number, denominator: number) {
   return (numerator / denominator) * 100
 }
 
-function ChartTooltipContent({ active, payload, label }: {
+function ChartTooltipContent({ active, payload, label, currency }: {
   active?: boolean
   payload?: { name: string; value: number; color: string }[]
   label?: string
+  /** Moneda base de la compañía (`kpis.currency`) — estos gráficos son agregados en moneda base, no por documento. */
+  currency?: string
 }) {
   if (!active || !payload?.length) return null
   return (
@@ -50,7 +52,7 @@ function ChartTooltipContent({ active, payload, label }: {
       <p style={{ color: 'var(--dash-ink-400)', marginBottom: 6, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
       {payload.map((p) => (
         <p key={p.name} style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', fontSize: 13, color: p.color, marginBottom: 2 }}>
-          {p.name}: {formatDOP(Math.abs(p.value))}
+          {p.name}: {formatMoney(Math.abs(p.value), currency)}
         </p>
       ))}
     </div>
@@ -71,9 +73,11 @@ function ChartPlaceholder({ title, sub }: { title: string; sub: string }) {
 // mixto (positiva/negativa) en la misma categoría produce barras cuya altura no coincide con
 // la escala real del eje Y — a veces ni se renderizan según la cantidad de categorías. Es un
 // bug de la librería, no de los datos. Con SVG propio controlamos la escala nosotros mismos.
-function DivergingBarChart({ data, height = 220 }: {
+function DivergingBarChart({ data, height = 220, currency }: {
   data: { label: string; ingresos: number; gastos: number }[]
   height?: number
+  /** Moneda base de la compañía (`kpis.currency`). */
+  currency?: string
 }) {
   const viewW = 600
   const padLeft = 34
@@ -115,12 +119,12 @@ function DivergingBarChart({ data, height = 220 }: {
           <g key={d.label}>
             {ingresosH > 0 && (
               <rect x={x} y={midY - ingresosH} width={barW} height={ingresosH} rx={4} fill="var(--dash-mint)">
-                <title>{`Ingresos ${d.label}: ${formatDOP(d.ingresos)}`}</title>
+                <title>{`Ingresos ${d.label}: ${formatMoney(d.ingresos, currency)}`}</title>
               </rect>
             )}
             {gastosH > 0 && (
               <rect x={x} y={midY} width={barW} height={gastosH} rx={4} fill="var(--dash-teal)">
-                <title>{`Gastos ${d.label}: ${formatDOP(d.gastos)}`}</title>
+                <title>{`Gastos ${d.label}: ${formatMoney(d.gastos, currency)}`}</title>
               </rect>
             )}
             <text x={cx} y={height - 4} textAnchor="middle" fontSize={10} fill="var(--dash-ink-400)">{d.label}</text>
@@ -224,6 +228,11 @@ export default function DashboardPage() {
     : []
   const hasIgData = igChartData.some((d) => d.ingresos > 0 || d.gastos > 0)
 
+  // Moneda base real de la compañía (antes se asumía 'DOP' fijo) — ver
+  // docs/tasks/64_multimoneda_completo.md §6.2. Los KPIs y los gráficos agregados (ventas,
+  // ingresos/gastos, top productos) están en esta moneda; `recentActivity` es la excepción, cada
+  // fila trae su propia moneda porque es la ficha de un documento puntual, no un agregado.
+  const currency   = kpis?.currency
   const ventas     = kpis?.totalVentas ?? 0
   const cobrado    = kpis?.totalCobrado ?? 0
   const gastos     = kpis?.totalGastos ?? 0
@@ -290,7 +299,7 @@ export default function DashboardPage() {
                 <span className="kpi-icon"><TrendingUp size={14} /></span>
                 <span className="kpi-label">Total Ventas</span>
               </div>
-              <div className="kpi-value">{formatDOP(ventas)}</div>
+              <div className="kpi-value">{formatMoney(ventas, currency)}</div>
               <div className="kpi-caption">
                 <span className="kpi-caption-tone" data-tone="neutral">{numFacturas} {numFacturas === 1 ? 'factura' : 'facturas'}</span>
                 <span>del período</span>
@@ -302,7 +311,7 @@ export default function DashboardPage() {
                 <span className="kpi-icon"><ShoppingCart size={14} /></span>
                 <span className="kpi-label">Ingresos</span>
               </div>
-              <div className="kpi-value">{formatDOP(cobrado)}</div>
+              <div className="kpi-value">{formatMoney(cobrado, currency)}</div>
               <div className="kpi-caption">
                 <span className="kpi-caption-tone" data-tone="success"><TrendingUp size={11} />{cobradoPct.toFixed(1)}%</span>
                 <span>de ventas cobradas</span>
@@ -314,7 +323,7 @@ export default function DashboardPage() {
                 <span className="kpi-icon" style={{ fontSize: 12, fontWeight: 700, lineHeight: 1, padding: '5px 6px' }}>$</span>
                 <span className="kpi-label">Gastos</span>
               </div>
-              <div className="kpi-value">{formatDOP(gastos)}</div>
+              <div className="kpi-value">{formatMoney(gastos, currency)}</div>
               <div className="kpi-caption">
                 <span className="kpi-caption-tone" data-tone="warning"><TrendingDown size={11} />{gastosPct.toFixed(1)}%</span>
                 <span>de ventas</span>
@@ -326,7 +335,7 @@ export default function DashboardPage() {
                 <span className="kpi-icon" style={{ fontSize: 12, fontWeight: 700, lineHeight: 1, padding: '5px 6px' }}>$</span>
                 <span className="kpi-label">Cuentas por Cobrar</span>
               </div>
-              <div className="kpi-value">{formatDOP(pendiente)}</div>
+              <div className="kpi-value">{formatMoney(pendiente, currency)}</div>
               <div className="kpi-caption">
                 <span className="kpi-caption-tone" data-tone="warning"><TrendingUp size={11} />{pendientePct.toFixed(1)}%</span>
                 <span>de ventas pendiente</span>
@@ -338,7 +347,7 @@ export default function DashboardPage() {
                 <span className="kpi-icon"><Box size={14} /></span>
                 <span className="kpi-label">Utilidad</span>
               </div>
-              <div className="kpi-value" data-colored={isPositive ? 'success' : 'error'}>{formatDOP(utilidad)}</div>
+              <div className="kpi-value" data-colored={isPositive ? 'success' : 'error'}>{formatMoney(utilidad, currency)}</div>
               <div className="kpi-caption">
                 <span className="kpi-caption-tone" data-tone={isPositive ? 'success' : 'error'}>
                   {isPositive ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
@@ -391,7 +400,7 @@ export default function DashboardPage() {
                           tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
                           width={40}
                         />
-                        <Tooltip content={<ChartTooltipContent />} cursor={{ stroke: 'var(--dash-border-2)', strokeWidth: 1, strokeDasharray: '4 2' }} />
+                        <Tooltip content={<ChartTooltipContent currency={currency} />} cursor={{ stroke: 'var(--dash-border-2)', strokeWidth: 1, strokeDasharray: '4 2' }} />
                         <Area
                           type="monotone" dataKey="sales" name="Ventas"
                           stroke="var(--dash-mint)" strokeWidth={2.5} fill="url(#salesGradient)"
@@ -426,20 +435,20 @@ export default function DashboardPage() {
                 ) : (
                   <div className="dash-chart-secondary-body">
                     <div className="ig-chart-wrap">
-                      <DivergingBarChart data={igChartData} height={220} />
+                      <DivergingBarChart data={igChartData} height={220} currency={currency} />
                     </div>
                     <div className="ig-summary">
                       <div>
-                        <div className="ig-summary-value">{formatDOP(data?.totalGanancias ?? 0)}</div>
+                        <div className="ig-summary-value">{formatMoney(data?.totalGanancias ?? 0, currency)}</div>
                         <div className="ig-summary-label">Total Ganancias</div>
                       </div>
                       <div className="ig-summary-row" data-tone="success">
                         <div className="ig-summary-row-label">Ingresos este mes</div>
-                        <div className="ig-summary-row-value">{formatDOP(data?.ingresosEsteMes ?? 0)}</div>
+                        <div className="ig-summary-row-value">{formatMoney(data?.ingresosEsteMes ?? 0, currency)}</div>
                       </div>
                       <div className="ig-summary-row" data-tone="dark">
                         <div className="ig-summary-row-label">Gastos este mes</div>
-                        <div className="ig-summary-row-value">{formatDOP(data?.gastosEsteMes ?? 0)}</div>
+                        <div className="ig-summary-row-value">{formatMoney(data?.gastosEsteMes ?? 0, currency)}</div>
                       </div>
                     </div>
                   </div>
@@ -494,7 +503,7 @@ export default function DashboardPage() {
                           <div className="list-row-sub">{row.itemCode}</div>
                         </div>
                         <div className="list-row-meta">
-                          <div className="list-row-value">{formatDOP(row.amount)}</div>
+                          <div className="list-row-value">{formatMoney(row.amount, currency)}</div>
                           <div className="list-row-sub">{formatNumber(row.qty)} unid. · {row.percentage.toFixed(1)}% del total</div>
                         </div>
                       </div>
@@ -544,7 +553,7 @@ export default function DashboardPage() {
                               {item.description}
                             </td>
                             <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: isOutflow ? 'var(--dash-rose)' : 'var(--dash-ink-800)' }}>
-                              {isOutflow ? '-' : ''}{formatDOP(item.amount)}
+                              {isOutflow ? '-' : ''}{formatMoney(item.amount, item.currency)}
                             </td>
                           </tr>
                         )

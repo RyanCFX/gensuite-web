@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { createSupplier, updateSupplier } from '@/shared/api/suppliers'
 import { listRetenciones } from '@/shared/api/retenciones'
 import type { ApiError, Supplier, CreateProveedorDto, UpdateProveedorDto } from '@/shared/api/types'
-import { listGruposProveedores, getCatalogosFiscales, listPaises, listBancos, listImpuestosCompras } from '@/shared/api/config'
+import { listGruposProveedores, getCatalogosFiscales, listPaises, listBancos, listImpuestosCompras, getFacturacionConfig } from '@/shared/api/config'
 import { validateRNCDetailed, validateCedulaDetailed, formatRNC, formatCedula } from '@/lib/validators/dgii'
 import { TIPO_IDENTIFICACION } from '@/lib/constants'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -42,6 +42,7 @@ const schema = z
     defaultFormaPago606: z.string().optional(),
     defaultTipoPagoProveedor: z.string().optional(),
     cuentaCxpDefault: z.string().optional(),
+    defaultCurrency: z.string().optional(),
     retencionesDefault: z.array(z.string()).optional(),
     impuestoComprasDefault: z.array(z.string()).optional(),
     impuestoGastosDefault: z.array(z.string()).optional(),
@@ -79,6 +80,15 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
     queryFn: listGruposProveedores,
     staleTime: 60_000,
   })
+
+  // ── Multimoneda (docs/tasks/64_multimoneda_completo.md Fase 2) ────────────
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
+  const monedasHabilitadas = facturacionConfig?.monedasHabilitadas ?? ['DOP']
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
@@ -178,6 +188,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
       defaultFormaPago606: '',
       defaultTipoPagoProveedor: '',
       cuentaCxpDefault: '',
+      defaultCurrency: '',
       retencionesDefault: [],
       impuestoComprasDefault: [],
       impuestoGastosDefault: [],
@@ -210,6 +221,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
         defaultFormaPago606: supplier.defaultFormaPago606 ?? '',
         defaultTipoPagoProveedor: supplier.defaultTipoPagoProveedor ?? '',
         cuentaCxpDefault: supplier.cuentaCxpDefault ?? '',
+        defaultCurrency: supplier.defaultCurrency ?? '',
         retencionesDefault: (supplier.retencionesDefault ?? []).map((d) => d.id),
         impuestoComprasDefault: (supplier.impuestoComprasDefault ?? []).map((d) => d.id),
         impuestoGastosDefault: (supplier.impuestoGastosDefault ?? []).map((d) => d.id),
@@ -241,6 +253,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
         defaultFormaPago606: data.defaultFormaPago606 || undefined,
         defaultTipoPagoProveedor: (data.defaultTipoPagoProveedor || undefined) as 'Contado' | 'Crédito' | undefined,
         cuentaCxpDefault: data.cuentaCxpDefault || undefined,
+        defaultCurrency: data.defaultCurrency || undefined,
         retencionesDefault: data.retencionesDefault && data.retencionesDefault.length > 0 ? data.retencionesDefault : undefined,
         impuestoComprasDefault: data.impuestoComprasDefault ?? [],
         impuestoGastosDefault: data.impuestoGastosDefault ?? [],
@@ -280,7 +293,10 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
 
   const onSubmit = (values: FormValues) => {
     if (isEdit) {
-      updateMutation.mutate(values)
+      // A diferencia del resto de los campos de este PUT, `defaultCurrency` es un enum
+      // restringido en el backend (DOP/USD/EUR) — un '' sin tocar se rechazaría con
+      // CURRENCY_NOT_SUPPORTED en vez de tratarse como "no enviado".
+      updateMutation.mutate({ ...values, defaultCurrency: values.defaultCurrency || undefined })
     } else {
       createMutation.mutate(values)
     }
@@ -627,6 +643,27 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                     </Select>
                   )}
                 />
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Moneda por Defecto</label>
+                <Controller
+                  name="defaultCurrency"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value ?? ''} onValueChange={field.onChange} placeholder={`Heredar (${monedaBase})`}>
+                      <SelectItem value="">Heredar ({monedaBase})</SelectItem>
+                      {(['DOP', 'USD', 'EUR'] as const).map((c) => (
+                        <SelectItem key={c} value={c} disabled={!monedasHabilitadas.includes(c)}>
+                          {c}{!monedasHabilitadas.includes(c) ? ' (habilítela primero en Monedas)' : ''}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                  )}
+                />
+                <p className="ff-hint">
+                  Prellena la moneda al pagarle a este proveedor. Al fijarla, se autopobla su cuenta CxP en esa
+                  moneda (salvo que elijas una "Cuenta CxP Alterna" explícita abajo).
+                </p>
               </div>
               <div className="ff-wrap">
                 <label className="ff-label">Cuenta CxP Alterna</label>

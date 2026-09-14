@@ -49,6 +49,25 @@ export function formatDOP(amount?: number | null, opts?: { trimZeros?: boolean }
   }).format(amount)
 }
 
+/** Igual que `formatDOP` pero para cualquiera de las 3 monedas soportadas (DOP/USD/EUR) — ver
+ *  docs/tasks/64_multimoneda_completo.md. Mantiene el estilo es-DO (agrupación/decimales)
+ *  independientemente de la moneda, solo cambia el símbolo (ej. "US$1,234.56"). Un código no
+ *  reconocido cae a DOP. */
+export function formatMoney(amount?: number | null, currency?: string | null, opts?: { trimZeros?: boolean }): string {
+  const code = currency === 'USD' || currency === 'EUR' ? currency : 'DOP'
+  if (amount == null) amount = 0
+  return new Intl.NumberFormat('es-DO', {
+    style: 'currency',
+    currency: code,
+    // 'symbol' (default) da "RD$"/"US$" correctamente para DOP/USD, pero en locale es-DO
+    // renderiza EUR como el texto literal "EUR" en vez de "€" — 'narrowSymbol' sí da "€", pero a
+    // cambio colapsa DOP y USD al mismo "$" ambiguo. Por eso solo se usa narrowSymbol para EUR.
+    currencyDisplay: code === 'EUR' ? 'narrowSymbol' : 'symbol',
+    minimumFractionDigits: opts?.trimZeros ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
 /** Redondea a 2 decimales — usar para mostrar precios crudos sin arrastrar residuos de punto flotante. */
 export function round2(n: number): number {
   return Math.round(n * 100) / 100

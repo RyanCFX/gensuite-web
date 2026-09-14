@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
@@ -12,11 +12,13 @@ import {
   getCuentaBancariaBalance,
   listBancosCatalogo,
   listTiposCuentaBancaria,
+  listInconsistenciasMoneda,
 } from '@/shared/api/cuentas-bancarias'
 import { listChequePrintTemplates } from '@/shared/api/tesoreria'
-import { listCurrencies } from '@/shared/api/config'
-import type { CuentaBancaria, CuentaBancariaEstado, ChequeFormat } from '@/shared/api/types'
-import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, Wallet } from 'lucide-react'
+import { getCuenta } from '@/shared/api/cuentas'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
+import type { CuentaBancaria, CuentaBancariaEstado, ChequeFormat, MonedaCode } from '@/shared/api/types'
+import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, Wallet, ShieldAlert } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { useDebounce } from '@/lib/useDebounce'
@@ -25,14 +27,18 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { FilterField } from '@/shared/ui/FilterField'
-import { formatDOP } from '@/lib/formatters'
+import { formatMoney } from '@/lib/formatters'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { usePuede } from '@/shared/permissions/can'
 
 const PAGE_SIZE = 20
 
 const ESTADOS: CuentaBancariaEstado[] = ['Activa', 'Inactiva', 'Cerrada']
 const CHEQUE_FORMATS: ChequeFormat[] = ['Estándar', 'Voucher', 'Media Carta', 'Cartera']
+// Universo cerrado de monedas soportadas por el módulo /monedas (docs/tasks/64_multimoneda_completo.md
+// §0.1) — no confundir con el catálogo abierto GET /config/currencies que usan Compras/Gastos.
+const MONEDA_OPTIONS: MonedaCode[] = ['DOP', 'USD', 'EUR']
 
 const cuentaBancariaSchema = z.object({
   accountName: z.string().min(1, 'El nombre es requerido'),
@@ -114,12 +120,6 @@ export default function CuentasBancariasPage() {
     enabled: dialogOpen,
   })
 
-  const { data: currencies } = useQuery({
-    queryKey: ['currencies'],
-    queryFn: listCurrencies,
-    enabled: dialogOpen,
-    staleTime: 60 * 60_000,
-  })
   const [bankSearch, setBankSearch] = useState('')
   const bankOptions: SearchSelectOption[] = (bancos ?? [])
     .filter((b) => !bankSearch || b.name.toLowerCase().includes(bankSearch.toLowerCase()))
@@ -143,6 +143,7 @@ export default function CuentasBancariasPage() {
     reset,
     watch,
     setError,
+    setValue,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<CuentaBancariaFormValues>({
     resolver: zodResolver(cuentaBancariaSchema),
@@ -150,11 +151,40 @@ export default function CuentasBancariasPage() {
   })
 
   const chequesManualesValue = watch('chequesManuales')
+  const accountValue = watch('account')
+
+  // La moneda REAL de una cuenta bancaria es siempre la de su cuenta contable (GL) vinculada —
+  // nunca un campo editable libre (docs/tasks/64_multimoneda_completo.md §5.6). Se deriva aquí
+  // de la cuenta contable elegida y se bloquea el selector de moneda; el backend igual la
+  // valida/rechaza con BANK_ACCOUNT_CURRENCY_MISMATCH_GL como defensa adicional.
+  const { data: cuentaContableSeleccionada } = useQuery({
+    queryKey: ['cuenta-contable-currency', accountValue],
+    queryFn: () => getCuenta(accountValue),
+    enabled: !!accountValue,
+    staleTime: 5 * 60_000,
+  })
+  useEffect(() => {
+    if (cuentaContableSeleccionada) {
+      setValue('currency', cuentaContableSeleccionada.currency, { shouldValidate: true, shouldDirty: true })
+    }
+  }, [cuentaContableSeleccionada, setValue])
   // Requerido cuando pasa a automático y no hay ya un ultimoCheque guardado en la cuenta (creación,
   // o edición cambiando de manual a automático sin contador previo). Ver docs/tasks/45.
   const ultimoChequeRequerido = !chequesManualesValue && !editTarget?.ultimoCheque
 
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, closeDialog)
+
+  // BANK_ACCOUNT_CURRENCY_MISMATCH_GL — código DISTINTO al BANK_ACCOUNT_CURRENCY_MISMATCH de
+  // Cobros/Pagos/Tesorería (docs/tasks/64_multimoneda_completo.md §5.6): la moneda mandada no
+  // coincide con la moneda real de la cuenta contable elegida. Se marca el campo `currency` con
+  // el mensaje del backend en vez de solo un toast genérico.
+  function handleCuentaBancariaError(err: unknown) {
+    if (isApiErrorCode(err, ERROR_CODES.BANK_ACCOUNT_CURRENCY_MISMATCH_GL)) {
+      setError('currency', { type: 'manual', message: err.message })
+      return
+    }
+    toast.error((err as { message?: string })?.message ?? 'Error al guardar la cuenta bancaria')
+  }
 
   const createMutation = useMutation({
     mutationFn: createCuentaBancaria,
@@ -163,7 +193,7 @@ export default function CuentasBancariasPage() {
       queryClient.invalidateQueries({ queryKey: ['cuentas-bancarias'] })
       closeDialog()
     },
-    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al crear la cuenta bancaria'),
+    onError: handleCuentaBancariaError,
   })
 
   const updateMutation = useMutation({
@@ -174,7 +204,7 @@ export default function CuentasBancariasPage() {
       queryClient.invalidateQueries({ queryKey: ['cuentas-bancarias'] })
       closeDialog()
     },
-    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al actualizar la cuenta bancaria'),
+    onError: handleCuentaBancariaError,
   })
 
   const deleteMutation = useMutation({
@@ -270,6 +300,16 @@ export default function CuentasBancariasPage() {
 
   const cuentas = data?.items ?? []
   const totalPages = data ? Math.ceil((data.meta.total ?? 0) / PAGE_SIZE) : 1
+
+  // ── Inconsistencias de moneda (docs/tasks/64_multimoneda_completo.md §5.6) ──
+  // Mismo permiso que el resto de esta pantalla — no es un recurso aparte.
+  const puedeVerInconsistencias = usePuede('tesoreria.cuentas-bancarias.listar')
+  const [showInconsistencias, setShowInconsistencias] = useState(false)
+  const { data: inconsistencias, isLoading: inconsistenciasLoading } = useQuery({
+    queryKey: ['cuentas-bancarias-inconsistencias-moneda'],
+    queryFn: listInconsistenciasMoneda,
+    enabled: showInconsistencias,
+  })
 
   return (
     <div className="page-container">
@@ -419,6 +459,75 @@ export default function CuentasBancariasPage() {
         )}
       </div>
 
+      {puedeVerInconsistencias && (
+        <div className="card" style={{ marginTop: 20 }}>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ShieldAlert size={16} /> Inconsistencias de Moneda
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-size-sm"
+              onClick={() => setShowInconsistencias((v) => !v)}
+            >
+              {showInconsistencias ? 'Ocultar' : 'Revisar'}
+            </button>
+          </div>
+          {showInconsistencias && (
+            <>
+              <div className="card-body" style={{ paddingBottom: 0 }}>
+                <p className="ff-hint" style={{ marginTop: 0 }}>
+                  Cuentas donde el campo espejo interno quedó desincronizado de la moneda real de su cuenta
+                  contable.
+                  Solo informativo: reeditar la cuenta (Editar → Guardar) la resincroniza sola.
+                </p>
+              </div>
+              <div className="table-scroll">
+                <table className="data-table navy-table">
+                  <thead>
+                    <tr>
+                      <th>Cuenta Bancaria</th>
+                      <th>Cuenta Contable</th>
+                      <th>Moneda registrada</th>
+                      <th>Moneda real (GL)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inconsistenciasLoading
+                      ? Array.from({ length: 2 }).map((_, i) => (
+                          <tr key={i}>
+                            {Array.from({ length: 4 }).map((__, j) => (
+                              <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
+                            ))}
+                          </tr>
+                        ))
+                      : (inconsistencias ?? []).length === 0
+                        ? (
+                            <tr>
+                              <td colSpan={4}>
+                                <div className="empty-state" style={{ padding: '20px 0' }}>
+                                  <p className="empty-title">Sin inconsistencias</p>
+                                  <p className="empty-sub">Todas las cuentas bancarias tienen su moneda sincronizada con su cuenta contable.</p>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        : inconsistencias!.map((i) => (
+                            <tr key={i.id}>
+                              <td style={{ fontWeight: 500 }}>{i.accountName}</td>
+                              <td className="td-muted" style={{ fontFamily: 'var(--font-mono)' }}>{i.account}</td>
+                              <td style={{ color: 'var(--error-text)' }}>{i.customMoneda}</td>
+                              <td style={{ fontWeight: 600 }}>{i.accountCurrency}</td>
+                            </tr>
+                          ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {dialogOpen && (
         <div className="modal-overlay" onClick={requestClose}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
@@ -497,14 +606,18 @@ export default function CuentasBancariasPage() {
                       name="currency"
                       control={control}
                       render={({ field }) => (
-                        <Select value={field.value} onValueChange={field.onChange} placeholder="Seleccionar moneda" clearable={false}>
-                          {(currencies ?? []).map((c) => (
-                            <SelectItem key={c.id} value={c.id}>{c.symbol ? `${c.name} (${c.symbol})` : c.name}</SelectItem>
-                          ))}
+                        // Siempre derivada de la cuenta contable elegida arriba, nunca editable
+                        // libre — la moneda real de una cuenta bancaria es la de su cuenta GL
+                        // (docs/tasks/64_multimoneda_completo.md §5.6). El backend igual la valida
+                        // (BANK_ACCOUNT_CURRENCY_MISMATCH_GL) como defensa adicional.
+                        <Select value={field.value} onValueChange={field.onChange} placeholder="Selecciona la cuenta contable primero" clearable={false} disabled>
+                          {MONEDA_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                         </Select>
                       )}
                     />
-                    {errors.currency && <p className="ff-error">{errors.currency.message}</p>}
+                    {errors.currency
+                      ? <p className="ff-error">{errors.currency.message}</p>
+                      : <p className="ff-hint">Se toma automáticamente de la moneda real de la cuenta contable elegida arriba.</p>}
                   </div>
 
                   <div className="ff-wrap">
@@ -684,11 +797,11 @@ export default function CuentasBancariasPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                         <span style={{ color: 'var(--text-secondary)' }}>Balance inicial</span>
-                        <strong>{formatDOP(balanceData.balanceInicial)}</strong>
+                        <strong>{formatMoney(balanceData.balanceInicial, balanceData.moneda)}</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15 }}>
                         <span style={{ color: 'var(--text-secondary)' }}>Balance actual</span>
-                        <strong>{formatDOP(balanceData.balance)}</strong>
+                        <strong>{formatMoney(balanceData.balance, balanceData.moneda)}</strong>
                       </div>
                     </div>
                   )}

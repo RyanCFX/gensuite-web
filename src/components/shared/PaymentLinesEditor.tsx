@@ -13,7 +13,8 @@ import {
   type PaymentLinesValue,
 } from '@/lib/paymentLines'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
-import { formatDOP } from '@/lib/formatters'
+import { formatMoney } from '@/lib/formatters'
+import { useMetodoPagoCurrencies } from '@/shared/hooks/useMetodoPagoCurrencies'
 import { Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 
 function calcularVuelto(monto: number, denominaciones: { denominacion: string; valor: number }[]): VueltoLineDraft[] {
@@ -36,9 +37,13 @@ interface PaymentLinesEditorProps {
   amountDue: number
   value: PaymentLinesValue
   onChange: (value: PaymentLinesValue) => void
+  /** Moneda de la factura que se está cobrando (default 'DOP'). Caja/POS nunca convierte
+   * (docs/tasks/70_caja_pos_sin_soporte_multimoneda.md) — solo se ofrecen al cajero los métodos
+   * de pago cuya cuenta real opera en esta misma moneda, y los montos se muestran en ella. */
+  currency?: string
 }
 
-export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesEditorProps) {
+export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP' }: PaymentLinesEditorProps) {
   const { data: metodos } = useQuery({ queryKey: ['metodos-pago'], queryFn: listMetodosPago, staleTime: 5 * 60_000 })
   const { data: bancos } = useQuery({ queryKey: ['bancos'], queryFn: listBancos, staleTime: 5 * 60_000 })
   const { data: denominaciones } = useQuery({ queryKey: ['denominaciones'], queryFn: listDenominaciones, staleTime: 5 * 60_000 })
@@ -54,7 +59,10 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
   const [vueltoDenomSearch, setVueltoDenomSearch] = useState<Record<number, string>>({})
   const prevTenderedCashRef = useRef<string>('')
 
-  const metodosActivos = (metodos ?? []).filter((m) => !m.disabled)
+  const todosMetodosActivos = (metodos ?? []).filter((m) => !m.disabled)
+  const metodoCurrencies = useMetodoPagoCurrencies(todosMetodosActivos, 'DOP')
+  // Solo se ofrecen métodos que operan en la moneda de la factura — Caja nunca convierte.
+  const metodosActivos = todosMetodosActivos.filter((m) => (metodoCurrencies[m.name] ?? 'DOP') === currency)
   const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo)
 
   const total = sumPayments(value.payments)
@@ -256,9 +264,9 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
             fontSize: 13,
           }}
         >
-          <span>Total ingresado: <strong>{formatDOP(total)}</strong></span>
+          <span>Total ingresado: <strong>{formatMoney(total, currency)}</strong></span>
           <span style={{ color: totalOk ? 'var(--color-success)' : 'var(--error-text)', fontWeight: 600 }}>
-            Total a cobrar: {formatDOP(amountDue)}
+            Total a cobrar: {formatMoney(amountDue, currency)}
           </span>
         </div>
       </div>
@@ -301,7 +309,7 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
             {tenderedCash > 0 && (
               <>
                 <p style={{ fontSize: 13, margin: 0, color: vueltoEsperado < 0 ? 'var(--color-error)' : undefined }}>
-                  Vuelto a entregar: {formatDOP(vueltoEsperado)}
+                  Vuelto a entregar: {formatMoney(vueltoEsperado, currency)}
                   {vueltoEsperado < 0 && (
                     <span style={{ display: 'block', fontSize: 12, color: 'var(--color-error)', marginTop: 2 }}>
                       El efectivo entregado es menor al total de pagos en efectivo
@@ -366,7 +374,7 @@ export function PaymentLinesEditor({ amountDue, value, onChange }: PaymentLinesE
                 </button>
 
                 <p style={{ fontSize: 13, margin: 0, color: vueltoEsperado >= 0 && vueltoOk ? 'var(--color-success)' : 'var(--error-text)' }}>
-                  Total desglosado: {formatDOP(vueltoDeclarado)} / Vuelto esperado: {formatDOP(vueltoEsperado)}
+                  Total desglosado: {formatMoney(vueltoDeclarado, currency)} / Vuelto esperado: {formatMoney(vueltoEsperado, currency)}
                   {vueltoEsperado >= 0 && !vueltoOk && (
                     <span style={{ display: 'block', fontSize: 12, color: 'var(--color-error)', marginTop: 2 }}>
                       El desglose no coincide con el vuelto esperado

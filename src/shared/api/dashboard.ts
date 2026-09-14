@@ -43,6 +43,10 @@ export interface RecentActivityItem {
   description: string
   amount: number
   timestamp: string
+  /** Moneda de ESE documento puntual (no la base) — a propósito no se consolida a la moneda
+   *  base porque es una ficha de "esto pasó", no un agregado. Formatear cada monto con su propia
+   *  moneda, no asumir que todos son DOP. Ver docs/tasks/64_multimoneda_completo.md §6.2. */
+  currency?: string
 }
 
 /** Ingresos vs. gastos de los últimos 7 días — fijo, independiente del `period` de la query. */

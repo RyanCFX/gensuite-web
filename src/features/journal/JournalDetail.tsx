@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getJournalEntry, submitJournalEntry, cancelJournalEntry } from '@/shared/api/journal-entry'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { formatDate, formatDOP, formatMoney } from '@/lib/formatters'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ArrowLeft } from 'lucide-react'
 
@@ -115,6 +115,8 @@ export default function JournalDetail() {
   }
 
   const isBalanced = Math.abs(entry.totalDebit - entry.totalCredit) < 0.01
+  // docs/tasks/64_multimoneda_completo.md §5.4 — aquí el campo se llama `currency`, no `moneda`.
+  const algunaLineaEnDivisa = (entry.entries ?? []).some((l) => l.currency)
 
   return (
     <div className="page-container">
@@ -213,13 +215,14 @@ export default function JournalDetail() {
                   <th style={{ textAlign: 'right' }}>Débito</th>
                   <th style={{ textAlign: 'right' }}>Crédito</th>
                   <th>Descripción</th>
+                  {algunaLineaEnDivisa && <th>Moneda / Tasa</th>}
                 </tr>
               </thead>
               <tbody>
                 {(entry.entries ?? []).length === 0
                   ? (
                       <tr>
-                        <td colSpan={4} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+                        <td colSpan={algunaLineaEnDivisa ? 5 : 4} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
                           Sin líneas de detalle
                         </td>
                       </tr>
@@ -228,12 +231,17 @@ export default function JournalDetail() {
                       <tr key={idx}>
                         <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{line.account}</td>
                         <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                          {line.debit > 0 ? formatDOP(line.debit) : '—'}
+                          {line.debit > 0 ? formatMoney(line.debit, line.currency) : '—'}
                         </td>
                         <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                          {line.credit > 0 ? formatDOP(line.credit) : '—'}
+                          {line.credit > 0 ? formatMoney(line.credit, line.currency) : '—'}
                         </td>
                         <td className="td-muted">{line.description ?? '—'}</td>
+                        {algunaLineaEnDivisa && (
+                          <td className="td-muted">
+                            {line.currency ? `${line.currency}${line.conversionRate ? ` · tasa ${line.conversionRate}` : ''}` : '—'}
+                          </td>
+                        )}
                       </tr>
                     ))}
               </tbody>
@@ -247,6 +255,7 @@ export default function JournalDetail() {
                     {formatDOP(entry.totalCredit)}
                   </td>
                   <td className="items-total-line" />
+                  {algunaLineaEnDivisa && <td className="items-total-line" />}
                 </tr>
               </tfoot>
             </table>

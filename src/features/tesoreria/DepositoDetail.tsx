@@ -6,7 +6,7 @@ import { ArrowLeft, Send, Ban, Pencil, BookOpen } from 'lucide-react'
 import { getDeposito, submitDeposito, cancelDeposito, updateDepositoCabecera, previewAsientosDeposito } from '@/shared/api/tesoreria'
 import { getCuentaBancaria } from '@/shared/api/cuentas-bancarias'
 import type { TesoreriaEstado, UpdateDepositoDto } from '@/shared/api/types'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { formatDate, formatDOP, formatMoney } from '@/lib/formatters'
 import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
 import { CuentaContableOverrideSection } from './components/CuentaContableOverrideSection'
 import { EditableAccountCell, findBancoYPartyRows } from './components/EditableAccountCell'
@@ -188,7 +188,14 @@ export default function DepositoDetail() {
           <div style={{ paddingTop: 16, borderTop: '1px solid var(--border-default)' }}>
             <div className="detail-field">
               <span className="detail-label">Monto</span>
-              <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--success-text)' }}>{formatDOP(deposito.monto)}</span>
+              <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--success-text)' }}>
+                {formatMoney(deposito.monto, deposito.moneda)}
+              </span>
+              {deposito.moneda && deposito.montoBase != null && (
+                <span className="detail-value" style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+                  ≈ {formatDOP(deposito.montoBase)}{deposito.conversionRate ? ` (tasa ${deposito.conversionRate})` : ''}
+                </span>
+              )}
             </div>
           </div>
 
@@ -223,9 +230,23 @@ export default function DepositoDetail() {
               <tbody>
                 {deposito.lineas.map((l, i) => (
                   <tr key={i}>
-                    <td>{l.cuenta}{l.esBanco && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>Banco</span>}</td>
-                    <td style={{ textAlign: 'right' }}>{l.debito ? formatDOP(l.debito) : '—'}</td>
-                    <td style={{ textAlign: 'right' }}>{l.credito ? formatDOP(l.credito) : '—'}</td>
+                    <td>
+                      {l.cuenta}
+                      {l.esBanco && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>Banco</span>}
+                      {l.esDiferenciaCambiaria && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>Ajuste cambiario</span>}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {l.debito ? formatMoney(l.debito, l.moneda) : '—'}
+                      {l.moneda && l.montoBase != null && l.debito > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>≈ {formatDOP(l.montoBase)}</div>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {l.credito ? formatMoney(l.credito, l.moneda) : '—'}
+                      {l.moneda && l.montoBase != null && l.credito > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>≈ {formatDOP(l.montoBase)}</div>
+                      )}
+                    </td>
                     <td className="td-muted">{l.descripcion ?? '—'}</td>
                   </tr>
                 ))}
@@ -241,7 +262,7 @@ export default function DepositoDetail() {
             <div className="modal-head"><h2 className="modal-title">Someter Depósito</h2></div>
             <div className="modal-body">
               <p style={{ margin: 0 }}>
-                ¿Confirmas someter el depósito <strong>{deposito.id}</strong> por <strong>{formatDOP(deposito.monto)}</strong>?
+                ¿Confirmas someter el depósito <strong>{deposito.id}</strong> por <strong>{formatMoney(deposito.monto, deposito.moneda)}</strong>?
               </p>
             </div>
             <div className="modal-foot">

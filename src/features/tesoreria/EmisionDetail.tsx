@@ -13,7 +13,7 @@ import {
 } from '@/shared/api/tesoreria'
 import { getCuentaBancaria } from '@/shared/api/cuentas-bancarias'
 import type { TesoreriaEstado, UpdateEmisionDto } from '@/shared/api/types'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { formatDate, formatDOP, formatMoney } from '@/lib/formatters'
 import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
 import { CuentaContableOverrideSection } from './components/CuentaContableOverrideSection'
 import { EditableAccountCell, findBancoYPartyRows } from './components/EditableAccountCell'
@@ -247,7 +247,14 @@ export default function EmisionDetail() {
           <div style={{ paddingTop: 16, borderTop: '1px solid var(--border-default)' }}>
             <div className="detail-field">
               <span className="detail-label">Monto</span>
-              <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--error-text)' }}>{formatDOP(emision.monto)}</span>
+              <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--error-text)' }}>
+                {formatMoney(emision.monto, emision.moneda)}
+              </span>
+              {emision.moneda && emision.montoBase != null && (
+                <span className="detail-value" style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+                  ≈ {formatDOP(emision.montoBase)}{emision.conversionRate ? ` (tasa ${emision.conversionRate})` : ''}
+                </span>
+              )}
             </div>
           </div>
 
@@ -282,9 +289,23 @@ export default function EmisionDetail() {
               <tbody>
                 {emision.lineas.map((l, i) => (
                   <tr key={i}>
-                    <td>{l.cuenta}{l.esBanco && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>Banco</span>}</td>
-                    <td style={{ textAlign: 'right' }}>{l.debito ? formatDOP(l.debito) : '—'}</td>
-                    <td style={{ textAlign: 'right' }}>{l.credito ? formatDOP(l.credito) : '—'}</td>
+                    <td>
+                      {l.cuenta}
+                      {l.esBanco && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>Banco</span>}
+                      {l.esDiferenciaCambiaria && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>Ajuste cambiario</span>}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {l.debito ? formatMoney(l.debito, l.moneda) : '—'}
+                      {l.moneda && l.montoBase != null && l.debito > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>≈ {formatDOP(l.montoBase)}</div>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {l.credito ? formatMoney(l.credito, l.moneda) : '—'}
+                      {l.moneda && l.montoBase != null && l.credito > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>≈ {formatDOP(l.montoBase)}</div>
+                      )}
+                    </td>
                     <td className="td-muted">{l.descripcion ?? '—'}</td>
                   </tr>
                 ))}
@@ -300,7 +321,7 @@ export default function EmisionDetail() {
             <div className="modal-head"><h2 className="modal-title">Someter Emisión</h2></div>
             <div className="modal-body">
               <p style={{ margin: 0 }}>
-                ¿Confirmas someter la emisión <strong>{emision.id}</strong> por <strong>{formatDOP(emision.monto)}</strong>?
+                ¿Confirmas someter la emisión <strong>{emision.id}</strong> por <strong>{formatMoney(emision.monto, emision.moneda)}</strong>?
               </p>
               <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-secondary)' }}>
                 Esta acción generará el asiento contable real y afectará el saldo de la cuenta bancaria.

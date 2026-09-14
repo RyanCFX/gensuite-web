@@ -11,7 +11,7 @@ import {
   previewAsientosTransferenciaInterna,
 } from '@/shared/api/tesoreria'
 import type { TesoreriaEstado, UpdateTransferenciaInternaDto } from '@/shared/api/types'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { formatDate, formatDOP, formatMoney } from '@/lib/formatters'
 import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
 import { CuentaContableOverrideSection } from './components/CuentaContableOverrideSection'
 import { EditableAccountCell, findOrigenYDestinoRows } from './components/EditableAccountCell'
@@ -189,7 +189,14 @@ export default function TransferenciaInternaDetail() {
           <div style={{ paddingTop: 16, borderTop: '1px solid var(--border-default)' }}>
             <div className="detail-field">
               <span className="detail-label">Monto (sale de origen)</span>
-              <span style={{ fontSize: 22, fontWeight: 700 }}>{formatDOP(transferencia.monto)}</span>
+              <span style={{ fontSize: 22, fontWeight: 700 }}>
+                {formatMoney(transferencia.monto, transferencia.moneda)}
+              </span>
+              {transferencia.moneda && transferencia.montoBase != null && (
+                <span className="detail-value" style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+                  ≈ {formatDOP(transferencia.montoBase)}
+                </span>
+              )}
             </div>
           </div>
 
@@ -224,9 +231,22 @@ export default function TransferenciaInternaDetail() {
               <tbody>
                 {transferencia.lineas.map((l, i) => (
                   <tr key={i}>
+                    {/* Nota: a diferencia de Emisiones/Depósitos, una transferencia interna nunca
+                        marca `esDiferenciaCambiaria` aunque también pueda generar un ajuste
+                        cambiario — ver docs/tasks/64_multimoneda_completo.md §5.3/§5.5. */}
                     <td>{l.cuenta}{l.esBanco && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>Banco</span>}</td>
-                    <td style={{ textAlign: 'right' }}>{l.debito ? formatDOP(l.debito) : '—'}</td>
-                    <td style={{ textAlign: 'right' }}>{l.credito ? formatDOP(l.credito) : '—'}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {l.debito ? formatMoney(l.debito, l.moneda) : '—'}
+                      {l.moneda && l.montoBase != null && l.debito > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>≈ {formatDOP(l.montoBase)}</div>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {l.credito ? formatMoney(l.credito, l.moneda) : '—'}
+                      {l.moneda && l.montoBase != null && l.credito > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>≈ {formatDOP(l.montoBase)}</div>
+                      )}
+                    </td>
                     <td className="td-muted">{l.descripcion ?? '—'}</td>
                   </tr>
                 ))}
@@ -242,7 +262,7 @@ export default function TransferenciaInternaDetail() {
             <div className="modal-head"><h2 className="modal-title">Someter Transferencia</h2></div>
             <div className="modal-body">
               <p style={{ margin: 0 }}>
-                ¿Confirmas someter la transferencia <strong>{transferencia.id}</strong> por <strong>{formatDOP(transferencia.monto)}</strong>?
+                ¿Confirmas someter la transferencia <strong>{transferencia.id}</strong> por <strong>{formatMoney(transferencia.monto, transferencia.moneda)}</strong>?
               </p>
             </div>
             <div className="modal-foot">
