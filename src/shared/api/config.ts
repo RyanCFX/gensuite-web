@@ -25,6 +25,8 @@ import type {
   HabilitarPosDto,
   HabilitarPosResult,
   DeshabilitarPosResult,
+  HabilitarDespachoResult,
+  DeshabilitarDespachoResult,
   LayawayConfig,
   AlmacenListItem,
   CreateAlmacenDto,
@@ -89,6 +91,18 @@ export async function habilitarPos(data: HabilitarPosDto) {
 
 export async function deshabilitarPos() {
   const res = await client.post<{ success: true; data: DeshabilitarPosResult }>(ENDPOINTS.config.posDeshabilitar)
+  return unwrap(res)
+}
+
+// Idempotente del lado servidor. Éxito: refrescar `['facturacion-config']` antes de navegar (§1.3).
+export async function habilitarDespacho() {
+  const res = await client.post<{ success: true; data: HabilitarDespachoResult }>(ENDPOINTS.config.despachoHabilitar)
+  return unwrap(res)
+}
+
+// Puede fallar con 409 — `error.details` trae `DesactivarDespachoBloqueos` (IDs concretos a resolver).
+export async function deshabilitarDespacho() {
+  const res = await client.post<{ success: true; data: DeshabilitarDespachoResult }>(ENDPOINTS.config.despachoDeshabilitar)
   return unwrap(res)
 }
 
@@ -401,6 +415,7 @@ export interface CatalogoFiscalItem {
 
 export interface CatalogosFiscales {
   ncfTypes: CatalogoFiscalItem[]
+  ncfTypesFisicos: CatalogoFiscalItem[]
   ncfTypesCompra: CatalogoFiscalItem[]
   tipoBienes606: CatalogoFiscalItem[]
   formaPago606: CatalogoFiscalItem[]
