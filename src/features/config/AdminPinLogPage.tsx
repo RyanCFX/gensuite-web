@@ -45,13 +45,13 @@ export default function AdminPinLogPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Auditoría de PIN"
+        title={<><span className="page-title-dot" />Auditoría de PIN</>}
         description="Cada intento de autorización con PIN de administrador (override de descuento, etc.) — éxito o fallo, quién lo pidió y quién autorizó"
       />
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <th>Fecha</th>

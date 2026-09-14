@@ -2,6 +2,7 @@ import axios from 'axios'
 import * as Sentry from '@sentry/react'
 import { toast } from 'sonner'
 import { getToken, getTenant, clearSession } from './storage'
+import { ocultarErp } from '@/lib/ocultarErp'
 import type { ApiError, ApiErrorResponse, ApiResponse, PaginatedResponse } from './types'
 
 // Ruta relativa por defecto: el dev server hace de proxy hacia el backend
@@ -94,6 +95,14 @@ client.interceptors.response.use(
 
     const data = error.response.data as ApiErrorResponse
 
+    // El backend a veces redacta `error.message` pensando en quien integra el BFF, no en el
+    // usuario final, y menciona "ERPNext" directamente — los clientes de este producto no deben
+    // saber que ERPNext es el motor interno. Se sanea acá, centralizado, antes de que el mensaje
+    // llegue a cualquier toast o pantalla (ver src/lib/ocultarErp.ts).
+    if (data?.error?.message) {
+      data.error.message = ocultarErp(data.error.message)
+    }
+
     // ERPNEXT_AUTH_ERROR: el BFF no pudo autenticarse contra ERPNext con las
     // credenciales de la integración (no es la sesión del usuario) — tratamos esto
     // como sesión inválida: cerramos sesión y redirigimos a login con un aviso.
@@ -174,9 +183,38 @@ export function unwrapRaw<T>(response: { data: T }): T {
 export const ERROR_CODES = {
   BRANCH_REQUIRED: 'BRANCH_REQUIRED',
   MIXED_BRANCH_COUNT: 'MIXED_BRANCH_COUNT',
+  // Multimoneda (docs/tasks/60_multimoneda_dop_usd_eur.md §5.2)
+  CURRENCY_IS_BASE: 'CURRENCY_IS_BASE',
+  CURRENCY_NOT_SUPPORTED: 'CURRENCY_NOT_SUPPORTED',
+  CURRENCY_NOT_ENABLED: 'CURRENCY_NOT_ENABLED',
+  PAYMENT_MIXED_CURRENCIES: 'PAYMENT_MIXED_CURRENCIES',
+  PAYMENT_MIXED_RATES: 'PAYMENT_MIXED_RATES',
+  BANK_ACCOUNT_CURRENCY_MISMATCH: 'BANK_ACCOUNT_CURRENCY_MISMATCH',
+  // Código DISTINTO al de arriba — Cuentas Bancarias (docs/tasks/64_multimoneda_completo.md §5.6),
+  // no lo trates igual.
+  BANK_ACCOUNT_CURRENCY_MISMATCH_GL: 'BANK_ACCOUNT_CURRENCY_MISMATCH_GL',
+  EXCHANGE_RATE_REQUIRED: 'EXCHANGE_RATE_REQUIRED',
+  BANK_AMOUNT_OUT_OF_TOLERANCE: 'BANK_AMOUNT_OUT_OF_TOLERANCE',
+  EXCHANGE_RATE_NOT_FOUND: 'EXCHANGE_RATE_NOT_FOUND',
+  // Transferencias Internas (docs/tasks/64_multimoneda_completo.md §5.3)
+  MONTO_DESTINO_REQUIRED: 'MONTO_DESTINO_REQUIRED',
+  // Caja/POS (docs/tasks/70_caja_pos_sin_soporte_multimoneda.md) — a diferencia de /cobros y
+  // /pagos, Caja nunca convierte: el método de pago debe operar en la MISMA moneda de la factura.
+  POS_PAYMENT_CURRENCY_MISMATCH: 'POS_PAYMENT_CURRENCY_MISMATCH',
+  // Alertas de stock disponible/reservado (docs/tasks/73_alertas_stock_disponible_reservado.md).
+  // Devuelto por /transferencias, /despachos, y submits de Factura/Delivery Note con
+  // update_stock=1 cuando la cantidad solicitada excede `disponible` (actualQty - reservedStock).
+  // Trae `details` estructurado SOLO en los dos primeros casos — en el submit nativo de ERPNext
+  // solo viene el `code`, sin `details` (el mensaje nativo es texto libre en inglés).
+  STOCK_INSUFFICIENT_OR_RESERVED: 'STOCK_INSUFFICIENT_OR_RESERVED',
 } as const
 
-export function isApiErrorCode(error: unknown, code: string): error is ApiError {
+// El predicado narrowa a `ApiError & { code: C }` (no solo `ApiError`) a propósito: cuando el
+// `error` del caller ya está tipado como `ApiError` (ej. `onError: (err: ApiError) => ...`), un
+// predicado idéntico al tipo declarado hace que TS derive el tipo del branch `else` como
+// `Exclude<ApiError, ApiError>` = `never` — cualquier acceso a `err.algo` después del `if` no
+// compila. Al narrowar a un subtipo estricto, el branch negativo conserva `ApiError`.
+export function isApiErrorCode<C extends string>(error: unknown, code: C): error is ApiError & { code: C } {
   return (
     typeof error === 'object' &&
     error !== null &&

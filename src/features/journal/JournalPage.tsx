@@ -70,51 +70,56 @@ export default function JournalPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Asientos Contables</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Asientos Contables</h1>
           {data && <p className="page-sub">{data.meta.total} asientos en total</p>}
         </div>
-        <button className="btn btn-primary" onClick={() => navigate('/asientos/nuevo')}>
+        <button className="btn btn-navy" onClick={() => navigate('/asientos/nuevo')}>
           <Plus size={16} />
           Nuevo Asiento
         </button>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={15} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por ID o descripción…"
-              value={search}
-              onChange={handleSearchChange}
-            />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div className="search-input-wrap">
+                <Search size={15} className="search-input-icon" />
+                <input
+                  className="search-input"
+                  placeholder="Buscar por ID o descripción…"
+                  value={search}
+                  onChange={handleSearchChange}
+                />
+              </div>
+              <FilterField label="Sucursal" style={{ width: 200 }}>
+                <SearchSelect
+                  value={branch}
+                  onChange={(val) => { setBranch(val); setPage(1) }}
+                  options={branchOptions}
+                  onSearch={setBranchSearch}
+                  selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
+                  placeholder="Todas las sucursales"
+                />
+              </FilterField>
+              <FilterField label="Departamento" style={{ width: 200 }}>
+                <SearchSelect
+                  value={department}
+                  onChange={(val) => { setDepartment(val); setPage(1) }}
+                  options={departmentOptions}
+                  onSearch={setDepartmentSearch}
+                  selectedLabel={departamentos?.items.find((d) => d.id === department)?.name ?? ''}
+                  placeholder="Todos los departamentos"
+                />
+              </FilterField>
+            </div>
           </div>
-          <FilterField label="Sucursal" style={{ width: 200 }}>
-            <SearchSelect
-              value={branch}
-              onChange={(val) => { setBranch(val); setPage(1) }}
-              options={branchOptions}
-              onSearch={setBranchSearch}
-              selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
-              placeholder="Todas las sucursales"
-            />
-          </FilterField>
-          <FilterField label="Departamento" style={{ width: 200 }}>
-            <SearchSelect
-              value={department}
-              onChange={(val) => { setDepartment(val); setPage(1) }}
-              options={departmentOptions}
-              onSearch={setDepartmentSearch}
-              selectedLabel={departamentos?.items.find((d) => d.id === department)?.name ?? ''}
-              placeholder="Todos los departamentos"
-            />
-          </FilterField>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <SortableTh label="ID" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
@@ -180,6 +185,7 @@ export default function JournalPage() {
                     ))}
           </tbody>
         </table>
+      </div>
       </div>
 
       {data && data.meta.total > PAGE_SIZE && (

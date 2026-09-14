@@ -9,10 +9,14 @@ import type {
   EcfConnectResult,
   CreateEcfClientDto,
   EcfClient,
+  EcfClientsListResult,
+  LinkEcfClientDto,
+  EcfMode,
   UploadEcfCertificateDto,
   UploadEcfCertificateResult,
   RegisterEcfWebhookDto,
   RegisterEcfWebhookResult,
+  UnlinkEcfClientResult,
   VoidEcfRangesDto,
   EcfCertificacion,
   EcfDiferidoItem,
@@ -22,7 +26,7 @@ import type {
 } from './types'
 
 /** Mensaje para el 503 al someter un documento cuando la DGII está caída y el tenant tiene
- *  `bloquearSubmitSiAuraCaido` activo (default). Ver F9 §3.2. */
+ *  `bloquearSubmitSiVegaCaido` activo (default). Ver F9 §3.2. */
 export const ECF_SUBMIT_UNAVAILABLE_MSG =
   'El servicio de facturación electrónica no está disponible en este momento. Reintenta en unos ' +
   'minutos, o pide a un administrador que active contingencia manualmente.'
@@ -93,11 +97,40 @@ export async function createEcfClient(data: CreateEcfClientDto) {
   return unwrap(res)
 }
 
+// Emisores (Clients) que ya existen en el proyecto Vega del tenant — para "seleccionar
+// emisor existente" en vez de crear uno nuevo (Vega rechaza un RNC duplicado con 409).
+export async function listEcfClients(mode?: EcfMode): Promise<EcfClientsListResult> {
+  const res = await client.get<{ success: true; data: EcfClient[]; meta: { mode: EcfMode } }>(
+    ENDPOINTS.config.ecfAdminClients,
+    mode ? { params: { mode } } : undefined,
+  )
+  return { clients: res.data.data, mode: res.data.meta.mode }
+}
+
+export async function linkEcfClient(data: LinkEcfClientDto) {
+  const res = await client.post<{ success: true; data: EcfClient }>(
+    ENDPOINTS.config.ecfAdminClientsLink,
+    data,
+  )
+  return unwrap(res)
+}
+
 export async function uploadEcfCertificate(data: UploadEcfCertificateDto, company?: string) {
   const res = await client.post<{ success: true; data: UploadEcfCertificateResult }>(
     ENDPOINTS.config.ecfAdminCertificate,
     data,
     company ? { params: { company } } : undefined,
+  )
+  return unwrap(res)
+}
+
+// Desvincula el Client de Vega de una Company (borra solo el puente local — no toca nada en
+// Vega). Úsalo cuando el `vegaClientId` guardado quedó apuntando a un Client que ya no existe
+// allá ("Cliente no encontrado" al emitir un e-CF) — después de esto, createEcfClient/linkEcfClient
+// vuelven a estar disponibles para esa Company.
+export async function unlinkEcfClient(company: string) {
+  const res = await client.delete<{ success: true; data: UnlinkEcfClientResult }>(
+    ENDPOINTS.config.ecfAdminClientsByCompany(company),
   )
   return unwrap(res)
 }

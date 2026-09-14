@@ -8,6 +8,8 @@ import { createCompra, updateCompra, getCompra } from '@/shared/api/compras-gast
 import { listSuppliers, getSupplier } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listAlmacenes, listImpuestosCompras, getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
+import { listMonedas, getTasaVigente } from '@/shared/api/monedas'
+import type { MonedaCode } from '@/shared/api/types'
 import { listRetenciones } from '@/shared/api/retenciones'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
@@ -531,6 +533,31 @@ export default function CompraForm() {
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
   const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
   const requiereSerialLoteCompra = facturacionConfig?.requiereSerialLoteCompra ?? false
+  const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
+  const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
+
+  // ── Multimoneda (docs/tasks/60_multimoneda_dop_usd_eur.md §4) ──────────────
+  const [currency, setCurrency] = useState('')
+  const [conversionRate, setConversionRate] = useState<number | ''>('')
+  const { data: monedas } = useQuery({
+    queryKey: ['monedas'],
+    queryFn: listMonedas,
+    enabled: multimonedaHabilitada,
+    staleTime: 5 * 60_000,
+  })
+  const monedasHabilitadasOptions = (monedas ?? []).filter((m) => m.habilitada)
+  const { data: tasaVigente } = useQuery({
+    queryKey: ['monedas-tasa-vigente', currency, monedaBase],
+    queryFn: () => getTasaVigente({ from: currency as MonedaCode, to: monedaBase as MonedaCode }),
+    enabled: !!currency && currency !== monedaBase,
+    retry: false,
+  })
+  useEffect(() => {
+    if (currency && currency !== monedaBase && tasaVigente && conversionRate === '') {
+      setConversionRate(tasaVigente.tasa)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasaVigente])
 
   const [ncfProveedor, setNcfProveedor] = useState('')
   const [tipoComprobante, setTipoComprobante] = useState('')
@@ -957,6 +984,10 @@ export default function CompraForm() {
       taxesTemplate: usaImpuestoDocumento ? (taxesTemplate.length > 0 ? taxesTemplate : undefined) : undefined,
       retenciones: retenciones.length > 0 ? retenciones : undefined,
       cuentaCxpOverride: cuentaCxpOverride || undefined,
+      currency: multimonedaHabilitada && currency ? currency : undefined,
+      conversionRate: multimonedaHabilitada && currency && currency !== monedaBase && conversionRate !== ''
+        ? conversionRate
+        : undefined,
     }
     saveMutation.mutate(dto)
   }
@@ -1256,6 +1287,38 @@ export default function CompraForm() {
                   <div className="ff-wrap">
                     <label className="ff-label">Departamento</label>
                     <DepartmentSelect value={department} onChange={setDepartment} placeholder="Buscar departamento…" disabled={isReturn} />
+                  </div>
+                )}
+
+                {multimonedaHabilitada && (
+                  <div className="ff-wrap">
+                    <label className="ff-label">Moneda</label>
+                    <Select
+                      value={currency || monedaBase}
+                      onValueChange={(val) => { setCurrency(val === monedaBase ? '' : val); setConversionRate('') }}
+                      disabled={isReturn}
+                    >
+                      <SelectItem value={monedaBase}>{monedaBase}</SelectItem>
+                      {monedasHabilitadasOptions.filter((m) => m.code !== monedaBase).map((m) => (
+                        <SelectItem key={m.code} value={m.code}>{m.code}</SelectItem>
+                      ))}
+                    </Select>
+                  </div>
+                )}
+
+                {multimonedaHabilitada && currency && currency !== monedaBase && (
+                  <div className="ff-wrap">
+                    <label className="ff-label">Tasa de cambio</label>
+                    <input
+                      type="number"
+                      min="0.0001"
+                      step="0.0001"
+                      className="ff-input"
+                      placeholder="Tasa del día (según config.)"
+                      value={conversionRate}
+                      onChange={(e) => setConversionRate(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                      disabled={isReturn}
+                    />
                   </div>
                 )}
 

@@ -1,6 +1,6 @@
 // Panel de administración de Facturación Electrónica (e-CF) — provisioning autoservicio del
-// administrador del propio tenant contra Aura. Wizard de 4 pasos:
-//   1. Conectar la API Key de Aura   2. Crear el emisor (RNC)
+// administrador del propio tenant contra Vega. Wizard de 4 pasos:
+//   1. Conectar la API Key de Vega   2. Crear el emisor (RNC)
 //   3. Subir el certificado de firma  4. Registrar el webhook
 //
 // Todos los endpoints (/config/ecf/admin/*) exigen el rol "System Manager" en el tenant, validado
@@ -8,21 +8,24 @@
 // este componente además degrada con gracia si el backend responde 403.
 //
 // CONSTANCIA: construido contra la API; las pruebas de integración end-to-end quedan pendientes —
-// ningún tenant real tiene todavía una cuenta de Aura conectada ni un certificado cargado. Crear
-// el Project en el panel de Aura y conseguir el .p12 firmado son pasos manuales fuera del sistema.
+// ningún tenant real tiene todavía una cuenta de Vega conectada ni un certificado cargado. Crear
+// el Project en el panel de Vega y conseguir el .p12 firmado son pasos manuales fuera del sistema.
 
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Check, ChevronDown, Eye, EyeOff, Info, Lock, ShieldCheck } from 'lucide-react'
+import { Check, ChevronDown, Eye, EyeOff, Info, Lock, ShieldCheck, Unlink } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { EcfTabs } from '@/shared/ui/EcfTabs'
 import { Select, SelectItem } from '@/components/ui/select'
-import { getEcfConfig } from '@/shared/api/config'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { getEcfConfig, getEmpresa } from '@/shared/api/config'
 import {
   connectEcfApiKey, createEcfClient, uploadEcfCertificate, registerEcfWebhook,
+  listEcfClients, linkEcfClient, unlinkEcfClient,
 } from '@/shared/api/ecf'
-import type { ApiError, EcfMode } from '@/shared/api/types'
+import type { ApiError, EcfClient, EcfMode } from '@/shared/api/types'
 import { useAuthStore } from '@/stores/auth.store'
 import { formatDate } from '@/lib/formatters'
 
@@ -40,7 +43,7 @@ function fileToBase64(file: File): Promise<string> {
 
 function handleMutationError(err: ApiError) {
   if (err?.statusCode === 403) {
-    toast.error('No tienes el rol "System Manager" en este tenant.')
+    toast.error('No tienes el rol "System Manager" en esta empresa.')
     return
   }
   toast.error(err?.message ?? 'Ocurrió un error')
@@ -130,8 +133,8 @@ function ConnectApiKeyStep({ done, locked }: { done: boolean; locked: boolean })
 
   return (
     <StepCard
-      n={1} title="Conectar la API Key de Aura" done={done} locked={locked}
-      hint="El operador ya creó el Project y generó la API Key en el panel de Aura. Aquí solo se pega para que el BFF la valide y la guarde cifrada — nunca se vuelve a mostrar."
+      n={1} title="Conectar la API Key de Vega" done={done} locked={locked}
+      hint="El operador ya creó el Project y generó la API Key en el panel de Vega. Aquí solo se pega para que el BFF la valide y la guarde cifrada — nunca se vuelve a mostrar."
     >
       <div className="form-row">
         <div className="ff-wrap">
@@ -149,7 +152,7 @@ function ConnectApiKeyStep({ done, locked }: { done: boolean; locked: boolean })
               type={show ? 'text' : 'password'}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="aura_test_xxxxx_yyyyy"
+              placeholder="vega_test_xxxxx_yyyyy"
               autoComplete="off"
               style={{ flex: 1 }}
             />
@@ -170,13 +173,103 @@ function ConnectApiKeyStep({ done, locked }: { done: boolean; locked: boolean })
 
 // ─── Step 2 — Emisor (RNC) ────────────────────────────────────────────────────
 
-function CreateClientStep({
-  done, locked, defaultCompany, existing,
+function ClientCertBadge({ c }: { c: EcfClient }) {
+  return c.hasCertificate
+    ? <span className="badge badge-success">Certificado ✔</span>
+    : <span className="badge badge-neutral">Certificado ✖</span>
+}
+
+// Lista de emisores ya existentes en el proyecto Vega — permite vincular uno en vez de
+// chocar con el 409 de RNC duplicado al intentar crearlo de nuevo.
+function SelectExistingClient({
+  clients, company, companyRnc, onLinked, onSwitchToCreate,
 }: {
-  done: boolean
-  locked: boolean
-  defaultCompany: string
-  existing?: { company: string; rnc: string; certificateExpiresAt?: string | null; certificationStage?: string | null }
+  clients: EcfClient[]
+  company: string
+  companyRnc?: string | null
+  onLinked: () => void
+  onSwitchToCreate: () => void
+}) {
+  const qc = useQueryClient()
+  const selectable = clients.filter((c) => !c.linkedCompany)
+  const [selectedId, setSelectedId] = useState(
+    () => selectable.find((c) => c.rnc === companyRnc)?.id ?? selectable[0]?.id ?? '',
+  )
+
+  const linkMutation = useMutation({
+    mutationFn: (vegaClientId: string) => linkEcfClient({ company: company.trim(), vegaClientId }),
+    onSuccess: () => {
+      toast.success('Emisor vinculado a la compañía')
+      qc.invalidateQueries({ queryKey: ['ecf-config'] })
+      onLinked()
+    },
+    onError: handleMutationError,
+  })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <p className="ff-hint" style={{ margin: 0 }}>
+        Este RNC ya existe en el proyecto Vega. Selecciona el emisor que corresponde a <strong>{company}</strong>{' '}
+        para vincularlo, en vez de crear uno nuevo.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {clients.map((c) => {
+          const disabled = !!c.linkedCompany
+          return (
+            <label
+              key={c.id}
+              className="ff-check-wrap"
+              style={{
+                alignItems: 'flex-start', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)',
+                padding: 10, opacity: disabled ? 0.55 : 1, cursor: disabled ? 'default' : 'pointer',
+              }}
+            >
+              <input
+                type="radio"
+                name="ecf-client-select"
+                className="ff-check"
+                checked={selectedId === c.id}
+                disabled={disabled}
+                onChange={() => setSelectedId(c.id)}
+                style={{ marginTop: 3 }}
+              />
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
+                <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <strong>{c.rnc}</strong>
+                  <span>{c.legalName}</span>
+                  {c.activeEnv && <span className="badge badge-neutral">{c.activeEnv}</span>}
+                  <ClientCertBadge c={c} />
+                </span>
+                <span style={{ color: 'var(--text-tertiary)' }}>
+                  Etapa de certificación: {c.certificationStage ?? '—'}
+                  {disabled && <> · Ya vinculado a <strong>{c.linkedCompany}</strong></>}
+                </span>
+              </span>
+            </label>
+          )
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          className="btn btn-primary btn-size-sm"
+          onClick={() => linkMutation.mutate(selectedId)}
+          disabled={!selectedId || linkMutation.isPending}
+        >
+          {linkMutation.isPending ? 'Vinculando…' : 'Vincular emisor seleccionado'}
+        </button>
+        <button className="btn btn-ghost btn-size-sm" onClick={onSwitchToCreate} disabled={linkMutation.isPending}>
+          Crear un emisor nuevo en su lugar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function CreateClientForm({
+  company, onConflict,
+}: {
+  company: string
+  onConflict: (info: { id: string; rnc: string; legalName: string }) => void
 }) {
   const qc = useQueryClient()
   const [form, setForm] = useState({
@@ -184,10 +277,6 @@ function CreateClientStep({
     municipality: '', province: '', email: '', economicActivity: '',
   })
   const [phones, setPhones] = useState<string[]>([''])
-
-  // La Company de ERPNext viene de GET /config/ecf y debe coincidir EXACTAMENTE — se envía
-  // automáticamente, el usuario no la edita.
-  const company = defaultCompany
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }))
@@ -206,12 +295,17 @@ function CreateClientStep({
       phones: phones.map((p) => p.trim()).filter(Boolean).slice(0, 3),
     }),
     onSuccess: () => {
-      toast.success('Emisor (RNC) creado en Aura')
+      toast.success('Emisor (RNC) creado en Vega')
       qc.invalidateQueries({ queryKey: ['ecf-config'] })
     },
     onError: (err: ApiError) => {
       if (err?.statusCode === 409) {
-        toast.error('Ya existe un emisor conectado para esta compañía.')
+        const existingClientId = err.details?.existingClientId as string | undefined
+        if (existingClientId) {
+          onConflict({ id: existingClientId, rnc: form.rnc.trim(), legalName: form.legalName.trim() })
+          return
+        }
+        toast.error(err?.message ?? 'Ya existe un emisor conectado para esta compañía.')
         qc.invalidateQueries({ queryKey: ['ecf-config'] })
         return
       }
@@ -219,28 +313,10 @@ function CreateClientStep({
     },
   })
 
-  if (done && existing) {
-    return (
-      <StepCard n={2} title="Crear el emisor (RNC)" done locked={locked}>
-        <table className="data-table">
-          <tbody>
-            <tr><td style={{ fontWeight: 500 }}>Compañía</td><td>{existing.company}</td></tr>
-            <tr><td style={{ fontWeight: 500 }}>RNC</td><td>{existing.rnc}</td></tr>
-            <tr><td style={{ fontWeight: 500 }}>Etapa de certificación</td><td>{existing.certificationStage ?? '—'}</td></tr>
-          </tbody>
-        </table>
-        <p className="ff-hint" style={{ margin: 0 }}>El emisor ya está conectado. No se puede crear un segundo emisor para la misma compañía.</p>
-      </StepCard>
-    )
-  }
-
   const canSubmit = company.trim() && form.rnc.trim() && form.legalName.trim() && form.address.trim()
 
   return (
-    <StepCard
-      n={2} title="Crear el emisor (RNC)" done={done} locked={locked}
-      hint="Crea el «Client» en Aura — el RNC bajo el cual se emiten los comprobantes."
-    >
+    <>
       {company
         ? (
             <p className="ff-hint" style={{ margin: 0 }}>
@@ -314,6 +390,188 @@ function CreateClientStep({
           {mutation.isPending ? 'Creando…' : 'Crear emisor'}
         </button>
       </div>
+    </>
+  )
+}
+
+// Se muestra cuando POST /clients devuelve 409 con `details.existingClientId` — el RNC ya
+// existe en Vega y se ofrece vincularlo en vez de reintentar la creación.
+function ConflictLinkPrompt({
+  conflict, company, onLinked, onDismiss,
+}: {
+  conflict: { id: string; rnc: string; legalName: string }
+  company: string
+  onLinked: () => void
+  onDismiss: () => void
+}) {
+  const linkMutation = useMutation({
+    mutationFn: () => linkEcfClient({ company: company.trim(), vegaClientId: conflict.id }),
+    onSuccess: () => {
+      toast.success('Emisor vinculado a la compañía')
+      onLinked()
+    },
+    onError: handleMutationError,
+  })
+
+  return (
+    <div className="inline-alert inline-alert-warn" style={{ alignItems: 'flex-start' }}>
+      <Info size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <span>
+          Este RNC (<strong>{conflict.rnc}</strong>) ya existe en Vega
+          {conflict.legalName ? <> como «{conflict.legalName}»</> : null}.
+        </span>
+        <span style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-primary btn-size-sm" onClick={() => linkMutation.mutate()} disabled={linkMutation.isPending}>
+            {linkMutation.isPending ? 'Vinculando…' : 'Vincular ese emisor'}
+          </button>
+          <button className="btn btn-ghost btn-size-sm" onClick={onDismiss} disabled={linkMutation.isPending}>
+            Volver al formulario
+          </button>
+        </span>
+      </span>
+    </div>
+  )
+}
+
+// "Desvincular" — DELETE /config/ecf/admin/clients/{company}. Rompe el puente local (Company ↔
+// Client de Vega) sin tocar nada en Vega — se usa cuando el vegaClientId guardado quedó apuntando
+// a un Client que ya no existe allá ("Cliente no encontrado" al intentar emitir un e-CF).
+function UnlinkClientButton({ company, rnc }: { company: string; rnc: string }) {
+  const qc = useQueryClient()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  const mutation = useMutation({
+    mutationFn: () => unlinkEcfClient(company),
+    onSuccess: (res) => {
+      toast.success(res.message)
+      setConfirmOpen(false)
+      qc.invalidateQueries({ queryKey: ['ecf-config'] })
+      qc.invalidateQueries({ queryKey: ['ecf-clients'] })
+    },
+    onError: (err: ApiError) => {
+      setConfirmOpen(false)
+      // 404 = ya estaba desvinculado (doble-click, estado desincronizado) — no-op benigno,
+      // simplemente refrescar para que la UI se corrija sola.
+      if (err?.statusCode === 404) {
+        qc.invalidateQueries({ queryKey: ['ecf-config'] })
+        qc.invalidateQueries({ queryKey: ['ecf-clients'] })
+        return
+      }
+      handleMutationError(err)
+    },
+  })
+
+  return (
+    <>
+      <button
+        type="button"
+        className="btn btn-ghost btn-size-sm"
+        style={{ color: 'var(--warning-text)' }}
+        onClick={() => setConfirmOpen(true)}
+      >
+        <Unlink size={14} /> Desvincular
+      </button>
+      <ConfirmModal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => mutation.mutate()}
+        title={`Desvincular emisor de ${company}`}
+        description={
+          `Esto va a desconectar el emisor (RNC ${rnc}) de esta compañía en el sistema. ` +
+          'No se borra nada en Vega — el Client sigue existiendo allá si todavía es válido. ' +
+          'Úsalo cuando el sistema no puede emitir comprobantes porque la conexión con Vega quedó rota ' +
+          '(por ejemplo, si el mensaje de error menciona "Cliente no encontrado"). Después de desvincular ' +
+          'vas a poder volver a conectar el emisor correcto.'
+        }
+        confirmLabel="Desvincular"
+        variant="danger"
+        loading={mutation.isPending}
+      />
+    </>
+  )
+}
+
+function CreateClientStep({
+  done, locked, defaultCompany, companyRnc, existing,
+}: {
+  done: boolean
+  locked: boolean
+  defaultCompany: string
+  companyRnc?: string | null
+  existing?: { company: string; rnc: string; certificateExpiresAt?: string | null; certificationStage?: string | null }
+}) {
+  const qc = useQueryClient()
+  // La Company de ERPNext viene de GET /config/ecf y debe coincidir EXACTAMENTE — se envía
+  // automáticamente, el usuario no la edita.
+  const company = defaultCompany
+  // null = sin elección manual del usuario todavía → se deriva de la lista de emisores.
+  const [viewOverride, setViewOverride] = useState<'select' | 'create' | null>(null)
+  const [conflict, setConflict] = useState<{ id: string; rnc: string; legalName: string } | null>(null)
+
+  const clientsQuery = useQuery({
+    queryKey: ['ecf-clients'],
+    queryFn: () => listEcfClients(),
+    enabled: !done && !locked,
+  })
+  const clients = clientsQuery.data?.clients ?? []
+  const selectable = clients.filter((c) => !c.linkedCompany)
+  // Por defecto, si algún emisor libre existe en el proyecto se propone vincularlo en vez de
+  // arrancar el formulario de crear — la elección manual del usuario (viewOverride) siempre gana.
+  const view = viewOverride ?? (selectable.length > 0 ? 'select' : 'create')
+
+  if (done && existing) {
+    return (
+      <StepCard n={2} title="Crear el emisor (RNC)" done locked={locked}>
+        <table className="data-table">
+          <tbody>
+            <tr><td style={{ fontWeight: 500 }}>Compañía</td><td>{existing.company}</td></tr>
+            <tr><td style={{ fontWeight: 500 }}>RNC</td><td>{existing.rnc}</td></tr>
+            <tr><td style={{ fontWeight: 500 }}>Etapa de certificación</td><td>{existing.certificationStage ?? '—'}</td></tr>
+          </tbody>
+        </table>
+        <p className="ff-hint" style={{ margin: 0 }}>El emisor ya está conectado. No se puede crear un segundo emisor para la misma compañía.</p>
+        <div>
+          <UnlinkClientButton company={existing.company} rnc={existing.rnc} />
+        </div>
+      </StepCard>
+    )
+  }
+
+  return (
+    <StepCard
+      n={2} title="Crear el emisor (RNC)" done={done} locked={locked}
+      hint="Crea el «Client» en Vega — el RNC bajo el cual se emiten los comprobantes — o vincula uno que ya exista en el proyecto."
+    >
+      {clientsQuery.isLoading ? (
+        <span className="skeleton-box" style={{ height: 80, display: 'block' }} />
+      ) : selectable.length > 0 && view === 'select' ? (
+        <SelectExistingClient
+          clients={clients}
+          company={company}
+          companyRnc={companyRnc}
+          onLinked={() => qc.invalidateQueries({ queryKey: ['ecf-clients'] })}
+          onSwitchToCreate={() => setViewOverride('create')}
+        />
+      ) : (
+        <>
+          {selectable.length > 0 && (
+            <button type="button" className="btn btn-ghost btn-size-xs" onClick={() => setViewOverride('select')} style={{ alignSelf: 'flex-start' }}>
+              ← Seleccionar un emisor existente en su lugar
+            </button>
+          )}
+          {conflict ? (
+            <ConflictLinkPrompt
+              conflict={conflict}
+              company={company}
+              onLinked={() => { setConflict(null); qc.invalidateQueries({ queryKey: ['ecf-clients'] }) }}
+              onDismiss={() => setConflict(null)}
+            />
+          ) : (
+            <CreateClientForm company={company} onConflict={setConflict} />
+          )}
+        </>
+      )}
     </StepCard>
   )
 }
@@ -344,7 +602,7 @@ function CertificateStep({
   return (
     <StepCard
       n={3} title="Subir el certificado de firma" done={done} locked={locked}
-      hint="Certificado PKCS#12 (.p12 / .pfx) firmado, obtenido en el panel de Aura. Se convierte a base64 en el navegador antes de enviarse."
+      hint="Certificado PKCS#12 (.p12 / .pfx) firmado, obtenido en el panel de Vega. Se convierte a base64 en el navegador antes de enviarse."
     >
       {done && expiresAt && (
         <div className={`inline-alert ${expiresSoon(expiresAt) ? 'inline-alert-warn' : 'inline-alert-info'}`}>
@@ -388,7 +646,7 @@ function WebhookStep({ locked, activeMode }: { locked: boolean; activeMode: EcfM
   return (
     <StepCard
       n={4} title="Registrar el webhook" done={!!registered} locked={locked} recommended
-      hint="Le dice a Aura a qué URL avisar cuando cambie el estado de un comprobante. La ruta receptora del BFF llega en la próxima fase — por ahora solo se verifica que la llamada no falle."
+      hint="Le dice a Vega a qué URL avisar cuando cambie el estado de un comprobante. La ruta receptora del BFF llega en la próxima fase — por ahora solo se verifica que la llamada no falle."
     >
       {registered && (
         <div className="inline-alert inline-alert-success">
@@ -410,15 +668,17 @@ function WebhookStep({ locked, activeMode }: { locked: boolean; activeMode: EcfM
 export default function EcfAdminPage() {
   const isSystemManager = useAuthStore((s) => s.user?.roles?.includes('System Manager') ?? false)
   const { data, isLoading } = useQuery({ queryKey: ['ecf-config'], queryFn: getEcfConfig })
+  const { data: empresa } = useQuery({ queryKey: ['empresa'], queryFn: getEmpresa, enabled: isSystemManager })
 
   if (!isSystemManager) {
     return (
       <div className="page-container">
         <PageHeader overline="Facturación Electrónica" title="Avanzado" />
+        <EcfTabs />
         <div className="empty-state" style={{ padding: '48px 0' }}>
           <span className="empty-icon" aria-hidden="true" style={{ fontSize: 24 }}>🔒</span>
           <p className="empty-title">No tienes acceso a esta sección</p>
-          <p className="empty-sub">La administración de Facturación Electrónica requiere el rol «System Manager» en este tenant.</p>
+          <p className="empty-sub">La administración de Facturación Electrónica requiere el rol «System Manager» en esta empresa.</p>
         </div>
       </div>
     )
@@ -436,10 +696,11 @@ export default function EcfAdminPage() {
     <div className="page-container">
       <PageHeader
         overline="Facturación Electrónica"
-        title="Avanzado"
-        description="Conexión de este tenant con Aura — provisioning de Facturación Electrónica"
+        title={<><span className="page-title-dot" />Avanzado</>}
+        description="Conexión de esta empresa con Vega — provisioning de Facturación Electrónica"
         action={<Link className="btn btn-ghost btn-size-sm" to="/config/ecf"><ShieldCheck size={14} /> Ir a Administración</Link>}
       />
+      <EcfTabs />
 
       <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div className="inline-alert inline-alert-info" style={{ alignItems: 'flex-start' }}>
@@ -447,8 +708,8 @@ export default function EcfAdminPage() {
           <span>
             Pantalla de <strong>setup único</strong>, más técnica que la configuración general. Requiere que el
             operador ya tenga el RNC certificado y el archivo <code>.p12</code> firmado (proceso que se hace en el
-            panel de Aura, no aquí). <strong>Las pruebas end-to-end siguen pendientes</strong>: ningún tenant real
-            tiene todavía una cuenta de Aura conectada.
+            panel de Vega, no aquí). <strong>Las pruebas end-to-end siguen pendientes</strong>: ninguna empresa real
+            tiene todavía una cuenta de Vega conectada.
           </span>
         </div>
 
@@ -461,6 +722,7 @@ export default function EcfAdminPage() {
               done={step2Done}
               locked={!step1Done}
               defaultCompany={data?.company ?? ''}
+              companyRnc={empresa?.rnc}
               existing={cliente}
             />
             <CertificateStep

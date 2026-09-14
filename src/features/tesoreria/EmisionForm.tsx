@@ -9,6 +9,7 @@ import {
   getSiguienteCheque,
   listTiposDocumento,
 } from '@/shared/api/tesoreria'
+import { getFacturacionConfig } from '@/shared/api/config'
 import type { CreateEmisionDto, CuentaBancaria, TesoreriaLinea, TesoreriaLiquidacion, TipoDocumentoBancario } from '@/shared/api/types'
 import { CuentaBancariaSelect } from './components/CuentaBancariaSelect'
 import { PartySelect } from './components/PartySelect'
@@ -66,6 +67,17 @@ export default function EmisionForm() {
   const [branch, setBranch] = useState('')
   const [branchSearch, setBranchSearch] = useState('')
   const [department, setDepartment] = useState('')
+
+  // ── Multimoneda (docs/tasks/64_multimoneda_completo.md §5.1) ──────────────
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
+  const [showMonedaOptions, setShowMonedaOptions] = useState(false)
+  const [conversionRate, setConversionRate] = useState<number | ''>('')
+  const [bankConversionRate, setBankConversionRate] = useState<number | ''>('')
 
   // ── Catálogo de tipos de documento ──────────────────────────────────────
   const { data: tiposData } = useQuery({
@@ -164,6 +176,8 @@ export default function EmisionForm() {
       nota,
       branch,
       department,
+      conversionRate,
+      bankConversionRate,
     },
     true,
   )
@@ -238,6 +252,8 @@ export default function EmisionForm() {
       department: department || undefined,
       cuentaBancoOverride: cuentaBancoOverride || undefined,
       cuentaPartyOverride: tieneBeneficiarioEfectivo && cuentaPartyOverride ? cuentaPartyOverride : undefined,
+      conversionRate: conversionRate === '' ? undefined : conversionRate,
+      bankConversionRate: bankConversionRate === '' ? undefined : bankConversionRate,
     }
 
     createMutation.mutate(dto)
@@ -292,6 +308,46 @@ export default function EmisionForm() {
                 <input className="ff-input" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
               </div>
             </div>
+
+            {multimonedaHabilitada && (
+              <div className="ff-wrap">
+                {!showMonedaOptions ? (
+                  <button type="button" className="btn btn-ghost btn-size-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setShowMonedaOptions(true)}>
+                    Mostrar opciones de moneda
+                  </button>
+                ) : (
+                  <>
+                    <label className="ff-label">Opciones de moneda (avanzado)</label>
+                    <div className="form-row form-row-3">
+                      <div className="ff-wrap">
+                        <label className="ff-label">Tasa de cambio (beneficiario → base)</label>
+                        <input
+                          type="number"
+                          min="0.0001"
+                          step="0.0001"
+                          className="ff-input"
+                          placeholder="Déjelo vacío para usar la configurada"
+                          value={conversionRate}
+                          onChange={(e) => setConversionRate(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        />
+                      </div>
+                      <div className="ff-wrap">
+                        <label className="ff-label">Tasa de cambio al banco</label>
+                        <input
+                          type="number"
+                          min="0.0001"
+                          step="0.0001"
+                          className="ff-input"
+                          placeholder="Solo si no hay tasa cargada"
+                          value={bankConversionRate}
+                          onChange={(e) => setBankConversionRate(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -374,6 +430,7 @@ export default function EmisionForm() {
                     ? `Si no distribuyes manualmente, se usará "${tipoDocumentoObj.defaultOffsetAccount}" como contrapartida.`
                     : 'La suma de las líneas debe igualar el monto total.'
                 }
+                showTasa={multimonedaHabilitada}
               />
             )}
           </div>
@@ -389,6 +446,7 @@ export default function EmisionForm() {
               sumaExacta={false}
               label="Comisiones / retenciones"
               helpText="Reducen lo que efectivamente se liquida/contabiliza en la contrapartida principal."
+              showTasa={multimonedaHabilitada}
             />
           </div>
         </div>

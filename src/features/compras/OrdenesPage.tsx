@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Badge } from '@/shared/ui/Badge'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { Plus, ChevronLeft, ChevronRight, Search, ShoppingCart } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Search, ShoppingCart, SlidersHorizontal } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -15,6 +15,7 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
+import { Drawer } from '@/shared/ui/Drawer'
 
 const PAGE_SIZE = 20
 
@@ -34,6 +35,7 @@ export default function OrdenesPage() {
   const [toDate, setToDate] = useState('')
   const [branch, setBranch] = useState('')
   const [page, setPage] = useState(1)
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
 
   const offset = (page - 1) * PAGE_SIZE
@@ -68,13 +70,25 @@ export default function OrdenesPage() {
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
 
+  const activeMoreFiltersCount = [fromDate, toDate].filter((v) => v !== '').length
+    + (receiptStatus !== 'all' ? 1 : 0)
+    + (billingStatus !== 'all' ? 1 : 0)
+
+  function clearMoreFilters() {
+    setReceiptStatus('all')
+    setBillingStatus('all')
+    setFromDate('')
+    setToDate('')
+    setPage(1)
+  }
+
   return (
     <div className="page-container">
       <PageHeader
-        title="Órdenes de Compra"
+        title={<><span className="page-title-dot" />Órdenes de Compra</>}
         description="El pedido formal a un proveedor específico, con precios — se genera desde una solicitud o se crea directa"
         action={
-          <button className="btn btn-primary" onClick={() => navigate('/compras/ordenes/nueva')}>
+          <button className="btn btn-navy" onClick={() => navigate('/compras/ordenes/nueva')}>
             <Plus size={16} />
             Nueva Orden
           </button>
@@ -82,61 +96,55 @@ export default function OrdenesPage() {
       />
 
       <div>
-        <div className="filter-bar">
-          <div className="filter-bar-left">
-            <div className="search-input-wrap">
-              <Search size={14} className="search-input-icon" />
-              <input
-                className="search-input"
-                placeholder="Buscar proveedor…"
-                value={supplier}
-                onChange={(e) => { setSupplier(e.target.value); setPage(1) }}
-              />
+        <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="filter-bar" style={{ margin: 0 }}>
+              <div className="filter-bar-left">
+                <div className="search-input-wrap">
+                  <Search size={14} className="search-input-icon" />
+                  <input
+                    className="search-input"
+                    placeholder="Buscar proveedor…"
+                    value={supplier}
+                    onChange={(e) => { setSupplier(e.target.value); setPage(1) }}
+                  />
+                </div>
+                <FilterField label="Estado">
+                  <Select value={status} onValueChange={(val) => { setStatus(val); setPage(1) }}>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    <SelectItem value="draft">Borrador</SelectItem>
+                    <SelectItem value="submitted">Sometida</SelectItem>
+                    <SelectItem value="cancelled">Anulada</SelectItem>
+                  </Select>
+                </FilterField>
+                <FilterField label="Sucursal" style={{ width: 200 }}>
+                  <SearchSelect
+                    value={branch}
+                    onChange={(val) => { setBranch(val); setPage(1) }}
+                    options={branchOptions}
+                    onSearch={setBranchSearch}
+                    selectedLabel={branch}
+                    placeholder="Todas las sucursales"
+                  />
+                </FilterField>
+              </div>
             </div>
-            <FilterField label="Recepción">
-              <Select value={receiptStatus} onValueChange={(val) => { setReceiptStatus(val); setPage(1) }}>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="pending">Pendientes de recibir</SelectItem>
-                <SelectItem value="received">Recibidas</SelectItem>
-              </Select>
-            </FilterField>
-            <FilterField label="Facturación">
-              <Select value={billingStatus} onValueChange={(val) => { setBillingStatus(val); setPage(1) }}>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="pending">Pendientes de facturar</SelectItem>
-                <SelectItem value="billed">Facturadas</SelectItem>
-              </Select>
-            </FilterField>
-            <FilterField label="Estado">
-              <Select value={status} onValueChange={(val) => { setStatus(val); setPage(1) }}>
-                <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="draft">Borrador</SelectItem>
-                <SelectItem value="submitted">Sometida</SelectItem>
-                <SelectItem value="cancelled">Anulada</SelectItem>
-              </Select>
-            </FilterField>
-            <FilterField label="Sucursal" style={{ width: 200 }}>
-              <SearchSelect
-                value={branch}
-                onChange={(val) => { setBranch(val); setPage(1) }}
-                options={branchOptions}
-                onSearch={setBranchSearch}
-                selectedLabel={branch}
-                placeholder="Todas las sucursales"
-              />
-            </FilterField>
-            <FilterField label="Desde">
-              <DatePicker className="filter-select" value={fromDate} onChange={(v) => { setFromDate(v); setPage(1) }} clearable />
-            </FilterField>
-            <FilterField label="Hasta">
-              <DatePicker className="filter-select" value={toDate} onChange={(v) => { setToDate(v); setPage(1) }} clearable />
-            </FilterField>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+              <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+                <SlidersHorizontal size={13} />
+                Más filtros
+                {activeMoreFiltersCount > 0 && (
+                  <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="card">
+        <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table navy-table">
               <thead>
                 <tr>
                   <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
@@ -176,7 +184,7 @@ export default function OrdenesPage() {
                                 </div>
                                 <p className="empty-title">Sin órdenes de compra</p>
                                 <p className="empty-sub">No hay órdenes de compra registradas.</p>
-                                <button className="btn btn-primary btn-size-sm" onClick={() => navigate('/compras/ordenes/nueva')}>
+                                <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/compras/ordenes/nueva')}>
                                   <Plus size={14} />Nueva Orden
                                 </button>
                               </div>
@@ -226,6 +234,46 @@ export default function OrdenesPage() {
           )}
         </div>
       </div>
+
+      <Drawer
+        open={moreFiltersOpen}
+        onClose={() => setMoreFiltersOpen(false)}
+        title="Más filtros"
+        subtitle="Refina la búsqueda de órdenes de compra"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={clearMoreFilters}>Limpiar</button>
+            <button className="btn btn-navy" onClick={() => setMoreFiltersOpen(false)}>Aplicar</button>
+          </>
+        }
+      >
+        <div className="ff-wrap">
+          <label className="ff-label">Recepción</label>
+          <Select value={receiptStatus} onValueChange={(val) => { setReceiptStatus(val); setPage(1) }}>
+            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="pending">Pendientes de recibir</SelectItem>
+            <SelectItem value="received">Recibidas</SelectItem>
+          </Select>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Facturación</label>
+          <Select value={billingStatus} onValueChange={(val) => { setBillingStatus(val); setPage(1) }}>
+            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="pending">Pendientes de facturar</SelectItem>
+            <SelectItem value="billed">Facturadas</SelectItem>
+          </Select>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Fecha</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DatePicker className="ff-input" value={fromDate} onChange={(v) => { setFromDate(v); setPage(1) }} clearable />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker className="ff-input" value={toDate} onChange={(v) => { setToDate(v); setPage(1) }} clearable />
+          </div>
+        </div>
+      </Drawer>
     </div>
   )
 }

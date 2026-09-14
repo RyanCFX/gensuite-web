@@ -1,8 +1,8 @@
 // Secuencias e-NCF (rangos electrónicos autorizados por la DGII) — análogo a las Secuencias NCF
-// físicas de este mismo archivo/pantalla, pero contra Aura (/config/ecf/secuencias).
+// físicas de este mismo archivo/pantalla, pero contra Vega (/config/ecf/secuencias).
 //
 // CONSTANCIA: construido contra la API; las pruebas de integración end-to-end quedan pendientes —
-// ningún tenant real tiene todavía una cuenta de Aura conectada ni un certificado cargado.
+// ningún tenant real tiene todavía una cuenta de Vega conectada ni un certificado cargado.
 
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -100,7 +100,7 @@ function CreateModal({ company, onClose }: { company: string; onClose: () => voi
         <div className="modal-head">
           <div>
             <div className="modal-title">Nuevo rango e-NCF</div>
-            <div className="modal-sub">Aura — Facturación Electrónica</div>
+            <div className="modal-sub">Vega — Facturación Electrónica</div>
           </div>
         </div>
         <form onSubmit={handleSubmit}>
@@ -420,7 +420,7 @@ export function EcfSequencesPanel() {
       <div className="inline-alert inline-alert-info">
         <Info size={15} aria-hidden="true" style={{ flexShrink: 0 }} />
         <span>
-          Este tenant todavía no está conectado a Aura. Conéctalo desde{' '}
+          Tu empresa todavía no está conectada a Vega. Conéctala desde{' '}
           <Link to="/config/ecf/admin">Facturación Electrónica → Avanzado</Link> para gestionar rangos e-NCF.
         </span>
       </div>
@@ -434,7 +434,7 @@ export function EcfSequencesPanel() {
       <div className="inline-alert inline-alert-info">
         <Info size={15} aria-hidden="true" style={{ flexShrink: 0 }} />
         <span>
-          Rangos numéricos autorizados por la DGII para comprobantes electrónicos, sincronizados con Aura.
+          Rangos numéricos autorizados por la DGII para comprobantes electrónicos, sincronizados con Vega.
           {electronicosCount > 0
             ? ` Hay ${electronicosCount} tipo(s) habilitado(s) para emitirse como e-CF.`
             : ' Ningún tipo está habilitado todavía para emitirse como e-CF.'}
@@ -442,7 +442,7 @@ export function EcfSequencesPanel() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button className="btn btn-primary btn-size-sm" onClick={() => setModal({ type: 'create' })}>
+        <button className="btn btn-navy btn-size-sm" onClick={() => setModal({ type: 'create' })}>
           <Plus size={14} aria-hidden="true" /> Nuevo rango
         </button>
       </div>
@@ -457,9 +457,9 @@ export function EcfSequencesPanel() {
         </div>
       ))}
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <th>Tipo</th>

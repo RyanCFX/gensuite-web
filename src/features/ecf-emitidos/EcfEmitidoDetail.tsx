@@ -1,7 +1,7 @@
 // Detalle de un e-CF emitido (origin: ISSUED): flujo de estado ante la DGII, líneas, totales,
 // timbre (QR) y enlace al documento de ERPNext. Solo lectura + "Refrescar estado".
 //
-// CONSTANCIA: las pruebas end-to-end con datos reales quedan pendientes — ningún tenant tiene Aura
+// CONSTANCIA: las pruebas end-to-end con datos reales quedan pendientes — ningún tenant tiene Vega
 // conectado en producción.
 
 import { useParams, useNavigate, Link } from 'react-router-dom'
@@ -61,8 +61,9 @@ export default function EcfEmitidoDetail() {
 
   // Solo aplica a un voucher REJECTED — asigna un e-NCF nuevo sobre el MISMO documento (el
   // invoiceId no cambia). No es exclusivo de Farmacia, pero ese vertical fue el que lo motivó
-  // (docs/FARMACIA_ARS_FRONTEND.md §4.6): tanto "Cobrar despacho" como "Facturar lote" pueden
-  // terminar con un e-CF rechazado que hay que regenerar sin perder el documento ya sometido.
+  // (docs/PROMPT_FARMACIA_V2_FRONTEND.md §4.4): tanto cobrar la factura del paciente como
+  // "Facturar lote" pueden terminar con un e-CF rechazado que hay que regenerar sin perder el
+  // documento ya sometido.
   const regenerarMutation = useMutation({
     mutationFn: () => regenerarEcfEmitido(voucherId),
     onSuccess: (res) => {

@@ -24,6 +24,9 @@ import type {
   FacturacionConfig,
   HabilitarPosDto,
   HabilitarPosResult,
+  DeshabilitarPosResult,
+  HabilitarDespachoResult,
+  DeshabilitarDespachoResult,
   LayawayConfig,
   AlmacenListItem,
   CreateAlmacenDto,
@@ -47,6 +50,7 @@ import type {
   UpdateUOMResult,
   EcfConfig,
   UpdateEcfConfigDto,
+  HabilitarFarmaciaResult,
 } from './types'
 
 export async function getEmpresa() {
@@ -82,6 +86,23 @@ export async function updateFacturacionConfig(data: Partial<FacturacionConfig>) 
 // Idempotente: activa el módulo POS (o reintenta si algo falló a mitad de camino).
 export async function habilitarPos(data: HabilitarPosDto) {
   const res = await client.post<{ success: true; data: HabilitarPosResult }>(ENDPOINTS.config.posHabilitar, data)
+  return unwrap(res)
+}
+
+export async function deshabilitarPos() {
+  const res = await client.post<{ success: true; data: DeshabilitarPosResult }>(ENDPOINTS.config.posDeshabilitar)
+  return unwrap(res)
+}
+
+// Idempotente del lado servidor. Éxito: refrescar `['facturacion-config']` antes de navegar (§1.3).
+export async function habilitarDespacho() {
+  const res = await client.post<{ success: true; data: HabilitarDespachoResult }>(ENDPOINTS.config.despachoHabilitar)
+  return unwrap(res)
+}
+
+// Puede fallar con 409 — `error.details` trae `DesactivarDespachoBloqueos` (IDs concretos a resolver).
+export async function deshabilitarDespacho() {
+  const res = await client.post<{ success: true; data: DeshabilitarDespachoResult }>(ENDPOINTS.config.despachoDeshabilitar)
   return unwrap(res)
 }
 
@@ -394,6 +415,7 @@ export interface CatalogoFiscalItem {
 
 export interface CatalogosFiscales {
   ncfTypes: CatalogoFiscalItem[]
+  ncfTypesFisicos: CatalogoFiscalItem[]
   ncfTypesCompra: CatalogoFiscalItem[]
   tipoBienes606: CatalogoFiscalItem[]
   formaPago606: CatalogoFiscalItem[]
@@ -414,8 +436,15 @@ export async function listCurrencies(): Promise<CurrencyOption[]> {
   return unwrap(res)
 }
 
-// POST /config/farmacia/habilitar — sin body, idempotente (docs/FARMACIA_ARS_FRONTEND.md §2.2).
+// POST /config/farmacia/habilitar — sin body, idempotente (docs/PROMPT_FARMACIA_V2_FRONTEND.md §9).
 // Response no documentada en openapi.json.
-export async function habilitarFarmacia(): Promise<void> {
-  await client.post(ENDPOINTS.config.farmaciaHabilitar)
+/**
+ * Idempotente: crea en ERPNext todo lo que el vertical Farmacia ARS necesita — cuenta puente,
+ * modo de pago "Cobertura ARS", grupo de clientes "ARS", perfiles, ítem de reclasificación del
+ * lote y la plantilla de impresión "Factura Farmacia"
+ * (docs/PROMPT_FARMACIA_V2_FRONTEND.md §9). Devuelve lo que quedó provisionado.
+ */
+export async function habilitarFarmacia(): Promise<HabilitarFarmaciaResult> {
+  const res = await client.post<{ success: true; data?: HabilitarFarmaciaResult }>(ENDPOINTS.config.farmaciaHabilitar)
+  return res.data?.data ?? {}
 }

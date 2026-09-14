@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { listLotesFarmacia } from '@/shared/api/farmacia'
 import type { ListLotesFarmaciaParams } from '@/shared/api/farmacia'
-import { listCustomers } from '@/shared/api/customers'
+import { listAseguradoras, nombreAseguradora } from '@/shared/api/aseguradoras'
 import { Plus, Eye } from 'lucide-react'
 import { formatDOP, formatDate } from '@/lib/formatters'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -31,12 +31,12 @@ export default function LotesPage() {
   const [showCreate, setShowCreate] = useState(false)
 
   const { data: aseguradorasData, isLoading: aseguradorasLoading } = useQuery({
-    queryKey: ['customerSearch-ars', aseguradoraQuery],
-    queryFn: () => listCustomers({ search: aseguradoraQuery || undefined, limit: 15 }),
+    queryKey: ['aseguradoraSearch', aseguradoraQuery],
+    queryFn: () => listAseguradoras({ search: aseguradoraQuery || undefined, limit: 15 }),
   })
-  const aseguradoraOptions: SearchSelectOption[] = (aseguradorasData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
+  const aseguradoraOptions: SearchSelectOption[] = (aseguradorasData?.items ?? []).map((a) => ({
+    value: a.id,
+    label: nombreAseguradora(a),
   }))
 
   const params: ListLotesFarmaciaParams = {
@@ -55,49 +55,55 @@ export default function LotesPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Lotes de Facturación ARS</h1>
-          <p className="page-sub">Agrupa despachos ya cobrados de una misma ARS para facturarlos juntos</p>
+          <h1 className="page-title"><span className="page-title-dot" />Lotes de Facturación ARS</h1>
+          <p className="page-sub">Agrupa la cobertura neta de facturas ya cobradas de una misma ARS para facturarlas juntas</p>
         </div>
         <Permitido accion="farmacia.lotes.crear">
-          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+          <button className="btn btn-navy" onClick={() => setShowCreate(true)}>
             <Plus size={16} /> Nuevo Lote
           </button>
         </Permitido>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="ARS" style={{ width: 220 }}>
-            <SearchSelect
-              value={aseguradoraId}
-              selectedLabel={aseguradoraLabel}
-              onChange={(val, opt) => { setAseguradoraId(val); setAseguradoraLabel(opt?.label ?? '') }}
-              options={aseguradoraOptions}
-              onSearch={setAseguradoraQuery}
-              loading={aseguradorasLoading}
-              placeholder="Filtrar por ARS…"
-            />
-          </FilterField>
-          <FilterField label="Estado">
-            <Select value={estado} onValueChange={(val) => setEstado(val as EstadoFilter)}>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="Abierto">Abierto</SelectItem>
-              <SelectItem value="En Revisión">En Revisión</SelectItem>
-              <SelectItem value="Facturado">Facturado</SelectItem>
-            </Select>
-          </FilterField>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="ARS" style={{ width: 220 }}>
+                <SearchSelect
+                  value={aseguradoraId}
+                  selectedLabel={aseguradoraLabel}
+                  onChange={(val, opt) => { setAseguradoraId(val); setAseguradoraLabel(opt?.label ?? '') }}
+                  options={aseguradoraOptions}
+                  onSearch={setAseguradoraQuery}
+                  loading={aseguradorasLoading}
+                  placeholder="Filtrar por ARS…"
+                />
+              </FilterField>
+              <FilterField label="Estado">
+                <Select value={estado} onValueChange={(val) => setEstado(val as EstadoFilter)}>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="Abierto">Abierto</SelectItem>
+                  <SelectItem value="En Revisión">En Revisión</SelectItem>
+                  <SelectItem value="Facturado">Facturado</SelectItem>
+                </Select>
+              </FilterField>
+            </div>
+          </div>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <th>#</th>
               <th>ARS</th>
               <th>Período</th>
-              <th style={{ textAlign: 'right' }}>Despachos</th>
+              <th style={{ textAlign: 'right' }}>Facturas</th>
               <th style={{ textAlign: 'right' }}>Total</th>
+              <th>NCF consolidada</th>
               <th>Estado</th>
               <th style={{ width: 48 }} />
             </tr>
@@ -106,17 +112,17 @@ export default function LotesPage() {
             {isLoading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 7 }).map((__, j) => (
+                  {Array.from({ length: 8 }).map((__, j) => (
                     <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                   ))}
                 </tr>
               ))
             ) : lotes.length === 0 ? (
               <tr>
-                <td colSpan={7}>
+                <td colSpan={8}>
                   <div className="empty-state">
                     <div className="empty-title">Sin lotes</div>
-                    <p className="empty-sub">Crea un lote para empezar a agrupar despachos cobrados de una ARS.</p>
+                    <p className="empty-sub">Crea un lote para empezar a agrupar facturas con cobertura de una ARS.</p>
                   </div>
                 </td>
               </tr>
@@ -126,8 +132,9 @@ export default function LotesPage() {
                   <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{l.id}</td>
                   <td style={{ fontWeight: 500 }}>{l.aseguradoraName ?? l.aseguradora}</td>
                   <td>{formatDate(l.periodoInicio)} – {formatDate(l.periodoFin)}</td>
-                  <td style={{ textAlign: 'right' }}>{l.cantidadDespachos}</td>
+                  <td style={{ textAlign: 'right' }}>{l.cantidadFacturas}</td>
                   <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(l.montoTotalLote)}</td>
+                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{l.ncfAsignado ?? <span className="td-dim">—</span>}</td>
                   <td><span className={`badge ${ESTADO_BADGE[l.estado] ?? 'badge-neutral'}`}>{l.estado}</span></td>
                   <td onClick={(e) => e.stopPropagation()} className="actions-cell">
                     <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/farmacia/lotes/${l.id}`)}>
@@ -139,6 +146,7 @@ export default function LotesPage() {
             )}
           </tbody>
         </table>
+      </div>
       </div>
 
       {data?.meta && (

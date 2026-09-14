@@ -1,5 +1,5 @@
 import { Wallet } from 'lucide-react'
-import { formatDOP } from '@/lib/formatters'
+import { formatMoney } from '@/lib/formatters'
 import type { CorteCaja } from '@/shared/api/types'
 
 /**
@@ -8,11 +8,11 @@ import type { CorteCaja } from '@/shared/api/types'
  * "Ventas a Crédito" y "Recibos de Contado" siempre vienen en 0 — es correcto,
  * no un dato faltante. "Importe a Entregar" es solo el efectivo físico (Cash).
  */
-export function CorteCajaView({ corteCaja }: { corteCaja: CorteCaja }) {
+export function CorteCajaView({ corteCaja, currency }: { corteCaja: CorteCaja; currency?: string }) {
   const row = (label: string, value: number, opts?: { bold?: boolean; muted?: boolean }) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
       <span style={{ color: opts?.muted ? 'var(--text-tertiary)' : 'var(--text-secondary)' }}>{label}</span>
-      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: opts?.bold ? 700 : 500 }}>{formatDOP(value)}</span>
+      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: opts?.bold ? 700 : 500 }}>{formatMoney(value, currency)}</span>
     </div>
   )
 
@@ -68,9 +68,9 @@ export function CorteCajaView({ corteCaja }: { corteCaja: CorteCaja }) {
                 corteCaja.ingresos.map((i) => (
                   <tr key={i.metodo}>
                     <td>{i.metodo}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatDOP(i.ventasContado)}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatDOP(i.recibosCobrados)}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatDOP(i.total)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatMoney(i.ventasContado, currency)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatMoney(i.recibosCobrados, currency)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatMoney(i.total, currency)}</td>
                   </tr>
                 ))
               )}
@@ -80,13 +80,13 @@ export function CorteCajaView({ corteCaja }: { corteCaja: CorteCaja }) {
                 <tr style={{ borderTop: '2px solid var(--border-strong)' }}>
                   <td style={{ fontWeight: 600 }}>Total</td>
                   <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                    {formatDOP(corteCaja.ingresos.reduce((s, i) => s + i.ventasContado, 0))}
+                    {formatMoney(corteCaja.ingresos.reduce((s, i) => s + i.ventasContado, 0), currency)}
                   </td>
                   <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                    {formatDOP(corteCaja.ingresos.reduce((s, i) => s + i.recibosCobrados, 0))}
+                    {formatMoney(corteCaja.ingresos.reduce((s, i) => s + i.recibosCobrados, 0), currency)}
                   </td>
                   <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-                    {formatDOP(corteCaja.ingresos.reduce((s, i) => s + i.total, 0))}
+                    {formatMoney(corteCaja.ingresos.reduce((s, i) => s + i.total, 0), currency)}
                   </td>
                 </tr>
               </tfoot>
@@ -106,7 +106,7 @@ export function CorteCajaView({ corteCaja }: { corteCaja: CorteCaja }) {
         <div className="card" style={{ padding: '14px 16px' }}>
           <div className="card-title" style={{ fontSize: 13, marginBottom: 8 }}>Fondo de Apertura</div>
           <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
-            {formatDOP(corteCaja.fondoApertura)}
+            {formatMoney(corteCaja.fondoApertura, currency)}
           </div>
         </div>
 
@@ -115,7 +115,7 @@ export function CorteCajaView({ corteCaja }: { corteCaja: CorteCaja }) {
             <Wallet size={14} /> Importe a Entregar
           </div>
           <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--brand-primary)' }}>
-            {formatDOP(corteCaja.importeAEntregar)}
+            {formatMoney(corteCaja.importeAEntregar, currency)}
           </div>
           <p style={{ fontSize: 11, color: 'var(--text-tertiary)', margin: '4px 0 0' }}>
             Solo efectivo físico (métodos de pago tipo Cash).

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { PlantillasTabs } from '@/shared/ui/PlantillasTabs'
 import { CANVAS_BOTTOM_MARGIN } from './constants'
 import { useTemplateEditorStore } from './store'
 import { TemplateEditorLeftPanel } from './TemplateEditorLeftPanel'
@@ -131,6 +132,7 @@ export default function InvoiceTemplateEditorPage({ fixedType }: Props) {
     return (
       <div className="page-container">
         <PageHeader title={PAGE_COPY[fixedType].title} description={PAGE_COPY[fixedType].description} />
+        <PlantillasTabs />
         <div className="card"><div className="card-body" style={{ textAlign: 'center', padding: '48px 0' }}><span className="spinner spinner-brand spinner-md" /></div></div>
       </div>
     )
@@ -163,6 +165,7 @@ export default function InvoiceTemplateEditorPage({ fixedType }: Props) {
       <div className="tpl-editor-content">
         <div className="tpl-editor-header">
           <PageHeader title={PAGE_COPY[fixedType].title} description={PAGE_COPY[fixedType].description} />
+          <PlantillasTabs />
 
           <div className="ff-wrap tpl-height-control">
             <label className="ff-label">Alto de página (px)</label>

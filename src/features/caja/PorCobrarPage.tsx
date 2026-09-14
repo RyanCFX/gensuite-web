@@ -8,7 +8,7 @@ import { getFacturacionConfig, listMetodosPago } from '@/shared/api/config'
 import { getCustomer } from '@/shared/api/customers'
 import { getTurnoActual } from '@/shared/api/pos'
 import { downloadInvoicePdf } from '@/shared/api/invoices'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { formatDate, formatMoney } from '@/lib/formatters'
 import { useDebounce } from '@/lib/useDebounce'
 import { PaymentLinesEditor } from '@/components/shared/PaymentLinesEditor'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -18,6 +18,8 @@ import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { usePosTicketPrinter } from '@/shared/hooks/usePosTicketPrinter'
+import { useMetodoPagoCurrencies } from '@/shared/hooks/useMetodoPagoCurrencies'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import {
   EMPTY_PAYMENT_LINES_VALUE,
   buildSubmitPayload,
@@ -31,6 +33,15 @@ import type { CobrarFacturaDto, PendienteCobroItem } from '@/shared/api/types'
 
 const PAGE_SIZE = 20
 
+/**
+ * Importe que realmente se le cobra al paciente/cliente. El backend lo manda resuelto en
+ * `montoACobrar`; el fallback a `roundedTotal ?? grandTotal` cubre respuestas sin el campo
+ * (tenant general o backend viejo), donde no hay cobertura que descontar.
+ */
+function montoACobrarDe(inv: PendienteCobroItem): number {
+  return inv.montoACobrar ?? inv.roundedTotal ?? inv.grandTotal
+}
+
 export default function PorCobrarPage() {
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -40,10 +51,13 @@ export default function PorCobrarPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<PendienteCobroItem | null>(null)
   const [confirmDescartar, setConfirmDescartar] = useState<PendienteCobroItem | null>(null)
 
-  // Monto real a cobrar (con redondeo de moneda aplicado) — usar en vez de grandTotal para
-  // prellenar, validar y someter el cobro.
-  const selectedRoundedTotal = selectedInvoice ? selectedInvoice.roundedTotal ?? selectedInvoice.grandTotal : 0
+  // Monto real a cobrar — usar en vez de grandTotal para prellenar, validar y someter el cobro.
+  // Con cobertura ARS el backend ya antepone la fila de pago "Cobertura ARS": el cajero cobra
+  // SOLO `montoACobrar` (= roundedTotal − montoCobertura) y nunca manda esa fila
+  // (docs/PROMPT_FARMACIA_V2_FRONTEND.md §4.1/§4.3).
+  const selectedRoundedTotal = selectedInvoice ? montoACobrarDe(selectedInvoice) : 0
   const selectedRoundingAdjustment = selectedInvoice?.roundingAdjustment ?? 0
+  const selectedCobertura = selectedInvoice?.aseguradora?.montoCobertura ?? 0
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
@@ -67,10 +81,17 @@ export default function PorCobrarPage() {
 
   const usaModuloPos = facturacion?.usaModuloPos ?? false
   const flujoCobro = facturacion?.flujoCobro ?? 'directo'
+  const monedaBase = facturacion?.monedaBase ?? 'DOP'
   const { tryPrintPosTicket, printTargetNode } = usePosTicketPrinter()
   const metodosActivos = (metodos ?? []).filter((m) => !m.disabled)
+  // Caja/POS nunca convierte moneda (docs/tasks/70_caja_pos_sin_soporte_multimoneda.md) — el
+  // método de pago debe operar en la MISMA moneda de la factura (nunca la de "Cobertura ARS",
+  // que el propio backend siempre resuelve en DOP sin importar la moneda de la factura).
+  const metodoCurrencies = useMetodoPagoCurrencies(metodosActivos, monedaBase)
+  const selectedInvoiceCurrency = selectedInvoice?.currency ?? monedaBase
+  const metodosCompatibles = metodosActivos.filter((m) => (metodoCurrencies[m.name] ?? monedaBase) === selectedInvoiceCurrency)
   const [directoMopSearch, setDirectoMopSearch] = useState('')
-  const directoMopOptions: SearchSelectOption[] = metodosActivos
+  const directoMopOptions: SearchSelectOption[] = metodosCompatibles
     .filter((m) => !directoMopSearch || m.name.toLowerCase().includes(directoMopSearch.toLowerCase()))
     .map((m) => ({ value: m.name, label: m.name }))
 
@@ -160,7 +181,7 @@ const [directoMop, setDirectoMop] = useState('')
       if (res.fullyPaid) {
         toast.success(msg)
       } else {
-        toast.success(`${msg} — Saldo pendiente: ${formatDOP(res.outstandingAmount)}. Puedes terminar el cobro desde la cola de Caja.`)
+        toast.success(`${msg} — Saldo pendiente: ${formatMoney(res.outstandingAmount, selectedInvoiceCurrency)}. Puedes terminar el cobro desde la cola de Caja.`)
       }
       closeModal()
       queryClient.invalidateQueries({ queryKey: ['caja-por-cobrar'] })
@@ -182,6 +203,10 @@ const [directoMop, setDirectoMop] = useState('')
       }
     },
     onError: (err: { message?: string }) => {
+      if (isApiErrorCode(err, ERROR_CODES.POS_PAYMENT_CURRENCY_MISMATCH)) {
+        toast.error(err.message, { duration: 8000 })
+        return
+      }
       toast.error(err?.message ?? 'Error al completar el cobro')
     },
   })
@@ -213,13 +238,17 @@ function openModal(invoice: PendienteCobroItem) {
      if (flujoCobro === 'directo') {
        setDirectoMop('')
      } else {
+       // El método de caja por defecto del turno solo se prellena si opera en la misma moneda
+       // que esta factura — si no, se deja en blanco para que el cajero elija uno compatible.
        const cashMethod = turno?.modeOfPayment ?? turno?.modoPagoCaja ?? ''
+       const invoiceCurrency = invoice.currency ?? monedaBase
+       const cashMethodCurrency = metodoCurrencies[cashMethod] ?? monedaBase
        setPaymentsValue({
          ...EMPTY_PAYMENT_LINES_VALUE,
          payments: [{
            ...emptyPaymentLine(),
-           modeOfPayment: cashMethod,
-           amount: String(invoice.roundedTotal ?? invoice.grandTotal),
+           modeOfPayment: cashMethodCurrency === invoiceCurrency ? cashMethod : '',
+           amount: String(montoACobrarDe(invoice)),
          }],
        })
      }
@@ -256,7 +285,7 @@ function validateAndSubmit() {
      if (validLines.length === 0) { toast.error('Agrega al menos una línea de pago válida'); return }
      const entered = sumPayments(paymentsValue.payments)
      if (entered > total + PAYMENT_LINES_TOLERANCE) {
-       toast.error(`La suma de pagos (${formatDOP(entered)}) excede el total (${formatDOP(total)})`)
+       toast.error(`La suma de pagos (${formatMoney(entered, selectedInvoiceCurrency)}) excede el total (${formatMoney(total, selectedInvoiceCurrency)})`)
        return
      }
 
@@ -266,7 +295,7 @@ function validateAndSubmit() {
        if (tenderedCash <= 0) { toast.error('Indica el efectivo entregado por el cliente'); return }
        if (cash <= 0) { toast.error('No hay pagos en efectivo para registrar vuelto'); return }
        if (tenderedCash < cash - PAYMENT_LINES_TOLERANCE) {
-         toast.error(`El efectivo entregado (RD$${tenderedCash.toFixed(2)}) es menor al total de pagos en efectivo (RD$${cash.toFixed(2)})`)
+         toast.error(`El efectivo entregado (${formatMoney(tenderedCash, selectedInvoiceCurrency)}) es menor al total de pagos en efectivo (${formatMoney(cash, selectedInvoiceCurrency)})`)
          return
        }
      }
@@ -356,6 +385,8 @@ function validateAndSubmit() {
                 <th>Cliente</th>
                 <th>Fecha</th>
                 <th style={{ textAlign: 'right' }}>Total</th>
+                <th style={{ textAlign: 'right' }}>Cubre ARS</th>
+                <th style={{ textAlign: 'right' }}>A cobrar</th>
                 <th style={{ width: 180 }} />
               </tr>
             </thead>
@@ -363,7 +394,7 @@ function validateAndSubmit() {
               {isLoading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 5 }).map((__, j) => (
+                      {Array.from({ length: 7 }).map((__, j) => (
                         <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                       ))}
                     </tr>
@@ -371,7 +402,7 @@ function validateAndSubmit() {
                 : pendientes.length === 0
                   ? (
                       <tr>
-                        <td colSpan={5}>
+                        <td colSpan={7}>
                           <div className="empty-state">
                             <p className="empty-title">Sin pendientes por cobrar</p>
                             <p className="empty-sub">No hay facturas en espera de completar cobro.</p>
@@ -391,8 +422,15 @@ function validateAndSubmit() {
                            inv.customerName
                          )}</td>
                         <td className="td-muted">{formatDate(inv.postingDate)}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                          {formatMoney(inv.roundedTotal ?? inv.grandTotal, inv.currency ?? monedaBase)}
+                        </td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--color-brand)' }}>
+                          {/* La cobertura ARS siempre es DOP, sin importar la moneda de la factura. */}
+                          {inv.aseguradora ? formatMoney(inv.aseguradora.montoCobertura, 'DOP') : <span className="td-dim">—</span>}
+                        </td>
                         <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600 }}>
-                          {formatDOP(inv.roundedTotal ?? inv.grandTotal)}
+                          {formatMoney(montoACobrarDe(inv), inv.currency ?? monedaBase)}
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 6 }}>
@@ -447,13 +485,32 @@ function validateAndSubmit() {
                  <span style={{ fontWeight: 500 }}>{selectedInvoice.customerName}</span>
                  <span style={{ color: 'var(--text-secondary)' }}>NCF:</span>
                  <span style={{ fontStyle: 'italic', color: 'var(--text-tertiary)' }}>Se asignará al cobrar</span>
+                 {selectedInvoice.aseguradora && (
+                   <>
+                     <span style={{ color: 'var(--text-secondary)' }}>Total de la factura:</span>
+                     <span>{formatMoney(selectedInvoice.roundedTotal ?? selectedInvoice.grandTotal, selectedInvoiceCurrency)}</span>
+                     <span style={{ color: 'var(--text-secondary)' }}>Cubre la ARS:</span>
+                     <span style={{ color: 'var(--color-brand)', fontWeight: 500 }}>
+                       {formatMoney(selectedCobertura, 'DOP')}
+                       <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 6 }}>
+                         ({selectedInvoice.aseguradora.aseguradoraName ?? selectedInvoice.aseguradora.aseguradora})
+                       </span>
+                     </span>
+                   </>
+                 )}
                  <span style={{ color: 'var(--text-secondary)' }}>Monto a cobrar:</span>
-                 <span style={{ fontWeight: 700, color: 'var(--color-error)' }}>{formatDOP(selectedRoundedTotal)}</span>
+                 <span style={{ fontWeight: 700, color: 'var(--color-error)' }}>{formatMoney(selectedRoundedTotal, selectedInvoiceCurrency)}</span>
                </div>
+               {selectedInvoice.aseguradora && (
+                 <p style={{ margin: 0, fontSize: 11, color: 'var(--text-tertiary)' }}>
+                   La fila de pago "Cobertura ARS" la agrega el sistema — acá solo se registra lo
+                   que entrega el paciente.
+                 </p>
+               )}
                {selectedRoundingAdjustment !== 0 && (
                  <p style={{ margin: 0, fontSize: 11, color: 'var(--text-tertiary)' }}>
-                   Incluye ajuste por redondeo: {selectedRoundingAdjustment > 0 ? '+' : ''}{formatDOP(selectedRoundingAdjustment)}
-                   {' '}(total sin redondear: {formatDOP(selectedInvoice.grandTotal)})
+                   Incluye ajuste por redondeo: {selectedRoundingAdjustment > 0 ? '+' : ''}{formatMoney(selectedRoundingAdjustment, selectedInvoiceCurrency)}
+                   {' '}(total sin redondear: {formatMoney(selectedInvoice.grandTotal, selectedInvoiceCurrency)})
                  </p>
                )}
 
@@ -532,19 +589,20 @@ function validateAndSubmit() {
                      />
                    </div>
                    <p className="ff-hint" style={{ margin: 0 }}>
-                     Se cobrará el total de {formatDOP(selectedRoundedTotal)} con este método.
+                     Se cobrará el total de {formatMoney(selectedRoundedTotal, selectedInvoiceCurrency)} con este método.
                    </p>
                  </div>
                ) : (
                  <>
                    <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: 0, lineHeight: 1.5 }}>
                      El monto de cada línea de pago es lo que se aplica a la factura.
-                     La suma no puede exceder <strong>{formatDOP(selectedRoundedTotal)}</strong>.
+                     La suma no puede exceder <strong>{formatMoney(selectedRoundedTotal, selectedInvoiceCurrency)}</strong>.
                    </p>
                    <PaymentLinesEditor
                      amountDue={selectedRoundedTotal}
                      value={paymentsValue}
                      onChange={setPaymentsValue}
+                     currency={selectedInvoiceCurrency}
                    />
                  </>
                )}
@@ -557,8 +615,9 @@ function validateAndSubmit() {
                  onClick={validateAndSubmit}
                  disabled={completarMutation.isPending || (flujoCobro === 'caja' && !canSubmitCaja)}
                >
-                 {completarMutation.isPending ? 'Procesando…' : `Cobrar ${formatDOP(
-                   flujoCobro === 'directo' ? selectedRoundedTotal : sumPayments(paymentsValue.payments)
+                 {completarMutation.isPending ? 'Procesando…' : `Cobrar ${formatMoney(
+                   flujoCobro === 'directo' ? selectedRoundedTotal : sumPayments(paymentsValue.payments),
+                   selectedInvoiceCurrency,
                  )}`}
                </button>
              </div>
@@ -586,7 +645,13 @@ function validateAndSubmit() {
                  <span style={{ color: 'var(--text-secondary)' }}>Cliente:</span>
                  <span>{confirmDescartar.customerName}</span>
                  <span style={{ color: 'var(--text-secondary)' }}>Total:</span>
-                 <span>{formatDOP(confirmDescartar.roundedTotal ?? confirmDescartar.grandTotal)}</span>
+                 <span>{formatMoney(confirmDescartar.roundedTotal ?? confirmDescartar.grandTotal, confirmDescartar.currency ?? monedaBase)}</span>
+                 {confirmDescartar.aseguradora && (
+                   <>
+                     <span style={{ color: 'var(--text-secondary)' }}>Cubre la ARS:</span>
+                     <span>{formatMoney(confirmDescartar.aseguradora.montoCobertura, 'DOP')}</span>
+                   </>
+                 )}
                </div>
              </div>
              <div className="modal-foot">

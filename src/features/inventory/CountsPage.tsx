@@ -177,18 +177,18 @@ export default function CountsPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Conteos de Inventario"
+        title={<><span className="page-title-dot" />Conteos de Inventario</>}
         description="Gestiona los conteos físicos de inventario"
         action={
-          <button className="btn btn-primary" onClick={() => setShowNewDialog(true)}>
+          <button className="btn btn-navy" onClick={() => setShowNewDialog(true)}>
             <Plus size={16} /> Nuevo Conteo
           </button>
         }
       />
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <th>ID</th>
@@ -223,7 +223,7 @@ export default function CountsPage() {
                             <div className="empty-state">
                               <div className="empty-title">Sin conteos</div>
                               <p className="empty-sub">Crea tu primer conteo físico de inventario.</p>
-                              <button className="btn btn-primary btn-size-sm" onClick={() => setShowNewDialog(true)}>
+                              <button className="btn btn-navy btn-size-sm" onClick={() => setShowNewDialog(true)}>
                                 <Plus size={14} /> Nuevo Conteo
                               </button>
                             </div>

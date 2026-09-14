@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { createCustomer, updateCustomer, listCustomerGroups } from '@/shared/api/customers'
 import { listSucursales } from '@/shared/api/sucursales'
-import { listMetodosPago, listImpuestosVentas } from '@/shared/api/config'
+import { listMetodosPago, listImpuestosVentas, getFacturacionConfig } from '@/shared/api/config'
 import { listUsuarios } from '@/shared/api/usuarios'
 import { getDgiiTaxpayer } from '@/shared/api/dgii'
 import type { ApiError, Customer } from '@/shared/api/types'
@@ -15,6 +15,7 @@ import { useDebounce } from '@/lib/useDebounce'
 import { SearchSelect, type SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { MultiSelectChecklist } from '@/shared/ui/MultiSelectChecklist'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 import { CheckCircle2, XCircle, Info, HelpCircle, Plus, Trash2 } from 'lucide-react'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
@@ -48,6 +49,7 @@ const schema = z.object({
   branch: z.string().optional(),
   formaPagoDefault: z.string().optional(),
   cuentaCxcDefault: z.string().optional(),
+  defaultCurrency: z.string().optional(),
   encargadoCxc: z.string().email('Email inválido').optional().or(z.literal('')),
   impuestoVentasDefault: z.array(z.string()).optional(),
 }).superRefine((data, ctx) => {
@@ -86,6 +88,15 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
     queryKey: ['customer-groups'],
     queryFn: listCustomerGroups,
   })
+
+  // ── Multimoneda (docs/tasks/64_multimoneda_completo.md Fase 2) ────────────
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
+  const monedasHabilitadas = facturacionConfig?.monedasHabilitadas ?? ['DOP']
 
   const { data: sucursalesData } = useQuery({
     queryKey: ['sucursales-all'],
@@ -146,6 +157,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
       branch: '',
       formaPagoDefault: '',
       cuentaCxcDefault: '',
+      defaultCurrency: '',
       encargadoCxc: '',
       impuestoVentasDefault: [],
     },
@@ -179,6 +191,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
         branch: customer.branch ?? '',
         formaPagoDefault: customer.formaPagoDefault ?? '',
         cuentaCxcDefault: customer.cuentaCxcDefault ?? '',
+        defaultCurrency: customer.defaultCurrency ?? '',
         encargadoCxc: customer.encargadoCxc ?? '',
         impuestoVentasDefault: customer.impuestoVentasDefault ?? [],
       })
@@ -239,6 +252,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
       branch: values.branch || undefined,
       formaPagoDefault: values.formaPagoDefault || undefined,
       cuentaCxcDefault: values.cuentaCxcDefault || undefined,
+      defaultCurrency: values.defaultCurrency || undefined,
       encargadoCxc: values.encargadoCxc || undefined,
       impuestoVentasDefault: values.impuestoVentasDefault ?? [],
     }
@@ -683,6 +697,34 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
                 )}
               />
               <p className="ff-hint">Prellena el método de pago al facturar a este cliente — editable por documento.</p>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="ff-wrap">
+              <label className="ff-label" htmlFor="defaultCurrency">Moneda por Defecto</label>
+              <Controller
+                name="defaultCurrency"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value ?? ''}
+                    onValueChange={field.onChange}
+                    placeholder={`Heredar (${monedaBase})`}
+                  >
+                    <SelectItem value="">Heredar ({monedaBase})</SelectItem>
+                    {(['DOP', 'USD', 'EUR'] as const).map((c) => (
+                      <SelectItem key={c} value={c} disabled={!monedasHabilitadas.includes(c)}>
+                        {c}{!monedasHabilitadas.includes(c) ? ' (habilítela primero en Monedas)' : ''}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                )}
+              />
+              <p className="ff-hint">
+                Prellena la moneda al facturar a este cliente. Al fijarla, se autopobla su cuenta CxC en esa moneda
+                (salvo que elijas una "Cuenta CxC Alterna" explícita abajo).
+              </p>
             </div>
           </div>
 

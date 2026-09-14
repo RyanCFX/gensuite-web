@@ -5,8 +5,8 @@ import { getQuotation, submitQuotation, deleteQuotation, convertQuotationToInvoi
 import type { Quotation } from '@/shared/api/types'
 import { ArrowLeft, Download, FileText, Loader2, Send, Trash2, ClipboardList, XCircle, Copy } from 'lucide-react'
 import { toast } from 'sonner'
-import { formatDate, formatDOP, displayId } from '@/lib/formatters'
-import { getCatalogosFiscales } from '@/shared/api/config'
+import { formatDate, formatMoney, displayId } from '@/lib/formatters'
+import { getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
 import { RelatedDocsCard } from '@/components/shared/RelatedDocsCard'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -39,6 +39,13 @@ export default function QuotationDetail() {
     queryFn: () => getQuotation(id!),
     enabled: !!id,
   })
+
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
@@ -83,7 +90,8 @@ export default function QuotationDetail() {
       setConvertDialogOpen(false)
       const invoice = result as Quotation & { invoiceId?: string }
       if (invoice.invoiceId) {
-        navigate(`/facturas/${invoice.invoiceId}`)
+        const needsRnc = selectedNcfType === 'B01' && !quotation?.clienteOcasionalRnc
+        navigate(needsRnc ? `/facturas/${invoice.invoiceId}/editar` : `/facturas/${invoice.invoiceId}`)
       } else {
         navigate('/facturas')
       }
@@ -156,6 +164,11 @@ export default function QuotationDetail() {
             {quotation.sequence > 0 && (
               <span className="badge badge-info" title="Veces que se ha editado en borrador">
                 Versión {quotation.sequence}
+              </span>
+            )}
+            {quotation.currency && quotation.currency !== monedaBase && (
+              <span className="badge badge-info" title={quotation.conversionRate != null ? `Tasa ${quotation.conversionRate}` : undefined}>
+                {quotation.currency}
               </span>
             )}
           </h1>
@@ -278,6 +291,12 @@ export default function QuotationDetail() {
                 )}
               </span>
             </div>
+            {quotation.esClienteOcasional && quotation.clienteOcasionalRnc && (
+              <div className="detail-field">
+                <span className="detail-label">RNC / Cédula</span>
+                <span className="detail-value" style={{ fontFamily: 'monospace' }}>{quotation.clienteOcasionalRnc}</span>
+              </div>
+            )}
             {quotation.esClienteOcasional && quotation.clienteOcasionalDireccion && (
               <div className="detail-field">
                 <span className="detail-label">Dirección</span>
@@ -339,14 +358,14 @@ export default function QuotationDetail() {
                   <td style={{ textAlign: 'right' }}>
                     {item.discountPct && item.discountPct > 0 ? (
                       <>
-                        <span style={{ textDecoration: 'line-through', color: 'var(--text-tertiary)', marginRight: 4 }}>{formatDOP(item.rate)}</span>
-                        {formatDOP(item.discountedRate ?? item.rate)}
+                        <span style={{ textDecoration: 'line-through', color: 'var(--text-tertiary)', marginRight: 4 }}>{formatMoney(item.rate, quotation.currency)}</span>
+                        {formatMoney(item.discountedRate ?? item.rate, quotation.currency)}
                       </>
-                    ) : formatDOP(item.rate)}
+                    ) : formatMoney(item.rate, quotation.currency)}
                   </td>
                   <td style={{ textAlign: 'right' }}>{item.discountPct ? `${item.discountPct}%` : '—'}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
-                  <td style={{ textAlign: 'right' }} title={`${item.taxRate}%`}>{formatDOP(item.taxAmount)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount, quotation.currency)}</td>
+                  <td style={{ textAlign: 'right' }} title={`${item.taxRate}%`}>{formatMoney(item.taxAmount, quotation.currency)}</td>
                   <td>{item.uom || '—'}</td>
                 </tr>
               ))}
@@ -355,25 +374,25 @@ export default function QuotationDetail() {
           <div className="items-total-row">
             <div className="items-total-line">
               <span>Subtotal bruto</span>
-              <span>{formatDOP(grossTotal)}</span>
+              <span>{formatMoney(grossTotal, quotation.currency)}</span>
             </div>
             {totalDiscount > 0 && (
               <div className="items-total-line" style={{ color: 'var(--text-danger)' }}>
                 <span>Descuento total</span>
-                <span>-{formatDOP(totalDiscount)}</span>
+                <span>-{formatMoney(totalDiscount, quotation.currency)}</span>
               </div>
             )}
             {/*<div className="items-total-line">
               <span>Subtotal neto</span>
-              <span>{formatDOP(subtotal)}</span>
+              <span>{formatMoney(subtotal, quotation.currency)}</span>
             </div>*/}
             <div className="items-total-line">
               <span>Impuesto</span>
-              <span>{formatDOP(taxAmount)}</span>
+              <span>{formatMoney(taxAmount, quotation.currency)}</span>
             </div>
             <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
               <span>Total</span>
-              <span>{formatDOP(total)}</span>
+              <span>{formatMoney(total, quotation.currency)}</span>
             </div>
           </div>
         </div>
@@ -393,6 +412,13 @@ export default function QuotationDetail() {
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
                 Selecciona el tipo de comprobante fiscal (NCF) para la nueva factura.
               </p>
+              {quotation?.esClienteOcasional && (
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', background: 'var(--bg-secondary)', borderRadius: 6, padding: '10px 12px' }}>
+                  <div><strong>Comprador ocasional:</strong> {quotation.clienteOcasionalNombre}</div>
+                  <div>RNC / Cédula: {quotation.clienteOcasionalRnc || <span style={{ color: 'var(--text-tertiary)' }}>sin registrar</span>}</div>
+                  {quotation.clienteOcasionalDireccion && <div>Dirección: {quotation.clienteOcasionalDireccion}</div>}
+                </div>
+              )}
               <div className="ff-wrap">
                 <label className="ff-label">Tipo NCF</label>
                 <SearchSelect
@@ -404,6 +430,11 @@ export default function QuotationDetail() {
                   placeholder="Seleccionar tipo"
                 />
               </div>
+              {quotation?.esClienteOcasional && selectedNcfType === 'B01' && !quotation.clienteOcasionalRnc && (
+                <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
+                  Falta el RNC del comprador ocasional. Crédito Fiscal (B01) lo requiere — podrás completarlo en la factura recién creada antes de someterla.
+                </p>
+              )}
             </div>
             <div className="modal-foot">
               <button className="btn btn-ghost" onClick={() => setConvertDialogOpen(false)}>Cancelar</button>

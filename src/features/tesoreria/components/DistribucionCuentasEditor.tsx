@@ -14,6 +14,10 @@ interface DistribucionCuentasEditorProps {
   helpText?: string
   addLabel?: string
   disabled?: boolean
+  /** Muestra una columna opcional de tasa de cambio por línea — solo relevante cuando la cuenta
+   *  de esa línea opera en una moneda distinta a la base y no hay tasa cargada para la fecha
+   *  (ver docs/tasks/64_multimoneda_completo.md §5.1/§5.2). Pásalo como `multimonedaHabilitada`. */
+  showTasa?: boolean
 }
 
 function round2(n: number): number {
@@ -26,7 +30,7 @@ function round2(n: number): number {
  * activo, muestra en tiempo real el diferencial contra `monto` (validación de "distribucion" en
  * los 3 submódulos); cuando no, es una lista libre de comisiones/retenciones sin validación de suma.
  */
-export function DistribucionCuentasEditor({ value, onChange, monto, sumaExacta = false, label, helpText, addLabel = 'Agregar línea', disabled }: DistribucionCuentasEditorProps) {
+export function DistribucionCuentasEditor({ value, onChange, monto, sumaExacta = false, label, helpText, addLabel = 'Agregar línea', disabled, showTasa }: DistribucionCuentasEditorProps) {
   function addLinea() {
     onChange([...value, { cuenta: '', monto: 0, descripcion: '' }])
   }
@@ -64,6 +68,7 @@ export function DistribucionCuentasEditor({ value, onChange, monto, sumaExacta =
                 <th>Cuenta</th>
                 <th style={{ width: 140, textAlign: 'right' }}>Monto</th>
                 <th>Descripción</th>
+                {showTasa && <th style={{ width: 130 }}>Tasa de cambio</th>}
                 <th style={{ width: 36 }} />
               </tr>
             </thead>
@@ -100,6 +105,20 @@ export function DistribucionCuentasEditor({ value, onChange, monto, sumaExacta =
                       onChange={(e) => updateLinea(i, { descripcion: e.target.value })}
                     />
                   </td>
+                  {showTasa && (
+                    <td>
+                      <input
+                        className="items-input"
+                        type="number"
+                        min="0.0001"
+                        step="0.0001"
+                        placeholder="Si aplica"
+                        value={linea.conversionRate ?? ''}
+                        disabled={disabled}
+                        onChange={(e) => updateLinea(i, { conversionRate: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                      />
+                    </td>
+                  )}
                   <td>
                     {!disabled && (
                       <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeLinea(i)}>

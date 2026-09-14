@@ -45,7 +45,7 @@ export default function NotificacionesPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Notificaciones"
+        title={<><span className="page-title-dot" />Notificaciones</>}
         description="Configura qué eventos notifican por correo y quién los recibe"
       />
 
@@ -124,9 +124,9 @@ function CatalogoTab() {
         ))}
       </div>
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <th>Notificación</th>
@@ -729,50 +729,54 @@ function HistorialTab() {
       {resumen && <ResumenWidget data={resumen} />}
 
       {/* ── Filtros ─────────────────────────────────────────────────────── */}
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Tipo" style={{ width: 200 }}>
-            <SearchSelect
-              value={filtroTipo}
-              onChange={(val) => { setFiltroTipo(val); resetPage() }}
-              options={filtroTipoOptions}
-              onSearch={setFiltroTipoSearch}
-              selectedLabel={tiposData?.find((t) => t.codigo === filtroTipo)?.nombre ?? ''}
-              placeholder="Todos los tipos"
-            />
-          </FilterField>
+      <div className="card filter-card-navy">
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Tipo" style={{ width: 200 }}>
+                <SearchSelect
+                  value={filtroTipo}
+                  onChange={(val) => { setFiltroTipo(val); resetPage() }}
+                  options={filtroTipoOptions}
+                  onSearch={setFiltroTipoSearch}
+                  selectedLabel={tiposData?.find((t) => t.codigo === filtroTipo)?.nombre ?? ''}
+                  placeholder="Todos los tipos"
+                />
+              </FilterField>
 
-          <FilterField label="Estado">
-            <Select value={filtroEstado} onValueChange={(val) => { setFiltroEstado(val); resetPage() }}>
-              {ESTADOS.map((e) => (
-                <SelectItem key={e} value={e}>{e === 'Todos' ? 'Todos los estados' : e}</SelectItem>
-              ))}
-            </Select>
-          </FilterField>
+              <FilterField label="Estado">
+                <Select value={filtroEstado} onValueChange={(val) => { setFiltroEstado(val); resetPage() }}>
+                  {ESTADOS.map((e) => (
+                    <SelectItem key={e} value={e}>{e === 'Todos' ? 'Todos los estados' : e}</SelectItem>
+                  ))}
+                </Select>
+              </FilterField>
 
-          <FilterField label="Desde">
-            <DatePicker
-              className="filter-select"
-              value={filtroDesde}
-              onChange={(v) => { setFiltroDesde(v); resetPage() }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker
-              className="filter-select"
-              value={filtroHasta}
-              onChange={(v) => { setFiltroHasta(v); resetPage() }}
-              clearable
-            />
-          </FilterField>
+              <FilterField label="Desde">
+                <DatePicker
+                  className="filter-select"
+                  value={filtroDesde}
+                  onChange={(v) => { setFiltroDesde(v); resetPage() }}
+                  clearable
+                />
+              </FilterField>
+              <FilterField label="Hasta">
+                <DatePicker
+                  className="filter-select"
+                  value={filtroHasta}
+                  onChange={(v) => { setFiltroHasta(v); resetPage() }}
+                  clearable
+                />
+              </FilterField>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* ── Tabla ───────────────────────────────────────────────────────── */}
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <th>Fecha</th>

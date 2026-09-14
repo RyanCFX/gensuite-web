@@ -110,7 +110,7 @@ export default function PermisosPage() {
         <div className="empty-state">
           <span className="empty-icon"><ShieldOff size={20} /></span>
           <p className="empty-title">Acceso restringido</p>
-          <p className="empty-sub">Esta sección requiere el rol System Manager en ERPNext.</p>
+          <p className="empty-sub">Esta sección requiere el rol System Manager.</p>
         </div>
       </div>
     )
@@ -128,7 +128,7 @@ export default function PermisosPage() {
         <div className="empty-state">
           <span className="empty-icon"><ShieldOff size={20} /></span>
           <p className="empty-title">Acceso restringido</p>
-          <p className="empty-sub">Tu usuario no tiene el rol System Manager en ERPNext.</p>
+          <p className="empty-sub">Tu usuario no tiene el rol System Manager.</p>
         </div>
       </div>
     )
@@ -136,29 +136,33 @@ export default function PermisosPage() {
 
   return (
     <div className="page-container">
-      <PageHeader title="Permisos" description="Control fino de permisos por DocType y Rol" />
+      <PageHeader title={<><span className="page-title-dot" />Permisos</>} description="Control fino de permisos por DocType y Rol" />
 
-      <div className="filter-bar">
-        <div className="filter-bar-left" style={{ minWidth: 340 }}>
-          <SearchSelect
-            value={doctype}
-            onChange={(v) => setDoctype(v)}
-            options={doctypeOptions}
-            onSearch={setDoctypeSearch}
-            loading={catalogoQuery.isLoading}
-            placeholder="Elegir DocType…"
-          />
-        </div>
-        {doctype && (
-          <div className="filter-bar-right">
-            <button className="btn btn-secondary btn-size-sm" onClick={() => setShowAddRole(true)}>
-              <Plus size={14} /> Agregar rol
-            </button>
-            <button className="btn btn-ghost btn-size-sm" onClick={() => setConfirmReset(true)}>
-              <RotateCcw size={14} /> Restablecer a estándar
-            </button>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left" style={{ minWidth: 340 }}>
+              <SearchSelect
+                value={doctype}
+                onChange={(v) => setDoctype(v)}
+                options={doctypeOptions}
+                onSearch={setDoctypeSearch}
+                loading={catalogoQuery.isLoading}
+                placeholder="Elegir DocType…"
+              />
+            </div>
+            {doctype && (
+              <div className="filter-bar-right">
+                <button className="btn btn-secondary btn-size-sm" onClick={() => setShowAddRole(true)}>
+                  <Plus size={14} /> Agregar rol
+                </button>
+                <button className="btn btn-ghost btn-size-sm" onClick={() => setConfirmReset(true)}>
+                  <RotateCcw size={14} /> Restablecer a estándar
+                </button>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {!doctype && (
@@ -169,7 +173,7 @@ export default function PermisosPage() {
       )}
 
       {doctype && (
-        <div className="card">
+        <div className="card navy-table-card">
           {permisosQuery.isLoading && (
             <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {Array.from({ length: 4 }).map((_, i) => (
@@ -190,7 +194,7 @@ export default function PermisosPage() {
           )}
           {!permisosQuery.isLoading && !permisosQuery.isError && rows.length > 0 && (
             <div className="table-scroll">
-              <table className="data-table permisos-matrix">
+              <table className="data-table navy-table permisos-matrix">
                 <thead>
                   <tr>
                     <th>Rol</th>
@@ -258,7 +262,7 @@ export default function PermisosPage() {
             <div className="modal-body">
               <p style={{ fontSize: 14 }}>
                 Se borrarán TODAS las reglas personalizadas de <strong>{doctype}</strong> y se
-                restaurarán los permisos de fábrica de ERPNext para todos los roles. Esta acción
+                restaurarán los permisos de fábrica para todos los roles. Esta acción
                 afecta a todos los roles de golpe y no se puede deshacer.
               </p>
             </div>
@@ -286,8 +290,8 @@ export default function PermisosPage() {
             <div className="modal-body">
               <p style={{ fontSize: 14 }}>
                 Se eliminará la regla de permiso de <strong>{rowToDelete.role}</strong> (nivel{' '}
-                {rowToDelete.permlevel}) sobre <strong>{doctype}</strong>. ERPNext puede rechazar
-                esta acción si es la única regla de permiso del DocType.
+                {rowToDelete.permlevel}) sobre <strong>{doctype}</strong>. Esta acción puede
+                rechazarse si es la única regla de permiso del DocType.
               </p>
             </div>
             <div className="modal-foot">
@@ -366,7 +370,27 @@ function AddRoleModal({
               />
             </div>
             <div>
-              <label className="ff-label" style={{ display: 'block', marginBottom: 8 }}>Permisos iniciales</label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <label className="ff-label" style={{ margin: 0 }}>Permisos iniciales</label>
+                {(() => {
+                  const todosSeleccionados = PERMISO_PTYPES.every((pt) => flags[pt])
+                  return (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-size-sm"
+                      onClick={() =>
+                        setFlags(() =>
+                          Object.fromEntries(
+                            PERMISO_PTYPES.map((pt) => [pt, !todosSeleccionados]),
+                          ) as Record<PermisoPtype, boolean>,
+                        )
+                      }
+                    >
+                      {todosSeleccionados ? 'Quitar todos' : 'Seleccionar todos'}
+                    </button>
+                  )
+                })()}
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                 {PERMISO_PTYPES.map((pt) => (
                   <label key={pt} className="ff-check-wrap" style={{ fontSize: 13 }}>

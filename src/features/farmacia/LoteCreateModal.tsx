@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { createLoteFarmacia } from '@/shared/api/farmacia'
-import { listCustomers } from '@/shared/api/customers'
+import { listAseguradoras, nombreAseguradora } from '@/shared/api/aseguradoras'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
@@ -19,14 +19,14 @@ export function LoteCreateModal({ onClose, onCreated }: { onClose: () => void; o
   const [submitted, setSubmitted] = useState(false)
 
   const { data: aseguradorasData, isLoading: aseguradorasLoading } = useQuery({
-    queryKey: ['customerSearch-ars', aseguradoraQuery],
-    queryFn: () => listCustomers({ search: aseguradoraQuery || undefined, limit: 15 }),
+    queryKey: ['aseguradoraSearch', aseguradoraQuery],
+    queryFn: () => listAseguradoras({ search: aseguradoraQuery || undefined, limit: 15 }),
   })
-  const aseguradoraOptions: SearchSelectOption[] = (aseguradorasData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
+  const aseguradoraOptions: SearchSelectOption[] = (aseguradorasData?.items ?? []).map((a) => ({
+    value: a.id,
+    label: nombreAseguradora(a),
   }))
-  const aseguradoraSeleccionada = aseguradorasData?.items.find((c) => c.id === aseguradoraId)
+  const aseguradoraSeleccionada = aseguradorasData?.items.find((a) => a.id === aseguradoraId)
 
   const createMutation = useMutation({
     mutationFn: createLoteFarmacia,
@@ -77,8 +77,8 @@ export function LoteCreateModal({ onClose, onCreated }: { onClose: () => void; o
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: 10, borderRadius: 'var(--radius-md)', background: 'var(--warning-bg, rgba(234,179,8,0.1))', fontSize: 12 }}>
                 <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
                 <span>
-                  Este cliente no tiene "Tiene crédito fiscal" activado — "Facturar" fallará al cierre.
-                  Actívalo en el registro del cliente antes de facturar este lote.
+                  Esta aseguradora no tiene "Tiene crédito" activado — "Facturar" fallará al cierre.
+                  Actívalo en el registro de la aseguradora antes de facturar este lote.
                 </span>
               </div>
             )}

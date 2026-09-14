@@ -2,18 +2,28 @@ import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'rea
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createInvoice, updateInvoice, getInvoice } from '@/shared/api/invoices'
+import { usePermissionsStore } from '@/stores/permissions.store'
+import { AseguradoraPanel, CoberturaArsResumen } from './AseguradoraPanel'
+import {
+  EMPTY_ASEGURADORA_FORM,
+  aseguradoraFormFromInvoice,
+  aseguradoraFormToDto,
+  validarAseguradoraForm,
+  type AseguradoraFormState,
+} from './aseguradoraForm'
+import { esCoberturaCompleta } from '@/shared/api/types'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
 import { listItems, getDefaultPriceTier, getItem } from '@/shared/api/catalog'
 import { listImpuestosVentas, listAlmacenes, getCatalogosFiscales, getStockSettings, getFacturacionConfig } from '@/shared/api/config'
 import { getItemUbicaciones } from '@/shared/api/ubicaciones'
-import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking } from '@/shared/api/types'
+import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking, ItemStock } from '@/shared/api/types'
 import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingModal'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
 import { ENDPOINTS } from '@/shared/api/endpoints'
-import { formatDOP, round2 } from '@/lib/formatters'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
+import { formatDOP, formatMoney, round2 } from '@/lib/formatters'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus, Lock, LockOpen, ChevronDown } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
@@ -36,8 +46,11 @@ import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
+import { formatStockInsufficientMessage } from '@/lib/stockAlerts'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -61,17 +74,20 @@ interface LineItem {
   /** Factor de conversión activo (UOM seleccionada / stockUom) */
   conversionFactor: number
   maxDiscountPct?: number
-  /** Porcentaje de descuento automático del Pricing Rule (solo lectura, se suma al manual) */
+  /** Porcentaje de descuento automático del Pricing Rule (solo lectura, se suma al manual en modo %) */
   autoDiscountPct?: number
-  /** Descuento manual que escribe el vendedor (encima del automático) */
+  /** Descuento manual que escribe el vendedor (encima del automático) — solo aplica en modo "%" */
   manualDiscountPct: number
+  /** Modo de descuento de la línea — mutuamente excluyentes, nunca se envían ambos campos al backend */
+  discountMode: 'pct' | 'amount'
+  /** Descuento fijo en RD$ — solo aplica en modo "monto fijo" */
+  discountAmount: number
   allowsDiscount?: boolean
   /** Almacén seleccionado para la línea */
   warehouse: string
   /** Precios por tier del catálogo, para recalcular al cambiar el pricing tier */
   _prices?: ItemPrices
   _stockByWarehouse?: Record<string, number>
-  stockError?: string
   /** Ubicación/rack específico dentro del almacén elegido, si el artículo tiene alguna asignada ahí */
   ubicacion?: string
   /** Mensaje cuando el backend rechazó la venta por ambigüedad de ubicación (varias con stock) — obliga a elegir una */
@@ -79,13 +95,30 @@ interface LineItem {
   /** Componentes del combo con tracking de serial/lote activo (solo si itemType === 'combo') */
   _comboComponents?: { itemCode: string; itemName?: string; trackingType: 'serial' | 'batch'; qtyPerCombo: number }[]
   componentTracking?: ComponentTracking[]
+  // ── Cobertura ARS por línea (vertical farmacia, §3.3). Editables: los tres primeros.
+  /** Peso (%) para el reparto automático. Vacío en TODAS = reparto en partes iguales. */
+  porcientoTeoricoArs?: number
+  /** Cobertura ARS de la línea en RD$. Si ninguna línea lo trae, el servidor la reparte al guardar. */
+  montoAprobadoArs?: number
+  lineaBloqueadaArs?: boolean
+  /** Solo respuesta del servidor (`amount − montoAprobadoArs`). */
+  montoPacienteArs?: number
+  /** Solo respuesta del servidor. */
+  porcientoRealArs?: number
 }
 
-function validateLineStock(row: LineItem): string | undefined {
-  if (!row.warehouse || !row._stockByWarehouse) return undefined
-  const available = row._stockByWarehouse[row.warehouse] ?? 0
-  if (row.qty > available) {
-    return `Stock insuficiente en ${row.warehouse}. Disponible: ${available}`
+// Factura directa (sin despacho) no valida disponibilidad del lado del servidor antes de someter
+// (docs/tasks/73_alertas_stock_disponible_reservado.md §4.2) — esta es la única barrera real
+// contra prometer stock que ya está reservado para otro cliente (Apartado) o que simplemente no
+// alcanza. Compara siempre contra `disponible` (físico − reservado), nunca contra el físico a secas.
+function validateLineStock(row: LineItem, stockMap: Map<string, ItemStock>): string | undefined {
+  if (!row.warehouse || !row.itemCode || row.itemType === 'service' || row.itemType === 'combo') return undefined
+  const info = resolveDisponible(stockMap.get(row.itemCode), row.warehouse)
+  if (!info) return undefined // stock del artículo aún no cargado — no bloquear con datos incompletos
+  if (row.qty > info.disponible) {
+    return info.reservedStock > 0
+      ? `Solo hay ${info.disponible} disponibles de este artículo en ${row.warehouse} (${info.reservedStock} reservadas para otro cliente)`
+      : `Stock insuficiente en ${row.warehouse}. Disponible: ${info.disponible}`
   }
   return undefined
 }
@@ -120,10 +153,10 @@ function defaultDueDate() {
   return format(addDays(new Date(), 30), 'yyyy-MM-dd')
 }
 
-function calcAmount(qty: number, rate: number, discountPct: number = 0) {
+function calcAmount(qty: number, rate: number, discountPct: number = 0, discountAmount: number = 0) {
   const base = qty * rate
-  const discount = base * (discountPct / 100)
-  return Math.round((base - discount) * 100) / 100
+  const discount = discountAmount > 0 ? discountAmount : base * (discountPct / 100)
+  return Math.round(Math.max(0, base - discount) * 100) / 100
 }
 
 function maxDiscFromPrices(rate: number, prices: ItemPrices | undefined): number {
@@ -233,6 +266,12 @@ export default function InvoiceForm() {
   const [dueDate, setDueDate] = useState(defaultDueDate())
   const [ncfType, setNcfType] = useState<NcfType>('B02')
   const [items, setItems] = useState<LineItem[]>([])
+  // Disponibilidad real (físico − reservado) por artículo — docs/tasks/73_alertas_stock_disponible_reservado.md.
+  // Se usa en validateLineStock para bloquear el submit ANTES de que ERPNext rechace la venta, que
+  // en Factura directa (sin despacho) no valida esto por su cuenta (§4.2 del prompt).
+  const stockMap = useItemsStock(
+    items.map((i) => (i.itemCode && i.itemType !== 'service' && i.itemType !== 'combo' ? i.itemCode : undefined)),
+  )
   const [highlightedRow, setHighlightedRow] = useState<number | null>(null)
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
   const flashRow = useCallback((index: number) => {
@@ -260,6 +299,20 @@ export default function InvoiceForm() {
   const [taxesTemplate, setTaxesTemplate] = useState('')
   const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
+  // '' = automático (Cliente.defaultCurrency → moneda base). Al editar (PATCH), se hidrata con
+  // la moneda/tasa que la factura ya tenía — reenviarla es equivalente a omitirla.
+  const [currency, setCurrency] = useState('')
+  const [conversionRate, setConversionRate] = useState<number | ''>('')
+
+  // ── Cobertura ARS (vertical farmacia, docs/PROMPT_FARMACIA_V2_FRONTEND.md §3) ──────────────
+  // El vertical no cambia en caliente (§11): se lee una vez de los permisos de la sesión.
+  const esFarmacia = usePermissionsStore((s) => s.vertical) === 'farmacia'
+  const [arsEnabled, setArsEnabled] = useState(false)
+  const [ars, setArs] = useState<AseguradoraFormState>(EMPTY_ASEGURADORA_FORM)
+  /** Bloque calculado por el servidor del borrador que se está editando — nunca se recalcula acá. */
+  const arsServidor = esCoberturaCompleta(editingInvoice?.aseguradora) ? editingInvoice.aseguradora : null
+  /** `Facturado` = bloque inmutable; el resto de los estados de un borrador son editables. */
+  const arsSoloLectura = arsServidor?.estadoArs === 'Facturado'
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
@@ -268,6 +321,12 @@ export default function InvoiceForm() {
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
   const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
+  // ── Multimoneda (docs/tasks/64_multimoneda_completo.md §3.1) ──────────────
+  const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
+  const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
+  const monedasHabilitadas = facturacionConfig?.monedasHabilitadas ?? ['DOP']
+  /** Una factura con cobertura ARS no puede llevar impuestos (§3.7): se oculta el selector. */
+  const mostrarImpuestoDocumento = usaImpuestoDocumento && !(esFarmacia && arsEnabled)
   // Si está inactivo, se permite capturar un serial/lote nuevo al vender en vez de exigir que ya exista.
   const requiereSerialLoteCompra = facturacionConfig?.requiereSerialLoteCompra ?? false
 
@@ -393,7 +452,7 @@ export default function InvoiceForm() {
   // para no borrar los almacenes que vienen en GET /invoices/:id.
   useEffect(() => {
     if (isEdit && !itemsHydratedRef.current) return
-    setItems((prev) => prev.map((row) => (row.warehouse ? { ...row, warehouse: '', stockError: undefined } : row)))
+    setItems((prev) => prev.map((row) => (row.warehouse ? { ...row, warehouse: '' } : row)))
   }, [branch])
 
   const warehouseSelectOptions: SearchSelectOption[] = useMemo(() => {
@@ -414,9 +473,7 @@ export default function InvoiceForm() {
     setItems((prev) =>
       prev.map((row) => {
         if (!row.itemCode || row.warehouse) return row
-        const updated = { ...row, warehouse: onlyId }
-        updated.stockError = validateLineStock(updated)
-        return updated
+        return { ...row, warehouse: onlyId }
       }),
     )
   }, [branchWarehouses])
@@ -529,6 +586,10 @@ export default function InvoiceForm() {
         toast.error(msg || 'Selecciona una sucursal')
         return
       }
+      if (isApiErrorCode(err, ERROR_CODES.STOCK_INSUFFICIENT_OR_RESERVED)) {
+        toast.error(formatStockInsufficientMessage(err), { duration: 8000 })
+        return
+      }
       if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) { setPinModalOpen(true); return }
       if (msg.toLowerCase().includes('no tienes acceso a la sucursal')) {
         refetchMyBranches()
@@ -582,6 +643,10 @@ export default function InvoiceForm() {
     branch,
     department,
     taxesTemplate,
+    arsEnabled,
+    ars,
+    currency,
+    conversionRate,
   }, hydrationDone)
   useBeforeUnloadWarning(isDirty)
 
@@ -597,6 +662,8 @@ export default function InvoiceForm() {
     setBranch(inv.branch ?? '')
     setDepartment(inv.department ?? '')
     setNotes(inv.notes ?? '')
+    setCurrency(inv.currency ?? '')
+    setConversionRate(inv.conversionRate ?? '')
     if (inv.esClienteOcasional) {
       setEsClienteOcasional(true)
       setClienteOcasionalNombre(inv.clienteOcasionalNombre ?? '')
@@ -605,6 +672,10 @@ export default function InvoiceForm() {
     } else if (inv.customer) {
       setCustomerId(inv.customer)
       getCustomer(inv.customer).then(setSelectedCustomer).catch(() => {})
+    }
+    if (inv.aseguradora) {
+      setArsEnabled(true)
+      setArs(aseguradoraFormFromInvoice(inv.aseguradora))
     }
     // El impuesto del documento (taxesTemplate) no viene en GET /invoices/:id; si se deja sin tocar
     // el PATCH reusa el default de la compañía. El usuario puede re-seleccionarlo si aplica.
@@ -628,7 +699,9 @@ export default function InvoiceForm() {
           } catch {
             // Sin catálogo la línea sigue siendo editable, solo pierde límites de descuento/stock.
           }
-          const discountPct = it.discountPct ?? 0
+          const discountAmount = it.discountAmount ?? 0
+          const discountPct = discountAmount > 0 ? 0 : (it.discountPct ?? 0)
+          const discountMode: 'pct' | 'amount' = discountAmount > 0 ? 'amount' : 'pct'
           return {
             itemCode: it.itemCode,
             itemLabel: cat?.itemName ?? it.itemCode,
@@ -636,8 +709,10 @@ export default function InvoiceForm() {
             description: it.description ?? cat?.internalDescription ?? cat?.itemName ?? '',
             qty: it.qty,
             rate: it.rate,
-            amount: calcAmount(it.qty, it.rate, discountPct),
+            amount: calcAmount(it.qty, it.rate, discountPct, discountAmount),
             discountPct,
+            discountMode,
+            discountAmount,
             salesTaxPct: cat?.salesTaxPct ?? 0,
             salesTaxTemplate: cat?.salesTaxTemplate ?? '',
             baseRate: it.rate,
@@ -645,12 +720,17 @@ export default function InvoiceForm() {
             conversionFactor: 1,
             maxDiscountPct: cat?.allowsDiscount ? cat?.maxDiscountPct : undefined,
             autoDiscountPct: undefined,
-            manualDiscountPct: discountPct,
+            manualDiscountPct: discountMode === 'pct' ? discountPct : 0,
             allowsDiscount: cat?.allowsDiscount,
             warehouse: it.warehouse ?? '',
             _prices: cat?.prices,
             _stockByWarehouse: cat?.stockByWarehouse,
             ubicacion: it.ubicacion || undefined,
+            porcientoTeoricoArs: it.porcientoTeoricoArs,
+            montoAprobadoArs: it.montoAprobadoArs,
+            lineaBloqueadaArs: it.lineaBloqueadaArs,
+            montoPacienteArs: it.montoPacienteArs,
+            porcientoRealArs: it.porcientoRealArs,
           }
         }),
       )
@@ -670,14 +750,23 @@ export default function InvoiceForm() {
        prev.map((item, i) => {
          if (i !== index) return item
          const updated = { ...item, ...patch }
+         if ('discountMode' in patch) {
+           // Mutuamente excluyentes — al cambiar de modo se limpia el valor del otro, nunca se
+           // envían ambos campos al backend.
+           if (updated.discountMode === 'amount') {
+             updated.manualDiscountPct = 0
+             updated.discountPct = 0
+           } else {
+             updated.discountAmount = 0
+           }
+         }
          if ('manualDiscountPct' in patch) {
            updated.discountPct = (updated.autoDiscountPct ?? 0) + (updated.manualDiscountPct ?? 0)
          }
-         if ('qty' in patch || 'rate' in patch || 'discountPct' in patch) {
-           updated.amount = calcAmount(updated.qty, updated.rate, updated.discountPct)
-         }
-         if ('qty' in patch || 'warehouse' in patch) {
-           updated.stockError = validateLineStock(updated)
+         if ('qty' in patch || 'rate' in patch || 'discountPct' in patch || 'discountAmount' in patch || 'discountMode' in patch) {
+           updated.amount = updated.discountMode === 'amount'
+             ? calcAmount(updated.qty, updated.rate, 0, updated.discountAmount)
+             : calcAmount(updated.qty, updated.rate, updated.discountPct)
          }
          return updated
        }),
@@ -690,9 +779,10 @@ export default function InvoiceForm() {
         if (i !== index) return item
         const available = item._stockByWarehouse?.[warehouse]
         const qty = available != null ? Math.min(item.qty, available) : item.qty
-        const updated = { ...item, warehouse, qty, amount: calcAmount(qty, item.rate, item.discountPct), ubicacion: undefined, ubicacionError: undefined }
-        updated.stockError = validateLineStock(updated)
-        return updated
+        const amount = item.discountMode === 'amount'
+          ? calcAmount(qty, item.rate, 0, item.discountAmount)
+          : calcAmount(qty, item.rate, item.discountPct)
+        return { ...item, warehouse, qty, amount, ubicacion: undefined, ubicacionError: undefined }
       }),
     )
   }
@@ -732,11 +822,14 @@ export default function InvoiceForm() {
           description: catalogItem.internalDescription ?? catalogItem.itemName,
           rate: baseRate,
           baseRate,
-           amount: calcAmount(row.qty, baseRate, row.discountPct),
+           amount: calcAmount(row.qty, baseRate, 0, 0),
           uom: catalogItem.stockUom ?? row.uom,
           conversionFactor: 1,
           maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
           autoDiscountPct: catalogItem.autoDiscount?.discountType === 'Discount Percentage' ? catalogItem.autoDiscount.discountPercentage : undefined,
+          discountPct: 0,
+          discountMode: 'pct',
+          discountAmount: 0,
           manualDiscountPct: 0,
           allowsDiscount: catalogItem.allowsDiscount,
           _prices: catalogItem.prices,
@@ -744,7 +837,6 @@ export default function InvoiceForm() {
           salesTaxTemplate: catalogItem.salesTaxTemplate ?? '',
           warehouse: defaultWarehouse(),
           _stockByWarehouse: catalogItem.stockByWarehouse,
-          stockError: undefined,
           _comboComponents: undefined,
           componentTracking: undefined,
           ubicacion: undefined,
@@ -756,7 +848,7 @@ export default function InvoiceForm() {
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', _comboComponents: undefined, componentTracking: undefined, ubicacion: undefined, ubicacionError: undefined })
+    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', _comboComponents: undefined, componentTracking: undefined, ubicacion: undefined, ubicacionError: undefined })
   }
 
   function selectBundle(index: number, bundle: Bundle) {
@@ -775,7 +867,9 @@ export default function InvoiceForm() {
           description: bundle.itemName,
           rate: baseRate,
           baseRate,
-          amount: calcAmount(row.qty, baseRate, row.discountPct),
+          amount: row.discountMode === 'amount'
+            ? calcAmount(row.qty, baseRate, 0, row.discountAmount)
+            : calcAmount(row.qty, baseRate, row.discountPct),
           uom: bundle.itemUom ?? '',
           conversionFactor: 1,
           maxDiscountPct: undefined,
@@ -784,7 +878,6 @@ export default function InvoiceForm() {
           salesTaxTemplate: '',
           warehouse: defaultWarehouse(),
           _stockByWarehouse: undefined,
-          stockError: undefined,
           _comboComponents: undefined,
           componentTracking: undefined,
           ubicacion: undefined,
@@ -832,6 +925,8 @@ export default function InvoiceForm() {
           baseRate: rate,
           amount: calcAmount(s.qty, rate, 0),
           discountPct: 0,
+          discountMode: 'pct' as const,
+          discountAmount: 0,
           salesTaxPct: s.item.salesTaxPct ?? 0,
           salesTaxTemplate: s.item.salesTaxTemplate ?? '',
           uom: s.item.stockUom ?? 'Unidad',
@@ -858,7 +953,10 @@ export default function InvoiceForm() {
       prev.map((row) => {
         if (!row._prices) return row
         const rate = row._prices[tier] ?? row.rate
-        return { ...row, rate, baseRate: rate, amount: calcAmount(row.qty, rate, row.discountPct) }
+        const amount = row.discountMode === 'amount'
+          ? calcAmount(row.qty, rate, 0, row.discountAmount)
+          : calcAmount(row.qty, rate, row.discountPct)
+        return { ...row, rate, baseRate: rate, amount }
       }),
     )
   }, [selectedCustomer?.priceTier, defaultPriceTier])
@@ -868,7 +966,7 @@ export default function InvoiceForm() {
       toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
       return
     }
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, discountPct: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', conversionFactor: 1, warehouse: '' }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', conversionFactor: 1, warehouse: '' }])
   }
 
   function removeRow(index: number) {
@@ -881,10 +979,44 @@ export default function InvoiceForm() {
   const taxTotal = items.reduce((s, i) => s + (i.amount * i.salesTaxPct / 100), 0)
   const total = subtotal + taxTotal
 
+  // ── Cobertura ARS: armado del payload (§3.2/§3.3) ─────────────────────────
+  const arsActiva = esFarmacia && arsEnabled
+  /** 11 columnas base + las 5 de cobertura ARS — para los `colSpan` de las filas especiales. */
+  const columnCount = arsActiva ? 16 : 11
+
+  /**
+   * Campos ARS de una línea. Solo se envían si el usuario realmente los tocó: si NINGUNA línea
+   * trae `montoAprobadoArs`/`lineaBloqueadaArs`, el servidor reparte la cobertura solo al
+   * guardar — mandar ceros lo desactivaría y dejaría todo el importe a cargo del paciente (§3.3).
+   */
+  function arsLineaDto(i: LineItem) {
+    if (!arsActiva) return {}
+    return {
+      porcientoTeoricoArs: i.porcientoTeoricoArs,
+      montoAprobadoArs: i.montoAprobadoArs,
+      lineaBloqueadaArs: i.lineaBloqueadaArs || undefined,
+    }
+  }
+
+  /**
+   * Bloque `aseguradora` del body. En edición, con el toggle apagado se envía `null` explícito
+   * para QUITAR una cobertura que ya estaba en el borrador; al crear simplemente se omite (§3.1).
+   */
+  function arsBloqueDto() {
+    if (!esFarmacia) return {}
+    if (arsEnabled) return { aseguradora: aseguradoraFormToDto(ars) }
+    return isEdit && editingInvoice?.aseguradora ? { aseguradora: null } : {}
+  }
+
   // ── Submit ────────────────────────────────────────────────────────────────
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitted(true)
+    // Fila vacía sobrante (queda una después de seleccionar el último artículo real, por el
+    // auto-agregado de fila) — se descarta de la vista y de la validación al someter, para no
+    // confundir al usuario ni enviarla al API.
+    const validItems = items.filter((i) => i.itemCode)
+    if (validItems.length !== items.length) setItems(validItems)
 
 if (esClienteOcasional) {
        if (!clienteOcasionalNombre.trim()) {
@@ -893,6 +1025,11 @@ if (esClienteOcasional) {
        }
        if (ncfType === 'B01' && !clienteOcasionalRnc.trim()) {
          toast.error('El RNC es requerido para comprobante B01 (Crédito Fiscal)')
+         return
+       }
+       const rncDigits = clienteOcasionalRnc.replace(/\D/g, '')
+       if (rncDigits && rncDigits.length !== 9 && rncDigits.length !== 11) {
+         toast.error('El RNC debe tener 9 dígitos o la cédula 11 dígitos')
          return
        }
      } else {
@@ -906,37 +1043,62 @@ if (esClienteOcasional) {
        }
      }
 
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i]
-      if (!item.itemCode) continue
+    for (let i = 0; i < validItems.length; i++) {
+      const item = validItems[i]
       const itemMax = item.maxDiscountPct && item.maxDiscountPct > 0 ? item.maxDiscountPct : 100
       const userMax = currentUser?.maxDiscountPct && currentUser.maxDiscountPct > 0 ? currentUser.maxDiscountPct : 100
       const priceLimit = maxDiscFromPrices(item.rate, item._prices)
       const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
-      if (item.discountPct > effectiveLimit) {
+      // En modo monto fijo no replicamos la conversión monto→% que hace el backend para
+      // comparar contra los topes — el backend valida y devuelve 400 si excede el límite.
+      if (item.discountMode === 'pct' && item.discountPct > effectiveLimit) {
         toast.error(`Línea ${i + 1}: el descuento supera el límite de ${effectiveLimit}%`)
         return
       }
-      if (item.stockError) {
-        toast.error(`Línea ${i + 1}: ${item.stockError}`)
+      const stockError = validateLineStock(item, stockMap)
+      if (stockError) {
+        toast.error(`Línea ${i + 1}: ${stockError}`)
         return
       }
       if (!isTrackingComplete(item)) {
         toast.error(`Línea ${i + 1}: selecciona las series/lotes de los componentes del combo antes de continuar`)
         return
       }
+      // §3.7: "Línea N: la cobertura ARS (X) supera el importe de la línea (Y)".
+      if (arsActiva && item.montoAprobadoArs != null && item.montoAprobadoArs > item.amount + 0.005) {
+        toast.error(`Línea ${i + 1}: la cobertura ARS (${formatDOP(item.montoAprobadoArs)}) supera el importe de la línea (${formatDOP(item.amount)})`)
+        return
+      }
     }
 
-const itemsDto = items.map((i) => ({
+    if (arsActiva) {
+      const arsError = validarAseguradoraForm(ars, { customerId: esClienteOcasional ? undefined : customerId })
+      if (arsError) {
+        toast.error(arsError)
+        return
+      }
+      // §3.7: "La cobertura ARS (X) no puede superar el total de la factura (Y)".
+      const coberturaRD = ars.tipoCobertura === 'monto' ? Number(ars.valorCobertura) : 0
+      if (coberturaRD > subtotal + 0.005) {
+        toast.error(`La cobertura ARS (${formatDOP(coberturaRD)}) no puede superar el total de la factura (${formatDOP(subtotal)})`)
+        return
+      }
+    }
+
+const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
        itemCode: i.itemCode,
        description: i.description,
        qty: i.qty,
        rate: i.rate,
-       discountPct: i.discountPct || undefined,
+       // Mutuamente excluyentes — nunca se envían ambos, aunque el usuario haya escrito algo
+       // en el otro campo antes de cambiar de modo.
+       discountPct: i.discountMode === 'amount' ? undefined : (i.discountPct || undefined),
+       discountAmount: i.discountMode === 'amount' ? (i.discountAmount || undefined) : undefined,
        uom: i.uom || undefined,
        warehouse: i.warehouse || undefined,
        ubicacion: i.ubicacion || undefined,
        componentTracking: i.componentTracking,
+       ...arsLineaDto(i),
      }))
 
      const baseDto = {
@@ -954,7 +1116,10 @@ const itemsDto = items.map((i) => ({
        ncfType,
        items: itemsDto,
         notes: notes || undefined,
-        taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
+        taxesTemplate: mostrarImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
+        currency: currency || undefined,
+        conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
+        ...arsBloqueDto(),
       }
 
      persistInvoice(baseDto as CreateInvoiceDto)
@@ -978,7 +1143,7 @@ const itemsDto = items.map((i) => ({
           <a className="page-back-link" onClick={() => navigate(isEdit ? `/facturas/${editId}` : '/facturas')}>
             <ArrowLeft size={14} /> {isEdit ? 'Factura' : 'Facturas'}
           </a>
-          <h1 className="page-title">{isEdit ? 'Editar Factura' : 'Nueva Factura'}</h1>
+          <h1 className="page-title"><span className="page-title-dot" />{isEdit ? 'Editar Factura' : 'Nueva Factura'}</h1>
         </div>
       </div>
 
@@ -990,7 +1155,7 @@ const itemsDto = items.map((i) => ({
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         <div className="card">
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <h2 className="card-title">Información General</h2>
           </div>
           <div className="card-body">
@@ -1052,6 +1217,43 @@ const itemsDto = items.map((i) => ({
                    </div>
                  )}
                </div>
+
+               {multimonedaHabilitada && (
+                 <div className="ff-wrap">
+                   <label className="ff-label" htmlFor="invoiceCurrency">Moneda</label>
+                   <Select
+                     value={currency}
+                     onValueChange={(v) => { setCurrency(v); if (v === monedaBase || !v) setConversionRate('') }}
+                     placeholder={selectedCustomer?.defaultCurrency ? `Del cliente (${selectedCustomer.defaultCurrency})` : `Automático (${monedaBase})`}
+                   >
+                     <SelectItem value="">
+                       {selectedCustomer?.defaultCurrency ? `Del cliente (${selectedCustomer.defaultCurrency})` : `Automático (${monedaBase})`}
+                     </SelectItem>
+                     {(['DOP', 'USD', 'EUR'] as const).map((c) => (
+                       <SelectItem key={c} value={c} disabled={!monedasHabilitadas.includes(c)}>
+                         {c}{!monedasHabilitadas.includes(c) ? ' (habilítela primero en Monedas)' : ''}
+                       </SelectItem>
+                     ))}
+                   </Select>
+                   {currency && currency !== monedaBase && (
+                     <div style={{ marginTop: 8 }}>
+                       <label className="ff-label" htmlFor="invoiceConversionRate">
+                         Tasa de cambio ({currency} → {monedaBase})
+                       </label>
+                       <input
+                         id="invoiceConversionRate"
+                         type="number"
+                         min="0"
+                         step="0.0001"
+                         className="ff-input"
+                         value={conversionRate}
+                         onChange={(e) => setConversionRate(e.target.value === '' ? '' : Number(e.target.value))}
+                         placeholder="Vacío = resuelve automático contra /monedas/tasas"
+                       />
+                     </div>
+                   )}
+                 </div>
+               )}
                {esClienteOcasional && (
                  <div className="ff-wrap">
                    <label className="ff-label" htmlFor="clienteOcasionalDireccion">Dirección</label>
@@ -1066,8 +1268,11 @@ const itemsDto = items.map((i) => ({
                )}
 
                <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
-                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
-                   <input type="checkbox" checked={esClienteOcasional} onChange={(e) => { customerTouchedRef.current = true; setEsClienteOcasional(e.target.checked); if (e.target.checked) { setCustomerId(''); setSelectedCustomer(null); setSemaforo(null) } }} />
+                 <label className="ff-toggle-wrap">
+                   <span className="ff-toggle">
+                     <input type="checkbox" checked={esClienteOcasional} onChange={(e) => { customerTouchedRef.current = true; setEsClienteOcasional(e.target.checked); if (e.target.checked) { setCustomerId(''); setSelectedCustomer(null); setSemaforo(null) } }} />
+                     <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+                   </span>
                    Venta ocasional (cliente no registrado)
                  </label>
                  {esClienteOcasional && (
@@ -1121,17 +1326,17 @@ const itemsDto = items.map((i) => ({
                  )}
                </div>
 
-               {esClienteOcasional && ncfType === 'B01' && (
+               {esClienteOcasional && (
                  <div className="ff-wrap">
-                   <label className="ff-label ff-required" htmlFor="clienteOcasionalRnc">RNC del cliente</label>
+                   <label className={`ff-label${ncfType === 'B01' ? ' ff-required' : ''}`} htmlFor="clienteOcasionalRnc">RNC o Cédula</label>
                    <input
                      id="clienteOcasionalRnc"
                      type="text"
                      className="ff-input"
                      value={clienteOcasionalRnc}
                      onChange={(e) => { customerTouchedRef.current = true; setClienteOcasionalRnc(e.target.value) }}
-                     placeholder="RNC del cliente ocasional"
-                     required
+                     placeholder="132456785 o 00113918866"
+                     required={ncfType === 'B01'}
                    />
                  </div>
                )}
@@ -1160,7 +1365,16 @@ const itemsDto = items.map((i) => ({
                 </div>
               )}
 
-              {usaImpuestoDocumento && (
+              {usaImpuestoDocumento && !mostrarImpuestoDocumento && (
+                <div className="ff-wrap">
+                  <label className="ff-label">Impuesto del Documento</label>
+                  <p className="ff-hint" style={{ marginTop: 6 }}>
+                    No aplica: una factura con cobertura ARS no puede llevar impuestos (Ley 253-12).
+                    Los medicamentos deben estar configurados como exentos de ITBIS en el catálogo.
+                  </p>
+                </div>
+              )}
+              {mostrarImpuestoDocumento && (
                 <div className="ff-wrap">
                   <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
                   <SearchSelect
@@ -1187,12 +1401,27 @@ const itemsDto = items.map((i) => ({
           </div>
         </div>
 
+        {esFarmacia && (
+          <AseguradoraPanel
+            enabled={arsEnabled}
+            onEnabledChange={setArsEnabled}
+            value={ars}
+            onChange={setArs}
+            submitted={submitted}
+            customerId={esClienteOcasional ? undefined : customerId}
+            readOnly={arsSoloLectura}
+            footer={arsServidor ? <CoberturaArsResumen ars={arsServidor} /> : (
+              <p className="ff-hint" style={{ margin: 0 }}>
+                La cobertura en RD$, el reparto por línea y lo que queda a cargo del paciente los
+                calcula el servidor al guardar el borrador.
+              </p>
+            )}
+          />
+        )}
+
         <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Artículos</h2>
-          </div>
           <div className="items-table-wrap">
-            <table className="items-table">
+            <table className="items-table navy-table">
               <thead>
                 <tr>
                   <th style={{ minWidth: 200 }}>Artículo</th>
@@ -1200,7 +1429,7 @@ const itemsDto = items.map((i) => ({
                   <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
                   <th style={{ textAlign: 'right', width: 72 }}>
-                  Dto. %
+                  Descuento
                   <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} />
                 </th>
                   <th style={{ textAlign: 'right', width: 80 }}>Impuesto</th>
@@ -1208,13 +1437,24 @@ const itemsDto = items.map((i) => ({
                   <th style={{ width: 56 }}>UDM</th>
                   <th style={{ width: 140 }}>Almacén</th>
                   <th style={{ width: 140 }}>Ubicación</th>
+                  {arsActiva && (
+                    <>
+                      <th style={{ textAlign: 'right', width: 80 }} title="Peso de esta línea en el reparto automático de la cobertura. Vacío en todas = partes iguales.">
+                        % teórico ARS
+                      </th>
+                      <th style={{ textAlign: 'right', width: 120 }}>Cobertura ARS</th>
+                      <th style={{ width: 44, textAlign: 'center' }} title="Ajuste manual protegido: Recalcular no toca la línea.">🔒</th>
+                      <th style={{ textAlign: 'right', width: 110 }}>Paciente</th>
+                      <th style={{ textAlign: 'right', width: 72 }}>% real</th>
+                    </>
+                  )}
                   <th style={{ width: 40 }} />
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={11} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+                    <td colSpan={columnCount} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
                       No hay artículos. Agrega uno con el botón de abajo.
                     </td>
                   </tr>
@@ -1242,12 +1482,24 @@ const itemsDto = items.map((i) => ({
                         <input className="items-input" value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="Descripción" />
                       </td>
                       <td>
-                        <QtyInput className={`items-input${item.stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
-                        {item.stockError && (
-                          <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                            {item.stockError}
-                          </span>
-                        )}
+                        {(() => {
+                          const stockError = validateLineStock(item, stockMap)
+                          const info = item.itemCode && item.warehouse ? resolveDisponible(stockMap.get(item.itemCode), item.warehouse) : undefined
+                          return (
+                            <>
+                              <QtyInput className={`items-input${stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
+                              {stockError ? (
+                                <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                  {stockError}
+                                </span>
+                              ) : info && info.reservedStock > 0 ? (
+                                <span style={{ fontSize: 11, color: 'var(--warning-text)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                  Disponible: {info.disponible} ({info.reservedStock} reservadas para otro cliente)
+                                </span>
+                              ) : null}
+                            </>
+                          )
+                        })()}
                       </td>
                       <td>
                         <input className="items-input" type="number" min="0" step="0.01" value={round2(item.rate)} disabled style={{ textAlign: 'right' }} />
@@ -1260,45 +1512,80 @@ const itemsDto = items.map((i) => ({
                            const priceLimit = maxDiscFromPrices(item.rate, item._prices)
                            const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
                            const allowsManual = item.allowsDiscount !== false
+                           const isAmountMode = item.discountMode === 'amount'
                            return (
                              <>
-                               {autoPct > 0 && (
+                               {autoPct > 0 && !isAmountMode && (
                                  <div style={{ marginBottom: 4 }}>
                                    <span className="badge badge-discount" style={{ fontSize: 10, padding: '2px 6px' }}>
                                      {autoPct}% auto
                                    </span>
                                  </div>
                                )}
-                               <input
-                                 className={`items-input${submitted && item.discountPct > effectiveLimit ? ' items-input-error' : ''}`}
-                                 type="number"
-                                 min="0"
-                                 max="100"
-                                 step="0.1"
-                                 value={item.manualDiscountPct}
-                                 onChange={(e) => updateItem(index, { manualDiscountPct: parseFloat(e.target.value) || 0 })}
-                                 style={{ textAlign: 'right', width: 56 }}
-                                 disabled={!allowsManual}
-                                 title={allowsManual ? undefined : 'Este artículo no acepta descuentos'}
-                               />
-                               {item.discountPct > 0 && (
+                               <div className={`disc-combo${submitted && !isAmountMode && item.discountPct > effectiveLimit ? ' disc-combo-error' : ''}`}>
+                                 <div className="disc-combo-select-wrap">
+                                   <select
+                                     className="disc-combo-select"
+                                     value={item.discountMode}
+                                     onChange={(e) => updateItem(index, { discountMode: e.target.value as 'pct' | 'amount' })}
+                                     disabled={!allowsManual}
+                                   >
+                                     <option value="pct">%</option>
+                                     <option value="amount">RD$</option>
+                                   </select>
+                                   <ChevronDown size={12} className="disc-combo-chevron" />
+                                 </div>
+                                 {isAmountMode ? (
+                                   <input
+                                     className="disc-combo-input"
+                                     type="number"
+                                     min="0"
+                                     step="0.01"
+                                     value={item.discountAmount}
+                                     onChange={(e) => updateItem(index, { discountAmount: parseFloat(e.target.value) || 0 })}
+                                     disabled={!allowsManual}
+                                     title={allowsManual ? undefined : 'Este artículo no acepta descuentos'}
+                                   />
+                                 ) : (
+                                   <input
+                                     className="disc-combo-input"
+                                     type="number"
+                                     min="0"
+                                     max="100"
+                                     step="0.1"
+                                     value={item.manualDiscountPct}
+                                     onChange={(e) => updateItem(index, { manualDiscountPct: parseFloat(e.target.value) || 0 })}
+                                     disabled={!allowsManual}
+                                     title={allowsManual ? undefined : 'Este artículo no acepta descuentos'}
+                                   />
+                                 )}
+                               </div>
+                               {isAmountMode ? (
                                  <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                   Total: {item.discountPct.toFixed(1)}%
+                                   Descuento: {formatMoney(item.discountAmount, currency || monedaBase)}
                                  </span>
+                               ) : (
+                                 <>
+                                   {item.discountPct > 0 && (
+                                     <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                       Total: {item.discountPct.toFixed(1)}%
+                                     </span>
+                                   )}
+                                   {effectiveLimit < 100 && (
+                                     <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                       máx {effectiveLimit.toFixed(2)}%
+                                     </span>
+                                   )}
+                                   {item.discountPct > effectiveLimit && (
+                                     <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                       Supera el límite de {effectiveLimit.toFixed(2)}%
+                                     </span>
+                                   )}
+                                   <span style={{ fontSize: 10, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, cursor: 'help' }} title="El descuento puede incluir una parte automática (Pricing Rule) y una parte manual del vendedor. Ambas se suman contra el tope máximo.">
+                                     ⓘ automático + manual
+                                   </span>
+                                 </>
                                )}
-                               {effectiveLimit < 100 && (
-                                 <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                   máx {effectiveLimit.toFixed(2)}%
-                                 </span>
-                               )}
-                               {item.discountPct > effectiveLimit && (
-                                 <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                   Supera el límite de {effectiveLimit.toFixed(2)}%
-                                 </span>
-                               )}
-                               <span style={{ fontSize: 10, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, cursor: 'help' }} title="El descuento puede incluir una parte automática (Pricing Rule) y una parte manual del vendedor. Ambas se suman contra el tope máximo.">
-                                 ⓘ automático + manual
-                               </span>
                              </>
                            )
                          })()}
@@ -1351,6 +1638,64 @@ const itemsDto = items.map((i) => ({
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                         )}
                       </td>
+                      {arsActiva && (
+                        <>
+                          <td>
+                            <input
+                              className="items-input"
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              style={{ textAlign: 'right' }}
+                              value={item.porcientoTeoricoArs ?? ''}
+                              disabled={arsSoloLectura}
+                              onChange={(e) => updateItem(index, {
+                                porcientoTeoricoArs: e.target.value === '' ? undefined : Number(e.target.value),
+                              })}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className={`items-input${(item.montoAprobadoArs ?? 0) > item.amount + 0.005 ? ' items-input-error' : ''}`}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              style={{ textAlign: 'right' }}
+                              value={item.montoAprobadoArs ?? ''}
+                              disabled={arsSoloLectura}
+                              placeholder="auto"
+                              onChange={(e) => updateItem(index, {
+                                montoAprobadoArs: e.target.value === '' ? undefined : Number(e.target.value),
+                              })}
+                            />
+                            {(item.montoAprobadoArs ?? 0) > item.amount + 0.005 && (
+                              <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                Supera el importe de la línea
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-size-icon-sm"
+                              disabled={arsSoloLectura}
+                              title={item.lineaBloqueadaArs ? 'Línea bloqueada: Recalcular no la toca' : 'Bloquear esta línea al recalcular'}
+                              onClick={() => updateItem(index, { lineaBloqueadaArs: !item.lineaBloqueadaArs })}
+                            >
+                              {item.lineaBloqueadaArs
+                                ? <Lock size={14} style={{ color: 'var(--color-brand)' }} />
+                                : <LockOpen size={14} style={{ color: 'var(--text-tertiary)' }} />}
+                            </button>
+                          </td>
+                          <td style={{ textAlign: 'right' }} className="td-muted">
+                            {item.montoPacienteArs != null ? formatDOP(item.montoPacienteArs, { trimZeros: true }) : '—'}
+                          </td>
+                          <td style={{ textAlign: 'right' }} className="td-muted">
+                            {item.porcientoRealArs != null ? `${item.porcientoRealArs.toFixed(1)}%` : '—'}
+                          </td>
+                        </>
+                      )}
                       <td onClick={(e) => e.stopPropagation()} className="actions-cell">
                         <ActionsMenu>
                           <ActionsMenuItem
@@ -1367,7 +1712,7 @@ const itemsDto = items.map((i) => ({
                     </tr>
                     {item.itemType === 'combo' && item._comboComponents && item._comboComponents.length > 0 && (
                       <tr>
-                        <td colSpan={11} style={{ padding: '4px 12px 10px' }}>
+                        <td colSpan={columnCount} style={{ padding: '4px 12px 10px' }}>
                           {useInlineSerialBatch ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                               {getTrackingRequirement(item).map((req) => {
@@ -1413,7 +1758,7 @@ const itemsDto = items.map((i) => ({
                 <Plus size={14} /> Agregar artículo
               </button>
             </div>
-            <div className="items-total-row">
+            <div className="items-total-row navy-totals">
               {/* <div className="items-total-line">
                 <span>Subtotal bruto</span>
                 <span>{formatDOP(grossTotal)}</span>
@@ -1429,21 +1774,33 @@ const itemsDto = items.map((i) => ({
                 <span>{formatDOP(subtotal)}</span>
               </div>
               {taxTotal > 0 && (
-                <div className="items-total-line" style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+                <div className="items-total-line" style={{ fontSize: 13 }}>
                   <span>Impuesto</span>
                   <span>{formatDOP(taxTotal)}</span>
                 </div>
               )}
-              <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
+              <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, fontSize: 15 }}>
                 <span>Total</span>
                 <span>{formatDOP(total)}</span>
               </div>
+              {arsActiva && arsServidor && (
+                <>
+                  <div className="items-total-line" style={{ color: 'var(--color-brand)' }}>
+                    <span>Cubre la ARS</span>
+                    <span>-{formatDOP(arsServidor.montoCobertura)}</span>
+                  </div>
+                  <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
+                    <span>A cargo del paciente</span>
+                    <span>{formatDOP(arsServidor.montoPaciente)}</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
 
         <div className="card">
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <h2 className="card-title">Notas</h2>
           </div>
           <div className="card-body">
@@ -1465,7 +1822,7 @@ const itemsDto = items.map((i) => ({
           >
             Cancelar
           </button>
-          <button type="submit" className="btn btn-primary" disabled={isSaving}>
+          <button type="submit" className="btn btn-navy" disabled={isSaving}>
             {isSaving
               ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
               : <Save size={15} />}
@@ -1481,11 +1838,14 @@ const itemsDto = items.map((i) => ({
 onAuthorized={(userId) => {
            client.defaults.headers.common['X-Admin-Pin'] = userId
            setPinModalOpen(false)
-           const itemsDto = items.map((i) => ({
+           const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
              itemCode: i.itemCode, description: i.description, qty: i.qty, rate: i.rate,
-             discountPct: i.discountPct || undefined, uom: i.uom || undefined, warehouse: i.warehouse || undefined,
+             discountPct: i.discountMode === 'amount' ? undefined : (i.discountPct || undefined),
+             discountAmount: i.discountMode === 'amount' ? (i.discountAmount || undefined) : undefined,
+             uom: i.uom || undefined, warehouse: i.warehouse || undefined,
              ubicacion: i.ubicacion || undefined,
              componentTracking: i.componentTracking,
+             ...arsLineaDto(i),
            }))
            const baseDto = {
              ...(esClienteOcasional
@@ -1498,7 +1858,10 @@ onAuthorized={(userId) => {
              postingDate, dueDate, branch: branch || undefined, department: usaDepartamentos ? (department || undefined) : undefined, ncfType,
              items: itemsDto,
              notes: notes || undefined,
-             taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
+             taxesTemplate: mostrarImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
+             currency: currency || undefined,
+             conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
+             ...arsBloqueDto(),
            }
 persistInvoice(baseDto as CreateInvoiceDto)
          }}

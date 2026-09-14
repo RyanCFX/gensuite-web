@@ -182,52 +182,56 @@ export default function CentrosCostoPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Centros de Costo"
+        title={<><span className="page-title-dot" />Centros de Costo</>}
         description={view === 'list' && data ? `${data.meta.total ?? 0} centros de costo` : undefined}
         action={
-          <button className="btn btn-primary" onClick={openCreate}>
+          <button className="btn btn-navy" onClick={openCreate}>
             <Plus size={16} />
             Nuevo Centro de Costo
           </button>
         }
       />
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          {view === 'list' && (
-            <div className="search-input-wrap">
-              <Search size={14} className="search-input-icon" />
-              <input
-                className="search-input"
-                placeholder="Buscar por nombre…"
-                value={search}
-                onChange={handleSearchChange}
-              />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              {view === 'list' && (
+                <div className="search-input-wrap">
+                  <Search size={14} className="search-input-icon" />
+                  <input
+                    className="search-input"
+                    placeholder="Buscar por nombre…"
+                    value={search}
+                    onChange={handleSearchChange}
+                  />
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <div className="filter-bar-right" style={{ display: 'flex', gap: 8 }}>
-          <button
-            type="button"
-            className={`btn btn-size-sm ${view === 'list' ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={() => setView('list')}
-          >
-            <List size={14} /> Lista
-          </button>
-          <button
-            type="button"
-            className={`btn btn-size-sm ${view === 'tree' ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={() => setView('tree')}
-          >
-            <Network size={14} /> Árbol
-          </button>
+            <div className="filter-bar-right" style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                className={`btn btn-size-sm ${view === 'list' ? 'btn-navy' : 'btn-ghost'}`}
+                onClick={() => setView('list')}
+              >
+                <List size={14} /> Lista
+              </button>
+              <button
+                type="button"
+                className={`btn btn-size-sm ${view === 'tree' ? 'btn-navy' : 'btn-ghost'}`}
+                onClick={() => setView('tree')}
+              >
+                <Network size={14} /> Árbol
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {view === 'list' ? (
-        <div className="card">
+        <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table navy-table">
               <thead>
                 <tr>
                   <SortableTh label="Nombre" sortKey="name" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />

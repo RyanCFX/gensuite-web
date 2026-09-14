@@ -2,14 +2,14 @@
 // (compras/gastos entrantes). Permite conciliar con una Purchase Invoice y decidir la aprobación
 // comercial (ACECF).
 //
-// CONSTANCIA: las pruebas end-to-end con datos reales quedan pendientes — ningún tenant tiene Aura
+// CONSTANCIA: las pruebas end-to-end con datos reales quedan pendientes — ningún tenant tiene Vega
 // conectado y no existe todavía ningún e-CF recibido de un tercero en los entornos de prueba.
 
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ChevronLeft, ChevronRight, Search, Upload, Link2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, Upload, Link2, SlidersHorizontal } from 'lucide-react'
 import { listEcfRecibidos, vincularEcfRecibido } from '@/shared/api/ecf-recibidos'
 import type { EcfRecibidoListItem, EcfStatusDgii, EcfTipoElectronico } from '@/shared/api/types'
 import { useDebounce } from '@/lib/useDebounce'
@@ -21,6 +21,7 @@ import {
 import { ECF_TIPOS } from '@/lib/dgii'
 import { FilterField } from '@/shared/ui/FilterField'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { Drawer } from '@/shared/ui/Drawer'
 import { Select, SelectItem } from '@/components/ui/select'
 import { CargarXmlModal } from './CargarXmlModal'
 
@@ -43,6 +44,7 @@ export default function EcfRecibidosPage() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [showCargarXml, setShowCargarXml] = useState(false)
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
 
   const debouncedSearch = useDebounce(search, 300)
   const debouncedRnc = useDebounce(rnc, 300)
@@ -81,11 +83,19 @@ export default function EcfRecibidosPage() {
   const items = (data?.items ?? []) as EcfRecibidoListItem[]
   const totalPages = data ? Math.max(1, Math.ceil(data.meta.total / PAGE_SIZE)) : 1
 
+  const activeMoreFiltersCount = [from, to].filter((v) => v !== '').length
+
+  function clearMoreFilters() {
+    setFrom('')
+    setTo('')
+    setPage(1)
+  }
+
   return (
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">e-CF Recibidos</h1>
+          <h1 className="page-title"><span className="page-title-dot" />e-CF Recibidos</h1>
           {data && <p className="page-sub">{data.meta.total} comprobantes recibidos de terceros</p>}
         </div>
         <button className="btn btn-secondary" onClick={() => setShowCargarXml(true)}>
@@ -93,51 +103,60 @@ export default function EcfRecibidosPage() {
         </button>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={15} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por NCF, proveedor…"
-              value={search}
-              onChange={handleSearchChange}
-            />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div className="search-input-wrap">
+                <Search size={15} className="search-input-icon" />
+                <input
+                  className="search-input"
+                  placeholder="Buscar por NCF, proveedor…"
+                  value={search}
+                  onChange={handleSearchChange}
+                />
+              </div>
+              <FilterField label="RNC emisor">
+                <input
+                  className="ff-input ff-input-sm"
+                  style={{ width: 160 }}
+                  placeholder="RNC / Cédula"
+                  value={rnc}
+                  onChange={(e) => { setRnc(e.target.value); setPage(1) }}
+                />
+              </FilterField>
+              <FilterField label="Estado DGII" style={{ width: 220 }}>
+                <Select value={estado} onValueChange={(v) => { setEstado(v); setPage(1) }} placeholder="Todos los estados">
+                  {ESTADOS_DGII.map((s) => (
+                    <SelectItem key={s} value={s}>{ecfStatusLabel(s)}</SelectItem>
+                  ))}
+                </Select>
+              </FilterField>
+              <FilterField label="Tipo" style={{ width: 220 }}>
+                <Select value={typeId} onValueChange={(v) => { setTypeId(v); setPage(1) }} placeholder="Todos los tipos">
+                  {ECF_TIPOS.map((t) => (
+                    <SelectItem key={t.typeId} value={t.typeId}>{ecfTipoLabel(t.typeId)}</SelectItem>
+                  ))}
+                </Select>
+              </FilterField>
+            </div>
           </div>
-          <FilterField label="RNC emisor">
-            <input
-              className="ff-input ff-input-sm"
-              style={{ width: 160 }}
-              placeholder="RNC / Cédula"
-              value={rnc}
-              onChange={(e) => { setRnc(e.target.value); setPage(1) }}
-            />
-          </FilterField>
-          <FilterField label="Estado DGII" style={{ width: 220 }}>
-            <Select value={estado} onValueChange={(v) => { setEstado(v); setPage(1) }} placeholder="Todos los estados">
-              {ESTADOS_DGII.map((s) => (
-                <SelectItem key={s} value={s}>{ecfStatusLabel(s)}</SelectItem>
-              ))}
-            </Select>
-          </FilterField>
-          <FilterField label="Tipo" style={{ width: 220 }}>
-            <Select value={typeId} onValueChange={(v) => { setTypeId(v); setPage(1) }} placeholder="Todos los tipos">
-              {ECF_TIPOS.map((t) => (
-                <SelectItem key={t.typeId} value={t.typeId}>{ecfTipoLabel(t.typeId)}</SelectItem>
-              ))}
-            </Select>
-          </FilterField>
-          <FilterField label="Desde">
-            <DatePicker className="ff-input ff-input-sm" value={from} onChange={(v) => { setFrom(v); setPage(1) }} style={{ width: 144 }} clearable />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker className="ff-input ff-input-sm" value={to} onChange={(v) => { setTo(v); setPage(1) }} style={{ width: 144 }} clearable />
-          </FilterField>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+              <SlidersHorizontal size={13} />
+              Más filtros
+              {activeMoreFiltersCount > 0 && (
+                <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <th>NCF</th>
@@ -221,6 +240,7 @@ export default function EcfRecibidosPage() {
           </tbody>
         </table>
       </div>
+      </div>
 
       {data && data.meta.total > PAGE_SIZE && (
         <div className="pagination">
@@ -240,6 +260,28 @@ export default function EcfRecibidosPage() {
       )}
 
       {showCargarXml && <CargarXmlModal onClose={() => setShowCargarXml(false)} />}
+
+      <Drawer
+        open={moreFiltersOpen}
+        onClose={() => setMoreFiltersOpen(false)}
+        title="Más filtros"
+        subtitle="Refina la búsqueda de e-CF recibidos"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={clearMoreFilters}>Limpiar</button>
+            <button className="btn btn-navy" onClick={() => setMoreFiltersOpen(false)}>Aplicar</button>
+          </>
+        }
+      >
+        <div className="ff-wrap">
+          <label className="ff-label">Fecha</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DatePicker className="ff-input" value={from} onChange={(v) => { setFrom(v); setPage(1) }} clearable />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker className="ff-input" value={to} onChange={(v) => { setTo(v); setPage(1) }} clearable />
+          </div>
+        </div>
+      </Drawer>
     </div>
   )
 }

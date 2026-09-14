@@ -13,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { AlertTriangle, Check, Info, RefreshCw, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { EcfTabs } from '@/shared/ui/EcfTabs'
 import { ConfirmModal, Modal } from '@/shared/ui/Modal'
 import { getEcfConfig } from '@/shared/api/config'
 import { getContingenciaPendientes, activarContingencia, desactivarContingencia, flushContingencia } from '@/shared/api/ecf'
@@ -94,7 +95,7 @@ function ContingenciaContent({ company }: { company: string }) {
         <Info size={15} aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
         <span>
           Cuando la DGII no responde, un e-CF se firma "en diferido" y se transmite dentro de las
-          72 horas legales. Si el tenant desactivó <em>«Bloquear sometimiento si Aura no responde»</em>,
+          72 horas legales. Si tu empresa desactivó <em>«Bloquear sometimiento si Vega no responde»</em>,
           la contingencia se activa sola cuando hace falta — aquí puedes gestionarla manualmente.
         </span>
       </div>
@@ -113,7 +114,7 @@ function ContingenciaContent({ company }: { company: string }) {
         )}
       </div>
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="card-header">
           <span className="card-title">Comprobantes en contingencia</span>
         </div>
@@ -123,7 +124,7 @@ function ContingenciaContent({ company }: { company: string }) {
           <p className="ff-hint" style={{ margin: 16 }}>No hay comprobantes en contingencia.</p>
         ) : (
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table navy-table">
               <thead>
                 <tr>
                   <th>NCF</th>
@@ -258,10 +259,11 @@ export default function EcfContingenciaPage() {
     return (
       <div className="page-container">
         <PageHeader overline="Facturación Electrónica" title="Contingencia" />
+        <EcfTabs />
         <div className="empty-state" style={{ padding: '48px 0' }}>
           <span className="empty-icon" aria-hidden="true" style={{ fontSize: 24 }}>🔒</span>
           <p className="empty-title">No tienes acceso a esta sección</p>
-          <p className="empty-sub">Requiere el rol «System Manager» en este tenant.</p>
+          <p className="empty-sub">Requiere el rol «System Manager» en esta empresa.</p>
         </div>
       </div>
     )
@@ -273,10 +275,11 @@ export default function EcfContingenciaPage() {
     <div className="page-container">
       <PageHeader
         overline="Facturación Electrónica"
-        title="Contingencia"
+        title={<><span className="page-title-dot" />Contingencia</>}
         description="Decreto 587-24 — gestión manual de e-CF diferidos"
         action={<Link className="btn btn-ghost btn-size-sm" to="/config/ecf/admin"><ShieldCheck size={14} /> Provisioning</Link>}
       />
+      <EcfTabs />
 
       <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {isLoading ? (
@@ -285,7 +288,7 @@ export default function EcfContingenciaPage() {
           <div className="inline-alert inline-alert-info">
             <Info size={15} aria-hidden="true" style={{ flexShrink: 0 }} />
             <span>
-              Este tenant todavía no está conectado a Aura. Conéctalo desde{' '}
+              Tu empresa todavía no está conectada a Vega. Conéctala desde{' '}
               <Link to="/config/ecf/admin">Provisioning</Link> para gestionar la contingencia.
             </span>
           </div>

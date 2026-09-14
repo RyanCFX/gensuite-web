@@ -1,7 +1,20 @@
 // GENERADO automáticamente por scripts/gen-acciones.mjs — NO editar a mano.
-// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (368 acciones). Regenerar: node scripts/gen-acciones.mjs
+// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (417 acciones). Regenerar: node scripts/gen-acciones.mjs
 
 export type AccionId =
+  | 'apertura.compras.anular'
+  | 'apertura.compras.crear'
+  | 'apertura.compras.listar'
+  | 'apertura.preparar.ejecutar'
+  | 'apertura.preparar.ver'
+  | 'apertura.resumen.ver'
+  | 'apertura.ventas.anular'
+  | 'apertura.ventas.crear'
+  | 'apertura.ventas.listar'
+  | 'aseguradoras.crear'
+  | 'aseguradoras.editar'
+  | 'aseguradoras.eliminar'
+  | 'aseguradoras.listar'
   | 'caja.cobrar'
   | 'caja.descartar'
   | 'caja.listar'
@@ -111,6 +124,8 @@ export type AccionId =
   | 'config.denominaciones.crear'
   | 'config.denominaciones.editar'
   | 'config.denominaciones.listar'
+  | 'config.despacho.deshabilitar'
+  | 'config.despacho.habilitar'
   | 'config.ecf.contingencia.administrar'
   | 'config.ecf.editar'
   | 'config.ecf.secuencias.administrar'
@@ -143,6 +158,7 @@ export type AccionId =
   | 'config.ncf.editar'
   | 'config.ncf.listar'
   | 'config.paises.ver'
+  | 'config.pos.deshabilitar'
   | 'config.pos.habilitar'
   | 'config.retenciones.crear'
   | 'config.retenciones.editar'
@@ -193,6 +209,14 @@ export type AccionId =
   | 'departamentos.editar'
   | 'departamentos.eliminar'
   | 'departamentos.listar'
+  | 'despachos.cancelar'
+  | 'despachos.crear'
+  | 'despachos.devolver'
+  | 'despachos.editar'
+  | 'despachos.facturar'
+  | 'despachos.imprimir'
+  | 'despachos.someter'
+  | 'despachos.ver'
   | 'ecf.emitidos.imprimir'
   | 'ecf.emitidos.listar'
   | 'ecf.emitidos.refrescar'
@@ -200,24 +224,15 @@ export type AccionId =
   | 'ecf.recibidos.aceptar-rechazar'
   | 'ecf.recibidos.cargar-xml'
   | 'ecf.recibidos.listar'
-  | 'farmacia.despachos.cobrar'
-  | 'farmacia.despachos.cola'
-  | 'farmacia.despachos.crear'
-  | 'farmacia.despachos.imprimir'
-  | 'farmacia.despachos.listar'
   | 'farmacia.lotes.crear'
   | 'farmacia.lotes.facturar'
+  | 'farmacia.lotes.facturas-elegibles'
   | 'farmacia.lotes.imprimir'
   | 'farmacia.lotes.listar'
   | 'farmacia.lotes.marcar-en-revision'
   | 'farmacia.lotes.recalcular'
-  | 'farmacia.lotes.vincular-despacho'
-  | 'farmacia.preaprobaciones.confirmar'
-  | 'farmacia.preaprobaciones.crear'
-  | 'farmacia.preaprobaciones.editar'
-  | 'farmacia.preaprobaciones.listar'
-  | 'farmacia.preaprobaciones.recalcular'
-  | 'farmacia.reportes.despachos-ncf.listar'
+  | 'farmacia.lotes.vincular-facturas'
+  | 'farmacia.reportes.facturas-ars.listar'
   | 'farmacia.reportes.lotes.listar'
   | 'gastos.anular'
   | 'gastos.aplicar-saldo'
@@ -259,6 +274,14 @@ export type AccionId =
   | 'inventario.zonas.editar'
   | 'inventario.zonas.eliminar'
   | 'inventario.zonas.listar'
+  | 'monedas.habilitar'
+  | 'monedas.preview.ver'
+  | 'monedas.tasas.crear'
+  | 'monedas.tasas.editar'
+  | 'monedas.tasas.eliminar'
+  | 'monedas.tasas.sincronizar'
+  | 'monedas.tasas.ver'
+  | 'monedas.ver'
   | 'notificaciones.canales-email.editar'
   | 'notificaciones.canales-email.ver'
   | 'notificaciones.logs.listar'
@@ -290,22 +313,47 @@ export type AccionId =
   | 'proveedores.listar'
   | 'reportes.caja.cuadre.imprimir'
   | 'reportes.caja.cuadre.ver'
+  | 'reportes.compras.analitica.imprimir'
+  | 'reportes.compras.analitica.ver'
+  | 'reportes.compras.item-wise.imprimir'
+  | 'reportes.compras.item-wise.ver'
+  | 'reportes.compras.ordenes-analitica.imprimir'
+  | 'reportes.compras.ordenes-analitica.ver'
+  | 'reportes.compras.registro.imprimir'
+  | 'reportes.compras.registro.ver'
   | 'reportes.contabilidad.balance-general.imprimir'
   | 'reportes.contabilidad.balance-general.ver'
+  | 'reportes.contabilidad.flujo-efectivo.imprimir'
+  | 'reportes.contabilidad.flujo-efectivo.ver'
   | 'reportes.contabilidad.ingresos-egresos.imprimir'
   | 'reportes.contabilidad.ingresos-egresos.ver'
+  | 'reportes.despacho.faltantes.ver'
+  | 'reportes.despacho.margen.ver'
+  | 'reportes.despacho.pendientes-compra.ver'
+  | 'reportes.despacho.reservas.ver'
+  | 'reportes.dgii.facturacion-fiscal.imprimir'
+  | 'reportes.dgii.facturacion-fiscal.ver'
   | 'reportes.dgii606.ver'
   | 'reportes.dgii607.ver'
   | 'reportes.dgii608.ver'
+  | 'reportes.inventario.antiguedad.imprimir'
+  | 'reportes.inventario.antiguedad.ver'
   | 'reportes.inventario.movimientos.imprimir'
   | 'reportes.inventario.movimientos.ver'
+  | 'reportes.inventario.proyeccion.imprimir'
+  | 'reportes.inventario.proyeccion.ver'
   | 'reportes.inventario.valoracion.imprimir'
   | 'reportes.inventario.valoracion.ver'
+  | 'reportes.pedidos.analitica.imprimir'
+  | 'reportes.pedidos.analitica.ver'
   | 'reportes.pos.corte-caja-dia.imprimir'
   | 'reportes.pos.corte-caja-dia.ver'
   | 'reportes.pos.cuadre-turno.imprimir'
   | 'reportes.pos.cuadre-turno.ver'
+  | 'reportes.solicitudes.ver'
   | 'reportes.ventas.imprimir'
+  | 'reportes.ventas.item-wise.imprimir'
+  | 'reportes.ventas.item-wise.ver'
   | 'reportes.ventas.ver'
   | 'sucursales.crear'
   | 'sucursales.editar'
@@ -360,6 +408,7 @@ export type AccionId =
   | 'ventas.factura.imprimir'
   | 'ventas.factura.imprimir-pos'
   | 'ventas.factura.listar'
+  | 'ventas.factura.recalcular-cobertura'
   | 'ventas.factura.someter'
   | 'ventas.factura.ver-asientos'
   | 'ventas.nota-credito.aplicar'
@@ -372,6 +421,19 @@ export type AccionId =
   | 'ventas.nota-debito.imprimir'
 
 export const ACCIONES_CATALOGO: readonly AccionId[] = [
+  'apertura.compras.anular',
+  'apertura.compras.crear',
+  'apertura.compras.listar',
+  'apertura.preparar.ejecutar',
+  'apertura.preparar.ver',
+  'apertura.resumen.ver',
+  'apertura.ventas.anular',
+  'apertura.ventas.crear',
+  'apertura.ventas.listar',
+  'aseguradoras.crear',
+  'aseguradoras.editar',
+  'aseguradoras.eliminar',
+  'aseguradoras.listar',
   'caja.cobrar',
   'caja.descartar',
   'caja.listar',
@@ -481,6 +543,8 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'config.denominaciones.crear',
   'config.denominaciones.editar',
   'config.denominaciones.listar',
+  'config.despacho.deshabilitar',
+  'config.despacho.habilitar',
   'config.ecf.contingencia.administrar',
   'config.ecf.editar',
   'config.ecf.secuencias.administrar',
@@ -513,6 +577,7 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'config.ncf.editar',
   'config.ncf.listar',
   'config.paises.ver',
+  'config.pos.deshabilitar',
   'config.pos.habilitar',
   'config.retenciones.crear',
   'config.retenciones.editar',
@@ -563,6 +628,14 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'departamentos.editar',
   'departamentos.eliminar',
   'departamentos.listar',
+  'despachos.cancelar',
+  'despachos.crear',
+  'despachos.devolver',
+  'despachos.editar',
+  'despachos.facturar',
+  'despachos.imprimir',
+  'despachos.someter',
+  'despachos.ver',
   'ecf.emitidos.imprimir',
   'ecf.emitidos.listar',
   'ecf.emitidos.refrescar',
@@ -570,24 +643,15 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'ecf.recibidos.aceptar-rechazar',
   'ecf.recibidos.cargar-xml',
   'ecf.recibidos.listar',
-  'farmacia.despachos.cobrar',
-  'farmacia.despachos.cola',
-  'farmacia.despachos.crear',
-  'farmacia.despachos.imprimir',
-  'farmacia.despachos.listar',
   'farmacia.lotes.crear',
   'farmacia.lotes.facturar',
+  'farmacia.lotes.facturas-elegibles',
   'farmacia.lotes.imprimir',
   'farmacia.lotes.listar',
   'farmacia.lotes.marcar-en-revision',
   'farmacia.lotes.recalcular',
-  'farmacia.lotes.vincular-despacho',
-  'farmacia.preaprobaciones.confirmar',
-  'farmacia.preaprobaciones.crear',
-  'farmacia.preaprobaciones.editar',
-  'farmacia.preaprobaciones.listar',
-  'farmacia.preaprobaciones.recalcular',
-  'farmacia.reportes.despachos-ncf.listar',
+  'farmacia.lotes.vincular-facturas',
+  'farmacia.reportes.facturas-ars.listar',
   'farmacia.reportes.lotes.listar',
   'gastos.anular',
   'gastos.aplicar-saldo',
@@ -629,6 +693,14 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'inventario.zonas.editar',
   'inventario.zonas.eliminar',
   'inventario.zonas.listar',
+  'monedas.habilitar',
+  'monedas.preview.ver',
+  'monedas.tasas.crear',
+  'monedas.tasas.editar',
+  'monedas.tasas.eliminar',
+  'monedas.tasas.sincronizar',
+  'monedas.tasas.ver',
+  'monedas.ver',
   'notificaciones.canales-email.editar',
   'notificaciones.canales-email.ver',
   'notificaciones.logs.listar',
@@ -660,22 +732,47 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'proveedores.listar',
   'reportes.caja.cuadre.imprimir',
   'reportes.caja.cuadre.ver',
+  'reportes.compras.analitica.imprimir',
+  'reportes.compras.analitica.ver',
+  'reportes.compras.item-wise.imprimir',
+  'reportes.compras.item-wise.ver',
+  'reportes.compras.ordenes-analitica.imprimir',
+  'reportes.compras.ordenes-analitica.ver',
+  'reportes.compras.registro.imprimir',
+  'reportes.compras.registro.ver',
   'reportes.contabilidad.balance-general.imprimir',
   'reportes.contabilidad.balance-general.ver',
+  'reportes.contabilidad.flujo-efectivo.imprimir',
+  'reportes.contabilidad.flujo-efectivo.ver',
   'reportes.contabilidad.ingresos-egresos.imprimir',
   'reportes.contabilidad.ingresos-egresos.ver',
+  'reportes.despacho.faltantes.ver',
+  'reportes.despacho.margen.ver',
+  'reportes.despacho.pendientes-compra.ver',
+  'reportes.despacho.reservas.ver',
+  'reportes.dgii.facturacion-fiscal.imprimir',
+  'reportes.dgii.facturacion-fiscal.ver',
   'reportes.dgii606.ver',
   'reportes.dgii607.ver',
   'reportes.dgii608.ver',
+  'reportes.inventario.antiguedad.imprimir',
+  'reportes.inventario.antiguedad.ver',
   'reportes.inventario.movimientos.imprimir',
   'reportes.inventario.movimientos.ver',
+  'reportes.inventario.proyeccion.imprimir',
+  'reportes.inventario.proyeccion.ver',
   'reportes.inventario.valoracion.imprimir',
   'reportes.inventario.valoracion.ver',
+  'reportes.pedidos.analitica.imprimir',
+  'reportes.pedidos.analitica.ver',
   'reportes.pos.corte-caja-dia.imprimir',
   'reportes.pos.corte-caja-dia.ver',
   'reportes.pos.cuadre-turno.imprimir',
   'reportes.pos.cuadre-turno.ver',
+  'reportes.solicitudes.ver',
   'reportes.ventas.imprimir',
+  'reportes.ventas.item-wise.imprimir',
+  'reportes.ventas.item-wise.ver',
   'reportes.ventas.ver',
   'sucursales.crear',
   'sucursales.editar',
@@ -730,6 +827,7 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'ventas.factura.imprimir',
   'ventas.factura.imprimir-pos',
   'ventas.factura.listar',
+  'ventas.factura.recalcular-cobertura',
   'ventas.factura.someter',
   'ventas.factura.ver-asientos',
   'ventas.nota-credito.aplicar',

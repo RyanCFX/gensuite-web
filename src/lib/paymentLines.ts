@@ -56,6 +56,22 @@ export function cashAmount(payments: PaymentLineDraft[], metodos: MetodoPago[]):
   }, 0)
 }
 
+/** Moneda real de un método de pago — nunca se asume del nombre. Se deriva de la Cuenta Bancaria
+ * asociada (`defaultBankAccount`) si tiene una, o si no de la cuenta contable directa (`account`,
+ * resuelta aparte vía `getCuenta` por quien llame esto — ver `useMetodoPagoCurrencies`). Cae a la
+ * moneda base si el método no tiene ninguna cuenta asociada (docs/tasks/70_caja_pos_sin_soporte_multimoneda.md:
+ * Caja exige que el método opere en la MISMA moneda que la factura, sin conversión). */
+export function resolveMetodoPagoCurrency(
+  metodo: MetodoPago,
+  cuentasBancariasPorId: Record<string, string>,
+  cuentasPorId: Record<string, string>,
+  monedaBase: string,
+): string {
+  if (metodo.defaultBankAccount) return cuentasBancariasPorId[metodo.defaultBankAccount] ?? monedaBase
+  if (metodo.account) return cuentasPorId[metodo.account] ?? monedaBase
+  return monedaBase
+}
+
 export function sumVuelto(vuelto: VueltoLineDraft[], denominaciones: { denominacion: string; valor: number }[]): number {
   return vuelto.reduce((sum, v) => {
     const d = denominaciones.find((d) => d.denominacion === v.denominacion)

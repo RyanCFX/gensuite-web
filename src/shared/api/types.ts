@@ -4,6 +4,22 @@ export interface ApiError {
   code: string;
   message: string;
   statusCode: number;
+  /** Presente en algunos 409 (ej. Client de Vega duplicado, bloqueos al desactivar el módulo POS). */
+  details?: Record<string, unknown>;
+}
+
+/** `details` de un error `STOCK_INSUFFICIENT_OR_RESERVED` con estructura completa — solo viene así
+ *  desde `/transferencias` y `/despachos` (vía `assertDisponibleNoReservado`). El mismo código
+ *  también puede llegar SIN `details` desde el submit nativo de ERPNext (Factura/Delivery Note con
+ *  update_stock=1) — ver docs/tasks/73_alertas_stock_disponible_reservado.md §4.1. */
+export interface StockInsufficientOrReservedDetails {
+  itemCode: string;
+  warehouse: string;
+  actualQty: number;
+  reservedStock: number;
+  disponible: number;
+  solicitado: number;
+  faltante: number;
 }
 
 export interface ApiResponse<T> {
@@ -135,6 +151,11 @@ export interface Customer {
   formaPagoDefault?: string;
   /** Cuenta contable (Account) alterna para la CxC de este cliente — si se omite, se usa el default de la compañía. */
   cuentaCxcDefault?: string;
+  /** Moneda por defecto de este cliente ('DOP'|'USD'|'EUR') — debe estar habilitada primero si
+   *  difiere de la moneda base (ver GET /monedas). Al fijarla, autopobla `cuentaCxcDefault` con
+   *  la cuenta CxC de esa moneda salvo que se mande `cuentaCxcDefault` explícito en el mismo
+   *  request. Ver docs/tasks/64_multimoneda_completo.md Fase 2. */
+  defaultCurrency?: string | null;
   /** Email del usuario (User) responsable de la cobranza de este cliente. */
   encargadoCxc?: string;
   /** IDs de Sales Taxes and Charges Template — prellenan el impuesto al facturar a este cliente. Solo viene poblado en GET /customers/:id. */
@@ -165,6 +186,10 @@ export interface CreateCustomerDto {
   branch?: string;
   formaPagoDefault?: string;
   cuentaCxcDefault?: string;
+  /** Ver `Customer.defaultCurrency`. Si al editar se manda igual a la moneda base de la
+   *  compañía, el backend limpia `cuentaCxcDefault` automáticamente salvo que también se
+   *  mande explícito en el mismo request. */
+  defaultCurrency?: string;
   encargadoCxc?: string;
   impuestoVentasDefault?: string[];
 }
@@ -174,6 +199,52 @@ export type UpdateCustomerDto = Partial<
 > & {
   customerType?: "Company" | "Individual";
 };
+
+// ─── Aseguradora (ARS) ────────────────────────────────────────────────────────
+// Vertical Farmacia: una ARS es, por debajo, el mismo doctype `Customer` que un cliente, pero el
+// BFF la expone en un CRUD aparte (`/aseguradoras`). Siempre es una empresa (RNC obligatorio, sin
+// opción Individual). `hasCredit` viene `true` por defecto al crear — es precondición para poder
+// facturar un lote consolidado a la ARS. Ver docs/PROMPT_ASEGURADORAS.md y docs/PROMPT_FARMACIA_V2_FRONTEND.md §6.
+// NOTA: `openapi.json` no documenta un schema de respuesta; los nombres de campo se confirmaron
+// contra una respuesta real. `customerName` se deja como fallback tolerante de `nombre`.
+
+export interface Aseguradora {
+  id: string;
+  nombre: string;
+  /** Fallback si el backend devuelve `customerName` en vez de `nombre`. */
+  customerName?: string;
+  rnc?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  hasCredit: boolean;
+  creditLimit: number;
+  creditDays: number;
+  cuentaCxcDefault?: string;
+  encargadoCxc?: string;
+  telefonos?: TelefonoCliente[];
+  disabled: boolean;
+  createdAt?: string;
+  modifiedAt?: string;
+}
+
+export interface CreateAseguradoraDto {
+  nombre: string;
+  /** Obligatorio — una aseguradora siempre es una empresa. */
+  rnc: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  /** El formulario lo sugiere `true` por defecto (a diferencia de Clientes). */
+  hasCredit?: boolean;
+  creditLimit?: number;
+  creditDays?: number;
+  cuentaCxcDefault?: string;
+  encargadoCxc?: string;
+  telefonos?: TelefonoCliente[];
+}
+
+export type UpdateAseguradoraDto = Partial<CreateAseguradoraDto>;
 
 // ─── Supplier ─────────────────────────────────────────────────────────────────
 // tipoIdentificacion IS required for suppliers.
@@ -219,6 +290,10 @@ export interface Supplier {
   defaultFormaPago606?: string | null;
   defaultTipoPagoProveedor?: "Contado" | "Crédito" | null;
   cuentaCxpDefault?: string | null;
+  /** Moneda por defecto de este proveedor ('DOP'|'USD'|'EUR') — mismo mecanismo que
+   *  `Customer.defaultCurrency` (Fase 2 de docs/tasks/64_multimoneda_completo.md), autopobla
+   *  `cuentaCxpDefault` salvo que se mande explícito. */
+  defaultCurrency?: string | null;
   /** En findOne viene enriquecido como `{id, tasa}[]`; en listado no se enriquece. */
   retencionesDefault?: ProveedorIdTasa[];
   /** Purchase Taxes and Charges Templates (config/impuestos-compras) aplicados por defecto al crear
@@ -256,6 +331,7 @@ export interface CreateProveedorDto {
   defaultFormaPago606?: string | null;
   defaultTipoPagoProveedor?: "Contado" | "Crédito" | null;
   cuentaCxpDefault?: string | null;
+  defaultCurrency?: string | null;
   retencionesDefault?: string[];
   impuestoComprasDefault?: string[];
   impuestoGastosDefault?: string[];
@@ -270,7 +346,10 @@ export interface InvoiceItem {
   description?: string;
   qty: number;
   rate: number;
+  /** Mutuamente excluyente con discountAmount — el que no se usó viene en 0. */
   discountPct?: number;
+  /** Descuento fijo en RD$. Mutuamente excluyente con discountPct — el que no se usó viene en 0. */
+  discountAmount?: number;
   discountedRate?: number;
   amount: number;
   uom: string;
@@ -278,6 +357,18 @@ export interface InvoiceItem {
   /** Ubicación/rack específico dentro del almacén desde donde se descontó el stock, si se especificó. */
   ubicacion?: string;
   notes?: string;
+  // ── Cobertura ARS por línea (solo vertical farmacia, y solo si la factura tiene
+  //    `aseguradora`; ausentes en una factura sin cobertura). Ver §3.3 del doc v2.
+  /** Peso (%) de esta línea para el reparto automático de la cobertura. */
+  porcientoTeoricoArs?: number;
+  /** Cobertura ARS de esta línea en RD$. */
+  montoAprobadoArs?: number;
+  /** Ajuste manual protegido: "Recalcular" no toca esta línea. */
+  lineaBloqueadaArs?: boolean;
+  /** Calculado por el servidor: `amount − montoAprobadoArs`. Solo lectura. */
+  montoPacienteArs?: number;
+  /** Calculado por el servidor. Solo lectura. */
+  porcientoRealArs?: number;
 }
 
 export interface Invoice {
@@ -344,6 +435,21 @@ export interface Invoice {
   ecf?: EcfSubmitResult;
   /** ID del Pedido de venta del que se originó esta factura, si aplica. */
   salesOrder?: string;
+  /** Cobertura de la ARS sobre esta factura (vertical farmacia). `null` en una factura sin
+   *  cobertura — en ese caso las líneas tampoco traen los campos `*Ars`. Ver §3.5 del doc v2.
+   *  En los elementos de `GET /invoices` viene la versión reducida (§3.8). */
+  aseguradora?: InvoiceAseguradora | InvoiceAseguradoraResumen | null;
+  // ─── Multimoneda (docs/tasks/64_multimoneda_completo.md Fase 3) ──────────────
+  /** Moneda del documento ('DOP'|'USD'|'EUR'). Todos los montos del documento (subtotal,
+   *  taxAmount, roundedTotal, outstandingAmount, items[], paymentLines[]...) están en ESTA
+   *  moneda, no en la moneda base — excepto `baseGrandTotal`/`baseOutstandingAmount`. */
+  currency?: string;
+  /** Solo en GET /invoices/:id (ausente en el listado). */
+  conversionRate?: number;
+  /** Total convertido a moneda base — igual a `grandTotal` si ya está en la moneda base. Solo en GET /invoices/:id. */
+  baseGrandTotal?: number;
+  /** Saldo pendiente convertido a moneda base. Solo en GET /invoices/:id. */
+  baseOutstandingAmount?: number;
 }
 
 export interface PendingTrackingEntry {
@@ -378,23 +484,45 @@ export interface CreateInvoiceDto {
   branch?: string;
   department?: string;
   ncfType: "B01" | "B02" | "B14" | "B15" | "B16";
+  /** Moneda del documento. Si se omite: `Customer.defaultCurrency` del cliente elegido → moneda
+   *  base de la compañía (un cliente ocasional también puede facturarse en moneda extranjera,
+   *  pasando `currency` explícito). Al editar (PATCH), omitirlo CONGELA la moneda/tasa que la
+   *  factura ya tenía — no se re-resuelve. */
+  currency?: string;
+  /** Obligatoria solo si `currency` resuelve a una moneda distinta de la base y no hay tasa
+   *  cargada en /monedas/tasas para la fecha — si se omite en ese caso, ERPNext falla al crear. */
+  conversionRate?: number;
   items: {
     itemCode: string;
     description?: string;
     qty: number;
     rate: number;
     uom?: string;
+    /** % de descuento (0-100). Mutuamente excluyente con discountAmount. */
     discountPct?: number;
+    /** Descuento fijo en RD$. Mutuamente excluyente con discountPct — use uno u otro, nunca ambos. */
+    discountAmount?: number;
     /** Almacén desde el que se descuenta el stock. Si se omite, ERPNext usa el almacén por defecto del artículo. */
     warehouse?: string;
     /** Ubicación/rack específico dentro del almacén. Si se envía, el descuento de stock ocurre exactamente ahí en vez del almacén general. */
     ubicacion?: string;
     /** Solo cuando itemCode es un Combo y algún componente tiene tracking de serial/lote. */
     componentTracking?: ComponentTracking[];
+    /** Peso (%) de la línea para el reparto automático de la cobertura ARS (0–100). */
+    porcientoTeoricoArs?: number;
+    /** Cobertura ARS de esta línea en RD$. Si NINGUNA línea lo envía, el servidor la reparte solo;
+     *  si alguna lo envía, se respeta tal cual lo enviado. */
+    montoAprobadoArs?: number;
+    /** Ajuste manual protegido: el recálculo no toca esta línea. */
+    lineaBloqueadaArs?: boolean;
   }[];
   notes?: string;
   /** ID de un Sales Taxes and Charges Template (/config/impuestos-ventas). Si se omite, se usa el default de la compañía si existe. */
   taxesTemplate?: string;
+  /** Solo tenants del vertical farmacia. Ausente = sin cobertura; `null` en el PATCH quita una
+   *  cobertura que ya estaba en el borrador. Una factura con cobertura NO puede llevar
+   *  `taxesTemplate` (el servidor responde 400). */
+  aseguradora?: AseguradoraInvoiceDto | null;
 }
 
 /**
@@ -435,7 +563,10 @@ export interface QuotationItem {
   description?: string;
   qty: number;
   rate: number;
+  /** Mutuamente excluyente con discountAmount — el que no se usó viene en 0. */
   discountPct?: number;
+  /** Descuento fijo en RD$. Mutuamente excluyente con discountPct — el que no se usó viene en 0. */
+  discountAmount?: number;
   discountedRate?: number;
   amount: number;
   uom: string;
@@ -450,6 +581,7 @@ export interface Quotation {
   customerName: string;
   esClienteOcasional: boolean;
   clienteOcasionalNombre?: string;
+  clienteOcasionalRnc?: string;
   clienteOcasionalDireccion?: string;
   date: string;
   validTill: string;
@@ -465,22 +597,36 @@ export interface Quotation {
   message?: string;
   /** ID del Pedido de venta generado a partir de esta cotización, si ya se convirtió. */
   salesOrder?: string;
+  /** Moneda del documento — mismo patrón que Factura. No hay `baseGrandTotal` en Cotizaciones;
+   *  si se necesita el equivalente en moneda base, calcularlo como `grandTotal * conversionRate`
+   *  (aproximado). Ver docs/tasks/64_multimoneda_completo.md §3.2. */
+  currency?: string;
+  conversionRate?: number;
 }
 
 export interface CreateQuotationDto {
   customer?: string;
   clienteOcasionalNombre?: string;
+  /** RNC (9 dígitos) o cédula (11) del comprador ocasional. Se conserva al convertir el documento en factura y se envía a Vega como identificación del comprador en el e-CF. */
+  clienteOcasionalRnc?: string;
   clienteOcasionalDireccion?: string;
   date: string; // required per API
   validTill?: string;
   branch?: string;
+  /** Ver `CreateInvoiceDto.currency` — misma regla de resolución. Al editar (PUT), omitirlo
+   *  conserva la moneda/tasa existente. */
+  currency?: string;
+  conversionRate?: number;
   items: {
     itemCode: string;
     description?: string;
     qty: number;
     rate: number;
     uom?: string;
+    /** % de descuento (0-100). Mutuamente excluyente con discountAmount. */
     discountPct?: number;
+    /** Descuento fijo en RD$. Mutuamente excluyente con discountPct — use uno u otro, nunca ambos. */
+    discountAmount?: number;
     /** Almacén de entrega. Si se omite, se usa el almacén por defecto del usuario. */
     warehouse?: string;
   }[];
@@ -503,6 +649,7 @@ export interface DuplicateQuotationSource {
     rate: number;
     uom?: string;
     discountPct?: number;
+    discountAmount?: number;
     warehouse?: string;
   }[];
   notes?: string;
@@ -540,6 +687,11 @@ export interface CreditNote {
   appliedAmount?: number;
   availableAmount?: number;
   appliedTo?: CreditNoteAppliedTo[];
+  /** Heredados automáticamente de la factura original — el DTO de creación NO tiene estos
+   *  campos, no agregar un selector de moneda a este formulario. Ver
+   *  docs/tasks/64_multimoneda_completo.md §3.4. */
+  currency?: string;
+  conversionRate?: number;
 }
 
 /** Código de modificación DGII (Tabla VI): 1=Anula, 2=Corrige texto, 3=Corrige montos,
@@ -623,6 +775,11 @@ export interface DevolucionDto {
    *  el tenant emite esta nota como e-CF (E34): 1=Anula, 2=Corrige texto, 3=Corrige montos,
    *  4=Reemplazo contingencia, 5=Referencia a Factura de Consumo. Sin efecto en el flujo físico (NCF B04). */
   modificationCode?: EcfModificationCode;
+  /** Solo facturas con cobertura ARS. Obligatorio cuando la devolución deja la cobertura en cero
+   *  (total, o parcial que devuelve toda la cobertura restante) y `estadoArs ≠ "Facturado"`. */
+  motivoAnulacionArs?: MotivoAnulacionArs;
+  /** Texto 5–500 — obligatorio si `motivoAnulacionArs === "Otro"`. */
+  motivoAnulacionDetalle?: string;
 }
 
 // POST /devoluciones/:id/cancelar — solo devoluciones en borrador. El documento no se elimina:
@@ -652,7 +809,44 @@ export interface DevolucionResult {
   remainingAvailable: number;
   /** Solo presente si resolution === 'refund' tuvo éxito (sin pendiente en la factura) */
   paymentEntryId?: string;
+  /** Solo viene cuando la factura original tenía cobertura ARS (§5.3). */
+  aseguradora?: {
+    parteArs: number;
+    partePaciente: number;
+    /** true si la devolución dejó la aprobación ARS anulada. */
+    aprobacionAnulada: boolean;
+    estadoArsOriginal: EstadoArs | null;
+    /** Solo cuando se emitió la NC a la ARS (`estadoArsOriginal === 'Facturado'`). */
+    creditNoteAseguradoraId?: string | null;
+    ncfAseguradora?: string | null;
+  } | null;
   message?: string;
+}
+
+/** Bloque `aseguradora` de `GET /devoluciones/:id` y `GET /credit-notes/:id` (§5.4).
+ *  `null` si la nota no tiene cobertura. */
+export interface DevolucionAseguradora {
+  aseguradora: string;
+  aseguradoraName?: string;
+  numeroAutorizacion: string;
+  parteArsDevuelta: number;
+  /** Estado ARS que tenía la factura original CUANDO se devolvió — no el actual. */
+  estadoArsAlDevolver: EstadoArs | null;
+  /** NC emitida a la aseguradora, o `null` si todavía no se emitió. */
+  ncAseguradoraId?: string | null;
+  /** Solo en la NC a la aseguradora: la factura de paciente que la originó. */
+  facturaPacienteRef?: string | null;
+}
+
+/** Body (opcional) de `POST /devoluciones/:id/emitir-nc-aseguradora` — idempotente. */
+export interface EmitirNcAseguradoraDto {
+  modificationCode?: EcfModificationCode;
+}
+
+export interface EmitirNcAseguradoraResult {
+  creditNoteId: string;
+  creditNoteAseguradoraId: string;
+  ncfAseguradora?: string | null;
 }
 
 // GET /devoluciones (lista) — mismo shape que GET /credit-notes
@@ -669,6 +863,8 @@ export interface DevolucionOriginalInvoice {
   grandTotal: number;
   outstandingAmount: number;
   status: "draft" | "submitted" | "cancelled";
+  /** Estado ARS ACTUAL de la factura original — informativo (§5.4). */
+  estadoArs?: EstadoArs | null;
 }
 
 export interface DevolucionItem {
@@ -702,6 +898,8 @@ export interface DevolucionDetail {
   usageStatus?: "available" | "partially_used" | "fully_used";
   /** null solo si falló traer la factura original (raro) */
   originalInvoice: DevolucionOriginalInvoice | null;
+  /** `null` si la nota no tiene cobertura ARS. */
+  aseguradora?: DevolucionAseguradora | null;
   createdAt: string;
   modifiedAt: string;
 }
@@ -832,6 +1030,11 @@ export interface DebitNote {
   branch?: string | null;
   department?: string | null;
   createdAt: string;
+  /** Con `referenceInvoice`: hereda estrictamente de esa factura. Sin `referenceInvoice`: se
+   *  resuelve igual que una Factura nueva (Cliente.defaultCurrency → moneda base). El DTO de
+   *  creación NO tiene estos campos — no agregar selector. Ver docs/tasks/64_multimoneda_completo.md §3.5. */
+  currency?: string;
+  conversionRate?: number;
 }
 
 export interface CreateDebitNoteDto {
@@ -847,7 +1050,7 @@ export interface CreateDebitNoteDto {
   }[];
   notes?: string;
   /** Factura que esta nota de débito afecta. Solo obligatorio si se emite como e-CF (E33) —
-   *  Aura exige el e-NCF afectado. Sin efecto en el flujo físico (NCF B03). */
+   *  Vega exige el e-NCF afectado. Sin efecto en el flujo físico (NCF B03). */
   referenceInvoice?: string;
   /** Ver CreateCreditNoteDto.modificationCode — mismas reglas (obligatorio solo para e-CF E33). */
   modificationCode?: EcfModificationCode;
@@ -1147,7 +1350,10 @@ export interface PedidoItem {
   rate: number;
   amount: number;
   uom?: string;
+  /** Mutuamente excluyente con discountAmount — el que no se usó viene en 0. */
   discountPct?: number;
+  /** Descuento fijo en RD$. Mutuamente excluyente con discountPct — el que no se usó viene en 0. */
+  discountAmount?: number;
   notes?: string;
   taxRate: number;
   taxAmount: number;
@@ -1159,6 +1365,7 @@ export interface Pedido {
   customerName: string;
   esClienteOcasional: boolean;
   clienteOcasionalNombre?: string;
+  clienteOcasionalRnc?: string;
   clienteOcasionalDireccion?: string;
   transactionDate: string;
   deliveryDate?: string;
@@ -1184,22 +1391,35 @@ export interface Pedido {
   isLayaway?: boolean;
   layawayVencido?: boolean;
   layawayDiasRestantes?: number;
+  /** Moneda del documento — mismo patrón que Factura/Cotización. Se hereda tal cual al convertir
+   *  desde una Cotización (nunca se re-resuelve). No hay `baseGrandTotal` en Pedidos. */
+  currency?: string;
+  conversionRate?: number;
 }
 
 export interface CreatePedidoDto {
   customer?: string;
   clienteOcasionalNombre?: string;
+  /** RNC (9 dígitos) o cédula (11) del comprador ocasional. Se conserva al convertir el documento en factura y se envía a Vega como identificación del comprador en el e-CF. */
+  clienteOcasionalRnc?: string;
   clienteOcasionalDireccion?: string;
   transactionDate?: string;
   deliveryDate?: string;
   branch?: string;
   department?: string;
+  /** Ver `CreateInvoiceDto.currency`. Al convertir desde Cotización, se hereda tal cual (este
+   *  campo se ignora en ese flujo — el backend nunca re-resuelve la moneda del pedido). */
+  currency?: string;
+  conversionRate?: number;
   items: {
     itemCode: string;
     qty: number;
     rate: number;
     uom?: string;
+    /** % de descuento (0-100). Mutuamente excluyente con discountAmount. */
     discountPct?: number;
+    /** Descuento fijo en RD$. Mutuamente excluyente con discountPct — use uno u otro, nunca ambos. */
+    discountAmount?: number;
     warehouse?: string;
   }[];
   quotation?: string;
@@ -1249,6 +1469,7 @@ export interface DuplicatePedidoSource {
     qty: number;
     rate: number;
     discountPct?: number;
+    discountAmount?: number;
     warehouse?: string;
   }[];
 }
@@ -1402,11 +1623,21 @@ export interface ItemStockWarehouse {
   qty: number;
   valuationRate: number;
   stockValue: number;
+  /** Comprometido con otro cliente/proceso en este almacén (Stock Reservation Entry — típicamente
+   *  un Apartado). Ver docs/tasks/73_alertas_stock_disponible_reservado.md. */
+  reservedStock: number;
+  /** = qty - reservedStock. Lo realmente disponible para prometer a un cliente nuevo — usar
+   *  siempre este campo (nunca `qty` a secas) para validar/mostrar disponibilidad al vender. */
+  disponible: number;
 }
 
 export interface ItemStock {
   itemCode: string;
   totalQty: number;
+  /** Suma de `reservedStock` de todos los almacenes. */
+  totalReservedStock: number;
+  /** Suma de `disponible` de todos los almacenes (= totalQty - totalReservedStock). */
+  totalDisponible: number;
   warehouses: ItemStockWarehouse[];
 }
 
@@ -1424,6 +1655,22 @@ export interface InventoryItem {
   potentialProfit: number;
   /** Nombres de las ubicaciones (Zona/Rack) asignadas a este artículo en este almacén */
   ubicaciones?: string[];
+  // ─── Campos del Bin — docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md §7 ───
+  // Existen siempre (no gateados por despachoHabilitado); el listado ya no oculta actualQty=0.
+  /** Comprometido en pedidos de venta sometidos aún sin entregar. */
+  reservedQty?: number;
+  /** Subconjunto de reservedQty con reserva nativa de ERPNext (Stock Reservation Entry) sobre
+   *  stock físico concreto — es el que se usa para calcular disponibleParaVender. */
+  reservedStock?: number;
+  /** Ya pedido a proveedores (orden de compra sometida, aún sin recibir). */
+  orderedQty?: number;
+  /** En solicitudes de material/compra pendientes (previo a orden de compra). */
+  indentedQty?: number;
+  /** Proyección nativa de ERPNext: actualQty + orderedQty + indentedQty - reservedQty. */
+  projectedQty?: number;
+  /** El campo más útil para la UI: actualQty - (reservedStock ?? 0) — lo que realmente se le
+   *  puede prometer a un cliente nuevo ahora mismo. Preferirlo sobre actualQty a secas. */
+  disponibleParaVender?: number;
 }
 
 // ─── Zonas y Ubicaciones (organización física dentro del almacén) ─────────────
@@ -1458,8 +1705,12 @@ export interface UbicacionResponseDto {
   id: string;
   ubicacionName: string;
   zona: string;
-  /** Heredado de la zona — solo lectura */
+  /** Heredado de la zona — es el almacén padre, NO sirve para transferencias (usar `warehouseReal`) */
   warehouse: string;
+  /** Nombre exacto del Warehouse real en ERPNext para esta ubicación/rack (incluye el sufijo de
+   *  la company, ej. "Rack 1 - Nivel 2 - rubheum4eb - JB") — es lo que hay que mandar como
+   *  `fromWarehouse`/`toWarehouse` en POST /api/v1/transferencias. */
+  warehouseReal: string;
   code?: string;
   descripcion?: string;
   disabled: boolean;
@@ -1699,6 +1950,9 @@ export interface InventoryHistory {
   stockAfter: number;
   valuationRate: number;
   postingDate: string;
+  /** Hora del movimiento (Stock Ledger Entry.posting_time) — no siempre viene poblada según el
+   *  documento de origen, tratar como opcional. */
+  postingTime?: string;
 }
 
 // ─── Recálculo de valuación (Repost Item Valuation) ───────────────────────────
@@ -2789,6 +3043,38 @@ export interface FacturacionConfig {
   ncfAlertaMinimo?: number
   /** Espejo de `Accounts Settings.disable_rounded_total` de ERPNext — aplica como default a toda factura/compra nueva del tenant. Si está en false (default), el grand_total con centavos se redondea a rounded_total y ese es el monto que queda a cobrar (pensado para efectivo). Si está en true, se cobra el grand_total exacto con centavos (pensado para tarjeta/cheque/transferencia). No afecta documentos ya sometidos. */
   redondeoTotalDeshabilitado?: boolean
+
+  // ─── Multimoneda (DOP/USD/EUR) — ver docs/tasks/60_multimoneda_dop_usd_eur.md ────────────
+
+  /** Si está activo, cobrar una factura de venta en moneda extranjera usa siempre la tasa con la que se emitió esa factura, nunca la tasa del día. */
+  tasaFijaCxc?: boolean
+  /** Igual que `tasaFijaCxc`, pero para pagos a proveedores (Cuentas por Pagar). */
+  tasaFijaCxp?: boolean
+  /** Si está activo, permite cobrar/pagar en una cuenta bancaria que opera en una moneda distinta a la del monto — sujeto a `bankConversionRate`/`receivedAmount` en el cobro/pago. */
+  permitirPagoMonedaDistintaBanco?: boolean
+  /** Si está activo, un job diario actualiza las tasas de cambio automáticamente (a la hora `tasasHoraActualizacion`, contra `tasasProveedor`). */
+  tasasActualizacionAutomatica?: boolean
+  /** Hora del servidor, formato "HH:mm" exacto (24 horas, sin segundos ni zona horaria), a la que corre el job de actualización automática de tasas. */
+  tasasHoraActualizacion?: string
+  /** Proveedor externo contra el que el job de actualización automática resuelve las tasas. */
+  tasasProveedor?: "Banco Central RD" | "Currency Exchange Settings"
+  /** Última vez que corrió el job de actualización automática de tasas — ISO datetime, o null si nunca corrió. Solo lectura. */
+  tasasUltimaActualizacion?: string | null
+  /** Último error del job de actualización automática de tasas, o null si no hubo. Solo lectura. */
+  tasasUltimoError?: string | null
+  /** Moneda base de la compañía — siempre "DOP", nunca se deshabilita. Derivado en vivo desde el catálogo de monedas, no editable con PUT. */
+  monedaBase?: string
+  /** Monedas habilitadas para el tenant (siempre incluye `monedaBase`). Derivado en vivo, no editable con PUT. */
+  monedasHabilitadas?: string[]
+  /** true si `monedasHabilitadas` tiene alguna moneda además de `monedaBase`. Derivado en vivo, no editable con PUT. */
+  multimonedaHabilitada?: boolean
+
+  // ─── Despacho (Delivery Note) — docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md ───
+  /** Interruptor por tenant, apagado por default. Con true: las facturas nuevas dejan de descontar
+   *  inventario al someterse (update_stock=0) — la salida física pasa a ocurrir al someter un
+   *  Despacho (Delivery Note). No se edita con PUT directo — usar POST /config/despacho/habilitar
+   *  y /deshabilitar (ver despachos.ts), y volver a pedir este endpoint después para refrescar. */
+  despachoHabilitado?: boolean
 }
 
 // ─── Facturación Electrónica (e-CF) ────────────────────────────────────────────
@@ -2797,7 +3083,7 @@ export interface FacturacionConfig {
 
 export type EcfTipoElectronico = "31" | "32" | "33" | "34" | "41" | "43" | "44" | "45" | "46" | "47";
 
-/** Uno por RNC emisor conectado a Aura — solo lectura, gestionado por soporte/backend. */
+/** Uno por RNC emisor conectado a Vega — solo lectura, gestionado por soporte/backend. */
 export interface EcfProvisioningCliente {
   company: string;
   rnc: string;
@@ -2806,9 +3092,9 @@ export interface EcfProvisioningCliente {
   contingencyMode?: boolean;
 }
 
-/** Estado de la conexión del tenant con Aura. Para el tenant promedio hoy `provisionado`
+/** Estado de la conexión del tenant con Vega. Para el tenant promedio hoy `provisionado`
  *  es false y el resto viene vacío/null — es normal, no un error. Solo lectura: no hay
- *  todavía un flujo de auto-servicio para conectar un tenant a Aura desde la UI. */
+ *  todavía un flujo de auto-servicio para conectar un tenant a Vega desde la UI. */
 export interface EcfProvisioning {
   provisionado: boolean;
   activeMode: "test" | "live" | null;
@@ -2823,14 +3109,14 @@ export interface EcfConfig {
   /** typeId de e-CF habilitados para esta compañía. Un tipo NO listado sigue emitiéndose
    *  como NCF físico aunque `habilitado` esté activo — migración por tipo, no big-bang. */
   tiposElectronicos: EcfTipoElectronico[];
-  auraClientId?: string | null;
+  vegaClientId?: string | null;
   ambiente?: string | null;
   contingenciaActiva: boolean;
   /** Si está activo, la emisión del e-CF ocurre automáticamente al someter el documento. */
   emitirAlSometer: boolean;
-  /** Si Aura/DGII no responde: true = se bloquea la facturación (default seguro); false =
+  /** Si Vega/DGII no responde: true = se bloquea la facturación (default seguro); false =
    *  se activa contingencia automáticamente. */
-  bloquearSubmitSiAuraCaido: boolean;
+  bloquearSubmitSiVegaCaido: boolean;
   /** 1=Contado, 2=Crédito, 3=Gratuito. */
   tipoPagoDefault: 1 | 2 | 3;
   /** 01=Habituales, 02=Financieros, 03=Extraordinarios, 04=Arrendamientos, 05=Venta de
@@ -2854,7 +3140,7 @@ export interface UpdateEcfConfigDto {
   habilitado?: boolean;
   tiposElectronicos?: EcfTipoElectronico[];
   emitirAlSometer?: boolean;
-  bloquearSubmitSiAuraCaido?: boolean;
+  bloquearSubmitSiVegaCaido?: boolean;
   tipoPagoDefault?: 1 | 2 | 3;
   tipoIngresosDefault?: "01" | "02" | "03" | "04" | "05" | "06";
   diasLimiteAprobacionComercial?: number;
@@ -2941,16 +3227,36 @@ export interface CreateEcfClientDto {
   mode?: EcfMode;
 }
 
-/** Objeto Client de Aura (respuesta de POST /config/ecf/admin/clients). Laxo a propósito. */
+/** Objeto Client de Vega (respuesta de POST /config/ecf/admin/clients, y de cada item de
+ *  GET /config/ecf/admin/clients). Laxo a propósito. */
 export interface EcfClient {
   id: string;
   rnc: string;
   legalName: string;
+  tradeName?: string | null;
   activeEnv?: string;
   hasCertificate?: boolean;
   certificationStage?: string | null;
   certificateExpiresAt?: string | null;
+  contingencyMode?: boolean;
+  /** Solo en GET /clients — Company de este tenant a la que ya está vinculado, o null si
+   *  está libre para vincular con POST /clients/link. */
+  linkedCompany?: string | null;
   [key: string]: unknown;
+}
+
+export interface EcfClientsListResult {
+  clients: EcfClient[];
+  mode: EcfMode;
+}
+
+/** POST /config/ecf/admin/clients/link — vincula un Client que ya existe en Vega sin crearlo. */
+export interface LinkEcfClientDto {
+  /** Nombre EXACTO de la Company en ERPNext. */
+  company: string;
+  vegaClientId: string;
+  /** Opcional — si se omite usa el ambiente activo ya conectado. */
+  mode?: EcfMode;
 }
 
 export interface UploadEcfCertificateDto {
@@ -2974,6 +3280,15 @@ export interface RegisterEcfWebhookResult {
   mode: EcfMode;
 }
 
+/** DELETE /config/ecf/admin/clients/{company} — desvincula el Client de Vega de una Company sin
+ *  tocar nada en Vega (solo borra el puente local `tenant_ecf_clients` y limpia el espejo en
+ *  Facturacion Electronica Config). Úsalo cuando el `vegaClientId` guardado quedó apuntando a un
+ *  Client que ya no existe en Vega ("Cliente no encontrado" al emitir). */
+export interface UnlinkEcfClientResult {
+  message: string;
+  previousVegaClientId: string;
+}
+
 // ─── e-CF — Resultado / estado del comprobante electrónico de una factura ──────
 // Viene tanto en POST /invoices/:id/submit (data.ecf, recién emitido) como en
 // GET /invoices/:id (data.ecf, estado actualizado en segundo plano por webhook).
@@ -2983,7 +3298,7 @@ export interface EcfSubmitResult {
   status: string;
   qrUrl?: string | null;
   securityCode?: string | null;
-  /** true = emitido en modo contingencia (caída de Aura/DGII). Caso muy raro. */
+  /** true = emitido en modo contingencia (caída de Vega/DGII). Caso muy raro. */
   deferred?: boolean;
   message?: string;
 }
@@ -3048,7 +3363,7 @@ export interface FlushContingenciaResult {
   queued: number;
   /** Cuántos superaron las 72h legales sin transmitirse (requieren anulación manual + 608). */
   expired: number;
-  /** Cuántos son de tipos que Aura no permite reenviar en contingencia (E41/E43/E45/E46/E47). */
+  /** Cuántos son de tipos que Vega no permite reenviar en contingencia (E41/E43/E45/E46/E47). */
   disallowed: number;
 }
 
@@ -3240,6 +3555,36 @@ export interface HabilitarPosResult {
   cajeroRole: string;
 }
 
+// POST /config/pos/deshabilitar
+export interface DeshabilitarPosResult {
+  message: string;
+}
+
+// POST /config/despacho/habilitar
+export interface HabilitarDespachoResult {
+  message: string;
+}
+
+// POST /config/despacho/deshabilitar — éxito. El 409 (bloqueado) trae `DesactivarDespachoBloqueos`
+// en `error.details` en su lugar, ver types de Despachos.
+export interface DeshabilitarDespachoResult {
+  message: string;
+}
+
+export interface PosTurnoBloqueante {
+  id: string;
+  cajero: string;
+}
+
+/** `error.details` del 409 de POST /config/pos/deshabilitar — las cuatro listas siempre vienen
+ *  (vacías si no aplican). `colaCaja` y `posConSaldo` son docnames de factura (ver /facturas/:id). */
+export interface PosDeshabilitarBloqueos {
+  turnosAbiertos: PosTurnoBloqueante[];
+  cierresBorrador: PosTurnoBloqueante[];
+  colaCaja: string[];
+  posConSaldo: string[];
+}
+
 // GET /pos/turnos/actual — null si el cajero no tiene turno abierto
 export interface TurnoCaja {
    openingEntryId: string;
@@ -3406,12 +3751,25 @@ export interface CorteCajaDiaTurno {
   periodStartDate: string;
   periodEndDate: string;
   corteCaja: CorteCaja;
+  /** Moneda del POS Profile de este turno — ERPNext garantiza que un turno nunca mezcla
+   *  monedas, así que es seguro asumir una sola moneda por fila. */
+  moneda?: string;
+}
+
+/** Misma forma que `CorteCaja` pero segmentada por moneda — ver `consolidadoPorMoneda`. */
+export interface CorteCajaPorMoneda extends CorteCaja {
+  moneda: string;
 }
 
 export interface CorteCajaDiaResult {
   date: string;
   turnos: CorteCajaDiaTurno[];
+  /** Suma cruda de todos los turnos — se mantiene por compatibilidad, solo tiene sentido si el
+   *  día operó en una sola moneda. Si hubo turnos en monedas distintas, usar
+   *  `consolidadoPorMoneda` como fuente de verdad, nunca sumar entre monedas en el cliente. */
   consolidado: CorteCaja;
+  /** Fuente de verdad cuando el día tuvo turnos de POS Profiles en distintas monedas. */
+  consolidadoPorMoneda?: CorteCajaPorMoneda[];
 }
 
 // GET /reportes/pos/cuadre-turno — una fila por combinación turno + modo de pago
@@ -3427,6 +3785,8 @@ export interface CuadreTurnoRow {
   expectedAmount: number;
   closingAmount: number;
   difference: number;
+  /** Moneda del POS Profile de ese turno — mismo criterio que `CorteCajaDiaTurno.moneda`. */
+  moneda?: string;
 }
 
 export interface CuadreTurnoResult {
@@ -3486,6 +3846,9 @@ export interface CuentaBancaria {
   bank: string;
   account: string;
   bankAccountNo?: string;
+  /** La moneda REAL de la cuenta es siempre la de su cuenta contable (GL) vinculada — nunca un
+   *  campo editable libre. El backend nunca persiste lo que se mande en create/update, siempre
+   *  guarda la moneda real resuelta de `account`. */
   currency: string;
   estado: CuentaBancariaEstado;
   chequeFormat: ChequeFormat;
@@ -3542,6 +3905,8 @@ export interface UpdateCuentaBancariaDto {
 export interface CuentaBancariaBalance {
   balance: number;
   balanceInicial: number;
+  /** ⚠️ Excepción de nomenclatura dentro del mismo módulo: este endpoint usa `moneda`, no
+   *  `currency` como el resto de Cuentas Bancarias — no es un typo. */
   moneda: string;
 }
 
@@ -3549,6 +3914,20 @@ export interface CuentaBancariaBalance {
 export interface TipoCuentaBancariaOption {
   value: string;
   label: string;
+}
+
+/** GET /cuentas-bancarias/inconsistencias-moneda — cuentas donde el campo espejo interno
+ *  (`custom_moneda`) quedó desincronizado de la moneda real de la cuenta contable vinculada
+ *  (típicamente porque alguien editó algo directo en ERPNext por fuera de esta app). Pantalla
+ *  informativa/de solo lectura — no hay endpoint para "arreglar" esto automáticamente,
+ *  reeditar la cuenta con PUT la resincroniza sola. `accountCurrency` es siempre la fuente de
+ *  verdad. Ver docs/tasks/64_multimoneda_completo.md §5.6. */
+export interface CuentaBancariaInconsistenciaMoneda {
+  id: string;
+  accountName: string;
+  account: string;
+  customMoneda: string;
+  accountCurrency: string;
 }
 
 // GET/POST/PUT /config/denominaciones — catálogo de billetes/monedas para el desglose de vuelto
@@ -3632,6 +4011,14 @@ export interface PendienteCobroItem {
    postingDate: string;
    esClienteOcasional: boolean;
    clienteOcasionalNombre?: string;
+   /** Cobertura de la ARS, o `null` en una venta sin cobertura (vertical farmacia, §4.3). */
+   aseguradora?: InvoiceAseguradoraResumen | null;
+   /** `roundedTotal − montoCobertura` (igual a `roundedTotal` sin cobertura). **Este** es el
+    *  importe a cobrar y contra el que se validan los métodos de pago — nunca `roundedTotal`. */
+   montoACobrar?: number;
+   /** Moneda de la factura completa (`grandTotal`/`roundedTotal`/`montoACobrar`) — nunca la de la
+    *  cobertura ARS, que siempre es DOP (docs/tasks/71_agregar_currency_a_caja_por_cobrar.md). */
+   currency?: string;
  }
 
 /** Respuesta de POST /caja/facturas/:id/completar-cobro. */
@@ -3932,6 +4319,12 @@ export interface CreateCobroDto {
     /** Requerido en 'Sales Order' para aplicar el anticipo a un pedido de apartado; default (factura) si se omite */
     referenceDoctype?: "Sales Order" | "Sales Invoice";
   }[];
+  /** Tasa explícita moneda del cliente → moneda de la compañía. Gana sobre "Tasa Fija" si se especifica. Solo aplica si la(s) factura(s) referenciadas están en moneda distinta a la de la compañía — hoy Ventas no soporta moneda, así que este campo no debería dispararse en la práctica (ver docs/tasks/60_multimoneda_dop_usd_eur.md §0). */
+  conversionRate?: number;
+  /** Monto real que entra al banco, en la moneda de la cuenta bancaria — requerido si esa cuenta opera en una moneda distinta a la del monto cobrado. */
+  receivedAmount?: number;
+  /** Tasa explícita moneda del cliente → moneda del banco — requerida si `receivedAmount` aplica y no hay tasa cargada entre esas dos monedas. */
+  bankConversionRate?: number;
 }
 
 // Alias for backward compat in existing pages
@@ -4080,6 +4473,12 @@ export interface CreatePagoDto {
    *  En cuenta manual, referenceNo es el número de cheque (requerido); en automática, referenceNo
    *  debe omitirse — el backend lo asigna y responde 400 si se envía. */
   esCheque?: boolean;
+  /** Tasa explícita moneda del proveedor → moneda de la compañía. Gana sobre "Tasa Fija" si se especifica. Solo aplica si la(s) factura(s) referenciadas están en moneda distinta a la de la compañía. */
+  conversionRate?: number;
+  /** Monto real que sale del banco, en la moneda de la cuenta bancaria — requerido si esa cuenta opera en una moneda distinta a la del monto pagado. */
+  receivedAmount?: number;
+  /** Tasa explícita moneda del proveedor → moneda del banco — requerida si `receivedAmount` aplica y no hay tasa cargada entre esas dos monedas. */
+  bankConversionRate?: number;
 }
 
 export interface SaldoFavorProveedorAppliedTo {
@@ -4244,6 +4643,15 @@ export interface JournalEntryLine {
   branch?: string;
   department?: string;
   costCenter?: string;
+  /** Request: obligatoria SOLO si `account` opera en una moneda distinta a la base y no hay
+   *  tasa cargada para la fecha (si se omite en ese caso: 400 `EXCHANGE_RATE_REQUIRED`). Si
+   *  TODAS las cuentas del asiento están en la moneda base, nunca aplica.
+   *  Respuesta (GET /journal-entry/:id): `null` si no aplicó conversión — aquí el campo de
+   *  moneda se llama `currency`, no `moneda` (a diferencia de Tesorería). */
+  conversionRate?: number;
+  /** Solo en la respuesta de GET /journal-entry/:id — moneda de esta cuenta, `null`/ausente si
+   *  es la moneda base. */
+  currency?: string;
 }
 
 export interface JournalEntry {
@@ -4426,6 +4834,16 @@ export interface StockSettings {
   enableSerialAndBatchNoForItem?: boolean;
   /** true → capturar Serial No / Batch No directamente en la fila del documento (sin diálogo emergente). Solo tiene efecto si enableSerialAndBatchNoForItem es true. */
   useSerialBatchFields?: boolean;
+  /** Activado automáticamente por POST /config/despacho/habilitar — permite reserva parcial de
+   *  una línea (Stock Reservation Entry) cuando no hay stock para cubrirla completa. No se expone
+   *  como checkbox independiente (ver PROMPT_DESPACHO... §8.2) — solo lectura acá. */
+  allowPartialReservation?: boolean;
+  /** % de tolerancia de sobre-recepción de compra / sobre-entrega de venta antes de que el
+   *  servidor rechace la operación (ej. recibir 105 cuando la OC pedía 100, con 5% de tolerancia). */
+  overDeliveryReceiptAllowance?: number;
+  /** Rol de ERPNext (string) cuyos usuarios pueden recibir compras o despachar ventas por encima
+   *  de `overDeliveryReceiptAllowance` sin que el sistema lo bloquee. Opcional. */
+  roleAllowedToOverDeliverReceive?: string;
   [key: string]: unknown;
 }
 export type UpdateStockSettingsDto = Partial<StockSettings>;
@@ -4856,6 +5274,11 @@ export interface TesoreriaLinea {
   cuenta: string;
   monto: number;
   descripcion?: string;
+  /** Solo en el camino SIN beneficiario/origen (asiento directo) — tasa de ESTA cuenta específica
+   *  → moneda base, si esa cuenta opera en moneda distinta y no hay tasa cargada para la fecha.
+   *  En Depósitos sin origen, la cuenta de la deducción debe estar en la misma moneda que el
+   *  banco (se rechaza con 400 si no). Ver docs/tasks/64_multimoneda_completo.md §5.1/§5.2. */
+  conversionRate?: number;
 }
 
 /** Liquidación de una factura pendiente — {@link EmisionLiquidacionDto} en el backend. */
@@ -4873,6 +5296,15 @@ export interface TesoreriaLineaAsiento {
   facturaId?: string;
   esAnticipo?: boolean;
   descripcion?: string;
+  /** Moneda de esta cuenta específica, si no es la moneda base. */
+  moneda?: string;
+  /** Esta línea convertida a moneda base. */
+  montoBase?: number;
+  /** true solo en una línea que ERPNext generó automáticamente como ajuste de ganancia/pérdida
+   *  cambiaria dentro de un Payment Entry (Emisiones/Depósitos CON beneficiario/origen). Las
+   *  Transferencias Internas NO usan este flag aunque también puedan generar un ajuste cambiario
+   *  — ahí es una línea contable normal más. Ver docs/tasks/64_multimoneda_completo.md §5.5. */
+  esDiferenciaCambiaria?: boolean;
 }
 
 export interface TreasuryTransaction {
@@ -4904,6 +5336,15 @@ export interface TreasuryTransaction {
   cuentaBancoOrigenOverride?: string;
   /** Solo Transferencias Internas — cuenta contable alterna de la pata de destino. */
   cuentaBancoDestinoOverride?: string;
+  // ─── Multimoneda (docs/tasks/64_multimoneda_completo.md §5.0-§5.3) ───────────
+  /** Moneda del lado banco de esta transacción — no hay campo `moneda`/`currency` propio del
+   *  documento, se deriva de la cuenta bancaria elegida (y de las facturas liquidadas, si hay
+   *  beneficiario/origen). `undefined` en un documento que nunca tocó multimoneda. */
+  moneda?: string;
+  /** Tasa banco/beneficiario/origen → moneda base usada en este documento. */
+  conversionRate?: number;
+  /** Monto de esta transacción convertido a moneda base. */
+  montoBase?: number;
 }
 
 // ─── Tesorería — Cheques (historial) ───────────────────────────────────────────
@@ -4981,6 +5422,15 @@ export interface CreateEmisionDto {
    *  se envían "liquidaciones", debe ser idéntica a la cuenta con la que quedó contabilizada cada
    *  factura liquidada — el backend rechaza con un mensaje explícito si no calzan. */
   cuentaPartyOverride?: string;
+  /** Tasa beneficiario/facturas liquidadas → moneda base. Solo relevante con `beneficiario`, y
+   *  solo si esa moneda difiere de la del banco — gana sobre la Tasa Fija en CxP
+   *  (`tasaFijaCxp`, ver Fase 1). Si las facturas liquidadas están en monedas distintas entre
+   *  sí: 400 `PAYMENT_MIXED_CURRENCIES`. */
+  conversionRate?: number;
+  /** Tasa banco → moneda base, si la cuenta bancaria opera en divisa y no hay tasa cargada para
+   *  la fecha. Si el banco difiere de la moneda del beneficiario y
+   *  `permitirPagoMonedaDistintaBanco` (Fase 1) está apagado: 400 `BANK_ACCOUNT_CURRENCY_MISMATCH`. */
+  bankConversionRate?: number;
 }
 
 /** PUT /tesoreria/emisiones/:id — solo cabecera de un borrador. */
@@ -5026,6 +5476,11 @@ export interface CreateDepositoDto {
    *  envían "liquidaciones", debe ser idéntica a la cuenta con la que quedó contabilizada cada
    *  factura liquidada. */
   cuentaPartyOverride?: string;
+  /** Tasa origen/facturas liquidadas → moneda base. Ver CreateEmisionDto.conversionRate (mismo
+   *  concepto, análogo para Depósitos con `tasaFijaCxc`). */
+  conversionRate?: number;
+  /** Tasa banco → moneda base. Ver CreateEmisionDto.bankConversionRate. */
+  bankConversionRate?: number;
 }
 
 /** PUT /tesoreria/depositos/:id — solo cabecera de un borrador. */
@@ -5054,8 +5509,18 @@ export interface CreateTransferenciaInternaDto {
   cuentaDestino: string;
   descripcion?: string;
   monto: number;
+  /** Obligatorio SI origen y destino están en monedas distintas — 400 `MONTO_DESTINO_REQUIRED`
+   *  si se omite en ese caso. El backend NUNCA lo calcula solo a partir de una tasa, siempre
+   *  debe venir explícito. Si origen y destino son la misma moneda, se ignora (el destino
+   *  siempre es `monto - deducciones`). */
+  montoDestino?: number;
+  /** Tasa moneda de origen → base, si esa cuenta opera en divisa y no hay tasa cargada. */
+  conversionRateOrigen?: number;
+  /** Tasa moneda de destino → base, análogo. */
+  conversionRateDestino?: number;
   referencias?: TesoreriaReferencias;
-  /** Comisiones interbancarias — reducen lo que llega a cuentaDestino respecto a lo que sale. */
+  /** Comisiones interbancarias — reducen lo que llega a cuentaDestino respecto a lo que sale.
+   *  Regla no obvia: cualquier comisión/deducción se asume SIEMPRE en la moneda de ORIGEN. */
   deducciones?: TesoreriaLinea[];
   nota?: string;
   /** Cuenta contable alterna para la pata de ORIGEN del asiento, en vez de la que tiene
@@ -5110,6 +5575,16 @@ export interface MovimientoBancario {
   remarks?: string;
   branch?: string;
   department?: string;
+  /** Moneda del lado banco de esta transacción — `undefined` en un tenant/documento que nunca
+   *  tocó multimoneda. Ver docs/tasks/64_multimoneda_completo.md §5.5. */
+  moneda?: string;
+  /** Tasa banco→base usada. */
+  conversionRate?: number;
+  /** Monto convertido a moneda base. */
+  montoBase?: number;
+  /** true en una línea que ERPNext generó automáticamente como ajuste de ganancia/pérdida
+   *  cambiaria — ver `TesoreriaLineaAsiento.esDiferenciaCambiaria` (misma semántica). */
+  esDiferenciaCambiaria?: boolean;
 }
 
 export interface MovimientosMeta {
@@ -5202,6 +5677,17 @@ export interface CreatePlantillaImpresionDto {
 
 export type UpdatePlantillaImpresionDto = Partial<CreatePlantillaImpresionDto>;
 
+/** Ítem del catálogo fijo de GET /plantillas/galeria — igual para todos los tenants (el ítem de
+ * farmacia solo aparece si el vertical del tenant es "farmacia", ya filtrado por el servidor). */
+export interface GaleriaPlantillaDto {
+  id: string;
+  type: PlantillaApiType;
+  name: string;
+  description: string;
+  /** TemplateDocument completo (page + pages[].elements[]), mismo shape que documentJson. */
+  document: Record<string, unknown>;
+}
+
 export interface CampoDisponiblePlantilla {
   key: string;
   label: string;
@@ -5263,7 +5749,7 @@ export interface SetSeleccionDto {
 
 // ─── Permisos (nivel 1/2) ───────────────────────────────────────────────────
 // Ver docs/PROMPT_PERMISOS_FRONTEND.md. Alcance acotado: solo se usa en el vertical Farmacia
-// ARS por ahora (ver docs/FARMACIA_ARS_FRONTEND.md §2) — no se migró el resto de la app.
+// ARS por ahora (ver docs/PROMPT_FARMACIA_V2_FRONTEND.md §1) — no se migró el resto de la app.
 
 export type PermisoPtypeFlag = 0 | 1
 
@@ -5284,114 +5770,100 @@ export interface DocumentPermissions {
   permisos: Partial<Record<PermisoPtype, PermisoPtypeFlag>>;
 }
 
-// ─── Farmacia ARS — Preaprobaciones ─────────────────────────────────────────
-// Ver docs/FARMACIA_ARS_FRONTEND.md §3.1. Los DTOs de request están confirmados contra
-// openapi.json; el shape de respuesta (Preaprobacion) no está documentado ahí — sale de los
-// ejemplos de prosa del doc §11, verificar campo por campo contra un backend real.
+// ─── Farmacia ARS v2 — cobertura dentro de la factura ───────────────────────
+// La v1 (Preaprobaciones / Despachos / Cola de Cobro) se eliminó: la cobertura de la ARS ahora
+// vive en el bloque `aseguradora` de la factura de venta normal. Ver
+// docs/PROMPT_FARMACIA_V2_FRONTEND.md §3 y el schema `AseguradoraInvoiceDto` de openapi.json.
 
-export type PreaprobacionEstado = 'Borrador' | 'Confirmada' | 'Despachado';
+export type TipoCoberturaArs = 'monto' | 'porciento';
 
-export interface CreatePreaprobacionDetalleItemDto {
-  item: string;
-  cantidad: number;
-  precioUnitario: number;
-  porcientoTeorico?: number;
-  montoAprobadoArs?: number;
-  lineaBloqueada?: boolean;
-}
+/** Estado de la aprobación ARS de una factura. `null` mientras es borrador (§3.8). */
+export type EstadoArs = 'Pendiente' | 'En Lote' | 'Facturado' | 'Anulada';
 
-export interface CreatePreaprobacionDto {
+export const MOTIVOS_ANULACION_ARS = [
+  'Rechazo de la ARS',
+  'Medicamento incorrecto',
+  'Error de digitación',
+  'Paciente desistió',
+  'Producto defectuoso/vencido',
+  'Otro',
+] as const;
+
+export type MotivoAnulacionArs = (typeof MOTIVOS_ANULACION_ARS)[number];
+
+/** Lo que el frontend ENVÍA en `aseguradora` de POST /invoices y PATCH /invoices/:id.
+ *  Ausente (o `null` en el PATCH) = factura sin cobertura. */
+export interface AseguradoraInvoiceDto {
+  /** Customer registrado como aseguradora — el picker debe consumir `GET /aseguradoras`. */
   aseguradora: string;
-  numeroAprobacion: string;
-  cliente: string;
-  cedula?: string;
-  telefonoPaciente?: string;
-  numeroSeguridadSocial?: string;
-  carnetAfiliado: string;
-  aprobadoPor?: string;
-  fechaAprobacion?: string;
-  valorCoberturaArs: number;
-  detalle: CreatePreaprobacionDetalleItemDto[];
-}
-
-export type UpdatePreaprobacionDto = Partial<Omit<CreatePreaprobacionDto, 'detalle'>> & {
-  detalle?: (Partial<CreatePreaprobacionDetalleItemDto> & { id?: string })[];
-};
-
-export interface PreaprobacionDetalleItem {
-  id: string;
-  item: string;
-  itemName?: string;
-  cantidad: number;
-  precioUnitario: number;
-  precioLinea: number;
-  montoAprobadoArs: number;
-  porcientoReal?: number;
-  montoPaciente: number;
-  lineaBloqueada: boolean;
-}
-
-export interface Preaprobacion {
-  id: string;
-  estado: PreaprobacionEstado;
-  confirmada: boolean;
-  aseguradora: string;
-  aseguradoraName?: string;
-  numeroAprobacion: string;
-  cliente: string;
-  clienteName?: string;
-  cedula?: string;
-  telefonoPaciente?: string;
-  numeroSeguridadSocial?: string;
-  carnetAfiliado: string;
-  aprobadoPor?: string;
-  fechaAprobacion?: string;
-  valorCoberturaArs: number;
-  montoTotalReceta: number;
-  montoDistribuido: number;
-  diferencia: number;
-  porcientoCobertura: number;
-  detalle: PreaprobacionDetalleItem[];
-}
-
-// ─── Farmacia ARS — Despachos ───────────────────────────────────────────────
-
-export type DespachoEstado = 'Confirmado' | 'Cobrado' | 'Facturado';
-
-export interface CreateDespachoDto {
-  preaprobacion: string;
-}
-
-export interface DespachoProvisionalArs {
-  id: string;
-  estado: DespachoEstado;
-  preaprobacion: string;
-  numeroAprobacion?: string;
-  aseguradora?: string;
-  aseguradoraName?: string;
-  cliente?: string;
-  clienteName?: string;
+  numeroAutorizacion: string;
+  tipoCobertura: TipoCoberturaArs;
+  /** RD$ si `tipoCobertura = 'monto'`; porcentaje (0, 100] si `'porciento'`. */
+  valorCobertura: number;
   carnetAfiliado?: string;
-  montoArs: number;
+  /** Cédula del paciente (11 dígitos, validada con el algoritmo JCE en el servidor). */
+  cedula?: string;
+  numeroSeguroSocial?: string;
+  telefonoPaciente?: string;
+  nombreDoctor?: string;
+  /** `YYYY-MM-DD` */
+  fechaAprobacion?: string;
+  /** `YYYY-MM-DD` */
+  fechaIndicacionReceta?: string;
+  aprobadoPor?: string;
+}
+
+/** Bloque `aseguradora` que DEVUELVE la factura (§3.5). Los campos calculados son del servidor:
+ *  nunca recalcularlos en el cliente, solo mostrarlos. */
+export interface InvoiceAseguradora extends AseguradoraInvoiceDto {
+  aseguradoraName?: string;
+  /** Cobertura en RD$ resuelta por el servidor (si es `porciento`, `subtotal × valor / 100`). */
+  montoCobertura: number;
+  /** Σ `montoAprobadoArs` de las líneas. */
+  montoDistribuido: number;
+  /** `montoCobertura − montoDistribuido` — debe ser 0 para poder someter. */
+  diferencia: number;
+  /** `grandTotal − montoCobertura` — lo que paga el paciente. */
   montoPaciente: number;
-  facturaContado?: string;
-  lote?: string;
+  estadoArs: EstadoArs | null;
+  /** Id del lote de facturación que la tomó, o `null`. */
+  lote?: string | null;
+  montoCoberturaDevuelta: number;
+  montoCoberturaNeta: number;
+  motivoAnulacion?: MotivoAnulacionArs | null;
+  motivoAnulacionDetalle?: string | null;
 }
 
-export interface CobrarDespachoDto {
-  payments: PaymentLine[];
-  vuelto?: VueltoLine[];
-  tenderedCash?: number;
-  ncfType?: 'B01' | 'B02';
+/** Versión reducida que traen los elementos de `GET /invoices` y `GET /caja/por-cobrar`. */
+export interface InvoiceAseguradoraResumen {
+  aseguradora: string;
+  aseguradoraName?: string;
+  numeroAutorizacion: string;
+  montoCobertura: number;
+  montoPaciente: number;
+  estadoArs: EstadoArs | null;
+  lote?: string | null;
 }
 
-export interface CobrarDespachoResult {
-  despachoId: string;
-  invoiceId: string;
-  ncf?: string;
+/** Narrowing entre el bloque completo (detalle de factura) y el reducido (listados): solo el
+ *  completo trae los campos calculados del reparto. */
+export function esCoberturaCompleta(
+  a: InvoiceAseguradora | InvoiceAseguradoraResumen | null | undefined,
+): a is InvoiceAseguradora {
+  return !!a && 'montoDistribuido' in a;
 }
 
-// ─── Farmacia ARS — Lotes de Facturación ────────────────────────────────────
+/** Respuesta de `POST /config/farmacia/habilitar` (§9) — todos los campos son informativos. */
+export interface HabilitarFarmaciaResult {
+  cuentaCxcArsProvisional?: string;
+  modoPagoCoberturaArs?: string;
+  customerGroupArs?: string;
+  itemCoberturaLote?: string;
+  rolDispensadorControlados?: string;
+  plantillaFactura?: string;
+}
+
+// ─── Farmacia ARS v2 — Lotes de Facturación ─────────────────────────────────
 
 export type LoteFarmaciaEstado = 'Abierto' | 'En Revisión' | 'Facturado';
 
@@ -5399,11 +5871,46 @@ export interface CreateLoteDto {
   aseguradora: string;
   periodoInicio: string;
   periodoFin: string;
+  /** Email de un User de ERPNext. */
   responsable?: string;
 }
 
-export interface VincularDespachoDto {
-  despachoId: string;
+/** Factura de paciente candidata o vinculada a un lote — mismo shape en
+ *  `GET /farmacia/lotes/facturas-elegibles` y en `LoteFacturacionArs.facturas` (§6.3). */
+export interface FacturaElegibleArs {
+  id: string;
+  customer: string;
+  customerName: string;
+  postingDate: string;
+  ncf?: string;
+  grandTotal: number;
+  outstandingAmount: number;
+  numeroAutorizacion: string;
+  carnetAfiliado?: string;
+  montoCobertura: number;
+  montoCoberturaNeta: number;
+  estadoArs: EstadoArs | null;
+}
+
+export interface FacturasElegiblesResult {
+  items: FacturaElegibleArs[];
+  total: number;
+  montoTotal: number;
+}
+
+export interface VincularFacturasDto {
+  /** 1–100 ids de facturas de paciente. */
+  facturaIds: string[];
+}
+
+/** Fila congelada al facturar el lote — el anexo oficial de la consolidada. */
+export interface LoteFacturaSnapshot {
+  factura: string;
+  ncf?: string;
+  paciente?: string;
+  numeroAutorizacion?: string;
+  carnetAfiliado?: string;
+  montoCobertura: number;
 }
 
 export interface LoteFacturacionArs {
@@ -5414,13 +5921,26 @@ export interface LoteFacturacionArs {
   periodoInicio: string;
   periodoFin: string;
   responsable?: string;
-  cantidadDespachos: number;
+  cantidadFacturas: number;
   montoTotalLote: number;
   facturaConsolidada?: string;
   ncfAsignado?: string;
-  /** No existe en openapi.json (solo mencionado en prosa) — ausencia = caso normal. */
-  despachosNoMarcados?: string[];
-  despachos?: DespachoProvisionalArs[];
+  /** Congelado al facturar: usar como anexo cuando `estado === 'Facturado'`. */
+  facturasSnapshot?: LoteFacturaSnapshot[];
+  /** Lista viva (solo en `GET /farmacia/lotes/:id`). Usar mientras el lote está abierto. */
+  facturas?: FacturaElegibleArs[];
+}
+
+/** Respuesta de `POST /farmacia/lotes/:id/facturas` — vincular en bloque nunca aborta por las
+ *  rechazadas: el lote vuelve actualizado junto con el detalle de cada caso (§6.3). */
+export interface VincularFacturasResult extends LoteFacturacionArs {
+  vinculadas: string[];
+  rechazadas: { factura: string; motivo: string }[];
+}
+
+/** Respuesta de `POST /farmacia/lotes/:id/facturar`. */
+export interface FacturarLoteResult extends LoteFacturacionArs {
+  facturasMarcadas?: string[];
 }
 
 export interface DgiiTaxpayer {
@@ -5433,4 +5953,536 @@ export interface DgiiTaxpayer {
   registrationDate?: string | null;
   status?: string | null;
   type?: string | null;
+}
+
+// ─── Multimoneda (DOP/USD/EUR) — GET/PATCH /monedas, /monedas/tasas — ver
+// docs/tasks/60_multimoneda_dop_usd_eur.md. Universo cerrado: solo existen estas 3 monedas. ──
+
+export type MonedaCode = "DOP" | "USD" | "EUR";
+
+// GET /monedas — siempre devuelve exactamente estos 3 elementos, en este orden.
+export interface Moneda {
+  code: MonedaCode;
+  nombre: string;
+  simbolo: string;
+  habilitada: boolean;
+  /** true solo para la moneda de la compañía (DOP) — no se puede deshabilitar. */
+  esBase: boolean;
+}
+
+// PATCH /monedas/:code
+export interface HabilitarMonedaDto {
+  habilitada: boolean;
+}
+
+export interface HabilitarMonedaResult {
+  currency: MonedaCode;
+  enabled: boolean;
+  /** null si se deshabilitó, o si nunca se habilitó. */
+  cuentas: { receivable: string; payable: string } | null;
+}
+
+// GET /monedas/tasas
+export interface TasaCambio {
+  /** name real del Currency Exchange en ERPNext — úsalo para PUT/DELETE, no lo construyas a mano. */
+  id: string;
+  fecha: string;
+  from: MonedaCode;
+  to: MonedaCode;
+  tasa: number;
+  forBuying: boolean;
+  forSelling: boolean;
+}
+
+export interface ListTasasCambioParams {
+  from?: MonedaCode;
+  to?: MonedaCode;
+  fromDate?: string;
+  toDate?: string;
+  tipo?: "compra" | "venta";
+  limit?: number;
+  offset?: number;
+}
+
+// POST /monedas/tasas — upsert: si ya hay una tasa para ese par en esa fecha exacta, la actualiza.
+export interface CreateTasaCambioDto {
+  from: MonedaCode;
+  to: MonedaCode;
+  rate: number;
+  /** Default: hoy. */
+  date?: string;
+}
+
+export interface UpdateTasaCambioDto {
+  rate: number;
+}
+
+export interface TasaCambioActionResult {
+  id: string;
+  message: string;
+}
+
+// GET /monedas/tasas/vigente
+export interface TasaVigente {
+  tasa: number;
+  fecha: string;
+  /** "currency_exchange": tasa cargada manualmente o por el job. "proveedor": resuelta contra el proveedor externo configurado, no contra la tabla de tasas del tenant. */
+  origen: "currency_exchange" | "proveedor";
+}
+
+// POST /monedas/tasas/sincronizar
+export interface SincronizarTasasResult {
+  actualizadas: { currency: MonedaCode; base: MonedaCode; rate: number }[];
+  errores: { currency: MonedaCode; error: string }[];
+}
+
+// GET /monedas/convertir — solo para mostrar (ej. calculadora de conversión), nunca para
+// precalcular un monto que se envíe al body de otro POST.
+export interface ConvertirMonedaResult {
+  monto: number;
+  from: MonedaCode;
+  to: MonedaCode;
+  tasa: number;
+  origen: "currency_exchange" | "proveedor";
+  resultado: number;
+}
+
+// POST /monedas/preview-conversion-banco — simula si un monto se puede depositar/cobrar en una
+// cuenta bancaria de otra moneda, SIN crear nada. Nunca lanza 400 por incompatibilidad — todo
+// viaja en `advertencia` con 200. Útil como paso previo opcional antes de confirmar un
+// cobro/pago/emisión (esos sí lanzan 400 duro con los códigos de MonedaErrorCode).
+export interface PreviewConversionBancoDto {
+  monto: number;
+  moneda: MonedaCode;
+  cuentaBancaria: string;
+  conversionRate?: number;
+}
+
+export interface PreviewConversionBancoResult {
+  monedaBanco: MonedaCode;
+  requiereConversion: boolean;
+  permitido: boolean;
+  tasaAplicada?: number;
+  origenTasa?: "manual" | "currency_exchange" | "proveedor";
+  montoEquivalente?: number;
+  advertencia: string | null;
+}
+
+// Tabla maestra de códigos de error de multimoneda (400) — campo `code` dentro del body.
+// Ver docs/tasks/64_multimoneda_completo.md §0.4.
+export type MonedaErrorCode =
+  | "CURRENCY_NOT_SUPPORTED"
+  | "CURRENCY_NOT_ENABLED"
+  | "CURRENCY_IS_BASE"
+  | "EXCHANGE_RATE_REQUIRED"
+  | "PAYMENT_MIXED_CURRENCIES"
+  | "PAYMENT_MIXED_RATES"
+  | "BANK_ACCOUNT_CURRENCY_MISMATCH"
+  | "BANK_ACCOUNT_CURRENCY_MISMATCH_GL"
+  | "BANK_AMOUNT_OUT_OF_TOLERANCE"
+  | "MONTO_DESTINO_REQUIRED";
+
+// ─── Facturas de Apertura (Migración de Saldos) ────────────────────────────────
+// docs/tasks/PROMPT_APERTURA_FRONTEND.md — carga, una sola vez, del saldo pendiente de facturas
+// de venta/compra que ya existían en el sistema anterior. Nunca hay borrador ni edición: crear
+// siempre confirma (estado "submitted"); corregir = anular ("cancelled") + volver a cargar.
+
+export interface AperturaPreflight {
+  listo: boolean;
+  ejerciciosFiscales: {
+    requeridos: string[];
+    existentes: string[];
+    faltantes: string[];
+  };
+  cuentaApertura: {
+    existe: boolean;
+    cuenta: string | null;
+    numeroSugerido: string;
+  };
+  serieNumeracion: {
+    existe: boolean;
+    ventas: string;
+    compras: string;
+  };
+  /** Mensajes ya redactados en español, listos para mostrar tal cual — no reformular. */
+  bloqueantes: string[];
+}
+
+export interface PrepararAperturaDto {
+  /** Fecha 'YYYY-MM-DD'. Por defecto, el 1 de enero de hace 3 años. */
+  desde?: string;
+  /** Fecha 'YYYY-MM-DD'. Por defecto, hoy. */
+  hasta?: string;
+}
+
+export interface AperturaPrepararResult {
+  ejerciciosFiscales: {
+    creados: string[];
+    yaExistian: string[];
+  };
+  cuentaApertura: {
+    cuenta: string;
+    creada: boolean;
+  };
+}
+
+export type AperturaEstado = "submitted" | "cancelled";
+
+export interface CrearFacturaAperturaVentaDto {
+  customer: string;
+  numeroFacturaOriginal: string;
+  fechaFactura: string;
+  fechaVencimiento?: string;
+  /** Saldo PENDIENTE de la factura — no el total original. */
+  montoPendiente: number;
+  descripcion?: string;
+  origen?: string;
+  /** Letra (B/E) + 2 dígitos de tipo + 8-10 dígitos de secuencial, ej. "B0100000123". */
+  ncfOriginal?: string;
+  /** Si es true, exige ncfOriginal. Default false. */
+  reportarEnDgii?: boolean;
+  moneda?: string;
+  /** Obligatoria si moneda difiere de la moneda de la compañía. */
+  tasaCambio?: number;
+  branch?: string;
+  costCenter?: string;
+}
+
+export interface FacturaAperturaVenta {
+  id: string;
+  numeroFacturaOriginal: string;
+  customer: string;
+  customerName: string;
+  fechaFactura: string;
+  fechaVencimiento: string;
+  montoPendiente: number;
+  /** Baja a medida que se registran cobros por los canales normales del sistema. */
+  saldoActual: number;
+  ncf: string | null;
+  ncfType: string | null;
+  reportadaEnDgii: boolean;
+  origen: string | null;
+  currency: string;
+  branch: string | null;
+  estado: AperturaEstado;
+  esApertura: true;
+}
+
+export interface ListAperturaVentasParams extends PaginationParams {
+  customer?: string;
+  fromDate?: string;
+  toDate?: string;
+}
+
+export interface ImportarAperturaVentasDto {
+  /** Entre 1 y 200 filas. */
+  filas: CrearFacturaAperturaVentaDto[];
+}
+
+export interface ImportarAperturaResultadoFilaBase {
+  fila: number;
+  ok: boolean;
+  id?: string;
+  error?: string;
+}
+
+export interface ImportarAperturaVentasResultadoFila extends ImportarAperturaResultadoFilaBase {
+  numeroFacturaOriginal: string;
+}
+
+export interface ImportarAperturaVentasResult {
+  total: number;
+  creadas: number;
+  fallidas: number;
+  /** Suma solo de las filas creadas (ok: true) — no la suma de todo el lote pedido. */
+  montoTotalMigrado: number;
+  resultados: ImportarAperturaVentasResultadoFila[];
+}
+
+export interface CrearFacturaAperturaCompraDto {
+  supplier: string;
+  /** Número de factura del PROVEEDOR — se guarda en el campo nativo bill_no. */
+  numeroFacturaProveedor: string;
+  fechaFactura: string;
+  fechaVencimiento?: string;
+  /** Saldo PENDIENTE de la factura — no el total original. */
+  montoPendiente: number;
+  descripcion?: string;
+  origen?: string;
+  /** NCF del proveedor — sin validación de formato en el backend. */
+  ncfProveedor?: string;
+  /** A diferencia de ventas, en compras el tipo NO se deriva del NCF — se elige aparte. */
+  tipoComprobante?: string;
+  reportarEnDgii?: boolean;
+  moneda?: string;
+  tasaCambio?: number;
+  branch?: string;
+  costCenter?: string;
+}
+
+export interface FacturaAperturaCompra {
+  id: string;
+  numeroFacturaProveedor: string;
+  supplier: string;
+  supplierName: string;
+  fechaFactura: string;
+  fechaVencimiento: string;
+  montoPendiente: number;
+  saldoActual: number;
+  ncf: string | null;
+  /** Puede venir null incluso si ncf tiene valor — en compras el tipo es un campo separado. */
+  ncfType: string | null;
+  reportadaEnDgii: boolean;
+  origen: string | null;
+  currency: string;
+  branch: string | null;
+  estado: AperturaEstado;
+  esApertura: true;
+}
+
+export interface ListAperturaComprasParams extends PaginationParams {
+  supplier?: string;
+  fromDate?: string;
+  toDate?: string;
+}
+
+export interface ImportarAperturaComprasDto {
+  filas: CrearFacturaAperturaCompraDto[];
+}
+
+export interface ImportarAperturaComprasResultadoFila extends ImportarAperturaResultadoFilaBase {
+  numeroFacturaProveedor: string;
+}
+
+export interface ImportarAperturaComprasResult {
+  total: number;
+  creadas: number;
+  fallidas: number;
+  montoTotalMigrado: number;
+  resultados: ImportarAperturaComprasResultadoFila[];
+}
+
+export interface AperturaResumen {
+  ventas: { cantidad: number; montoMigrado: number; saldoPendiente: number };
+  compras: { cantidad: number; montoMigrado: number; saldoPendiente: number };
+  cuentaApertura: {
+    cuenta: string | null;
+    saldo: number;
+    esperado: number;
+    cuadra: boolean;
+  };
+  porAnio: { anio: number; ventas: number; compras: number }[];
+  /** true mientras la cuenta puente tenga saldo distinto de cero — el cierre es manual, fuera de este módulo. */
+  pendienteDeCierre: boolean;
+}
+
+// ─── Despachos (Delivery Note) ─────────────────────────────────────────────────
+// docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md — módulo nuevo, gateado por
+// FacturacionConfig.despachoHabilitado. Nunca "Delivery Note" ni "Nota de entrega" en la UI: usar
+// siempre "Despacho".
+
+/** Estado de documento — gobierna qué botones mostrar (mismo patrón que Factura/Pedido). */
+export type DespachoStatus = "draft" | "submitted" | "cancelled";
+
+/** Estado nativo de ERPNext — más granular, solo informativo (badge secundario/tooltip). NUNCA
+ *  usar para decidir qué acciones mostrar — para eso usar siempre `status`. */
+export type DespachoDeliveryStatus =
+  | "Draft"
+  | "To Bill"
+  | "Completed"
+  | "Return"
+  | "Return Issued"
+  | "Cancelled"
+  | "Closed";
+
+export interface DespachoItem {
+  itemCode: string;
+  itemName: string;
+  qty: number;
+  rate: number;
+  amount: number;
+  warehouse: string;
+  uom: string;
+  deliveredQty: number;
+  /** Pedido de origen de esta línea, si nació de desde-pedido (o de una factura que a su vez vino de un pedido). */
+  againstSalesOrder: string | null;
+  soDetail: string | null;
+  /** Factura de origen de esta línea, si nació de desde-factura. */
+  againstSalesInvoice: string | null;
+  siDetail: string | null;
+}
+
+export interface Despacho {
+  id: string;
+  customer: string;
+  customerName: string;
+  postingDate: string;
+  status: DespachoStatus;
+  deliveryStatus: DespachoDeliveryStatus;
+  /** true si este despacho ES una devolución (nació de POST /despachos/:id/devolucion). */
+  isReturn: boolean;
+  /** Despacho original que se devolvió, cuando isReturn === true. */
+  returnAgainst: string | null;
+  salesOrder: string | null;
+  salesInvoice: string | null;
+  branch?: string | null;
+  department?: string | null;
+  /** % ya facturado de este despacho (0-100) — barra de progreso si se factura parcialmente. */
+  perBilled: number;
+  items: DespachoItem[];
+  amendedFrom: string | null;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+export interface DespachoItemDto {
+  itemCode: string;
+  qty: number;
+  /** Si se omite, se usa el almacén por defecto del usuario. */
+  warehouse?: string;
+  /** Costo/valor de referencia, informativo — el Despacho no es un documento fiscal. Default 0. */
+  rate?: number;
+}
+
+/** POST /despachos — creación directa (venta mostrador, sin Sales Order previo). Único de los 3
+ *  caminos de creación donde el frontend arma el body completo. */
+export interface CreateDespachoDto {
+  customer: string;
+  branch?: string;
+  department?: string;
+  items: DespachoItemDto[];
+  notes?: string;
+}
+
+/** PUT /despachos/:id — reemplazo completo de `items` cuando se envía (igual que PUT /pedidos/:id).
+ *  Solo cantidad/almacén por línea existente — no se pueden agregar líneas nuevas. */
+export interface UpdateDespachoDto {
+  items?: DespachoItemDto[];
+}
+
+export interface DespachoBatchAllocationDto {
+  batchId: string;
+  qty: number;
+}
+
+export interface AssignDespachoTrackingItemDto {
+  itemCode: string;
+  /** Uno por unidad — la cantidad debe coincidir con `qty` de la línea. */
+  serials?: string[];
+  /** Debe sumar `qty` de la línea. */
+  batches?: DespachoBatchAllocationDto[];
+}
+
+export interface AssignDespachoTrackingDto {
+  items: AssignDespachoTrackingItemDto[];
+}
+
+export interface CancelarDespachoDto {
+  /** Motivo obligatorio, 10-500 caracteres. */
+  reason: string;
+}
+
+export interface ListDespachosParams extends PaginationParams {
+  customer?: string;
+  /** Default del backend: trae Borrador+Sometido (no "all"). */
+  status?: DespachoStatus | "all";
+  warehouse?: string;
+  branch?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+  salesOrder?: string;
+  salesInvoice?: string;
+}
+
+/** GET /despachos/pendientes — cola de trabajo, líneas sueltas de todo lo pendiente de despachar
+ *  sin importar de qué documento vienen. Puede haber líneas duplicadas por artículo si un pedido
+ *  ya tiene factura (una fila `origen:"pedido"` y otra `origen:"factura"`) — no es un bug, cada
+ *  una representa una situación de negocio distinta (§2.3). */
+export interface DespachoPendienteLinea {
+  origen: "factura" | "pedido";
+  documentoId: string;
+  customer: string;
+  customerName: string;
+  /** null en casos especiales sin línea de artículo real (ej. facturas de apertura/migración). */
+  itemCode: string | null;
+  itemName: string;
+  warehouse: string | null;
+  qtyPendiente: number;
+}
+
+export interface ListDespachosPendientesParams extends PaginationParams {
+  customer?: string;
+  itemCode?: string;
+  warehouse?: string;
+}
+
+/** POST /despachos/:id/facturar */
+export interface FacturarDespachoResult {
+  invoiceId: string;
+  despachoId: string;
+  message: string;
+}
+
+/** `details` del 409 de POST /config/despacho/deshabilitar — cada categoría no vacía es una lista
+ *  de IDs concretos que el operador debe resolver antes de poder desactivar. */
+export interface DesactivarDespachoBloqueos {
+  despachosBorrador: string[];
+  pedidosPendientes: string[];
+  facturasPendientesDespacho: string[];
+  reservasVivas: { id: string; status: string }[];
+}
+
+// ─── Abastecimiento (Compras → Órdenes, multi-pedido) ──────────────────────────
+
+/** GET /compras/ordenes/pendientes-abastecimiento — viene ya ordenado FIFO por transactionDate,
+ *  no reordenar arbitrariamente. Distinto de `DespachoPendienteLinea`: esto mide qué falta COMPRAR
+ *  (qty - ordered_qty), no qué falta entregar. */
+export interface PendienteAbastecimientoLinea {
+  salesOrder: string;
+  transactionDate: string;
+  customer: string;
+  customerName: string;
+  itemCode: string;
+  itemName: string;
+  warehouse: string;
+  rate: number;
+  qtyPendiente: number;
+}
+
+export interface ListPendientesAbastecimientoParams extends PaginationParams {
+  itemCode?: string;
+  customer?: string;
+}
+
+export interface DesdePedidosItemDto {
+  salesOrder: string;
+  itemCode: string;
+}
+
+export interface CreateOrdenDesdePedidosDto {
+  supplier: string;
+  /** Pares (salesOrder, itemCode) — nunca cantidad, el servidor toma todo el pendiente de esa línea. */
+  items: DesdePedidosItemDto[];
+  /** Opcional, default hoy. */
+  transactionDate?: string;
+  /** Segundo paso del flujo de confirmación de margen negativo — ver §5.4. */
+  confirmarMargenNegativo?: boolean;
+}
+
+export interface MargenNegativoWarning {
+  itemCode: string;
+  salesOrder: string;
+  precioVenta: number;
+  costoCompra: number;
+  /** precioVenta - costoCompra — negativo o cero cuando comprar así implica perder dinero. */
+  margen: number;
+}
+
+/** Respuesta de POST /compras/ordenes/desde-pedidos cuando el servidor detecta margen negativo/nulo
+ *  en al menos una línea — la orden NO se crea todavía, hay que reenviar con
+ *  `confirmarMargenNegativo: true` tras que el operador confirme explícitamente en un modal. */
+export interface OrdenDesdePedidosMargenResult {
+  requiereConfirmacion: true;
+  warnings: MargenNegativoWarning[];
+  message?: string;
 }

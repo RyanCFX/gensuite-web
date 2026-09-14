@@ -92,74 +92,81 @@ export default function PedidosPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Pedidos de Venta</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Pedidos de Venta</h1>
           <p className="page-sub">Cotización → Pedido → Factura</p>
         </div>
-        <button className="btn btn-primary" onClick={() => navigate('/pedidos/nuevo')}>
+        <button className="btn btn-navy" onClick={() => navigate('/pedidos/nuevo')}>
           <Plus size={16} />
           Nuevo Pedido
         </button>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Cliente" style={{ width: 260 }}>
-            <SearchSelect
-              value={customerId}
-              selectedLabel={customerLabel}
-              onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
-              options={customerOptions}
-              onSearch={setCustomerQuery}
-              loading={customersLoading}
-              placeholder="Filtrar por cliente…"
-            />
-          </FilterField>
-          <FilterField label="Estado">
-            <Select value={status} onValueChange={setStatus}>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="draft">Borrador</SelectItem>
-              <SelectItem value="submitted">En Proceso</SelectItem>
-              <SelectItem value="cancelled">Cancelado</SelectItem>
-            </Select>
-          </FilterField>
-          <FilterField label="Sucursal" style={{ width: 200 }}>
-            <SearchSelect
-              value={branch}
-              onChange={setBranch}
-              options={branchOptions}
-              onSearch={setBranchSearch}
-              selectedLabel={branch}
-              placeholder="Todas las sucursales"
-            />
-          </FilterField>
-          <FilterField label="Desde">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={fromDate}
-              onChange={setFromDate}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={toDate}
-              onChange={setToDate}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
-            <input type="checkbox" checked={onlyLayaway} onChange={(e) => setOnlyLayaway(e.target.checked)} />
-            <PackageOpen size={14} style={{ color: 'var(--text-secondary)' }} />
-            Solo apartados
-          </label>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Cliente" style={{ width: 260 }}>
+                <SearchSelect
+                  value={customerId}
+                  selectedLabel={customerLabel}
+                  onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
+                  options={customerOptions}
+                  onSearch={setCustomerQuery}
+                  loading={customersLoading}
+                  placeholder="Filtrar por cliente…"
+                />
+              </FilterField>
+              <FilterField label="Estado">
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="draft">Borrador</SelectItem>
+                  <SelectItem value="submitted">En Proceso</SelectItem>
+                  <SelectItem value="cancelled">Cancelado</SelectItem>
+                </Select>
+              </FilterField>
+              <FilterField label="Sucursal" style={{ width: 200 }}>
+                <SearchSelect
+                  value={branch}
+                  onChange={setBranch}
+                  options={branchOptions}
+                  onSearch={setBranchSearch}
+                  selectedLabel={branch}
+                  placeholder="Todas las sucursales"
+                />
+              </FilterField>
+              <FilterField label="Desde">
+                <DatePicker
+                  className="ff-input ff-input-sm"
+                  value={fromDate}
+                  onChange={setFromDate}
+                  style={{ width: 144 }}
+                  clearable
+                />
+              </FilterField>
+              <FilterField label="Hasta">
+                <DatePicker
+                  className="ff-input ff-input-sm"
+                  value={toDate}
+                  onChange={setToDate}
+                  style={{ width: 144 }}
+                  clearable
+                />
+              </FilterField>
+              <label className="ff-toggle-wrap">
+                <span className="ff-toggle">
+                  <input type="checkbox" checked={onlyLayaway} onChange={(e) => setOnlyLayaway(e.target.checked)} />
+                  <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+                </span>
+                Solo apartados
+              </label>
+            </div>
+          </div>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} />
@@ -186,7 +193,7 @@ export default function PedidosPage() {
                   <div className="empty-state">
                     <div className="empty-title">Sin pedidos</div>
                     <p className="empty-sub">Crea el primer pedido de venta.</p>
-                    <button className="btn btn-primary btn-size-sm" onClick={() => navigate('/pedidos/nuevo')}>
+                    <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/pedidos/nuevo')}>
                       <Plus size={14} /> Nuevo Pedido
                     </button>
                   </div>
@@ -242,6 +249,7 @@ export default function PedidosPage() {
             )}
           </tbody>
         </table>
+      </div>
       </div>
 
       {data?.meta && (

@@ -12,7 +12,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { CheckCircle2, AlertTriangle, Wallet, PackageOpen } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
-import { formatDOP } from '@/lib/formatters'
+import { formatDOP, formatMoney } from '@/lib/formatters'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import { getUser } from '@/shared/api/storage'
@@ -28,6 +28,7 @@ interface ReferenciaRow {
   outstandingAmount: number
   postingDate: string
   checked: boolean
+  currency?: string
 }
 
 interface PedidoReferenciaRow {
@@ -61,12 +62,21 @@ export default function PagoPage() {
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
 
+  // ── Multimoneda (docs/tasks/64_multimoneda_completo.md Fase 4) — Ventas (Facturas/
+  // Cotizaciones/Pedidos) ya soporta moneda (Fase 3), así que este bloque sí aplica en la
+  // práctica: un cobro puede referenciar una factura en USD/EUR. Ver 0.6/0.7/4.1-4.4 del doc. ──
+  const [showMonedaOptions, setShowMonedaOptions] = useState(false)
+  const [conversionRate, setConversionRate] = useState<number | ''>('')
+  const [receivedAmount, setReceivedAmount] = useState<number | ''>('')
+  const [bankConversionRate, setBankConversionRate] = useState<number | ''>('')
+
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
     staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
+  const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
 
   const currentUserEmail = getUser()?.email
   const { data: currentUser } = useQuery({
@@ -152,6 +162,7 @@ export default function PagoPage() {
           outstandingAmount: inv.outstandingAmount,
           postingDate: inv.postingDate,
           checked: false,
+          currency: inv.currency,
         })),
     )
     setManualRefs({})
@@ -248,6 +259,27 @@ export default function PagoPage() {
   }
 
   const checkedRefs = referencias.filter((r) => r.checked)
+  // `paidAmount` va en la moneda del cliente/factura (doc 64 §4.1) — las facturas referenciadas
+  // ya deben compartir moneda entre sí (el backend rechaza con PAYMENT_MIXED_CURRENCIES si no),
+  // así que la primera con moneda conocida representa la moneda de este cobro. En un cobro
+  // anticipado (sin factura referenciada) esa moneda sigue siendo la del cliente — se cae a
+  // `Customer.defaultCurrency`, igual que hace el backend al resolver moneda de un documento nuevo.
+  const cobroCurrency = referencias.find((r) => r.currency)?.currency
+    ?? customersData?.items.find((c) => c.id === customerId)?.defaultCurrency
+    ?? undefined
+
+  // "Caso triangular" (doc 64 §4.1): si la moneda del cobro y la del banco son ambas distintas
+  // a la base Y distintas entre sí, el backend no puede derivar un equivalente correcto sin
+  // `bankConversionRate` explícito — sin él, degrada silenciosamente a un monto sin convertir.
+  // Se exige aquí en vez de dejarlo opcional como el resto de las "opciones de moneda".
+  const monedaBase = facturacionConfig?.monedaBase
+  const bankCurrency = (cuentasBancarias?.items ?? []).find((c) => c.id === bankAccount)?.currency
+  const triangularCase = !!monedaBase && !!cobroCurrency && !!bankCurrency
+    && cobroCurrency !== monedaBase && bankCurrency !== monedaBase && bankCurrency !== cobroCurrency
+  const bankConversionRateMissing = triangularCase && bankConversionRate === ''
+  // Se fuerza visible en cuanto se detecta el caso triangular, sin esperar a que el usuario
+  // pulse "Mostrar opciones de moneda" — deriva del render en vez de un efecto con setState.
+  const monedaOptionsVisible = showMonedaOptions || triangularCase
 
   // Asignación automática del monto del cobro sobre las facturas seleccionadas:
   // la más antigua primero, con tope por pendiente, hasta agotar el monto.
@@ -301,6 +333,9 @@ export default function PagoPage() {
         toast.error(err?.message ?? 'Selecciona una sucursal')
         return
       }
+      if (isApiErrorCode(err, ERROR_CODES.EXCHANGE_RATE_REQUIRED)) {
+        setShowMonedaOptions(true)
+      }
       toast.error(err?.message ?? 'Error al registrar el cobro')
     },
   })
@@ -313,6 +348,11 @@ export default function PagoPage() {
     if (!paidAmount || paidAmount <= 0) { toast.error('Ingresa un monto válido'); return }
     if (!modeOfPayment) { toast.error('Selecciona un método de pago'); return }
     if (requiresBankAccount && !bankAccount) { toast.error('Selecciona una cuenta bancaria'); return }
+    if (bankConversionRateMissing) {
+      setShowMonedaOptions(true)
+      toast.error('El cliente y el banco están en monedas distintas entre sí (y ambas distintas a la base) — ingresa la tasa de cambio al banco para poder convertir correctamente')
+      return
+    }
 
     for (const ref of checkedPedidoRefs) {
       if (ref.allocatedAmount < ref.minRequired) {
@@ -342,6 +382,9 @@ export default function PagoPage() {
       referencias: allReferencias.length > 0 ? allReferencias : undefined,
       branch: branch || undefined,
       department: usaDepartamentos ? (department || undefined) : undefined,
+      conversionRate: conversionRate === '' ? undefined : conversionRate,
+      receivedAmount: receivedAmount === '' ? undefined : receivedAmount,
+      bankConversionRate: bankConversionRate === '' ? undefined : bankConversionRate,
     })
   }
 
@@ -453,6 +496,68 @@ export default function PagoPage() {
                 onChange={(e) => setRemarks(e.target.value)}
               />
             </div>
+
+            {multimonedaHabilitada && (
+              <div className="ff-wrap">
+                {!monedaOptionsVisible ? (
+                  <button type="button" className="btn btn-ghost btn-size-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setShowMonedaOptions(true)}>
+                    Mostrar opciones de moneda
+                  </button>
+                ) : (
+                  <>
+                    <label className="ff-label">Opciones de moneda (avanzado)</label>
+                    {triangularCase && (
+                      <div className="ff-hint" style={{ color: 'var(--color-danger)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <AlertTriangle size={13} />
+                        El cliente está en {cobroCurrency} y el banco en {bankCurrency} (ninguna es la moneda base {monedaBase}) —
+                        la tasa de cambio al banco es obligatoria para evitar un monto incorrecto.
+                      </div>
+                    )}
+                    <div className="form-row form-row-3">
+                      <div className="ff-wrap">
+                        <label className="ff-label">Tasa de cambio</label>
+                        <input
+                          type="number"
+                          min="0.0001"
+                          step="0.0001"
+                          className="ff-input"
+                          placeholder="Tasa del día (déjelo vacío para usar la configurada)"
+                          value={conversionRate}
+                          onChange={(e) => setConversionRate(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        />
+                      </div>
+                      <div className="ff-wrap">
+                        <label className="ff-label">Monto recibido en el banco</label>
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          className="ff-input"
+                          placeholder="Solo si la cuenta bancaria opera en otra moneda"
+                          value={receivedAmount}
+                          onChange={(e) => setReceivedAmount(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        />
+                      </div>
+                      <div className="ff-wrap">
+                        <label className="ff-label">
+                          Tasa de cambio al banco {triangularCase && <span className="ff-required">*</span>}
+                        </label>
+                        <input
+                          type="number"
+                          min="0.0001"
+                          step="0.0001"
+                          className="ff-input"
+                          placeholder="Solo si no hay tasa cargada"
+                          value={bankConversionRate}
+                          onChange={(e) => setBankConversionRate(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                          style={bankConversionRateMissing ? { borderColor: 'var(--color-danger)' } : undefined}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             <hr style={{ border: 'none', borderTop: '1px solid var(--border-default)', margin: '4px 0' }} />
 
@@ -577,9 +682,9 @@ export default function PagoPage() {
                             <br />
                             <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{ref.postingDate}</span>
                           </td>
-                          <td style={{ textAlign: 'right', fontSize: 13 }}>{formatDOP(ref.grandTotal)}</td>
+                          <td style={{ textAlign: 'right', fontSize: 13 }}>{formatMoney(ref.grandTotal, ref.currency)}</td>
                           <td style={{ textAlign: 'right', fontSize: 13, fontWeight: 500, color: 'var(--error-text)' }}>
-                            {formatDOP(ref.outstandingAmount)}
+                            {formatMoney(ref.outstandingAmount, ref.currency)}
                           </td>
                           <td>
                             <input
@@ -611,11 +716,11 @@ export default function PagoPage() {
                   }}>
                     <div style={{ display: 'flex', gap: 32, fontSize: 13 }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Total asignado</span>
-                      <strong>{formatDOP(totalAllocated)}</strong>
+                      <strong>{formatMoney(totalAllocated, cobroCurrency)}</strong>
                     </div>
                     <div style={{ display: 'flex', gap: 32, fontSize: 13 }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Monto del cobro</span>
-                      <strong>{formatDOP(paidAmount)}</strong>
+                      <strong>{formatMoney(paidAmount, cobroCurrency)}</strong>
                     </div>
                     {diff !== 0 && (
                       <div style={{
@@ -628,8 +733,8 @@ export default function PagoPage() {
                       }}>
                         <AlertTriangle size={13} />
                         {diff > 0
-                          ? `Quedan ${formatDOP(diff)} sin asignar`
-                          : `Asignación excede el cobro en ${formatDOP(Math.abs(diff))}`}
+                          ? `Quedan ${formatMoney(diff, cobroCurrency)} sin asignar`
+                          : `Asignación excede el cobro en ${formatMoney(Math.abs(diff), cobroCurrency)}`}
                       </div>
                     )}
                   </div>

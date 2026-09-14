@@ -12,7 +12,7 @@ export default function SemaforoPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Semáforo de Crédito"
+        title={<><span className="page-title-dot" />Semáforo de Crédito</>}
         description="Estado de crédito por cliente"
       />
 

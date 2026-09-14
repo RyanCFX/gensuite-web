@@ -24,12 +24,9 @@ const ItemsPage       = lazy(() => import('@/features/catalog/ItemsPage'))
 const AttributesPage  = lazy(() => import('@/features/catalog/AttributesPage'))
 const ItemDetail      = lazy(() => import('@/features/catalog/ItemDetail'))
 const ItemForm         = lazy(() => import('@/features/catalog/ItemForm'))
-const PreaprobacionesPage = lazy(() => import('@/features/farmacia/PreaprobacionesPage'))
-const PreaprobacionForm   = lazy(() => import('@/features/farmacia/PreaprobacionForm'))
-const PreaprobacionDetail = lazy(() => import('@/features/farmacia/PreaprobacionDetail'))
-const DespachosPage = lazy(() => import('@/features/farmacia/DespachosPage'))
-const DespachoDetail = lazy(() => import('@/features/farmacia/DespachoDetail'))
-const ColaCobroPage = lazy(() => import('@/features/farmacia/ColaCobroPage'))
+const AseguradorasPage = lazy(() => import('@/features/aseguradoras/AseguradorasPage'))
+const AseguradoraDetail = lazy(() => import('@/features/aseguradoras/AseguradoraDetail'))
+const AseguradoraForm = lazy(() => import('@/features/aseguradoras/AseguradoraForm'))
 const LotesPage = lazy(() => import('@/features/farmacia/LotesPage'))
 const LoteDetail = lazy(() => import('@/features/farmacia/LoteDetail'))
 const QuotationsPage  = lazy(() => import('@/features/quotations/QuotationsPage'))
@@ -41,6 +38,21 @@ const InvoiceForm     = lazy(() => import('@/features/invoicing/InvoiceForm'))
 const CreditNotesPage = lazy(() => import('@/features/invoicing/CreditNotesPage'))
 const DebitNotesPage  = lazy(() => import('@/features/invoicing/DebitNotesPage'))
 const DevolucionesPage = lazy(() => import('@/features/invoicing/DevolucionesPage'))
+// Facturas de Apertura (Migración de Saldos) — docs/tasks/PROMPT_APERTURA_FRONTEND.md
+const AperturaDiagnosticoPage = lazy(() => import('@/features/apertura/DiagnosticoPage'))
+const AperturaVentasPage = lazy(() => import('@/features/apertura/VentasListPage'))
+const AperturaVentaForm = lazy(() => import('@/features/apertura/VentaForm'))
+const AperturaVentaDetail = lazy(() => import('@/features/apertura/VentaDetail'))
+const AperturaVentasImportarPage = lazy(() => import('@/features/apertura/VentasImportarPage'))
+const AperturaComprasPage = lazy(() => import('@/features/apertura/ComprasListPage'))
+const AperturaCompraForm = lazy(() => import('@/features/apertura/CompraForm'))
+const AperturaCompraDetail = lazy(() => import('@/features/apertura/CompraDetail'))
+const AperturaComprasImportarPage = lazy(() => import('@/features/apertura/ComprasImportarPage'))
+const AperturaResumenPage = lazy(() => import('@/features/apertura/ResumenPage'))
+// Despachos (Delivery Note) — docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md
+const DespachosListPage = lazy(() => import('@/features/despachos/DespachosListPage'))
+const DespachoForm = lazy(() => import('@/features/despachos/DespachoForm'))
+const DespachoDetail = lazy(() => import('@/features/despachos/DespachoDetail'))
 const DevolucionDetail = lazy(() => import('@/features/invoicing/DevolucionDetail'))
 const DevolucionForm   = lazy(() => import('@/features/invoicing/DevolucionForm'))
 const StockPage       = lazy(() => import('@/features/inventory/StockPage'))
@@ -59,6 +71,7 @@ const SolicitudForm   = lazy(() => import('@/features/compras/SolicitudForm'))
 const OrdenesPage     = lazy(() => import('@/features/compras/OrdenesPage'))
 const OrdenDetail     = lazy(() => import('@/features/compras/OrdenDetail'))
 const OrdenForm       = lazy(() => import('@/features/compras/OrdenForm'))
+const AbastecimientoPage = lazy(() => import('@/features/compras/AbastecimientoPage'))
 const GastosPage      = lazy(() => import('@/features/gastos/GastosPage'))
 const GastoDetail     = lazy(() => import('@/features/gastos/GastoDetail'))
 const GastoForm       = lazy(() => import('@/features/gastos/GastoForm'))
@@ -87,6 +100,7 @@ const UsuariosPage    = lazy(() => import('@/features/usuarios/UsuariosPage'))
 const ReportesPage    = lazy(() => import('@/features/reportes/ReportesPage'))
 const EmpresaConfig   = lazy(() => import('@/features/config/EmpresaConfig'))
 const NcfPage         = lazy(() => import('@/features/config/NcfPage'))
+const MonedasPage     = lazy(() => import('@/features/config/MonedasPage'))
 const EcfAdminPage    = lazy(() => import('@/features/config/EcfAdminPage'))
 const EcfCertificacionPage = lazy(() => import('@/features/config/EcfCertificacionPage'))
 const EcfContingenciaPage  = lazy(() => import('@/features/config/EcfContingenciaPage'))
@@ -192,12 +206,10 @@ export default function App() {
             <Route path="/catalogo/descuentos" element={<Suspense fallback={<PageLoader />}><PricingRulesPage /></Suspense>} />
 
             {/* Cotizaciones */}
-            <Route path="/farmacia/preaprobaciones" element={<Suspense fallback={<PageLoader />}><PreaprobacionesPage /></Suspense>} />
-            <Route path="/farmacia/preaprobaciones/nueva" element={<Suspense fallback={<PageLoader />}><PreaprobacionForm /></Suspense>} />
-            <Route path="/farmacia/preaprobaciones/:id" element={<Suspense fallback={<PageLoader />}><PreaprobacionDetail /></Suspense>} />
-            <Route path="/farmacia/despachos" element={<Suspense fallback={<PageLoader />}><DespachosPage /></Suspense>} />
-            <Route path="/farmacia/despachos/cola" element={<Suspense fallback={<PageLoader />}><ColaCobroPage /></Suspense>} />
-            <Route path="/farmacia/despachos/:id" element={<Suspense fallback={<PageLoader />}><DespachoDetail /></Suspense>} />
+            <Route path="/farmacia/aseguradoras" element={<Suspense fallback={<PageLoader />}><AseguradorasPage /></Suspense>} />
+            <Route path="/farmacia/aseguradoras/nueva" element={<Suspense fallback={<PageLoader />}><AseguradoraForm /></Suspense>} />
+            <Route path="/farmacia/aseguradoras/:id" element={<Suspense fallback={<PageLoader />}><AseguradoraDetail /></Suspense>} />
+            <Route path="/farmacia/aseguradoras/:id/editar" element={<Suspense fallback={<PageLoader />}><AseguradoraForm /></Suspense>} />
             <Route path="/farmacia/lotes" element={<Suspense fallback={<PageLoader />}><LotesPage /></Suspense>} />
             <Route path="/farmacia/lotes/:id" element={<Suspense fallback={<PageLoader />}><LoteDetail /></Suspense>} />
             <Route path="/cotizaciones" element={<Suspense fallback={<PageLoader />}><QuotationsPage /></Suspense>} />
@@ -263,6 +275,7 @@ export default function App() {
             {/* Órdenes de Compra (Purchase Order) */}
             <Route path="/compras/ordenes" element={<Suspense fallback={<PageLoader />}><OrdenesPage /></Suspense>} />
             <Route path="/compras/ordenes/nueva" element={<Suspense fallback={<PageLoader />}><OrdenForm /></Suspense>} />
+            <Route path="/compras/ordenes/abastecimiento" element={<Suspense fallback={<PageLoader />}><AbastecimientoPage /></Suspense>} />
             <Route path="/compras/ordenes/:id/editar" element={<Suspense fallback={<PageLoader />}><OrdenForm /></Suspense>} />
             <Route path="/compras/ordenes/:id" element={<Suspense fallback={<PageLoader />}><OrdenDetail /></Suspense>} />
 
@@ -361,10 +374,28 @@ export default function App() {
             {/* Contabilidad — Libro Mayor */}
             <Route path="/contabilidad/libro-mayor" element={<Suspense fallback={<PageLoader />}><LibroMayorPage /></Suspense>} />
 
+            {/* Facturas de Apertura (Migración de Saldos) — rutas específicas antes que /:id */}
+            <Route path="/apertura/diagnostico" element={<Suspense fallback={<PageLoader />}><AperturaDiagnosticoPage /></Suspense>} />
+            <Route path="/apertura/ventas" element={<Suspense fallback={<PageLoader />}><AperturaVentasPage /></Suspense>} />
+            <Route path="/apertura/ventas/nueva" element={<Suspense fallback={<PageLoader />}><AperturaVentaForm /></Suspense>} />
+            <Route path="/apertura/ventas/importar" element={<Suspense fallback={<PageLoader />}><AperturaVentasImportarPage /></Suspense>} />
+            <Route path="/apertura/ventas/:id" element={<Suspense fallback={<PageLoader />}><AperturaVentaDetail /></Suspense>} />
+            <Route path="/apertura/compras" element={<Suspense fallback={<PageLoader />}><AperturaComprasPage /></Suspense>} />
+            <Route path="/apertura/compras/nueva" element={<Suspense fallback={<PageLoader />}><AperturaCompraForm /></Suspense>} />
+            <Route path="/apertura/compras/importar" element={<Suspense fallback={<PageLoader />}><AperturaComprasImportarPage /></Suspense>} />
+            <Route path="/apertura/compras/:id" element={<Suspense fallback={<PageLoader />}><AperturaCompraDetail /></Suspense>} />
+            <Route path="/apertura/resumen" element={<Suspense fallback={<PageLoader />}><AperturaResumenPage /></Suspense>} />
+
+            {/* Despachos (Delivery Note) — ruta específica antes que /:id */}
+            <Route path="/despachos" element={<Suspense fallback={<PageLoader />}><DespachosListPage /></Suspense>} />
+            <Route path="/despachos/nuevo" element={<Suspense fallback={<PageLoader />}><DespachoForm /></Suspense>} />
+            <Route path="/despachos/:id" element={<Suspense fallback={<PageLoader />}><DespachoDetail /></Suspense>} />
+
             {/* Configuración */}
             <Route path="/config/empresa" element={<Suspense fallback={<PageLoader />}><EmpresaConfig /></Suspense>} />
             {/* /config/ncf and /config/sucursales must be before /config/:seccion to avoid being caught as seccion */}
             <Route path="/config/ncf" element={<Suspense fallback={<PageLoader />}><NcfPage /></Suspense>} />
+            <Route path="/config/monedas" element={<Suspense fallback={<PageLoader />}><MonedasPage /></Suspense>} />
             <Route path="/config/ecf/admin" element={<Suspense fallback={<PageLoader />}><EcfAdminPage /></Suspense>} />
             <Route path="/config/ecf/certificacion" element={<Suspense fallback={<PageLoader />}><EcfCertificacionPage /></Suspense>} />
             <Route path="/config/ecf/contingencia" element={<Suspense fallback={<PageLoader />}><EcfContingenciaPage /></Suspense>} />

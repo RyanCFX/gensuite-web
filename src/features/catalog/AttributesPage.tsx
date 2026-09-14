@@ -476,13 +476,13 @@ export default function AttributesPage() {
   return (
     <div className="page-container">
       <div className="page-header">
-        <h1 className="page-title">Atributos</h1>
-        <button className="btn btn-primary" onClick={openCreate}>
+        <h1 className="page-title"><span className="page-title-dot" />Atributos</h1>
+        <button className="btn btn-navy" onClick={openCreate}>
           <Plus size={14} /> Nuevo Atributo
         </button>
       </div>
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="card-header">
           <span className="card-title">Lista de atributos</span>
         </div>
@@ -509,7 +509,7 @@ export default function AttributesPage() {
 
           {!isLoading && attributes.length > 0 && (
             <div className="table-scroll">
-              <table className="data-table" style={{ width: '100%' }}>
+              <table className="data-table navy-table" style={{ width: '100%' }}>
                 <thead>
                   <tr>
                     <SortableTh label="Nombre" sortKey="name" orderBy={orderBy} onSort={sort} />

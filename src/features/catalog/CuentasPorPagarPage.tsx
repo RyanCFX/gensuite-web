@@ -163,34 +163,39 @@ export default function CuentasPorPagarPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Cuentas por Pagar</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Cuentas por Pagar</h1>
           <p className="page-sub">
             Conceptos recurrentes de gasto (ej. alquiler, servicios de limpieza) que nunca se venden —
             solo sirven para prellenar un Gasto.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={openCreate}>
+        <button className="btn btn-navy" onClick={openCreate}>
           <Plus size={16} />
           Nuevo Concepto
         </button>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={14} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por título…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div className="search-input-wrap">
+                <Search size={14} className="search-input-icon" />
+                <input
+                  className="search-input"
+                  placeholder="Buscar por título…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <SortableTh label="Título" sortKey="titulo" orderBy={orderBy} onSort={sort} />
@@ -262,6 +267,7 @@ export default function CuentasPorPagarPage() {
                     ))}
           </tbody>
         </table>
+      </div>
       </div>
 
       {dialogOpen && (
@@ -336,7 +342,7 @@ export default function CuentasPorPagarPage() {
                       />
                     )}
                   />
-                  <p className="ff-hint">Si se omite, ERPNext usa el default de la compañía.</p>
+                  <p className="ff-hint">Si se omite, se usa el default de la compañía.</p>
                 </div>
 
                 <div className="ff-wrap">

@@ -7,7 +7,7 @@ import { listUOMs } from '@/shared/api/config'
 import type { Item } from '@/shared/api/types'
 import { useDebounce } from '@/lib/useDebounce'
 import { formatDOP } from '@/lib/formatters'
-import { Plus, Eye, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { Plus, Eye, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight, Search, SlidersHorizontal } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -16,6 +16,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { FilterField } from '@/shared/ui/FilterField'
+import { Drawer } from '@/shared/ui/Drawer'
 
 const PAGE_SIZE = 20
 
@@ -84,6 +85,7 @@ export default function ItemsPage() {
   const [maxDiscountPctMin, setMaxDiscountPctMin] = useState('')
   const [maxDiscountPctMax, setMaxDiscountPctMax] = useState('')
   const [trackingTypeFilter, setTrackingTypeFilter] = useState<'all' | 'none' | 'serial' | 'batch'>('all')
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
@@ -170,177 +172,119 @@ export default function ItemsPage() {
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
 
+  const activeMoreFiltersCount = [
+    stockUomFilter, warrantyPeriodMin, warrantyPeriodMax, pricesMin, pricesMax,
+    maxDiscountPctMin, maxDiscountPctMax,
+  ].filter((v) => v !== '').length
+    + (hasWarrantyFilter !== 'all' ? 1 : 0)
+    + (priceModeFilter !== 'all' ? 1 : 0)
+    + (trackingTypeFilter !== 'all' ? 1 : 0)
+
+  function clearMoreFilters() {
+    setStockUomFilter('')
+    setHasWarrantyFilter('all')
+    setWarrantyPeriodMin('')
+    setWarrantyPeriodMax('')
+    setPricesMin('')
+    setPricesMax('')
+    setPriceModeFilter('all')
+    setMaxDiscountPctMin('')
+    setMaxDiscountPctMax('')
+    setTrackingTypeFilter('all')
+    setPage(1)
+  }
+
   return (
     <div className="page-container">
       <PageHeader
-        title={moduleLabel}
+        title={<><span className="page-title-dot" />{moduleLabel}</>}
         description={data ? `${data.meta.total} ${isProduct ? 'productos' : 'servicios'}` : undefined}
         action={
-          <button className="btn btn-primary" onClick={() => navigate(`${basePath}/nuevo`)}>
+          <button className="btn btn-navy" onClick={() => navigate(`${basePath}/nuevo`)}>
             <Plus size={16} />
             Nuevo {isProduct ? 'Producto' : 'Servicio'}
           </button>
         }
       />
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={14} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por código o nombre…"
-              value={search}
-              onChange={handleSearchChange}
-            />
-          </div>
-          <FilterField label="Categoría" style={{ width: 200 }}>
-            <SearchSelect
-              value={categoryFilter}
-              onChange={(val) => { setCategoryFilter(val); setPage(1) }}
-              options={categoryOptions}
-              onSearch={setCategorySearch}
-              selectedLabel={categoriesData?.items.find((c) => c.id === categoryFilter)?.name ?? ''}
-              placeholder="Todas las categorías"
-            />
-          </FilterField>
-          <FilterField label="Marca" style={{ width: 200 }}>
-            <SearchSelect
-              value={brandFilter}
-              onChange={(val) => { setBrandFilter(val); setPage(1) }}
-              options={brandOptions}
-              onSearch={setBrandSearch}
-              selectedLabel={brandsData?.items.find((b) => b.id === brandFilter)?.name ?? ''}
-              placeholder="Todas las marcas"
-            />
-          </FilterField>
-          <FilterField label="Estado">
-            <Select
-              value={statusFilter}
-              onValueChange={(val) => { setStatusFilter(val as 'all' | 'active' | 'disabled'); setPage(1) }}
-            >
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="active">Activos</SelectItem>
-              <SelectItem value="disabled">Inactivos</SelectItem>
-            </Select>
-          </FilterField>
-        </div>
-        {/* Template / standalone toggle */}
-        <div style={{ display: 'flex', gap: 4 }}>
-          {[
-            { value: 'all', label: 'Todos' },
-            { value: 'template', label: 'Solo Plantillas' },
-            { value: 'standalone', label: 'Solo Artículos' },
-          ].map((opt) => (
-            <button
-              key={opt.value}
-              className={`btn btn-size-xs ${templateFilter === opt.value ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => { setTemplateFilter(opt.value as typeof templateFilter); setPage(1) }}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          {isProduct && (
-            <div style={{ width: 160 }}>
-              <SearchSelect
-                value={stockUomFilter}
-                onChange={(val) => { setStockUomFilter(val); setPage(1) }}
-                options={stockUomOptions}
-                onSearch={setStockUomSearch}
-                selectedLabel={stockUomFilter}
-                placeholder="Todas las UOM"
-              />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div className="search-input-wrap">
+                <Search size={14} className="search-input-icon" />
+                <input
+                  className="search-input"
+                  placeholder="Buscar por código o nombre…"
+                  value={search}
+                  onChange={handleSearchChange}
+                />
+              </div>
+              <FilterField label="Categoría" style={{ width: 200 }}>
+                <SearchSelect
+                  value={categoryFilter}
+                  onChange={(val) => { setCategoryFilter(val); setPage(1) }}
+                  options={categoryOptions}
+                  onSearch={setCategorySearch}
+                  selectedLabel={categoriesData?.items.find((c) => c.id === categoryFilter)?.name ?? ''}
+                  placeholder="Todas las categorías"
+                />
+              </FilterField>
+              <FilterField label="Marca" style={{ width: 200 }}>
+                <SearchSelect
+                  value={brandFilter}
+                  onChange={(val) => { setBrandFilter(val); setPage(1) }}
+                  options={brandOptions}
+                  onSearch={setBrandSearch}
+                  selectedLabel={brandsData?.items.find((b) => b.id === brandFilter)?.name ?? ''}
+                  placeholder="Todas las marcas"
+                />
+              </FilterField>
+              <FilterField label="Estado">
+                <Select
+                  value={statusFilter}
+                  onValueChange={(val) => { setStatusFilter(val as 'all' | 'active' | 'disabled'); setPage(1) }}
+                >
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="active">Activos</SelectItem>
+                  <SelectItem value="disabled">Inactivos</SelectItem>
+                </Select>
+              </FilterField>
             </div>
-          )}
-          <Select
-            value={hasWarrantyFilter}
-            onValueChange={(val) => { setHasWarrantyFilter(val as 'all' | 'true' | 'false'); setPage(1) }}
-          >
-            <SelectItem value="all">Garantía: Todos</SelectItem>
-            <SelectItem value="true">Con garantía</SelectItem>
-            <SelectItem value="false">Sin garantía</SelectItem>
-          </Select>
-          <input
-            type="number"
-            className="ff-input ff-input-sm"
-            style={{ width: 100 }}
-            placeholder="Garant. mín."
-            value={warrantyPeriodMin}
-            onChange={(e) => { setWarrantyPeriodMin(e.target.value); setPage(1) }}
-          />
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-          <input
-            type="number"
-            className="ff-input ff-input-sm"
-            style={{ width: 100 }}
-            placeholder="Garant. máx."
-            value={warrantyPeriodMax}
-            onChange={(e) => { setWarrantyPeriodMax(e.target.value); setPage(1) }}
-          />
-          <input
-            type="number"
-            className="ff-input ff-input-sm"
-            style={{ width: 100 }}
-            placeholder="Precio mín."
-            value={pricesMin}
-            onChange={(e) => { setPricesMin(e.target.value); setPage(1) }}
-          />
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-          <input
-            type="number"
-            className="ff-input ff-input-sm"
-            style={{ width: 100 }}
-            placeholder="Precio máx."
-            value={pricesMax}
-            onChange={(e) => { setPricesMax(e.target.value); setPage(1) }}
-          />
-          <Select
-            value={priceModeFilter}
-            onValueChange={(val) => { setPriceModeFilter(val as 'all' | 'manual' | 'cost_plus'); setPage(1) }}
-          >
-            <SelectItem value="all">Modo precio: Todos</SelectItem>
-            <SelectItem value="manual">Manual</SelectItem>
-            <SelectItem value="cost_plus">Costo + Margen</SelectItem>
-          </Select>
-          <input
-            type="number"
-            className="ff-input ff-input-sm"
-            style={{ width: 100 }}
-            placeholder="Dto. máx. mín."
-            value={maxDiscountPctMin}
-            onChange={(e) => { setMaxDiscountPctMin(e.target.value); setPage(1) }}
-          />
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-          <input
-            type="number"
-            className="ff-input ff-input-sm"
-            style={{ width: 100 }}
-            placeholder="Dto. máx. máx."
-            value={maxDiscountPctMax}
-            onChange={(e) => { setMaxDiscountPctMax(e.target.value); setPage(1) }}
-          />
-          {isProduct && (
-            <Select
-              value={trackingTypeFilter}
-              onValueChange={(val) => { setTrackingTypeFilter(val as 'all' | 'none' | 'serial' | 'batch'); setPage(1) }}
-            >
-              <SelectItem value="all">Tracking: Todos</SelectItem>
-              <SelectItem value="none">Sin tracking</SelectItem>
-              <SelectItem value="serial">Serial</SelectItem>
-              <SelectItem value="batch">Lote</SelectItem>
-            </Select>
-          )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            {/* Template / standalone toggle */}
+            <div style={{ display: 'flex', gap: 4 }}>
+              {[
+                { value: 'all', label: 'Todos' },
+                { value: 'template', label: 'Solo Plantillas' },
+                { value: 'standalone', label: 'Solo Artículos' },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  className={`btn btn-size-xs ${templateFilter === opt.value ? 'btn-navy' : 'btn-ghost'}`}
+                  onClick={() => { setTemplateFilter(opt.value as typeof templateFilter); setPage(1) }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+              <SlidersHorizontal size={13} />
+              Más filtros
+              {activeMoreFiltersCount > 0 && (
+                <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
           <thead>
             <tr>
               <SortableTh label="Código" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
@@ -465,6 +409,135 @@ export default function ItemsPage() {
           </div>
         )}
       </div>
+
+      <Drawer
+        open={moreFiltersOpen}
+        onClose={() => setMoreFiltersOpen(false)}
+        title="Más filtros"
+        subtitle={`Refina la búsqueda de ${isProduct ? 'productos' : 'servicios'}`}
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={clearMoreFilters}>Limpiar</button>
+            <button className="btn btn-navy" onClick={() => setMoreFiltersOpen(false)}>Aplicar</button>
+          </>
+        }
+      >
+        {isProduct && (
+          <div className="ff-wrap">
+            <label className="ff-label">UOM de stock</label>
+            <SearchSelect
+              value={stockUomFilter}
+              onChange={(val) => { setStockUomFilter(val); setPage(1) }}
+              options={stockUomOptions}
+              onSearch={setStockUomSearch}
+              selectedLabel={stockUomFilter}
+              placeholder="Todas las UOM"
+            />
+          </div>
+        )}
+
+        <div className="ff-wrap">
+          <label className="ff-label">Garantía</label>
+          <Select
+            value={hasWarrantyFilter}
+            onValueChange={(val) => { setHasWarrantyFilter(val as 'all' | 'true' | 'false'); setPage(1) }}
+          >
+            <SelectItem value="all">Garantía: Todos</SelectItem>
+            <SelectItem value="true">Con garantía</SelectItem>
+            <SelectItem value="false">Sin garantía</SelectItem>
+          </Select>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Período de garantía</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Mín."
+              value={warrantyPeriodMin}
+              onChange={(e) => { setWarrantyPeriodMin(e.target.value); setPage(1) }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Máx."
+              value={warrantyPeriodMax}
+              onChange={(e) => { setWarrantyPeriodMax(e.target.value); setPage(1) }}
+            />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Precio</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Mín."
+              value={pricesMin}
+              onChange={(e) => { setPricesMin(e.target.value); setPage(1) }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Máx."
+              value={pricesMax}
+              onChange={(e) => { setPricesMax(e.target.value); setPage(1) }}
+            />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Modo de precio</label>
+          <Select
+            value={priceModeFilter}
+            onValueChange={(val) => { setPriceModeFilter(val as 'all' | 'manual' | 'cost_plus'); setPage(1) }}
+          >
+            <SelectItem value="all">Modo precio: Todos</SelectItem>
+            <SelectItem value="manual">Manual</SelectItem>
+            <SelectItem value="cost_plus">Costo + Margen</SelectItem>
+          </Select>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Descuento máximo (%)</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Mín."
+              value={maxDiscountPctMin}
+              onChange={(e) => { setMaxDiscountPctMin(e.target.value); setPage(1) }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Máx."
+              value={maxDiscountPctMax}
+              onChange={(e) => { setMaxDiscountPctMax(e.target.value); setPage(1) }}
+            />
+          </div>
+        </div>
+
+        {isProduct && (
+          <div className="ff-wrap">
+            <label className="ff-label">Tracking</label>
+            <Select
+              value={trackingTypeFilter}
+              onValueChange={(val) => { setTrackingTypeFilter(val as 'all' | 'none' | 'serial' | 'batch'); setPage(1) }}
+            >
+              <SelectItem value="all">Tracking: Todos</SelectItem>
+              <SelectItem value="none">Sin tracking</SelectItem>
+              <SelectItem value="serial">Serial</SelectItem>
+              <SelectItem value="batch">Lote</SelectItem>
+            </Select>
+          </div>
+        )}
+      </Drawer>
     </div>
   )
 }

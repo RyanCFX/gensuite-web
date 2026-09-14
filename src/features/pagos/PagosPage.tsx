@@ -7,7 +7,7 @@ import { listSuppliers } from '@/shared/api/suppliers'
 import { listMetodosPago } from '@/shared/api/config'
 import { listSucursales } from '@/shared/api/sucursales'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { Plus } from 'lucide-react'
+import { Plus, SlidersHorizontal } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -15,6 +15,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FilterField } from '@/shared/ui/FilterField'
+import { Drawer } from '@/shared/ui/Drawer'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -45,6 +46,7 @@ export default function PagosPage() {
   const [paidAmountMin, setPaidAmountMin] = useState('')
   const [paidAmountMax, setPaidAmountMax] = useState('')
   const [referenceNo, setReferenceNo] = useState('')
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
 
   const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
@@ -90,117 +92,82 @@ export default function PagosPage() {
 
   const pagos = data?.items ?? []
 
+  const activeMoreFiltersCount = [fromDate, toDate, branch, referenceNo, paidAmountMin, paidAmountMax].filter((v) => v !== '').length
+
+  function clearMoreFilters() {
+    setFromDate('')
+    setToDate('')
+    setBranch('')
+    setReferenceNo('')
+    setPaidAmountMin('')
+    setPaidAmountMax('')
+  }
+
   return (
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Pagos a Proveedores</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Pagos a Proveedores</h1>
           <p className="page-sub">Historial de pagos registrados a proveedores</p>
         </div>
-        <button className="btn btn-primary" onClick={() => navigate('/pagos/nuevo')}>
+        <button className="btn btn-navy" onClick={() => navigate('/pagos/nuevo')}>
           <Plus size={16} />
           Registrar Pago
         </button>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Proveedor" style={{ width: 260 }}>
-            <SearchSelect
-              value={supplierId}
-              selectedLabel={supplierLabel}
-              onChange={(val, opt) => { setSupplierId(val); setSupplierLabel(opt?.label ?? '') }}
-              options={supplierOptions}
-              onSearch={setSupplierQuery}
-              loading={suppliersLoading}
-              placeholder="Filtrar por proveedor…"
-            />
-          </FilterField>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Proveedor" style={{ width: 260 }}>
+                <SearchSelect
+                  value={supplierId}
+                  selectedLabel={supplierLabel}
+                  onChange={(val, opt) => { setSupplierId(val); setSupplierLabel(opt?.label ?? '') }}
+                  options={supplierOptions}
+                  onSearch={setSupplierQuery}
+                  loading={suppliersLoading}
+                  placeholder="Filtrar por proveedor…"
+                />
+              </FilterField>
 
-          <FilterField label="Estado">
-            <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="draft">Borrador</SelectItem>
-              <SelectItem value="submitted">Sometido</SelectItem>
-              <SelectItem value="cancelled">Cancelado</SelectItem>
-            </Select>
-          </FilterField>
+              <FilterField label="Estado">
+                <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="draft">Borrador</SelectItem>
+                  <SelectItem value="submitted">Sometido</SelectItem>
+                  <SelectItem value="cancelled">Cancelado</SelectItem>
+                </Select>
+              </FilterField>
 
-          <FilterField label="Desde">
-            <DatePicker
-              className="filter-select"
-              value={fromDate}
-              onChange={setFromDate}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker
-              className="filter-select"
-              value={toDate}
-              onChange={setToDate}
-              clearable
-            />
-          </FilterField>
-
-          <FilterField label="Método de pago" style={{ width: 200 }}>
-            <SearchSelect
-              value={modeOfPayment}
-              onChange={(val) => setModeOfPayment(val)}
-              options={modeOfPaymentOptions}
-              onSearch={setModeOfPaymentSearch}
-              placeholder="Todos los métodos de pago"
-            />
-          </FilterField>
-
-          <FilterField label="Sucursal" style={{ width: 200 }}>
-            <SearchSelect
-              value={branch}
-              onChange={(val) => setBranch(val)}
-              options={branchOptions}
-              onSearch={setBranchSearch}
-              selectedLabel={branch}
-              placeholder="Todas las sucursales"
-            />
-          </FilterField>
-
-          <FilterField label="Referencia">
-            <input
-              className="ff-input ff-input-sm"
-              style={{ width: 180 }}
-              placeholder="Número de referencia…"
-              value={referenceNo}
-              onChange={(e) => setReferenceNo(e.target.value)}
-            />
-          </FilterField>
-
-          <FilterField label="Monto pagado">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Mín."
-                value={paidAmountMin}
-                onChange={(e) => setPaidAmountMin(e.target.value)}
-              />
-              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Máx."
-                value={paidAmountMax}
-                onChange={(e) => setPaidAmountMax(e.target.value)}
-              />
+              <FilterField label="Método de pago" style={{ width: 200 }}>
+                <SearchSelect
+                  value={modeOfPayment}
+                  onChange={(val) => setModeOfPayment(val)}
+                  options={modeOfPaymentOptions}
+                  onSearch={setModeOfPaymentSearch}
+                  placeholder="Todos los métodos de pago"
+                />
+              </FilterField>
             </div>
-          </FilterField>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+              <SlidersHorizontal size={13} />
+              Más filtros
+              {activeMoreFiltersCount > 0 && (
+                <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <SortableTh label="ID" sortKey="id" orderBy={orderBy} onSort={sort} />
@@ -264,6 +231,71 @@ export default function PagosPage() {
           </div>
         )}
       </div>
+
+      <Drawer
+        open={moreFiltersOpen}
+        onClose={() => setMoreFiltersOpen(false)}
+        title="Más filtros"
+        subtitle="Refina la búsqueda de pagos"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={clearMoreFilters}>Limpiar</button>
+            <button className="btn btn-navy" onClick={() => setMoreFiltersOpen(false)}>Aplicar</button>
+          </>
+        }
+      >
+        <div className="ff-wrap">
+          <label className="ff-label">Fecha</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} clearable />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker className="ff-input" value={toDate} onChange={setToDate} clearable />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Sucursal</label>
+          <SearchSelect
+            value={branch}
+            onChange={(val) => setBranch(val)}
+            options={branchOptions}
+            onSearch={setBranchSearch}
+            selectedLabel={branch}
+            placeholder="Todas las sucursales"
+          />
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Referencia</label>
+          <input
+            className="ff-input"
+            placeholder="Número de referencia…"
+            value={referenceNo}
+            onChange={(e) => setReferenceNo(e.target.value)}
+          />
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Monto pagado</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Mín."
+              value={paidAmountMin}
+              onChange={(e) => setPaidAmountMin(e.target.value)}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Máx."
+              value={paidAmountMax}
+              onChange={(e) => setPaidAmountMax(e.target.value)}
+            />
+          </div>
+        </div>
+      </Drawer>
     </div>
   )
 }

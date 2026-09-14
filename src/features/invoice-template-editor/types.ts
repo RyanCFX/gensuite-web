@@ -90,7 +90,9 @@ export interface LogoElement extends BaseElement {
 }
 
 export interface TableColumn {
-  key: 'descripcion' | 'cantidad' | 'precio' | 'itbis' | 'total'
+  /** `coberturaArs`/`montoPaciente` solo traen valor en facturas con cobertura ARS (§8.2 del doc
+   *  de Farmacia v2); en el resto quedan vacías, así que nacen invisibles. */
+  key: 'descripcion' | 'cantidad' | 'precio' | 'itbis' | 'total' | 'coberturaArs' | 'montoPaciente'
   label: string
   visible: boolean
 }

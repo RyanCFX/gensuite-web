@@ -139,32 +139,37 @@ export default function BrandsPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Marcas</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Marcas</h1>
           {brandsData && <p className="page-sub">{brandsData.meta.total} marcas</p>}
         </div>
-        <button className="btn btn-primary" onClick={openCreate}>
+        <button className="btn btn-navy" onClick={openCreate}>
           <Plus size={16} />
           Nueva Marca
         </button>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div style={{ width: 220 }}>
-            <SearchSelect
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-              options={categoryFilterOptions}
-              onSearch={setCategoryFilterSearch}
-              selectedLabel={categoriesData?.items.find((c) => c.id === categoryFilter)?.name ?? ''}
-              placeholder="Todas las categorías"
-            />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div style={{ width: 220 }}>
+                <SearchSelect
+                  value={categoryFilter}
+                  onChange={setCategoryFilter}
+                  options={categoryFilterOptions}
+                  onSearch={setCategoryFilterSearch}
+                  selectedLabel={categoriesData?.items.find((c) => c.id === categoryFilter)?.name ?? ''}
+                  placeholder="Todas las categorías"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <SortableTh label="Nombre" sortKey="name" orderBy={orderBy} onSort={sort} />
@@ -226,6 +231,7 @@ export default function BrandsPage() {
                     ))}
           </tbody>
         </table>
+      </div>
       </div>
 
       {dialogOpen && (

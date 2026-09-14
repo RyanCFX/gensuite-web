@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { getMovimientos, getResumenMovimientos } from '@/shared/api/tesoreria'
 import { CuentaBancariaSelect } from './components/CuentaBancariaSelect'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { formatDate, formatDOP, formatMoney } from '@/lib/formatters'
+import type { CuentaBancaria } from '@/shared/api/types'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -38,6 +39,7 @@ function today(): string {
 export default function MovimientosBancoPage() {
   const navigate = useNavigate()
   const [cuentaBancaria, setCuentaBancaria] = useState('')
+  const [cuentaBancariaObj, setCuentaBancariaObj] = useState<CuentaBancaria | undefined>()
   const [fromDate, setFromDate] = useState(firstOfMonth())
   const [toDate, setToDate] = useState(today())
   const [appliedRange, setAppliedRange] = useState({ fromDate: firstOfMonth(), toDate: today() })
@@ -68,28 +70,32 @@ export default function MovimientosBancoPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Movimientos Bancarios"
+        title={<><span className="page-title-dot" />Movimientos Bancarios</>}
         description="Estado de cuenta / kardex con saldo corrido — se alimenta de todo lo que afecta la cuenta, no solo lo registrado desde Tesorería"
       />
 
-      <div className="filter-bar">
-        <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
-          <FilterField label="Cuenta bancaria" style={{ minWidth: 260 }}>
-            <CuentaBancariaSelect
-              value={cuentaBancaria}
-              onChange={(id) => { setCuentaBancaria(id); setPage(1) }}
-              placeholder="Selecciona una cuenta bancaria…"
-            />
-          </FilterField>
-          <FilterField label="Desde">
-            <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} clearable />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker className="ff-input" value={toDate} onChange={setToDate} clearable />
-          </FilterField>
-          <button className="btn btn-primary btn-size-sm" onClick={handleBuscar} disabled={!cuentaBancaria}>
-            <Search size={13} /> Buscar
-          </button>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
+              <FilterField label="Cuenta bancaria" style={{ minWidth: 260 }}>
+                <CuentaBancariaSelect
+                  value={cuentaBancaria}
+                  onChange={(id, cuenta) => { setCuentaBancaria(id); setCuentaBancariaObj(cuenta); setPage(1) }}
+                  placeholder="Selecciona una cuenta bancaria…"
+                />
+              </FilterField>
+              <FilterField label="Desde">
+                <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} clearable />
+              </FilterField>
+              <FilterField label="Hasta">
+                <DatePicker className="ff-input" value={toDate} onChange={setToDate} clearable />
+              </FilterField>
+              <button className="btn btn-navy btn-size-sm" onClick={handleBuscar} disabled={!cuentaBancaria}>
+                <Search size={13} /> Buscar
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -112,28 +118,28 @@ export default function MovimientosBancoPage() {
                 <>
                   <div className="detail-field">
                     <span className="detail-label">Saldo inicial</span>
-                    <span className="detail-value" style={{ fontSize: 16, fontWeight: 600 }}>{formatDOP(resumen.saldoInicial)}</span>
+                    <span className="detail-value" style={{ fontSize: 16, fontWeight: 600 }}>{formatMoney(resumen.saldoInicial, cuentaBancariaObj?.currency)}</span>
                   </div>
                   <div className="detail-field">
                     <span className="detail-label">Entradas</span>
-                    <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--success-text)' }}>{formatDOP(resumen.entradas)}</span>
+                    <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--success-text)' }}>{formatMoney(resumen.entradas, cuentaBancariaObj?.currency)}</span>
                   </div>
                   <div className="detail-field">
                     <span className="detail-label">Salidas</span>
-                    <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--error-text)' }}>{formatDOP(resumen.salidas)}</span>
+                    <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--error-text)' }}>{formatMoney(resumen.salidas, cuentaBancariaObj?.currency)}</span>
                   </div>
                   <div className="detail-field">
                     <span className="detail-label">Saldo final</span>
-                    <span style={{ fontSize: 18, fontWeight: 700 }}>{formatDOP(resumen.saldoFinal)}</span>
+                    <span style={{ fontSize: 18, fontWeight: 700 }}>{formatMoney(resumen.saldoFinal, cuentaBancariaObj?.currency)}</span>
                   </div>
                 </>
               )}
             </div>
           </div>
 
-          <div className="card">
+          <div className="card navy-table-card">
             <div className="table-scroll">
-              <table className="data-table">
+              <table className="data-table navy-table">
                 <thead>
                   <tr>
                     <th>Fecha</th>
@@ -162,7 +168,7 @@ export default function MovimientosBancoPage() {
                             Saldo inicial al {formatDate(appliedRange.fromDate)}
                           </td>
                           <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, fontSize: 12 }}>
-                            {formatDOP(meta.saldoInicialDelRango)}
+                            {formatMoney(meta.saldoInicialDelRango, cuentaBancariaObj?.currency)}
                           </td>
                         </tr>
                       )}
@@ -198,15 +204,24 @@ export default function MovimientosBancoPage() {
                                     )
                                   : <span style={{ fontSize: 12 }}>{row.voucherNo}</span>}
                               </td>
-                              <td className="td-muted" style={{ fontSize: 12 }}>{row.party ?? row.remarks ?? '—'}</td>
-                              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
-                                {row.debito ? formatDOP(row.debito) : '—'}
+                              <td className="td-muted" style={{ fontSize: 12 }}>
+                                {row.party ?? row.remarks ?? '—'}
+                                {row.esDiferenciaCambiaria && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>Ajuste cambiario</span>}
                               </td>
                               <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
-                                {row.credito ? formatDOP(row.credito) : '—'}
+                                {row.debito ? formatMoney(row.debito, row.moneda) : '—'}
+                                {row.moneda && row.montoBase != null && row.debito > 0 && (
+                                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>≈ {formatDOP(row.montoBase)}</div>
+                                )}
+                              </td>
+                              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
+                                {row.credito ? formatMoney(row.credito, row.moneda) : '—'}
+                                {row.moneda && row.montoBase != null && row.credito > 0 && (
+                                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>≈ {formatDOP(row.montoBase)}</div>
+                                )}
                               </td>
                               <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12, color: balanceColor }}>
-                                {formatDOP(row.saldoCorrido)}
+                                {formatMoney(row.saldoCorrido, row.moneda)}
                               </td>
                             </tr>
                           )

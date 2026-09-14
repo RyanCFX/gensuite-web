@@ -19,6 +19,52 @@ server {
 
     # ... certificados TLS, root del build (dist/), etc. ...
 
+    # Headers de seguridad — `always` para que se envíen también en respuestas de error (4xx/5xx),
+    # no solo en el 200 normal. Se declaran una sola vez a nivel server: nginx los hereda en cada
+    # location de abajo (proxy incluido) siempre que esa location no tenga su propio add_header —
+    # si algún día se agrega un add_header dentro de /api/, /files/ o /glitchtip-tunnel, hay que
+    # repetir aquí también los que se quieran conservar, porque nginx deja de heredar en cuanto
+    # el location define uno propio.
+    #
+    # HSTS: fuerza HTTPS en el navegador para este dominio (y subdominios) por un año. Sin
+    # preload porque no está en la lista de precarga de Chrome/Firefox; agregar `preload` requiere
+    # someter el dominio a hstspreload.org y es casi imposible revertir.
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # Content-Security-Policy ajustado a lo que el bundle realmente carga:
+    #   - script-src 'self': todo el JS es del propio build (index-*.js, chunks), sin inline scripts.
+    #   - style-src incluye 'unsafe-inline' porque Radix UI / react-moveable / react-selecto
+    #     escriben estilos inline (style="...") en tiempo de ejecución para popovers, drag, resize.
+    #   - fonts.googleapis.com / fonts.gstatic.com: Google Fonts cargado en index.html.
+    #   - img-src con data:/blob: para QR codes (qrcode.react), gráficos (recharts) y el blob del
+    #     certificado QZ (downloadQzCertificate en src/shared/printing/qz.ts).
+    #   - connect-src 'self' cubre /api, /files y /glitchtip-tunnel (todo relativo, ver comentario
+    #     arriba); wss/https a localhost:* es QZ Tray (agente de impresión de escritorio, puertos
+    #     8181-8585 según cuál esté libre — ver src/shared/printing/qz.ts).
+    #   - frame-ancestors 'self': refuerzo moderno de X-Frame-Options (abajo) contra clickjacking.
+    #   - object-src 'none': sin Flash/plugins embebidos, no hay caso de uso legítimo.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' wss://localhost:* https://localhost:*; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests" always;
+
+    # Defensa contra clickjacking: nadie puede embeber este sitio en un <iframe>, ni siquiera
+    # otro dominio propio (equivalente legado a frame-ancestors 'self' de arriba, para navegadores
+    # que no soporten CSP).
+    add_header X-Frame-Options "SAMEORIGIN" always;
+
+    # Evita que el navegador adivine el content-type por el contenido del archivo (MIME-sniffing) —
+    # sin esto, un archivo subido a /files/ con extensión inofensiva pero contenido HTML/JS podría
+    # ejecutarse como script en vez de descargarse/mostrarse como el tipo declarado.
+    add_header X-Content-Type-Options "nosniff" always;
+
+    # No manda el Referer completo (con path/query) a otros orígenes; sí lo manda completo en
+    # navegaciones same-origin, útil para analítica interna sin filtrar URLs internas (ids de
+    # facturas, tokens en query string, etc.) a sitios de terceros.
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Desactiva APIs sensibles del navegador que esta app no usa (confirmado: sin
+    # navigator.mediaDevices/geolocation/usb/bluetooth en el código). Si en el futuro se agrega
+    # escaneo de códigos de barras por cámara, por ejemplo, hay que habilitar camera=(self) aquí.
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=(), magnetometer=(), gyroscope=(), accelerometer=(), interest-cohort=()" always;
+
     location /api/ {
         proxy_pass http://207.180.235.134:4000/api/;
         proxy_set_header Host $host;

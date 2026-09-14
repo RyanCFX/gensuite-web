@@ -17,8 +17,8 @@ for (const m of doc.matchAll(/\|\s*`([a-z0-9]+(?:\.[a-z0-9-]+)+)`/g)) {
   ids.add(m[1])
 }
 const sorted = [...ids].sort()
-if (sorted.length !== 368) {
-  console.warn(`[gen-acciones] esperaba 368 acciones, encontré ${sorted.length} — revisá el doc`)
+if (sorted.length !== 394) {
+  console.warn(`[gen-acciones] esperaba 394 acciones, encontré ${sorted.length} — revisá el doc`)
 }
 
 const out = `// GENERADO automáticamente por scripts/gen-acciones.mjs — NO editar a mano.

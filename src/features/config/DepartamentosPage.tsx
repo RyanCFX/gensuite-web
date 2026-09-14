@@ -164,57 +164,65 @@ export default function DepartamentosPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Departamentos"
+        title={<><span className="page-title-dot" />Departamentos</>}
         description={data ? `${data.meta.total ?? 0} departamentos` : undefined}
         action={
-          <button className="btn btn-primary" onClick={openCreate}>
+          <button className="btn btn-navy" onClick={openCreate}>
             <Plus size={16} />
             Nuevo Departamento
           </button>
         }
       />
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={14} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por nombre…"
-              value={search}
-              onChange={handleSearchChange}
-              disabled={viewMode === 'tree'}
-            />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div className="search-input-wrap">
+                <Search size={14} className="search-input-icon" />
+                <input
+                  className="search-input"
+                  placeholder="Buscar por nombre…"
+                  value={search}
+                  onChange={handleSearchChange}
+                  disabled={viewMode === 'tree'}
+                />
+              </div>
+            </div>
+            <div className="filter-bar-right" style={{ display: 'flex', gap: 4 }}>
+              <button
+                className={`btn btn-size-sm ${viewMode === 'list' ? 'btn-navy' : 'btn-ghost'}`}
+                onClick={() => setViewMode('list')}
+              >
+                <List size={14} /> Lista
+              </button>
+              <button
+                className={`btn btn-size-sm ${viewMode === 'tree' ? 'btn-navy' : 'btn-ghost'}`}
+                onClick={() => setViewMode('tree')}
+              >
+                <GitBranch size={14} /> Árbol
+              </button>
+            </div>
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-secondary)' }}>
-            <input
-              type="checkbox"
-              checked={includeDisabled}
-              onChange={(e) => { setIncludeDisabled(e.target.checked); setPage(1) }}
-            />
+
+          <label className="ff-toggle-wrap">
+            <span className="ff-toggle">
+              <input
+                type="checkbox"
+                checked={includeDisabled}
+                onChange={(e) => { setIncludeDisabled(e.target.checked); setPage(1) }}
+              />
+              <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+            </span>
             Mostrar deshabilitados
           </label>
-        </div>
-        <div className="filter-bar-right" style={{ display: 'flex', gap: 4 }}>
-          <button
-            className={`btn btn-size-sm ${viewMode === 'list' ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={() => setViewMode('list')}
-          >
-            <List size={14} /> Lista
-          </button>
-          <button
-            className={`btn btn-size-sm ${viewMode === 'tree' ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={() => setViewMode('tree')}
-          >
-            <GitBranch size={14} /> Árbol
-          </button>
         </div>
       </div>
 
       {viewMode === 'list' ? (
-        <div className="card">
+        <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table navy-table">
               <thead>
                 <tr>
                   <SortableTh label="Nombre" sortKey="name" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />

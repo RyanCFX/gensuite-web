@@ -96,71 +96,76 @@ export default function QuotationsPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Cotizaciones</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Cotizaciones</h1>
           <p className="page-sub">Gestiona tus cotizaciones y presupuestos</p>
         </div>
-        <button className="btn btn-primary" onClick={() => navigate('/cotizaciones/nueva')}>
+        <button className="btn btn-navy" onClick={() => navigate('/cotizaciones/nueva')}>
           <Plus size={16} />
           Nueva Cotización
         </button>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Cliente" style={{ width: 260 }}>
-            <SearchSelect
-              value={customerId}
-              selectedLabel={customerLabel}
-              onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
-              options={customerOptions}
-              onSearch={setCustomerQuery}
-              loading={customersLoading}
-              placeholder="Filtrar por cliente…"
-            />
-          </FilterField>
-          <FilterField label="Estado">
-            <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="draft">Borrador</SelectItem>
-              <SelectItem value="submitted">Sometido</SelectItem>
-              <SelectItem value="ordered">Ordenado</SelectItem>
-              <SelectItem value="lost">Perdido</SelectItem>
-              <SelectItem value="cancelled">Cancelado</SelectItem>
-            </Select>
-          </FilterField>
-          <FilterField label="Sucursal" style={{ width: 200 }}>
-            <SearchSelect
-              value={branch}
-              onChange={setBranch}
-              options={branchOptions}
-              onSearch={setBranchSearch}
-              selectedLabel={branch}
-              placeholder="Todas las sucursales"
-            />
-          </FilterField>
-          <FilterField label="Desde">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={fromDate}
-              onChange={setFromDate}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={toDate}
-              onChange={setToDate}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Cliente" style={{ width: 260 }}>
+                <SearchSelect
+                  value={customerId}
+                  selectedLabel={customerLabel}
+                  onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
+                  options={customerOptions}
+                  onSearch={setCustomerQuery}
+                  loading={customersLoading}
+                  placeholder="Filtrar por cliente…"
+                />
+              </FilterField>
+              <FilterField label="Estado">
+                <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="draft">Borrador</SelectItem>
+                  <SelectItem value="submitted">Sometido</SelectItem>
+                  <SelectItem value="ordered">Ordenado</SelectItem>
+                  <SelectItem value="lost">Perdido</SelectItem>
+                  <SelectItem value="cancelled">Cancelado</SelectItem>
+                </Select>
+              </FilterField>
+              <FilterField label="Sucursal" style={{ width: 200 }}>
+                <SearchSelect
+                  value={branch}
+                  onChange={setBranch}
+                  options={branchOptions}
+                  onSearch={setBranchSearch}
+                  selectedLabel={branch}
+                  placeholder="Todas las sucursales"
+                />
+              </FilterField>
+              <FilterField label="Desde">
+                <DatePicker
+                  className="ff-input ff-input-sm"
+                  value={fromDate}
+                  onChange={setFromDate}
+                  style={{ width: 144 }}
+                  clearable
+                />
+              </FilterField>
+              <FilterField label="Hasta">
+                <DatePicker
+                  className="ff-input ff-input-sm"
+                  value={toDate}
+                  onChange={setToDate}
+                  style={{ width: 144 }}
+                  clearable
+                />
+              </FilterField>
+            </div>
+          </div>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} />
@@ -187,7 +192,7 @@ export default function QuotationsPage() {
                   <div className="empty-state">
                     <div className="empty-title">Sin cotizaciones</div>
                     <p className="empty-sub">Crea tu primera cotización para comenzar.</p>
-                    <button className="btn btn-primary btn-size-sm" onClick={() => navigate('/cotizaciones/nueva')}>
+                    <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/cotizaciones/nueva')}>
                       <Plus size={14} /> Nueva Cotización
                     </button>
                   </div>
@@ -236,6 +241,7 @@ export default function QuotationsPage() {
             )}
           </tbody>
         </table>
+      </div>
       </div>
 
       {data?.meta && (

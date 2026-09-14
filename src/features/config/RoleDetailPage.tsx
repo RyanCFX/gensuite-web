@@ -74,7 +74,7 @@ export default function RoleDetailPage() {
         <div className="empty-state">
           <span className="empty-icon"><ShieldOff size={20} /></span>
           <p className="empty-title">Acceso restringido</p>
-          <p className="empty-sub">Esta sección requiere el rol System Manager en ERPNext.</p>
+          <p className="empty-sub">Esta sección requiere el rol System Manager.</p>
         </div>
       </div>
     )
@@ -89,7 +89,7 @@ export default function RoleDetailPage() {
         <div className="empty-state">
           <span className="empty-icon"><ShieldOff size={20} /></span>
           <p className="empty-title">Acceso restringido</p>
-          <p className="empty-sub">Tu usuario no tiene el rol System Manager en ERPNext.</p>
+          <p className="empty-sub">Tu usuario no tiene el rol System Manager.</p>
         </div>
       </div>
     )
@@ -136,7 +136,7 @@ export default function RoleDetailPage() {
                 className="btn btn-danger"
                 onClick={() => setConfirmDelete(true)}
                 disabled={!data.isCustom}
-                title={!data.isCustom ? 'Los roles estándar de ERPNext no se pueden eliminar' : undefined}
+                title={!data.isCustom ? 'Los roles estándar del sistema no se pueden eliminar' : undefined}
               >
                 <Trash2 size={14} /> Eliminar
               </button>
@@ -239,8 +239,8 @@ export default function RoleDetailPage() {
             </div>
             <div className="modal-body">
               <p style={{ fontSize: 14 }}>
-                Se eliminará el rol <strong>{roleName}</strong>. ERPNext rechazará esta acción si
-                el rol sigue asignado a algún usuario o tiene permisos de DocType activos.
+                Se eliminará el rol <strong>{roleName}</strong>. Esta acción se rechazará si el rol
+                sigue asignado a algún usuario o tiene permisos de DocType activos.
               </p>
             </div>
             <div className="modal-foot">

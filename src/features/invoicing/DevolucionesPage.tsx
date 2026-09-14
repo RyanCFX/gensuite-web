@@ -7,7 +7,7 @@ import { listDepartamentos } from '@/shared/api/departamentos'
 import { listCustomers } from '@/shared/api/customers'
 import { getCatalogosFiscales } from '@/shared/api/config'
 import { useDebounce } from '@/lib/useDebounce'
-import { ChevronLeft, ChevronRight, Search, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, Plus, SlidersHorizontal } from 'lucide-react'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -15,6 +15,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
+import { Drawer } from '@/shared/ui/Drawer'
 import { Select, SelectItem } from '@/components/ui/select'
 
 const PAGE_SIZE = 20
@@ -71,6 +72,7 @@ export default function DevolucionesPage() {
   const [grandTotalMax, setGrandTotalMax] = useState('')
   const [refundedAmountMin, setRefundedAmountMin] = useState('')
   const [refundedAmountMax, setRefundedAmountMax] = useState('')
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
 
   // ── Filtro por cliente (autocomplete real, mismo patrón que CreditNotesPage) ──
@@ -159,176 +161,111 @@ export default function DevolucionesPage() {
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
 
+  const activeMoreFiltersCount = [
+    ncf, ncfType, createdAtFrom, createdAtTo, postingDateFrom, postingDateTo,
+    grandTotalMin, grandTotalMax, refundedAmountMin, refundedAmountMax,
+  ].filter((v) => v !== '').length
+
+  function clearMoreFilters() {
+    setNcf('')
+    setNcfType('')
+    setCreatedAtFrom('')
+    setCreatedAtTo('')
+    setPostingDateFrom('')
+    setPostingDateTo('')
+    setGrandTotalMin('')
+    setGrandTotalMax('')
+    setRefundedAmountMin('')
+    setRefundedAmountMax('')
+    setPage(1)
+  }
+
   return (
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Devoluciones</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Devoluciones</h1>
           {data && <p className="page-sub">{data.meta.total} devoluciones en total</p>}
         </div>
-        <button className="btn btn-primary" onClick={() => navigate('/devoluciones/nueva')}>
+        <button className="btn btn-navy" onClick={() => navigate('/devoluciones/nueva')}>
           <Plus size={16} />
           Nueva Devolución
         </button>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={15} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar por cliente, NCF…"
-              value={search}
-              onChange={handleSearchChange}
-            />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div className="search-input-wrap">
+                <Search size={15} className="search-input-icon" />
+                <input
+                  className="search-input"
+                  placeholder="Buscar por cliente, NCF…"
+                  value={search}
+                  onChange={handleSearchChange}
+                />
+              </div>
+              <FilterField label="Cliente" style={{ width: 220 }}>
+                <SearchSelect
+                  value={customerId}
+                  selectedLabel={customerLabel}
+                  onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? ''); setPage(1) }}
+                  options={customerOptions}
+                  onSearch={setCustomerQuery}
+                  loading={customersLoading}
+                  placeholder="Filtrar por cliente…"
+                />
+              </FilterField>
+              <FilterField label="Sucursal" style={{ width: 200 }}>
+                <SearchSelect
+                  value={branch}
+                  onChange={(val) => { setBranch(val); setPage(1) }}
+                  options={branchOptions}
+                  onSearch={setBranchSearch}
+                  selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
+                  placeholder="Todas las sucursales"
+                />
+              </FilterField>
+              <FilterField label="Departamento" style={{ width: 200 }}>
+                <SearchSelect
+                  value={department}
+                  onChange={(val) => { setDepartment(val); setPage(1) }}
+                  options={departmentOptions}
+                  onSearch={setDepartmentSearch}
+                  selectedLabel={departamentos?.items.find((d) => d.id === department)?.name ?? ''}
+                  placeholder="Todos los departamentos"
+                />
+              </FilterField>
+              <FilterField label="Estado">
+                <Select
+                  value={status}
+                  onValueChange={(val) => { setStatus(val); setPage(1) }}
+                >
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="draft">Borrador</SelectItem>
+                  <SelectItem value="submitted">Sometido</SelectItem>
+                  <SelectItem value="cancelled">Cancelado</SelectItem>
+                </Select>
+              </FilterField>
+            </div>
           </div>
-          <FilterField label="Cliente" style={{ width: 220 }}>
-            <SearchSelect
-              value={customerId}
-              selectedLabel={customerLabel}
-              onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? ''); setPage(1) }}
-              options={customerOptions}
-              onSearch={setCustomerQuery}
-              loading={customersLoading}
-              placeholder="Filtrar por cliente…"
-            />
-          </FilterField>
-          <FilterField label="Sucursal" style={{ width: 200 }}>
-            <SearchSelect
-              value={branch}
-              onChange={(val) => { setBranch(val); setPage(1) }}
-              options={branchOptions}
-              onSearch={setBranchSearch}
-              selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
-              placeholder="Todas las sucursales"
-            />
-          </FilterField>
-          <FilterField label="Departamento" style={{ width: 200 }}>
-            <SearchSelect
-              value={department}
-              onChange={(val) => { setDepartment(val); setPage(1) }}
-              options={departmentOptions}
-              onSearch={setDepartmentSearch}
-              selectedLabel={departamentos?.items.find((d) => d.id === department)?.name ?? ''}
-              placeholder="Todos los departamentos"
-            />
-          </FilterField>
-          <FilterField label="Estado">
-            <Select
-              value={status}
-              onValueChange={(val) => { setStatus(val); setPage(1) }}
-            >
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="draft">Borrador</SelectItem>
-              <SelectItem value="submitted">Sometido</SelectItem>
-              <SelectItem value="cancelled">Cancelado</SelectItem>
-            </Select>
-          </FilterField>
-        </div>
-        <div className="filter-bar-left" style={{ marginTop: 8 }}>
-          <FilterField label="NCF">
-            <input
-              className="ff-input ff-input-sm"
-              style={{ width: 160 }}
-              placeholder="Buscar NCF…"
-              value={ncf}
-              onChange={(e) => { setNcf(e.target.value); setPage(1) }}
-            />
-          </FilterField>
-          <FilterField label="Tipo NCF" style={{ width: 200 }}>
-            <SearchSelect
-              value={ncfType}
-              onChange={(val) => { setNcfType(val); setPage(1) }}
-              options={ncfTypeOptions}
-              onSearch={setNcfTypeSearch}
-              selectedLabel={catalogos?.ncfTypes?.find((t) => t.value === ncfType)?.label ?? ''}
-              placeholder="Todos los tipos NCF"
-            />
-          </FilterField>
-          <FilterField label="Creada desde">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={createdAtFrom}
-              onChange={(v) => { setCreatedAtFrom(v); setPage(1) }}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Creada hasta">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={createdAtTo}
-              onChange={(v) => { setCreatedAtTo(v); setPage(1) }}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Fecha desde">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={postingDateFrom}
-              onChange={(v) => { setPostingDateFrom(v); setPage(1) }}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Fecha hasta">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={postingDateTo}
-              onChange={(v) => { setPostingDateTo(v); setPage(1) }}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Total">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Total mín."
-                value={grandTotalMin}
-                onChange={(e) => { setGrandTotalMin(e.target.value); setPage(1) }}
-              />
-              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Total máx."
-                value={grandTotalMax}
-                onChange={(e) => { setGrandTotalMax(e.target.value); setPage(1) }}
-              />
-            </div>
-          </FilterField>
-          <FilterField label="Monto reembolsado">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Reemb. mín."
-                value={refundedAmountMin}
-                onChange={(e) => { setRefundedAmountMin(e.target.value); setPage(1) }}
-              />
-              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Reemb. máx."
-                value={refundedAmountMax}
-                onChange={(e) => { setRefundedAmountMax(e.target.value); setPage(1) }}
-              />
-            </div>
-          </FilterField>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+              <SlidersHorizontal size={13} />
+              Más filtros
+              {activeMoreFiltersCount > 0 && (
+                <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
@@ -399,6 +336,7 @@ export default function DevolucionesPage() {
           </tbody>
         </table>
       </div>
+      </div>
 
       {data && data.meta.total > PAGE_SIZE && (
         <div className="pagination">
@@ -424,6 +362,101 @@ export default function DevolucionesPage() {
           </div>
         </div>
       )}
+
+      <Drawer
+        open={moreFiltersOpen}
+        onClose={() => setMoreFiltersOpen(false)}
+        title="Más filtros"
+        subtitle="Refina la búsqueda de devoluciones"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={clearMoreFilters}>Limpiar</button>
+            <button className="btn btn-navy" onClick={() => setMoreFiltersOpen(false)}>Aplicar</button>
+          </>
+        }
+      >
+        <div className="ff-wrap">
+          <label className="ff-label">NCF</label>
+          <input
+            className="ff-input"
+            placeholder="Buscar NCF…"
+            value={ncf}
+            onChange={(e) => { setNcf(e.target.value); setPage(1) }}
+          />
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Tipo NCF</label>
+          <SearchSelect
+            value={ncfType}
+            onChange={(val) => { setNcfType(val); setPage(1) }}
+            options={ncfTypeOptions}
+            onSearch={setNcfTypeSearch}
+            selectedLabel={catalogos?.ncfTypes?.find((t) => t.value === ncfType)?.label ?? ''}
+            placeholder="Todos los tipos NCF"
+          />
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Fecha de creación</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DatePicker className="ff-input" value={createdAtFrom} onChange={(v) => { setCreatedAtFrom(v); setPage(1) }} clearable />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker className="ff-input" value={createdAtTo} onChange={(v) => { setCreatedAtTo(v); setPage(1) }} clearable />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Fecha de emisión</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DatePicker className="ff-input" value={postingDateFrom} onChange={(v) => { setPostingDateFrom(v); setPage(1) }} clearable />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker className="ff-input" value={postingDateTo} onChange={(v) => { setPostingDateTo(v); setPage(1) }} clearable />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Total</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Total mín."
+              value={grandTotalMin}
+              onChange={(e) => { setGrandTotalMin(e.target.value); setPage(1) }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Total máx."
+              value={grandTotalMax}
+              onChange={(e) => { setGrandTotalMax(e.target.value); setPage(1) }}
+            />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Monto reembolsado</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Reemb. mín."
+              value={refundedAmountMin}
+              onChange={(e) => { setRefundedAmountMin(e.target.value); setPage(1) }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Reemb. máx."
+              value={refundedAmountMax}
+              onChange={(e) => { setRefundedAmountMax(e.target.value); setPage(1) }}
+            />
+          </div>
+        </div>
+      </Drawer>
     </div>
   )
 }

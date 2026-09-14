@@ -277,6 +277,15 @@ function InventarioTab() {
       .map((w) => ({ value: w.id, label: w.name }))
   }, [warehouses, warehouseSearch])
 
+  const { data: rolesData } = useQuery({
+    queryKey: ['roles-all'],
+    queryFn: listRoles,
+  })
+  const [overDeliverRoleSearch, setOverDeliverRoleSearch] = useState('')
+  const overDeliverRoleOptions: SearchSelectOption[] = (rolesData ?? [])
+    .filter((r) => !overDeliverRoleSearch || r.label.toLowerCase().includes(overDeliverRoleSearch.toLowerCase()))
+    .map((r) => ({ value: r.id, label: r.label }))
+
   const saveMutation = useMutation({
     mutationFn: (dto: Partial<StockSettings>) => updateStockSettings(dto),
     onSuccess: () => {
@@ -390,6 +399,45 @@ function InventarioTab() {
               Cuando está activo, los documentos (facturas, pedidos, compras, transferencias) muestran los campos de Número de
               Serie y Lote directamente en la fila del artículo, en lugar del diálogo emergente de captura. Requiere que
               "Activar Serie / Lote para Artículos" esté encendido — de lo contrario no tiene ningún efecto.
+            </p>
+          </div>
+
+          <div className="ff-wrap" style={{ borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
+            <label className="ff-label" htmlFor="overDeliveryReceiptAllowance">% de Tolerancia de Sobre-recepción/Sobre-entrega</label>
+            <input
+              id="overDeliveryReceiptAllowance"
+              className="ff-input"
+              type="number"
+              min="0"
+              step="0.01"
+              style={{ maxWidth: 160 }}
+              {...register('overDeliveryReceiptAllowance', { valueAsNumber: true })}
+            />
+            <p className="ff-hint">
+              Cuánto puede excederse una recepción de compra o un despacho de venta por encima de lo pedido/vendido
+              antes de que el sistema lo rechace. 0 = sin tolerancia (cualquier exceso se rechaza).
+            </p>
+          </div>
+
+          <div className="ff-wrap">
+            <label className="ff-label">Rol Autorizado para Recibir/Entregar de Más</label>
+            <Controller
+              name="roleAllowedToOverDeliverReceive"
+              control={control}
+              render={({ field }) => (
+                <SearchSelect
+                  value={field.value ?? ''}
+                  onChange={(val) => field.onChange(val)}
+                  options={overDeliverRoleOptions}
+                  onSearch={setOverDeliverRoleSearch}
+                  selectedLabel={rolesData?.find((r) => r.id === field.value)?.label ?? field.value ?? ''}
+                  placeholder="Sin restricción adicional"
+                />
+              )}
+            />
+            <p className="ff-hint">
+              Los usuarios con este rol pueden recibir compras o despachar ventas por encima del porcentaje de
+              tolerancia configurado arriba, sin que el sistema lo bloquee.
             </p>
           </div>
         </div>
@@ -832,7 +880,7 @@ function ModoCreacionPasswordCard() {
           <p className="ff-hint">
             "Por correo": al crear un usuario o resetear su contraseña se envía un link por correo
             (comportamiento actual). "Directo en pantalla": el administrador escribe la contraseña él
-            mismo en el momento, sin enviar ningún correo — útil si el tenant no tiene un canal de
+            mismo en el momento, sin enviar ningún correo — útil si tu empresa no tiene un canal de
             email saliente confiable.
           </p>
         </div>

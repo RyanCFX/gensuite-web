@@ -163,13 +163,13 @@ export default function CierrePeriodoPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Cierre de Período"
+        title={<><span className="page-title-dot" />Cierre de Período</>}
         description="Gestión de cierres contables por ejercicio fiscal"
       />
 
       {/* Filter bar */}
-      <div className="filter-bar" style={{ marginBottom: 16 }}>
-        <div className="filter-bar-left">
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ width: 200 }}>
             <SearchSelect
               value={fyFilter}
@@ -180,16 +180,16 @@ export default function CierrePeriodoPage() {
               placeholder="Todos los ejercicios"
             />
           </div>
+          <button className="btn btn-navy btn-size-sm" onClick={openWizard}>
+            <Plus size={14} /> Nuevo cierre
+          </button>
         </div>
-        <button className="btn btn-primary btn-size-sm" onClick={openWizard}>
-          <Plus size={14} /> Nuevo cierre
-        </button>
       </div>
 
       {/* Table */}
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <th>ID</th>
@@ -317,7 +317,7 @@ export default function CierrePeriodoPage() {
                       onChange={(e) => setFormAccountHead(e.target.value)}
                       placeholder="Utilidades Retenidas - EMP"
                     />
-                    <p className="ff-hint">Cuenta de Ganancias Retenidas en ERPNext</p>
+                    <p className="ff-hint">Cuenta de Ganancias Retenidas del sistema</p>
                   </div>
 
                   <div className="ff-wrap">
@@ -359,7 +359,7 @@ export default function CierrePeriodoPage() {
                   }}>
                     <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
                     <p style={{ fontSize: 13, margin: 0, lineHeight: 1.5 }}>
-                      Al confirmar el cierre contable, ERPNext generará <strong>asientos GL irreversibles</strong> que transferirán el resultado neto del período a la cuenta de Ganancias Retenidas. <strong>Esta acción no puede deshacerse.</strong>
+                      Al confirmar el cierre contable, se generarán <strong>asientos GL irreversibles</strong> que transferirán el resultado neto del período a la cuenta de Ganancias Retenidas. <strong>Esta acción no puede deshacerse.</strong>
                     </p>
                   </div>
 
@@ -428,7 +428,7 @@ export default function CierrePeriodoPage() {
               }}>
                 <p style={{ margin: 0 }}>
                   ¿Confirmar el cierre del período <strong>{confirmTarget.closingFiscalYear}</strong>?
-                  ERPNext ejecutará los asientos contables que transfieren el resultado neto a{' '}
+                  Se ejecutarán los asientos contables que transfieren el resultado neto a{' '}
                   <strong>{confirmTarget.closingAccountHead}</strong>.{' '}
                   <strong>Esta operación NO puede deshacerse.</strong>
                 </p>

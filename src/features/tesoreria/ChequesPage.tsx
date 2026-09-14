@@ -15,7 +15,8 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
-import { Printer } from 'lucide-react'
+import { Drawer } from '@/shared/ui/Drawer'
+import { Printer, SlidersHorizontal } from 'lucide-react'
 
 const STATUS_BADGE: Record<ChequeEstado, string> = {
   Reservado: 'badge-draft',
@@ -37,6 +38,7 @@ export default function ChequesPage() {
   const [beneficiarioLabel, setBeneficiarioLabel] = useState('')
   const [beneficiarioQuery, setBeneficiarioQuery] = useState('')
   const [impreso, setImpreso] = useState<'all' | 'yes' | 'no'>('all')
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
 
   const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
@@ -67,66 +69,75 @@ export default function ChequesPage() {
 
   const cheques = data?.items ?? []
 
+  const activeMoreFiltersCount = [fromDate, toDate].filter((v) => v !== '').length + (impreso !== 'all' ? 1 : 0)
+
+  function clearMoreFilters() {
+    setImpreso('all')
+    setFromDate('')
+    setToDate('')
+  }
+
   return (
     <div className="page-container">
       <PageHeader
-        title="Cheques"
+        title={<><span className="page-title-dot" />Cheques</>}
         description="Historial de cheques emitidos a proveedores desde Emisiones o Pagos"
       />
 
-      <div className="filter-bar">
-        <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
-          <FilterField label="Cuenta bancaria" style={{ width: 220 }}>
-            <CuentaBancariaSelect value={cuentaBancaria} onChange={setCuentaBancaria} placeholder="Todas las cuentas" />
-          </FilterField>
-          <FilterField label="Número de cheque">
-            <input
-              className="ff-input"
-              style={{ width: 140 }}
-              placeholder="Buscar número…"
-              value={chequeNo}
-              onChange={(e) => setChequeNo(e.target.value)}
-            />
-          </FilterField>
-          <FilterField label="Beneficiario" style={{ width: 220 }}>
-            <SearchSelect
-              value={beneficiario}
-              selectedLabel={beneficiarioLabel}
-              onChange={(val, opt) => { setBeneficiario(val); setBeneficiarioLabel(opt?.label ?? '') }}
-              options={beneficiarioOptions}
-              onSearch={setBeneficiarioQuery}
-              loading={suppliersLoading}
-              placeholder="Filtrar por proveedor…"
-            />
-          </FilterField>
-          <FilterField label="Estado">
-            <Select value={estado} onValueChange={(v) => setEstado(v as EstadoFilter)} clearable={false}>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="Reservado">Reservado</SelectItem>
-              <SelectItem value="Emitido">Emitido</SelectItem>
-              <SelectItem value="Cobrado">Cobrado</SelectItem>
-              <SelectItem value="Anulado">Anulado</SelectItem>
-            </Select>
-          </FilterField>
-          <FilterField label="Impreso">
-            <Select value={impreso} onValueChange={(v) => setImpreso(v as typeof impreso)} clearable={false}>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="yes">Impresos</SelectItem>
-              <SelectItem value="no">Sin imprimir</SelectItem>
-            </Select>
-          </FilterField>
-          <FilterField label="Desde">
-            <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} clearable />
-          </FilterField>
-          <FilterField label="Hasta">
-            <DatePicker className="ff-input" value={toDate} onChange={setToDate} clearable />
-          </FilterField>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
+              <FilterField label="Cuenta bancaria" style={{ width: 220 }}>
+                <CuentaBancariaSelect value={cuentaBancaria} onChange={setCuentaBancaria} placeholder="Todas las cuentas" />
+              </FilterField>
+              <FilterField label="Número de cheque">
+                <input
+                  className="ff-input"
+                  style={{ width: 140 }}
+                  placeholder="Buscar número…"
+                  value={chequeNo}
+                  onChange={(e) => setChequeNo(e.target.value)}
+                />
+              </FilterField>
+              <FilterField label="Beneficiario" style={{ width: 220 }}>
+                <SearchSelect
+                  value={beneficiario}
+                  selectedLabel={beneficiarioLabel}
+                  onChange={(val, opt) => { setBeneficiario(val); setBeneficiarioLabel(opt?.label ?? '') }}
+                  options={beneficiarioOptions}
+                  onSearch={setBeneficiarioQuery}
+                  loading={suppliersLoading}
+                  placeholder="Filtrar por proveedor…"
+                />
+              </FilterField>
+              <FilterField label="Estado">
+                <Select value={estado} onValueChange={(v) => setEstado(v as EstadoFilter)} clearable={false}>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="Reservado">Reservado</SelectItem>
+                  <SelectItem value="Emitido">Emitido</SelectItem>
+                  <SelectItem value="Cobrado">Cobrado</SelectItem>
+                  <SelectItem value="Anulado">Anulado</SelectItem>
+                </Select>
+              </FilterField>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+              <SlidersHorizontal size={13} />
+              Más filtros
+              {activeMoreFiltersCount > 0 && (
+                <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <SortableTh label="Fecha" sortKey="fecha" orderBy={orderBy} onSort={sort} />
@@ -189,6 +200,37 @@ export default function ChequesPage() {
           </div>
         )}
       </div>
+
+      <Drawer
+        open={moreFiltersOpen}
+        onClose={() => setMoreFiltersOpen(false)}
+        title="Más filtros"
+        subtitle="Refina la búsqueda de cheques"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={clearMoreFilters}>Limpiar</button>
+            <button className="btn btn-navy" onClick={() => setMoreFiltersOpen(false)}>Aplicar</button>
+          </>
+        }
+      >
+        <div className="ff-wrap">
+          <label className="ff-label">Impreso</label>
+          <Select value={impreso} onValueChange={(v) => setImpreso(v as typeof impreso)} clearable={false}>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="yes">Impresos</SelectItem>
+            <SelectItem value="no">Sin imprimir</SelectItem>
+          </Select>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Fecha</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} clearable />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker className="ff-input" value={toDate} onChange={setToDate} clearable />
+          </div>
+        </div>
+      </Drawer>
     </div>
   )
 }

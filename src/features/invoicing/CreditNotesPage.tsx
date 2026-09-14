@@ -20,13 +20,14 @@ import { listDepartamentos } from '@/shared/api/departamentos'
 import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo, EcfModificationCode } from '@/shared/api/types'
 import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
 import { Select, SelectItem } from '@/components/ui/select'
-import { Plus, Loader2, Wallet, ArrowRightLeft, ChevronDown, ChevronRight, Download } from 'lucide-react'
+import { Plus, Loader2, Wallet, ArrowRightLeft, ChevronDown, ChevronRight, Download, SlidersHorizontal } from 'lucide-react'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { esClienteEmisorNoEncontrado } from '@/lib/ecfErrors'
+import { formatDate, formatMoney } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -34,6 +35,7 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
+import { Drawer } from '@/shared/ui/Drawer'
 
 interface NoteItem {
   itemCode: string
@@ -64,6 +66,10 @@ interface CreditNoteRow {
   appliedAmount?: number
   availableAmount?: number
   appliedTo?: CreditNoteAppliedTo[]
+  /** Heredada automáticamente de la factura original — no hay selector de moneda en este
+   *  formulario (docs/tasks/64_multimoneda_completo.md §3.4). */
+  currency?: string
+  conversionRate?: number
 }
 
 interface NoteLineItem {
@@ -116,6 +122,7 @@ export default function CreditNotesPage() {
   const [grandTotalMax, setGrandTotalMax] = useState('')
   const [refundedAmountMin, setRefundedAmountMin] = useState('')
   const [refundedAmountMax, setRefundedAmountMax] = useState('')
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
@@ -283,6 +290,23 @@ export default function CreditNotesPage() {
   }))
   const notes = (Array.isArray(notesData) ? notesData : []) as unknown as CreditNoteRow[]
 
+  const activeMoreFiltersCount = [
+    ncfType, createdAtFrom, createdAtTo, postingDateFrom, postingDateTo,
+    grandTotalMin, grandTotalMax, refundedAmountMin, refundedAmountMax,
+  ].filter((v) => v !== '').length
+
+  function clearMoreFilters() {
+    setNcfType('')
+    setCreatedAtFrom('')
+    setCreatedAtTo('')
+    setPostingDateFrom('')
+    setPostingDateTo('')
+    setGrandTotalMin('')
+    setGrandTotalMax('')
+    setRefundedAmountMin('')
+    setRefundedAmountMax('')
+  }
+
   // Artículos de la factura original que aún no están en la nota (para poder re-agregarlos tras quitarlos)
   const availableToAdd = (selectedInvoiceDetail?.items ?? []).filter(
     (i) => !noteItems.some((n) => n.itemCode === i.itemCode),
@@ -298,15 +322,34 @@ export default function CreditNotesPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (dto: CreateCreditNoteDto) => createCreditNote(dto) as unknown as Promise<CreditNoteRow>,
-    onSuccess: async (note: CreditNoteRow) => {
+    // Se combinan crear+someter en un solo mutationFn (en vez de llamar submitCreditNote() dentro
+    // de onSuccess) porque un error lanzado en onSuccess de TanStack Query NO dispara onError —
+    // quedaría como una promesa rechazada sin manejar y la nota creada-pero-no-sometida no
+    // mostraría ningún error al usuario (bug encontrado durante las pruebas E2E de doc 72).
+    mutationFn: async (dto: CreateCreditNoteDto) => {
+      const note = (await createCreditNote(dto)) as unknown as CreditNoteRow
       await submitCreditNote(note.id)
-      queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
+      return note
+    },
+    onSuccess: () => {
       toast.success('Nota de crédito creada y sometida (NCF B04 asignado)')
       handleCloseModal()
     },
-    onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al crear la nota de crédito')
+    onError: (err: ApiError) => {
+      const msg = err?.message ?? 'Error al crear la nota de crédito'
+      if (esClienteEmisorNoEncontrado(msg)) {
+        toast.error(msg, {
+          duration: 10000,
+          action: { label: 'Ir a administración de e-CF', onClick: () => navigate('/config/ecf/admin') },
+        })
+        return
+      }
+      toast.error(msg)
+    },
+    onSettled: () => {
+      // También cuando falla el submit: la nota ya quedó creada (en Borrador) y debe verse en la
+      // lista aunque no se haya podido someter.
+      queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
     },
   })
 
@@ -378,7 +421,7 @@ export default function CreditNotesPage() {
   const applyInvoiceOptions: SearchSelectOption[] = (applyInvoicesData?.items ?? []).map((inv) => ({
     value: inv.id,
     label: inv.ncf ?? inv.id,
-    sublabel: `${formatDate(inv.postingDate)} — ${formatDOP(inv.grandTotal)} (${inv.status})`,
+    sublabel: `${formatDate(inv.postingDate)} — ${formatMoney(inv.grandTotal, inv.currency)} (${inv.status})`,
   }))
 
   // Para saber si applyTarget ya está aplicada a la factura seleccionada (evita el 409 del backend)
@@ -498,149 +541,76 @@ export default function CreditNotesPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Notas de Crédito</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Notas de Crédito</h1>
           <p className="page-sub">Gestiona devoluciones y ajustes (NCF B04)</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
+        <button className="btn btn-navy" onClick={() => setModalOpen(true)}>
           <Plus size={16} /> Nueva Nota de Crédito
         </button>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Cliente" style={{ width: 260 }}>
-            <SearchSelect
-              value={customerId}
-              selectedLabel={customerLabel}
-              onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
-              options={customerOptions}
-              onSearch={setCustomerQuery}
-              loading={customersLoading}
-              placeholder="Filtrar por cliente…"
-            />
-          </FilterField>
-          <FilterField label="Sucursal" style={{ width: 200 }}>
-            <SearchSelect
-              value={branch}
-              onChange={setBranch}
-              options={branchOptions}
-              onSearch={setBranchSearch}
-              selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
-              placeholder="Todas las sucursales"
-            />
-          </FilterField>
-          <FilterField label="Departamento" style={{ width: 200 }}>
-            <SearchSelect
-              value={department}
-              onChange={setDepartment}
-              options={departmentOptions}
-              onSearch={setDepartmentSearch}
-              selectedLabel={departamentos?.items.find((d) => d.id === department)?.name ?? ''}
-              placeholder="Todos los departamentos"
-            />
-          </FilterField>
-          <FilterField label="NCF">
-            <input
-              className="ff-input ff-input-sm"
-              style={{ width: 160 }}
-              placeholder="Buscar NCF…"
-              value={ncf}
-              onChange={(e) => setNcf(e.target.value)}
-            />
-          </FilterField>
-          <FilterField label="Tipo NCF" style={{ width: 200 }}>
-            <SearchSelect
-              value={ncfType}
-              onChange={setNcfType}
-              options={ncfTypeOptions}
-              onSearch={setNcfTypeSearch}
-              selectedLabel={catalogos?.ncfTypes?.find((t) => t.value === ncfType)?.label ?? ''}
-              placeholder="Todos los tipos NCF"
-            />
-          </FilterField>
-          <FilterField label="Creada desde">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={createdAtFrom}
-              onChange={setCreatedAtFrom}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Creada hasta">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={createdAtTo}
-              onChange={setCreatedAtTo}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Fecha desde">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={postingDateFrom}
-              onChange={setPostingDateFrom}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Fecha hasta">
-            <DatePicker
-              className="ff-input ff-input-sm"
-              value={postingDateTo}
-              onChange={setPostingDateTo}
-              style={{ width: 144 }}
-              clearable
-            />
-          </FilterField>
-          <FilterField label="Total">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Total mín."
-                value={grandTotalMin}
-                onChange={(e) => setGrandTotalMin(e.target.value)}
-              />
-              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Total máx."
-                value={grandTotalMax}
-                onChange={(e) => setGrandTotalMax(e.target.value)}
-              />
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Cliente" style={{ width: 260 }}>
+                <SearchSelect
+                  value={customerId}
+                  selectedLabel={customerLabel}
+                  onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
+                  options={customerOptions}
+                  onSearch={setCustomerQuery}
+                  loading={customersLoading}
+                  placeholder="Filtrar por cliente…"
+                />
+              </FilterField>
+              <FilterField label="Sucursal" style={{ width: 200 }}>
+                <SearchSelect
+                  value={branch}
+                  onChange={setBranch}
+                  options={branchOptions}
+                  onSearch={setBranchSearch}
+                  selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
+                  placeholder="Todas las sucursales"
+                />
+              </FilterField>
+              <FilterField label="Departamento" style={{ width: 200 }}>
+                <SearchSelect
+                  value={department}
+                  onChange={setDepartment}
+                  options={departmentOptions}
+                  onSearch={setDepartmentSearch}
+                  selectedLabel={departamentos?.items.find((d) => d.id === department)?.name ?? ''}
+                  placeholder="Todos los departamentos"
+                />
+              </FilterField>
+              <FilterField label="NCF">
+                <input
+                  className="ff-input ff-input-sm"
+                  style={{ width: 160 }}
+                  placeholder="Buscar NCF…"
+                  value={ncf}
+                  onChange={(e) => setNcf(e.target.value)}
+                />
+              </FilterField>
             </div>
-          </FilterField>
-          <FilterField label="Monto reembolsado">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Reemb. mín."
-                value={refundedAmountMin}
-                onChange={(e) => setRefundedAmountMin(e.target.value)}
-              />
-              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
-              <input
-                type="number"
-                className="ff-input ff-input-sm"
-                style={{ width: 100 }}
-                placeholder="Reemb. máx."
-                value={refundedAmountMax}
-                onChange={(e) => setRefundedAmountMax(e.target.value)}
-              />
-            </div>
-          </FilterField>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+              <SlidersHorizontal size={13} />
+              Más filtros
+              {activeMoreFiltersCount > 0 && (
+                <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table navy-table">
           <thead>
             <tr>
               <th style={{ width: 28 }} />
@@ -671,7 +641,7 @@ export default function CreditNotesPage() {
                   <div className="empty-state">
                     <div className="empty-title">Sin notas de crédito</div>
                     <p className="empty-sub">Crea una nota de crédito para procesar una devolución.</p>
-                    <button className="btn btn-primary btn-size-sm" onClick={() => setModalOpen(true)}>
+                    <button className="btn btn-navy btn-size-sm" onClick={() => setModalOpen(true)}>
                       <Plus size={14} /> Nueva Nota de Crédito
                     </button>
                   </div>
@@ -709,7 +679,7 @@ export default function CreditNotesPage() {
                   <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.returnAgainst}</td>
                   <td>{note.customerName ?? '—'}</td>
                   <td>{formatDate(note.postingDate)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(Math.abs(note.grandTotal ?? 0))}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(Math.abs(note.grandTotal ?? 0), note.currency)}</td>
                   <td>
                     <span className={`badge ${STATUS_BADGE[statusLower] ?? 'badge-neutral'}`}>
                       {STATUS_LABEL[statusLower] ?? note.status}
@@ -721,7 +691,7 @@ export default function CreditNotesPage() {
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         {note.refunded && (
-                          <span className="badge badge-success">Reembolsada: {formatDOP(note.refundedAmount ?? 0)}</span>
+                          <span className="badge badge-success">Reembolsada: {formatMoney(note.refundedAmount ?? 0, note.currency)}</span>
                         )}
                         {canAct && (
                           <>
@@ -768,7 +738,7 @@ export default function CreditNotesPage() {
                             >
                               {a.invoiceId}
                             </button>
-                            <span>— {formatDOP(a.amount)}</span>
+                            <span>— {formatMoney(a.amount, note.currency)}</span>
                             <span className={`badge ${a.status === 'reconciled' ? 'badge-success' : 'badge-warning'}`}>
                               {a.status === 'reconciled' ? 'Reconciliada' : 'Pendiente'}
                             </span>
@@ -785,6 +755,92 @@ export default function CreditNotesPage() {
           </tbody>
         </table>
       </div>
+      </div>
+
+      <Drawer
+        open={moreFiltersOpen}
+        onClose={() => setMoreFiltersOpen(false)}
+        title="Más filtros"
+        subtitle="Refina la búsqueda de notas de crédito"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={clearMoreFilters}>Limpiar</button>
+            <button className="btn btn-navy" onClick={() => setMoreFiltersOpen(false)}>Aplicar</button>
+          </>
+        }
+      >
+        <div className="ff-wrap">
+          <label className="ff-label">Tipo NCF</label>
+          <SearchSelect
+            value={ncfType}
+            onChange={setNcfType}
+            options={ncfTypeOptions}
+            onSearch={setNcfTypeSearch}
+            selectedLabel={catalogos?.ncfTypes?.find((t) => t.value === ncfType)?.label ?? ''}
+            placeholder="Todos los tipos NCF"
+          />
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Fecha de creación</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DatePicker className="ff-input" value={createdAtFrom} onChange={setCreatedAtFrom} clearable />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker className="ff-input" value={createdAtTo} onChange={setCreatedAtTo} clearable />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Fecha de emisión</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DatePicker className="ff-input" value={postingDateFrom} onChange={setPostingDateFrom} clearable />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <DatePicker className="ff-input" value={postingDateTo} onChange={setPostingDateTo} clearable />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Total</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Total mín."
+              value={grandTotalMin}
+              onChange={(e) => setGrandTotalMin(e.target.value)}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Total máx."
+              value={grandTotalMax}
+              onChange={(e) => setGrandTotalMax(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">Monto reembolsado</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Reemb. mín."
+              value={refundedAmountMin}
+              onChange={(e) => setRefundedAmountMin(e.target.value)}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>
+            <input
+              type="number"
+              className="ff-input"
+              placeholder="Reemb. máx."
+              value={refundedAmountMax}
+              onChange={(e) => setRefundedAmountMax(e.target.value)}
+            />
+          </div>
+        </div>
+      </Drawer>
 
       {modalOpen && (
         <div className="modal-overlay" onClick={crearClose.requestClose}>
@@ -815,7 +871,7 @@ export default function CreditNotesPage() {
                     <div style={{ marginTop: 4, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface-sunken)', fontSize: 13 }}>
                       <span style={{ fontWeight: 500 }}>{selectedInvoice.customerName}</span>
                       <span style={{ color: 'var(--text-secondary)', fontSize: 11, marginLeft: 8 }}>
-                        {selectedInvoice.ncf ?? selectedInvoice.id} — {formatDate(selectedInvoice.postingDate)} — {formatDOP(selectedInvoice.grandTotal)}
+                        {selectedInvoice.ncf ?? selectedInvoice.id} — {formatDate(selectedInvoice.postingDate)} — {formatMoney(selectedInvoice.grandTotal, selectedInvoice.currency)}
                       </span>
                     </div>
                   )}
@@ -903,8 +959,8 @@ export default function CreditNotesPage() {
                                   style={{ textAlign: 'right' }}
                                 />
                               </td>
-                              <td style={{ textAlign: 'right' }}>{formatDOP(item.rate)}</td>
-                              <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.qty * item.rate)}</td>
+                              <td style={{ textAlign: 'right' }}>{formatMoney(item.rate, selectedInvoice?.currency)}</td>
+                              <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.qty * item.rate, selectedInvoice?.currency)}</td>
                               <td>
                                 <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeNoteItem(index)}>✕</button>
                               </td>
@@ -915,7 +971,7 @@ export default function CreditNotesPage() {
                       <div className="items-total-row">
                         <div className="items-total-line" style={{ fontWeight: 700 }}>
                           <span>Total crédito</span>
-                          <span>{formatDOP(noteItems.reduce((s, i) => s + i.qty * i.rate, 0))}</span>
+                          <span>{formatMoney(noteItems.reduce((s, i) => s + i.qty * i.rate, 0), selectedInvoice?.currency)}</span>
                         </div>
                       </div>
                     </div>
@@ -955,7 +1011,7 @@ export default function CreditNotesPage() {
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                {refundTarget.id} — Total disponible: {formatDOP(Math.abs(refundTarget.grandTotal ?? 0))}
+                {refundTarget.id} — Total disponible: {formatMoney(Math.abs(refundTarget.grandTotal ?? 0), refundTarget.currency)}
               </p>
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="refundAmount">Monto a reembolsar</label>
@@ -970,7 +1026,7 @@ export default function CreditNotesPage() {
                   onChange={(e) => setRefundAmount(parseFloat(e.target.value) || 0)}
                 />
                 {!refundAmountValid && (
-                  <p className="ff-hint" style={{ color: 'red' }}>El monto debe ser mayor a 0 y no exceder {formatDOP(Math.abs(refundTarget.grandTotal ?? 0))}</p>
+                  <p className="ff-hint" style={{ color: 'red' }}>El monto debe ser mayor a 0 y no exceder {formatMoney(Math.abs(refundTarget.grandTotal ?? 0), refundTarget.currency)}</p>
                 )}
               </div>
               <div className="ff-wrap">
@@ -1040,7 +1096,7 @@ export default function CreditNotesPage() {
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                {applyTarget.id} — Total de la nota: {formatDOP(Math.abs(applyTarget.grandTotal ?? 0))}
+                {applyTarget.id} — Total de la nota: {formatMoney(Math.abs(applyTarget.grandTotal ?? 0), applyTarget.currency)}
               </p>
 
               <div className="ff-wrap">
@@ -1070,7 +1126,7 @@ export default function CreditNotesPage() {
                 <div className="inline-alert" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Wallet size={16} />
                   <span>
-                    Esta nota ya está aplicada a esta factura por {formatDOP(alreadyAppliedToSelected.amount)}
+                    Esta nota ya está aplicada a esta factura por {formatMoney(alreadyAppliedToSelected.amount, applyTarget?.currency)}
                     {' '}
                     <span className={`badge ${alreadyAppliedToSelected.status === 'reconciled' ? 'badge-success' : 'badge-warning'}`}>
                       {alreadyAppliedToSelected.status === 'reconciled' ? 'Reconciliada' : 'Pendiente'}

@@ -14,7 +14,7 @@ import type {
 
 export interface ListEcfRecibidosParams extends PaginationParams {
   search?: string
-  /** Estado DGII del voucher en Aura. */
+  /** Estado DGII del voucher en Vega. */
   estado?: EcfStatusDgii
   /** RNC/Cédula del emisor (contraparte). */
   rnc?: string

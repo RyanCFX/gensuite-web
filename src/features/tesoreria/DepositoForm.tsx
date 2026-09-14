@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { AlertTriangle, ArrowLeft } from 'lucide-react'
 import { createDeposito, getDepositosPendientes, listTiposDocumento } from '@/shared/api/tesoreria'
+import { getFacturacionConfig } from '@/shared/api/config'
 import type { CreateDepositoDto, CuentaBancaria, TesoreriaLinea, TesoreriaLiquidacion } from '@/shared/api/types'
 import { CuentaBancariaSelect } from './components/CuentaBancariaSelect'
 import { PartySelect } from './components/PartySelect'
@@ -60,6 +61,17 @@ export default function DepositoForm() {
   const [branch, setBranch] = useState('')
   const [branchSearch, setBranchSearch] = useState('')
   const [department, setDepartment] = useState('')
+
+  // ── Multimoneda (docs/tasks/64_multimoneda_completo.md §5.2) ──────────────
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
+  const [showMonedaOptions, setShowMonedaOptions] = useState(false)
+  const [conversionRate, setConversionRate] = useState<number | ''>('')
+  const [bankConversionRate, setBankConversionRate] = useState<number | ''>('')
 
   const { data: tiposData } = useQuery({
     queryKey: ['tesoreria-tipos-documento-form-deposito'],
@@ -148,6 +160,8 @@ export default function DepositoForm() {
     nota,
     branch,
     department,
+    conversionRate,
+    bankConversionRate,
   }, true)
   useBeforeUnloadWarning(isDirty)
 
@@ -196,6 +210,8 @@ export default function DepositoForm() {
       department: department || undefined,
       cuentaBancoOverride: cuentaBancoOverride || undefined,
       cuentaPartyOverride: tieneOrigen && cuentaPartyOverride ? cuentaPartyOverride : undefined,
+      conversionRate: conversionRate === '' ? undefined : conversionRate,
+      bankConversionRate: bankConversionRate === '' ? undefined : bankConversionRate,
     }
 
     createMutation.mutate(dto)
@@ -251,6 +267,46 @@ export default function DepositoForm() {
                 <input className="ff-input" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
               </div>
             </div>
+
+            {multimonedaHabilitada && (
+              <div className="ff-wrap">
+                {!showMonedaOptions ? (
+                  <button type="button" className="btn btn-ghost btn-size-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setShowMonedaOptions(true)}>
+                    Mostrar opciones de moneda
+                  </button>
+                ) : (
+                  <>
+                    <label className="ff-label">Opciones de moneda (avanzado)</label>
+                    <div className="form-row form-row-3">
+                      <div className="ff-wrap">
+                        <label className="ff-label">Tasa de cambio (origen → base)</label>
+                        <input
+                          type="number"
+                          min="0.0001"
+                          step="0.0001"
+                          className="ff-input"
+                          placeholder="Déjelo vacío para usar la configurada"
+                          value={conversionRate}
+                          onChange={(e) => setConversionRate(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        />
+                      </div>
+                      <div className="ff-wrap">
+                        <label className="ff-label">Tasa de cambio al banco</label>
+                        <input
+                          type="number"
+                          min="0.0001"
+                          step="0.0001"
+                          className="ff-input"
+                          placeholder="Solo si no hay tasa cargada"
+                          value={bankConversionRate}
+                          onChange={(e) => setBankConversionRate(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -306,6 +362,7 @@ export default function DepositoForm() {
                     ? `Si no distribuyes manualmente, se usará "${tipoDocumentoObj.defaultOffsetAccount}" como contrapartida.`
                     : 'La suma de las líneas debe igualar el monto total.'
                 }
+                showTasa={multimonedaHabilitada}
               />
             )}
           </div>
@@ -323,7 +380,7 @@ export default function DepositoForm() {
               helpText={
                 tieneOrigen
                   ? 'Estas deducciones reducen el saldo disponible para aplicar a facturas, no el monto que entra al banco (que siempre es el monto bruto).'
-                  : 'Estas deducciones se restan del monto que efectivamente entra al banco.'
+                  : `Estas deducciones se restan del monto que efectivamente entra al banco. Deben estar en cuentas de la misma moneda que la cuenta bancaria elegida${cuentaBancariaObj?.currency ? ` (${cuentaBancariaObj.currency})` : ''} — una cuenta en otra moneda es rechazada al guardar.`
               }
             />
             {!tieneOrigen && deducciones.length > 0 && (

@@ -10,6 +10,8 @@ import { listSuppliers, getSupplier } from '@/shared/api/suppliers'
 import type { CreateGastoDto, DistribucionCuentaDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { getCatalogosFiscales, getFacturacionConfig, getCuentasEmpresa, listImpuestosCompras } from '@/shared/api/config'
+import { listMonedas, getTasaVigente } from '@/shared/api/monedas'
+import type { MonedaCode } from '@/shared/api/types'
 import { getCuenta } from '@/shared/api/cuentas'
 import { CATEGORIA_GASTO } from '@/lib/constants'
 import { listRetenciones } from '@/shared/api/retenciones'
@@ -158,6 +160,31 @@ export default function GastoForm() {
     staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
+  const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
+  const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
+
+  // ── Multimoneda (docs/tasks/60_multimoneda_dop_usd_eur.md §4) ──────────────
+  const [selectedCurrency, setSelectedCurrency] = useState('')
+  const [conversionRate, setConversionRate] = useState<number | ''>('')
+  const { data: monedas } = useQuery({
+    queryKey: ['monedas'],
+    queryFn: listMonedas,
+    enabled: multimonedaHabilitada,
+    staleTime: 5 * 60_000,
+  })
+  const monedasHabilitadasOptions = (monedas ?? []).filter((m) => m.habilitada)
+  const { data: tasaVigente } = useQuery({
+    queryKey: ['monedas-tasa-vigente', selectedCurrency, monedaBase],
+    queryFn: () => getTasaVigente({ from: selectedCurrency as MonedaCode, to: monedaBase as MonedaCode }),
+    enabled: !!selectedCurrency && selectedCurrency !== monedaBase,
+    retry: false,
+  })
+  useEffect(() => {
+    if (selectedCurrency && selectedCurrency !== monedaBase && tasaVigente && conversionRate === '') {
+      setConversionRate(tasaVigente.tasa)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasaVigente])
 
   const { data: cuentasEmpresa } = useQuery({
     queryKey: ['cuentas-empresa'],
@@ -643,6 +670,10 @@ export default function GastoForm() {
       branch: branch || undefined,
       department: usaDepartamentos ? (department || undefined) : undefined,
       taxesTemplate: taxesTemplate.length > 0 ? taxesTemplate : undefined,
+      currency: multimonedaHabilitada && selectedCurrency ? selectedCurrency : undefined,
+      conversionRate: multimonedaHabilitada && selectedCurrency && selectedCurrency !== monedaBase && conversionRate !== ''
+        ? conversionRate
+        : undefined,
     }
     saveMutation.mutate(dto)
   }
@@ -772,6 +803,35 @@ export default function GastoForm() {
                   <div className="ff-wrap">
                     <label className="ff-label">Departamento</label>
                     <DepartmentSelect id="department" value={department} onChange={setDepartment} />
+                  </div>
+                )}
+                {multimonedaHabilitada && (
+                  <div className="ff-wrap">
+                    <label className="ff-label">Moneda</label>
+                    <Select
+                      value={selectedCurrency || monedaBase}
+                      onValueChange={(val) => { setSelectedCurrency(val === monedaBase ? '' : val); setConversionRate('') }}
+                    >
+                      <SelectItem value={monedaBase}>{monedaBase}</SelectItem>
+                      {monedasHabilitadasOptions.filter((m) => m.code !== monedaBase).map((m) => (
+                        <SelectItem key={m.code} value={m.code}>{m.code}</SelectItem>
+                      ))}
+                    </Select>
+                  </div>
+                )}
+                {multimonedaHabilitada && selectedCurrency && selectedCurrency !== monedaBase && (
+                  <div className="ff-wrap">
+                    <label className="ff-label">Tasa de cambio</label>
+                    <input
+                      type="number"
+                      min="0.0001"
+                      step="0.0001"
+                      className="ff-input"
+                      placeholder="Tasa del día (según config.)"
+                      value={conversionRate}
+                      onChange={(e) => setConversionRate(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                    />
+                    <p className="ff-hint">Si la dejas vacía, el backend resuelve la tasa contra las tasas cargadas.</p>
                   </div>
                 )}
               </div>

@@ -106,7 +106,7 @@ export function dgiiUomLabel(codigo: string): string {
   return entry ? `${entry.codigo} — ${entry.abreviatura} — ${entry.medida}` : codigo
 }
 
-/** Ambientes de emisión e-CF (Aura). */
+/** Ambientes de emisión e-CF (Vega). */
 export const ECF_ENV_LABELS: Record<string, string> = {
   TesteCF: 'Pruebas (TesteCF)',
   CerteCF: 'Certificación (CerteCF)',

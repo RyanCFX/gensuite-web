@@ -52,6 +52,10 @@ export const DEFAULT_TABLE_COLUMNS = [
   { key: 'precio' as const, label: 'Precio', visible: true },
   { key: 'itbis' as const, label: 'ITBIS', visible: false },
   { key: 'total' as const, label: 'Total', visible: true },
+  // Vertical farmacia: cada fila de `items.tabla` trae además `coberturaArs` y `montoPaciente`
+  // (`null` sin aseguradora). Nacen ocultas — el usuario las activa en la plantilla de farmacia.
+  { key: 'coberturaArs' as const, label: 'ARS', visible: false },
+  { key: 'montoPaciente' as const, label: 'Paciente', visible: false },
 ]
 
 export const CONDITION_OPERATOR_LABELS: Record<string, string> = {

@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { usePermissionsStore } from '@/stores/permissions.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTabs } from '@/contexts/TabsContext'
 import { toast } from 'sonner'
 import { Permitido } from '@/components/shared/Permitido'
+import { EcfTabs } from '@/shared/ui/EcfTabs'
+import { ImpuestosTabs } from '@/shared/ui/ImpuestosTabs'
 import axios from 'axios'
 import {
   getCobrosConfig, updateCobrosConfig,
@@ -20,6 +23,9 @@ import {
   getFacturacionConfig, updateFacturacionConfig,
   listDenominaciones, createDenominacion, updateDenominacion,
   habilitarPos,
+  deshabilitarPos,
+  habilitarDespacho,
+  deshabilitarDespacho,
   habilitarFarmacia,
   getEcfConfig, updateEcfConfig,
 } from '@/shared/api/config'
@@ -27,17 +33,17 @@ import { listSucursales } from '@/shared/api/sucursales'
 import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { listCustomerGroups, createCustomerGroup, deleteCustomerGroup } from '@/shared/api/customers'
 import { listRoles } from '@/shared/api/usuarios'
-import type { CobrosConfig, MetodoPago, TaxLineCategory, TasaImpuesto, TasaImpuestoComponente, CreateTasaImpuestoDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError, UpdateAlmacenDto, FormatoImpresion, EcfTipoElectronico } from '@/shared/api/types'
+import type { CobrosConfig, MetodoPago, TaxLineCategory, TasaImpuesto, TasaImpuestoComponente, CreateTasaImpuestoDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError, UpdateAlmacenDto, FormatoImpresion, EcfTipoElectronico, PosDeshabilitarBloqueos, HabilitarFarmaciaResult, DesactivarDespachoBloqueos } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
-import { ConfirmModal } from '@/shared/ui/Modal'
+import { ConfirmModal, Modal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { formatDate } from '@/lib/formatters'
-import { Plus, Trash2, Save, FileWarning, X, Pencil, ChevronLeft, ChevronRight, Info, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, Save, FileWarning, X, Pencil, ChevronLeft, ChevronRight, Info, ChevronDown, Check } from 'lucide-react'
 import EjercicioFiscalSection from './EjercicioFiscalSection'
 import { DGII_UOM_CODES, dgiiUomLabel, ECF_TIPOS, TIPO_PAGO_DEFAULT_OPTIONS, TIPO_INGRESOS_DEFAULT_OPTIONS } from '@/lib/dgii'
 
@@ -1995,31 +2001,124 @@ const PRICE_TIER_OPTIONS = [
 ]
 
 // Solo se registra en el menú si vertical === "farmacia" (ver AppLayout.tsx); si alguien entra
-// directo por URL en un tenant general, el propio POST responde 403 (docs/FARMACIA_ARS_FRONTEND.md §2.2).
+// directo por URL en un tenant general, el propio POST responde 403.
+// El backend NO expone un GET de estado del vertical (docs/PROMPT_FARMACIA_V2_FRONTEND.md §9):
+// el checklist es una lista de tareas para el admin, no un diagnóstico en vivo.
+const LINK_STYLE: React.CSSProperties = { color: 'var(--color-brand)', textDecoration: 'underline' }
+
+/** Fila de resultado del provisionamiento — se omite si el backend no devolvió ese campo. */
+function ResultadoFarmacia({ label, valor }: { label: string; valor?: string }) {
+  if (!valor) return null
+  return (
+    <div className="detail-field">
+      <span className="detail-label">{label}</span>
+      <span className="detail-value" style={{ fontFamily: 'monospace', fontSize: 12 }}>{valor}</span>
+    </div>
+  )
+}
+
 function FarmaciaArsConfigSection() {
+  const esFarmacia = usePermissionsStore((s) => s.vertical) === 'farmacia'
+  const [resultado, setResultado] = useState<HabilitarFarmaciaResult | null>(null)
+
   const habilitarMutation = useMutation({
     mutationFn: habilitarFarmacia,
-    onSuccess: () => toast.success('Farmacia ARS habilitada/reparada correctamente'),
+    onSuccess: (data) => {
+      setResultado(data)
+      toast.success('Farmacia ARS habilitada/reparada correctamente')
+    },
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al habilitar Farmacia ARS'),
   })
 
+  const checklist: { texto: React.ReactNode; hecho?: boolean }[] = [
+    {
+      texto: <>Vertical <strong>farmacia</strong> fijado por el operador para tu empresa.</>,
+      hecho: esFarmacia,
+    },
+    {
+      texto: <>Ejecutar <strong>Habilitar / Reparar</strong> (el botón de abajo) — idempotente.</>,
+      hecho: habilitarMutation.isSuccess || undefined,
+    },
+    {
+      texto: (
+        <>
+          Dar de alta las ARS en{' '}
+          <Link to="/farmacia/aseguradoras" style={LINK_STYLE}>Aseguradoras</Link>{' '}
+          (nacen con crédito fiscal, precondición para facturar el lote consolidado).
+        </>
+      ),
+    },
+    {
+      texto: (
+        <>
+          Medicamentos con plantilla de impuesto <strong>exenta</strong> (Ley 253-12) y creados como{' '}
+          <em>producto</em> desde el catálogo del sistema — nunca creados a mano por fuera de este
+          catálogo, o no aparecen en los selectores.
+        </>
+      ),
+    },
+    {
+      texto: (
+        <>
+          Rangos NCF/e-NCF para <strong>B02/E32</strong> (paciente), <strong>B01/E31</strong>{' '}
+          (consolidada a la ARS) y <strong>B04/E34</strong> (notas de crédito) en{' '}
+          <Link to="/config/ecf" style={LINK_STYLE}>Configuración → e-CF</Link>
+          .
+        </>
+      ),
+    },
+    {
+      texto: <>Usuarios con sus perfiles normales (Ventas, Cajero POS, Contabilidad).</>,
+    },
+  ]
+
   return (
-    <div className="ff-wrap">
-      <label className="ff-label">Farmacia ARS</label>
-      <p className="ff-hint" style={{ marginBottom: 8 }}>
-        Provisiona (de forma idempotente) la cuenta puente contable, el modo de pago "Cobertura ARS",
-        el grupo de clientes "ARS" y los perfiles de rol Dependiente/Cajera Farmacia. Puede ejecutarse
-        varias veces sin riesgo — útil si algo quedó a medias en un intento anterior.
-      </p>
-      <Permitido accion="config.farmacia.habilitar">
-        <button
-          className="btn btn-secondary btn-size-sm"
-          onClick={() => habilitarMutation.mutate()}
-          disabled={habilitarMutation.isPending}
-        >
-          {habilitarMutation.isPending ? 'Procesando…' : 'Habilitar / Reparar'}
-        </button>
-      </Permitido>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="ff-wrap">
+        <label className="ff-label">Puesta en marcha de Farmacia ARS</label>
+        <p className="ff-hint" style={{ marginBottom: 10 }}>
+          La cobertura de la aseguradora vive dentro de la factura de venta normal: no hay pantallas
+          de preaprobación ni de despacho. Esta es la lista de tareas para dejar el vertical operativo.
+        </p>
+        <ol style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+          {checklist.map((item, i) => (
+            <li key={i} style={{ lineHeight: 1.5 }}>
+              {item.hecho === true && <Check size={13} style={{ color: 'var(--success-text)', marginRight: 4, verticalAlign: 'middle' }} />}
+              {item.texto}
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div className="ff-wrap">
+        <label className="ff-label">Habilitar / Reparar configuración</label>
+        <p className="ff-hint" style={{ marginBottom: 8 }}>
+          Provisiona (de forma idempotente) la cuenta puente contable, el modo de pago "Cobertura ARS",
+          el grupo de clientes "ARS", los perfiles de rol, el ítem de reclasificación del lote y la
+          plantilla de impresión "Factura Farmacia". Puede ejecutarse varias veces sin riesgo — útil
+          si algo quedó a medias en un intento anterior.
+        </p>
+        <Permitido accion="config.farmacia.habilitar">
+          <button
+            className="btn btn-secondary btn-size-sm"
+            onClick={() => habilitarMutation.mutate()}
+            disabled={habilitarMutation.isPending}
+          >
+            {habilitarMutation.isPending ? 'Procesando…' : 'Habilitar / Reparar'}
+          </button>
+        </Permitido>
+
+        {resultado && Object.values(resultado).some(Boolean) && (
+          <div className="fields-grid" style={{ marginTop: 14 }}>
+            <ResultadoFarmacia label="Cuenta CxC ARS provisional" valor={resultado.cuentaCxcArsProvisional} />
+            <ResultadoFarmacia label='Modo de pago "Cobertura ARS"' valor={resultado.modoPagoCoberturaArs} />
+            <ResultadoFarmacia label='Grupo de clientes "ARS"' valor={resultado.customerGroupArs} />
+            <ResultadoFarmacia label="Ítem de cobertura del lote" valor={resultado.itemCoberturaLote} />
+            <ResultadoFarmacia label="Rol dispensador de controlados" valor={resultado.rolDispensadorControlados} />
+            <ResultadoFarmacia label="Plantilla de factura" valor={resultado.plantillaFactura} />
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -2238,6 +2337,10 @@ function FacturacionConfigSection() {
   const [plantillaImpuestoComprasDefault, setPlantillaImpuestoComprasDefault] = useState('')
   const [showPosActivar, setShowPosActivar] = useState(false)
   const [posWarehouse, setPosWarehouse] = useState('')
+  const [showDeshabilitarPosConfirm, setShowDeshabilitarPosConfirm] = useState(false)
+  const [posBloqueos, setPosBloqueos] = useState<PosDeshabilitarBloqueos | null>(null)
+  const [showDeshabilitarDespachoConfirm, setShowDeshabilitarDespachoConfirm] = useState(false)
+  const [despachoBloqueos, setDespachoBloqueos] = useState<DesactivarDespachoBloqueos | null>(null)
    const [arqueoEfectivoRequerido, setArqueoEfectivoRequerido] = useState(false)
    const [formatoImpresionDefault, setFormatoImpresionDefault] = useState<FormatoImpresion>("a4")
    const [formatosPermitidos, setFormatosPermitidos] = useState<FormatoImpresion[]>(ALL_FORMATOS_IMPRESION)
@@ -2247,6 +2350,12 @@ function FacturacionConfigSection() {
    const [modosPagoConciliar, setModosPagoConciliar] = useState<string[]>([])
    const [rolesCierreCajaAjena, setRolesCierreCajaAjena] = useState<string[]>([])
    const [redondearTotales, setRedondearTotales] = useState(true)
+   const [tasaFijaCxc, setTasaFijaCxc] = useState(false)
+   const [tasaFijaCxp, setTasaFijaCxp] = useState(false)
+   const [permitirPagoMonedaDistintaBanco, setPermitirPagoMonedaDistintaBanco] = useState(false)
+   const [tasasActualizacionAutomatica, setTasasActualizacionAutomatica] = useState(false)
+   const [tasasHoraActualizacion, setTasasHoraActualizacion] = useState('06:00')
+   const [tasasProveedor, setTasasProveedor] = useState<'Banco Central RD' | 'Currency Exchange Settings'>('Banco Central RD')
 
    useEffect(() => {
      if (data) {
@@ -2267,6 +2376,12 @@ function FacturacionConfigSection() {
         setModosPagoConciliar(data.modosPagoConciliar ?? [])
         setRolesCierreCajaAjena(data.rolesCierreCajaAjena ?? [])
         setRedondearTotales(!(data.redondeoTotalDeshabilitado ?? false))
+        setTasaFijaCxc(data.tasaFijaCxc ?? false)
+        setTasaFijaCxp(data.tasaFijaCxp ?? false)
+        setPermitirPagoMonedaDistintaBanco(data.permitirPagoMonedaDistintaBanco ?? false)
+        setTasasActualizacionAutomatica(data.tasasActualizacionAutomatica ?? false)
+        setTasasHoraActualizacion(data.tasasHoraActualizacion ?? '06:00')
+        setTasasProveedor(data.tasasProveedor ?? 'Banco Central RD')
       }
     }, [data])
 
@@ -2323,6 +2438,50 @@ function FacturacionConfigSection() {
     },
   })
 
+  const deshabilitarPosMutation = useMutation({
+    mutationFn: () => deshabilitarPos(),
+    onSuccess: () => {
+      toast.success('Módulo POS desactivado')
+      setShowDeshabilitarPosConfirm(false)
+      queryClient.invalidateQueries({ queryKey: ['facturacion-config'] })
+    },
+    onError: (err: ApiError) => {
+      setShowDeshabilitarPosConfirm(false)
+      if (err?.statusCode === 409 && err.details) {
+        setPosBloqueos(err.details as unknown as PosDeshabilitarBloqueos)
+        return
+      }
+      toast.error(err?.message ?? 'Error al desactivar el módulo POS')
+    },
+  })
+
+  // Idempotente del lado servidor — no hace falta lógica extra si el usuario hace doble click.
+  const habilitarDespachoMutation = useMutation({
+    mutationFn: () => habilitarDespacho(),
+    onSuccess: (res) => {
+      toast.success(res.message)
+      queryClient.invalidateQueries({ queryKey: ['facturacion-config'] })
+    },
+    onError: (err: ApiError) => toast.error(err?.message ?? 'Error al activar el despacho'),
+  })
+
+  const deshabilitarDespachoMutation = useMutation({
+    mutationFn: () => deshabilitarDespacho(),
+    onSuccess: (res) => {
+      toast.success(res.message)
+      setShowDeshabilitarDespachoConfirm(false)
+      queryClient.invalidateQueries({ queryKey: ['facturacion-config'] })
+    },
+    onError: (err: ApiError) => {
+      setShowDeshabilitarDespachoConfirm(false)
+      if (err?.statusCode === 409 && err.details) {
+        setDespachoBloqueos(err.details as unknown as DesactivarDespachoBloqueos)
+        return
+      }
+      toast.error(err?.message ?? 'Error al desactivar el despacho')
+    },
+  })
+
   if (isLoading) return <span className="skeleton-box" style={{ height: 200, display: 'block' }} />
 
   function toggleRole(name: string) {
@@ -2355,7 +2514,7 @@ function FacturacionConfigSection() {
         <div className="ff-wrap">
           <label className="ff-label">Roles autorizados para cancelar facturas sometidas</label>
           <p className="ff-hint" style={{ marginBottom: 8 }}>
-            Solo usuarios con alguno de estos roles de ERPNext pueden cancelar una factura ya sometida (con NCF asignado).
+            Solo usuarios con alguno de estos roles pueden cancelar una factura ya sometida (con NCF asignado).
           </p>
           <div style={{
             display: 'grid',
@@ -2503,15 +2662,22 @@ function FacturacionConfigSection() {
           </p>
 
           {data?.usaModuloPos ? (
-            <div className="inline-alert inline-alert-success" style={{ alignItems: 'flex-start' }}>
-              <span>
-                Módulo POS activo.
-                {data.posProfileDefault && (
-                  <>
-                    {' '}Perfil: <strong>{data.posProfileDefault}</strong>
-                  </>
-                )}
-              </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
+              <div className="inline-alert inline-alert-success" style={{ alignItems: 'flex-start' }}>
+                <span>
+                  Módulo POS activo.
+                  {data.posProfileDefault && (
+                    <>
+                      {' '}Perfil: <strong>{data.posProfileDefault}</strong>
+                    </>
+                  )}
+                </span>
+              </div>
+              <Permitido accion="config.pos.deshabilitar">
+                <button className="btn btn-secondary btn-size-sm" onClick={() => setShowDeshabilitarPosConfirm(true)}>
+                  Desactivar módulo POS
+                </button>
+              </Permitido>
             </div>
           ) : !showPosActivar ? (
             <button className="btn btn-secondary btn-size-sm" onClick={() => setShowPosActivar(true)}>
@@ -2547,6 +2713,37 @@ function FacturacionConfigSection() {
                 </button>
               </div>
             </div>
+          )}
+        </div>
+
+        <div className="ff-wrap" style={{ borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
+          <label className="ff-label">Despacho (Delivery Note)</label>
+          <p className="ff-hint" style={{ marginBottom: 8 }}>
+            Separa la entrega física de inventario de la factura. Al activarlo, las facturas nuevas
+            dejan de descontar inventario; la salida física se registra con un despacho (Delivery Note).
+          </p>
+
+          {data?.despachoHabilitado ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
+              <div className="inline-alert inline-alert-success" style={{ alignItems: 'flex-start' }}>
+                <span>Despacho activado.</span>
+              </div>
+              <Permitido accion="config.despacho.deshabilitar">
+                <button className="btn btn-secondary btn-size-sm" onClick={() => setShowDeshabilitarDespachoConfirm(true)}>
+                  Desactivar
+                </button>
+              </Permitido>
+            </div>
+          ) : (
+            <Permitido accion="config.despacho.habilitar">
+              <button
+                className="btn btn-secondary btn-size-sm"
+                onClick={() => habilitarDespachoMutation.mutate()}
+                disabled={habilitarDespachoMutation.isPending}
+              >
+                {habilitarDespachoMutation.isPending ? 'Activando…' : 'Activar'}
+              </button>
+            </Permitido>
           )}
         </div>
 
@@ -2658,7 +2855,7 @@ function FacturacionConfigSection() {
            <div className="ff-wrap">
              <label className="ff-label">Roles autorizados para cerrar cajas de otros usuarios</label>
              <p className="ff-hint" style={{ marginBottom: 8 }}>
-               Solo usuarios con alguno de estos roles de ERPNext pueden cerrar el turno de OTRO cajero
+               Solo usuarios con alguno de estos roles pueden cerrar el turno de OTRO cajero
                (mismas validaciones que cerrar el propio turno). Si esta lista queda vacía, nadie puede cerrar
                turnos ajenos — es el comportamiento por defecto.
              </p>
@@ -2751,6 +2948,110 @@ function FacturacionConfigSection() {
           />
         </div>
 
+        <hr style={{ border: 'none', borderTop: '1px solid var(--border-default)', margin: '4px 0' }} />
+
+        <div className="ff-wrap">
+          <label className="ff-label" style={{ fontSize: 14, fontWeight: 600 }}>Multimoneda</label>
+          <p className="ff-hint" style={{ marginBottom: 12 }}>
+            Moneda base: <strong>{data?.monedaBase ?? 'DOP'}</strong> (no editable) — Monedas habilitadas:{' '}
+            <strong>{(data?.monedasHabilitadas ?? ['DOP']).join(', ')}</strong>{' '}
+            — <Link to="/config/monedas">gestionar monedas y tasas</Link>
+          </p>
+
+          {!data?.multimonedaHabilitada && (
+            <p className="ff-hint" style={{ color: 'var(--warning-text, #b45309)', marginBottom: 12 }}>
+              Habilite USD o EUR primero (en <Link to="/config/monedas">Monedas</Link>) para poder configurar tasa fija u otras opciones de multimoneda.
+            </p>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, opacity: data?.multimonedaHabilitada ? 1 : 0.5 }}>
+            <label className="ff-check-wrap" style={{ cursor: data?.multimonedaHabilitada ? 'pointer' : 'default' }}>
+              <input
+                type="checkbox"
+                className="ff-check"
+                checked={tasaFijaCxc}
+                disabled={!data?.multimonedaHabilitada}
+                onChange={(e) => setTasaFijaCxc(e.target.checked)}
+              />
+              <span style={{ fontSize: 13 }}>
+                Tasa Fija en Cuentas por Cobrar
+                <br />
+                <span className="td-muted" style={{ fontSize: 12 }}>
+                  Al cobrar una factura en moneda extranjera, usar siempre la tasa con la que se emitió, no la tasa del día.
+                </span>
+              </span>
+            </label>
+
+            <label className="ff-check-wrap" style={{ cursor: data?.multimonedaHabilitada ? 'pointer' : 'default' }}>
+              <input
+                type="checkbox"
+                className="ff-check"
+                checked={tasaFijaCxp}
+                disabled={!data?.multimonedaHabilitada}
+                onChange={(e) => setTasaFijaCxp(e.target.checked)}
+              />
+              <span style={{ fontSize: 13 }}>Tasa Fija en Cuentas por Pagar</span>
+            </label>
+
+            <label className="ff-check-wrap" style={{ cursor: data?.multimonedaHabilitada ? 'pointer' : 'default' }}>
+              <input
+                type="checkbox"
+                className="ff-check"
+                checked={permitirPagoMonedaDistintaBanco}
+                disabled={!data?.multimonedaHabilitada}
+                onChange={(e) => setPermitirPagoMonedaDistintaBanco(e.target.checked)}
+              />
+              <span style={{ fontSize: 13 }}>
+                Permitir pago en moneda distinta a la cuenta bancaria
+                <br />
+                <span className="td-muted" style={{ fontSize: 12 }}>
+                  Ej. transferir 2,000 DOP a una cuenta que opera en dólares.
+                </span>
+              </span>
+            </label>
+
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border-default)', margin: '4px 0' }} />
+
+            <label className="ff-check-wrap">
+              <input
+                type="checkbox"
+                className="ff-check"
+                checked={tasasActualizacionAutomatica}
+                onChange={(e) => setTasasActualizacionAutomatica(e.target.checked)}
+              />
+              <span style={{ fontSize: 13 }}>Actualización automática de tasas</span>
+            </label>
+
+            {tasasActualizacionAutomatica && (
+              <div className="form-row form-row-3">
+                <div className="ff-wrap">
+                  <label className="ff-label">Hora</label>
+                  <input
+                    type="time"
+                    className="ff-input"
+                    value={tasasHoraActualizacion}
+                    onChange={(e) => setTasasHoraActualizacion(e.target.value)}
+                  />
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label">Proveedor</label>
+                  <Select value={tasasProveedor} onValueChange={(v) => setTasasProveedor(v as typeof tasasProveedor)}>
+                    <SelectItem value="Banco Central RD">Banco Central RD</SelectItem>
+                    <SelectItem value="Currency Exchange Settings">Currency Exchange Settings</SelectItem>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            <p className="ff-hint" style={{ margin: 0 }}>
+              Última actualización: {data?.tasasUltimaActualizacion ? formatDate(data.tasasUltimaActualizacion) : 'nunca'}
+              {data?.tasasUltimoError && (
+                <><br /><span style={{ color: 'var(--error-text)' }}>Último error: {data.tasasUltimoError}</span></>
+              )}
+            </p>
+          </div>
+        </div>
+
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <button
             className="btn btn-primary btn-size-sm"
@@ -2772,6 +3073,12 @@ function FacturacionConfigSection() {
                 modosPagoConciliar,
                 rolesCierreCajaAjena,
                 redondeoTotalDeshabilitado: !redondearTotales,
+                tasaFijaCxc,
+                tasaFijaCxp,
+                permitirPagoMonedaDistintaBanco,
+                tasasActualizacionAutomatica,
+                tasasHoraActualizacion,
+                tasasProveedor,
               })}
             disabled={saveMutation.isPending}
           >
@@ -2779,7 +3086,176 @@ function FacturacionConfigSection() {
           </button>
         </div>
       </div>
+
+      <ConfirmModal
+        open={showDeshabilitarPosConfirm}
+        onClose={() => setShowDeshabilitarPosConfirm(false)}
+        onConfirm={() => deshabilitarPosMutation.mutate()}
+        title="¿Desactivar el módulo POS?"
+        description="Se desactivarán los turnos de caja y la cola de cobro para tu empresa. Los turnos y facturas ya registrados se conservan."
+        confirmLabel="Desactivar módulo POS"
+        loading={deshabilitarPosMutation.isPending}
+      />
+
+      <PosBloqueosModal bloqueos={posBloqueos} onClose={() => setPosBloqueos(null)} />
+
+      <ConfirmModal
+        open={showDeshabilitarDespachoConfirm}
+        onClose={() => setShowDeshabilitarDespachoConfirm(false)}
+        onConfirm={() => deshabilitarDespachoMutation.mutate()}
+        title="¿Desactivar el despacho?"
+        description="Las facturas nuevas volverán a descontar inventario al someterse. Los despachos ya sometidos se conservan como histórico."
+        confirmLabel="Desactivar despacho"
+        loading={deshabilitarDespachoMutation.isPending}
+      />
+
+      <DespachoBloqueosModal bloqueos={despachoBloqueos} onClose={() => setDespachoBloqueos(null)} />
     </div>
+  )
+}
+
+// Lista los documentos que bloquean POST /config/despacho/deshabilitar (409), agrupados con
+// enlaces a la pantalla donde el usuario debe resolver cada uno — docs/tasks/
+// PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md §8.3.
+function DespachoBloqueosModal({ bloqueos, onClose }: { bloqueos: DesactivarDespachoBloqueos | null; onClose: () => void }) {
+  if (!bloqueos) return null
+  const { despachosBorrador, pedidosPendientes, facturasPendientesDespacho, reservasVivas } = bloqueos
+  const nada = despachosBorrador.length === 0 && pedidosPendientes.length === 0 && facturasPendientesDespacho.length === 0 && reservasVivas.length === 0
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="No se puede desactivar el despacho"
+      subtitle="Resuelve estos pendientes y vuelve a intentarlo."
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {nada && <p className="ff-hint" style={{ margin: 0 }}>No hay detalle de los documentos que bloquean la desactivación.</p>}
+        {despachosBorrador.length > 0 && (
+          <div>
+            <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>Despachos en Borrador ({despachosBorrador.length})</p>
+            <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {despachosBorrador.map((id) => (
+                <li key={id} style={{ fontSize: 13 }}>
+                  <Link to={`/despachos/${encodeURIComponent(id)}`}>{id}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {pedidosPendientes.length > 0 && (
+          <div>
+            <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>Pedidos pendientes de despacho ({pedidosPendientes.length})</p>
+            <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {pedidosPendientes.map((id) => (
+                <li key={id} style={{ fontSize: 13 }}>
+                  <Link to={`/pedidos/${encodeURIComponent(id)}`}>{id}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {facturasPendientesDespacho.length > 0 && (
+          <div>
+            <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>Facturas pendientes de despachar ({facturasPendientesDespacho.length})</p>
+            <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {facturasPendientesDespacho.map((id) => (
+                <li key={id} style={{ fontSize: 13 }}>
+                  <Link to={`/facturas/${encodeURIComponent(id)}`}>{id}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {reservasVivas.length > 0 && (
+          <div>
+            <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
+              Reservas de stock vivas ({reservasVivas.length}) — <Link to="/reportes/despacho-reservas">ver reporte de Reservas</Link>
+            </p>
+            <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {reservasVivas.map((r) => (
+                <li key={r.id} style={{ fontSize: 13 }}>
+                  {r.id} — {r.status}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
+// Lista los documentos que bloquean POST /config/pos/deshabilitar (409), agrupados con enlaces
+// a la pantalla donde el usuario debe resolver cada uno.
+function PosBloqueosModal({ bloqueos, onClose }: { bloqueos: PosDeshabilitarBloqueos | null; onClose: () => void }) {
+  if (!bloqueos) return null
+  const { turnosAbiertos, cierresBorrador, colaCaja, posConSaldo } = bloqueos
+  const nada = turnosAbiertos.length === 0 && cierresBorrador.length === 0 && colaCaja.length === 0 && posConSaldo.length === 0
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="No se puede desactivar el módulo POS"
+      subtitle="Resuelve estos pendientes y vuelve a intentarlo."
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {nada && <p className="ff-hint" style={{ margin: 0 }}>No hay detalle de los documentos que bloquean la desactivación.</p>}
+        {turnosAbiertos.length > 0 && (
+          <div>
+            <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>Cajas abiertas ({turnosAbiertos.length})</p>
+            <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {turnosAbiertos.map((t) => (
+                <li key={t.id} style={{ fontSize: 13 }}>
+                  <Link to={`/turnos/${encodeURIComponent(t.id)}`}>{t.id}</Link> — {t.cajero}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {cierresBorrador.length > 0 && (
+          <div>
+            <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>Cierres de turno sin someter ({cierresBorrador.length})</p>
+            <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {cierresBorrador.map((t) => (
+                <li key={t.id} style={{ fontSize: 13 }}>
+                  <Link to={`/turnos/${encodeURIComponent(t.id)}`}>{t.id}</Link> — {t.cajero}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {colaCaja.length > 0 && (
+          <div>
+            <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
+              Facturas en la cola de caja sin cobrar ({colaCaja.length}) — <Link to="/caja/por-cobrar">ir a Cola de Caja</Link>
+            </p>
+            <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {colaCaja.map((id) => (
+                <li key={id} style={{ fontSize: 13 }}>
+                  <Link to={`/facturas/${encodeURIComponent(id)}`}>{id}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {posConSaldo.length > 0 && (
+          <div>
+            <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
+              Facturas POS con saldo pendiente ({posConSaldo.length}) — <Link to="/caja/pendientes">ir a Cobros Pendientes</Link>
+            </p>
+            <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {posConSaldo.map((id) => (
+                <li key={id} style={{ fontSize: 13 }}>
+                  <Link to={`/facturas/${encodeURIComponent(id)}`}>{id}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Modal>
   )
 }
 
@@ -2799,7 +3275,7 @@ function EcfConfigSection() {
   const [adjuntarPdfa, setAdjuntarPdfa] = useState(false)
   const [umbralAlertaSecuencia, setUmbralAlertaSecuencia] = useState(50)
   const [emitirAlSometer, setEmitirAlSometer] = useState(true)
-  const [bloquearSubmitSiAuraCaido, setBloquearSubmitSiAuraCaido] = useState(true)
+  const [bloquearSubmitSiVegaCaido, setBloquearSubmitSiVegaCaido] = useState(true)
   const [showAdvanced, setShowAdvanced] = useState(false)
   // 400 al habilitar e-CF en modo live sin certificación DGII completa (F9 §3.1).
   const [certRequiredMsg, setCertRequiredMsg] = useState('')
@@ -2814,7 +3290,7 @@ function EcfConfigSection() {
       setAdjuntarPdfa(data.adjuntarPdfa ?? false)
       setUmbralAlertaSecuencia(data.umbralAlertaSecuencia ?? 50)
       setEmitirAlSometer(data.emitirAlSometer ?? true)
-      setBloquearSubmitSiAuraCaido(data.bloquearSubmitSiAuraCaido ?? true)
+      setBloquearSubmitSiVegaCaido(data.bloquearSubmitSiVegaCaido ?? true)
     }
   }, [data])
 
@@ -2828,7 +3304,7 @@ function EcfConfigSection() {
       adjuntarPdfa,
       umbralAlertaSecuencia,
       emitirAlSometer,
-      bloquearSubmitSiAuraCaido,
+      bloquearSubmitSiVegaCaido,
     }),
     onSuccess: () => {
       toast.success('Configuración de facturación electrónica actualizada')
@@ -2875,15 +3351,6 @@ function EcfConfigSection() {
           </div>
         )}
 
-        <div className="inline-alert inline-alert-info" style={{ alignItems: 'flex-start' }}>
-          <Info size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-          <span>
-            Esta pantalla solo configura el módulo de facturación electrónica. La emisión real de e-CF
-            (someter, consultar estatus, anular) todavía no está disponible — es una fase futura del backend.
-            Mientras tanto, la facturación sigue funcionando 100% igual que hoy con NCF físico.
-          </span>
-        </div>
-
         <div className="ff-wrap">
           <label className="ff-check-wrap">
             <input
@@ -2895,7 +3362,7 @@ function EcfConfigSection() {
             <span style={{ fontSize: 13, fontWeight: 500 }}>Habilitar facturación electrónica</span>
           </label>
           <p className="ff-hint" style={{ marginTop: 4 }}>
-            Si está apagado, este tenant sigue facturando 100% igual que hoy (NCF físico). El resto de esta
+            Si está apagado, tu empresa sigue facturando 100% igual que hoy (NCF físico). El resto de esta
             pantalla solo tiene efecto cuando esté activo.
           </p>
         </div>
@@ -3038,14 +3505,14 @@ function EcfConfigSection() {
                   <input
                     type="checkbox"
                     className="ff-check"
-                    checked={bloquearSubmitSiAuraCaido}
+                    checked={bloquearSubmitSiVegaCaido}
                     disabled={!habilitado}
-                    onChange={(e) => setBloquearSubmitSiAuraCaido(e.target.checked)}
+                    onChange={(e) => setBloquearSubmitSiVegaCaido(e.target.checked)}
                   />
-                  <span style={{ fontSize: 13 }}>Bloquear sometimiento si Aura no responde</span>
+                  <span style={{ fontSize: 13 }}>Bloquear sometimiento si Vega no responde</span>
                 </label>
                 <p className="ff-hint" style={{ marginTop: 4 }}>
-                  Si Aura/DGII no responde: activo = se bloquea la facturación (default seguro); inactivo =
+                  Si Vega/DGII no responde: activo = se bloquea la facturación (default seguro); inactivo =
                   se activa contingencia automáticamente y se sigue facturando.
                 </p>
               </div>
@@ -3063,16 +3530,16 @@ function EcfConfigSection() {
           </button>
         </div>
 
-        {/* Estado de conexión con Aura — solo lectura */}
+        {/* Estado de conexión con Vega — solo lectura */}
         <div style={{ borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
-          <label className="ff-label">Estado de conexión con Aura</label>
+          <label className="ff-label">Estado de conexión con Vega</label>
           <p className="ff-hint" style={{ marginBottom: 8 }}>
-            Gestionado por soporte — todavía no hay un flujo de auto-servicio para conectar este tenant a Aura
+            Gestionado por soporte — todavía no hay un flujo de auto-servicio para conectar tu empresa a Vega
             desde aquí.
           </p>
           {!provisioning?.provisionado ? (
             <div className="empty-state" style={{ padding: '20px 0' }}>
-              <p className="empty-title">Este tenant aún no está conectado a Aura</p>
+              <p className="empty-title">Tu empresa aún no está conectada a Vega</p>
               <p className="empty-sub">Contacta a soporte para activar la facturación electrónica.</p>
             </div>
           ) : (
@@ -3313,6 +3780,10 @@ const SECTION_TITLES: Record<string, string> = {
   farmacia: 'Farmacia ARS',
 }
 
+const IMPUESTOS_SECTIONS = new Set([
+  'tasas-impuesto', 'impuestos-ventas', 'impuestos-compras', 'impuestos-articulo',
+])
+
 export default function ConfigPage() {
   const { seccion = 'cobros' } = useParams<{ seccion?: string }>()
   const title = SECTION_TITLES[seccion] ?? 'Configuración'
@@ -3340,6 +3811,8 @@ export default function ConfigPage() {
   return (
     <div className="page-container">
       <PageHeader title={title} />
+      {seccion === 'ecf' && <EcfTabs />}
+      {IMPUESTOS_SECTIONS.has(seccion) && <ImpuestosTabs />}
       <div style={{ maxWidth: 760 }}>
         {sectionMap[seccion] ?? (
           <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: '48px 0' }}>

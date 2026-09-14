@@ -1,14 +1,15 @@
 import { create, type StoreApi } from 'zustand'
 import { DEFAULT_ZOOM, TEMPLATE_FORMATS, ZOOM_LEVELS } from './constants'
-import { fetchDefaultTemplate, fetchTemplateGallery } from './mocks'
+import { fetchDefaultTemplate } from './mocks'
 import { createDefaultElement, createElementFromField, createEmptyPage, cloneDocument } from './elementFactory'
 import { deleteDraft as deleteDraftStorage, getDraft, listDrafts, saveDraft as saveDraftStorage } from './drafts'
 import { toApiType, fromApiType } from './typeMapping'
-import { mapCamposToFieldCategories } from './apiAdapters'
+import { mapCamposToFieldCategories, mapGaleriaItemToTemplateGalleryItem } from './apiAdapters'
 import {
   createPlantilla,
   deletePlantilla,
   getCamposDisponibles,
+  getGaleriaPlantillas,
   getPlantillaDefault,
   listPlantillas,
   marcarPlantillaDefault,
@@ -63,7 +64,10 @@ interface EditorState {
   saving: boolean
   lastSavedAt: string | null
   history: Record<TemplateType, History>
+  /** Galería del tipo actualmente activo — ver `templateGalleryByType` para la de ambos tipos
+   * (cada uno ya viene filtrado server-side vía `?type=`, igual que `availableFieldsByType`). */
   templateGallery: TemplateGalleryItem[]
+  templateGalleryByType: Partial<Record<TemplateType, TemplateGalleryItem[]>>
   galleryLoading: boolean
   drafts: DraftSummary[]
 
@@ -159,7 +163,7 @@ function withOwningPageElements(
 /** Cuerpo de `init()` extraído a función de módulo para poder envolverlo en un try/finally
  * único (ver `init`) sin anidar otro nivel de try/catch dentro del store literal. */
 async function initFromBackend(set: StoreApi<EditorState>['setState']) {
-  const [fieldsByType, gallery, loaded] = await Promise.all([
+  const [fieldsByType, galleryByType, loaded] = await Promise.all([
     Promise.all(
       TEMPLATE_FORMATS.map(async (f) => {
         try {
@@ -172,7 +176,19 @@ async function initFromBackend(set: StoreApi<EditorState>['setState']) {
         }
       }),
     ),
-    fetchTemplateGallery(),
+    Promise.all(
+      TEMPLATE_FORMATS.map(async (f) => {
+        try {
+          // Filtrado server-side por `?type=` — evita traer los 6 ítems y filtrar en el
+          // cliente (ver Fase 2 del doc de la tarea: menos payload y no depende de una lista
+          // hardcodeada de tipos conocidos si el backend agrega uno nuevo).
+          const items = await getGaleriaPlantillas(toApiType(f.type))
+          return [f.type, items.map(mapGaleriaItemToTemplateGalleryItem)] as const
+        } catch {
+          return [f.type, [] as TemplateGalleryItem[]] as const
+        }
+      }),
+    ),
     Promise.all(
       TEMPLATE_FORMATS.map(async (f) => {
         try {
@@ -198,6 +214,11 @@ async function initFromBackend(set: StoreApi<EditorState>['setState']) {
     availableFieldsByType[type] = categories
   })
 
+  const templateGalleryByType: Partial<Record<TemplateType, TemplateGalleryItem[]>> = {}
+  galleryByType.forEach(([type, items]) => {
+    templateGalleryByType[type] = items
+  })
+
   const documents: Partial<Record<TemplateType, TemplateDocument>> = {}
   const activePageId: Partial<Record<TemplateType, string>> = {}
   const templateId: Partial<Record<TemplateType, string | null>> = {}
@@ -212,7 +233,8 @@ async function initFromBackend(set: StoreApi<EditorState>['setState']) {
   set((state) => ({
     availableFieldsByType,
     availableFields: availableFieldsByType[state.format] ?? [],
-    templateGallery: gallery,
+    templateGalleryByType,
+    templateGallery: templateGalleryByType[state.format] ?? [],
     documents,
     activePageId,
     templateId,
@@ -240,6 +262,7 @@ export const useTemplateEditorStore = create<EditorState>((set, get) => ({
     label_5x2: emptyHistory(),
   },
   templateGallery: [],
+  templateGalleryByType: {},
   galleryLoading: false,
   drafts: [],
 
@@ -257,7 +280,12 @@ export const useTemplateEditorStore = create<EditorState>((set, get) => ({
   setFormat: (type) => {
     const format = TEMPLATE_FORMATS.find((f) => f.type === type)
     if (format?.comingSoon) return
-    set((state) => ({ format: type, selectedIds: [], availableFields: state.availableFieldsByType[type] ?? [] }))
+    set((state) => ({
+      format: type,
+      selectedIds: [],
+      availableFields: state.availableFieldsByType[type] ?? [],
+      templateGallery: state.templateGalleryByType[type] ?? [],
+    }))
   },
 
   setPageHeight: (height) => {

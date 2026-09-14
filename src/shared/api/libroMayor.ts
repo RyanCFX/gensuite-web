@@ -1,40 +1,27 @@
 import { client } from './client'
 import { ENDPOINTS } from './endpoints'
 
-export interface LibroMayorMovimiento {
-  postingDate: string
-  voucherType: string
-  voucherNo: string
-  debit: number
-  credit: number
-  balance: number
-  party?: string | null
-  partyType?: string | null
-  remarks?: string | null
-  costCenter?: string | null
+// Mismo reporte nativo `General Ledger` que Libro Diario, con `group_by: "Group by Account"` —
+// shape genérico `{columns, rows}`, con filas sintéticas de Apertura/Total/Cierre por cuenta y
+// una separadora entre cuentas (docs/tasks/61_migracion_libro_diario_mayor_general_ledger.md §2.2).
+export interface GlReportColumn {
+  fieldname: string
+  label: string
 }
 
-export interface LibroMayorCuenta {
-  account: string
-  openingDebit: number
-  openingCredit: number
-  openingBalance: number
-  movements: LibroMayorMovimiento[]
-  periodDebit: number
-  periodCredit: number
-  closingBalance: number
-}
+export type GlReportRow = Record<string, unknown>
 
 export interface LibroMayorData {
-  fromDate: string
-  toDate: string
-  totalAccounts: number
-  accounts: LibroMayorCuenta[]
+  columns: GlReportColumn[]
+  rows: GlReportRow[]
+  totalRows: number
 }
 
 export interface LibroMayorParams {
   fromDate?: string
   toDate?: string
+  branch?: string
+  department?: string
   account?: string
 }
 

@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 
 const schema = z.object({
   email: z.string().min(1, 'El correo es obligatorio').email('Correo inválido'),
-  tenant: z.string().min(1, 'El tenant es obligatorio'),
+  tenant: z.string().min(1, 'La empresa es obligatoria'),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { tenant: 'tenant1' },
+    defaultValues: { tenant: '' },
   })
 
   async function onSubmit(values: FormValues) {
@@ -81,11 +81,11 @@ export default function ForgotPasswordPage() {
             </div>
 
             <div className="form-field">
-              <Label htmlFor="tenant">Tenant</Label>
+              <Label htmlFor="tenant">Empresa</Label>
               <Input
                 id="tenant"
                 type="text"
-                placeholder="tenant1"
+                placeholder="mi-empresa"
                 autoComplete="organization"
                 {...register('tenant')}
                 data-error={!!errors.tenant}

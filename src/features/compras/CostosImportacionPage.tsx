@@ -203,10 +203,10 @@ export default function CostosImportacionPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Costos de Importación"
+        title={<><span className="page-title-dot" />Costos de Importación</>}
         description="Prorratea cargos e impuestos de importación sobre los artículos recibidos"
         action={
-          <button className="btn btn-primary" onClick={openCreate}>
+          <button className="btn btn-navy" onClick={openCreate}>
             <Plus size={16} />
             Nuevo Costo de Importación
           </button>
@@ -214,32 +214,36 @@ export default function CostosImportacionPage() {
       />
 
       <div>
-        <div className="filter-bar">
-          <div className="filter-bar-left">
-            <div className="search-input-wrap">
-              <Search size={14} className="search-input-icon" />
-              <input
-                className="search-input"
-                placeholder="Buscar por número…"
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-              />
+        <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+          <div className="card-body">
+            <div className="filter-bar" style={{ margin: 0 }}>
+              <div className="filter-bar-left">
+                <div className="search-input-wrap">
+                  <Search size={14} className="search-input-icon" />
+                  <input
+                    className="search-input"
+                    placeholder="Buscar por número…"
+                    value={search}
+                    onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+                  />
+                </div>
+                <Select
+                  value={status}
+                  onValueChange={(val) => { setStatus(val); setPage(1) }}
+                >
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="draft">Borrador</SelectItem>
+                  <SelectItem value="submitted">Sometido</SelectItem>
+                  <SelectItem value="cancelled">Anulado</SelectItem>
+                </Select>
+              </div>
             </div>
-            <Select
-              value={status}
-              onValueChange={(val) => { setStatus(val); setPage(1) }}
-            >
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="draft">Borrador</SelectItem>
-              <SelectItem value="submitted">Sometido</SelectItem>
-              <SelectItem value="cancelled">Anulado</SelectItem>
-            </Select>
           </div>
         </div>
 
-        <div className="card">
+        <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table navy-table">
               <thead>
                 <tr>
                   <th>#</th>
@@ -276,7 +280,7 @@ export default function CostosImportacionPage() {
                                 </div>
                                 <p className="empty-title">Sin costos de importación</p>
                                 <p className="empty-sub">No hay costos de importación registrados.</p>
-                                <button className="btn btn-primary btn-size-sm" onClick={openCreate}>
+                                <button className="btn btn-navy btn-size-sm" onClick={openCreate}>
                                   <Plus size={14} />Nuevo Costo de Importación
                                 </button>
                               </div>

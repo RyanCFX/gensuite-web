@@ -3,7 +3,31 @@ import { QRCodeSVG } from 'qrcode.react'
 import Barcode from 'react-barcode'
 import { Image as ImageIcon, Layers } from 'lucide-react'
 import { resolveFileUrl } from '@/shared/api/client'
+import { formatMoney as formatCurrencyAmount } from '@/lib/formatters'
 import type { TemplateElement, TemplateFieldCategory } from './types'
+
+// Bindings multimoneda de Pos Invoice (docs/tasks/63_plantillas_multimoneda.md §1) — los 3
+// montos "*Base" se formatean como dinero (símbolo + separadores) en `empresa.monedaBase`, y la
+// tasa con 4 decimales sin símbolo — a diferencia del resto de los bindings de texto, que se
+// imprimen tal cual vienen del backend (ver `resolveBoundValue`/caso 'text' abajo).
+const MONEDA_BASE_AMOUNT_BINDINGS = new Set(['factura.subtotalBase', 'factura.impuestosBase', 'factura.totalBase'])
+
+function formatTextBinding(binding: string | undefined, raw: unknown, values: Record<string, unknown>): string | null {
+  if (!binding) return null
+  if (MONEDA_BASE_AMOUNT_BINDINGS.has(binding)) {
+    if (raw == null || raw === '') return ''
+    const num = typeof raw === 'number' ? raw : Number(raw)
+    if (!Number.isFinite(num)) return ''
+    const monedaBase = typeof values['empresa.monedaBase'] === 'string' ? (values['empresa.monedaBase'] as string) : undefined
+    return formatCurrencyAmount(num, monedaBase)
+  }
+  if (binding === 'factura.tasaCambio') {
+    if (raw == null || raw === '') return ''
+    const num = typeof raw === 'number' ? raw : Number(raw)
+    return Number.isFinite(num) ? num.toFixed(4) : ''
+  }
+  return null
+}
 
 function resolveSample(fields: TemplateFieldCategory[], binding?: string): string {
   if (!binding) return ''
@@ -128,9 +152,15 @@ interface ItemRow {
   cantidad?: number
   precio?: number
   monto?: number
+  /** Solo con cobertura ARS; `null` en cualquier otra factura (§8.2 del doc de Farmacia v2). */
+  coberturaArs?: number | null
+  montoPaciente?: number | null
 }
 
 function formatMoney(value: unknown): string {
+  // `null`/`undefined` deben quedar en blanco, no en "0.00": es lo que traen los campos ARS en
+  // una factura sin aseguradora (Number(null) daría 0).
+  if (value == null || value === '') return ''
   const num = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(num) ? num.toFixed(2) : ''
 }
@@ -184,7 +214,8 @@ export function TemplateEditorElementView({ element, fields, values }: Props) {
       const content = !element.binding
         ? element.text
         : values
-          ? String(resolveBoundValue(values, element.binding) ?? '')
+          ? (formatTextBinding(element.binding, resolveBoundValue(values, element.binding), values)
+              ?? String(resolveBoundValue(values, element.binding) ?? ''))
           : resolveSample(fields, element.binding)
       return (
         <div
@@ -332,7 +363,12 @@ export function TemplateEditorElementView({ element, fields, values }: Props) {
                           ? formatMoney(row.precio)
                           : c.key === 'total'
                             ? formatMoney(row.monto)
-                            : /* itbis: no existe en items.tabla real (§2.3 del doc) */ ''}
+                            : c.key === 'coberturaArs'
+                              // `null` = factura sin aseguradora: la celda queda vacía, no en 0.00.
+                              ? formatMoney(row.coberturaArs)
+                              : c.key === 'montoPaciente'
+                                ? formatMoney(row.montoPaciente)
+                                : /* itbis: no existe en items.tabla real (§2.3 del doc) */ ''}
                   </td>
                 ))}
               </tr>

@@ -4,6 +4,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { createJournalEntry, submitJournalEntry } from '@/shared/api/journal-entry'
+import { getFacturacionConfig } from '@/shared/api/config'
 import type { CreateJournalEntryDto, JournalEntryLine, ItemProps } from '@/shared/api/types'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
@@ -30,6 +31,10 @@ interface EntryRow {
   department: string
   costCenter: string
   reportType?: 'Profit and Loss' | 'Balance Sheet'
+  /** Moneda de la cuenta seleccionada (docs/tasks/64_multimoneda_completo.md §5.4) — determina si
+   *  se muestra el input de tasa de cambio para esta línea. */
+  currency?: string
+  conversionRate?: number
 }
 
 let rowCounter = 2
@@ -59,6 +64,15 @@ export default function JournalForm() {
   const [defaultBranch, setDefaultBranch] = useState('')
   const [defaultDepartment, setDefaultDepartment] = useState('')
   const [defaultCostCenter, setDefaultCostCenter] = useState<ItemProps | null>(null)
+
+  // ── Multimoneda (docs/tasks/64_multimoneda_completo.md §5.4) — solo relevante si alguna línea
+  // usa una cuenta que opera en moneda distinta a la base. ──
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
 
   const [sucursalQuery, setSucursalQuery] = useState('')
   const { data: sucursalesData, isLoading: sucursalesLoading } = useQuery({
@@ -104,6 +118,7 @@ export default function JournalForm() {
         branch: r.branch || undefined,
         department: r.department || undefined,
         costCenter: r.costCenter || undefined,
+        conversionRate: r.conversionRate || undefined,
       }))
     return {
       postingDate,
@@ -152,11 +167,11 @@ export default function JournalForm() {
   }, [])
 
   const handleAccountChange = useCallback((id: number, accountId: string) => {
-    updateRow(id, { account: accountId, reportType: undefined })
+    updateRow(id, { account: accountId, reportType: undefined, currency: undefined, conversionRate: undefined })
     if (!accountId) return
     getCuenta(accountId)
       .then((cuenta) => {
-        updateRow(id, { reportType: cuenta.reportType })
+        updateRow(id, { reportType: cuenta.reportType, currency: cuenta.currency })
       })
       .catch(() => {
         // Si falla el fetch puntual, no bloqueamos al usuario — el backend valida de todas formas
@@ -170,6 +185,9 @@ export default function JournalForm() {
   function handleCreditChange(id: number, value: number) {
     updateRow(id, { credit: value, debit: value > 0 ? 0 : undefined })
   }
+
+  // Si ninguna línea usa una cuenta en moneda distinta a la base, la columna de tasa no aporta nada.
+  const algunaLineaEnDivisa = rows.some((r) => r.currency && r.currency !== monedaBase)
 
   const isPending = createMutation.isPending || submitMutation.isPending
 
@@ -291,6 +309,7 @@ export default function JournalForm() {
                     <th style={{ width: '14%' }}>Sucursal</th>
                     <th style={{ width: '14%' }}>Departamento</th>
                     <th style={{ width: '14%' }}>Centro de Costo</th>
+                    {algunaLineaEnDivisa && <th style={{ width: '10%' }}>Tasa de cambio</th>}
                     <th style={{ width: 40 }} />
                   </tr>
                 </thead>
@@ -368,6 +387,21 @@ export default function JournalForm() {
                           placeholder="C. Costo…"
                         />
                       </td>
+                      {algunaLineaEnDivisa && (
+                        <td>
+                          {row.currency && row.currency !== monedaBase ? (
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.0001}
+                              className="items-input"
+                              placeholder={`${row.currency} → ${monedaBase}`}
+                              value={row.conversionRate ?? ''}
+                              onChange={(e) => updateRow(row.id, { conversionRate: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                            />
+                          ) : null}
+                        </td>
+                      )}
                       <td>
                         <button
                           type="button"
@@ -393,7 +427,7 @@ export default function JournalForm() {
                     <td className="items-total-line" style={{ textAlign: 'right', fontWeight: 600 }}>
                       {formatDOP(totalCredits)}
                     </td>
-                    <td className="items-total-line" colSpan={5}>
+                    <td className="items-total-line" colSpan={algunaLineaEnDivisa ? 6 : 5}>
                       <span style={{
                         fontWeight: 600,
                         fontSize: 13,

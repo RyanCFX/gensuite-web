@@ -218,8 +218,35 @@ export async function downloadCxpAgingPdf(params?: CxpAgingParams) {
   URL.revokeObjectURL(url)
 }
 
+export interface CajaCuadrePorMoneda {
+  moneda: string
+  totalCobrado: number
+  totalFacturado: number
+  numCobros: number
+  numFacturas: number
+  diferencia: number
+  porMetodoDePago: { metodo: string; total: number }[]
+}
+
+/** GET /reportes/caja/cuadre. Los campos "legacy" a nivel raíz (totalCobrado, totalFacturado,
+ *  porMetodoDePago, diferencia) son la SUMA CRUDA entre todas las monedas — solo tienen sentido
+ *  si el tenant opera en una sola moneda. `porMoneda` es la fuente de verdad cuando hay más de
+ *  una moneda operando en el día — nunca sumar montos de monedas distintas en el cliente. Ver
+ *  docs/tasks/64_multimoneda_completo.md §6.3. */
+export interface CajaCuadreResult {
+  date: string
+  cashier: string
+  totalCobrado: number
+  totalFacturado: number
+  numCobros: number
+  numFacturas: number
+  porMetodoDePago: { metodo: string; total: number }[]
+  diferencia: number
+  porMoneda?: CajaCuadrePorMoneda[]
+}
+
 export async function getCajaCuadre(params?: { date?: string; branch?: string; department?: string }) {
-  const res = await client.get(ENDPOINTS.reportes.cajaCuadre, { params })
+  const res = await client.get<{ success: true; data: CajaCuadreResult }>(ENDPOINTS.reportes.cajaCuadre, { params })
   return res.data
 }
 
@@ -243,7 +270,11 @@ export interface LibroDiarioParams {
   account?: string
   voucherNo?: string
   voucherType?: 'Sales Invoice' | 'Purchase Invoice' | 'Payment Entry' | 'Journal Entry' | 'Stock Entry'
+  /** Requiere valor exacto (no substring) y va siempre acompañado de `partyType` — el reporte
+   *  nativo `General Ledger` de ERPNext no filtra bien sin ambos (docs/tasks/61_migracion_libro_diario_mayor_general_ledger.md §3). */
   party?: string
+  /** "Customer" | "Supplier" — valores en inglés, no traducir (van tal cual en el query param). */
+  partyType?: 'Customer' | 'Supplier'
   groupBy?:
     | 'Group by Voucher'
     | 'Group by Voucher (Consolidated)'
@@ -355,7 +386,321 @@ export async function downloadCorteCajaDiaPdf(params: CorteCajaDiaParams) {
   URL.revokeObjectURL(url)
 }
 
-// ─── Farmacia ARS — reportes de auditoría (docs/FARMACIA_ARS_FRONTEND.md §4.9) ─────────────
+// ─── DGII — Facturación Fiscal (E31/E32 por forma de pago) ────────────────────
+
+export interface FacturacionFiscalParams {
+  fromDate?: string
+  toDate?: string
+  branch?: string
+  department?: string
+}
+
+export async function getFacturacionFiscal(params?: FacturacionFiscalParams) {
+  const res = await client.get(ENDPOINTS.reportes.facturacionFiscal, { params })
+  return res.data
+}
+
+export async function downloadFacturacionFiscalPdf(params?: FacturacionFiscalParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.facturacionFiscalPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `facturacion-fiscal_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Flujo de Efectivo (Cash Flow) ────────────────────────────────────────────
+// docs/tasks/62_reportes_solicitados_y_reportes_nuevos.md §Parte 2
+
+export interface FlujoEfectivoParams {
+  fromDate?: string
+  toDate?: string
+  /** Nótese que este endpoint usa capitalización distinta a Balance General/Estado de
+   *  Resultados (`monthly`/`quarterly`/`yearly`) — este va en PascalCase. */
+  periodicity?: 'Monthly' | 'Quarterly' | 'Yearly'
+  branch?: string
+  department?: string
+}
+
+export async function getFlujoEfectivo(params?: FlujoEfectivoParams) {
+  const res = await client.get(ENDPOINTS.reportes.flujoEfectivo, { params })
+  return res.data
+}
+
+export async function downloadFlujoEfectivoPdf(params?: FlujoEfectivoParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.flujoEfectivoPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `flujo-efectivo_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Analítica de Compras (Purchase Analytics) ────────────────────────────────
+
+export interface ComprasAnaliticaParams {
+  fromDate?: string
+  toDate?: string
+  branch?: string
+  department?: string
+  supplier?: string
+  itemCode?: string
+}
+
+export async function getComprasAnalitica(params?: ComprasAnaliticaParams) {
+  const res = await client.get(ENDPOINTS.reportes.comprasAnalitica, { params })
+  return res.data
+}
+
+export async function downloadComprasAnaliticaPdf(params?: ComprasAnaliticaParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.comprasAnaliticaPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `compras-analitica_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Registro de Compras (Purchase Register) ──────────────────────────────────
+
+export interface ComprasRegistroParams {
+  fromDate?: string
+  toDate?: string
+  supplier?: string
+  branch?: string
+  department?: string
+}
+
+export async function getComprasRegistro(params?: ComprasRegistroParams) {
+  const res = await client.get(ENDPOINTS.reportes.comprasRegistro, { params })
+  return res.data
+}
+
+export async function downloadComprasRegistroPdf(params?: ComprasRegistroParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.comprasRegistroPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `compras-registro_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Registro de Ventas por Artículo (Item-wise Sales Register) ─────────────
+
+export interface VentasItemWiseParams {
+  fromDate?: string
+  toDate?: string
+  branch?: string
+  department?: string
+  customer?: string
+  itemCode?: string
+}
+
+export async function getVentasItemWise(params?: VentasItemWiseParams) {
+  const res = await client.get(ENDPOINTS.reportes.ventasItemWise, { params })
+  return res.data
+}
+
+export async function downloadVentasItemWisePdf(params?: VentasItemWiseParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.ventasItemWisePdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `ventas-item-wise_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Registro de Compras por Artículo (Item-wise Purchase Register) ─────────
+
+export interface ComprasItemWiseParams {
+  fromDate?: string
+  toDate?: string
+  branch?: string
+  department?: string
+  supplier?: string
+  itemCode?: string
+}
+
+export async function getComprasItemWise(params?: ComprasItemWiseParams) {
+  const res = await client.get(ENDPOINTS.reportes.comprasItemWise, { params })
+  return res.data
+}
+
+export async function downloadComprasItemWisePdf(params?: ComprasItemWiseParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.comprasItemWisePdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `compras-item-wise_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Analítica de Pedidos (Sales Order Analysis) ──────────────────────────────
+// Reporte de funnel: cantidad pedida vs. entregada vs. facturada (columnas pending_qty,
+// billed_qty, qty_to_bill, etc.), no montos contables.
+
+export interface PedidosAnaliticaParams {
+  fromDate?: string
+  toDate?: string
+  branch?: string
+  department?: string
+  customer?: string
+}
+
+export async function getPedidosAnalitica(params?: PedidosAnaliticaParams) {
+  const res = await client.get(ENDPOINTS.reportes.pedidosAnalitica, { params })
+  return res.data
+}
+
+export async function downloadPedidosAnaliticaPdf(params?: PedidosAnaliticaParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.pedidosAnaliticaPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `pedidos-analitica_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Analítica de Órdenes de Compra (Purchase Order Analysis) ────────────────
+// Mismo tipo de reporte de funnel que Analítica de Pedidos, pero del lado de compras.
+
+export interface ComprasOrdenesAnaliticaParams {
+  fromDate?: string
+  toDate?: string
+  branch?: string
+  department?: string
+  supplier?: string
+}
+
+export async function getComprasOrdenesAnalitica(params?: ComprasOrdenesAnaliticaParams) {
+  const res = await client.get(ENDPOINTS.reportes.comprasOrdenesAnalitica, { params })
+  return res.data
+}
+
+export async function downloadComprasOrdenesAnaliticaPdf(params?: ComprasOrdenesAnaliticaParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.comprasOrdenesAnaliticaPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `compras-ordenes-analitica_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Antigüedad de Inventario (Stock Ageing) ──────────────────────────────────
+// Corte a una fecha, no un rango: "¿cómo está el inventario a esta fecha?".
+
+export interface InventarioAntiguedadParams {
+  /** Fecha de corte. Default: hoy. */
+  date?: string
+  branch?: string
+  department?: string
+  warehouse?: string
+  itemCode?: string
+}
+
+export async function getInventarioAntiguedad(params?: InventarioAntiguedadParams) {
+  const res = await client.get(ENDPOINTS.reportes.inventarioAntiguedad, { params })
+  return res.data
+}
+
+export async function downloadInventarioAntiguedadPdf(params?: InventarioAntiguedadParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.inventarioAntiguedadPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `inventario-antiguedad_${params?.date ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Proyección de Inventario (Stock Projected Qty) ──────────────────────────
+// Foto en vivo del stock actual/reservado/proyectado — intencionalmente sin fechas.
+
+export interface InventarioProyeccionParams {
+  branch?: string
+  department?: string
+  warehouse?: string
+  itemCode?: string
+}
+
+export async function getInventarioProyeccion(params?: InventarioProyeccionParams) {
+  const res = await client.get(ENDPOINTS.reportes.inventarioProyeccion, { params })
+  return res.data
+}
+
+export async function downloadInventarioProyeccionPdf(params?: InventarioProyeccionParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.inventarioProyeccionPdf, { params, responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'inventario-proyeccion.pdf'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Reportes Solicitados (ejecución en background) ──────────────────────────
+// docs/tasks/62_reportes_solicitados_y_reportes_nuevos.md §Parte 1. Hoy SOLO existe el
+// endpoint /solicitar para Movimientos de Inventario — no hay "solicitar" genérico para
+// ningún otro reporte todavía (ni los 9 de arriba, ni Libro Diario/Mayor, ni los existentes).
+
+export interface SolicitudReporte {
+  solicitudId: string
+  reportName: string
+  status: 'Queued' | 'Started' | 'Completed' | 'Error'
+  queuedAt?: string
+  completedAt?: string | null
+  errorMessage?: string | null
+}
+
+export interface SolicitudReporteDetalle extends SolicitudReporte {
+  /** Solo viene cuando `status === 'Completed'` — mismo shape `{columns, rows}` de siempre. */
+  report?: { columns: { fieldname: string; label: string }[]; rows: Record<string, unknown>[]; totalRows: number }
+}
+
+/** Encola el mismo reporte de `GET /reportes/inventario/movimientos` para correr en background;
+ *  responde de inmediato con el `solicitudId` a consultar después. */
+export async function solicitarInventarioMovimientos(params?: InventarioParams) {
+  const res = await client.post<{ success: true; data: SolicitudReporte }>(
+    ENDPOINTS.reportes.inventarioMovimientosSolicitar,
+    undefined,
+    { params },
+  )
+  return res.data.data
+}
+
+export interface ListSolicitudesParams {
+  /** Filtrar por reporte, ej. "Stock Ledger". */
+  reportName?: string
+  /** Default 20, máx 100. */
+  limit?: number
+  offset?: number
+}
+
+/** No trae total — para paginar, pedir una página más y ver si `data.length < limit`. */
+export async function listSolicitudes(params?: ListSolicitudesParams) {
+  const res = await client.get<{ success: true; data: SolicitudReporte[]; meta: { limit: number; offset: number } }>(
+    ENDPOINTS.reportes.solicitudes,
+    { params },
+  )
+  return res.data
+}
+
+export async function getSolicitud(id: string) {
+  const res = await client.get<{ success: true; data: SolicitudReporteDetalle }>(
+    ENDPOINTS.reportes.solicitudById(id),
+  )
+  return res.data.data
+}
+
+// ─── Farmacia ARS — reportes de auditoría (docs/PROMPT_FARMACIA_V2_FRONTEND.md §7) ─────────
 // Prefijo real /farmacia/reportes/*, no /reportes — por eso viven bajo ENDPOINTS.farmacia.reportes,
 // no ENDPOINTS.reportes. Sin PDF: el doc no documenta un endpoint de descarga para estos dos.
 
@@ -371,13 +716,76 @@ export async function getReporteFarmaciaLotes(params?: ReporteFarmaciaLotesParam
   return res.data
 }
 
-export interface ReporteFarmaciaDespachosNcfParams {
+/** Reemplaza al reporte "Despacho / Lote / NCF" de la v1 (docs/PROMPT_FARMACIA_V2_FRONTEND.md §7). */
+export interface ReporteFacturasArsParams {
   aseguradora?: string
+  estadoArs?: string
+  /** Fecha de la factura. */
   desde?: string
   hasta?: string
+  limit?: number
+  offset?: number
 }
 
-export async function getReporteFarmaciaDespachosNcf(params?: ReporteFarmaciaDespachosNcfParams) {
-  const res = await client.get(ENDPOINTS.farmacia.reportes.despachosNcf, { params })
+export async function getReporteFacturasArs(params?: ReporteFacturasArsParams) {
+  const res = await client.get(ENDPOINTS.farmacia.reportes.facturasArs, { params })
+  return res.data
+}
+
+// ─── Despacho — 4 reportes nativos de ERPNext, sin PDF ────────────────────────
+// docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md §9. Todos devuelven la forma
+// genérica { columns, rows, totalRows } que ya consume AutoTable/extractRows en ReportesPage.tsx —
+// no hay columnas/DTOs custom del BFF más allá de lo que ERPNext ya define.
+
+export interface DespachoMargenParams {
+  fromDate?: string
+  toDate?: string
+  branch?: string
+  department?: string
+  groupBy?: 'day' | 'week' | 'month'
+  customer?: string
+  itemCode?: string
+}
+
+export async function getDespachoMargen(params?: DespachoMargenParams) {
+  const res = await client.get(ENDPOINTS.reportes.despachoMargen, { params })
+  return res.data
+}
+
+export interface DespachoReservasParams {
+  fromDate?: string
+  toDate?: string
+  branch?: string
+  department?: string
+  warehouse?: string
+  itemCode?: string
+  /** Fecha de corte para valoración — default hoy. */
+  date?: string
+}
+
+export async function getDespachoReservas(params?: DespachoReservasParams) {
+  const res = await client.get(ENDPOINTS.reportes.despachoReservas, { params })
+  return res.data
+}
+
+export interface DespachoFaltantesParams {
+  fromDate?: string
+  toDate?: string
+  branch?: string
+  department?: string
+  /** Obligatorio — el reporte nativo de ERPNext no consolida "todos los almacenes". */
+  warehouse: string
+  itemCode?: string
+  date?: string
+}
+
+export async function getDespachoFaltantes(params: DespachoFaltantesParams) {
+  const res = await client.get(ENDPOINTS.reportes.despachoFaltantes, { params })
+  return res.data
+}
+
+// Sin query params — GET /reportes/despacho/pendientes-compra no acepta filtros.
+export async function getDespachoPendientesCompra() {
+  const res = await client.get(ENDPOINTS.reportes.despachoPendientesCompra)
   return res.data
 }

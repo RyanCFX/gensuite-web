@@ -3,9 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { BookText, Download, Loader2 } from 'lucide-react'
-import { getLibroMayor, downloadLibroMayorPdf, type LibroMayorParams } from '@/shared/api/libroMayor'
+import { getLibroMayor, downloadLibroMayorPdf, type LibroMayorParams, type GlReportRow } from '@/shared/api/libroMayor'
+import { listSucursales } from '@/shared/api/sucursales'
 import { formatDate, formatDOP } from '@/lib/formatters'
+import { classifyGlRow } from '@/shared/lib/glLedger'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 
 function firstOfMonth(): string {
@@ -28,12 +33,74 @@ function voucherLink(voucherType: string, voucherNo: string): string | null {
   }
 }
 
+interface CuentaGroup {
+  account: string
+  openingBalance: number
+  periodDebit: number
+  periodCredit: number
+  closingBalance: number
+  movements: GlReportRow[]
+}
+
+/** Reconstruye las tarjetas por cuenta a partir del flat `{columns, rows}` del reporte nativo:
+ * cada cuenta trae una fila de Apertura, sus movimientos, una fila de Total y una de Cierre,
+ * separada de la siguiente cuenta por una fila 100% null
+ * (docs/tasks/61_migracion_libro_diario_mayor_general_ledger.md §2.2). */
+function groupLibroMayorRows(rows: GlReportRow[]): CuentaGroup[] {
+  const groups: CuentaGroup[] = []
+  let current: CuentaGroup | null = null
+
+  function ensureCurrent(): CuentaGroup {
+    if (!current) {
+      current = { account: '', openingBalance: 0, periodDebit: 0, periodCredit: 0, closingBalance: 0, movements: [] }
+    }
+    return current
+  }
+
+  for (const row of rows) {
+    const kind = classifyGlRow(row)
+
+    if (kind === 'separator') {
+      if (current) { groups.push(current); current = null }
+      continue
+    }
+
+    const account = row.account
+    if (kind === 'subtotal' && typeof account === 'string') {
+      const g = ensureCurrent()
+      if (account.includes('Apertura')) g.openingBalance = Number(row.balance ?? 0)
+      else if (account.includes('Total')) { g.periodDebit = Number(row.debit ?? 0); g.periodCredit = Number(row.credit ?? 0) }
+      else if (account.includes('Cierre')) g.closingBalance = Number(row.balance ?? 0)
+      continue
+    }
+
+    // Fila de movimiento normal
+    const g = ensureCurrent()
+    if (!g.account && typeof account === 'string') g.account = account
+    g.movements.push(row)
+  }
+  if (current) groups.push(current)
+  return groups
+}
+
 export default function LibroMayorPage() {
   const navigate = useNavigate()
 
   const [fromDate, setFromDate] = useState(firstOfMonth())
   const [toDate, setToDate] = useState(today())
   const [account, setAccount] = useState('')
+  const [branch, setBranch] = useState('')
+  const [department, setDepartment] = useState('')
+
+  const [branchQuery, setBranchQuery] = useState('')
+  const { data: sucursalesData } = useQuery({
+    queryKey: ['sucursales-libro-mayor', branchQuery],
+    queryFn: () => listSucursales({ limit: 100 }),
+    staleTime: 60_000,
+  })
+  const branchOptions: SearchSelectOption[] = (sucursalesData?.items ?? [])
+    .filter((s) => !branchQuery || s.name.toLowerCase().includes(branchQuery.toLowerCase()))
+    .map((s) => ({ value: s.name, label: s.name }))
 
   const [queryParams, setQueryParams] = useState<LibroMayorParams | null>(null)
 
@@ -48,6 +115,8 @@ export default function LibroMayorPage() {
     return {
       fromDate,
       toDate,
+      branch: branch || undefined,
+      department: department || undefined,
       account: account || undefined,
     }
   }
@@ -61,16 +130,18 @@ export default function LibroMayorPage() {
     onError: () => toast.error('No se pudo descargar el PDF'),
   })
 
+  const groups = data ? groupLibroMayorRows(data.rows) : []
+
   return (
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Libro Mayor</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Libro Mayor</h1>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
         <div className="card-body">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
             <div className="ff-wrap">
@@ -100,7 +171,26 @@ export default function LibroMayorPage() {
                 placeholder="Filtrar por cuenta…"
               />
             </div>
-            <button className="btn btn-primary btn-size-sm" onClick={handleGenerar}>
+            <div className="ff-wrap" style={{ minWidth: 200 }}>
+              <label className="ff-label">Sucursal</label>
+              <SearchSelect
+                value={branch}
+                selectedLabel={branch}
+                onChange={setBranch}
+                options={branchOptions}
+                onSearch={setBranchQuery}
+                placeholder="Todas las sucursales"
+              />
+            </div>
+            <div className="ff-wrap" style={{ minWidth: 220 }}>
+              <label className="ff-label">Departamento</label>
+              <DepartmentSelect
+                value={department}
+                onChange={setDepartment}
+                placeholder="Todos los departamentos"
+              />
+            </div>
+            <button className="btn btn-navy btn-size-sm" onClick={handleGenerar}>
               <BookText size={14} />
               Generar
             </button>
@@ -141,7 +231,7 @@ export default function LibroMayorPage() {
       )}
 
       {/* Empty results */}
-      {!isLoading && queryParams !== null && data?.accounts.length === 0 && (
+      {!isLoading && queryParams !== null && groups.length === 0 && (
         <div className="empty-state">
           <div className="empty-icon"><BookText size={32} /></div>
           <p className="empty-title">Sin movimientos</p>
@@ -150,18 +240,18 @@ export default function LibroMayorPage() {
       )}
 
       {/* Account cards */}
-      {!isLoading && data && data.accounts.length > 0 && (
+      {!isLoading && groups.length > 0 && (
         <>
-          {data.accounts.map((cuenta) => (
-            <div key={cuenta.account} className="card" style={{ marginBottom: 16 }}>
+          {groups.map((cuenta, gi) => (
+            <div key={gi} className="card navy-table-card" style={{ marginBottom: 16 }}>
               <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className="card-title" style={{ fontWeight: 700 }}>{cuenta.account}</span>
+                <span className="card-title" style={{ fontWeight: 700 }}>{cuenta.account || '—'}</span>
                 <span className="td-muted" style={{ fontSize: 13 }}>
                   Saldo inicial: {formatDOP(cuenta.openingBalance)}
                 </span>
               </div>
               <div className="table-scroll">
-                <table className="data-table">
+                <table className="data-table navy-table">
                   <thead>
                     <tr>
                       <th>Fecha</th>
@@ -181,10 +271,16 @@ export default function LibroMayorPage() {
                           </tr>
                         )
                       : cuenta.movements.map((mov, i) => {
-                          const link = voucherLink(mov.voucherType, mov.voucherNo)
+                          const voucherType = String(mov.voucher_type ?? '')
+                          const voucherNo = String(mov.voucher_no ?? '')
+                          const link = voucherLink(voucherType, voucherNo)
+                          const debit = mov.debit != null ? Number(mov.debit) : 0
+                          const credit = mov.credit != null ? Number(mov.credit) : 0
+                          const balance = mov.balance != null ? Number(mov.balance) : 0
+                          const party = mov.party as string | null | undefined
                           return (
                             <tr key={i}>
-                              <td className="td-muted">{formatDate(mov.postingDate)}</td>
+                              <td className="td-muted">{mov.posting_date ? formatDate(String(mov.posting_date)) : '—'}</td>
                               <td>
                                 {link
                                   ? (
@@ -193,31 +289,31 @@ export default function LibroMayorPage() {
                                         style={{ padding: '0 4px', fontSize: 12 }}
                                         onClick={() => navigate(link)}
                                       >
-                                        {mov.voucherNo}
+                                        {voucherNo}
                                       </button>
                                     )
-                                  : <span style={{ fontSize: 12 }}>{mov.voucherNo}</span>}
-                                {mov.party && (
-                                  <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{mov.party}</div>
+                                  : <span style={{ fontSize: 12 }}>{voucherNo || '—'}</span>}
+                                {party && (
+                                  <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{party}</div>
                                 )}
                               </td>
                               <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
-                                {mov.debit > 0 ? formatDOP(mov.debit) : '—'}
+                                {debit > 0 ? formatDOP(debit) : '—'}
                               </td>
                               <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
-                                {mov.credit > 0 ? formatDOP(mov.credit) : '—'}
+                                {credit > 0 ? formatDOP(credit) : '—'}
                               </td>
                               <td style={{
                                 textAlign: 'right',
                                 fontFamily: 'monospace',
                                 fontSize: 12,
-                                color: mov.balance > 0
+                                color: balance > 0
                                   ? 'var(--success-text)'
-                                  : mov.balance < 0
+                                  : balance < 0
                                     ? 'var(--error-text)'
                                     : undefined,
                               }}>
-                                {formatDOP(mov.balance)}
+                                {formatDOP(balance)}
                               </td>
                             </tr>
                           )
@@ -250,7 +346,7 @@ export default function LibroMayorPage() {
           {/* Global footer */}
           <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--surface-card)', borderRadius: 8, border: '1px solid var(--border-default)' }}>
             <span className="td-muted" style={{ fontSize: 13 }}>
-              {data.totalAccounts} cuenta{data.totalAccounts !== 1 ? 's' : ''} con actividad en el período
+              {groups.length} cuenta{groups.length !== 1 ? 's' : ''} con actividad en el período
             </span>
           </div>
         </>

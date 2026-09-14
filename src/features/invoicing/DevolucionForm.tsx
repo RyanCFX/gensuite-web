@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
@@ -16,7 +16,8 @@ import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { RotateCcw, Users, FileText, Check, AlertCircle, AlertTriangle } from 'lucide-react'
-import type { ApiError, EcfModificationCode } from '@/shared/api/types'
+import type { ApiError, EcfModificationCode, MotivoAnulacionArs } from '@/shared/api/types'
+import { MOTIVOS_ANULACION_ARS, esCoberturaCompleta } from '@/shared/api/types'
 import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DEVOLUCION_DIAS_LIMITE_ITBIS } from '@/lib/constants'
@@ -44,6 +45,11 @@ export default function DevolucionForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { multiTab, activeId, closeTab } = useTabs()
+  const [searchParams] = useSearchParams()
+  // Precarga desde ?invoiceId=... — usado por Despachos (§2.10) cuando el operador intenta
+  // devolver un despacho ya facturado: el servidor rechaza esa devolución y redirige acá con la
+  // factura correcta ya identificada, en vez de dejar que el usuario la busque de nuevo a mano.
+  const prefillInvoiceId = searchParams.get('invoiceId') ?? ''
 
   // ── Paso 1/2: selección de cliente → factura sometida (pagada o pendiente) ──
   // Todo vive en esta misma vista — elegir la factura no navega a otra pantalla,
@@ -80,6 +86,21 @@ export default function DevolucionForm() {
       sublabel: `${formatDate(i.postingDate)} — ${formatDOP(i.grandTotal)} — ${PAYMENT_STATUS_LABEL[i.paymentStatus ?? ''] ?? 'Sin cobro registrado'}`,
     }))
 
+  const { data: prefillInvoice } = useQuery({
+    queryKey: ['invoice', prefillInvoiceId],
+    queryFn: () => getInvoice(prefillInvoiceId),
+    enabled: !!prefillInvoiceId && !customerId,
+  })
+  useEffect(() => {
+    if (prefillInvoice && !customerId) {
+      setCustomerId(prefillInvoice.customer)
+      setCustomerLabel(prefillInvoice.customerName)
+      setInvoiceId(prefillInvoice.id)
+      setInvoiceLabel(prefillInvoice.ncf ?? prefillInvoice.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillInvoice])
+
   function changeCustomer() {
     setCustomerId('')
     setCustomerLabel('')
@@ -105,7 +126,7 @@ export default function DevolucionForm() {
   })
 
   // e-CF: si la Nota de Crédito (typeId 34) se emite como comprobante electrónico para este
-  // tenant, el modificationCode (Tabla VI DGII) es obligatorio para poder someterla en Aura.
+  // tenant, el modificationCode (Tabla VI DGII) es obligatorio para poder someterla en Vega.
   const { data: ecfTipos } = useQuery({ queryKey: ['ecf-tipos'], queryFn: getEcfTipos, staleTime: 60 * 60_000 })
   const notaCreditoEsEcf = ecfTipoElectronicoHabilitado(ecfTipos, '34')
 
@@ -119,6 +140,10 @@ export default function DevolucionForm() {
   const [modificationCode, setModificationCode] = useState<EcfModificationCode | ''>('')
   const [modificationCodeError, setModificationCodeError] = useState('')
   const modificationCodeTouched = useRef(false)
+
+  // ── Cobertura ARS de la factura original (docs/PROMPT_FARMACIA_V2_FRONTEND.md §5) ────────────
+  const [motivoAnulacionArs, setMotivoAnulacionArs] = useState<MotivoAnulacionArs | ''>('')
+  const [motivoAnulacionDetalle, setMotivoAnulacionDetalle] = useState('')
 
   // Infiere el código de modificación DGII a partir de lo que el usuario elige devolver: la
   // factura completa se declara como "Anula" (1), una devolución parcial como "Corrige montos"
@@ -154,6 +179,8 @@ export default function DevolucionForm() {
     modificationCodeTouched.current = false
     setModificationCode(1)
     setModificationCodeError('')
+    setMotivoAnulacionArs('')
+    setMotivoAnulacionDetalle('')
   }
 
   function toggleReturnRow(itemCode: string) {
@@ -185,6 +212,24 @@ export default function DevolucionForm() {
       .map((m) => ({ value: m.name, label: m.name }))
   }, [metodos, returnModeOfPaymentSearch])
 
+  // El bloque completo (con `montoCoberturaNeta`) viene en `GET /invoices/:id`; leerlo ANTES de
+  // abrir el formulario es lo que decide si hay que pedir el motivo de anulación (§5.1).
+  const arsOriginal = esCoberturaCompleta(invoice?.aseguradora) ? invoice.aseguradora : null
+  const estadoArsOriginal = arsOriginal?.estadoArs ?? null
+  /**
+   * El servidor exige `motivoAnulacionArs` cuando la devolución deja la cobertura en cero y la
+   * aprobación todavía no se facturó a la ARS. Se pide siempre que la devolución sea total y el
+   * estado sea Pendiente/En Lote — es la recomendación del doc y evita el 400 que borra el
+   * borrador sin dejar rastro (§5.1).
+   */
+  const requiereMotivoArs =
+    !!arsOriginal && returnFullInvoice && (estadoArsOriginal === 'Pendiente' || estadoArsOriginal === 'En Lote')
+  const motivoArsValid =
+    !requiereMotivoArs ||
+    (!!motivoAnulacionArs &&
+      (motivoAnulacionArs !== 'Otro' ||
+        (motivoAnulacionDetalle.trim().length >= 5 && motivoAnulacionDetalle.trim().length <= 500)))
+
   const returnCheckedRows = returnRows.filter((r) => r.checked)
   const returnReasonValid = returnReason.trim().length >= 10 && returnReason.trim().length <= 500
   const returnModeValid = returnResolution !== 'refund' || !!returnModeOfPayment
@@ -192,10 +237,10 @@ export default function DevolucionForm() {
     returnFullInvoice ||
     (returnCheckedRows.length > 0 && returnCheckedRows.every((r) => r.qty > 0 && r.qty <= r.qtyPurchased))
   const returnModificationCodeValid = !notaCreditoEsEcf || !!modificationCode
-  const canConfirmReturn = returnReasonValid && returnModeValid && returnItemsValid && returnModificationCodeValid
+  const canConfirmReturn = returnReasonValid && returnModeValid && returnItemsValid && returnModificationCodeValid && motivoArsValid
 
   const isDirty = useDirtyCheck(
-    { returnFullInvoice, returnRows, returnResolution, returnModeOfPayment, returnReason, modificationCode },
+    { returnFullInvoice, returnRows, returnResolution, returnModeOfPayment, returnReason, modificationCode, motivoAnulacionArs, motivoAnulacionDetalle },
     !!invoiceId && !loadingInvoice,
   )
   const confirmClose = useConfirmClose(isDirty, () => navigate('/devoluciones'))
@@ -210,12 +255,26 @@ export default function DevolucionForm() {
         refundModeOfPayment: returnResolution === 'refund' ? returnModeOfPayment : undefined,
         reason: returnReason.trim(),
         modificationCode: modificationCode || undefined,
+        // Solo se mandan si la factura original tiene cobertura — en un tenant general el
+        // backend rechazaría el bloque.
+        motivoAnulacionArs: arsOriginal ? (motivoAnulacionArs || undefined) : undefined,
+        motivoAnulacionDetalle:
+          arsOriginal && motivoAnulacionArs === 'Otro' ? motivoAnulacionDetalle.trim() : undefined,
       })
     },
     onSuccess: (result) => {
       toast.success(result.message ?? 'Devolución procesada correctamente', {
-        duration: result.appliedToOriginalInvoice ? 8000 : undefined,
+        duration: result.appliedToOriginalInvoice || result.aseguradora ? 8000 : undefined,
       })
+      if (result.aseguradora?.creditNoteAseguradoraId) {
+        toast.success(
+          `Nota de crédito a la aseguradora: ${result.aseguradora.creditNoteAseguradoraId}` +
+            (result.aseguradora.ncfAseguradora ? ` (NCF ${result.aseguradora.ncfAseguradora})` : ''),
+          { duration: 10000 },
+        )
+      } else if (result.aseguradora?.aprobacionAnulada) {
+        toast.info('La aprobación ARS quedó anulada y la factura salió del lote, si estaba en uno.', { duration: 8000 })
+      }
       const formTabId = activeId
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       queryClient.invalidateQueries({ queryKey: ['invoice', invoiceId] })
@@ -231,6 +290,15 @@ export default function DevolucionForm() {
       // como error de validación del campo, no como un toast genérico.
       if (err?.message?.toLowerCase().includes('modificationcode')) {
         setModificationCodeError(err.message)
+        return
+      }
+      // 500 a mitad de camino: la NC del paciente YA se emitió y solo falló el paso de la ARS.
+      // Reintentar este POST duplicaría la nota del paciente — hay que usar el endpoint de
+      // reintento desde el detalle de la devolución (§5.4).
+      const retryMatch = err?.message?.match(/\/devoluciones\/([^/\s]+)\/emitir-nc-aseguradora/)
+      if (retryMatch) {
+        toast.error(err.message, { duration: 15000 })
+        navigate(`/devoluciones/${retryMatch[1]}`)
         return
       }
       toast.error(err?.message ?? 'Error al procesar la devolución')
@@ -365,6 +433,20 @@ export default function DevolucionForm() {
                   fiscal, la nota de crédito no reintegrará el ITBIS, solo el monto neto antes de impuestos.
                 </div>
               )}
+              {arsOriginal && (
+                <div className="inline-alert" style={{ display: 'block' }}>
+                  <strong>Esta factura tiene cobertura de {arsOriginal.aseguradoraName ?? arsOriginal.aseguradora}.</strong>
+                  <div style={{ fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>
+                    Cobertura neta {formatDOP(arsOriginal.montoCoberturaNeta)} · a cargo del paciente{' '}
+                    {formatDOP(arsOriginal.montoPaciente)} · estado ARS <strong>{estadoArsOriginal ?? '—'}</strong>.
+                    {' '}La parte de la ARS se revierte sola: lo que elijas abajo
+                    ("¿Qué hacer con el monto?" y el método de reembolso) aplica <strong>solo a la
+                    parte del paciente</strong>.
+                    {estadoArsOriginal === 'Facturado' && ' Como ya se facturó a la ARS, además se emitirá una nota de crédito a la aseguradora contra la consolidada del lote.'}
+                  </div>
+                </div>
+              )}
+
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
                 <input
                   type="checkbox"
@@ -422,6 +504,45 @@ export default function DevolucionForm() {
                 </div>
               )}
 
+              {arsOriginal && estadoArsOriginal !== 'Facturado' && (
+                <>
+                  <div className="ff-wrap">
+                    <label className={`ff-label${requiereMotivoArs ? ' ff-required' : ''}`}>
+                      Motivo de anulación ARS
+                    </label>
+                    <Select
+                      value={motivoAnulacionArs || ''}
+                      onValueChange={(v) => setMotivoAnulacionArs((v || '') as MotivoAnulacionArs | '')}
+                      placeholder="Selecciona el motivo…"
+                    >
+                      {MOTIVOS_ANULACION_ARS.map((m) => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </Select>
+                    <p className="ff-hint">
+                      {requiereMotivoArs
+                        ? 'Obligatorio: esta devolución deja la cobertura en cero y la aprobación ARS quedará anulada con este motivo.'
+                        : 'Opcional en devoluciones parciales — queda registrado en la aprobación ARS.'}
+                    </p>
+                  </div>
+
+                  {motivoAnulacionArs === 'Otro' && (
+                    <div className="ff-wrap">
+                      <label className="ff-label ff-required">Detalle del motivo</label>
+                      <textarea
+                        className="ff-textarea"
+                        rows={2}
+                        value={motivoAnulacionDetalle}
+                        onChange={(e) => setMotivoAnulacionDetalle(e.target.value)}
+                        placeholder="Describe el motivo (entre 5 y 500 caracteres)"
+                        maxLength={500}
+                      />
+                      <p className="ff-hint">{motivoAnulacionDetalle.trim().length}/500 caracteres (mínimo 5)</p>
+                    </div>
+                  )}
+                </>
+              )}
+
               <div className="ff-wrap">
                 <label className={`ff-label${notaCreditoEsEcf ? ' ff-required' : ''}`}>Código de modificación (DGII)</label>
                 <Select
@@ -451,7 +572,9 @@ export default function DevolucionForm() {
               </div>
 
               <div className="ff-wrap">
-                <label className="ff-label ff-required">¿Qué hacer con el monto?</label>
+                <label className="ff-label ff-required">
+                  ¿Qué hacer con el monto{arsOriginal ? ' de la parte del paciente' : ''}?
+                </label>
                 <SearchSelect
                   value={returnResolution}
                   selectedLabel={RETURN_RESOLUTION_OPTIONS.find((o) => o.value === returnResolution)?.label ?? ''}
