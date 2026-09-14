@@ -10,6 +10,10 @@ import type {
   PurchaseReceipt,
   PaginatedResponse,
   PaginationParams,
+  PendienteAbastecimientoLinea,
+  ListPendientesAbastecimientoParams,
+  CreateOrdenDesdePedidosDto,
+  OrdenDesdePedidosMargenResult,
 } from './types'
 
 export interface ListOrdenesCompraParams extends PaginationParams {
@@ -97,4 +101,28 @@ export async function facturarOrdenCompra(id: string, data: CreateInvoiceFromOrd
 export async function getOrdenCompraPdfBlobUrl(id: string): Promise<string> {
   const res = await client.get<Blob>(ENDPOINTS.ordenesCompra.pdf(id), { responseType: 'blob' })
   return URL.createObjectURL(res.data)
+}
+
+// ─── Abastecimiento (multi-pedido) — docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md §5 ───
+
+/** Viene ya ordenado FIFO por transactionDate — no reordenar del lado del cliente. */
+export async function listPendientesAbastecimiento(params?: ListPendientesAbastecimientoParams) {
+  const res = await client.get<PaginatedResponse<PendienteAbastecimientoLinea>>(
+    ENDPOINTS.ordenesCompra.pendientesAbastecimiento,
+    { params },
+  )
+  return unwrapPaginated(res)
+}
+
+/** Si alguna línea tiene margen negativo/nulo y `confirmarMargenNegativo` no viene en `true`, el
+ *  servidor NO crea nada y responde `{ requiereConfirmacion: true, warnings: [...] }` — reenviar el
+ *  mismo request con `confirmarMargenNegativo: true` tras confirmación explícita del operador. */
+export async function crearOrdenDesdePedidos(
+  dto: CreateOrdenDesdePedidosDto,
+): Promise<OrdenCompra | OrdenDesdePedidosMargenResult> {
+  const res = await client.post<{ success: true; data: OrdenCompra | OrdenDesdePedidosMargenResult }>(
+    ENDPOINTS.ordenesCompra.desdePedidos,
+    dto,
+  )
+  return unwrap(res)
 }

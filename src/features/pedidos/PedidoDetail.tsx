@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getPedido, submitPedido, cancelPedido, amendPedido, downloadPedidoPdf, facturarApartado, cancelarApartado } from '@/shared/api/pedidos'
-import { listMetodosPago } from '@/shared/api/config'
+import { listMetodosPago, getFacturacionConfig } from '@/shared/api/config'
+import { crearDespachoDesdePedido } from '@/shared/api/despachos'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
 import { RelatedDocsCard } from '@/components/shared/RelatedDocsCard'
-import { displayId, formatDate, formatDOP } from '@/lib/formatters'
+import { displayId, formatDate, formatMoney } from '@/lib/formatters'
 import type { ApiError } from '@/shared/api/types'
-import { ArrowLeft, Download, Send, Trash2, GitBranch, FileText, History, Copy, PackageOpen, AlertTriangle, Ban } from 'lucide-react'
+import { ArrowLeft, Download, Send, Trash2, GitBranch, FileText, History, Copy, PackageOpen, AlertTriangle, Ban, Truck } from 'lucide-react'
 import { toast } from 'sonner'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -42,6 +43,14 @@ export default function PedidoDetail() {
     enabled: !!id,
   })
 
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
+  const despachoHabilitado = facturacionConfig?.despachoHabilitado ?? false
+
   const { data: metodos } = useQuery({
     queryKey: ['metodos-pago'],
     queryFn: listMetodosPago,
@@ -74,6 +83,17 @@ export default function PedidoDetail() {
     mutationFn: () => cancelPedido(id!),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['pedidos'] }); queryClient.invalidateQueries({ queryKey: ['pedido', id] }); toast.success('Pedido cancelado') },
     onError: () => toast.error('Error al cancelar el pedido'),
+  })
+
+  // §4.2 — solo mientras el pedido no tenga factura todavía; si ya la tiene, se prefiere despachar
+  // desde ahí (§3.3) para que delivered_qty quede exacto — el botón se oculta en ese caso.
+  const despacharPedidoMutation = useMutation({
+    mutationFn: () => crearDespachoDesdePedido(id!),
+    onSuccess: (despacho) => {
+      toast.success(`Despacho ${despacho.id} creado en Borrador — revísalo y somételo`)
+      navigate(`/despachos/${despacho.id}`)
+    },
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al crear el despacho'),
   })
 
   const cancelarApartadoMutation = useMutation({
@@ -156,6 +176,11 @@ export default function PedidoDetail() {
             <span className={`badge ${STATUS_BADGE[pedido.status] ?? 'badge-neutral'}`}>{STATUS_LABEL[pedido.status] ?? pedido.status}</span>
             {pedido.sequence > 0 && <span className="badge badge-info">seq {pedido.sequence}</span>}
             {pedido.amendedFrom && <span className="badge badge-neutral">Enmienda</span>}
+            {pedido.currency && pedido.currency !== monedaBase && (
+              <span className="badge badge-info" title={pedido.conversionRate != null ? `Tasa ${pedido.conversionRate}` : undefined}>
+                {pedido.currency}
+              </span>
+            )}
             {pedido.isLayaway && (
               <span className={`badge ${pedido.layawayVencido ? 'badge-error' : 'badge-info'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                 <PackageOpen size={12} /> Apartado
@@ -218,6 +243,15 @@ export default function PedidoDetail() {
             {pedido.isLayaway && !pedido.facturaId && (
               <button className="btn btn-primary btn-size-sm" onClick={() => facturarApartadoMutation.mutate()} disabled={isPending}>
                 <Send size={14} /> Facturar Apartado
+              </button>
+            )}
+            {despachoHabilitado && (pedido.invoices?.length ?? (pedido.facturaId ? 1 : 0)) === 0 && (
+              <button
+                className="btn btn-navy btn-size-sm"
+                onClick={() => despacharPedidoMutation.mutate()}
+                disabled={despacharPedidoMutation.isPending}
+              >
+                <Truck size={14} /> {despacharPedidoMutation.isPending ? 'Creando despacho…' : 'Despachar'}
               </button>
             )}
             <button className="btn btn-ghost btn-size-sm" onClick={() => amendMutation.mutate()} disabled={isPending}>
@@ -298,6 +332,12 @@ export default function PedidoDetail() {
                 )}
               </span>
             </div>
+            {pedido.esClienteOcasional && pedido.clienteOcasionalRnc && (
+              <div className="detail-field">
+                <span className="detail-label">RNC / Cédula</span>
+                <span className="detail-value" style={{ fontFamily: 'monospace' }}>{pedido.clienteOcasionalRnc}</span>
+              </div>
+            )}
             {pedido.esClienteOcasional && pedido.clienteOcasionalDireccion && (
               <div className="detail-field">
                 <span className="detail-label">Dirección</span>
@@ -352,21 +392,21 @@ export default function PedidoDetail() {
                   <td>{item.description || '—'}</td>
                   <td style={{ fontSize: 12, color: 'var(--text-tertiary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.notes ?? ''}>{item.notes ?? '—'}</td>
                   <td style={{ textAlign: 'right' }}>{item.qty}</td>
-                  <td style={{ textAlign: 'right' }}>{formatDOP(item.rate)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatMoney(item.rate, pedido.currency)}</td>
                   <td style={{ textAlign: 'right' }}>{item.discountPct ? `${item.discountPct}%` : '—'}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
-                  <td style={{ textAlign: 'right' }} title={`${item.taxRate}%`}>{formatDOP(item.taxAmount)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount, pedido.currency)}</td>
+                  <td style={{ textAlign: 'right' }} title={`${item.taxRate}%`}>{formatMoney(item.taxAmount, pedido.currency)}</td>
                   <td>{item.uom || '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
           <div className="items-total-row">
-            <div className="items-total-line"><span>Subtotal bruto</span><span>{formatDOP(grossTotal)}</span></div>
-            {totalDiscount > 0 && <div className="items-total-line" style={{ color: 'var(--text-danger)' }}><span>Descuento total</span><span>-{formatDOP(totalDiscount)}</span></div>}
-            {/*<div className="items-total-line"><span>Subtotal neto</span><span>{formatDOP(subtotal)}</span></div>*/}
-            <div className="items-total-line"><span>Impuesto</span><span>{formatDOP(taxAmount)}</span></div>
-            <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}><span>Total</span><span>{formatDOP(total)}</span></div>
+            <div className="items-total-line"><span>Subtotal bruto</span><span>{formatMoney(grossTotal, pedido.currency)}</span></div>
+            {totalDiscount > 0 && <div className="items-total-line" style={{ color: 'var(--text-danger)' }}><span>Descuento total</span><span>-{formatMoney(totalDiscount, pedido.currency)}</span></div>}
+            {/*<div className="items-total-line"><span>Subtotal neto</span><span>{formatMoney(subtotal, pedido.currency)}</span></div>*/}
+            <div className="items-total-line"><span>Impuesto</span><span>{formatMoney(taxAmount, pedido.currency)}</span></div>
+            <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}><span>Total</span><span>{formatMoney(total, pedido.currency)}</span></div>
           </div>
         </div>
       </div>

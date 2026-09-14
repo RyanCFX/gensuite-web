@@ -26,7 +26,10 @@ import { createDevolucion } from "@/shared/api/devoluciones";
 import { getItem } from "@/shared/api/catalog";
 import { getBundle } from "@/shared/api/bundles";
 import { getTurnoActual, abrirTurno } from "@/shared/api/pos";
+import { crearDespachoDesdeFactura } from "@/shared/api/despachos";
 import { ECF_SUBMIT_UNAVAILABLE_MSG } from "@/shared/api/ecf";
+import { esClienteEmisorNoEncontrado } from "@/lib/ecfErrors";
+import { formatStockInsufficientMessage } from "@/lib/stockAlerts";
 import { usePosTicketPrinter } from "@/shared/hooks/usePosTicketPrinter";
 import { useAuthStore } from "@/stores/auth.store";
 import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion, EcfSubmitResult } from "@/shared/api/types";
@@ -63,15 +66,19 @@ import {
   Eye,
   Archive,
   Printer,
+  Truck,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   formatDate,
   formatDateTime,
   formatDOP,
+  formatMoney,
   displayId,
 } from "@/lib/formatters";
 
+import { useMetodoPagoCurrencies } from "@/shared/hooks/useMetodoPagoCurrencies";
+import { isApiErrorCode, ERROR_CODES } from "@/shared/api/client";
 import { DocumentHistoryCard } from "@/components/shared/DocumentHistoryCard";
 import { EcfStatusCard } from "@/components/shared/EcfStatusCard";
 import { RelatedDocsCard } from "@/components/shared/RelatedDocsCard";
@@ -218,6 +225,8 @@ export default function InvoiceDetail() {
     staleTime: 5 * 60_000,
   });
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false;
+  const despachoHabilitado = facturacionConfig?.despachoHabilitado ?? false;
+  const monedaBase = facturacionConfig?.monedaBase ?? "DOP";
   const flujoCobro = facturacionConfig?.flujoCobro ?? "directo";
   const formatoImpresionDefault = facturacionConfig?.formatoImpresionDefault ?? "a4";
   const formatosPermitidos = facturacionConfig?.formatosPermitidos;
@@ -450,7 +459,13 @@ export default function InvoiceDetail() {
   const paymentRequired = showPaymentBlock && noCredit;
 
   const metodosActivos = (metodos ?? []).filter((m) => !m.disabled);
-  const directoMopOptions: SearchSelectOption[] = metodosActivos
+  // Igual que Caja (docs/tasks/70_caja_pos_sin_soporte_multimoneda.md): este bloque somete y
+  // cobra la factura en el mismo paso, sin conversión — solo se ofrecen métodos de pago que
+  // operan en la misma moneda que la factura.
+  const metodoCurrencies = useMetodoPagoCurrencies(metodosActivos, monedaBase);
+  const invoiceCurrency = invoice?.currency ?? monedaBase;
+  const metodosCompatibles = metodosActivos.filter((m) => (metodoCurrencies[m.name] ?? monedaBase) === invoiceCurrency);
+  const directoMopOptions: SearchSelectOption[] = metodosCompatibles
     .filter((m) => !directoMopSearch || m.name.toLowerCase().includes(directoMopSearch.toLowerCase()))
     .map((m) => ({ value: m.name, label: m.name }));
   const paymentsFilled =
@@ -523,12 +538,12 @@ export default function InvoiceDetail() {
         toast.success("Factura sometida y cobrada");
       } else if (updated.isPos && updated.outstandingAmount > 0) {
         toast.success(
-          `Factura sometida con pago parcial — saldo pendiente: ${formatDOP(updated.outstandingAmount)}`,
+          `Factura sometida con pago parcial — saldo pendiente: ${formatMoney(updated.outstandingAmount, invoiceCurrency)}`,
         );
         setSubmitResult({ outstandingAmount: updated.outstandingAmount, invoiceId: updated.id });
       } else if (updated.cobro && !updated.cobro.fullyPaid) {
         toast.success(
-          `Factura sometida con pago parcial — saldo pendiente: ${formatDOP(updated.outstandingAmount)}`,
+          `Factura sometida con pago parcial — saldo pendiente: ${formatMoney(updated.outstandingAmount, invoiceCurrency)}`,
         );
         setSubmitResult({ outstandingAmount: updated.outstandingAmount, invoiceId: updated.id });
       } else if (updated.paymentStatus === "paid") {
@@ -547,6 +562,10 @@ export default function InvoiceDetail() {
     },
     onError: (err: ApiError) => {
       const msg = err?.message ?? "";
+      if (isApiErrorCode(err, ERROR_CODES.POS_PAYMENT_CURRENCY_MISMATCH)) {
+        toast.error(msg, { duration: 8000 });
+        return;
+      }
       if (err?.statusCode === 503) {
         toast.error(ECF_SUBMIT_UNAVAILABLE_MSG, {
           duration: 8000,
@@ -572,6 +591,19 @@ export default function InvoiceDetail() {
             onClick: () => navigate("/inventario/zonas?tab=pendientes"),
           },
         });
+        return;
+      }
+      if (esClienteEmisorNoEncontrado(msg)) {
+        toast.error(msg, {
+          duration: 10000,
+          action: isSystemManager
+            ? { label: "Ir a administración de e-CF", onClick: () => navigate("/config/ecf/admin") }
+            : undefined,
+        });
+        return;
+      }
+      if (isApiErrorCode(err, ERROR_CODES.STOCK_INSUFFICIENT_OR_RESERVED)) {
+        toast.error(formatStockInsufficientMessage(err), { duration: 8000 });
         return;
       }
       toast.error(msg || "Error al someter la factura");
@@ -852,6 +884,21 @@ export default function InvoiceDetail() {
     onError: (err: { message?: string }) => {
       toast.error(err?.message ?? "Error al enmendar la factura");
     },
+  });
+
+  // §3.3 — solo tiene sentido con despacho activo: la factura ya no descontó inventario al
+  // someterse (update_stock=0), así que hay que despachar aparte para la salida física real.
+  const despacharMutation = useMutation({
+    mutationFn: () => crearDespachoDesdeFactura(id!),
+    onSuccess: (despacho) => {
+      if (despacho.items.length === 0) {
+        toast.info("Esta factura ya fue despachada por completo");
+        return;
+      }
+      toast.success(`Despacho ${despacho.id} creado en Borrador — revísalo y somételo`);
+      navigate(`/despachos/${despacho.id}`);
+    },
+    onError: (err: { message?: string }) => toast.error(err?.message ?? "Error al crear el despacho"),
   });
 
   const isActionsLoading =
@@ -1198,6 +1245,7 @@ export default function InvoiceDetail() {
                     amountDue={pendingAmount}
                     value={payments}
                     onChange={setPayments}
+                    currency={invoiceCurrency}
                   />
                 )}
 
@@ -1212,6 +1260,15 @@ export default function InvoiceDetail() {
               </div>
             )}
           </div>
+        )}
+        {invoice.status === "submitted" && despachoHabilitado && (
+          <button
+            className="btn btn-navy btn-size-sm"
+            onClick={() => despacharMutation.mutate()}
+            disabled={despacharMutation.isPending}
+          >
+            <Truck size={14} /> {despacharMutation.isPending ? "Creando despacho…" : "Despachar"}
+          </button>
         )}
         {invoice.status === "submitted" && (
           <>
@@ -1318,7 +1375,7 @@ export default function InvoiceDetail() {
         >
           <AlertTriangle size={16} />
           <span style={{ fontSize: 13, flex: 1 }}>
-            Esta factura tiene un saldo pendiente de {formatDOP(submitResult.outstandingAmount)} — puedes
+            Esta factura tiene un saldo pendiente de {formatMoney(submitResult.outstandingAmount, invoice?.currency)} — puedes
             completar el cobro desde la cola de Caja.
           </span>
           <button
@@ -1476,9 +1533,27 @@ export default function InvoiceDetail() {
                   className="detail-value"
                   style={{ fontWeight: 700, color: outstandingColor }}
                 >
-                  {formatDOP(invoice.outstandingAmount)}
+                  {formatMoney(invoice.outstandingAmount, invoice.currency)}
                 </span>
+                {invoice.currency && invoice.currency !== monedaBase && invoice.baseOutstandingAmount != null && (
+                  <span className="detail-value" style={{ fontWeight: 400, fontSize: 12, color: "var(--text-tertiary)" }}>
+                    ≈ {formatMoney(invoice.baseOutstandingAmount, monedaBase)}
+                  </span>
+                )}
               </div>
+              {invoice.currency && invoice.currency !== monedaBase && (
+                <div className="detail-field">
+                  <span className="detail-label">Moneda</span>
+                  <span className="detail-value">
+                    {invoice.currency}
+                    {invoice.conversionRate != null && (
+                      <span style={{ fontWeight: 400, fontSize: 12, color: "var(--text-tertiary)", marginLeft: 6 }}>
+                        (tasa {invoice.conversionRate})
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
               {(ps || invoice.isPos) && (
                 <div className="detail-field">
                   <span className="detail-label">Estado de Pago</span>
@@ -2041,8 +2116,8 @@ export default function InvoiceDetail() {
                   margin: 0,
                 }}
               >
-                Estos artículos requieren tracking de serial/lote. ERPNext lo
-                asigna automáticamente al someter si hay stock disponible —
+                Estos artículos requieren tracking de serial/lote. Se asigna
+                automáticamente al someter si hay stock disponible —
                 usa este selector solo si quieres elegir uno específico, o si
                 el submit falla por falta de stock.
               </p>
@@ -2208,19 +2283,19 @@ export default function InvoiceDetail() {
                             marginRight: 4,
                           }}
                         >
-                          {formatDOP(item.rate)}
+                          {formatMoney(item.rate, invoice.currency)}
                         </span>
-                        {formatDOP(item.discountedRate ?? item.rate)}
+                        {formatMoney(item.discountedRate ?? item.rate, invoice.currency)}
                       </>
                     ) : (
-                      formatDOP(item.rate)
+                      formatMoney(item.rate, invoice.currency)
                     )}
                   </td>
                   <td style={{ textAlign: "right" }}>
                     {item.discountPct ? `${item.discountPct}%` : "—"}
                   </td>
                   <td style={{ textAlign: "right", fontWeight: 500 }}>
-                    {formatDOP(item.amount)}
+                    {formatMoney(item.amount, invoice.currency)}
                   </td>
                   <td>{item.uom || "—"}</td>
                   {arsCobertura && (
@@ -2256,7 +2331,7 @@ export default function InvoiceDetail() {
                 <>
                   <div className="items-total-line">
                     <span>Subtotal bruto</span>
-                    <span>{formatDOP(gross)}</span>
+                    <span>{formatMoney(gross, invoice.currency)}</span>
                   </div>
                   {discount > 0 && (
                     <div
@@ -2264,7 +2339,7 @@ export default function InvoiceDetail() {
                       style={{ color: "var(--text-danger)" }}
                     >
                       <span>Descuento total</span>
-                      <span>-{formatDOP(discount)}</span>
+                      <span>-{formatMoney(discount, invoice.currency)}</span>
                     </div>
                   )}
                 </>
@@ -2272,7 +2347,7 @@ export default function InvoiceDetail() {
             })()}
             <div className="items-total-line">
               <span>Impuestos</span>
-              <span>{formatDOP(invoice.grandTotal - invoice.subtotal)}</span>
+              <span>{formatMoney(invoice.grandTotal - invoice.subtotal, invoice.currency)}</span>
             </div>
             {creditoAplicado > 0 && (
               <div
@@ -2280,7 +2355,7 @@ export default function InvoiceDetail() {
                 style={{ color: "var(--color-success)" }}
               >
                 <span>Crédito</span>
-                <span>-{formatDOP(creditoAplicado)}</span>
+                <span>-{formatMoney(creditoAplicado, invoice.currency)}</span>
               </div>
             )}
             <div
@@ -2288,12 +2363,18 @@ export default function InvoiceDetail() {
               style={{ fontWeight: roundingAdjustment !== 0 ? 500 : 700, fontSize: roundingAdjustment !== 0 ? 13 : 15 }}
             >
               <span>Total</span>
-              <span>{formatDOP(invoice.grandTotal)}</span>
+              <span>{formatMoney(invoice.grandTotal, invoice.currency)}</span>
             </div>
+            {invoice.currency && invoice.currency !== monedaBase && invoice.baseGrandTotal != null && (
+              <div className="items-total-line" style={{ color: "var(--text-tertiary)", fontSize: 12 }}>
+                <span>Equivalente en {monedaBase}</span>
+                <span>≈ {formatMoney(invoice.baseGrandTotal, monedaBase)}</span>
+              </div>
+            )}
             {roundingAdjustment !== 0 && (
               <div className="items-total-line" style={{ color: "var(--text-tertiary)", fontSize: 13 }}>
                 <span>Ajuste por redondeo</span>
-                <span>{roundingAdjustment > 0 ? "+" : ""}{formatDOP(roundingAdjustment)}</span>
+                <span>{roundingAdjustment > 0 ? "+" : ""}{formatMoney(roundingAdjustment, invoice.currency)}</span>
               </div>
             )}
             {roundingAdjustment !== 0 && (
@@ -2302,7 +2383,7 @@ export default function InvoiceDetail() {
                 style={{ fontWeight: 700, fontSize: 15 }}
               >
                 <span>Total a pagar</span>
-                <span>{formatDOP(roundedTotal)}</span>
+                <span>{formatMoney(roundedTotal, invoice.currency)}</span>
               </div>
             )}
             {creditoAplicado > 0 && (
@@ -2311,7 +2392,7 @@ export default function InvoiceDetail() {
                 style={{ fontWeight: 700, fontSize: 15 }}
               >
                 <span>Total después de crédito</span>
-                <span>{formatDOP(roundedTotal - creditoAplicado)}</span>
+                <span>{formatMoney(roundedTotal - creditoAplicado, invoice.currency)}</span>
               </div>
             )}
             {invoice.status === "submitted" && (
@@ -2320,7 +2401,13 @@ export default function InvoiceDetail() {
                 style={{ color: outstandingColor, fontWeight: 600 }}
               >
                 <span>Pendiente</span>
-                <span>{formatDOP(invoice.outstandingAmount)}</span>
+                <span>{formatMoney(invoice.outstandingAmount, invoice.currency)}</span>
+              </div>
+            )}
+            {invoice.status === "submitted" && invoice.currency && invoice.currency !== monedaBase && invoice.baseOutstandingAmount != null && (
+              <div className="items-total-line" style={{ color: "var(--text-tertiary)", fontSize: 12 }}>
+                <span>Pendiente equivalente en {monedaBase}</span>
+                <span>≈ {formatMoney(invoice.baseOutstandingAmount, monedaBase)}</span>
               </div>
             )}
           </div>
@@ -2355,7 +2442,7 @@ export default function InvoiceDetail() {
           bundleName={trackingRecovery.itemName ?? trackingRecovery.itemCode}
           components={[trackingRecovery]}
           title={`Serial / Lote requerido — ${trackingRecovery.itemName ?? trackingRecovery.itemCode}`}
-          description="ERPNext no pudo asignar automáticamente el serial/lote de este artículo (sin stock disponible en el almacén de la línea, o requiere selección manual). Elige uno para continuar."
+          description="No se pudo asignar automáticamente el serial/lote de este artículo (sin stock disponible en el almacén de la línea, o requiere selección manual). Elige uno para continuar."
           confirmLabel={assignTrackingRecoveryMutation.isPending ? "Asignando…" : "Asignar y reintentar"}
           onConfirm={(tracking) => assignTrackingRecoveryMutation.mutate(tracking)}
           onClose={() => setTrackingRecovery(null)}
@@ -2376,7 +2463,7 @@ export default function InvoiceDetail() {
             warehouse: p.warehouse,
           }))}
           title="Asignar seriales/lotes pendientes"
-          description="Selecciona los seriales/lotes de cada artículo pendiente. No es obligatorio para someter la factura — ERPNext los asigna automáticamente si hay stock disponible."
+          description="Selecciona los seriales/lotes de cada artículo pendiente. No es obligatorio para someter la factura — se asignan automáticamente si hay stock disponible."
           confirmLabel={
             assignPendingTrackingMutation.isPending
               ? "Guardando…"
@@ -2711,7 +2798,7 @@ export default function InvoiceDetail() {
                 />
                 {hasOutstandingBalance && (
                   <p className="ff-hint">
-                    Esta factura tiene {formatDOP(invoice.outstandingAmount)}{" "}
+                    Esta factura tiene {formatMoney(invoice.outstandingAmount, invoice.currency)}{" "}
                     pendiente de cobro — la nota de crédito se aplicará
                     automáticamente a ese pendiente, por eso "Reembolsar
                     ahora" no está disponible.

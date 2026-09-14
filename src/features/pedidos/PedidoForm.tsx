@@ -7,16 +7,18 @@ import { createPedido, updatePedido, getPedido, getPedidoDuplicateSource } from 
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getQuotation } from '@/shared/api/quotations'
 import { getLayawayConfig, listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
-import type { Item, ItemPrices, CreatePedidoDto, Bundle, Customer } from '@/shared/api/types'
+import type { Item, ItemPrices, CreatePedidoDto, Bundle, Customer, ItemStock } from '@/shared/api/types'
+import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
-import { formatDOP, round2 } from '@/lib/formatters'
+import { formatDOP, formatMoney, round2 } from '@/lib/formatters'
+import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, PackageOpen, UserPlus } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, PackageOpen, UserPlus, ChevronDown } from 'lucide-react'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { toast } from 'sonner'
@@ -45,6 +47,10 @@ interface LineItem {
   rate: number
   amount: number
   discountPct: number
+  /** Modo de descuento de la línea — mutuamente excluyentes, nunca se envían ambos al backend */
+  discountMode: 'pct' | 'amount'
+  /** Descuento fijo en RD$ — solo aplica en modo "monto fijo" */
+  discountAmount: number
   uom: string
   conversionFactor: number
   maxDiscountPct?: number
@@ -52,23 +58,31 @@ interface LineItem {
   warehouse: string
   /** Stock por almacén del artículo seleccionado, para validar contra el almacén elegido en la línea */
   _stockByWarehouse?: Record<string, number>
-  stockError?: string
 }
 
-function validateLineStock(row: LineItem): string | undefined {
-  if (!row.warehouse || !row._stockByWarehouse) return undefined
-  const available = row._stockByWarehouse[row.warehouse] ?? 0
-  if (row.qty > available) {
-    return `Stock insuficiente en ${row.warehouse}. Disponible: ${available}`
+// Un Pedido no valida disponibilidad del lado del servidor antes de crearse (ni siquiera al
+// someterse, si no toca stock — despacho habilitado, o el pedido queda en borrador) — ver
+// docs/tasks/73_alertas_stock_disponible_reservado.md §4.2. Esta es la única barrera real contra
+// prometer stock que ya está reservado para otro cliente (Apartado) o que simplemente no alcanza.
+// Compara siempre contra `disponible` (físico − reservado), nunca contra el físico a secas.
+function validateLineStock(row: LineItem, stockMap: Map<string, ItemStock>): string | undefined {
+  if (!row.warehouse || !row.itemCode || row.itemType === 'service' || row.itemType === 'combo') return undefined
+  const info = resolveDisponible(stockMap.get(row.itemCode), row.warehouse)
+  if (!info) return undefined // stock del artículo aún no cargado — no bloquear con datos incompletos
+  if (row.qty > info.disponible) {
+    return info.reservedStock > 0
+      ? `Solo hay ${info.disponible} disponibles de este artículo en ${row.warehouse} (${info.reservedStock} reservadas para otro cliente)`
+      : `Stock insuficiente en ${row.warehouse}. Disponible: ${info.disponible}`
   }
   return undefined
 }
 
 function todayIso() { return format(new Date(), 'yyyy-MM-dd') }
 function defaultDelivery() { return format(addDays(new Date(), 7), 'yyyy-MM-dd') }
-function calcAmount(qty: number, rate: number, discountPct: number = 0) {
-  const base = qty * rate; const discount = base * (discountPct / 100)
-  return Math.round((base - discount) * 100) / 100
+function calcAmount(qty: number, rate: number, discountPct: number = 0, discountAmount: number = 0) {
+  const base = qty * rate
+  const discount = discountAmount > 0 ? discountAmount : base * (discountPct / 100)
+  return Math.round(Math.max(0, base - discount) * 100) / 100
 }
 
 function maxDiscFromPrices(rate: number, prices: ItemPrices | undefined): number {
@@ -97,10 +111,15 @@ const [customerId, setCustomerId] = useState('')
    const [showCreateCustomer, setShowCreateCustomer] = useState(false)
    const [esClienteOcasional, setEsClienteOcasional] = useState(false)
    const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
+   const [clienteOcasionalRnc, setClienteOcasionalRnc] = useState('')
    const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
    const [transactionDate, setTransactionDate] = useState(todayIso())
   const [deliveryDate, setDeliveryDate] = useState(defaultDelivery())
   const [items, setItems] = useState<LineItem[]>([])
+  // Disponibilidad real (físico − reservado) por artículo — docs/tasks/73_alertas_stock_disponible_reservado.md.
+  const stockMap = useItemsStock(
+    items.map((i) => (i.itemCode && i.itemType !== 'service' && i.itemType !== 'combo' ? i.itemCode : undefined)),
+  )
   const [highlightedRow, setHighlightedRow] = useState<number | null>(null)
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
   const flashRow = useCallback((index: number) => {
@@ -122,6 +141,11 @@ const [customerId, setCustomerId] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
+  // '' = automático (Cliente.defaultCurrency → moneda base). Al convertir desde una Cotización se
+  // hidrata explícitamente con la moneda/tasa de esa cotización (se hereda tal cual, nunca se
+  // re-resuelve — docs/tasks/64_multimoneda_completo.md §3.3).
+  const [currency, setCurrency] = useState('')
+  const [conversionRate, setConversionRate] = useState<number | ''>('')
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
@@ -129,6 +153,13 @@ const [customerId, setCustomerId] = useState('')
     staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
+  const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
+  const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
+  const monedasHabilitadas = facturacionConfig?.monedasHabilitadas ?? ['DOP']
+  // Con despacho activo, un pedido puede venderse sin stock (se reserva lo que haya y el resto se
+  // completa al recibir la compra — docs/PROMPT_VENDER_SIN_STOCK_FRONTEND.md §0/§9): la falta de
+  // stock deja de ser un bloqueo del lado del cliente y pasa a ser solo informativa.
+  const despachoHabilitado = facturacionConfig?.despachoHabilitado ?? false
 
   const { data: layawayConfig } = useQuery({
     queryKey: ['layaway-config'],
@@ -144,7 +175,7 @@ const [customerId, setCustomerId] = useState('')
         toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
         return
       }
-      const res = await listItems({ barcode: code, limit: 1, branch })
+      const res = await listItems({ barcode: code, limit: 1, branch: despachoHabilitado ? undefined : branch })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
       const existingIndex = items.findIndex((row) => row.itemCode === item.id)
@@ -168,17 +199,27 @@ const [customerId, setCustomerId] = useState('')
     getQuotation(quotationId).then((q) => {
       setCustomerId(q.customer)
       setTransactionDate(todayIso())
-      setItems(q.items.map((i) => ({
-        itemCode: i.itemCode,
-        description: i.description ?? '',
-        qty: i.qty,
-        rate: i.rate,
-        amount: i.amount,
-        discountPct: (i as any).discountPct ?? 0,
-         uom: i.uom,
-         conversionFactor: 1,
-        warehouse: '',
-      })))
+      // Se hereda tal cual de la cotización — nunca se re-resuelve contra el cliente actual.
+      setCurrency(q.currency ?? '')
+      setConversionRate(q.conversionRate ?? '')
+      setItems(q.items.map((i) => {
+        const discountAmount = i.discountAmount ?? 0
+        const discountPct = discountAmount > 0 ? 0 : (i.discountPct ?? 0)
+        const discountMode: 'pct' | 'amount' = discountAmount > 0 ? 'amount' : 'pct'
+        return {
+          itemCode: i.itemCode,
+          description: i.description ?? '',
+          qty: i.qty,
+          rate: i.rate,
+          amount: i.amount,
+          discountPct,
+          discountMode,
+          discountAmount,
+          uom: i.uom,
+          conversionFactor: 1,
+          warehouse: '',
+        }
+      }))
       setNotes(q.notes ?? '')
     }).catch(() => toast.error('Error al cargar la cotización'))
   }, [quotationId, loaded, isEdit])
@@ -190,17 +231,24 @@ const [customerId, setCustomerId] = useState('')
     getPedidoDuplicateSource(duplicateId).then((src) => {
       setCustomerId(src.customer)
       setTransactionDate(todayIso())
-      setItems(src.items.map((i) => ({
-        itemCode: i.itemCode,
-        description: i.description ?? '',
-        qty: i.qty,
-        rate: i.rate,
-        amount: calcAmount(i.qty, i.rate, i.discountPct ?? 0),
-        discountPct: i.discountPct ?? 0,
-         uom: 'Unidad',
-         conversionFactor: 1,
-         warehouse: '',
-      })))
+      setItems(src.items.map((i) => {
+        const discountAmount = i.discountAmount ?? 0
+        const discountPct = discountAmount > 0 ? 0 : (i.discountPct ?? 0)
+        const discountMode: 'pct' | 'amount' = discountAmount > 0 ? 'amount' : 'pct'
+        return {
+          itemCode: i.itemCode,
+          description: i.description ?? '',
+          qty: i.qty,
+          rate: i.rate,
+          amount: calcAmount(i.qty, i.rate, discountPct, discountAmount),
+          discountPct,
+          discountMode,
+          discountAmount,
+          uom: 'Unidad',
+          conversionFactor: 1,
+          warehouse: '',
+        }
+      }))
       getCustomer(src.customer).then((c) => {
         setCustomerName(c.customerName)
         setCustomerPriceTier(c.priceTier)
@@ -225,23 +273,33 @@ useEffect(() => {
      setCustomerId(existing.customer)
      setTransactionDate(existing.transactionDate)
      setDeliveryDate(existing.deliveryDate ?? defaultDelivery())
-     setItems(existing.items.map((i) => ({
-       itemCode: i.itemCode,
-       description: i.description,
-       qty: i.qty,
-       rate: i.rate,
-       amount: i.amount,
-       discountPct: (i as any).discountPct ?? 0,
-        uom: i.uom ?? 'Unidad',
-        conversionFactor: 1,
-       warehouse: '',
-     })))
+     setCurrency(existing.currency ?? '')
+     setConversionRate(existing.conversionRate ?? '')
+     setItems(existing.items.map((i) => {
+       const discountAmount = i.discountAmount ?? 0
+       const discountPct = discountAmount > 0 ? 0 : (i.discountPct ?? 0)
+       const discountMode: 'pct' | 'amount' = discountAmount > 0 ? 'amount' : 'pct'
+       return {
+         itemCode: i.itemCode,
+         description: i.description,
+         qty: i.qty,
+         rate: i.rate,
+         amount: i.amount,
+         discountPct,
+         discountMode,
+         discountAmount,
+         uom: i.uom ?? 'Unidad',
+         conversionFactor: 1,
+         warehouse: '',
+       }
+     }))
      setNotes(existing.notes ?? '')
      setBranch(existing.branch ?? '')
      setDepartment((existing as any).department ?? '')
      if (existing.esClienteOcasional) {
        setEsClienteOcasional(true)
        setClienteOcasionalNombre(existing.clienteOcasionalNombre ?? '')
+       setClienteOcasionalRnc(existing.clienteOcasionalRnc ?? '')
        setClienteOcasionalDireccion(existing.clienteOcasionalDireccion ?? '')
      }
      setLoaded(true)
@@ -311,7 +369,7 @@ useEffect(() => {
 
   // Al cambiar de sucursal, el almacén elegido en cada línea deja de ser válido
   useEffect(() => {
-    setItems((prev) => prev.map((row) => (row.warehouse ? { ...row, warehouse: '', stockError: undefined } : row)))
+    setItems((prev) => prev.map((row) => (row.warehouse ? { ...row, warehouse: '' } : row)))
   }, [branch])
 
   const warehouseSelectOptions: SearchSelectOption[] = useMemo(() => {
@@ -332,9 +390,7 @@ useEffect(() => {
     setItems((prev) =>
       prev.map((row) => {
         if (!row.itemCode || row.warehouse) return row
-        const updated = { ...row, warehouse: onlyId }
-        updated.stockError = validateLineStock(updated)
-        return updated
+        return { ...row, warehouse: onlyId }
       }),
     )
   }, [branchWarehouses])
@@ -395,19 +451,29 @@ useEffect(() => {
     setItems((prev) => prev.map((item, i) => {
       if (i !== index) return item
       const updated = { ...item, ...patch }
-      if ('qty' in patch || 'rate' in patch || 'discountPct' in patch) updated.amount = calcAmount(updated.qty, updated.rate, updated.discountPct)
-      if ('qty' in patch || 'warehouse' in patch) updated.stockError = validateLineStock(updated)
+      if ('discountMode' in patch) {
+        // Mutuamente excluyentes — al cambiar de modo se limpia el valor del otro, nunca se
+        // envían ambos campos al backend.
+        if (updated.discountMode === 'amount') updated.discountPct = 0
+        else updated.discountAmount = 0
+      }
+      if ('qty' in patch || 'rate' in patch || 'discountPct' in patch || 'discountAmount' in patch || 'discountMode' in patch) {
+        updated.amount = updated.discountMode === 'amount'
+          ? calcAmount(updated.qty, updated.rate, 0, updated.discountAmount)
+          : calcAmount(updated.qty, updated.rate, updated.discountPct)
+      }
       return updated
     }))
   }
   function updateWarehouse(index: number, warehouse: string) {
     setItems((prev) => prev.map((item, i) => {
       if (i !== index) return item
-      const available = item._stockByWarehouse?.[warehouse]
+      const available = despachoHabilitado ? undefined : item._stockByWarehouse?.[warehouse]
       const qty = available != null ? Math.min(item.qty, available) : item.qty
-      const updated = { ...item, warehouse, qty, amount: calcAmount(qty, item.rate, item.discountPct) }
-      updated.stockError = validateLineStock(updated)
-      return updated
+      const amount = item.discountMode === 'amount'
+        ? calcAmount(qty, item.rate, 0, item.discountAmount)
+        : calcAmount(qty, item.rate, item.discountPct)
+      return { ...item, warehouse, qty, amount }
     }))
   }
   function selectCatalogItem(index: number, catalogItem: Item, opts?: { autoAddRow?: boolean }) {
@@ -426,14 +492,16 @@ useEffect(() => {
           itemType: catalogItem.type,
           description: catalogItem.internalDescription ?? catalogItem.itemName,
           rate,
-          amount: calcAmount(row.qty, rate, row.discountPct),
+          amount: calcAmount(row.qty, rate, 0, 0),
+          discountPct: 0,
+          discountMode: 'pct' as const,
+          discountAmount: 0,
            uom: catalogItem.stockUom ?? row.uom,
            conversionFactor: 1,
            maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
           _prices: catalogItem.prices,
           warehouse: defaultWarehouse(),
           _stockByWarehouse: catalogItem.stockByWarehouse,
-          stockError: undefined,
         }
       })
     })
@@ -454,14 +522,15 @@ useEffect(() => {
           itemType: 'combo',
           description: bundle.itemName,
           rate,
-          amount: calcAmount(row.qty, rate, row.discountPct),
+          amount: row.discountMode === 'amount'
+            ? calcAmount(row.qty, rate, 0, row.discountAmount)
+            : calcAmount(row.qty, rate, row.discountPct),
            uom: bundle.itemUom ?? '',
            conversionFactor: 1,
            maxDiscountPct: undefined,
           _prices: bundle.prices,
           warehouse: defaultWarehouse(),
           _stockByWarehouse: undefined,
-          stockError: undefined,
         }
       })
     })
@@ -482,6 +551,8 @@ useEffect(() => {
           rate,
           amount: calcAmount(s.qty, rate, 0),
           discountPct: 0,
+          discountMode: 'pct' as const,
+          discountAmount: 0,
           uom: s.item.stockUom ?? 'Unidad',
           conversionFactor: 1,
           maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
@@ -501,7 +572,10 @@ useEffect(() => {
       prev.map((row) => {
         if (!row._prices) return row
         const rate = row._prices[tier] ?? row.rate
-        return { ...row, rate, amount: calcAmount(row.qty, rate, row.discountPct) }
+        const amount = row.discountMode === 'amount'
+          ? calcAmount(row.qty, rate, 0, row.discountAmount)
+          : calcAmount(row.qty, rate, row.discountPct)
+        return { ...row, rate, amount }
       }),
     )
   }, [customerPriceTier, defaultPriceTier])
@@ -511,7 +585,7 @@ useEffect(() => {
       toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
       return
     }
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, uom: 'Unidad', conversionFactor: 1, warehouse: '' }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, uom: 'Unidad', conversionFactor: 1, warehouse: '' }])
   }
   function removeRow(index: number) { setItems((prev) => prev.filter((_, i) => i !== index)) }
 
@@ -521,17 +595,20 @@ useEffect(() => {
   const total = subtotal
 
 function submitDto() {
-     const itemsDto = items.map((i) => ({
+     const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
        itemCode: i.itemCode,
        qty: i.qty,
        rate: i.rate,
-       discountPct: i.discountPct || undefined,
+       // Mutuamente excluyentes — nunca se envían ambos, aunque el usuario haya escrito algo
+       // en el otro campo antes de cambiar de modo.
+       discountPct: i.discountMode === 'amount' ? undefined : (i.discountPct || undefined),
+       discountAmount: i.discountMode === 'amount' ? (i.discountAmount || undefined) : undefined,
        warehouse: i.warehouse || undefined,
        uom: i.uom || undefined,
      }))
      const baseDto = {
        ...(esClienteOcasional
-         ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalDireccion: clienteOcasionalDireccion || undefined }
+         ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalRnc: clienteOcasionalRnc || undefined, clienteOcasionalDireccion: clienteOcasionalDireccion || undefined }
          : { customer: customerId }),
        transactionDate,
        deliveryDate: deliveryDate || undefined,
@@ -540,6 +617,8 @@ function submitDto() {
        items: itemsDto,
        quotation: quotationId || undefined,
        isLayaway: isLayaway || undefined,
+       currency: currency || undefined,
+       conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
      }
      if (isEdit) updateMutation.mutate(baseDto)
      else createMutation.mutate(baseDto)
@@ -549,6 +628,7 @@ function submitDto() {
     customerId,
     esClienteOcasional,
     clienteOcasionalNombre,
+    clienteOcasionalRnc,
     clienteOcasionalDireccion,
     transactionDate,
     deliveryDate,
@@ -557,6 +637,8 @@ function submitDto() {
     isLayaway,
     branch,
     department,
+    currency,
+    conversionRate,
   }, isEdit || quotationId || duplicateId ? loaded : true)
   useBeforeUnloadWarning(isDirty)
 
@@ -564,28 +646,41 @@ function submitDto() {
     e.preventDefault()
     setSubmitted(true)
     setSubmitError(null)
+    // Fila vacía sobrante (queda una después de seleccionar el último artículo real, por el
+    // auto-agregado de fila — ver selectCatalogItem/selectBundle) — se descarta de la vista y de
+    // la validación al someter, para no confundir al usuario ni enviarla al API.
+    const validItems = items.filter((i) => i.itemCode)
+    if (validItems.length !== items.length) setItems(validItems)
 
 try {
        if (esClienteOcasional) {
          if (!clienteOcasionalNombre.trim()) { toast.error('Ingresa el nombre del cliente ocasional'); return }
+         const rncDigits = clienteOcasionalRnc.replace(/\D/g, '')
+         if (rncDigits && rncDigits.length !== 9 && rncDigits.length !== 11) {
+           toast.error('El RNC debe tener 9 dígitos o la cédula 11 dígitos')
+           return
+         }
        } else {
          if (!customerId) { toast.error('Selecciona un cliente'); return }
        }
-       if (items.length === 0) { toast.error('Agrega al menos un artículo'); return }
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]; const num = i + 1
+       if (validItems.length === 0) { toast.error('Agrega al menos un artículo'); return }
+      for (let i = 0; i < validItems.length; i++) {
+        const item = validItems[i]; const num = i + 1
         if (!item.qty || item.qty <= 0) { toast.error(`Artículo #${num}: la cantidad es requerida`); return }
         if (!item.rate || item.rate <= 0) { toast.error(`Artículo #${num}: el precio unitario es requerido`); return }
         const itemMax = item.maxDiscountPct && item.maxDiscountPct > 0 ? item.maxDiscountPct : 100
         const userMax = currentUser?.maxDiscountPct && currentUser.maxDiscountPct > 0 ? currentUser.maxDiscountPct : 100
         const priceLimit = maxDiscFromPrices(item.rate, item._prices)
         const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
-        if (item.discountPct > effectiveLimit) {
+        // En modo monto fijo no replicamos la conversión monto→% que hace el backend para
+        // comparar contra los topes — el backend valida y devuelve 400 si excede el límite.
+        if (item.discountMode === 'pct' && item.discountPct > effectiveLimit) {
           toast.error(`Línea ${num}: el descuento supera el límite de ${effectiveLimit}%`)
           return
         }
-        if (item.stockError) {
-          toast.error(`Línea ${num}: ${item.stockError}`)
+        const stockError = validateLineStock(item, stockMap)
+        if (stockError && !despachoHabilitado) {
+          toast.error(`Línea ${num}: ${stockError}`)
           return
         }
       }
@@ -654,6 +749,61 @@ try {
                    />
                  )}
                </div>
+
+               {multimonedaHabilitada && !quotationId && (
+                 <div className="ff-wrap">
+                   <label className="ff-label" htmlFor="pedidoCurrency">Moneda</label>
+                   <Select
+                     value={currency}
+                     onValueChange={(v) => { setCurrency(v); if (v === monedaBase || !v) setConversionRate('') }}
+                     placeholder={`Automático (${monedaBase})`}
+                   >
+                     <SelectItem value="">Automático ({monedaBase})</SelectItem>
+                     {(['DOP', 'USD', 'EUR'] as const).map((c) => (
+                       <SelectItem key={c} value={c} disabled={!monedasHabilitadas.includes(c)}>
+                         {c}{!monedasHabilitadas.includes(c) ? ' (habilítela primero en Monedas)' : ''}
+                       </SelectItem>
+                     ))}
+                   </Select>
+                   {currency && currency !== monedaBase && (
+                     <div style={{ marginTop: 8 }}>
+                       <label className="ff-label" htmlFor="pedidoConversionRate">
+                         Tasa de cambio ({currency} → {monedaBase})
+                       </label>
+                       <input
+                         id="pedidoConversionRate"
+                         type="number"
+                         min="0"
+                         step="0.0001"
+                         className="ff-input"
+                         value={conversionRate}
+                         onChange={(e) => setConversionRate(e.target.value === '' ? '' : Number(e.target.value))}
+                         placeholder="Vacío = resuelve automático contra /monedas/tasas"
+                       />
+                     </div>
+                   )}
+                 </div>
+               )}
+               {multimonedaHabilitada && quotationId && currency && (
+                 <div className="ff-wrap">
+                   <label className="ff-label">Moneda</label>
+                   <p className="ff-hint" style={{ marginTop: 6 }}>
+                     Heredada de la cotización: <strong>{currency}</strong>
+                     {conversionRate !== '' ? ` (tasa ${conversionRate})` : ''}
+                   </p>
+                 </div>
+               )}
+               {esClienteOcasional && (
+                 <div className="ff-wrap">
+                   <label className="ff-label">RNC o Cédula</label>
+                   <input
+                     className="ff-input"
+                     value={clienteOcasionalRnc}
+                     onChange={(e) => setClienteOcasionalRnc(e.target.value)}
+                     placeholder="132456785 o 00113918866 (opcional)"
+                   />
+                 </div>
+               )}
                {esClienteOcasional && (
                  <div className="ff-wrap">
                    <label className="ff-label">Dirección</label>
@@ -667,8 +817,11 @@ try {
                )}
 
                <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
-                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
-                   <input type="checkbox" checked={esClienteOcasional} onChange={(e) => { setEsClienteOcasional(e.target.checked); if (e.target.checked) setCustomerId('') }} />
+                 <label className="ff-toggle-wrap">
+                   <span className="ff-toggle">
+                     <input type="checkbox" checked={esClienteOcasional} onChange={(e) => { setEsClienteOcasional(e.target.checked); if (e.target.checked) setCustomerId('') }} />
+                     <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+                   </span>
                    Venta ocasional (cliente no registrado)
                  </label>
                  {esClienteOcasional && (
@@ -735,7 +888,7 @@ try {
                   <th>Descripción</th>
                   <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
-                  <th style={{ textAlign: 'right', width: 72 }}>Dto. %</th>
+                  <th style={{ textAlign: 'right', width: 72 }}>Descuento</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 72 }}>UDM</th>
                   <th style={{ width: 140 }}>Almacén</th>
@@ -753,18 +906,30 @@ try {
                       className={highlightedRow === index ? 'row-flash' : undefined}
                     >
                       <td>
-                        <ItemSelect value={item.itemCode} selectedLabel={item.itemLabel} onSelect={(ci) => selectCatalogItem(index, ci)} onSelectBundle={(b) => selectBundle(index, b)} includeBundles onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0 })} onVariantSelect={(t) => setVariantTemplate(t)} validateStock branch={branch || undefined} />
+                        <ItemSelect value={item.itemCode} selectedLabel={item.itemLabel} onSelect={(ci) => selectCatalogItem(index, ci)} onSelectBundle={(b) => selectBundle(index, b)} includeBundles onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0 })} onVariantSelect={(t) => setVariantTemplate(t)} validateStock={!despachoHabilitado} branch={despachoHabilitado ? undefined : (branch || undefined)} />
                       </td>
                       <td>
                         <input className="items-input" value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="Descripción" />
                       </td>
                       <td>
-                        <QtyInput className={`items-input${(submitted && (!item.qty || item.qty <= 0)) || item.stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
-                        {item.stockError && (
-                          <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                            {item.stockError}
-                          </span>
-                        )}
+                        {(() => {
+                          const stockError = validateLineStock(item, stockMap)
+                          const info = item.itemCode && item.warehouse ? resolveDisponible(stockMap.get(item.itemCode), item.warehouse) : undefined
+                          return (
+                            <>
+                              <QtyInput className={`items-input${(submitted && (!item.qty || item.qty <= 0)) || stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
+                              {stockError ? (
+                                <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                  {stockError}
+                                </span>
+                              ) : info && info.reservedStock > 0 ? (
+                                <span style={{ fontSize: 11, color: 'var(--warning-text)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                  Disponible: {info.disponible} ({info.reservedStock} reservadas para otro cliente)
+                                </span>
+                              ) : null}
+                            </>
+                          )
+                        })()}
                       </td>
                       <td>
                         <input className={`items-input${submitted && (!item.rate || item.rate <= 0) ? ' items-input-error' : ''}`} type="number" min="0" step="0.01" value={round2(item.rate)} disabled style={{ textAlign: 'right' }} />
@@ -775,18 +940,59 @@ try {
                           const userMax = currentUser?.maxDiscountPct && currentUser.maxDiscountPct > 0 ? currentUser.maxDiscountPct : 100
                           const priceLimit = maxDiscFromPrices(item.rate, item._prices)
                           const effectiveLimit = Math.min(itemMax, userMax, priceLimit)
+                          const isAmountMode = item.discountMode === 'amount'
                           return (
                             <>
-                              <input className={`items-input${item.discountPct > effectiveLimit ? ' items-input-error' : ''}`} type="number" min="0" max="100" step="0.1" value={item.discountPct} onChange={(e) => updateItem(index, { discountPct: parseFloat(e.target.value) || 0 })} style={{ textAlign: 'right', width: 56 }} />
-                              {effectiveLimit < 100 && (
+                              <div className={`disc-combo${!isAmountMode && item.discountPct > effectiveLimit ? ' disc-combo-error' : ''}`}>
+                                <div className="disc-combo-select-wrap">
+                                  <select
+                                    className="disc-combo-select"
+                                    value={item.discountMode}
+                                    onChange={(e) => updateItem(index, { discountMode: e.target.value as 'pct' | 'amount' })}
+                                  >
+                                    <option value="pct">%</option>
+                                    <option value="amount">RD$</option>
+                                  </select>
+                                  <ChevronDown size={12} className="disc-combo-chevron" />
+                                </div>
+                                {isAmountMode ? (
+                                  <input
+                                    className="disc-combo-input"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={item.discountAmount}
+                                    onChange={(e) => updateItem(index, { discountAmount: parseFloat(e.target.value) || 0 })}
+                                  />
+                                ) : (
+                                  <input
+                                    className="disc-combo-input"
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.1"
+                                    value={item.discountPct}
+                                    onChange={(e) => updateItem(index, { discountPct: parseFloat(e.target.value) || 0 })}
+                                  />
+                                )}
+                              </div>
+                              {isAmountMode ? (
                                 <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                  máx {effectiveLimit.toFixed(2)}%
+                                  Descuento: {formatMoney(item.discountAmount, currency || monedaBase)}
                                 </span>
-                              )}
-                              {item.discountPct > effectiveLimit && (
-                                <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                  Supera el límite de {effectiveLimit.toFixed(2)}%
-                                </span>
+                              ) : (
+                                <>
+                                  {effectiveLimit < 100 && (
+                                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                      máx {effectiveLimit.toFixed(2)}%
+                                    </span>
+                                  )}
+                                  {item.discountPct > effectiveLimit && (
+                                    <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                      Supera el límite de {effectiveLimit.toFixed(2)}%
+                                    </span>
+                                  )}
+                                </>
                               )}
                             </>
                           )
