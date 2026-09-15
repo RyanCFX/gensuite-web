@@ -12473,6 +12473,213 @@
         ]
       }
     },
+    "/api/v1/inventory/carga-inicial": {
+      "get": {
+        "operationId": "CargaInicialController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Principal",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Almacén - ACME",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "submitted",
+                "cancelled"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar cargas iniciales de inventario (Material Receipt)",
+        "tags": [
+          "Inventario — Carga Inicial"
+        ]
+      },
+      "post": {
+        "description": "Stock Entry con stock_entry_type=\"Material Receipt\". Agrega cantidad al almacén destino, contra Company.stock_adjustment_account. No confundir con la Apertura de Inventario (POST /apertura/inventario, Opening Stock, fija un saldo final absoluto contra la cuenta de apertura) — ver docs/plans/PLAN_CARGA_INICIAL_INVENTARIO.md §2.",
+        "operationId": "CargaInicialController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCargaInicialDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar carga inicial de inventario (crea y somete en un solo paso)",
+        "tags": [
+          "Inventario — Carga Inicial"
+        ]
+      }
+    },
+    "/api/v1/inventory/carga-inicial/{id}": {
+      "get": {
+        "operationId": "CargaInicialController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una carga inicial",
+        "tags": [
+          "Inventario — Carga Inicial"
+        ]
+      }
+    },
+    "/api/v1/inventory/carga-inicial/{id}/cancelar": {
+      "post": {
+        "description": "El inventario cargado por este documento es revertido.",
+        "operationId": "CargaInicialController_cancel",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar una carga inicial ya sometida",
+        "tags": [
+          "Inventario — Carga Inicial"
+        ]
+      }
+    },
     "/api/v1/caja/pendientes": {
       "get": {
         "operationId": "CajaController_listPendientes",
@@ -26450,6 +26657,42 @@
         "tags": [
           "Despachos (Delivery Note)"
         ]
+      },
+      "delete": {
+        "description": "Solo para despachos nunca sometidos (docstatus=0) — un despacho sometido se cancela con POST :id/cancel. Libera, best effort, cualquier reserva de stock (Stock Reservation Entry) que este despacho hubiera generado al crearse.",
+        "operationId": "DespachosController_eliminarBorrador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar un despacho en Borrador",
+        "tags": [
+          "Despachos (Delivery Note)"
+        ]
       }
     },
     "/api/v1/despachos/desde-pedido/{soId}": {
@@ -32081,6 +32324,210 @@
         ]
       }
     },
+    "/api/v1/apertura/inventario": {
+      "post": {
+        "description": "Crea y somete en una sola llamada un Stock Reconciliation (purpose=Opening Stock) que fija el saldo FINAL absoluto por ítem/almacén — no se suma a lo existente. Contabiliza contra la misma cuenta Temporary que usan las facturas de apertura (14-03 APERTURA TEMPORAL). Un solo documento no puede mezclar almacenes de sucursales distintas.",
+        "operationId": "AperturaController_crearInventario",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearAperturaInventarioDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cargar saldo de apertura de inventario",
+        "tags": [
+          "Facturas de Apertura (Migración de Saldos)"
+        ]
+      },
+      "get": {
+        "operationId": "AperturaController_listarInventario",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Sucursal del documento (Stock Reconciliation.branch, de cabecera). No filtra por almacén de línea — un documento puede tener varios almacenes de la misma sucursal.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2024-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2024-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar aperturas de inventario",
+        "tags": [
+          "Facturas de Apertura (Migración de Saldos)"
+        ]
+      }
+    },
+    "/api/v1/apertura/inventario/{id}": {
+      "get": {
+        "operationId": "AperturaController_obtenerInventario",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una apertura de inventario",
+        "tags": [
+          "Facturas de Apertura (Migración de Saldos)"
+        ]
+      }
+    },
+    "/api/v1/apertura/inventario/{id}/cancel": {
+      "post": {
+        "description": "A diferencia de anular una factura de apertura, esto SÍ revierte el stock de los ítems/almacenes afectados.",
+        "operationId": "AperturaController_cancelarInventario",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Anular una apertura de inventario",
+        "tags": [
+          "Facturas de Apertura (Migración de Saldos)"
+        ]
+      }
+    },
     "/api/v1/apertura/resumen": {
       "get": {
         "description": "Σ ventas/compras de apertura, saldo real de la cuenta de apertura contra el esperado, y si todavía queda pendiente de cierre (Journal Entry contra Resultados de Años Anteriores, ver §9 del plan — este endpoint no lo ejecuta, solo lo diagnostica).",
@@ -34214,7 +34661,7 @@
           },
           "stockAdjustmentAccount": {
             "type": "string",
-            "description": "Contrapartida de Stock Reconciliation (ajustes de inventario)"
+            "description": "Contrapartida de los ajustes de inventario: conteos físicos (Stock Reconciliation, purpose=\"Stock Reconciliation\") y carga inicial de inventario (Stock Entry, stock_entry_type=\"Material Receipt\", POST /inventory/carga-inicial). No confundir con la cuenta de Apertura de Inventario (14-03 APERTURA TEMPORAL, migración de saldos), que es una cuenta distinta y no se configura acá."
           },
           "defaultDeferredRevenueAccount": {
             "type": "string",
@@ -35031,6 +35478,65 @@
             "type": "boolean"
           }
         }
+      },
+      "CargaInicialItemDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "example": "ITEM-001"
+          },
+          "warehouse": {
+            "type": "string",
+            "example": "Almacén Principal - ACME"
+          },
+          "qty": {
+            "type": "number",
+            "example": 100
+          },
+          "valuationRate": {
+            "type": "number",
+            "example": 500
+          }
+        },
+        "required": [
+          "itemCode",
+          "warehouse",
+          "qty",
+          "valuationRate"
+        ]
+      },
+      "CreateCargaInicialDto": {
+        "type": "object",
+        "properties": {
+          "postingDate": {
+            "type": "string",
+            "example": "2026-01-15"
+          },
+          "remarks": {
+            "type": "string",
+            "description": "Por defecto: sin texto. No confundir con la apertura de inventario (Stock Reconciliation, purpose=\"Opening Stock\") — esto es un Stock Entry, Material Receipt."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CargaInicialItemDto"
+            }
+          },
+          "branch": {
+            "type": "string",
+            "example": "Principal",
+            "description": "Sucursal de la carga inicial. Si se omite, se deriva de la sucursal de los almacenes de las líneas (deben ser todos de la misma sucursal)."
+          },
+          "department": {
+            "type": "string",
+            "description": "Departamento (dimensión contable informativa, nunca obligatoria)."
+          }
+        },
+        "required": [
+          "postingDate",
+          "items"
+        ]
       },
       "CobrarFacturaDto": {
         "type": "object",
@@ -41810,6 +42316,66 @@
         },
         "required": [
           "filas"
+        ]
+      },
+      "AperturaInventarioItemDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "example": "ITEM-001"
+          },
+          "warehouse": {
+            "type": "string",
+            "example": "Almacén Principal - ACME"
+          },
+          "qty": {
+            "type": "number",
+            "example": 120,
+            "description": "Saldo FINAL absoluto — no se suma a lo existente."
+          },
+          "valuationRate": {
+            "type": "number",
+            "example": 450.5,
+            "description": "Obligatorio — una apertura sin costo no tiene sentido contable (mismo criterio que la carga inicial vía Stock Entry)."
+          }
+        },
+        "required": [
+          "itemCode",
+          "warehouse",
+          "qty",
+          "valuationRate"
+        ]
+      },
+      "CrearAperturaInventarioDto": {
+        "type": "object",
+        "properties": {
+          "fechaApertura": {
+            "type": "string",
+            "example": "2024-01-01",
+            "description": "Fecha de la apertura. No puede ser posterior a hoy ni caer fuera de un Ejercicio Fiscal activo."
+          },
+          "remarks": {
+            "type": "string",
+            "description": "Por defecto: \"Apertura de inventario — saldo inicial del sistema anterior\"."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AperturaInventarioItemDto"
+            }
+          },
+          "branch": {
+            "type": "string",
+            "description": "Sucursal del documento. Un solo documento no puede mezclar almacenes de sucursales distintas — si se omite, se deriva de los almacenes de las líneas (misma regla que inventory/counts)."
+          },
+          "department": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fechaApertura",
+          "items"
         ]
       }
     }

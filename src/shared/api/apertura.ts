@@ -15,6 +15,10 @@ import type {
   ImportarAperturaComprasDto,
   ImportarAperturaComprasResult,
   AperturaResumen,
+  CrearAperturaInventarioDto,
+  AperturaInventario,
+  AperturaInventarioListItem,
+  ListAperturaInventarioParams,
   PaginatedResponse,
 } from './types'
 
@@ -88,6 +92,30 @@ export async function importarAperturaCompras(dto: ImportarAperturaComprasDto) {
     ENDPOINTS.apertura.compras.importar,
     dto,
   )
+  return unwrap(res)
+}
+
+// ── Inventario ───────────────────────────────────────────────────────────────
+// docs/tasks/PROMPT_APERTURA_INVENTARIO_FRONTEND.md — sin importar (§6): un Stock Reconciliation
+// es un documento atómico, no admite éxito parcial fila por fila.
+
+export async function crearAperturaInventario(dto: CrearAperturaInventarioDto) {
+  const res = await client.post<{ success: true; data: AperturaInventario }>(ENDPOINTS.apertura.inventario.list, dto)
+  return unwrap(res)
+}
+
+export async function listAperturaInventario(params?: ListAperturaInventarioParams) {
+  const res = await client.get<PaginatedResponse<AperturaInventarioListItem>>(ENDPOINTS.apertura.inventario.list, { params })
+  return unwrapPaginated(res)
+}
+
+export async function getAperturaInventario(id: string) {
+  const res = await client.get<{ success: true; data: AperturaInventario }>(ENDPOINTS.apertura.inventario.byId(id))
+  return unwrap(res)
+}
+
+export async function cancelarAperturaInventario(id: string) {
+  const res = await client.post<{ success: true; data: { message: string } }>(ENDPOINTS.apertura.inventario.cancel(id))
   return unwrap(res)
 }
 

@@ -27,6 +27,7 @@ import type {
   DeshabilitarPosResult,
   HabilitarDespachoResult,
   DeshabilitarDespachoResult,
+  UpdateDespachoFuturoDto,
   LayawayConfig,
   AlmacenListItem,
   CreateAlmacenDto,
@@ -103,6 +104,13 @@ export async function habilitarDespacho() {
 // Puede fallar con 409 — `error.details` trae `DesactivarDespachoBloqueos` (IDs concretos a resolver).
 export async function deshabilitarDespacho() {
   const res = await client.post<{ success: true; data: DeshabilitarDespachoResult }>(ENDPOINTS.config.despachoDeshabilitar)
+  return unwrap(res)
+}
+
+// docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §2.1 — la respuesta es solo un mensaje, no el
+// estado final: volver a pedir getFacturacionConfig() después de un PUT exitoso para refrescar.
+export async function actualizarDespachoFuturo(data: UpdateDespachoFuturoDto) {
+  const res = await client.put<{ success: true; data: { message: string } }>(ENDPOINTS.config.despachoFuturo, data)
   return unwrap(res)
 }
 

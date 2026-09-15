@@ -139,6 +139,11 @@ export const ENDPOINTS = {
       byId: (id: string) => `/inventory/counts/${id}`,
       submit: (id: string) => `/inventory/counts/${id}/submit`,
     },
+    cargaInicial: {
+      list: '/inventory/carga-inicial',
+      byId: (id: string) => `/inventory/carga-inicial/${encodeURIComponent(id)}`,
+      cancelar: (id: string) => `/inventory/carga-inicial/${encodeURIComponent(id)}/cancelar`,
+    },
     zonas: {
       list: '/inventory/zonas',
       byId: (id: string) => `/inventory/zonas/${id}`,
@@ -318,6 +323,7 @@ export const ENDPOINTS = {
     posDeshabilitar: '/config/pos/deshabilitar',
     despachoHabilitar: '/config/despacho/habilitar',
     despachoDeshabilitar: '/config/despacho/deshabilitar',
+    despachoFuturo: '/config/despacho/futuro',
     ecf: '/config/ecf',
     ecfSecuencias: '/config/ecf/secuencias',
     ecfSecuenciasAnularRangos: '/config/ecf/secuencias/anular-rangos',
@@ -627,5 +633,10 @@ export const ENDPOINTS = {
       importar: '/apertura/compras/importar',
     },
     resumen: '/apertura/resumen',
+    inventario: {
+      list: '/apertura/inventario',
+      byId: (id: string) => `/apertura/inventario/${encodeURIComponent(id)}`,
+      cancel: (id: string) => `/apertura/inventario/${encodeURIComponent(id)}/cancel`,
+    },
   },
 } as const

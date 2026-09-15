@@ -183,6 +183,12 @@ export function unwrapRaw<T>(response: { data: T }): T {
 export const ERROR_CODES = {
   BRANCH_REQUIRED: 'BRANCH_REQUIRED',
   MIXED_BRANCH_COUNT: 'MIXED_BRANCH_COUNT',
+  // Apertura de Inventario (docs/tasks/PROMPT_APERTURA_INVENTARIO_FRONTEND.md §5) — un documento
+  // no puede mezclar almacenes de sucursales distintas. Código DISTINTO a MIXED_BRANCH_COUNT.
+  MIXED_BRANCH_APERTURA_INVENTARIO: 'MIXED_BRANCH_APERTURA_INVENTARIO',
+  // Carga Inicial de Inventario (docs/tasks/PROMPT_CARGA_INICIAL_INVENTARIO_FRONTEND.md §4) —
+  // código DISTINTO a los otros dos MIXED_BRANCH_* (cada pantalla tiene el suyo propio).
+  MIXED_BRANCH_CARGA_INICIAL: 'MIXED_BRANCH_CARGA_INICIAL',
   // Multimoneda (docs/tasks/60_multimoneda_dop_usd_eur.md §5.2)
   CURRENCY_IS_BASE: 'CURRENCY_IS_BASE',
   CURRENCY_NOT_SUPPORTED: 'CURRENCY_NOT_SUPPORTED',

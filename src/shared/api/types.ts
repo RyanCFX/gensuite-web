@@ -523,6 +523,11 @@ export interface CreateInvoiceDto {
    *  cobertura que ya estaba en el borrador. Una factura con cobertura NO puede llevar
    *  `taxesTemplate` (el servidor responde 400). */
   aseguradora?: AseguradoraInvoiceDto | null;
+  /** docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §3 — solo mandar si el selector "Despachar
+   *  ahora/después" está visible (despachoHabilitado && despachoFuturoHabilitado). Omitido =
+   *  conserva el comportamiento por defecto del tenant. `true` sin despacho habilitado, o sin
+   *  despachoFuturoHabilitado, responde 400. */
+  despachoFuturo?: boolean;
 }
 
 /**
@@ -3075,6 +3080,28 @@ export interface FacturacionConfig {
    *  Despacho (Delivery Note). No se edita con PUT directo — usar POST /config/despacho/habilitar
    *  y /deshabilitar (ver despachos.ts), y volver a pedir este endpoint después para refrescar. */
   despachoHabilitado?: boolean
+  /** Con despacho habilitado, permite elegir "despachar ahora" vs. "despachar después" por venta
+   *  (`despachoFuturo` en Create/UpdateInvoiceDto). Default true (preserva el comportamiento
+   *  previo: con despacho activo, todo era a futuro). No se edita con PUT directo — usar
+   *  PUT /config/despacho/futuro (ver despachos.ts) y refrescar este endpoint después. */
+  despachoFuturoHabilitado?: boolean
+  /** Si una venta a futuro reserva stock en firme (Stock Reservation Entry) contra otros clientes
+   *  al crear el despacho pendiente. Default true. Ver PUT /config/despacho/futuro. */
+  despachoFuturoBloqueaVenta?: boolean
+  /** Solo ventas inmediatas (no a futuro): si true, al someter la factura el sistema auto-asigna
+   *  seriales/lotes disponibles (FIFO/FEFO) en vez de exigir que el usuario los asigne a mano.
+   *  Default false. Ver PUT /config/despacho/futuro. */
+  despachoConfirmarStockAsignaSeriales?: boolean
+}
+
+/** PUT /config/despacho/futuro — docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §2.1. Los 3 campos
+ *  son independientes y opcionales: mandar solo los que el usuario tocó. 400 si no se manda
+ *  ninguno. La respuesta es solo un mensaje — volver a pedir GET /config/facturacion después para
+ *  refrescar los valores reales. */
+export interface UpdateDespachoFuturoDto {
+  futuroHabilitado?: boolean;
+  futuroBloqueaVenta?: boolean;
+  confirmarStockAsignaSeriales?: boolean;
 }
 
 // ─── Facturación Electrónica (e-CF) ────────────────────────────────────────────
@@ -4604,18 +4631,20 @@ export interface ItemProps {
 }
 
 export interface CuentasEmpresa {
-  defaultReceivableAccount?: string;
-  defaultPayableAccount?: string;
-  defaultIncomeAccount?: string;
-  defaultExpenseAccount?: string;
-  defaultBankAccount?: string;
-  writeOffAccount?: string;
-  roundOffAccount?: string;
+  /** `null` explícito limpia el campo (a diferencia de omitirlo, que lo deja sin tocar) — igual
+   *  criterio que el resto de los campos de esta interfaz. */
+  defaultReceivableAccount?: string | null;
+  defaultPayableAccount?: string | null;
+  defaultIncomeAccount?: string | null;
+  defaultExpenseAccount?: string | null;
+  defaultBankAccount?: string | null;
+  writeOffAccount?: string | null;
+  roundOffAccount?: string | null;
   // 🆕 16 campos nuevos (ver plan/IMPLEMENTACION.md sección 6)
-  defaultCashAccount?: string;
-  defaultInventoryAccount?: string;
-  stockReceivedButNotBilled?: string;
-  stockAdjustmentAccount?: string;
+  defaultCashAccount?: string | null;
+  defaultInventoryAccount?: string | null;
+  stockReceivedButNotBilled?: string | null;
+  stockAdjustmentAccount?: string | null;
   defaultDeferredRevenueAccount?: string | null;
   defaultDeferredExpenseAccount?: string | null;
   exchangeGainLossAccount?: string | null;
@@ -6265,15 +6294,127 @@ export interface ImportarAperturaComprasResult {
 export interface AperturaResumen {
   ventas: { cantidad: number; montoMigrado: number; saldoPendiente: number };
   compras: { cantidad: number; montoMigrado: number; saldoPendiente: number };
+  /** Sin `saldoPendiente` — no aplica a un ajuste de stock (docs/tasks/PROMPT_APERTURA_INVENTARIO_FRONTEND.md §10). */
+  inventario: { cantidad: number; montoMigrado: number };
   cuentaApertura: {
     cuenta: string | null;
     saldo: number;
     esperado: number;
     cuadra: boolean;
   };
-  porAnio: { anio: number; ventas: number; compras: number }[];
+  porAnio: { anio: number; ventas: number; compras: number; inventario: number }[];
   /** true mientras la cuenta puente tenga saldo distinto de cero — el cierre es manual, fuera de este módulo. */
   pendienteDeCierre: boolean;
+}
+
+// ─── Apertura de Inventario (dentro de Migración de Saldos) ───────────────────
+// docs/tasks/PROMPT_APERTURA_INVENTARIO_FRONTEND.md — migra el saldo FÍSICO inicial (stock por
+// ítem/almacén) del sistema anterior. `qty` es el saldo FINAL absoluto, no se suma (§3). Crea y
+// confirma en una sola llamada, igual que Ventas/Compras — no hay borrador ni edición ni /importar
+// (§6, un Stock Reconciliation es un documento atómico). Anular SÍ revierte stock real (§7).
+
+export interface AperturaInventarioItemDto {
+  itemCode: string;
+  warehouse: string;
+  /** Saldo FINAL absoluto de este ítem en este almacén — 0 es válido. */
+  qty: number;
+  /** Estrictamente > 0, a diferencia de qty. */
+  valuationRate: number;
+}
+
+export interface CrearAperturaInventarioDto {
+  fechaApertura: string;
+  /** Si se omite, el backend usa "Apertura de inventario — saldo inicial del sistema anterior". */
+  remarks?: string;
+  /** Un documento no puede mezclar almacenes de sucursales distintas (§5). */
+  items: AperturaInventarioItemDto[];
+  branch?: string;
+  department?: string;
+}
+
+export interface AperturaInventarioItem extends AperturaInventarioItemDto {
+  /** qty × valuationRate, calculado por el servidor — no recalcular en el cliente. */
+  amount: number;
+}
+
+export interface AperturaInventarioListItem {
+  id: string;
+  fechaApertura: string;
+  company: string;
+  branch: string | null;
+  department: string | null;
+  cuentaApertura: string;
+  estado: AperturaEstado;
+  esApertura: true;
+}
+
+/** Shape del detalle (§4.3/§8.2) — el listado (§8.1) NO trae `items`/`montoTotal`, a propósito. */
+export interface AperturaInventario extends AperturaInventarioListItem {
+  items: AperturaInventarioItem[];
+  montoTotal: number;
+}
+
+export interface ListAperturaInventarioParams extends PaginationParams {
+  branch?: string;
+  fromDate?: string;
+  toDate?: string;
+}
+
+// ─── Carga Inicial de Inventario (Stock Entry / Material Receipt) ─────────────
+// docs/tasks/PROMPT_CARGA_INICIAL_INVENTARIO_FRONTEND.md — agrega existencias a un almacén SIN
+// que haya una compra de por medio (hallazgos, donaciones, ajustes). NO es lo mismo que Apertura
+// de Inventario (`AperturaInventario` arriba): acá `qty` se SUMA a lo que ya existe (nunca fija
+// un saldo absoluto) y por eso `qty: 0` es inválido — a diferencia de Apertura, donde 0 sí es
+// válido. Contabiliza contra `Company.stock_adjustment_account`, una cuenta DISTINTA de la
+// `14-03 APERTURA TEMPORAL` que usa Apertura de Inventario. Crea y confirma en una sola llamada,
+// sin borrador ni edición ni /importar por lote.
+
+export type CargaInicialStatus = "submitted" | "cancelled";
+
+export interface CargaInicialItemDto {
+  itemCode: string;
+  warehouse: string;
+  /** Estrictamente > 0 — a diferencia de Apertura de Inventario, 0 NO es válido acá. */
+  qty: number;
+  valuationRate: number;
+}
+
+export interface CrearCargaInicialDto {
+  postingDate: string;
+  /** Si se omite, el backend guarda cadena vacía (no un texto por defecto). */
+  remarks?: string;
+  /** Un documento no puede mezclar almacenes de sucursales distintas. */
+  items: CargaInicialItemDto[];
+  branch?: string;
+  department?: string;
+}
+
+export interface CargaInicialItem extends CargaInicialItemDto {
+  /** qty × valuationRate, calculado por ERPNext — no recalcular en el cliente. */
+  amount: number;
+}
+
+export interface CargaInicialListItem {
+  id: string;
+  status: CargaInicialStatus;
+  postingDate: string;
+  company: string;
+  branch: string | null;
+  department: string | null;
+  remarks: string;
+  createdAt: string;
+}
+
+/** Shape del detalle (§3.3/§7.2) — el listado (§7.1) NO trae `items`/`totalValue`, a propósito. */
+export interface CargaInicialInventario extends CargaInicialListItem {
+  items: CargaInicialItem[];
+  totalValue: number;
+}
+
+export interface ListCargaInicialParams extends PaginationParams {
+  branch?: string;
+  department?: string;
+  status?: CargaInicialStatus;
 }
 
 // ─── Despachos (Delivery Note) ─────────────────────────────────────────────────
