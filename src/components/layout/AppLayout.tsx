@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Users,
   Package,
+  PackagePlus,
   FileText,
   Receipt,
   Warehouse,
@@ -215,6 +216,14 @@ const NAV_OPS: NavEntry[] = [
         label: "Transferencias",
         icon: <Truck size={14} />,
         path: "/transferencias",
+      },
+      {
+        // Carga Inicial (Stock Entry / Material Receipt) — docs/tasks/
+        // PROMPT_CARGA_INICIAL_INVENTARIO_FRONTEND.md. NO confundir con "Inventario" bajo
+        // Migración de Saldos (Configuración): cuentas contables y semántica de qty distintas.
+        label: "Carga Inicial",
+        icon: <PackagePlus size={14} />,
+        path: "/inventario/carga-inicial",
       },
       {
         label: "Valoración de Stock",
@@ -557,10 +566,13 @@ const NAV_CONFIG: NavEntry = {
       icon: <Calendar size={14} />,
       path: "/config/ejercicio-fiscal",
     },
-    // Migración de Saldos (Facturas de Apertura) — docs/tasks/PROMPT_APERTURA_FRONTEND.md §2.
+    // Migración de Saldos (Facturas de Apertura) — docs/tasks/PROMPT_APERTURA_FRONTEND.md §2 y
+    // docs/tasks/PROMPT_APERTURA_INVENTARIO_FRONTEND.md §2 (pestaña "Inventario").
     // Grupo anidado (soportado por NavGroupBtn/filtrarNavPorPermisos de forma recursiva) para que
-    // sus 4 pantallas queden agrupadas; si el usuario no tiene ninguna acción "ver" de este
+    // sus 5 pantallas queden agrupadas; si el usuario no tiene ninguna acción "ver" de este
     // módulo, filtrarNavPorPermisos oculta cada hijo y el grupo entero desaparece del menú.
+    // "Inventario" usa un permiso independiente (apertura.inventario.*, doctype Stock
+    // Reconciliation) — un usuario puede ver Ventas/Compras y no ver Inventario, no es un bug.
     {
       label: "Migración de Saldos",
       icon: <History size={14} />,
@@ -569,6 +581,7 @@ const NAV_CONFIG: NavEntry = {
         { label: "Diagnóstico", icon: <Wrench size={14} />, path: "/apertura/diagnostico" },
         { label: "Ventas", icon: <Receipt size={14} />, path: "/apertura/ventas" },
         { label: "Compras", icon: <ShoppingCart size={14} />, path: "/apertura/compras" },
+        { label: "Inventario", icon: <Package size={14} />, path: "/apertura/inventario" },
         { label: "Cuadre", icon: <BarChart3 size={14} />, path: "/apertura/resumen" },
       ],
     },

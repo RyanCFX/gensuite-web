@@ -2424,6 +2424,7 @@ button {
 }
 
 .form-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+.form-row-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
 
 /* ─── 606 DGII SECTION ─── */
 .dgii-section {

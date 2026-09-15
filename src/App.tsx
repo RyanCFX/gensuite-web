@@ -48,6 +48,9 @@ const AperturaComprasPage = lazy(() => import('@/features/apertura/ComprasListPa
 const AperturaCompraForm = lazy(() => import('@/features/apertura/CompraForm'))
 const AperturaCompraDetail = lazy(() => import('@/features/apertura/CompraDetail'))
 const AperturaComprasImportarPage = lazy(() => import('@/features/apertura/ComprasImportarPage'))
+const AperturaInventarioPage = lazy(() => import('@/features/apertura/InventarioListPage'))
+const AperturaInventarioForm = lazy(() => import('@/features/apertura/InventarioForm'))
+const AperturaInventarioDetail = lazy(() => import('@/features/apertura/InventarioDetail'))
 const AperturaResumenPage = lazy(() => import('@/features/apertura/ResumenPage'))
 // Despachos (Delivery Note) — docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md
 const DespachosListPage = lazy(() => import('@/features/despachos/DespachosListPage'))
@@ -59,6 +62,9 @@ const StockPage       = lazy(() => import('@/features/inventory/StockPage'))
 const HistoryPage     = lazy(() => import('@/features/inventory/HistoryPage'))
 const CountsPage      = lazy(() => import('@/features/inventory/CountsPage'))
 const ZonasPage       = lazy(() => import('@/features/inventory/ZonasPage'))
+const CargaInicialListPage = lazy(() => import('@/features/inventory/CargaInicialListPage'))
+const CargaInicialForm     = lazy(() => import('@/features/inventory/CargaInicialForm'))
+const CargaInicialDetail   = lazy(() => import('@/features/inventory/CargaInicialDetail'))
 const ComprasPage     = lazy(() => import('@/features/compras/ComprasPage'))
 const CompraDetail    = lazy(() => import('@/features/compras/CompraDetail'))
 const CompraForm      = lazy(() => import('@/features/compras/CompraForm'))
@@ -253,6 +259,9 @@ export default function App() {
             <Route path="/inventario/historial" element={<Suspense fallback={<PageLoader />}><HistoryPage /></Suspense>} />
             <Route path="/inventario/conteos" element={<Suspense fallback={<PageLoader />}><CountsPage /></Suspense>} />
             <Route path="/inventario/zonas" element={<Suspense fallback={<PageLoader />}><ZonasPage /></Suspense>} />
+            <Route path="/inventario/carga-inicial" element={<Suspense fallback={<PageLoader />}><CargaInicialListPage /></Suspense>} />
+            <Route path="/inventario/carga-inicial/nueva" element={<Suspense fallback={<PageLoader />}><CargaInicialForm /></Suspense>} />
+            <Route path="/inventario/carga-inicial/:id" element={<Suspense fallback={<PageLoader />}><CargaInicialDetail /></Suspense>} />
 
             {/* Compras */}
             <Route path="/compras" element={<Suspense fallback={<PageLoader />}><ComprasPage /></Suspense>} />
@@ -384,6 +393,9 @@ export default function App() {
             <Route path="/apertura/compras/nueva" element={<Suspense fallback={<PageLoader />}><AperturaCompraForm /></Suspense>} />
             <Route path="/apertura/compras/importar" element={<Suspense fallback={<PageLoader />}><AperturaComprasImportarPage /></Suspense>} />
             <Route path="/apertura/compras/:id" element={<Suspense fallback={<PageLoader />}><AperturaCompraDetail /></Suspense>} />
+            <Route path="/apertura/inventario" element={<Suspense fallback={<PageLoader />}><AperturaInventarioPage /></Suspense>} />
+            <Route path="/apertura/inventario/nueva" element={<Suspense fallback={<PageLoader />}><AperturaInventarioForm /></Suspense>} />
+            <Route path="/apertura/inventario/:id" element={<Suspense fallback={<PageLoader />}><AperturaInventarioDetail /></Suspense>} />
             <Route path="/apertura/resumen" element={<Suspense fallback={<PageLoader />}><AperturaResumenPage /></Suspense>} />
 
             {/* Despachos (Delivery Note) — ruta específica antes que /:id */}

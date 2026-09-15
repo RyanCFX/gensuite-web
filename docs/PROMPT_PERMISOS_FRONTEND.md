@@ -821,6 +821,7 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 |---|---|---|---|
 | `config.despacho.habilitar` | Botón "Activar" (sección Despacho) | `Facturacion Config.write` | — |
 | `config.despacho.deshabilitar` | Botón "Desactivar" (sección Despacho) | `Facturacion Config.write` | — |
+| `config.despacho.configurar` | Switches de despacho a futuro + botón "Guardar" (sección Despacho) | `Facturacion Config.write` | — |
 
 #### Configuración de Facturación
 
@@ -1120,6 +1121,9 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 | `apertura.compras.crear` | "Cargar saldo de proveedor" + "Importar" (compras) | `Purchase Invoice.create` | — |
 | `apertura.compras.anular` | Anular factura de compra de apertura | `Purchase Invoice.cancel` | — |
 | `apertura.resumen.ver` | Ver pantalla "Cuadre" | `Sales Invoice.report` | — |
+| `apertura.inventario.listar` | Ver pestaña "Inventario" (listado + detalle) | `Stock Reconciliation.read` | — |
+| `apertura.inventario.crear` | Botón "Cargar inventario inicial" | `Stock Reconciliation.create` | — |
+| `apertura.inventario.anular` | Anular apertura de inventario (revierte stock) | `Stock Reconciliation.cancel` | — |
 
 #### Gasto — detalle
 
@@ -1594,6 +1598,14 @@ por `despachoHabilitado` en el menú.
 | `inventario.transferencias.crear` | Nueva | `Stock Entry.create` | — |
 | `inventario.transferencias.someter` | Confirmar | `Stock Entry.submit` | — |
 | `inventario.transferencias.anular` | Cancelar | `Stock Entry.cancel` | — |
+
+#### Carga Inicial de Inventario
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `inventario.carga-inicial.listar` | Ver pantalla "Carga Inicial" (listado + detalle) | `Stock Entry.read` | — |
+| `inventario.carga-inicial.crear` | Botón "Registrar entrada" | `Stock Entry.create` | — |
+| `inventario.carga-inicial.anular` | Anular carga inicial (revierte inventario) | `Stock Entry.cancel` | — |
 
 #### Turnos POS
 
