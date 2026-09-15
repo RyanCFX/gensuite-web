@@ -167,18 +167,21 @@ export default function EmpresaConfig() {
   }
 
   function handleSaveCuentas() {
+    // `|| null` (no `|| undefined`) en todos los campos: un campo vacío debe LIMPIARSE de verdad
+    // en el servidor, no omitirse del body — `undefined` desaparece al serializar el JSON, así
+    // que el backend nunca se entera de que el usuario lo vació y conserva el valor anterior.
     saveCuentasMutation.mutate({
-      defaultReceivableAccount: defaultReceivableAccount || undefined,
-      defaultPayableAccount: defaultPayableAccount || undefined,
-      defaultIncomeAccount: defaultIncomeAccount || undefined,
-      defaultExpenseAccount: defaultExpenseAccount || undefined,
-      defaultBankAccount: defaultBankAccount || undefined,
-      writeOffAccount: writeOffAccount || undefined,
-      roundOffAccount: roundOffAccount || undefined,
-      defaultCashAccount: defaultCashAccount || undefined,
-      defaultInventoryAccount: defaultInventoryAccount || undefined,
-      stockReceivedButNotBilled: stockReceivedButNotBilled || undefined,
-      stockAdjustmentAccount: stockAdjustmentAccount || undefined,
+      defaultReceivableAccount: defaultReceivableAccount || null,
+      defaultPayableAccount: defaultPayableAccount || null,
+      defaultIncomeAccount: defaultIncomeAccount || null,
+      defaultExpenseAccount: defaultExpenseAccount || null,
+      defaultBankAccount: defaultBankAccount || null,
+      writeOffAccount: writeOffAccount || null,
+      roundOffAccount: roundOffAccount || null,
+      defaultCashAccount: defaultCashAccount || null,
+      defaultInventoryAccount: defaultInventoryAccount || null,
+      stockReceivedButNotBilled: stockReceivedButNotBilled || null,
+      stockAdjustmentAccount: stockAdjustmentAccount || null,
       defaultDeferredRevenueAccount: defaultDeferredRevenueAccount || null,
       defaultDeferredExpenseAccount: defaultDeferredExpenseAccount || null,
       exchangeGainLossAccount: exchangeGainLossAccount || null,
@@ -187,8 +190,8 @@ export default function EmpresaConfig() {
       depreciationExpenseAccount: depreciationExpenseAccount || null,
       disposalAccount: disposalAccount || null,
       defaultDiscountAccount: defaultDiscountAccount || null,
-      costCenter: costCenter || undefined,
-      roundOffCostCenter: roundOffCostCenter || undefined,
+      costCenter: costCenter || null,
+      roundOffCostCenter: roundOffCostCenter || null,
       depreciationCostCenter: depreciationCostCenter || null,
       enablePerpetualInventory,
     })
