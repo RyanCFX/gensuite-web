@@ -9,9 +9,16 @@ import { forgotPassword, isApiError } from '@/shared/api/auth'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+// En producción el tenant se resuelve del lado del backend (no hay múltiples
+// organizaciones seleccionables desde recuperar contraseña) — el campo se
+// oculta y no se envía `X-Tenant`, igual que en LoginPage.
+const IS_PRODUCTION = import.meta.env.PROD
+
 const schema = z.object({
   email: z.string().min(1, 'El correo es obligatorio').email('Correo inválido'),
-  tenant: z.string().min(1, 'La empresa es obligatoria'),
+  tenant: IS_PRODUCTION
+    ? z.string().optional()
+    : z.string().min(1, 'La empresa es obligatoria'),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -26,13 +33,13 @@ export default function ForgotPasswordPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { tenant: '' },
+    defaultValues: { tenant: IS_PRODUCTION ? undefined : 'tenant1' },
   })
 
   async function onSubmit(values: FormValues) {
     setServerError(null)
     try {
-      const result = await forgotPassword({ email: values.email }, values.tenant)
+      const result = await forgotPassword({ email: values.email }, IS_PRODUCTION ? null : values.tenant)
       setSuccessMessage(result.message)
     } catch (error) {
       if (isApiError(error)) {
@@ -80,18 +87,20 @@ export default function ForgotPasswordPage() {
               {errors.email?.message && <span className="form-error">{errors.email.message}</span>}
             </div>
 
-            <div className="form-field">
-              <Label htmlFor="tenant">Empresa</Label>
-              <Input
-                id="tenant"
-                type="text"
-                placeholder="mi-empresa"
-                autoComplete="organization"
-                {...register('tenant')}
-                data-error={!!errors.tenant}
-              />
-              {errors.tenant?.message && <span className="form-error">{errors.tenant.message}</span>}
-            </div>
+            {!IS_PRODUCTION && (
+              <div className="form-field">
+                <Label htmlFor="tenant">Empresa</Label>
+                <Input
+                  id="tenant"
+                  type="text"
+                  placeholder="mi-empresa"
+                  autoComplete="organization"
+                  {...register('tenant')}
+                  data-error={!!errors.tenant}
+                />
+                {errors.tenant?.message && <span className="form-error">{errors.tenant.message}</span>}
+              </div>
+            )}
 
             {serverError && (
               <div className="auth-server-error" role="alert">

@@ -51,11 +51,11 @@ export async function login(data: LoginRequest): Promise<AuthResult> {
   return handleLoginPayload(unwrap(res))
 }
 
-export async function forgotPassword(data: ForgotPasswordDto, tenant: string): Promise<ForgotPasswordResult> {
+export async function forgotPassword(data: ForgotPasswordDto, tenant?: string | null): Promise<ForgotPasswordResult> {
   const res = await client.post<{ success: true; data: ForgotPasswordResult }>(
     ENDPOINTS.auth.forgotPassword,
     data,
-    { headers: { 'X-Tenant': tenant } },
+    tenant ? { headers: { 'X-Tenant': tenant } } : undefined,
   )
   return unwrap(res)
 }
