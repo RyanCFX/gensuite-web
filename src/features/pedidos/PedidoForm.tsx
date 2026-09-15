@@ -9,6 +9,7 @@ import { getQuotation } from '@/shared/api/quotations'
 import { getLayawayConfig, listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
 import type { Item, ItemPrices, CreatePedidoDto, Bundle, Customer, ItemStock } from '@/shared/api/types'
 import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
+import { useItemInventory } from '@/shared/hooks/useItemInventory'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
@@ -119,6 +120,10 @@ const [customerId, setCustomerId] = useState('')
   // Disponibilidad real (físico − reservado) por artículo — docs/tasks/73_alertas_stock_disponible_reservado.md.
   const stockMap = useItemsStock(
     items.map((i) => (i.itemCode && i.itemType !== 'service' && i.itemType !== 'combo' ? i.itemCode : undefined)),
+  )
+  // "En pedido" (reservedQty, informativo, NO bloqueante) — docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §7.4.
+  const inventoryMap = useItemInventory(
+    items.map((i) => (i.itemCode && i.warehouse && i.itemType !== 'service' && i.itemType !== 'combo' ? { itemCode: i.itemCode, warehouse: i.warehouse } : undefined)),
   )
   const [highlightedRow, setHighlightedRow] = useState<number | null>(null)
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
@@ -915,6 +920,8 @@ try {
                         {(() => {
                           const stockError = validateLineStock(item, stockMap)
                           const info = item.itemCode && item.warehouse ? resolveDisponible(stockMap.get(item.itemCode), item.warehouse) : undefined
+                          const invItem = item.itemCode && item.warehouse ? inventoryMap.get(`${item.itemCode}::${item.warehouse}`) : undefined
+                          const enPedido = invItem?.reservedQty ?? 0
                           return (
                             <>
                               <QtyInput className={`items-input${(submitted && (!item.qty || item.qty <= 0)) || stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
@@ -925,6 +932,11 @@ try {
                               ) : info && info.reservedStock > 0 ? (
                                 <span style={{ fontSize: 11, color: 'var(--warning-text)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
                                   Disponible: {info.disponible} ({info.reservedStock} reservadas para otro cliente)
+                                  {enPedido > 0 ? ` · En pedido: ${enPedido} (informativo)` : ''}
+                                </span>
+                              ) : enPedido > 0 ? (
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                  En pedido: {enPedido} (informativo)
                                 </span>
                               ) : null}
                             </>

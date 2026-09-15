@@ -26,6 +26,7 @@ import {
   deshabilitarPos,
   habilitarDespacho,
   deshabilitarDespacho,
+  actualizarDespachoFuturo,
   habilitarFarmacia,
   getEcfConfig, updateEcfConfig,
 } from '@/shared/api/config'
@@ -33,7 +34,7 @@ import { listSucursales } from '@/shared/api/sucursales'
 import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { listCustomerGroups, createCustomerGroup, deleteCustomerGroup } from '@/shared/api/customers'
 import { listRoles } from '@/shared/api/usuarios'
-import type { CobrosConfig, MetodoPago, TaxLineCategory, TasaImpuesto, TasaImpuestoComponente, CreateTasaImpuestoDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError, UpdateAlmacenDto, FormatoImpresion, EcfTipoElectronico, PosDeshabilitarBloqueos, HabilitarFarmaciaResult, DesactivarDespachoBloqueos } from '@/shared/api/types'
+import type { CobrosConfig, MetodoPago, TaxLineCategory, TasaImpuesto, TasaImpuestoComponente, CreateTasaImpuestoDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError, UpdateAlmacenDto, FormatoImpresion, EcfTipoElectronico, PosDeshabilitarBloqueos, HabilitarFarmaciaResult, DesactivarDespachoBloqueos, UpdateDespachoFuturoDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { ConfirmModal, Modal } from '@/shared/ui/Modal'
@@ -2341,6 +2342,9 @@ function FacturacionConfigSection() {
   const [posBloqueos, setPosBloqueos] = useState<PosDeshabilitarBloqueos | null>(null)
   const [showDeshabilitarDespachoConfirm, setShowDeshabilitarDespachoConfirm] = useState(false)
   const [despachoBloqueos, setDespachoBloqueos] = useState<DesactivarDespachoBloqueos | null>(null)
+  const [despachoFuturoHabilitado, setDespachoFuturoHabilitado] = useState(true)
+  const [despachoFuturoBloqueaVenta, setDespachoFuturoBloqueaVenta] = useState(true)
+  const [despachoConfirmarStockAsignaSeriales, setDespachoConfirmarStockAsignaSeriales] = useState(false)
    const [arqueoEfectivoRequerido, setArqueoEfectivoRequerido] = useState(false)
    const [formatoImpresionDefault, setFormatoImpresionDefault] = useState<FormatoImpresion>("a4")
    const [formatosPermitidos, setFormatosPermitidos] = useState<FormatoImpresion[]>(ALL_FORMATOS_IMPRESION)
@@ -2367,6 +2371,9 @@ function FacturacionConfigSection() {
        setUsaImpuestoDocumento(data.usaImpuestoDocumento ?? true)
        setPlantillaImpuestoVentasDefault(data.plantillaImpuestoVentasDefault ?? '')
        setPlantillaImpuestoComprasDefault(data.plantillaImpuestoComprasDefault ?? '')
+        setDespachoFuturoHabilitado(data.despachoFuturoHabilitado ?? true)
+        setDespachoFuturoBloqueaVenta(data.despachoFuturoBloqueaVenta ?? true)
+        setDespachoConfirmarStockAsignaSeriales(data.despachoConfirmarStockAsignaSeriales ?? false)
         setArqueoEfectivoRequerido(data.arqueoEfectivoRequerido ?? false)
         setFormatoImpresionDefault(data.formatoImpresionDefault ?? "a4")
         setFormatosPermitidos(data.formatosPermitidos && data.formatosPermitidos.length > 0 ? data.formatosPermitidos : ALL_FORMATOS_IMPRESION)
@@ -2481,6 +2488,32 @@ function FacturacionConfigSection() {
       toast.error(err?.message ?? 'Error al desactivar el despacho')
     },
   })
+
+  // Los 3 campos son independientes — mandar solo los que el usuario tocó respecto al último
+  // valor conocido del servidor (§2.1: el backend responde 400 si no se manda ninguno).
+  const actualizarDespachoFuturoMutation = useMutation({
+    mutationFn: (dto: UpdateDespachoFuturoDto) => actualizarDespachoFuturo(dto),
+    onSuccess: () => {
+      toast.success('Configuración de despacho a futuro actualizada')
+      queryClient.invalidateQueries({ queryKey: ['facturacion-config'] })
+    },
+    onError: (err: ApiError) => toast.error(err?.message ?? 'Error al guardar la configuración de despacho a futuro'),
+  })
+
+  const despachoFuturoDirty = !!data && (
+    despachoFuturoHabilitado !== (data.despachoFuturoHabilitado ?? true) ||
+    despachoFuturoBloqueaVenta !== (data.despachoFuturoBloqueaVenta ?? true) ||
+    despachoConfirmarStockAsignaSeriales !== (data.despachoConfirmarStockAsignaSeriales ?? false)
+  )
+
+  function guardarDespachoFuturo() {
+    if (!data) return
+    const dto: UpdateDespachoFuturoDto = {}
+    if (despachoFuturoHabilitado !== (data.despachoFuturoHabilitado ?? true)) dto.futuroHabilitado = despachoFuturoHabilitado
+    if (despachoFuturoBloqueaVenta !== (data.despachoFuturoBloqueaVenta ?? true)) dto.futuroBloqueaVenta = despachoFuturoBloqueaVenta
+    if (despachoConfirmarStockAsignaSeriales !== (data.despachoConfirmarStockAsignaSeriales ?? false)) dto.confirmarStockAsignaSeriales = despachoConfirmarStockAsignaSeriales
+    actualizarDespachoFuturoMutation.mutate(dto)
+  }
 
   if (isLoading) return <span className="skeleton-box" style={{ height: 200, display: 'block' }} />
 
@@ -2732,6 +2765,70 @@ function FacturacionConfigSection() {
                 <button className="btn btn-secondary btn-size-sm" onClick={() => setShowDeshabilitarDespachoConfirm(true)}>
                   Desactivar
                 </button>
+              </Permitido>
+
+              <Permitido accion="config.despacho.configurar">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4, width: '100%' }}>
+                  <div className="ff-wrap">
+                    <label className="ff-check-wrap">
+                      <input
+                        type="checkbox"
+                        className="ff-check"
+                        checked={despachoFuturoHabilitado}
+                        onChange={(e) => setDespachoFuturoHabilitado(e.target.checked)}
+                      />
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>Permitir despacho a futuro</span>
+                    </label>
+                    <p className="ff-hint">
+                      Si está activo, al facturar se puede elegir despachar ahora o después. Si está apagado, toda
+                      venta nueva se despacha de inmediato (se confirma que exista stock físico antes de facturar).
+                    </p>
+                  </div>
+
+                  <div className="ff-wrap" style={{ opacity: despachoFuturoHabilitado ? 1 : 0.5 }}>
+                    <label className="ff-check-wrap">
+                      <input
+                        type="checkbox"
+                        className="ff-check"
+                        checked={despachoFuturoBloqueaVenta}
+                        disabled={!despachoFuturoHabilitado}
+                        onChange={(e) => setDespachoFuturoBloqueaVenta(e.target.checked)}
+                      />
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>El despacho a futuro reserva el stock</span>
+                    </label>
+                    <p className="ff-hint">
+                      Si está activo, mientras una venta a futuro no se despache, esas unidades no se le pueden
+                      vender a otro cliente. Si está apagado, la venta a futuro queda solo como una promesa — el
+                      mismo stock sigue disponible para cualquier otro cliente hasta que alguien lo despache primero.
+                    </p>
+                  </div>
+
+                  <div className="ff-wrap" style={{ opacity: despachoFuturoHabilitado ? 1 : 0.5 }}>
+                    <label className="ff-check-wrap">
+                      <input
+                        type="checkbox"
+                        className="ff-check"
+                        checked={despachoConfirmarStockAsignaSeriales}
+                        onChange={(e) => setDespachoConfirmarStockAsignaSeriales(e.target.checked)}
+                      />
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>Auto-asignar seriales/lotes al confirmar stock</span>
+                    </label>
+                    <p className="ff-hint">
+                      Solo aplica a ventas inmediatas (no a futuro). Si está activo, al someter la factura el
+                      sistema elige automáticamente los seriales/lotes disponibles. Si está apagado (recomendado si
+                      necesitás elegir manualmente cuál unidad exacta se vende), hay que asignarlos a mano antes de
+                      someter.
+                    </p>
+                  </div>
+
+                  <button
+                    className="btn btn-navy btn-size-sm"
+                    onClick={guardarDespachoFuturo}
+                    disabled={!despachoFuturoDirty || actualizarDespachoFuturoMutation.isPending}
+                  >
+                    {actualizarDespachoFuturoMutation.isPending ? 'Guardando…' : 'Guardar'}
+                  </button>
+                </div>
               </Permitido>
             </div>
           ) : (

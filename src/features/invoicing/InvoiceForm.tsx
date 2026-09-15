@@ -50,6 +50,7 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
+import { useItemInventory } from '@/shared/hooks/useItemInventory'
 import { formatStockInsufficientMessage } from '@/lib/stockAlerts'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
@@ -272,6 +273,10 @@ export default function InvoiceForm() {
   const stockMap = useItemsStock(
     items.map((i) => (i.itemCode && i.itemType !== 'service' && i.itemType !== 'combo' ? i.itemCode : undefined)),
   )
+  // "En pedido" (reservedQty, informativo, NO bloqueante) — docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §7.4.
+  const inventoryMap = useItemInventory(
+    items.map((i) => (i.itemCode && i.warehouse && i.itemType !== 'service' && i.itemType !== 'combo' ? { itemCode: i.itemCode, warehouse: i.warehouse } : undefined)),
+  )
   const [highlightedRow, setHighlightedRow] = useState<number | null>(null)
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
   const flashRow = useCallback((index: number) => {
@@ -329,6 +334,16 @@ export default function InvoiceForm() {
   const mostrarImpuestoDocumento = usaImpuestoDocumento && !(esFarmacia && arsEnabled)
   // Si está inactivo, se permite capturar un serial/lote nuevo al vender en vez de exigir que ya exista.
   const requiereSerialLoteCompra = facturacionConfig?.requiereSerialLoteCompra ?? false
+  // ── Despacho a futuro (docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md) ─────
+  const despachoHabilitado = facturacionConfig?.despachoHabilitado ?? false
+  const despachoFuturoHabilitado = facturacionConfig?.despachoFuturoHabilitado ?? true
+  const despachoConfirmarStockAsignaSeriales = facturacionConfig?.despachoConfirmarStockAsignaSeriales ?? false
+  // Selector visible solo si despachoHabilitado && despachoFuturoHabilitado (§3.1). Cuando no está
+  // visible, el valor efectivo es siempre "inmediato" (§3.2: omitido resuelve a futuro SOLO si
+  // habilitado && permitido — en cualquier otro caso resuelve a inmediato).
+  const mostrarSelectorDespachoFuturo = despachoHabilitado && despachoFuturoHabilitado
+  const [despachoFuturo, setDespachoFuturo] = useState(false)
+  const esInmediata = mostrarSelectorDespachoFuturo ? !despachoFuturo : true
 
   // ── Stock settings: define si los seriales/lotes se capturan inline en la fila (useSerialBatchFields)
   //    o vía diálogo emergente (ComponentTrackingModal). El catálogo es fijo, se cachea 1h.
@@ -1055,12 +1070,17 @@ if (esClienteOcasional) {
         toast.error(`Línea ${i + 1}: el descuento supera el límite de ${effectiveLimit}%`)
         return
       }
+      // El chequeo real de stock físico al someter solo aplica a ventas inmediatas (§4.1 de
+      // docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md) — una venta a futuro no descuenta
+      // inventario al someterse, así que no tiene sentido bloquear la creación por esto acá.
       const stockError = validateLineStock(item, stockMap)
-      if (stockError) {
+      if (stockError && esInmediata) {
         toast.error(`Línea ${i + 1}: ${stockError}`)
         return
       }
-      if (!isTrackingComplete(item)) {
+      // Auto-asignación de seriales/lotes (§4.2): solo aplica a ventas inmediatas. Con el switch
+      // activo, el backend elige el serial/lote al someter — no hace falta exigirlo acá.
+      if (!(despachoConfirmarStockAsignaSeriales && esInmediata) && !isTrackingComplete(item)) {
         toast.error(`Línea ${i + 1}: selecciona las series/lotes de los componentes del combo antes de continuar`)
         return
       }
@@ -1119,6 +1139,7 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
         taxesTemplate: mostrarImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
         currency: currency || undefined,
         conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
+        despachoFuturo: mostrarSelectorDespachoFuturo ? despachoFuturo : undefined,
         ...arsBloqueDto(),
       }
 
@@ -1485,6 +1506,10 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
                         {(() => {
                           const stockError = validateLineStock(item, stockMap)
                           const info = item.itemCode && item.warehouse ? resolveDisponible(stockMap.get(item.itemCode), item.warehouse) : undefined
+                          const invItem = item.itemCode && item.warehouse ? inventoryMap.get(`${item.itemCode}::${item.warehouse}`) : undefined
+                          // "En pedido" es puramente informativo — nunca bloquea, no confundir con
+                          // reservedStock (que sí resta de disponible y sí puede bloquear la venta).
+                          const enPedido = invItem?.reservedQty ?? 0
                           return (
                             <>
                               <QtyInput className={`items-input${stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
@@ -1495,6 +1520,11 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
                               ) : info && info.reservedStock > 0 ? (
                                 <span style={{ fontSize: 11, color: 'var(--warning-text)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
                                   Disponible: {info.disponible} ({info.reservedStock} reservadas para otro cliente)
+                                  {enPedido > 0 ? ` · En pedido: ${enPedido} (informativo)` : ''}
+                                </span>
+                              ) : enPedido > 0 ? (
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                  En pedido: {enPedido} (informativo)
                                 </span>
                               ) : null}
                             </>
@@ -1799,6 +1829,37 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
           </div>
         </div>
 
+        {mostrarSelectorDespachoFuturo && (
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="card-header navy-card-header">
+              <h2 className="card-title">Despacho</h2>
+            </div>
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className={`btn btn-size-sm ${!despachoFuturo ? 'btn-navy' : 'btn-secondary'}`}
+                  onClick={() => setDespachoFuturo(false)}
+                >
+                  Despachar ahora
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-size-sm ${despachoFuturo ? 'btn-navy' : 'btn-secondary'}`}
+                  onClick={() => setDespachoFuturo(true)}
+                >
+                  Despachar después
+                </button>
+              </div>
+              <p className="ff-hint" style={{ margin: 0 }}>
+                {despachoFuturo
+                  ? 'La factura no descontará inventario al someterse — la salida física se registra después con un Despacho.'
+                  : 'La factura descontará inventario al someterse — se confirma que exista stock físico en el almacén de cada línea.'}
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="card">
           <div className="card-header navy-card-header">
             <h2 className="card-title">Notas</h2>
@@ -1861,6 +1922,7 @@ onAuthorized={(userId) => {
              taxesTemplate: mostrarImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
              currency: currency || undefined,
              conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
+             despachoFuturo: mostrarSelectorDespachoFuturo ? despachoFuturo : undefined,
              ...arsBloqueDto(),
            }
 persistInvoice(baseDto as CreateInvoiceDto)

@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, ChevronLeft, ChevronRight, Truck } from 'lucide-react'
 import { listDespachos, listDespachosPendientes, crearDespachoDesdeFactura, crearDespachoDesdePedido } from '@/shared/api/despachos'
+import { getFacturacionConfig } from '@/shared/api/config'
 import type { DespachoStatus } from '@/shared/api/types'
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate } from '@/lib/formatters'
@@ -187,6 +188,17 @@ function PendientesTable() {
     }),
   })
 
+  // docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §5.2 — aviso informativo (no bloqueante): con
+  // el switch apagado, una venta a futuro no reserva stock en firme, así que este pendiente puede
+  // perder el stock frente a otro cliente antes de despacharse. Se lee una sola vez por pantalla,
+  // no por despacho individual.
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const stockNoReservado = facturacionConfig?.despachoFuturoBloqueaVenta === false
+
   const crearMutation = useMutation({
     mutationFn: (linea: { origen: 'factura' | 'pedido'; documentoId: string }) =>
       linea.origen === 'factura' ? crearDespachoDesdeFactura(linea.documentoId) : crearDespachoDesdePedido(linea.documentoId),
@@ -204,6 +216,13 @@ function PendientesTable() {
 
   return (
     <>
+      {stockNoReservado && (
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
+          Este stock no está reservado — otro cliente podría comprarlo antes de que se despache (el
+          despacho a futuro no bloquea venta en esta empresa).
+        </div>
+      )}
+
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>
