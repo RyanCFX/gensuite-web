@@ -7,7 +7,8 @@ import { createPedido, updatePedido, getPedido, getPedidoDuplicateSource } from 
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getQuotation } from '@/shared/api/quotations'
 import { getLayawayConfig, listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
-import type { Item, ItemPrices, CreatePedidoDto, Bundle, Customer, ItemStock } from '@/shared/api/types'
+import type { Item, ItemPrices, CreatePedidoDto, Bundle, Customer, ItemStock, MonedaCode } from '@/shared/api/types'
+import { getTasaVigente } from '@/shared/api/monedas'
 import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { useItemInventory } from '@/shared/hooks/useItemInventory'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
@@ -15,7 +16,8 @@ import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
-import { formatDOP, formatMoney, round2 } from '@/lib/formatters'
+import { formatMoney, round2 } from '@/lib/formatters'
+import { formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -31,8 +33,8 @@ import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { listItems, getDefaultPriceTier } from '@/shared/api/catalog'
 import { client, isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
-import { listSucursales } from '@/shared/api/sucursales'
-import { getUser } from '@/shared/api/storage'
+import { listSucursales, getSucursal } from '@/shared/api/sucursales'
+import { getCachedUser } from '@/shared/api/storage'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
@@ -46,6 +48,9 @@ interface LineItem {
   description: string
   qty: number
   rate: number
+  /** Precio en `monedaBase` (catálogo), ya ajustado por UDM pero SIN convertir a la moneda
+   *  elegida — es el anchor a partir del cual se recalcula `rate` al cambiar moneda/tasa/UDM. */
+  baseRate: number
   amount: number
   discountPct: number
   /** Modo de descuento de la línea — mutuamente excluyentes, nunca se envían ambos al backend */
@@ -142,6 +147,7 @@ const [customerId, setCustomerId] = useState('')
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [isLayaway, setIsLayaway] = useState(false)
+  const [despachoFuturo, setDespachoFuturo] = useState(false)
   const [branch, setBranch] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
@@ -165,6 +171,55 @@ const [customerId, setCustomerId] = useState('')
   // completa al recibir la compra — docs/PROMPT_VENDER_SIN_STOCK_FRONTEND.md §0/§9): la falta de
   // stock deja de ser un bloqueo del lado del cliente y pasa a ser solo informativa.
   const despachoHabilitado = facturacionConfig?.despachoHabilitado ?? false
+  const despachoFuturoHabilitado = facturacionConfig?.despachoFuturoHabilitado ?? true
+  // Mismo criterio que InvoiceForm — visible solo si el tenant tiene ambos módulos habilitados.
+  // Mutuamente excluyente con "Es un apartado": un pedido a futuro ya difiere la entrega por su
+  // cuenta, no tiene sentido combinarlo con layaway (docs/tasks/79_confirmacion_despacho_pedido.md §2).
+  const mostrarSelectorDespachoFuturo = despachoHabilitado && despachoFuturoHabilitado && !isLayaway
+
+  // Tasa vigente configurada para el par (moneda elegida → moneda base) — se autocompleta el
+  // campo "Tasa de cambio" con esto la primera vez que el usuario elige una moneda distinta a la
+  // base, sin pisar un valor que el usuario ya haya tocado a mano.
+  const { data: tasaVigente } = useQuery({
+    queryKey: ['monedas-tasa-vigente', currency, monedaBase],
+    queryFn: () => getTasaVigente({ from: currency as MonedaCode, to: monedaBase as MonedaCode }),
+    enabled: multimonedaHabilitada && !!currency && currency !== monedaBase,
+    retry: false,
+  })
+  useEffect(() => {
+    if (currency && currency !== monedaBase && tasaVigente && conversionRate === '') {
+      setConversionRate(tasaVigente.tasa)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasaVigente])
+
+  // El catálogo (prices/standardRate) siempre está en `monedaBase` — `baseRate` guarda ese precio
+  // sin tocar; `saleRate` es lo que efectivamente se cobra/muestra por línea: convertido a la
+  // moneda elegida (si no es la base) y ajustado por la UDM de venta (`factor`, 1 = UDM de stock).
+  function saleRate(base: number, factor: number = 1): number {
+    const converted = base * factor
+    const rate = currency && currency !== monedaBase && conversionRate !== '' && Number(conversionRate) > 0
+      ? converted / Number(conversionRate)
+      : converted
+    return Math.round(rate * 10000) / 10000
+  }
+
+  // Al elegir/cambiar moneda o tasa, se reconvierten los precios de las líneas ya cargadas en esta
+  // sesión (con `_prices`, es decir, elegidas desde el catálogo) — no toca líneas hidratadas de un
+  // pedido/cotización existente, que ya vienen en la moneda con la que se guardaron originalmente.
+  useEffect(() => {
+    setItems((prev) =>
+      prev.map((row) => {
+        if (!row._prices || !row.itemCode) return row
+        const rate = saleRate(row.baseRate, row.conversionFactor)
+        const amount = row.discountMode === 'amount'
+          ? calcAmount(row.qty, rate, 0, row.discountAmount)
+          : calcAmount(row.qty, rate, row.discountPct)
+        return { ...row, rate, amount }
+      }),
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currency, conversionRate, monedaBase])
 
   const { data: layawayConfig } = useQuery({
     queryKey: ['layaway-config'],
@@ -216,6 +271,7 @@ const [customerId, setCustomerId] = useState('')
           description: i.description ?? '',
           qty: i.qty,
           rate: i.rate,
+          baseRate: i.rate,
           amount: i.amount,
           discountPct,
           discountMode,
@@ -245,6 +301,7 @@ const [customerId, setCustomerId] = useState('')
           description: i.description ?? '',
           qty: i.qty,
           rate: i.rate,
+          baseRate: i.rate,
           amount: calcAmount(i.qty, i.rate, discountPct, discountAmount),
           discountPct,
           discountMode,
@@ -289,6 +346,7 @@ useEffect(() => {
          description: i.description,
          qty: i.qty,
          rate: i.rate,
+         baseRate: i.rate,
          amount: i.amount,
          discountPct,
          discountMode,
@@ -320,7 +378,7 @@ useEffect(() => {
     staleTime: 5 * 60_000,
   })
 
-  const currentUserEmail = getUser()?.email
+  const currentUserEmail = getCachedUser()?.email
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser', currentUserEmail],
     queryFn: () => getUsuario(currentUserEmail!),
@@ -364,6 +422,12 @@ useEffect(() => {
     if (myBranches?.defaultBranch && !branch && !isEdit) setBranch(myBranches.defaultBranch)
   }, [myBranches])
 
+  // Si el usuario solo tiene una sucursal asignada, se selecciona sola (igual que en Nueva
+  // Factura) — el select queda bloqueado en la práctica porque no hay otra opción que elegir.
+  useEffect(() => {
+    if (!isEdit && branchOptions.length === 1 && branch !== branchOptions[0]) setBranch(branchOptions[0])
+  }, [branchOptions, branch, isEdit])
+
   // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
   const { data: branchWarehouses } = useQuery({
     queryKey: ['almacenes', { branch }],
@@ -371,6 +435,18 @@ useEffect(() => {
     enabled: !!branch,
     staleTime: 60_000,
   })
+
+  // docs/tasks/75_almacen_venta_confirmar_stock_uoms_permitidas.md §1.4 — si la sucursal tiene
+  // almacén de venta configurado, TODA venta debe salir de ahí sin excepción: se oculta el
+  // selector por línea y se fuerza ese almacén, en vez de dejar elegir y recién enterarse con el
+  // 400 de SALE_WAREHOUSE_MISMATCH al someter.
+  const { data: sucursalActual } = useQuery({
+    queryKey: ['sucursal', branch],
+    queryFn: () => getSucursal(branch),
+    enabled: !!branch,
+    staleTime: 60_000,
+  })
+  const almacenVentaSucursal = sucursalActual?.almacenVenta || null
 
   // Al cambiar de sucursal, el almacén elegido en cada línea deja de ser válido
   useEffect(() => {
@@ -385,6 +461,7 @@ useEffect(() => {
   }, [branchWarehouses, warehouseSearch])
 
   function defaultWarehouse(): string {
+    if (almacenVentaSucursal) return almacenVentaSucursal
     return branchWarehouses?.length === 1 ? branchWarehouses[0].id : ''
   }
 
@@ -400,12 +477,29 @@ useEffect(() => {
     )
   }, [branchWarehouses])
 
+  // Con almacén de venta configurado, se fuerza en TODAS las líneas (no solo en las vacías) — no
+  // hay atajo posible desde otro almacén de la misma sucursal.
+  useEffect(() => {
+    if (!almacenVentaSucursal) return
+    setItems((prev) =>
+      prev.map((row) => (row.warehouse === almacenVentaSucursal ? row : { ...row, warehouse: almacenVentaSucursal })),
+    )
+  }, [almacenVentaSucursal])
+
   function handleError(err: unknown) {
     const msg = (err as any)?.message ?? ''
     setSubmitError(msg)
     if (isApiErrorCode(err, ERROR_CODES.BRANCH_REQUIRED)) {
       setBranchError(true)
       toast.error(msg || 'Selecciona una sucursal')
+      return
+    }
+    if (isApiErrorCode(err, ERROR_CODES.SALE_WAREHOUSE_MISMATCH)) {
+      toast.error(msg, { duration: 8000 })
+      return
+    }
+    if (isApiErrorCode(err, ERROR_CODES.UOM_NOT_ALLOWED)) {
+      toast.error(formatUomNotAllowedMessage(err), { duration: 8000 })
       return
     }
     if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) {
@@ -489,7 +583,8 @@ useEffect(() => {
       wasLastRow = index === prev.length - 1
       return prev.map((row, i) => {
         if (i !== index) return row
-        const rate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
+        const baseRate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
+        const rate = saleRate(baseRate)
         return {
           ...row,
           itemCode: catalogItem.id,
@@ -497,6 +592,7 @@ useEffect(() => {
           itemType: catalogItem.type,
           description: catalogItem.internalDescription ?? catalogItem.itemName,
           rate,
+          baseRate,
           amount: calcAmount(row.qty, rate, 0, 0),
           discountPct: 0,
           discountMode: 'pct' as const,
@@ -519,7 +615,8 @@ useEffect(() => {
       wasLastRow = index === prev.length - 1
       return prev.map((row, i) => {
         if (i !== index) return row
-        const rate = bundle.prices?.[tier] ?? 0
+        const baseRate = bundle.prices?.[tier] ?? 0
+        const rate = saleRate(baseRate)
         return {
           ...row,
           itemCode: bundle.id,
@@ -527,6 +624,7 @@ useEffect(() => {
           itemType: 'combo',
           description: bundle.itemName,
           rate,
+          baseRate,
           amount: row.discountMode === 'amount'
             ? calcAmount(row.qty, rate, 0, row.discountAmount)
             : calcAmount(row.qty, rate, row.discountPct),
@@ -546,7 +644,8 @@ useEffect(() => {
     setItems((prev) => [
       ...prev,
       ...selections.map((s) => {
-        const rate = s.item.prices?.[tier] ?? s.item.standardRate ?? 0
+        const baseRate = s.item.prices?.[tier] ?? s.item.standardRate ?? 0
+        const rate = saleRate(baseRate)
         return {
           itemCode: s.item.id,
           itemLabel: s.item.itemName,
@@ -554,6 +653,7 @@ useEffect(() => {
           description: s.item.internalDescription ?? s.item.itemName,
           qty: s.qty,
           rate,
+          baseRate,
           amount: calcAmount(s.qty, rate, 0),
           discountPct: 0,
           discountMode: 'pct' as const,
@@ -576,13 +676,15 @@ useEffect(() => {
     setItems((prev) =>
       prev.map((row) => {
         if (!row._prices) return row
-        const rate = row._prices[tier] ?? row.rate
+        const baseRate = row._prices[tier] ?? row.baseRate
+        const rate = saleRate(baseRate, row.conversionFactor)
         const amount = row.discountMode === 'amount'
           ? calcAmount(row.qty, rate, 0, row.discountAmount)
           : calcAmount(row.qty, rate, row.discountPct)
-        return { ...row, rate, amount }
+        return { ...row, rate, baseRate, amount }
       }),
     )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerPriceTier, defaultPriceTier])
 
   function addRow() {
@@ -590,7 +692,7 @@ useEffect(() => {
       toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
       return
     }
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, uom: 'Unidad', conversionFactor: 1, warehouse: '' }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, uom: 'Unidad', conversionFactor: 1, warehouse: '' }])
   }
   function removeRow(index: number) { setItems((prev) => prev.filter((_, i) => i !== index)) }
 
@@ -622,6 +724,7 @@ function submitDto() {
        items: itemsDto,
        quotation: quotationId || undefined,
        isLayaway: isLayaway || undefined,
+       despachoFuturo: mostrarSelectorDespachoFuturo ? despachoFuturo : undefined,
        currency: currency || undefined,
        conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
      }
@@ -640,6 +743,7 @@ function submitDto() {
     items,
     notes,
     isLayaway,
+    despachoFuturo,
     branch,
     department,
     currency,
@@ -853,6 +957,7 @@ try {
                   selectedLabel={branch}
                   placeholder="Sin especificar"
                   error={!branch || branchError}
+                  disabled={branchOptions.length === 1}
                 />
               </div>
               {usaDepartamentos && (
@@ -866,9 +971,16 @@ try {
             {!isEdit && (
               <div style={{ marginTop: 16 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
-                  <input type="checkbox" checked={isLayaway} onChange={(e) => setIsLayaway(e.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={isLayaway}
+                    onChange={(e) => {
+                      setIsLayaway(e.target.checked)
+                      if (e.target.checked) setDespachoFuturo(false)
+                    }}
+                  />
                   <PackageOpen size={14} style={{ color: 'var(--text-secondary)' }} />
-                  Es un apartado (layaway)
+                  Es un apartado
                 </label>
                 {isLayaway && (
                   <p className="ff-hint" style={{ marginTop: 6 }}>
@@ -878,6 +990,33 @@ try {
                     )}
                   </p>
                 )}
+              </div>
+            )}
+
+            {!isEdit && mostrarSelectorDespachoFuturo && (
+              <div style={{ marginTop: 16, borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
+                <label className="ff-label" style={{ marginBottom: 8, display: 'block' }}>Despacho</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    className={`btn btn-size-sm ${!despachoFuturo ? 'btn-navy' : 'btn-secondary'}`}
+                    onClick={() => setDespachoFuturo(false)}
+                  >
+                    Despachar ahora
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-size-sm ${despachoFuturo ? 'btn-navy' : 'btn-secondary'}`}
+                    onClick={() => setDespachoFuturo(true)}
+                  >
+                    Despachar después
+                  </button>
+                </div>
+                <p className="ff-hint" style={{ marginTop: 6 }}>
+                  {despachoFuturo
+                    ? 'El pedido no descontará inventario al facturarse — la salida física se registra después con un Despacho.'
+                    : 'El pedido descontará inventario al facturarse — se confirma que exista stock físico en el almacén de cada línea.'}
+                </p>
               </div>
             )}
           </div>
@@ -896,13 +1035,13 @@ try {
                   <th style={{ textAlign: 'right', width: 72 }}>Descuento</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 72 }}>UDM</th>
-                  <th style={{ width: 140 }}>Almacén</th>
+                  {!almacenVentaSucursal && <th style={{ width: 140 }}>Almacén</th>}
                   <th style={{ width: 40 }} />
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
-                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>No hay artículos.</td></tr>
+                  <tr><td colSpan={almacenVentaSucursal ? 8 : 9} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>No hay artículos.</td></tr>
                 ) : (
                   items.map((item, index) => (
                     <tr
@@ -1010,25 +1149,32 @@ try {
                           )
                         })()}
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount, { trimZeros: true })}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount, currency || monedaBase, { trimZeros: true })}</td>
                       <td>
                         {item.itemType === 'service' || item.itemType === 'combo' ? (
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                         ) : (
-                          <UomSelect value={item.uom} onChange={(v) => updateItem(index, { uom: v })} itemCode={item.itemCode || undefined} />
+                          <UomSelect
+                            value={item.uom}
+                            onChange={(v, factor) => updateItem(index, { uom: v, rate: saleRate(item.baseRate, factor), conversionFactor: factor })}
+                            itemCode={item.itemCode || undefined}
+                            direction="sale"
+                          />
                         )}
                       </td>
-                      <td>
-                        <SearchSelect
-                          value={item.warehouse}
-                          onChange={(val) => updateWarehouse(index, val)}
-                          options={warehouseSelectOptions}
-                          onSearch={setWarehouseSearch}
-                          selectedLabel={branchWarehouses?.find((w) => w.id === item.warehouse)?.name ?? ''}
-                          placeholder="Almacén por defecto"
-                          disabled={!item.itemCode}
-                        />
-                      </td>
+                      {!almacenVentaSucursal && (
+                        <td>
+                          <SearchSelect
+                            value={item.warehouse}
+                            onChange={(val) => updateWarehouse(index, val)}
+                            options={warehouseSelectOptions}
+                            onSearch={setWarehouseSearch}
+                            selectedLabel={branchWarehouses?.find((w) => w.id === item.warehouse)?.name ?? ''}
+                            placeholder="Almacén por defecto"
+                            disabled={!item.itemCode}
+                          />
+                        </td>
+                      )}
                       <td onClick={(e) => e.stopPropagation()} className="actions-cell">
                         <ActionsMenu>
                           <ActionsMenuItem
@@ -1051,10 +1197,10 @@ try {
               <button type="button" className="btn btn-ghost btn-size-sm" onClick={addRow}><Plus size={14} /> Agregar artículo</button>
             </div>
             <div className="items-total-row">
-              <div className="items-total-line"><span>Subtotal bruto</span><span>{formatDOP(grossTotal)}</span></div>
-              {totalDiscount > 0 && <div className="items-total-line" style={{ color: 'var(--text-danger)' }}><span>Descuento total</span><span>-{formatDOP(totalDiscount)}</span></div>}
+              <div className="items-total-line"><span>Subtotal bruto</span><span>{formatMoney(grossTotal, currency || monedaBase)}</span></div>
+              {totalDiscount > 0 && <div className="items-total-line" style={{ color: 'var(--text-danger)' }}><span>Descuento total</span><span>-{formatMoney(totalDiscount, currency || monedaBase)}</span></div>}
               {/*<div className="items-total-line"><span>Subtotal neto</span><span>{formatDOP(subtotal)}</span></div>*/}
-              <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}><span>Total</span><span>{formatDOP(total)}</span></div>
+              <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}><span>Total</span><span>{formatMoney(total, currency || monedaBase)}</span></div>
             </div>
           </div>
         </div>
