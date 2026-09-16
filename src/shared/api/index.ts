@@ -1,15 +1,14 @@
 export { client, BASE_URL, unwrap, unwrapPaginated, unwrapRaw } from './client'
 export { login, isApiError } from './auth'
 export {
-  getToken,
+  getAccessToken,
   getTenant,
-  getUser,
-  setToken,
+  getCachedUser,
+  setAccessToken,
   setTenant,
-  setUser,
-  saveSession,
+  setCachedUser,
   clearSession,
-  clearToken,
+  clearAccessToken,
 } from './storage'
 export { ENDPOINTS } from './endpoints'
 export type * from './types'

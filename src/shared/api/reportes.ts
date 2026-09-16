@@ -1,6 +1,6 @@
 import { client, BASE_URL } from './client'
 import { ENDPOINTS } from './endpoints'
-import { getToken, getTenant } from './storage'
+import { getAccessToken, getTenant } from './storage'
 import type { CuadreTurnoResult, CorteCajaDiaResult } from './types'
 
 // ─── DGII (606 / 607 / 608) ──────────────────────────────────────────────────
@@ -38,7 +38,7 @@ export async function downloadReporteExcel(tipo: string, year: number, month: nu
   const params = new URLSearchParams({ year: String(year), month: String(month), format: 'excel' })
   if (branch) params.set('branch', branch)
 
-  const token = getToken()
+  const token = getAccessToken()
   const tenant = getTenant()
 
   const res = await fetch(`${BASE_URL}${ENDPOINT_MAP[tipo]}?${params}`, {
@@ -336,7 +336,7 @@ export async function downloadCuadreTurnoExcel(params?: CuadreTurnoParams) {
   if (params?.toDate) search.set('toDate', params.toDate)
   if (params?.cajero) search.set('cajero', params.cajero)
 
-  const token = getToken()
+  const token = getAccessToken()
   const tenant = getTenant()
 
   const res = await fetch(`${BASE_URL}${ENDPOINTS.reportes.cuadreTurno}?${search}`, {

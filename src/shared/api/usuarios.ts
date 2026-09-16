@@ -2,16 +2,22 @@ import { client, unwrap, unwrapPaginated } from './client'
 import { ENDPOINTS } from './endpoints'
 import type {
   Usuario,
-  CreateUsuarioDto,
+  UsuarioLookupResult,
+  InviteUsuarioDto,
+  InviteUsuarioResult,
   UpdateUsuarioDto,
+  MembershipStatus,
   PaginatedResponse,
   PaginationParams,
   UsuarioSucursales,
   UsuarioAlmacenesPermitidos,
-  ResetPasswordUsuarioDto,
 } from './types'
 
-export async function listUsuarios(params?: PaginationParams) {
+export interface ListUsuariosParams extends PaginationParams {
+  status?: MembershipStatus;
+}
+
+export async function listUsuarios(params?: ListUsuariosParams) {
   const res = await client.get<PaginatedResponse<Usuario>>(ENDPOINTS.usuarios.list, { params })
   return unwrapPaginated(res)
 }
@@ -29,8 +35,17 @@ export async function buscarUsuarioPorCodigo(codigo: string) {
   return unwrap(res)
 }
 
-export async function createUsuario(data: CreateUsuarioDto) {
-  const res = await client.post<{ success: true; data: Usuario }>(ENDPOINTS.usuarios.list, data)
+/** Paso previo obligatorio antes de mostrar el formulario de invitar (§6.2) — nunca revela en
+ *  qué otros tenants está la persona, solo nombre/apellido/teléfono y su estado en ESTE tenant. */
+export async function lookupUsuario(email: string): Promise<UsuarioLookupResult> {
+  const res = await client.get<{ success: true; data: UsuarioLookupResult }>(ENDPOINTS.usuarios.lookup, { params: { email } })
+  return unwrap(res)
+}
+
+/** Invita — nunca crea con contraseña (§6.3). El backend maneja re-invitación automáticamente si
+ *  ya existía una fila para este email en este tenant en un estado no-`accepted`. */
+export async function inviteUsuario(data: InviteUsuarioDto): Promise<InviteUsuarioResult> {
+  const res = await client.post<{ success: true; data: InviteUsuarioResult }>(ENDPOINTS.usuarios.list, data)
   return unwrap(res)
 }
 
@@ -39,17 +54,28 @@ export async function updateUsuario(email: string, data: Partial<UpdateUsuarioDt
   return unwrap(res)
 }
 
-export async function deleteUsuario(email: string) {
-  await client.delete(ENDPOINTS.usuarios.byEmail(email))
+/** Revoca el acceso de alguien que ya lo tenía — definitivo hasta una nueva invitación (§6.7). */
+export async function revocarUsuario(email: string, reason?: string) {
+  await client.delete(ENDPOINTS.usuarios.byEmail(email), { data: reason ? { reason } : undefined })
 }
 
-export async function enableUsuario(email: string) {
-  const res = await client.post<{ success: true; data: Usuario }>(ENDPOINTS.usuarios.enable(email))
+/** Temporal — pensado para reactivarse después con `reactivarUsuario` (§6.7). */
+export async function suspenderUsuario(email: string, reason?: string) {
+  const res = await client.post<{ success: true; data: { message: string } }>(ENDPOINTS.usuarios.suspender(email), reason ? { reason } : undefined)
   return unwrap(res)
 }
 
-export async function resetPasswordUsuario(email: string, data?: ResetPasswordUsuarioDto) {
-  await client.post(ENDPOINTS.usuarios.resetPassword(email), data)
+/** Solo tiene sentido desde `suspended` — vuelve directo a `accepted` (§6.7). */
+export async function reactivarUsuario(email: string) {
+  const res = await client.post<{ success: true; data: { message: string } }>(ENDPOINTS.usuarios.reactivar(email))
+  return unwrap(res)
+}
+
+/** Reenvía el correo de invitación con un link nuevo (el anterior queda invalidado) — para
+ *  cualquier estado que no sea `accepted` (§6.4). */
+export async function reinvitarUsuario(email: string) {
+  const res = await client.post<{ success: true; data: { message: string } }>(ENDPOINTS.usuarios.reinvitar(email))
+  return unwrap(res)
 }
 
 export async function listRoles(): Promise<Array<{ id: string; label: string; }>> {

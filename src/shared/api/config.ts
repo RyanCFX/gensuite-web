@@ -47,7 +47,6 @@ import type {
   BuyingSettings,
   UpdateBuyingSettingsDto,
   SeguridadSettings,
-  UpdateSeguridadSettingsDto,
   UpdateUOMResult,
   EcfConfig,
   UpdateEcfConfigDto,
@@ -406,13 +405,10 @@ export async function updateBuyingSettings(data: UpdateBuyingSettingsDto) {
   return unwrap(res)
 }
 
+/** Solo lectura — docs/tasks/PROMPT_IDENTIDAD_GLOBAL_FRONTEND.md §9, no hay PUT: no queda nada
+ *  configurable por tenant en Seguridad. */
 export async function getSeguridadSettings() {
   const res = await client.get<{ success: true; data: SeguridadSettings }>(ENDPOINTS.settings.seguridad)
-  return unwrap(res)
-}
-
-export async function updateSeguridadSettings(data: UpdateSeguridadSettingsDto) {
-  const res = await client.put<{ success: true; data: SeguridadSettings }>(ENDPOINTS.settings.seguridad, data)
   return unwrap(res)
 }
 

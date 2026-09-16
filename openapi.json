@@ -3,18 +3,9 @@
   "paths": {
     "/api/v1/auth/login": {
       "post": {
+        "description": "Ya no depende de `X-Tenant` para autenticar: la contraseña vive en el control-plane, una sola vez por persona. Si el usuario tiene 2FA confirmado, responde `mfaRequired` en vez de tokens — completar con `POST /auth/mfa/verify`. La respuesta trae SIEMPRE la lista completa de tenants a los que pertenece (`tenants[]`), y el `access_token` del tenant activo (X-Tenant/`tenant` del body, o el marcado `isDefault`) — `null` si ninguno aplica, para que el frontend muestre las invitaciones pendientes.",
         "operationId": "AuthController_login",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "description": "Si llega, resuelve el tenant directo por ese slug (tiene prioridad sobre \"tenant\" en el body). Si no llega, se intenta resolver por el dominio del header Origin. Si ninguna de las dos formas resuelve un tenant, responde el mismo error genérico que credenciales inválidas — nunca se prueba la contraseña contra otros tenants.",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -30,7 +21,291 @@
             "description": ""
           }
         },
-        "summary": "Login against ERPNext and get JWT",
+        "summary": "Login global — identifica al usuario, no un tenant",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/verify": {
+      "post": {
+        "operationId": "AuthController_verifyMfa",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MfaVerifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Completa el login tras el desafío de 2FA",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/resend": {
+      "post": {
+        "operationId": "AuthController_resendMfa",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MfaResendDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Reenvía el código de 2FA por correo (si el factor activo es email)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "description": "Rotativo con detección de reuso: si el refresh token ya fue consumido antes, se revoca toda la sesión (posible robo de token) y responde 401.",
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Rota el refresh token y emite un access token nuevo",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Cierra la sesión (o todas, con `all: true`)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/switch-tenant": {
+      "post": {
+        "description": "El usuario \"inicia sesión en todos los tenants\" perezosamente: el refresh token es una sola sesión global, y este endpoint emite un access token nuevo para OTRO tenant al que el usuario ya tenga una membresía ACCEPTED.",
+        "operationId": "AuthController_switchTenant",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwitchTenantDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Cambia el tenant activo sin volver a pedir contraseña",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/invitations/{token}": {
+      "get": {
+        "description": "Un cliente de correo que pre-carga links no debe aceptar/rechazar nada — por eso este GET es de solo lectura. Usarlo para pintar la pantalla \"¿Acepta unirse a \u003Ctenant\u003E?\".",
+        "operationId": "AuthController_getInvitation",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Detalle de una invitación — NO la consume",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/invitations/{token}/accept": {
+      "post": {
+        "operationId": "AuthController_acceptInvitation",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInvitationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Acepta una invitación — autologuea y devuelve el mismo cuerpo que /auth/login",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/invitations/{token}/reject": {
+      "post": {
+        "description": "Marca la membresía como REJECTED (distinto de REVOKED, que es cuando el tenant retira el acceso después de aceptar) — el tenant puede volver a invitar cuando quiera.",
+        "operationId": "AuthController_rejectInvitation",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Rechaza una invitación",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/oauth/google": {
+      "get": {
+        "operationId": "AuthController_googleAuthorize",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Redirige a Google (Authorization Code + PKCE)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/oauth/google/callback": {
+      "get": {
+        "description": "Valida el `id_token` (firma, iss, aud, exp, email_verified) y resuelve la cuenta. Solo sirve para ENTRAR a una cuenta ya registrada — si el correo no existe en el sistema, redirige con un error `OAUTH_NO_ACCOUNT`, nunca auto-registra.",
+        "operationId": "AuthController_googleCallback",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Callback de Google — redirige al frontend con un ticket de un solo uso",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/oauth/exchange": {
+      "post": {
+        "operationId": "AuthController_exchangeOAuth",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthExchangeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Canjea el ticket del callback de Google por tokens de sesión",
         "tags": [
           "Auth"
         ]
@@ -38,17 +313,9 @@
     },
     "/api/v1/auth/forgot-password": {
       "post": {
+        "description": "Envía un correo (SMTP de plataforma) con un link al frontend. Siempre responde con el mismo mensaje genérico, exista o no el correo.",
         "operationId": "AuthController_forgotPassword",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -64,7 +331,7 @@
             "description": ""
           }
         },
-        "summary": "Recuperar contraseña — envía un correo propio (no el nativo de ERPNext) con un link al frontend desde el que se hizo la request (header Origin, validado contra ALLOWED_ORIGINS). Siempre responde con el mismo mensaje genérico, exista o no el correo.",
+        "summary": "Recuperar contraseña — global, ya no depende de un tenant",
         "tags": [
           "Auth"
         ]
@@ -73,22 +340,13 @@
     "/api/v1/auth/reset-password": {
       "post": {
         "operationId": "AuthController_resetPassword",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ResetPasswordKeyDto"
+                "$ref": "#/components/schemas/ResetPasswordDto"
               }
             }
           }
@@ -98,41 +356,7 @@
             "description": ""
           }
         },
-        "summary": "Completa la recuperación de contraseña con el key recibido por correo (link de forgot-password) — autologuea al usuario y devuelve un JWT, igual que /auth/login.",
-        "tags": [
-          "Auth"
-        ]
-      }
-    },
-    "/api/v1/auth/complete-registration": {
-      "post": {
-        "operationId": "AuthController_completeRegistration",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ResetPasswordKeyDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Completa el registro de un usuario nuevo con el key recibido por correo de bienvenida (link enviado al crear el usuario, POST /usuarios) — mismo mecanismo que /auth/reset-password; autologuea al usuario y devuelve un JWT.",
+        "summary": "Completa la recuperación con el token del correo — autologuea",
         "tags": [
           "Auth"
         ]
@@ -221,45 +445,6 @@
           }
         ],
         "summary": "Auditoría de autorizaciones con PIN de administrador (éxitos y fallos). Requiere rol System Manager o Auditor.",
-        "tags": [
-          "Auth"
-        ]
-      }
-    },
-    "/api/v1/auth/change-password": {
-      "post": {
-        "operationId": "AuthController_changePassword",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangePasswordDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Cambiar mi propia contraseña",
         "tags": [
           "Auth"
         ]
@@ -8075,6 +8260,46 @@
         ]
       }
     },
+    "/api/v1/config/despacho/futuro": {
+      "put": {
+        "description": "Ajusta despacho_futuro_habilitado / despacho_futuro_bloquea_venta / despacho_confirmar_stock_asigna_seriales de Facturacion Config. Solo tiene efecto real con el despacho habilitado (POST /config/despacho/habilitar). Ver docs/plans/PLAN_DESPACHO_FUTURO_CONFIGURABLE.md.",
+        "operationId": "ConfigController_updateDespachoFuturoConfig",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDespachoFuturoConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configurar despacho a futuro (permitirlo, si bloquea venta, auto-asignar seriales)",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
     "/api/v1/config/farmacia/habilitar": {
       "post": {
         "description": "Solo disponible para un tenant cuyo tenants.vertical ya sea \"farmacia\" en el control-plane. Provisiona (idempotente) la cuenta puente CxC ARS - Provisional, el Mode of Payment \"Cobertura ARS\", el Customer Group \"ARS\" y los Role Profile \"Dependiente\"/\"Cajera Farmacia\". Ver docs/plans/PLAN_VERTICAL_FARMACIA_ARS.md Fase 3.",
@@ -10479,7 +10704,7 @@
     },
     "/api/v1/config/seguridad": {
       "get": {
-        "description": "resetPasswordLinkExpiryMinutes: un solo valor gobierna ambos casos, \"olvidé mi contraseña\" y \"crear contraseña\" de un usuario nuevo, porque son el mismo mecanismo en ERPNext (mismo reset_password_key). modoCreacionPassword: si crear/resetear la contraseña de un usuario (POST /usuarios, POST /usuarios/:email/reset-password) manda un link por correo o la fija directo el administrador. Ambos son configuración de nivel site — un valor por tenant.",
+        "description": "DEPRECADO en gran parte: desde la identidad global (ver docs/plans/PLAN_IDENTIDAD_GLOBAL_USUARIOS.md), la contraseña vive en el control-plane y ya no se fija por tenant. `invitationLinkExpiryHours` es informativo (viene de `INVITATION_TTL_HOURS`, variable de entorno global) — `PUT /config/seguridad` ya no acepta cambios.",
         "operationId": "ConfigController_getSeguridadSettings",
         "parameters": [
           {
@@ -10501,7 +10726,7 @@
             "bearer": []
           }
         ],
-        "summary": "Seguridad: vigencia del link de contraseña y modo de creación/reset de contraseña",
+        "summary": "Seguridad: vigencia del link de invitación (ahora global, no por tenant)",
         "tags": [
           "Configuración"
         ]
@@ -10771,6 +10996,16 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": false,
+            "in": "query",
+            "description": "Detalle de existencias de UN artículo puntual (todos sus almacenes, o uno solo si además se manda `warehouse`) — actualQty, orderedQty (comprado, pendiente de recibir), reservedQty (vendido en pedidos abiertos, informativo — no bloqueante) y disponibleParaVender (actualQty menos lo YA reservado de verdad, reservedStock).",
+            "schema": {
+              "example": "PROD-001",
               "type": "string"
             }
           },
@@ -18789,6 +19024,45 @@
         ]
       }
     },
+    "/api/v1/usuarios/lookup": {
+      "get": {
+        "description": "Debe ir declarado ANTES de GET /:email para que \"lookup\" no se interprete como un email. Nunca revela en qué otros tenants está el usuario — solo nombre/apellido/teléfono y si ya es miembro de ESTE tenant.",
+        "operationId": "UsuariosController_lookup",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "maria@empresa.com",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Busca un correo antes de invitar — para autocompletar/bloquear nombre y apellido",
+        "tags": [
+          "Usuarios"
+        ]
+      }
+    },
     "/api/v1/usuarios": {
       "get": {
         "operationId": "UsuariosController_findAll",
@@ -18837,18 +19111,26 @@
             }
           },
           {
-            "name": "enabled",
+            "name": "status",
             "required": false,
             "in": "query",
+            "description": "Filtrar por estado de la membresía en este tenant",
             "schema": {
-              "type": "boolean"
+              "type": "string",
+              "enum": [
+                "invited",
+                "accepted",
+                "rejected",
+                "revoked",
+                "suspended"
+              ]
             }
           },
           {
             "name": "role",
             "required": false,
             "in": "query",
-            "description": "Filtrar por rol",
+            "description": "Filtrar por rol/perfil asignado",
             "schema": {
               "type": "string"
             }
@@ -18873,13 +19155,14 @@
             "bearer": []
           }
         ],
-        "summary": "Listar usuarios del tenant",
+        "summary": "Listar usuarios (membresías) del tenant",
         "tags": [
           "Usuarios"
         ]
       },
       "post": {
-        "operationId": "UsuariosController_create",
+        "description": "Si el correo ya existe en el sistema (ver GET /usuarios/lookup), se ignoran `firstName`/`lastName` — el nombre es de la persona. Envía SIEMPRE un correo con un link de invitación: a confirmar+fijar contraseña si es nuevo, o solo a confirmar si ya existía.",
+        "operationId": "UsuariosController_invite",
         "parameters": [
           {
             "name": "X-Tenant",
@@ -18895,7 +19178,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateUsuarioDto"
+                "$ref": "#/components/schemas/InviteUsuarioDto"
               }
             }
           }
@@ -18910,7 +19193,7 @@
             "bearer": []
           }
         ],
-        "summary": "Crear usuario en el tenant ERPNext",
+        "summary": "Invita a un usuario a este tenant",
         "tags": [
           "Usuarios"
         ]
@@ -18990,6 +19273,7 @@
         ]
       },
       "put": {
+        "description": "Nombre y apellido ya NO se editan acá — son de la persona (ver PATCH /me/profile). Esta ruta sigue controlando roles/perfiles, almacenes, sucursales, PIN y descuento máximo.",
         "operationId": "UsuariosController_update",
         "parameters": [
           {
@@ -19029,87 +19313,14 @@
             "bearer": []
           }
         ],
-        "summary": "Actualizar perfil y roles de usuario",
+        "summary": "Actualizar roles y datos de ERPNext de un usuario",
         "tags": [
           "Usuarios"
         ]
       },
       "delete": {
-        "operationId": "UsuariosController_disable",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "email",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Desactivar usuario (enabled=0) — no se elimina",
-        "tags": [
-          "Usuarios"
-        ]
-      }
-    },
-    "/api/v1/usuarios/{email}/enable": {
-      "post": {
-        "operationId": "UsuariosController_enable",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "email",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Reactivar usuario desactivado",
-        "tags": [
-          "Usuarios"
-        ]
-      }
-    },
-    "/api/v1/usuarios/{email}/reset-password": {
-      "post": {
-        "operationId": "UsuariosController_resetPassword",
+        "description": "Distinto de que el usuario RECHACE la invitación (REJECTED) — acá es el tenant quien quita el acceso. Se puede volver a invitar cuando quiera.",
+        "operationId": "UsuariosController_revoke",
         "parameters": [
           {
             "name": "X-Tenant",
@@ -19133,7 +19344,91 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ResetPasswordUsuarioDto"
+                "$ref": "#/components/schemas/RevokeUsuarioDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoca el acceso de un usuario que ya había aceptado (REVOKED)",
+        "tags": [
+          "Usuarios"
+        ]
+      }
+    },
+    "/api/v1/usuarios/{email}/reinvitar": {
+      "post": {
+        "operationId": "UsuariosController_reinvitar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reenvía la invitación (invalida el link anterior) a un usuario invited/rejected/revoked/suspended",
+        "tags": [
+          "Usuarios"
+        ]
+      }
+    },
+    "/api/v1/usuarios/{email}/suspender": {
+      "post": {
+        "operationId": "UsuariosController_suspend",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeUsuarioDto"
               }
             }
           }
@@ -19148,7 +19443,44 @@
             "bearer": []
           }
         ],
-        "summary": "Resetear contraseña — por correo (link propio al frontend) o directo, según GET /config/seguridad → modoCreacionPassword. En modo \"directo\" requiere `newPassword` en el body.",
+        "summary": "Suspende temporalmente el acceso (SUSPENDED) — distinto de revocar",
+        "tags": [
+          "Usuarios"
+        ]
+      }
+    },
+    "/api/v1/usuarios/{email}/reactivar": {
+      "post": {
+        "operationId": "UsuariosController_reactivate",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reactiva un usuario suspendido (vuelve a ACCEPTED)",
         "tags": [
           "Usuarios"
         ]
@@ -22597,6 +22929,53 @@
           }
         ],
         "summary": "Someter pedido. Si es un apartado (isLayaway), reserva stock físicamente y NO factura todavía (ver POST /:id/facturar-apartado); si no, crea la factura Draft vinculada de inmediato.",
+        "tags": [
+          "Pedidos de Venta"
+        ]
+      }
+    },
+    "/api/v1/pedidos/{id}/confirmar-despacho": {
+      "post": {
+        "operationId": "PedidosController_confirmarDespacho",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmarStockDespachoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirma manualmente la existencia física de los artículos ANTES de someter/facturar el pedido — solo aplica si el tenant tiene Facturacion Config.pedido_requiere_confirmacion_despacho activo, y el pedido no es apartado ni despacho a futuro. Resuelve el faltante de stock con una transferencia automática (mismo mecanismo que POST /despachos/:id/confirmar-stock) y valida/guarda seriales o lotes para artículos que los requieren en este momento (Item.custom_asignar_serial_en_despacho). Requisito para poder someter el pedido — ver POST /:id/submit.",
         "tags": [
           "Pedidos de Venta"
         ]
@@ -26903,6 +27282,54 @@
         ]
       }
     },
+    "/api/v1/despachos/{id}/confirmar-stock": {
+      "post": {
+        "description": "Para un despacho en Borrador que se quedó sin poder someterse por falta de stock: indica, por ítem, de qué almacén sale el faltante — arma y somete una transferencia (Stock Entry / Material Transfer) de un solo paso hacia el almacén del despacho por exactamente la cantidad que falta. No somete el despacho — eso sigue siendo POST :id/submit, aparte.",
+        "operationId": "DespachosController_confirmarStock",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmarStockDespachoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirmar de dónde sale el faltante de stock de un despacho pendiente",
+        "tags": [
+          "Despachos (Delivery Note)"
+        ]
+      }
+    },
     "/api/v1/despachos/{id}/facturar": {
       "post": {
         "operationId": "DespachosController_facturar",
@@ -27352,6 +27779,353 @@
           }
         ],
         "summary": "Permisos del usuario sobre un documento concreto (nivel documento)",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/me/profile": {
+      "get": {
+        "operationId": "MeController_getProfile",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mi perfil global (nombre, contacto, tenants, estado de 2FA)",
+        "tags": [
+          "Mis permisos"
+        ]
+      },
+      "patch": {
+        "description": "Nombre y apellido son de la persona, no del tenant — un administrador de empresa ya no puede editarlos (ver PUT /usuarios/:email). Solo el propio usuario puede cambiarlos, acá, y el cambio se refleja en el `User` de ERPNext de cada tenant donde tenga membresía.",
+        "operationId": "MeController_updateProfile",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMyProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualiza mi nombre/apellido/teléfono — se propaga a TODOS mis tenants",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/me/password": {
+      "post": {
+        "description": "Exige la contraseña actual. Revoca todas mis demás sesiones (refresh tokens) — hay que volver a iniciar sesión en cada dispositivo.",
+        "operationId": "MeController_changePassword",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeMyPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambia mi contraseña global",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/me/mfa/factors": {
+      "get": {
+        "operationId": "MeController_listMfaFactors",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lista mis factores de doble autenticación",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/me/mfa/totp": {
+      "post": {
+        "operationId": "MeController_startTotp",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartTotpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Inicia el alta de TOTP (Google/Microsoft Authenticator) — devuelve el QR",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/me/mfa/totp/confirm": {
+      "post": {
+        "description": "Un factor sin confirmar NUNCA cuenta para el login. Los 10 códigos de recuperación se muestran UNA sola vez acá — el usuario debe guardarlos antes de cerrar esta pantalla.",
+        "operationId": "MeController_confirmTotp",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmTotpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirma el alta de TOTP con un código válido — devuelve códigos de recuperación",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/me/mfa/email": {
+      "post": {
+        "operationId": "MeController_enableEmailMfa",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activa 2FA por código enviado al correo",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/me/mfa/{factorId}": {
+      "delete": {
+        "operationId": "MeController_removeMfaFactor",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "factorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Elimina un factor de 2FA",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/me/identities": {
+      "get": {
+        "operationId": "MeController_listIdentities",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cuentas externas vinculadas (Google, etc.)",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/me/identities/{identityId}": {
+      "delete": {
+        "operationId": "MeController_unlinkIdentity",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "identityId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Desvincula una cuenta externa",
         "tags": [
           "Mis permisos"
         ]
@@ -32593,26 +33367,123 @@
         "properties": {
           "email": {
             "type": "string",
-            "example": "Administrator"
+            "example": "maria@empresa.com"
           },
           "password": {
             "type": "string",
-            "example": "admin"
+            "example": "MiClave2026!"
           },
           "tenant": {
             "type": "string",
-            "example": "tenant1",
-            "description": "Slug del tenant. Si se manda el header X-Tenant, este campo se ignora (el header tiene prioridad). Si no hay tenant por ninguna de las dos vías ni un Origin resoluble, el login falla con el mismo error genérico que credenciales inválidas."
-          },
-          "origin": {
-            "type": "string",
-            "example": "https://gensuite.ryancfx.click",
-            "description": "Origin header usado para determinar el tenant cuando no se especifica ni X-Tenant ni `tenant` en el body."
+            "example": "acme",
+            "description": "Slug del tenant a activar de una vez. Si se manda el header X-Tenant, este campo se ignora (el header tiene prioridad). Si el usuario no tiene una membresía ACCEPTED con ese tenant, el login sigue siendo válido pero responde sin `access_token` — solo la lista de `tenants` disponibles."
           }
         },
         "required": [
           "email",
           "password"
+        ]
+      },
+      "MfaVerifyDto": {
+        "type": "object",
+        "properties": {
+          "mfaToken": {
+            "type": "string",
+            "description": "Token corto devuelto por /auth/login cuando exige 2FA"
+          },
+          "factorId": {
+            "type": "string",
+            "description": "Factor a usar, si el usuario tiene más de uno"
+          },
+          "code": {
+            "type": "string",
+            "example": "123456",
+            "description": "Código TOTP/email, o un código de recuperación"
+          },
+          "tenant": {
+            "type": "string",
+            "example": "acme",
+            "description": "Mismo `tenant` (si lo hubo) enviado en el POST /auth/login original."
+          }
+        },
+        "required": [
+          "mfaToken",
+          "code"
+        ]
+      },
+      "MfaResendDto": {
+        "type": "object",
+        "properties": {
+          "mfaToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mfaToken"
+        ]
+      },
+      "RefreshTokenDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "LogoutDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          },
+          "all": {
+            "type": "boolean",
+            "default": false,
+            "description": "true = revocar TODAS las sesiones del usuario, no solo esta."
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "SwitchTenantDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          },
+          "tenant": {
+            "type": "string",
+            "example": "acme"
+          }
+        },
+        "required": [
+          "refreshToken",
+          "tenant"
+        ]
+      },
+      "AcceptInvitationDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "Obligatoria solo si la invitación es de un usuario nuevo (purpose=registration) — fija la contraseña global al aceptar. Se ignora si el usuario ya tenía contraseña."
+          }
+        }
+      },
+      "OAuthExchangeDto": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "description": "Ticket de un solo uso emitido por el callback de OAuth"
+          }
+        },
+        "required": [
+          "ticket"
         ]
       },
       "ForgotPasswordDto": {
@@ -32627,16 +33498,12 @@
           "email"
         ]
       },
-      "ResetPasswordKeyDto": {
+      "ResetPasswordDto": {
         "type": "object",
         "properties": {
-          "email": {
+          "token": {
             "type": "string",
-            "example": "maria@empresa.com"
-          },
-          "key": {
-            "type": "string",
-            "description": "Key recibido por correo (query param \"key\" del link)."
+            "description": "Token recibido por correo (query param \"token\" del link)."
           },
           "newPassword": {
             "type": "string",
@@ -32644,8 +33511,7 @@
           }
         },
         "required": [
-          "email",
-          "key",
+          "token",
           "newPassword"
         ]
       },
@@ -32676,18 +33542,6 @@
         "required": [
           "pin",
           "accion"
-        ]
-      },
-      "ChangePasswordDto": {
-        "type": "object",
-        "properties": {
-          "newPassword": {
-            "type": "string",
-            "example": "NuevaClave2026!"
-          }
-        },
-        "required": [
-          "newPassword"
         ]
       },
       "NotificacionDestinatarioDto": {
@@ -33591,6 +34445,11 @@
                 "$ref": "#/components/schemas/AseguradoraInvoiceDto"
               }
             ]
+          },
+          "despachoFuturo": {
+            "type": "boolean",
+            "example": false,
+            "description": "Solo con despacho habilitado para el tenant. `true` = a futuro: se factura y cobra ahora, la salida física se registra después con un Delivery Note (POST /despachos) — no se valida stock físico al someter. `false` = inmediato: antes de someter se confirma que las unidades existan en el almacén, igual que sin despacho. Si se omite, se conserva el comportamiento previo del tenant (a futuro, si el módulo lo permite) — ver docs/plans/PLAN_DESPACHO_FUTURO_CONFIGURABLE.md. `true` es rechazado (400) si el tenant no tiene despacho habilitado, o no permite elegir despacho a futuro por venta."
           }
         },
         "required": [
@@ -33706,6 +34565,11 @@
                 "$ref": "#/components/schemas/AseguradoraInvoiceDto"
               }
             ]
+          },
+          "despachoFuturo": {
+            "type": "boolean",
+            "example": false,
+            "description": "Solo con despacho habilitado para el tenant. `true` = a futuro: se factura y cobra ahora, la salida física se registra después con un Delivery Note (POST /despachos) — no se valida stock físico al someter. `false` = inmediato: antes de someter se confirma que las unidades existan en el almacén, igual que sin despacho. Si se omite, se conserva el comportamiento previo del tenant (a futuro, si el módulo lo permite) — ver docs/plans/PLAN_DESPACHO_FUTURO_CONFIGURABLE.md. `true` es rechazado (400) si el tenant no tiene despacho habilitado, o no permite elegir despacho a futuro por venta."
           }
         },
         "required": [
@@ -33777,7 +34641,7 @@
           "modeOfPayment": {
             "type": "string",
             "example": "Efectivo",
-            "description": "Mode of Payment de esta línea."
+            "description": "Mode of Payment de esta línea. Opcional — si se omite, se usa el método de pago default configurado en Facturacion Config para la moneda del documento (modoPagoCaja para DOP, modoPagoCajaUsd/modoPagoCajaEur para USD/EUR). Si esa moneda no tiene un default configurado, la línea se rechaza con 400."
           },
           "amount": {
             "type": "number",
@@ -33806,7 +34670,6 @@
           }
         },
         "required": [
-          "modeOfPayment",
           "amount"
         ]
       },
@@ -34046,7 +34909,15 @@
           },
           "modoPagoCaja": {
             "type": "string",
-            "description": "Método de pago (Mode of Payment) que se compara contra el efectivo físico en caja al cuadrar el turno. GET /pos/turnos/actual expone el monto cobrado con este método desde que se abrió el turno, para comparar en el frontend antes de cerrar. Solo aplica cuando usaModuloPos está activo."
+            "description": "Método de pago (Mode of Payment) default para facturas en DOP: se compara contra el efectivo físico en caja al cuadrar el turno (GET /pos/turnos/actual, solo aplica cuando usaModuloPos está activo) y se usa como fallback cuando una línea de pago no trae `modeOfPayment` explícito al someter/pagar o cobrar una factura en DOP."
+          },
+          "modoPagoCajaUsd": {
+            "type": "string",
+            "description": "Método de pago (Mode of Payment) default para facturas en USD: se usa como fallback cuando una línea de pago no trae `modeOfPayment` explícito al someter/pagar o cobrar una factura en USD. El frontend solo debe mostrar este campo si el tenant tiene USD habilitado (ver `monedasHabilitadas` en GET /config/facturacion) — es opcional incluso en ese caso."
+          },
+          "modoPagoCajaEur": {
+            "type": "string",
+            "description": "Igual que `modoPagoCajaUsd`, pero para facturas en EUR. El frontend solo debe mostrar este campo si el tenant tiene EUR habilitado (ver `monedasHabilitadas` en GET /config/facturacion)."
           },
           "modosPagoConciliar": {
             "description": "Métodos de pago (Mode of Payment) que requieren conciliación manual (monto contado por el cajero) al cerrar turno — los demás se dan por conciliados automáticamente contra el monto esperado, sin exigirle nada al cajero (ej. tarjeta, que ya se verifica contra el lote del datáfono, no contra un conteo físico). Si se envía vacío o se omite, se usan por defecto los métodos con type=\"Cash\" en ERPNext. Solo aplica cuando usaModuloPos está activo.",
@@ -34120,6 +34991,11 @@
             "default": false,
             "description": "Si está activo, comprar un artículo con tracking de serial/lote (has_serial_no/has_batch_no) exige que la línea de compra incluya `serials`/`batches` — hoy es opcional. Además, al VENDER ese artículo el serial/lote debe existir YA en ERPNext (se asume que entró por una compra registrada); un serial inexistente se rechaza. Si está inactivo (default), la compra sigue siendo opcional y, al vender, un serial/lote que no existe se crea sobre la marcha en vez de rechazarse. En ambos casos ERPNext sigue exigiendo que se asigne algún serial/lote a la línea antes de someter el documento — eso no cambia."
           },
+          "actualizarCostoEnCompra": {
+            "type": "boolean",
+            "default": true,
+            "description": "Si está activo (default), cada compra sometida actualiza Item.valuation_rate (\"Costo de Valoración\") con la tasa de esa línea — comportamiento histórico, sin cambios para un tenant que nunca tocó esto. Si se desactiva, el costo del artículo deja de sincronizarse automáticamente con las compras y solo cambia si alguien lo edita a mano (o vía el override por artículo `PUT /catalog/items/:id` → actualizarCostoEnCompraOverride, que puede anular este default en cualquier sentido para un artículo puntual). No afecta el precio de venta en modo cost_plus, que sigue leyendo el costo vigente en ese momento sea cual sea su origen."
+          },
           "redondeoTotalDeshabilitado": {
             "type": "boolean",
             "default": false,
@@ -34158,6 +35034,26 @@
             ],
             "default": "Banco Central RD",
             "description": "Fuente de la tasa de cambio para la actualización automática. \"Banco Central RD\": tasa oficial del BCRD (USD/EUR ↔ DOP). \"Currency Exchange Settings\": el proveedor externo configurado en ese doctype nativo de ERPNext."
+          }
+        }
+      },
+      "UpdateDespachoFuturoConfigDto": {
+        "type": "object",
+        "properties": {
+          "futuroHabilitado": {
+            "type": "boolean",
+            "example": true,
+            "description": "Permite elegir POR VENTA (campo `despachoFuturo` de POST /invoices) si se despacha ahora o a futuro. Apagado: toda venta nueva se despacha de inmediato (update_stock=1, se confirma existencia física antes de someter), igual que sin despacho habilitado."
+          },
+          "futuroBloqueaVenta": {
+            "type": "boolean",
+            "example": true,
+            "description": "Cuando una venta se marca como despacho a futuro, si se reserva la cantidad (Stock Reservation Entry nativa) contra otros clientes. Apagado: la venta a futuro queda solo como una promesa informativa — el mismo stock sigue disponible para cualquier otro cliente hasta que se despache de verdad."
+          },
+          "confirmarStockAsignaSeriales": {
+            "type": "boolean",
+            "example": false,
+            "description": "Solo para ventas que NO son a futuro (inmediatas): si al confirmar stock (justo antes de someter la factura) el BFF asigna automáticamente los seriales/lotes disponibles (nativo `get_auto_data` de ERPNext) en vez de exigir asignación manual previa (POST /invoices/:id/asignar-serial-lote)."
           }
         }
       },
@@ -34696,16 +35592,16 @@
             "description": "Cuenta de descuentos — solo si se usa la Opción B de presentación bruta (§6.3)"
           },
           "costCenter": {
-            "type": "string",
-            "description": "Centro de costo por defecto de la compañía (fieldname real de ERPNext: cost_center, NO default_cost_center)"
+            "type": "object",
+            "description": "Centro de costo por defecto de la compañía (fieldname real de ERPNext: cost_center, NO default_cost_center). Acepta el string (el ID, ej. \"Main - ABC\") o el objeto {id, name} que devuelve GET /config/cuentas-empresa para este mismo campo — se extrae el id."
           },
           "roundOffCostCenter": {
-            "type": "string",
-            "description": "Centro de costo para el asiento de redondeo. Sin este campo, el asiento de redondeo lanza excepción (ver ANEXO_CORRECCIONES.md C17)"
+            "type": "object",
+            "description": "Centro de costo para el asiento de redondeo. Sin este campo, el asiento de redondeo lanza excepción (ver ANEXO_CORRECCIONES.md C17). Acepta string u objeto {id, name}, igual que costCenter."
           },
           "depreciationCostCenter": {
-            "type": "string",
-            "description": "Centro de costo para asientos de depreciación"
+            "type": "object",
+            "description": "Centro de costo para asientos de depreciación. Acepta string u objeto {id, name}, igual que costCenter."
           },
           "enablePerpetualInventory": {
             "type": "boolean",
@@ -35066,20 +35962,7 @@
       "UpdateSeguridadSettingsDto": {
         "type": "object",
         "properties": {
-          "resetPasswordLinkExpiryMinutes": {
-            "type": "number",
-            "example": 10,
-            "description": "Minutos de vigencia del link para restablecer contraseña y para crear la contraseña la primera vez (usuario nuevo) — es EL MISMO mecanismo en ERPNext, así que un solo valor gobierna ambos casos. `0` desactiva la expiración (el link nunca vence) — úsese con cuidado, no se recomienda en producción."
-          },
-          "modoCreacionPassword": {
-            "type": "string",
-            "enum": [
-              "email",
-              "directo"
-            ],
-            "default": "email",
-            "description": "\"email\": al crear un usuario (POST /usuarios) o resetear su contraseña (POST /usuarios/:email/reset-password) se genera un link y se manda por correo (comportamiento histórico). \"directo\": el administrador escribe la contraseña él mismo en el momento (`password` en la creación, `newPassword` en el reset) y se fija de una vez en ERPNext sin enviar ningún correo — útil si el tenant no tiene canal de email saliente confiable."
-          }
+
         }
       },
       "RetencionRateDto": {
@@ -36268,6 +37151,28 @@
             "example": "Nos",
             "description": "Unidad de medida base. Requerido para productos. Para servicios se omite (el BFF asigna \"Nos\" automáticamente)."
           },
+          "purchaseUoms": {
+            "example": [
+              "Caja",
+              "Docena"
+            ],
+            "description": "UOMs en las que este artículo SE PUEDE COMPRAR (opcional). Cada una debe tener conversión real contra stockUom (400 si alguna no la tiene). Vacío/omitido = cualquier UOM con conversión válida sirve, como hoy — sin restricción.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "saleUoms": {
+            "example": [
+              "Unidad",
+              "Caja"
+            ],
+            "description": "UOMs en las que este artículo SE PUEDE VENDER (opcional). Cada una debe tener conversión real contra stockUom (400 si alguna no la tiene). Vacío/omitido = cualquier UOM con conversión válida sirve, como hoy — sin restricción.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "hasVariants": {
             "type": "boolean",
             "default": false,
@@ -36317,6 +37222,15 @@
               "cost_plus"
             ],
             "default": "manual"
+          },
+          "actualizarCostoEnCompraOverride": {
+            "type": "string",
+            "enum": [
+              "",
+              "si",
+              "no"
+            ],
+            "description": "Anula, solo para este artículo, el default del tenant (config/facturacion → actualizarCostoEnCompra) que decide si comprarlo actualiza su costo de valoración. Sin enviar (`undefined`, en una edición): no toca el override actual. `\"\"` explícito: quita el override y vuelve a usar el default del tenant. \"si\": este artículo SIEMPRE sincroniza su costo con la última compra, aunque el tenant lo tenga desactivado. \"no\": este artículo NUNCA lo sincroniza automáticamente, aunque el tenant lo tenga activado — útil para un costo fijado a propósito que no debe moverse con cada compra."
           },
           "marginA": {
             "type": "number",
@@ -36445,6 +37359,28 @@
             "example": "Nos",
             "description": "Unidad de medida base. Requerido para productos. Para servicios se omite (el BFF asigna \"Nos\" automáticamente)."
           },
+          "purchaseUoms": {
+            "example": [
+              "Caja",
+              "Docena"
+            ],
+            "description": "UOMs en las que este artículo SE PUEDE COMPRAR (opcional). Cada una debe tener conversión real contra stockUom (400 si alguna no la tiene). Vacío/omitido = cualquier UOM con conversión válida sirve, como hoy — sin restricción.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "saleUoms": {
+            "example": [
+              "Unidad",
+              "Caja"
+            ],
+            "description": "UOMs en las que este artículo SE PUEDE VENDER (opcional). Cada una debe tener conversión real contra stockUom (400 si alguna no la tiene). Vacío/omitido = cualquier UOM con conversión válida sirve, como hoy — sin restricción.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "hasVariants": {
             "type": "boolean",
             "default": false,
@@ -36494,6 +37430,15 @@
               "cost_plus"
             ],
             "default": "manual"
+          },
+          "actualizarCostoEnCompraOverride": {
+            "type": "string",
+            "enum": [
+              "",
+              "si",
+              "no"
+            ],
+            "description": "Anula, solo para este artículo, el default del tenant (config/facturacion → actualizarCostoEnCompra) que decide si comprarlo actualiza su costo de valoración. Sin enviar (`undefined`, en una edición): no toca el override actual. `\"\"` explícito: quita el override y vuelve a usar el default del tenant. \"si\": este artículo SIEMPRE sincroniza su costo con la última compra, aunque el tenant lo tenga desactivado. \"no\": este artículo NUNCA lo sincroniza automáticamente, aunque el tenant lo tenga activado — útil para un costo fijado a propósito que no debe moverse con cada compra."
           },
           "marginA": {
             "type": "number",
@@ -36612,6 +37557,15 @@
           "marginC": {
             "type": "number",
             "example": 10
+          },
+          "actualizarCostoEnCompraOverride": {
+            "type": "string",
+            "enum": [
+              "",
+              "si",
+              "no"
+            ],
+            "description": "Anula, solo para este artículo, el default del tenant (config/facturacion → actualizarCostoEnCompra) que decide si comprarlo actualiza purchasePrice (valuation_rate) automáticamente. `\"\"` explícito quita el override y vuelve a usar el default del tenant."
           }
         }
       },
@@ -38265,7 +39219,7 @@
           }
         }
       },
-      "CreateUsuarioDto": {
+      "InviteUsuarioDto": {
         "type": "object",
         "properties": {
           "email": {
@@ -38274,7 +39228,8 @@
           },
           "firstName": {
             "type": "string",
-            "example": "María"
+            "example": "María",
+            "description": "Solo aplica si el correo NO existe todavía en el sistema (usuario nuevo). Si ya existe, se ignora — el nombre es de la persona, no del tenant (ver GET /usuarios/lookup)."
           },
           "lastName": {
             "type": "string",
@@ -38288,7 +39243,7 @@
             "example": [
               "Ventas"
             ],
-            "description": "Perfiles de rol (`Role Profile`) a asignar — la forma recomendada. Cada perfil es un paquete de roles nativos coherente (ver localizacion_rd/provisioning/role_profiles.py); asignarlos evita los huecos silenciosos de armar la lista de roles a mano, porque en Frappe los roles son planos y \"Accounts Manager\" no implica \"Accounts User\". Excluyente con `roles`: los perfiles son autoritativos y Frappe elimina del usuario cualquier rol que no pertenezca a ellos. Ver GET /roles/perfiles.",
+            "description": "Perfiles de rol (`Role Profile`) a asignar — la forma recomendada. Excluyente con `roles`: los perfiles son autoritativos. Ver GET /roles/perfiles.",
             "type": "array",
             "items": {
               "type": "string"
@@ -38299,54 +39254,25 @@
               "Sales User",
               "Accounts User"
             ],
-            "description": "Lista de roles ERPNext sueltos. Obligatoria solo si no se envía `perfiles`. Preferir `perfiles` salvo que se necesite una combinación que ningún perfil cubre.",
+            "description": "Lista de roles ERPNext sueltos. Obligatoria solo si no se envía `perfiles`.",
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "language": {
-            "type": "string",
-            "default": "es"
-          },
-          "timeZone": {
-            "type": "string",
-            "default": "America/Santo_Domingo"
-          },
-          "sendWelcomeEmail": {
-            "type": "boolean",
-            "default": true
-          },
-          "maxDiscountPct": {
-            "type": "number",
-            "example": 15,
-            "description": "Descuento máximo (%) que puede aplicar este usuario en ventas. 0 = sin permiso de descuento."
-          },
-          "password": {
-            "type": "string",
-            "example": "NuevaClave2026!",
-            "description": "Contraseña inicial del usuario. Solo se usa (y es obligatoria) cuando el tenant tiene GET /config/seguridad → modoCreacionPassword=\"directo\" — el administrador la define aquí mismo y se la entrega en persona, en vez de mandar un correo con link. Se ignora si el tenant está en modo \"email\"."
-          },
           "adminCode": {
             "type": "string",
             "example": "EMP-00231",
-            "description": "Código de identificación impreso/codificado en un carnet, QR o código de barras — permite buscar rápido a este usuario por escaneo (ver GET /usuarios/buscar-codigo/:codigo) en vez de escribir su email. No es secreto, único por tenant."
+            "description": "Código de identificación impreso/codificado en un carnet, QR o código de barras — permite buscar rápido a este usuario por escaneo. No es secreto, único por tenant."
           }
         },
         "required": [
-          "email",
-          "firstName"
+          "email"
         ]
       },
       "UpdateUsuarioDto": {
         "type": "object",
         "properties": {
-          "firstName": {
-            "type": "string"
-          },
-          "lastName": {
-            "type": "string"
-          },
           "mobileNo": {
             "type": "string"
           },
@@ -38418,13 +39344,12 @@
           }
         }
       },
-      "ResetPasswordUsuarioDto": {
+      "RevokeUsuarioDto": {
         "type": "object",
         "properties": {
-          "newPassword": {
+          "reason": {
             "type": "string",
-            "example": "NuevaClave2026!",
-            "description": "Nueva contraseña. Solo se usa (y es obligatoria) cuando el tenant tiene GET /config/seguridad → modoCreacionPassword=\"directo\" — el administrador la define aquí mismo y se la entrega en persona, en vez de mandar un correo con link. Se ignora si el tenant está en modo \"email\"."
+            "description": "Motivo — el usuario lo ve al intentar entrar de nuevo"
           }
         }
       },
@@ -39203,6 +40128,11 @@
             "default": false,
             "description": "Marca este pedido como un apartado (layaway): al someterlo se reserva físicamente el stock (Stock Reservation Entry) y NO se genera factura de inmediato — se factura después con POST /pedidos/:id/facturar-apartado cuando el cliente regresa a retirar el producto."
           },
+          "despachoFuturo": {
+            "type": "boolean",
+            "default": false,
+            "description": "Despacho a futuro: la venta se factura de inmediato pero se despacha después (mismo concepto que `despachoFuturo` en Facturas — POST /invoicing/invoices). Requiere que el tenant tenga el módulo de despacho y \"despacho a futuro\" habilitados (400 si no). Un pedido con esto activo queda FUERA del requisito de confirmación de despacho antes de facturar (Facturacion Config.pedido_requiere_confirmacion_despacho no aplica) — si ya es a futuro, no hace falta confirmar existencia física ahora. La factura generada al someter este pedido hereda esta elección — no se vuelve a preguntar ni se puede contradecir ahí."
+          },
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
@@ -39212,6 +40142,67 @@
             "type": "string",
             "example": "Ventas - JBC",
             "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "DespachoBatchAllocationDto": {
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string",
+            "example": "BATCH-0001"
+          },
+          "qty": {
+            "type": "number",
+            "example": 2
+          }
+        },
+        "required": [
+          "batchId",
+          "qty"
+        ]
+      },
+      "ConfirmarStockDespachoItemDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "description": "Ítem del despacho/pedido al que le falta stock en su almacén destino."
+          },
+          "sourceWarehouse": {
+            "type": "string",
+            "description": "Almacén de donde va a salir el faltante (transferencia automática de un solo paso). No tiene que pertenecer a la misma sucursal del destino — puede ser un depósito central. Solo hace falta si el ítem realmente tiene faltante — si ya hay suficiente en el almacén destino, se puede omitir."
+          },
+          "serials": {
+            "description": "Seriales a confirmar para este ítem — solo si el artículo tiene `custom_asignar_serial_en_despacho` activo (confirmación de despacho de un Pedido, ver docs/plans/PLAN_CONFIRMACION_DESPACHO_PEDIDO.md). No aplica a la confirmación de un Despacho (Delivery Note) existente.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "batches": {
+            "description": "Lotes a confirmar para este ítem — mismo criterio que `serials`.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DespachoBatchAllocationDto"
+            }
+          }
+        },
+        "required": [
+          "itemCode"
+        ]
+      },
+      "ConfirmarStockDespachoDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfirmarStockDespachoItemDto"
+            }
           }
         },
         "required": [
@@ -39354,6 +40345,11 @@
           "name": {
             "type": "string",
             "example": "Sucursal Norte"
+          },
+          "almacenVenta": {
+            "type": "string",
+            "example": "Almacén Norte - Ventas",
+            "description": "Almacén de venta de esta sucursal. Si se configura, las ventas de esta sucursal (Facturas, Pedidos, Cotizaciones, Caja/POS, despacho mostrador) solo pueden salir de este almacén — debe pertenecer a esta misma sucursal. Opcional: sin configurar, cualquier almacén de la sucursal sirve."
           }
         },
         "required": [
@@ -39366,6 +40362,11 @@
           "name": {
             "type": "string",
             "example": "Sucursal Norte"
+          },
+          "almacenVenta": {
+            "type": "string",
+            "example": "Almacén Norte - Ventas",
+            "description": "Almacén de venta de esta sucursal (debe pertenecer a esta misma sucursal). Mande cadena vacía para quitarlo y volver al comportamiento sin restricción."
           }
         }
       },
@@ -40346,23 +41347,6 @@
           }
         }
       },
-      "DespachoBatchAllocationDto": {
-        "type": "object",
-        "properties": {
-          "batchId": {
-            "type": "string",
-            "example": "BATCH-0001"
-          },
-          "qty": {
-            "type": "number",
-            "example": 2
-          }
-        },
-        "required": [
-          "batchId",
-          "qty"
-        ]
-      },
       "AssignDespachoTrackingItemDto": {
         "type": "object",
         "properties": {
@@ -40592,6 +41576,60 @@
         "required": [
           "doctype",
           "role"
+        ]
+      },
+      "UpdateMyProfileDto": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "example": "María"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "González"
+          },
+          "phone": {
+            "type": "string",
+            "example": "809-555-0100"
+          }
+        }
+      },
+      "ChangeMyPasswordDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string"
+          },
+          "newPassword": {
+            "type": "string",
+            "example": "NuevaClave2026!"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
+      "StartTotpDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "example": "iPhone de María"
+          }
+        }
+      },
+      "ConfirmTotpDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "code"
         ]
       },
       "CreateCuentaBancariaDto": {

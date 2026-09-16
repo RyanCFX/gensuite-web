@@ -1,27 +1,16 @@
-import type { AuthTenant, AuthUser } from './types'
+import type { AuthTenant, AuthUser, AuthMembership } from './types'
 
-const STORAGE_VERSION = 'v1'
-const TOKEN_KEY = `gensuite:token:${STORAGE_VERSION}`
+// docs/tasks/PROMPT_IDENTIDAD_GLOBAL_FRONTEND.md §1.4 — el `refresh_token` es la sesión (30
+// días, sobrevive F5 y cierre del navegador) y vive en localStorage como fuente de verdad. El
+// `access_token`/`tenant` activos se guardan también acá por conveniencia (para no perder la
+// sesión visual en un F5), pero NUNCA son la fuente de verdad — auth.store.ts siempre los
+// revalida/reconsigue con POST /auth/refresh al arrancar la app.
+const STORAGE_VERSION = 'v2'
+const REFRESH_TOKEN_KEY = `gensuite:refreshToken:${STORAGE_VERSION}`
+const ACCESS_TOKEN_KEY = `gensuite:accessToken:${STORAGE_VERSION}`
 const TENANT_KEY = `gensuite:tenant:${STORAGE_VERSION}`
-const USER_KEY = `gensuite:user:${STORAGE_VERSION}`
 
 const cache = new Map<string, string | null>()
-
-try {
-  const oldToken = localStorage.getItem('gensuite_token')
-  if (oldToken) {
-    setToken(oldToken)
-    localStorage.removeItem('gensuite_token')
-  }
-  const oldTenant = localStorage.getItem('gensuite_tenant')
-  if (oldTenant) {
-    localStorage.removeItem('gensuite_tenant')
-  }
-  const oldUser = localStorage.getItem('gensuite_user')
-  if (oldUser) {
-    localStorage.removeItem('gensuite_user')
-  }
-} catch {}
 
 function read(key: string): string | null {
   if (cache.has(key)) return cache.get(key)!
@@ -56,16 +45,28 @@ try {
   })
 } catch {}
 
-export function getToken(): string | null {
-  return read(TOKEN_KEY)
+export function getRefreshToken(): string | null {
+  return read(REFRESH_TOKEN_KEY)
 }
 
-export function setToken(token: string): void {
-  write(TOKEN_KEY, token)
+export function setRefreshToken(token: string): void {
+  write(REFRESH_TOKEN_KEY, token)
 }
 
-export function clearToken(): void {
-  remove(TOKEN_KEY)
+export function clearRefreshToken(): void {
+  remove(REFRESH_TOKEN_KEY)
+}
+
+export function getAccessToken(): string | null {
+  return read(ACCESS_TOKEN_KEY)
+}
+
+export function setAccessToken(token: string): void {
+  write(ACCESS_TOKEN_KEY, token)
+}
+
+export function clearAccessToken(): void {
+  remove(ACCESS_TOKEN_KEY)
 }
 
 export function getTenant(): AuthTenant | null {
@@ -86,7 +87,13 @@ export function clearTenant(): void {
   remove(TENANT_KEY)
 }
 
-export function getUser(): AuthUser | null {
+// ─── Caché de perfil/membresías (solo para mostrar y para el selector de tenant en un F5 con
+// `access_token: null`) — NUNCA la fuente de verdad para autenticación, eso son los tokens de
+// arriba. Se actualiza con cada login/mfa-verify/switch-tenant/GET /me/profile. ────────────────
+const USER_KEY = `gensuite:user:${STORAGE_VERSION}`
+const MEMBERSHIPS_KEY = `gensuite:memberships:${STORAGE_VERSION}`
+
+export function getCachedUser(): AuthUser | null {
   const raw = read(USER_KEY)
   if (!raw) return null
   try {
@@ -96,22 +103,29 @@ export function getUser(): AuthUser | null {
   }
 }
 
-export function setUser(user: AuthUser): void {
+export function setCachedUser(user: AuthUser): void {
   write(USER_KEY, JSON.stringify(user))
 }
 
-export function clearUser(): void {
-  remove(USER_KEY)
+export function getCachedMemberships(): AuthMembership[] {
+  const raw = read(MEMBERSHIPS_KEY)
+  if (!raw) return []
+  try {
+    return JSON.parse(raw) as AuthMembership[]
+  } catch {
+    return []
+  }
 }
 
+export function setCachedMemberships(memberships: AuthMembership[]): void {
+  write(MEMBERSHIPS_KEY, JSON.stringify(memberships))
+}
+
+/** Limpia TODO el estado de sesión — logout completo o sesión inválida detectada. */
 export function clearSession(): void {
-  clearToken()
+  clearRefreshToken()
+  clearAccessToken()
   clearTenant()
-  clearUser()
-}
-
-export function saveSession(token: string, tenant: AuthTenant, user: AuthUser): void {
-  setToken(token)
-  setTenant(tenant)
-  setUser(user)
+  remove(USER_KEY)
+  remove(MEMBERSHIPS_KEY)
 }

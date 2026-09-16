@@ -6,6 +6,8 @@ import type {
   UpdateDespachoDto,
   AssignDespachoTrackingDto,
   CancelarDespachoDto,
+  ConfirmarStockDespachoDto,
+  ConfirmarStockDespachoResult,
   ListDespachosParams,
   ListDespachosPendientesParams,
   DespachoPendienteLinea,
@@ -60,6 +62,21 @@ export async function updateDespacho(id: string, dto: UpdateDespachoDto) {
 export async function asignarTrackingDespacho(id: string, dto: AssignDespachoTrackingDto) {
   const res = await client.post<{ success: true; data: Despacho }>(ENDPOINTS.despachos.asignarTracking(id), dto)
   return unwrap(res)
+}
+
+/** Solo aplica a un despacho en Borrador — resuelve el faltante de stock transfiriendo desde
+ *  `sourceWarehouse` hacia el almacén destino de cada línea. NO somete el despacho; "Someter"
+ *  sigue siendo un paso separado y explícito después — docs/tasks/
+ *  75_almacen_venta_confirmar_stock_uoms_permitidas.md §2. */
+export async function confirmarStockDespacho(id: string, dto: ConfirmarStockDespachoDto) {
+  const res = await client.post<{ success: true; data: ConfirmarStockDespachoResult }>(ENDPOINTS.despachos.confirmarStock(id), dto)
+  return unwrap(res)
+}
+
+/** Solo aplica a un despacho en Borrador (nunca sometido) — un despacho ya sometido se cancela con
+ *  cancelarDespacho, nunca se elimina. */
+export async function deleteDespacho(id: string) {
+  await client.delete(ENDPOINTS.despachos.byId(id))
 }
 
 /** Aquí ocurre la salida física real de inventario. */
