@@ -1370,9 +1370,9 @@ export interface Item {
   hasExpiryDate?: boolean;
   shelfLifeInDays?: number;
   /** Solo tiene sentido con trackingType !== "none". Si está activo, el serial/lote de este
-   *  artículo se pide al confirmar despacho (venta) en vez de en la compra. Ver
-   *  docs/tasks/79_confirmacion_despacho_pedido.md §9. */
-  custom_asignar_serial_en_despacho?: boolean;
+   *  artículo se pide al confirmar despacho (venta, POST /despachos/confirmaciones/:id/confirmar)
+   *  en vez de en la compra. Ver docs/tasks/79_confirmacion_despacho_pedido.md §9. */
+  asignarSerialEnDespacho?: boolean;
   purchaseTaxTemplate?: string;
   purchaseTaxPct?: number;
   salesTaxTemplate?: string;
@@ -1437,7 +1437,7 @@ export interface CreateItemDto {
   trackingType?: "none" | "batch" | "serial";
   hasExpiryDate?: boolean;
   shelfLifeInDays?: number;
-  custom_asignar_serial_en_despacho?: boolean;
+  asignarSerialEnDespacho?: boolean;
   purchaseTaxTemplate?: string;
   salesTaxTemplate?: string;
 }
@@ -6867,18 +6867,19 @@ export interface FacturarDespachoResult {
  *  §2. Solo aplica a un despacho en Borrador. No somete el despacho — eso sigue siendo un paso
  *  separado y explícito (POST /despachos/:id/submit) después de confirmar.
  *
- *  Mismo DTO reutilizado por POST /pedidos/:id/confirmar-despacho (docs/tasks/
- *  79_confirmacion_despacho_pedido.md §4) — ahí sí importan `serials`/`batches` (solo para un
- *  artículo con `Item.custom_asignar_serial_en_despacho` activo); la confirmación de un Despacho
- *  existente los ignora si se envían. */
+ *  Mismo DTO reutilizado por POST /despachos/confirmaciones/:id/confirmar (docs/tasks/
+ *  79_confirmacion_despacho_pedido.md §4 — reemplaza al viejo POST /pedidos/:id/confirmar-despacho,
+ *  eliminado) — ahí sí importan `serials`/`batches` (solo para un artículo con
+ *  `Item.custom_asignar_serial_en_despacho` activo, y ahí `items[]` debe cubrir TODAS las líneas de
+ *  la solicitud); la confirmación de un Despacho existente los ignora si se envían. */
 export interface ConfirmarStockDespachoItemDto {
   itemCode: string;
   /** Solo hace falta si el ítem realmente tiene faltante en su almacén destino — se puede omitir
    *  si ya hay suficiente ahí. Cualquier almacén de la compañía, no restringido a la sucursal. */
   sourceWarehouse?: string;
-  /** Solo para POST /pedidos/:id/confirmar-despacho, con `trackingType: 'serial'`. */
+  /** Solo para POST /despachos/confirmaciones/:id/confirmar, con `trackingType: 'serial'`. */
   serials?: string[];
-  /** Solo para POST /pedidos/:id/confirmar-despacho, con `trackingType: 'batch'`. */
+  /** Solo para POST /despachos/confirmaciones/:id/confirmar, con `trackingType: 'batch'`. */
   batches?: { batchId: string; qty: number }[];
 }
 
@@ -6899,12 +6900,58 @@ export interface ConfirmarStockDespachoResultItem {
 }
 
 export interface ConfirmarStockDespachoResult {
-  /** Solo en la respuesta de POST /pedidos/:id/confirmar-despacho. */
-  pedidoId?: string;
+  /** Solo en la respuesta de POST /despachos/confirmaciones/:id/confirmar. */
+  solicitudId?: string;
+  /** Solo en la respuesta de POST /despachos/confirmaciones/:id/confirmar. */
+  salesOrder?: string;
   /** `null` si ninguna línea necesitaba transferencia (todo ya estaba disponible). */
   stockEntryId: string | null;
   items: ConfirmarStockDespachoResultItem[];
   message: string;
+}
+
+// ─── Confirmación de despacho de Pedidos (cola en Despachos) ─────────────────
+// docs/tasks/79_confirmacion_despacho_pedido.md §3-§5. Reemplaza al viejo POST
+// /pedidos/:id/confirmar-despacho (eliminado) — la confirmación ahora vive del lado de Despachos,
+// con su propia cola consultable (`GET /despachos/confirmaciones`), separada del detalle de Pedido.
+
+export type SolicitudConfirmacionDespachoStatus = 'Pendiente' | 'Confirmado' | 'Cancelado';
+
+export interface SolicitudConfirmacionDespachoItem {
+  itemCode: string;
+  itemName: string;
+  qty: number;
+  uom: string;
+  warehouse: string;
+  /** Si true, hay que pedir serial(es)/lote(s) para esta línea al confirmar (ver
+   *  `ConfirmarStockDespachoItemDto.serials`/`batches`) — evita tener que consultar el artículo
+   *  aparte para saber si `custom_asignar_serial_en_despacho` está activo. */
+  requiresSerialOrBatch: boolean;
+}
+
+/** Fila de `GET /despachos/confirmaciones` — mismo shape que devuelve `GET
+ *  /despachos/confirmaciones/:id` para el detalle (sin `data[]`/`meta`, un solo objeto). */
+export interface SolicitudConfirmacionDespacho {
+  id: string;
+  salesOrder: string;
+  status: SolicitudConfirmacionDespachoStatus;
+  company: string;
+  branch?: string | null;
+  department?: string | null;
+  customer: string;
+  customerName: string;
+  items: SolicitudConfirmacionDespachoItem[];
+  stockEntry?: string | null;
+  confirmedBy?: string | null;
+  confirmedAt?: string | null;
+}
+
+export interface ListConfirmacionesParams extends PaginationParams {
+  status?: SolicitudConfirmacionDespachoStatus;
+  customer?: string;
+  branch?: string;
+  search?: string;
+  orderBy?: string;
 }
 
 /** `details` del 400 de POST /despachos/:id/confirmar-stock cuando el almacén origen indicado no

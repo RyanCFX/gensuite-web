@@ -5,10 +5,10 @@ import { useState } from 'react'
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus, ChevronLeft, ChevronRight, Truck } from 'lucide-react'
-import { listDespachos, listDespachosPendientes, crearDespachoDesdeFactura, crearDespachoDesdePedido } from '@/shared/api/despachos'
+import { Plus, ChevronLeft, ChevronRight, Truck, ClipboardCheck } from 'lucide-react'
+import { listDespachos, listDespachosPendientes, crearDespachoDesdeFactura, crearDespachoDesdePedido, listConfirmaciones } from '@/shared/api/despachos'
 import { getFacturacionConfig } from '@/shared/api/config'
-import type { DespachoStatus } from '@/shared/api/types'
+import type { DespachoStatus, SolicitudConfirmacionDespachoStatus } from '@/shared/api/types'
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -24,17 +24,25 @@ const PAGE_SIZE = 20
 export default function DespachosListPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  // /despachos/pendientes es una ruta real (registrada antes de /despachos/:id en App.tsx) que
-  // abre esta misma pantalla directo en la pestaña "Pendientes" — antes caía en /despachos/:id
-  // con id="pendientes" y renderizaba el detalle equivocado.
-  const [tab, setTab] = useState<'despachos' | 'pendientes'>(
-    location.pathname === '/despachos/pendientes' ? 'pendientes' : 'despachos',
+  // /despachos/pendientes y /despachos/confirmaciones son rutas reales (registradas antes de
+  // /despachos/:id en App.tsx) que abren esta misma pantalla directo en la pestaña
+  // correspondiente — antes /despachos/pendientes caía en /despachos/:id con id="pendientes" y
+  // renderizaba el detalle equivocado.
+  const [tab, setTab] = useState<'despachos' | 'pendientes' | 'confirmaciones'>(
+    location.pathname === '/despachos/pendientes'
+      ? 'pendientes'
+      : location.pathname === '/despachos/confirmaciones'
+        ? 'confirmaciones'
+        : 'despachos',
   )
   const puedeCrear = usePuede('despachos.crear')
 
-  function selectTab(next: 'despachos' | 'pendientes') {
+  function selectTab(next: 'despachos' | 'pendientes' | 'confirmaciones') {
     setTab(next)
-    navigate(next === 'pendientes' ? '/despachos/pendientes' : '/despachos', { replace: true })
+    navigate(
+      next === 'pendientes' ? '/despachos/pendientes' : next === 'confirmaciones' ? '/despachos/confirmaciones' : '/despachos',
+      { replace: true },
+    )
   }
 
   return (
@@ -58,9 +66,12 @@ export default function DespachosListPage() {
         <button className={`tab-btn${tab === 'pendientes' ? ' on' : ''}`} onClick={() => selectTab('pendientes')}>
           Pendientes de despachar
         </button>
+        <button className={`tab-btn${tab === 'confirmaciones' ? ' on' : ''}`} onClick={() => selectTab('confirmaciones')}>
+          Confirmaciones de Pedido
+        </button>
       </div>
 
-      {tab === 'despachos' ? <DespachosTable /> : <PendientesTable />}
+      {tab === 'despachos' ? <DespachosTable /> : tab === 'pendientes' ? <PendientesTable /> : <ConfirmacionesTable />}
     </div>
   )
 }
@@ -324,6 +335,128 @@ function PendientesTable() {
         Si un pedido ya tiene factura, la línea de la factura es la que representa el pendiente exacto — la
         del pedido puede seguir apareciendo si todavía tiene algo sin facturar. No es un duplicado.
       </p>
+    </>
+  )
+}
+
+const CONFIRMACION_STATUS_BADGE: Record<SolicitudConfirmacionDespachoStatus, string> = {
+  Pendiente: 'badge-warning',
+  Confirmado: 'badge-success',
+  Cancelado: 'badge-neutral',
+}
+
+function ConfirmacionesTable() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  // Prellenado desde ?search=... — atajo usado por el detalle de Pedido (docs/tasks/
+  // 79_confirmacion_despacho_pedido.md §4.1) para llevar directo a la solicitud de ESE pedido.
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '')
+  const [status, setStatus] = useState<SolicitudConfirmacionDespachoStatus>('Pendiente')
+  const [customer, setCustomer] = useState('')
+  const [branch, setBranch] = useState('')
+  const [page, setPage] = useState(1)
+  const offset = (page - 1) * PAGE_SIZE
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['despachos-confirmaciones', { search, status, customer, branch, offset }],
+    queryFn: () => listConfirmaciones({
+      search: search || undefined,
+      status,
+      customer: customer || undefined,
+      branch: branch || undefined,
+      limit: PAGE_SIZE,
+      offset,
+    }),
+  })
+
+  const items = data?.items ?? []
+  const total = data?.meta.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  return (
+    <>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
+              <FilterField label="Estado">
+                <Select value={status} onValueChange={(v) => { setStatus(v as SolicitudConfirmacionDespachoStatus); setPage(1) }} clearable={false}>
+                  <SelectItem value="Pendiente">Pendiente</SelectItem>
+                  <SelectItem value="Confirmado">Confirmado</SelectItem>
+                  <SelectItem value="Cancelado">Cancelado</SelectItem>
+                </Select>
+              </FilterField>
+              <FilterField label="Pedido / Cliente">
+                <input className="ff-input filter-select" placeholder="SO-... o texto libre" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+              </FilterField>
+              <FilterField label="Cliente (ID)">
+                <input className="ff-input filter-select" placeholder="ID del cliente" value={customer} onChange={(e) => { setCustomer(e.target.value); setPage(1) }} />
+              </FilterField>
+              <FilterField label="Sucursal">
+                <input className="ff-input filter-select" placeholder="Sucursal" value={branch} onChange={(e) => { setBranch(e.target.value); setPage(1) }} />
+              </FilterField>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card navy-table-card">
+        <div className="table-scroll">
+          <table className="data-table navy-table">
+            <thead>
+              <tr>
+                <th>Pedido</th>
+                <th>Cliente</th>
+                <th>Sucursal</th>
+                <th>Estado</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading
+                ? Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i}>{Array.from({ length: 5 }).map((__, j) => <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>)}</tr>
+                  ))
+                : items.length === 0
+                  ? (
+                      <tr>
+                        <td colSpan={5}>
+                          <div className="empty-state">
+                            <span className="empty-icon"><ClipboardCheck size={20} /></span>
+                            <p className="empty-title">Nada pendiente de confirmar</p>
+                            <p className="empty-sub">Los pedidos que requieren confirmación de despacho aparecen acá al crearse.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  : items.map((s) => (
+                      <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/despachos/confirmaciones/${s.id}`)}>
+                        <td>{s.salesOrder}</td>
+                        <td>{s.customerName}</td>
+                        <td className="td-muted">{s.branch ?? '—'}</td>
+                        <td><span className={`badge ${CONFIRMACION_STATUS_BADGE[s.status]}`}>{s.status}</span></td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button className="btn btn-secondary btn-size-sm" onClick={(e) => { e.stopPropagation(); navigate(`/despachos/confirmaciones/${s.id}`) }}>
+                            Ver
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {total > PAGE_SIZE && (
+        <div className="pagination">
+          <span className="pagination-info">Mostrando {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} de {total}</span>
+          <div className="pagination-controls">
+            <button className="btn btn-ghost btn-size-icon-sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft size={16} /></button>
+            <span style={{ fontSize: 13 }}>Página {page} de {totalPages}</span>
+            <button className="btn btn-ghost btn-size-icon-sm" disabled={!data?.meta.hasMore} onClick={() => setPage((p) => p + 1)}><ChevronRight size={16} /></button>
+          </div>
+        </div>
+      )}
     </>
   )
 }

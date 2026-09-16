@@ -156,7 +156,7 @@
     },
     "/api/v1/auth/invitations/{token}": {
       "get": {
-        "description": "Un cliente de correo que pre-carga links no debe aceptar/rechazar nada — por eso este GET es de solo lectura. Usarlo para pintar la pantalla \"¿Acepta unirse a \u003Ctenant\u003E?\".",
+        "description": "Un cliente de correo que pre-carga links no debe aceptar/rechazar nada — por eso este GET es de solo lectura. Usarlo para pintar la pantalla \"¿Acepta unirse a <tenant>?\".",
         "operationId": "AuthController_getInvitation",
         "parameters": [
           {
@@ -3500,7 +3500,7 @@
             "bearer": []
           }
         ],
-        "summary": "Item Shortage Report — artículos con projected_qty \u003C 0 en un almacén",
+        "summary": "Item Shortage Report — artículos con projected_qty < 0 en un almacén",
         "tags": [
           "Reportes"
         ]
@@ -5227,7 +5227,7 @@
             "name": "overdueOnly",
             "required": false,
             "in": "query",
-            "description": "Solo facturas vencidas (due_date \u003C hoy)",
+            "description": "Solo facturas vencidas (due_date < hoy)",
             "schema": {
               "type": "boolean"
             }
@@ -5635,7 +5635,7 @@
             "bearer": []
           }
         ],
-        "summary": "Saldo a favor disponible del cliente (Payment Entries con unallocated_amount \u003E 0, ej. anticipos sin aplicar a ninguna factura). Sin expiración.",
+        "summary": "Saldo a favor disponible del cliente (Payment Entries con unallocated_amount > 0, ej. anticipos sin aplicar a ninguna factura). Sin expiración.",
         "tags": [
           "Cuentas por Cobrar"
         ]
@@ -6054,7 +6054,7 @@
             "name": "overdueOnly",
             "required": false,
             "in": "query",
-            "description": "Solo facturas vencidas (due_date \u003C hoy)",
+            "description": "Solo facturas vencidas (due_date < hoy)",
             "schema": {
               "type": "boolean"
             }
@@ -6322,7 +6322,7 @@
             "bearer": []
           }
         ],
-        "summary": "Saldo a favor disponible con el proveedor (Payment Entries con unallocated_amount \u003E 0, ej. anticipos pagados sin aplicar a ninguna factura). Sin expiración.",
+        "summary": "Saldo a favor disponible con el proveedor (Payment Entries con unallocated_amount > 0, ej. anticipos pagados sin aplicar a ninguna factura). Sin expiración.",
         "tags": [
           "Cuentas por Pagar"
         ]
@@ -13276,7 +13276,7 @@
             "name": "from",
             "required": false,
             "in": "query",
-            "description": "Fecha/hora mínima de apertura (period_start_date \u003E=)",
+            "description": "Fecha/hora mínima de apertura (period_start_date >=)",
             "schema": {
               "type": "string"
             }
@@ -13285,7 +13285,7 @@
             "name": "to",
             "required": false,
             "in": "query",
-            "description": "Fecha/hora máxima de apertura (period_start_date \u003C=)",
+            "description": "Fecha/hora máxima de apertura (period_start_date <=)",
             "schema": {
               "type": "string"
             }
@@ -13294,7 +13294,7 @@
             "name": "grandTotalMin",
             "required": false,
             "in": "query",
-            "description": "Solo turnos cerrados (Closed) con grand_total de cierre \u003E= este valor",
+            "description": "Solo turnos cerrados (Closed) con grand_total de cierre >= este valor",
             "schema": {
               "type": "number"
             }
@@ -13303,7 +13303,7 @@
             "name": "grandTotalMax",
             "required": false,
             "in": "query",
-            "description": "Solo turnos cerrados (Closed) con grand_total de cierre \u003C= este valor",
+            "description": "Solo turnos cerrados (Closed) con grand_total de cierre <= este valor",
             "schema": {
               "type": "number"
             }
@@ -15644,7 +15644,7 @@
             "name": "validateStock",
             "required": false,
             "in": "query",
-            "description": "true = solo devolver artículos con stock disponible (\u003E 0) en algún almacén. Solo aplica a productos.",
+            "description": "true = solo devolver artículos con stock disponible (> 0) en algún almacén. Solo aplica a productos.",
             "schema": {
               "default": false,
               "type": "boolean"
@@ -15672,7 +15672,7 @@
             "name": "hasWarranty",
             "required": false,
             "in": "query",
-            "description": "true = solo artículos con garantía (warranty_period \u003E 0). false = sin garantía.",
+            "description": "true = solo artículos con garantía (warranty_period > 0). false = sin garantía.",
             "schema": {
               "type": "boolean"
             }
@@ -19488,6 +19488,7 @@
     },
     "/api/v1/usuarios/{email}/sucursales": {
       "get": {
+        "description": "Si el usuario tiene un rol de bypass (System Manager), `branches` trae TODAS las sucursales del sistema y `allBranches: true` — no tiene asignación explícita, pero en la práctica no está restringido a ninguna (mismo criterio que /almacenes-permitidos). Con `allBranches: false`, `branches` es la asignación explícita real (custom_allowed_branches).",
         "operationId": "UsuariosController_getSucursales",
         "parameters": [
           {
@@ -22934,53 +22935,6 @@
         ]
       }
     },
-    "/api/v1/pedidos/{id}/confirmar-despacho": {
-      "post": {
-        "operationId": "PedidosController_confirmarDespacho",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ConfirmarStockDespachoDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Confirma manualmente la existencia física de los artículos ANTES de someter/facturar el pedido — solo aplica si el tenant tiene Facturacion Config.pedido_requiere_confirmacion_despacho activo, y el pedido no es apartado ni despacho a futuro. Resuelve el faltante de stock con una transferencia automática (mismo mecanismo que POST /despachos/:id/confirmar-stock) y valida/guarda seriales o lotes para artículos que los requieren en este momento (Item.custom_asignar_serial_en_despacho). Requisito para poder someter el pedido — ver POST /:id/submit.",
-        "tags": [
-          "Pedidos de Venta"
-        ]
-      }
-    },
     "/api/v1/pedidos/{id}/facturar-apartado": {
       "post": {
         "operationId": "PedidosController_facturarApartado",
@@ -25002,7 +24956,7 @@
             "name": "billingStatus",
             "required": false,
             "in": "query",
-            "description": "pending = per_billed \u003C 100 (aún falta facturar total o parcialmente). billed = per_billed = 100.",
+            "description": "pending = per_billed < 100 (aún falta facturar total o parcialmente). billed = per_billed = 100.",
             "schema": {
               "type": "string",
               "enum": [
@@ -25435,7 +25389,7 @@
             "name": "receiptStatus",
             "required": false,
             "in": "query",
-            "description": "pending = per_received \u003C 100. received = per_received = 100.",
+            "description": "pending = per_received < 100. received = per_received = 100.",
             "schema": {
               "type": "string",
               "enum": [
@@ -25449,7 +25403,7 @@
             "name": "billingStatus",
             "required": false,
             "in": "query",
-            "description": "pending = per_billed \u003C 100. billed = per_billed = 100.",
+            "description": "pending = per_billed < 100. billed = per_billed = 100.",
             "schema": {
               "type": "string",
               "enum": [
@@ -25550,7 +25504,7 @@
     },
     "/api/v1/compras/ordenes/pendientes-abastecimiento": {
       "get": {
-        "description": "Distinto de GET /despachos/pendientes (que mide qty \u003E delivered_qty, lo que falta entregar): esto mide lo que falta COMPRAR. Ordenado por transaction_date ascendente (FIFO).",
+        "description": "Distinto de GET /despachos/pendientes (que mide qty > delivered_qty, lo que falta entregar): esto mide lo que falta COMPRAR. Ordenado por transaction_date ascendente (FIFO).",
         "operationId": "OrdenesController_pendientesAbastecimiento",
         "parameters": [
           {
@@ -25623,7 +25577,7 @@
             "bearer": []
           }
         ],
-        "summary": "Líneas de pedidos pendientes de comprar (qty \u003E ordered_qty)",
+        "summary": "Líneas de pedidos pendientes de comprar (qty > ordered_qty)",
         "tags": [
           "Compras — Órdenes de Compra (Purchase Order)"
         ]
@@ -25631,7 +25585,7 @@
     },
     "/api/v1/compras/ordenes/desde-pedidos": {
       "post": {
-        "description": "Cada línea queda vinculada a su pedido de origen (sales_order/sales_order_item) — nunca fusionada con la de otro pedido aunque sea el mismo artículo. Si alguna línea tiene costo de compra \u003E= precio de venta del pedido de origen, no crea nada y responde requiereConfirmacion:true con el detalle; reenvíe con confirmarMargenNegativo:true para crearla de todas formas.",
+        "description": "Cada línea queda vinculada a su pedido de origen (sales_order/sales_order_item) — nunca fusionada con la de otro pedido aunque sea el mismo artículo. Si alguna línea tiene costo de compra >= precio de venta del pedido de origen, no crea nada y responde requiereConfirmacion:true con el detalle; reenvíe con confirmarMargenNegativo:true para crearla de todas formas.",
         "operationId": "OrdenesController_crearDesdePedidos",
         "parameters": [
           {
@@ -26225,7 +26179,7 @@
             "name": "orderingStatus",
             "required": false,
             "in": "query",
-            "description": "pending = per_ordered = 0. partial = 0 \u003C per_ordered \u003C 100. ordered = per_ordered = 100.",
+            "description": "pending = per_ordered = 0. partial = 0 < per_ordered < 100. ordered = per_ordered = 100.",
             "schema": {
               "type": "string",
               "enum": [
@@ -26869,7 +26823,7 @@
     },
     "/api/v1/despachos/pendientes": {
       "get": {
-        "description": "Une líneas de Sales Invoice (update_stock=0, ya facturadas) y Sales Order (confirmado pero aún sin facturar) con qty \u003E delivered_qty.",
+        "description": "Une líneas de Sales Invoice (update_stock=0, ya facturadas) y Sales Order (confirmado pero aún sin facturar) con qty > delivered_qty.",
         "operationId": "DespachosController_pendientes",
         "parameters": [
           {
@@ -26951,6 +26905,187 @@
           }
         ],
         "summary": "Líneas de pedidos/facturas pendientes de despachar",
+        "tags": [
+          "Despachos (Delivery Note)"
+        ]
+      }
+    },
+    "/api/v1/despachos/confirmaciones": {
+      "get": {
+        "description": "Pedidos que un tenant configuró como obligatorios a confirmar antes de facturarse (Facturacion Config.pedido_requiere_confirmacion_despacho, ver docs/plans/PLAN_CONFIRMACION_DESPACHO_PEDIDO.md). Por defecto trae solo status=Pendiente.",
+        "operationId": "DespachosController_listConfirmaciones",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por estado de la solicitud. Por defecto, solo las pendientes.",
+            "schema": {
+              "default": "Pendiente",
+              "type": "string",
+              "enum": [
+                "Pendiente",
+                "Confirmado",
+                "Cancelado"
+              ]
+            }
+          },
+          {
+            "name": "customer",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cola de confirmación de despacho de Pedidos",
+        "tags": [
+          "Despachos (Delivery Note)"
+        ]
+      }
+    },
+    "/api/v1/despachos/confirmaciones/{id}": {
+      "get": {
+        "operationId": "DespachosController_getConfirmacion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una solicitud de confirmación de despacho",
+        "tags": [
+          "Despachos (Delivery Note)"
+        ]
+      }
+    },
+    "/api/v1/despachos/confirmaciones/{id}/confirmar": {
+      "post": {
+        "description": "Reemplaza el viejo POST /pedidos/:id/confirmar-despacho. Resuelve el faltante de stock con una transferencia automática (mismo mecanismo que POST /despachos/:id/confirmar-stock) y valida/guarda seriales o lotes para artículos que los requieren en este momento (Item.custom_asignar_serial_en_despacho). dto.items debe cubrir TODAS las líneas de la solicitud. Al completarse, el Pedido vinculado ya puede someterse.",
+        "operationId": "DespachosController_confirmarSolicitud",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmarStockDespachoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirma la existencia física de las líneas de un Pedido",
         "tags": [
           "Despachos (Delivery Note)"
         ]
@@ -31726,7 +31861,7 @@
     },
     "/api/v1/farmacia/lotes/facturas-elegibles": {
       "get": {
-        "description": "Sometidas, con esta aseguradora, estado ARS \"Pendiente\", cobertura neta \u003E 0, sin lote y con la cobertura ya cobrada/posteada a la cuenta puente. Opcionalmente acotadas por período (posting_date). Es exactamente lo que acepta POST /:id/facturas.",
+        "description": "Sometidas, con esta aseguradora, estado ARS \"Pendiente\", cobertura neta > 0, sin lote y con la cobertura ya cobrada/posteada a la cuenta puente. Opcionalmente acotadas por período (posting_date). Es exactamente lo que acepta POST /:id/facturas.",
         "operationId": "LotesController_facturasElegibles",
         "parameters": [
           {
@@ -31750,7 +31885,7 @@
             "name": "periodoInicio",
             "required": false,
             "in": "query",
-            "description": "posting_date \u003E= (inclusive)",
+            "description": "posting_date >= (inclusive)",
             "schema": {
               "example": "2026-09-01",
               "type": "string"
@@ -31760,7 +31895,7 @@
             "name": "periodoFin",
             "required": false,
             "in": "query",
-            "description": "posting_date \u003C= (inclusive)",
+            "description": "posting_date <= (inclusive)",
             "schema": {
               "example": "2026-09-30",
               "type": "string"
@@ -32139,7 +32274,7 @@
             "name": "desde",
             "required": false,
             "in": "query",
-            "description": "periodo_inicio \u003E= desde (YYYY-MM-DD)",
+            "description": "periodo_inicio >= desde (YYYY-MM-DD)",
             "schema": {
               "type": "string"
             }
@@ -32148,7 +32283,7 @@
             "name": "hasta",
             "required": false,
             "in": "query",
-            "description": "periodo_fin \u003C= hasta (YYYY-MM-DD)",
+            "description": "periodo_fin <= hasta (YYYY-MM-DD)",
             "schema": {
               "type": "string"
             }
@@ -32246,7 +32381,7 @@
             "name": "desde",
             "required": false,
             "in": "query",
-            "description": "posting_date de la factura \u003E= desde (YYYY-MM-DD)",
+            "description": "posting_date de la factura >= desde (YYYY-MM-DD)",
             "schema": {
               "type": "string"
             }
@@ -32255,7 +32390,7 @@
             "name": "hasta",
             "required": false,
             "in": "query",
-            "description": "posting_date de la factura \u003C= hasta (YYYY-MM-DD)",
+            "description": "posting_date de la factura <= hasta (YYYY-MM-DD)",
             "schema": {
               "type": "string"
             }
@@ -33337,9 +33472,7 @@
     "title": "ERP RD API",
     "description": "Backend API del ERP localizado para República Dominicana",
     "version": "1.0",
-    "contact": {
-
-    }
+    "contact": {}
   },
   "tags": [],
   "servers": [
@@ -33694,7 +33827,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del cobro. Si se omite, se toma de las facturas/pedidos referenciados (si todos coinciden en una sola) o se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente)."
+            "description": "Sucursal del cobro. Si se omite, se toma de las facturas/pedidos referenciados (si todos coinciden en una sola) o se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente)."
           },
           "department": {
             "type": "string",
@@ -33704,7 +33837,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) a la que se acredita este cobro. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) a la que se acredita este cobro. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
           },
           "conversionRate": {
             "type": "number",
@@ -33735,7 +33868,7 @@
           "paymentEntryId": {
             "type": "string",
             "example": "ACC-PAY-2026-00003",
-            "description": "Payment Entry con saldo a favor (unallocated_amount \u003E 0) del mismo proveedor de la factura"
+            "description": "Payment Entry con saldo a favor (unallocated_amount > 0) del mismo proveedor de la factura"
           },
           "amount": {
             "type": "number",
@@ -33845,7 +33978,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del pago. Si se omite, se toma de las facturas referenciadas (si todas coinciden en una sola) o se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente)."
+            "description": "Sucursal del pago. Si se omite, se toma de las facturas referenciadas (si todas coinciden en una sola) o se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente)."
           },
           "department": {
             "type": "string",
@@ -33855,7 +33988,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) desde la que se hace este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) desde la que se hace este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
           },
           "conversionRate": {
             "type": "number",
@@ -34426,7 +34559,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -34546,7 +34679,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -34666,7 +34799,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) a la que se acredita este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) a la que se acredita este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
           }
         },
         "required": [
@@ -35034,6 +35167,16 @@
             ],
             "default": "Banco Central RD",
             "description": "Fuente de la tasa de cambio para la actualización automática. \"Banco Central RD\": tasa oficial del BCRD (USD/EUR ↔ DOP). \"Currency Exchange Settings\": el proveedor externo configurado en ese doctype nativo de ERPNext."
+          },
+          "pedidoRequiereConfirmacionDespacho": {
+            "type": "boolean",
+            "default": false,
+            "description": "Si está activo, al crear un Pedido de venta INMEDIATO (no marcado como despacho a futuro, ni un apartado) se genera automáticamente una solicitud en la cola de confirmación de Despacho (GET /despachos/confirmaciones) — el pedido no se puede someter/facturar hasta que Despacho la confirme (POST /despachos/confirmaciones/:id/confirmar), aunque el sistema ya calcule que hay stock suficiente. Apagado (default): un pedido se puede someter y facturar de inmediato, sin este paso. Solo tiene efecto si despachoHabilitado está activo."
+          },
+          "pedidoConduceIncluyePrecios": {
+            "type": "boolean",
+            "default": true,
+            "description": "Si está activo (default), el PDF del Pedido (GET /pedidos/:id/pdf, Print Format \"Pedido RD\") incluye columnas de precio/ITBIS/total y la sección de totales, igual que siempre. Si se desactiva, ese mismo documento omite precios/totales — queda como un \"conduce\": descripción, cantidad, nota, nada de montos. No hay endpoint de impresión nuevo ni parámetro que mandar — GET /pedidos/:id/pdf sigue siendo el mismo."
           }
         }
       },
@@ -35961,9 +36104,7 @@
       },
       "UpdateSeguridadSettingsDto": {
         "type": "object",
-        "properties": {
-
-        }
+        "properties": {}
       },
       "RetencionRateDto": {
         "type": "object",
@@ -36574,7 +36715,11 @@
           },
           "tipoPagoDefault": {
             "type": "number",
-            "enum": [1, 2, 3],
+            "enum": [
+              1,
+              2,
+              3
+            ],
             "description": "TipoPago DGII por defecto: 1=Contado, 2=Crédito, 3=Gratuito."
           },
           "tipoIngresosDefault": {
@@ -36772,7 +36917,7 @@
           },
           "apiKey": {
             "type": "string",
-            "description": "API Key completa generada en el panel de Vega (formato vega_\u003Cmode\u003E_\u003Chex\u003E_\u003Csecret\u003E). Se valida contra Vega y se cifra antes de persistirse — nunca se devuelve de vuelta."
+            "description": "API Key completa generada en el panel de Vega (formato vega_<mode>_<hex>_<secret>). Se valida contra Vega y se cifra antes de persistirse — nunca se devuelve de vuelta."
           }
         },
         "required": [
@@ -37298,6 +37443,11 @@
             "type": "number",
             "description": "Campo NATIVO de Item (shelf_life_in_days). Días desde la fecha de fabricación del lote hasta su vencimiento — ERPNext lo usa para calcular `expiry_date` cuando el lote se crea sin uno explícito. Solo aplica con `hasExpiryDate: true`.",
             "example": 730
+          },
+          "asignarSerialEnDespacho": {
+            "type": "boolean",
+            "default": false,
+            "description": "Solo aplica con `trackingType` distinto de \"none\". Si está activo, el serial/lote de este artículo se asigna al vender/despachar (en POST /despachos/confirmaciones/:id/confirmar, cuando Facturacion Config.pedido_requiere_confirmacion_despacho está activo) en vez de dejarse para la asignación manual/automática ya existente al facturar. No reemplaza `requiereSerialLoteCompra` (Facturacion Config) — ese sigue controlando la compra; este campo es sobre CUÁNDO, del lado de la venta, se pide el serial/lote."
           }
         },
         "required": [
@@ -37506,6 +37656,11 @@
             "type": "number",
             "description": "Campo NATIVO de Item (shelf_life_in_days). Días desde la fecha de fabricación del lote hasta su vencimiento — ERPNext lo usa para calcular `expiry_date` cuando el lote se crea sin uno explícito. Solo aplica con `hasExpiryDate: true`.",
             "example": 730
+          },
+          "asignarSerialEnDespacho": {
+            "type": "boolean",
+            "default": false,
+            "description": "Solo aplica con `trackingType` distinto de \"none\". Si está activo, el serial/lote de este artículo se asigna al vender/despachar (en POST /despachos/confirmaciones/:id/confirmar, cuando Facturacion Config.pedido_requiere_confirmacion_despacho está activo) en vez de dejarse para la asignación manual/automática ya existente al facturar. No reemplaza `requiereSerialLoteCompra` (Facturacion Config) — ese sigue controlando la compra; este campo es sobre CUÁNDO, del lado de la venta, se pide el serial/lote."
           }
         }
       },
@@ -38430,7 +38585,7 @@
           },
           "ordenCompra": {
             "type": "string",
-            "description": "Orden de compra a la que pertenece esta línea (enlace manual). Requiere también \"ordenCompraItem\". El BFF rechaza la compra si esa orden ya tiene mercancía recibida por conduce (per_received \u003E 0) — en ese caso factúrela desde POST /compras/purchase-receipt/:id/facturar para no duplicar el inventario. No usar en una línea de combo ni junto con distribucionCuenta."
+            "description": "Orden de compra a la que pertenece esta línea (enlace manual). Requiere también \"ordenCompraItem\". El BFF rechaza la compra si esa orden ya tiene mercancía recibida por conduce (per_received > 0) — en ese caso factúrela desde POST /compras/purchase-receipt/:id/facturar para no duplicar el inventario. No usar en una línea de combo ni junto con distribucionCuenta."
           },
           "ordenCompraItem": {
             "type": "string",
@@ -38565,7 +38720,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -38703,7 +38858,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -39040,7 +39195,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -39188,7 +39343,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -39657,7 +39812,13 @@
           },
           "modificationCode": {
             "type": "number",
-            "enum": [1, 2, 3, 4, 5],
+            "enum": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
             "description": "Código de modificación DGII (Tabla VI) — solo obligatorio si el tenant emite esta nota como e-CF (E34): 1=Anula, 2=Corrige texto, 3=Corrige montos, 4=Reemplazo contingencia, 5=Referencia a Factura de Consumo. Sin efecto en el flujo físico (NCF B04)."
           }
         },
@@ -39681,7 +39842,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) involucrada en el reembolso. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) involucrada en el reembolso. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
           }
         },
         "required": [
@@ -39728,7 +39889,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal de la nota de débito. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal de la nota de débito. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -39742,7 +39903,13 @@
           },
           "modificationCode": {
             "type": "number",
-            "enum": [1, 2, 3, 4, 5],
+            "enum": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
             "description": "Código de modificación DGII (Tabla VI) — solo obligatorio si el tenant emite esta nota como e-CF (E33). Ver CreateCreditNoteDto.modificationCode para el detalle de cada código."
           }
         },
@@ -39971,7 +40138,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal por defecto para las líneas que no especifiquen la suya. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente)."
+            "description": "Sucursal por defecto para las líneas que no especifiquen la suya. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente)."
           },
           "department": {
             "type": "string",
@@ -40136,73 +40303,12 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
             "example": "Ventas - JBC",
             "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
-          }
-        },
-        "required": [
-          "items"
-        ]
-      },
-      "DespachoBatchAllocationDto": {
-        "type": "object",
-        "properties": {
-          "batchId": {
-            "type": "string",
-            "example": "BATCH-0001"
-          },
-          "qty": {
-            "type": "number",
-            "example": 2
-          }
-        },
-        "required": [
-          "batchId",
-          "qty"
-        ]
-      },
-      "ConfirmarStockDespachoItemDto": {
-        "type": "object",
-        "properties": {
-          "itemCode": {
-            "type": "string",
-            "description": "Ítem del despacho/pedido al que le falta stock en su almacén destino."
-          },
-          "sourceWarehouse": {
-            "type": "string",
-            "description": "Almacén de donde va a salir el faltante (transferencia automática de un solo paso). No tiene que pertenecer a la misma sucursal del destino — puede ser un depósito central. Solo hace falta si el ítem realmente tiene faltante — si ya hay suficiente en el almacén destino, se puede omitir."
-          },
-          "serials": {
-            "description": "Seriales a confirmar para este ítem — solo si el artículo tiene `custom_asignar_serial_en_despacho` activo (confirmación de despacho de un Pedido, ver docs/plans/PLAN_CONFIRMACION_DESPACHO_PEDIDO.md). No aplica a la confirmación de un Despacho (Delivery Note) existente.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "batches": {
-            "description": "Lotes a confirmar para este ítem — mismo criterio que `serials`.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DespachoBatchAllocationDto"
-            }
-          }
-        },
-        "required": [
-          "itemCode"
-        ]
-      },
-      "ConfirmarStockDespachoDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConfirmarStockDespachoItemDto"
-            }
           }
         },
         "required": [
@@ -40289,7 +40395,13 @@
           },
           "modificationCode": {
             "type": "number",
-            "enum": [1, 2, 3, 4, 5],
+            "enum": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
             "description": "Código de modificación DGII (Tabla VI) — solo obligatorio si el tenant emite esta nota como e-CF (E34): 1=Anula, 2=Corrige texto, 3=Corrige montos, 4=Reemplazo contingencia, 5=Referencia a Factura de Consumo. Sin efecto en el flujo físico (NCF B04)."
           },
           "motivoAnulacionArs": {
@@ -40320,7 +40432,13 @@
         "properties": {
           "modificationCode": {
             "type": "number",
-            "enum": [1, 2, 3, 4, 5],
+            "enum": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
             "description": "Código de modificación DGII (Tabla VI) para el e-CF E34 a la aseguradora, si el tenant emite electrónico."
           }
         }
@@ -40422,7 +40540,7 @@
           "label": {
             "type": "string",
             "example": "Caja 1",
-            "description": "Nombre/etiqueta de la caja. El documento en ERPNext se crea como \"POS \u003Clabel\u003E\"."
+            "description": "Nombre/etiqueta de la caja. El documento en ERPNext se crea como \"POS <label>\"."
           },
           "warehouse": {
             "type": "string",
@@ -40856,7 +40974,7 @@
           },
           "confirmarMargenNegativo": {
             "type": "boolean",
-            "description": "Confirma someter aunque alguna línea tenga costo de compra \u003E= precio de venta del pedido vinculado (margen negativo o nulo). Sin esto, si hay margen negativo la orden NO se crea — la respuesta trae `requiereConfirmacion: true` y el detalle en `warnings`."
+            "description": "Confirma someter aunque alguna línea tenga costo de compra >= precio de venta del pedido vinculado (margen negativo o nulo). Sin esto, si hay margen negativo la orden NO se crea — la respuesta trae `requiereConfirmacion: true` y el detalle en `warnings`."
           }
         },
         "required": [
@@ -41166,7 +41284,7 @@
           },
           "scheduleDate": {
             "type": "string",
-            "description": "Fecha por defecto en que se necesita la mercancía, aplicada a toda línea que no traiga la suya propia. Debe ser \u003E= transactionDate."
+            "description": "Fecha por defecto en que se necesita la mercancía, aplicada a toda línea que no traiga la suya propia. Debe ser >= transactionDate."
           },
           "branch": {
             "type": "string",
@@ -41197,7 +41315,7 @@
           },
           "scheduleDate": {
             "type": "string",
-            "description": "Fecha por defecto en que se necesita la mercancía, aplicada a toda línea que no traiga la suya propia. Debe ser \u003E= transactionDate."
+            "description": "Fecha por defecto en que se necesita la mercancía, aplicada a toda línea que no traiga la suya propia. Debe ser >= transactionDate."
           },
           "branch": {
             "type": "string",
@@ -41281,6 +41399,67 @@
         },
         "required": [
           "supplier"
+        ]
+      },
+      "DespachoBatchAllocationDto": {
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string",
+            "example": "BATCH-0001"
+          },
+          "qty": {
+            "type": "number",
+            "example": 2
+          }
+        },
+        "required": [
+          "batchId",
+          "qty"
+        ]
+      },
+      "ConfirmarStockDespachoItemDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "description": "Ítem del despacho/pedido al que le falta stock en su almacén destino."
+          },
+          "sourceWarehouse": {
+            "type": "string",
+            "description": "Almacén de donde va a salir el faltante (transferencia automática de un solo paso). No tiene que pertenecer a la misma sucursal del destino — puede ser un depósito central. Solo hace falta si el ítem realmente tiene faltante — si ya hay suficiente en el almacén destino, se puede omitir."
+          },
+          "serials": {
+            "description": "Seriales a confirmar para este ítem — solo si el artículo tiene `custom_asignar_serial_en_despacho` activo (confirmación de despacho de un Pedido, ver docs/plans/PLAN_CONFIRMACION_DESPACHO_PEDIDO.md). No aplica a la confirmación de un Despacho (Delivery Note) existente.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "batches": {
+            "description": "Lotes a confirmar para este ítem — mismo criterio que `serials`.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DespachoBatchAllocationDto"
+            }
+          }
+        },
+        "required": [
+          "itemCode"
+        ]
+      },
+      "ConfirmarStockDespachoDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfirmarStockDespachoItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
         ]
       },
       "DespachoItemDto": {
@@ -43048,7 +43227,7 @@
             "example": [
               "ACC-SINV-2026-00003"
             ],
-            "description": "Facturas de paciente a agregar al lote. Cada una debe ser elegible (ver GET /farmacia/lotes/facturas-elegibles): sometida, de esta aseguradora, estado ARS \"Pendiente\", con cobertura neta \u003E 0 y con la cobertura ya cobrada/posteada. Las que no lo sean se reportan en `rechazadas` con su motivo, sin abortar el resto.",
+            "description": "Facturas de paciente a agregar al lote. Cada una debe ser elegible (ver GET /farmacia/lotes/facturas-elegibles): sometida, de esta aseguradora, estado ARS \"Pendiente\", con cobertura neta > 0 y con la cobertura ya cobrada/posteada. Las que no lo sean se reportan en `rechazadas` con su motivo, sin abortar el resto.",
             "type": "array",
             "items": {
               "type": "string"

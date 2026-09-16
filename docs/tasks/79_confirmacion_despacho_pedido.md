@@ -6,6 +6,13 @@ piezas — léelo completo antes de empezar, no lo trates como una lista de chec
 Antes de implementar, abre `openapi.json` y confirma ahí los tipos exactos de cada campo/endpoint
 mencionado — lo que sigue es la explicación funcional completa del comportamiento.
 
+> **⚠️ Actualización 2026-09-16 (v2) — cambio de contrato rompedor si ya implementaste esto.**
+> `POST /pedidos/:id/confirmar-despacho` **fue eliminado**. La confirmación ahora vive del lado de
+> **Despachos**, con una cola propia y consultable — ver §3, §4 y §5, reescritas para el nuevo
+> flujo. Si tu frontend ya tenía una pantalla de "Confirmar despacho" dentro del detalle de
+> Pedido, hay que moverla a una pantalla nueva dentro de Despachos. El resto del documento (§1,
+> §2, §6-§10) no cambió.
+
 ---
 
 ## 1. Contexto — el problema que esto resuelve
@@ -54,13 +61,14 @@ Body: { ..., "despachoFuturo": true }
 
 Con el flag de tenant activo y un pedido inmediato (no apartado, no despacho a futuro):
 
-1. **Se crea el pedido en Borrador** — `POST /pedidos`, igual que siempre.
-2. **Se envía a confirmación de despacho** — no hay un endpoint separado para "enviar a despacho"
-   como tal; el pedido en Borrador simplemente aparece disponible para confirmar (ver §5, cómo
-   listarlos). No hace falta ninguna acción explícita de "enviar" — el pedido YA está pendiente de
-   confirmación en cuanto se crea, si el tenant tiene el flag activo.
-3. **Despacho confirma** — `POST /pedidos/:id/confirmar-despacho` (ver §4). Si algún artículo
-   requiere serial/lote en este momento, se asigna acá.
+1. **Se crea el pedido en Borrador** — `POST /pedidos`, igual que siempre. El backend crea
+   automáticamente, en ese mismo momento, una **Solicitud de Confirmación de Despacho** (una cola
+   de trabajo propia de Despacho, no un campo del pedido) — no hace falta ninguna acción explícita
+   de "enviar a confirmar" de tu lado.
+2. **La solicitud aparece en la cola de Despacho** — `GET /despachos/confirmaciones` (ver §5).
+3. **Despacho confirma** — `POST /despachos/confirmaciones/:id/confirmar` (ver §4, `:id` es el id
+   de la SOLICITUD, no del pedido). Si algún artículo requiere serial/lote en este momento, se
+   asigna acá.
 4. **El pedido puede someterse** — `POST /pedidos/:id/submit`, el mismo endpoint de siempre. Sin
    confirmar, este endpoint ahora puede devolver 400 (ver §4.4).
 5. **Se factura** — al someter, se crea la Sales Invoice en Draft, igual que siempre; se somete
@@ -69,19 +77,34 @@ Con el flag de tenant activo y un pedido inmediato (no apartado, no despacho a f
 7. **Se despacha** — el despacho real (Delivery Note) se sigue creando y sometiendo después,
    exactamente como funciona hoy (`POST /despachos/desde-factura/:id`) — nada de esto cambió.
 
+**Si editás un pedido en Borrador** (`PUT /pedidos/:id`) mientras su solicitud sigue Pendiente, el
+backend la cancela y crea una nueva reflejando las líneas actuales — no hace falta que el frontend
+haga nada especial, pero tené en cuenta que el `id` de la solicitud puede cambiar tras editar el
+pedido (siempre resolvé el id vigente desde `custom_solicitud_confirmacion_despacho` del pedido, o
+desde la cola de §5 — nunca lo guardes en caché de un paso anterior).
+
 ---
 
-## 4. `POST /pedidos/:id/confirmar-despacho`
+## 4. `POST /despachos/confirmaciones/:id/confirmar`
 
-### 4.1 Cuándo mostrar la acción
+Reemplaza al viejo `POST /pedidos/:id/confirmar-despacho`. Vive en el módulo de **Despachos**, no
+en Pedidos — el `:id` es el de la **Solicitud** (`GET /despachos/confirmaciones` te da ese id, ver
+§5), no el del pedido.
 
-Solo tiene sentido ofrecerla cuando:
-- El tenant tiene `pedidoRequiereConfirmacionDespacho` activo.
-- El pedido está en Borrador (`docstatus`/`status` aún no sometido — ver `estadoFlujo` en §6).
-- El pedido NO es apartado (`isLayaway: false`) NI despacho a futuro (`despachoFuturo: false`).
-- El pedido todavía no está confirmado (`despachoConfirmado: false`).
+### 4.1 Dónde vive esto en la UI
+
+Es una pantalla/pestaña **dentro de Despachos** (no dentro del detalle de Pedido): una cola de
+"Confirmaciones pendientes" que lista `GET /despachos/confirmaciones` (default `status=Pendiente`)
+— el equivalente, del lado de Despacho, a lo que ya tenés para `GET /despachos/pendientes`.
+Opcionalmente, el detalle de un Pedido puede mostrar un indicador de solo-lectura ("Pendiente de
+confirmar despacho", con link a la solicitud) usando `estadoFlujo` (§6) — pero la ACCIÓN de
+confirmar se hace desde Despachos, no desde Pedidos.
 
 ### 4.2 Request
+
+```
+POST /despachos/confirmaciones/:id/confirmar
+```
 
 ```json
 {
@@ -98,14 +121,14 @@ Solo tiene sentido ofrecerla cuando:
   en su almacén de venta. Si el artículo ya tiene suficiente stock ahí, se puede omitir (o mandarlo
   igual, no rompe nada — el backend lo ignora si no hacía falta).
 - `serials`/`batches`: solo para artículos cuyo `Item.custom_asignar_serial_en_despacho` esté
-  activo (ver `GET /catalog/items/:id` — este campo ya viene en la respuesta del artículo). Mismo
-  shape que ya usás en `POST /despachos/:id/asignar-tracking` (`batches: [{batchId, qty}]`).
+  activo — `GET /despachos/confirmaciones/:id` ya te dice cuáles con `items[].requiresSerialOrBatch`
+  (no hace falta consultar el artículo aparte). Mismo shape que ya usás en
+  `POST /despachos/:id/asignar-tracking` (`batches: [{batchId, qty}]`).
 
-**Solo enviá en el body los artículos que realmente necesitan algo** — un artículo con stock
-suficiente y sin requisito de serial no necesita aparecer en absoluto (el backend, si no aparece,
-simplemente no lo toca — pero atención: **la confirmación completa exige que TODOS los artículos
-del pedido que sí necesitan algo estén en el body**, no hace falta re-enviar los que no necesitan
-nada).
+**A diferencia de la v1, `dto.items` ahora DEBE cubrir TODAS las líneas de la solicitud** — mandá
+una entrada por cada línea que `GET /despachos/confirmaciones/:id` te devolvió en `items[]`, tenga
+o no faltante/serial (las que no necesitan nada igual deben aparecer, solo con `itemCode`). Si falta
+alguna, `400` te dice exactamente cuáles.
 
 ### 4.3 Response (éxito)
 
@@ -113,7 +136,8 @@ nada).
 {
   "success": true,
   "data": {
-    "pedidoId": "SO-2026-00042",
+    "solicitudId": "hJ8sKq2mNp",
+    "salesOrder": "SO-2026-00042",
     "stockEntryId": "MAT-STE-2026-00099",
     "items": [
       {
@@ -129,42 +153,90 @@ nada).
 }
 ```
 
-Mismo shape que ya conocés de `POST /despachos/:id/confirmar-stock` — `stockEntryId: null` si
-ninguna línea necesitaba transferencia, `transferido: false` para una línea que ya tenía
-suficiente (informativo, no error). **Esta llamada NO somete el pedido** — el siguiente paso sigue
-siendo `POST /pedidos/:id/submit`, un botón/acción separada.
+Mismo shape que ya conocés de `POST /despachos/:id/confirmar-stock`, más `solicitudId`/
+`salesOrder` — `stockEntryId: null` si ninguna línea necesitaba transferencia, `transferido: false`
+para una línea que ya tenía suficiente (informativo, no error). **Esta llamada NO somete el
+pedido** — el siguiente paso sigue siendo `POST /pedidos/:id/submit`, un botón/acción separada (y
+en otra pantalla, la de Pedidos).
 
 ### 4.4 Errores
 
 - 400 con `code: "STOCK_INSUFFICIENT_OR_RESERVED"` si el `sourceWarehouse` indicado no tiene
   realmente el faltante disponible — mismo `details` estructurado que ya conocés (§75.2.2 del
   prompt de Despachos), reutilizá el mismo manejo.
-- 400 texto plano si un artículo con `custom_asignar_serial_en_despacho` no trae `serials`/
-  `batches` en el body.
-- 400 si el tenant no tiene el flag activo, si el pedido no está en Borrador, si es apartado, o si
-  es despacho a futuro — mensajes claros, mostralos tal cual.
+- 400 texto plano si un artículo con `requiresSerialOrBatch` no trae `serials`/`batches` en el
+  body.
+- 400 texto plano ("Faltan confirmar los artículos: ...") si `dto.items` no cubre todas las líneas
+  de la solicitud (nuevo en v2, ver §4.2).
+- 400 si la solicitud ya no está `Pendiente` (ya `Confirmado` o `Cancelado` — por ejemplo, si el
+  pedido se editó mientras tanto y esta solicitud quedó reemplazada por una nueva).
+- 404 si el `id` no corresponde a ninguna solicitud.
 
 ### 4.5 Qué construir en la UI
 
-Pantalla/modal de "Confirmar despacho" sobre el detalle de un pedido pendiente:
-- Lista de líneas del pedido con faltante real — para cada una, un selector de almacén origen
+Pantalla de "Confirmaciones de Despacho" (cola, `GET /despachos/confirmaciones`) → detalle de una
+solicitud (`GET /despachos/confirmaciones/:id`) → acción "Confirmar":
+- Lista de líneas de la solicitud — para cada una, un selector de almacén origen
   (`sourceWarehouse`), idealmente mostrando disponible por almacén (reusar
   `GET /catalog/items/:id/stock`, igual que en Despachos).
-- Para líneas cuyo artículo tiene `custom_asignar_serial_en_despacho` activo: un selector de
-  serial(es)/lote(s) — mismo componente que ya uses para `POST /despachos/:id/asignar-tracking`,
-  si existe.
-- Tras confirmar con éxito, mostrar el resultado (qué se transfirió) y ofrecer directamente el
-  botón "Someter pedido" a continuación.
+- Para líneas con `requiresSerialOrBatch: true`: un selector de serial(es)/lote(s) — mismo
+  componente que ya uses para `POST /despachos/:id/asignar-tracking`, si existe.
+- El formulario debe armar una entrada en `items[]` por CADA línea de la solicitud antes de
+  habilitar el botón "Confirmar" (ver §4.2 — cobertura completa obligatoria).
+- Tras confirmar con éxito, mostrar el resultado (qué se transfirió) — el pedido vinculado
+  (`salesOrder` en la respuesta) ya puede someterse desde la pantalla de Pedidos.
 
 ---
 
-## 5. Listar pedidos pendientes de confirmar
+## 5. `GET /despachos/confirmaciones` — cola de confirmaciones pendientes
 
-No hay un endpoint separado — usá el listado normal de Pedidos (`GET /pedidos`) filtrando por
-`estadoFlujo: "pendiente_confirmacion_despacho"` del lado del cliente (o, si `GET /pedidos` ya
-soporta un filtro por status/estado en tu integración actual, confirmá en `openapi.json` si hay un
-query param directo — si no lo hay, traé los pedidos en Borrador y filtrá por `estadoFlujo` en el
-cliente). Es información que ya viene en cada pedido de la lista, no hace falta un endpoint aparte.
+Reemplaza la idea de "listar pedidos pendientes filtrando `estadoFlujo` del lado del cliente" de la
+v1 — ahora es un endpoint real y paginado, igual que `GET /despachos/pendientes`.
+
+```
+GET /despachos/confirmaciones                       # default: status=Pendiente
+GET /despachos/confirmaciones?status=Confirmado
+GET /despachos/confirmaciones?customer=CUST-001&branch=Norte
+```
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "hJ8sKq2mNp",
+      "salesOrder": "SO-2026-00042",
+      "status": "Pendiente",
+      "company": "ACME",
+      "branch": "Norte",
+      "department": null,
+      "customer": "CUST-001",
+      "customerName": "Cliente Uno SRL",
+      "items": [
+        {
+          "itemCode": "PROD-003",
+          "itemName": "Producto 3",
+          "qty": 10,
+          "uom": "Unidad",
+          "warehouse": "Almacén Venta - ACME",
+          "requiresSerialOrBatch": false
+        }
+      ],
+      "stockEntry": null,
+      "confirmedBy": null,
+      "confirmedAt": null
+    }
+  ],
+  "meta": { "total": 1, "limit": 20, "offset": 0, "hasMore": false }
+}
+```
+
+`GET /despachos/confirmaciones/:id` devuelve el mismo shape de un solo objeto (sin `data[]`, sin
+`meta`) — es el endpoint que usás para el detalle antes de confirmar (§4.5).
+
+**Qué construir en la UI**: una pantalla/pestaña dentro de Despachos, tabla con `salesOrder`,
+`customerName`, `branch`, cantidad de líneas — clic en una fila lleva al detalle/confirmación
+(§4.5). Mismo patrón de paginación/filtros que ya usás para `GET /despachos/pendientes`.
 
 ---
 
@@ -188,7 +260,7 @@ etiqueta, sin tener que combinar varios campos. Valores posibles:
 | Valor | Significado |
 |---|---|
 | `borrador` | Recién creado, o ya confirmado y listo para someter (si el tenant no requiere confirmación, o el pedido es a futuro/apartado, siempre es este valor mientras esté en Borrador) |
-| `pendiente_confirmacion_despacho` | Requiere `POST /pedidos/:id/confirmar-despacho` antes de poder someterse |
+| `pendiente_confirmacion_despacho` | Requiere que Despacho confirme la solicitud vinculada (`POST /despachos/confirmaciones/:id/confirmar`, ver §4) antes de poder someterse |
 | `apartado_reservado` | Apartado ya sometido (stock reservado), pendiente de que el cliente regrese a retirar |
 | `facturando` | Sometido, factura recién creada en Draft, todavía sin someter esa factura |
 | `facturado` | La factura ya fue sometida (NCF asignado), pendiente de despacho físico |
@@ -283,16 +355,19 @@ al confirmar despacho (venta), no en la compra."
    si el tenant lo permite.
 2. Configuración → Facturación tiene los 2 toggles nuevos: "Pedido requiere confirmación de
    despacho" y "Conduce incluye precios".
-3. Con el requisito activo, un pedido inmediato en Borrador muestra la acción "Confirmar
-   despacho"; un apartado o uno marcado a futuro NUNCA la muestra.
-4. Confirmar despacho con faltante + almacén origen crea la transferencia y permite someter
-   después; sin faltante, no pide nada y permite someter directo.
+3. Con el requisito activo, un pedido inmediato en Borrador genera una solicitud visible en la
+   cola de Despachos (`GET /despachos/confirmaciones`); un apartado o uno marcado a futuro NUNCA
+   genera una.
+4. Confirmar una solicitud con faltante + almacén origen crea la transferencia y permite someter
+   el pedido después; sin faltante, no pide nada y permite someter directo.
 5. Intentar someter sin confirmar (con el requisito activo) se rechaza con un mensaje claro, no el
    JSON crudo.
-6. Un artículo con `custom_asignar_serial_en_despacho` exige serial/lote al confirmar despacho —
+6. Editar un pedido en Borrador con solicitud Pendiente la reemplaza por una nueva (verificar que
+   la vieja queda `Cancelado` en `GET /despachos/confirmaciones?status=Cancelado`).
+7. Un artículo con `custom_asignar_serial_en_despacho` exige serial/lote al confirmar despacho —
    y esos mismos seriales aparecen ya asignados en la factura resultante, sin pedirse de nuevo.
-7. La lista/detalle de Pedidos muestra `estadoFlujo` traducido a un badge legible, para los 9
+8. La lista/detalle de Pedidos muestra `estadoFlujo` traducido a un badge legible, para los 9
    valores posibles.
-8. El PDF del pedido (conduce) respeta el toggle de precios — probar ambos casos.
-9. Detalle de artículo muestra `entregado` cuando corresponde, ausente para Servicios.
-10. Todo contrastado contra `openapi.json` actualizado para los tipos exactos.
+9. El PDF del pedido (conduce) respeta el toggle de precios — probar ambos casos.
+10. Detalle de artículo muestra `entregado` cuando corresponde, ausente para Servicios.
+11. Todo contrastado contra `openapi.json` actualizado para los tipos exactos.

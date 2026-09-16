@@ -56,7 +56,7 @@ const schema = z.object({
   trackingType: z.enum(['none', 'batch', 'serial']).optional(),
   hasExpiryDate: z.boolean().optional(),
   shelfLifeInDays: z.number().int().min(1).optional().catch(undefined),
-  custom_asignar_serial_en_despacho: z.boolean().optional(),
+  asignarSerialEnDespacho: z.boolean().optional(),
   purchaseTaxTemplate: z.string().optional(),
   salesTaxTemplate: z.string().optional(),
 })
@@ -306,7 +306,7 @@ export default function ItemForm() {
       trackingType: 'none',
       hasExpiryDate: false,
       shelfLifeInDays: undefined,
-      custom_asignar_serial_en_despacho: false,
+      asignarSerialEnDespacho: false,
       purchaseTaxTemplate: '',
       salesTaxTemplate: '',
     },
@@ -357,7 +357,7 @@ export default function ItemForm() {
       trackingType: existingItem.trackingType ?? 'none',
       hasExpiryDate: existingItem.hasExpiryDate ?? false,
       shelfLifeInDays: existingItem.shelfLifeInDays,
-      custom_asignar_serial_en_despacho: existingItem.custom_asignar_serial_en_despacho ?? false,
+      asignarSerialEnDespacho: existingItem.asignarSerialEnDespacho ?? false,
       purchaseTaxTemplate: existingItem.purchaseTaxTemplate ?? '',
       salesTaxTemplate: existingItem.salesTaxTemplate ?? '',
     })
@@ -430,7 +430,7 @@ export default function ItemForm() {
       shelfLifeInDays: data.trackingType === 'batch' ? (data.shelfLifeInDays || undefined) : undefined,
       // Solo tiene sentido con seguimiento activo — mismo criterio que hasExpiryDate/shelfLifeInDays
       // arriba (docs/tasks/79_confirmacion_despacho_pedido.md §9).
-      custom_asignar_serial_en_despacho: data.trackingType !== 'none' ? data.custom_asignar_serial_en_despacho : undefined,
+      asignarSerialEnDespacho: data.trackingType !== 'none' ? data.asignarSerialEnDespacho : undefined,
       purchaseTaxTemplate: noPurchaseTax ? undefined : data.purchaseTaxTemplate || undefined,
       salesTaxTemplate: noSalesTax ? undefined : data.salesTaxTemplate || undefined,
     }
@@ -958,7 +958,7 @@ export default function ItemForm() {
                 <div className="form-row">
                   <div className="ff-wrap">
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-                      <input type="checkbox" className="ff-check" {...register('custom_asignar_serial_en_despacho')} />
+                      <input type="checkbox" className="ff-check" {...register('asignarSerialEnDespacho')} />
                       Asignar serial/lote al vender o despachar
                     </label>
                     <p className="ff-hint">

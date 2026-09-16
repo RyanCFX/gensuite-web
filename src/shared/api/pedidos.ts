@@ -8,8 +8,6 @@ import type {
   SubmitPedidoResult,
   FacturarApartadoResult,
   CancelarApartadoDto,
-  ConfirmarStockDespachoDto,
-  ConfirmarStockDespachoResult,
   PaginatedResponse,
   PaginationParams,
 } from './types'
@@ -65,16 +63,6 @@ export async function facturarApartado(id: string) {
 export async function cancelarApartado(id: string, data: CancelarApartadoDto) {
   const res = await client.post<{ success: true; data: Pedido }>(
     ENDPOINTS.pedidos.cancelarApartado(id),
-    data,
-  )
-  return unwrap(res)
-}
-
-// POST /pedidos/:id/confirmar-despacho — docs/tasks/79_confirmacion_despacho_pedido.md §4. NO
-// somete el pedido — sigue siendo un paso aparte (POST /pedidos/:id/submit).
-export async function confirmarDespachoPedido(id: string, data: ConfirmarStockDespachoDto) {
-  const res = await client.post<{ success: true; data: ConfirmarStockDespachoResult }>(
-    ENDPOINTS.pedidos.confirmarDespacho(id),
     data,
   )
   return unwrap(res)

@@ -13,6 +13,8 @@ import type {
   DespachoPendienteLinea,
   FacturarDespachoResult,
   PaginatedResponse,
+  SolicitudConfirmacionDespacho,
+  ListConfirmacionesParams,
 } from './types'
 
 // Despachos (Delivery Note) — docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md §2.
@@ -100,6 +102,26 @@ export async function facturarDespacho(id: string) {
  *  facturado, el servidor rechaza con 400 y hay que redirigir a POST /devoluciones en su lugar). */
 export async function devolucionDespacho(id: string) {
   const res = await client.post<{ success: true; data: Despacho }>(ENDPOINTS.despachos.devolucion(id))
+  return unwrap(res)
+}
+
+// Cola de confirmación de despacho de Pedidos — docs/tasks/79_confirmacion_despacho_pedido.md §5.
+// Reemplaza al viejo POST /pedidos/:id/confirmar-despacho (eliminado): la confirmación vive acá,
+// con `:id` siendo el de la SOLICITUD, no el del pedido.
+export async function listConfirmaciones(params?: ListConfirmacionesParams) {
+  const res = await client.get<PaginatedResponse<SolicitudConfirmacionDespacho>>(ENDPOINTS.despachos.confirmaciones.list, { params })
+  return unwrapPaginated(res)
+}
+
+export async function getConfirmacion(id: string) {
+  const res = await client.get<{ success: true; data: SolicitudConfirmacionDespacho }>(ENDPOINTS.despachos.confirmaciones.byId(id))
+  return unwrap(res)
+}
+
+/** No somete el pedido vinculado — eso sigue siendo un paso aparte (POST /pedidos/:id/submit),
+ *  desde la pantalla de Pedidos. `dto.items` debe cubrir TODAS las líneas de la solicitud. */
+export async function confirmarSolicitud(id: string, dto: ConfirmarStockDespachoDto) {
+  const res = await client.post<{ success: true; data: ConfirmarStockDespachoResult }>(ENDPOINTS.despachos.confirmaciones.confirmar(id), dto)
   return unwrap(res)
 }
 

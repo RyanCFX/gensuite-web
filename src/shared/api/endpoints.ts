@@ -234,7 +234,6 @@ export const ENDPOINTS = {
     duplicateSource: (id: string) => `/pedidos/${id}/duplicate-source`,
     facturarApartado: (id: string) => `/pedidos/${id}/facturar-apartado`,
     cancelarApartado: (id: string) => `/pedidos/${id}/cancelar-apartado`,
-    confirmarDespacho: (id: string) => `/pedidos/${id}/confirmar-despacho`,
   },
   gastos: {
     list: '/gastos',
@@ -640,6 +639,11 @@ export const ENDPOINTS = {
     facturar: (id: string) => `/despachos/${encodeURIComponent(id)}/facturar`,
     devolucion: (id: string) => `/despachos/${encodeURIComponent(id)}/devolucion`,
     print: (id: string) => `/despachos/${encodeURIComponent(id)}/print`,
+    confirmaciones: {
+      list: '/despachos/confirmaciones',
+      byId: (id: string) => `/despachos/confirmaciones/${encodeURIComponent(id)}`,
+      confirmar: (id: string) => `/despachos/confirmaciones/${encodeURIComponent(id)}/confirmar`,
+    },
   },
   apertura: {
     preflight: '/apertura/preflight',

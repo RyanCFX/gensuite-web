@@ -57,6 +57,7 @@ const AperturaResumenPage = lazy(() => import('@/features/apertura/ResumenPage')
 const DespachosListPage = lazy(() => import('@/features/despachos/DespachosListPage'))
 const DespachoForm = lazy(() => import('@/features/despachos/DespachoForm'))
 const DespachoDetail = lazy(() => import('@/features/despachos/DespachoDetail'))
+const ConfirmacionDespachoDetail = lazy(() => import('@/features/despachos/ConfirmacionDespachoDetail'))
 const DevolucionDetail = lazy(() => import('@/features/invoicing/DevolucionDetail'))
 const DevolucionForm   = lazy(() => import('@/features/invoicing/DevolucionForm'))
 const StockPage       = lazy(() => import('@/features/inventory/StockPage'))
@@ -405,6 +406,8 @@ export default function App() {
             <Route path="/despachos" element={<Suspense fallback={<PageLoader />}><DespachosListPage /></Suspense>} />
             <Route path="/despachos/nuevo" element={<Suspense fallback={<PageLoader />}><DespachoForm /></Suspense>} />
             <Route path="/despachos/pendientes" element={<Suspense fallback={<PageLoader />}><DespachosListPage /></Suspense>} />
+            <Route path="/despachos/confirmaciones" element={<Suspense fallback={<PageLoader />}><DespachosListPage /></Suspense>} />
+            <Route path="/despachos/confirmaciones/:id" element={<Suspense fallback={<PageLoader />}><ConfirmacionDespachoDetail /></Suspense>} />
             <Route path="/despachos/:id" element={<Suspense fallback={<PageLoader />}><DespachoDetail /></Suspense>} />
 
             {/* Configuración */}
