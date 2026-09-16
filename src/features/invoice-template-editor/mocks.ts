@@ -11,10 +11,17 @@ function delay(ms = 250) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+// `idCounter` arranca en 0 en cada carga de módulo/pestaña, pero los ids que trae un documento
+// cargado del backend (`plantilla.documentJson`) fueron generados por el contador de OTRA sesión
+// — que también arrancó en 0. Sin el sufijo de sesión (`SESSION_ID`), el primer id nuevo de esta
+// sesión (ej. el primer "pegar") podía coincidir con un id ya presente en el documento cargado:
+// dos elementos con el mismo id → misma `key` de React → uno de los dos "desaparecía" al mover el
+// pegado (`updateElement` actualiza ambos por compartir id, y React colapsa las keys duplicadas).
+const SESSION_ID = Date.now().toString(36)
 let idCounter = 0
 function nextId(prefix: string) {
   idCounter += 1
-  return `${prefix}_${idCounter}`
+  return `${prefix}_${SESSION_ID}_${idCounter}`
 }
 
 function singlePage(elements: TemplateElement[]): TemplatePage[] {
@@ -23,7 +30,7 @@ function singlePage(elements: TemplateElement[]): TemplatePage[] {
 
 // Las plantillas mock de pos_invoice se diseñaron originalmente para un ancho de página de
 // 302px — ese valor era incorrecto (no correspondía a 80mm reales, ver TEMPLATE_FORMATS).
-// Al corregir el ancho real de página a 576px (72mm imprimibles), esta escala reposiciona
+// Al corregir el ancho real de página a 600px (75mm imprimibles), esta escala reposiciona
 // cada elemento (y su tamaño de fuente/grosor) proporcionalmente para conservar el mismo
 // diseño relativo, ahora al tamaño físico correcto.
 const POS_LEGACY_WIDTH = 302
