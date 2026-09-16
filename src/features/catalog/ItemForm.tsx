@@ -10,10 +10,11 @@ import { useTabs } from '@/contexts/TabsContext'
 import { createItem, updateItem, getItem, listCategories, listBrands, uploadItemImagen } from '@/shared/api/catalog'
 import type { CreateItemDto } from '@/shared/api/types'
 import { listWarehouses } from '@/shared/api/inventory'
-import { listUOMs, getEmpresa, listItemTaxTemplates } from '@/shared/api/config'
+import { listUOMs, getEmpresa, listItemTaxTemplates, getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { MultiSearchSelect } from '@/shared/ui/MultiSearchSelect'
 import { AttributeSelect } from '@/components/shared/AttributeSelect'
 import { ArrowLeft, Plus, Minus, Trash2, HelpCircle, ImagePlus, Loader2 } from 'lucide-react'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
@@ -36,17 +37,26 @@ const schema = z.object({
   priceB: z.number().min(0, 'El precio debe ser mayor o igual a 0'),
   priceC: z.number().min(0).optional().catch(undefined),
   priceMode: z.enum(['manual', 'cost_plus']).optional(),
+  // docs/tasks/77_actualizar_costo_en_compra_configurable.md §2 — tri-estado: '' = usar el
+  // default del tenant (se envía explícito, no se omite, para poder borrar un override previo).
+  actualizarCostoEnCompraOverride: z.enum(['', 'si', 'no']).optional(),
   marginA: z.number().min(0).optional().catch(undefined),
   marginB: z.number().min(0).optional().catch(undefined),
   marginC: z.number().min(0).optional().catch(undefined),
   valuationRate: z.number().min(0).optional().catch(undefined),
   defaultWarehouse: z.string().optional(),
   stockUom: z.string().optional(),
+  // Docs/tasks/75_almacen_venta_confirmar_stock_uoms_permitidas.md §3 — listas independientes,
+  // ambas opcionales. Vacío = sin restricción (cualquier UOM con conversión válida sirve, como
+  // siempre). Solo tiene efecto para artículos type === "product".
+  purchaseUoms: z.array(z.string()).optional(),
+  saleUoms: z.array(z.string()).optional(),
   allowsDiscount: z.boolean().optional(),
   maxDiscountPct: z.number().min(0).max(100).optional().catch(undefined),
   trackingType: z.enum(['none', 'batch', 'serial']).optional(),
   hasExpiryDate: z.boolean().optional(),
   shelfLifeInDays: z.number().int().min(1).optional().catch(undefined),
+  custom_asignar_serial_en_despacho: z.boolean().optional(),
   purchaseTaxTemplate: z.string().optional(),
   salesTaxTemplate: z.string().optional(),
 })
@@ -173,6 +183,15 @@ export default function ItemForm() {
     enabled: isEdit,
   })
 
+  // Para mostrar el default actual del tenant junto al selector de override — docs/tasks/
+  // 77_actualizar_costo_en_compra_configurable.md §2.
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const actualizarCostoEnCompraDefault = facturacionConfig?.actualizarCostoEnCompra ?? true
+
   // Con Multipestañas, esta pantalla queda montada (KeepAlive) al cambiar de pestaña — al volver
   // a ella se re-consulta por si el artículo cambió en el servidor mientras el usuario estaba en otra.
   useEffectOnActive(() => {
@@ -267,6 +286,7 @@ export default function ItemForm() {
       priceB: 0,
       priceC: undefined,
       priceMode: 'manual',
+      actualizarCostoEnCompraOverride: '',
       marginA: undefined,
       marginB: undefined,
       marginC: undefined,
@@ -279,11 +299,14 @@ export default function ItemForm() {
       warrantyPeriod: undefined,
       defaultWarehouse: '',
       stockUom: '',
+      purchaseUoms: [],
+      saleUoms: [],
       allowsDiscount: true,
       maxDiscountPct: 0,
       trackingType: 'none',
       hasExpiryDate: false,
       shelfLifeInDays: undefined,
+      custom_asignar_serial_en_despacho: false,
       purchaseTaxTemplate: '',
       salesTaxTemplate: '',
     },
@@ -314,6 +337,7 @@ export default function ItemForm() {
       priceB: existingItem.prices?.B ?? existingItem.standardRate ?? 0,
       priceC: existingItem.prices?.C,
       priceMode: existingItem.priceMode ?? 'manual',
+      actualizarCostoEnCompraOverride: existingItem.actualizarCostoEnCompraOverride ?? '',
       marginA: existingItem.marginA,
       marginB: existingItem.marginB,
       marginC: existingItem.marginC,
@@ -326,11 +350,14 @@ export default function ItemForm() {
       warrantyPeriod: existingItem.warrantyPeriod,
       defaultWarehouse: existingItem.defaultWarehouse ?? '',
       stockUom: existingItem.stockUom ?? '',
+      purchaseUoms: existingItem.purchaseUoms ?? [],
+      saleUoms: existingItem.saleUoms ?? [],
       allowsDiscount: existingItem.allowsDiscount ?? true,
       maxDiscountPct: existingItem.maxDiscountPct ?? 0,
       trackingType: existingItem.trackingType ?? 'none',
       hasExpiryDate: existingItem.hasExpiryDate ?? false,
       shelfLifeInDays: existingItem.shelfLifeInDays,
+      custom_asignar_serial_en_despacho: existingItem.custom_asignar_serial_en_despacho ?? false,
       purchaseTaxTemplate: existingItem.purchaseTaxTemplate ?? '',
       salesTaxTemplate: existingItem.salesTaxTemplate ?? '',
     })
@@ -379,6 +406,8 @@ export default function ItemForm() {
       defaultWarehouse: data.defaultWarehouse || undefined,
       valuationRate: data.valuationRate || undefined,
       stockUom: data.stockUom || undefined,
+      purchaseUoms: isProduct ? (data.purchaseUoms ?? []) : undefined,
+      saleUoms: isProduct ? (data.saleUoms ?? []) : undefined,
       priceA: data.priceA || undefined,
       priceB: data.priceB || undefined,
       priceC: data.priceC || undefined,
@@ -399,6 +428,9 @@ export default function ItemForm() {
       // tipo de seguimiento (docs/FARMACIA_ARS_FRONTEND.md §6.1).
       hasExpiryDate: data.trackingType === 'batch' ? data.hasExpiryDate : undefined,
       shelfLifeInDays: data.trackingType === 'batch' ? (data.shelfLifeInDays || undefined) : undefined,
+      // Solo tiene sentido con seguimiento activo — mismo criterio que hasExpiryDate/shelfLifeInDays
+      // arriba (docs/tasks/79_confirmacion_despacho_pedido.md §9).
+      custom_asignar_serial_en_despacho: data.trackingType !== 'none' ? data.custom_asignar_serial_en_despacho : undefined,
       purchaseTaxTemplate: noPurchaseTax ? undefined : data.purchaseTaxTemplate || undefined,
       salesTaxTemplate: noSalesTax ? undefined : data.salesTaxTemplate || undefined,
     }
@@ -459,6 +491,18 @@ export default function ItemForm() {
       .map((u) => ({ value: u.name, label: u.name }))
   }, [uomsData, uomSearch])
 
+  // UOMs con conversión YA configurada contra la UOM de stock — docs/tasks/
+  // 75_almacen_venta_confirmar_stock_uoms_permitidas.md §3.3: filtrar de entrada evita el 400 de
+  // "no tiene conversión configurada". Se deriva de `existingItem.uoms` (conversiones ya guardadas
+  // en el backend) + la UOM de stock actual del formulario, no de una lista editable acá — hoy
+  // este form no tiene UI para crear conversiones nuevas.
+  const watchedStockUom = watch('stockUom')
+  const configuredUomOptions = useMemo(() => {
+    const fromExisting = (existingItem?.uoms ?? []).map((u) => u.uom)
+    const all = [...new Set([watchedStockUom, ...fromExisting].filter((v): v is string => !!v))]
+    return all.map((u) => ({ id: u, label: u }))
+  }, [existingItem, watchedStockUom])
+
   const categoryOptions: SearchSelectOption[] = useMemo(() => {
     const q = catSearch.toLowerCase()
     return parentCategories
@@ -497,6 +541,19 @@ export default function ItemForm() {
     const q = priceModeSearch.toLowerCase()
     return PRICE_MODE_OPTIONS_ALL.filter((o) => !q || o.label.toLowerCase().includes(q))
   }, [priceModeSearch])
+
+  // docs/tasks/77_actualizar_costo_en_compra_configurable.md §2 — el label de "usar default" lleva
+  // el valor actual del tenant entre paréntesis, para que el usuario no tenga que ir a otra pantalla.
+  const actualizarCostoOptionsAll = useMemo(() => [
+    { value: '', label: `Usar configuración de la empresa (actualmente: ${actualizarCostoEnCompraDefault ? 'activado' : 'desactivado'})` },
+    { value: 'si', label: 'Sí, siempre actualizar' },
+    { value: 'no', label: 'No, nunca actualizar' },
+  ], [actualizarCostoEnCompraDefault])
+  const [actualizarCostoSearch, setActualizarCostoSearch] = useState('')
+  const actualizarCostoOptions: SearchSelectOption[] = useMemo(() => {
+    const q = actualizarCostoSearch.toLowerCase()
+    return actualizarCostoOptionsAll.filter((o) => !q || o.label.toLowerCase().includes(q))
+  }, [actualizarCostoOptionsAll, actualizarCostoSearch])
 
   const warehouseOptions: SearchSelectOption[] = useMemo(() => {
     const q = warehouseSearch.toLowerCase()
@@ -817,6 +874,42 @@ export default function ItemForm() {
                     />
                   </div>
                   <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="purchaseUoms">UOMs de compra permitidas</label>
+                    <Controller
+                      name="purchaseUoms"
+                      control={control}
+                      render={({ field }) => (
+                        <MultiSearchSelect
+                          id="purchaseUoms"
+                          value={field.value ?? []}
+                          onChange={field.onChange}
+                          options={configuredUomOptions}
+                          placeholder="Sin restricción — cualquier UOM con conversión sirve"
+                          emptyLabel="Configure primero la UDM de Stock (y sus conversiones) para poder elegir acá."
+                        />
+                      )}
+                    />
+                    <p className="ff-hint">Independiente de las UOMs de venta. Dejar vacío = sin restricción.</p>
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label" htmlFor="saleUoms">UOMs de venta permitidas</label>
+                    <Controller
+                      name="saleUoms"
+                      control={control}
+                      render={({ field }) => (
+                        <MultiSearchSelect
+                          id="saleUoms"
+                          value={field.value ?? []}
+                          onChange={field.onChange}
+                          options={configuredUomOptions}
+                          placeholder="Sin restricción — cualquier UOM con conversión sirve"
+                          emptyLabel="Configure primero la UDM de Stock (y sus conversiones) para poder elegir acá."
+                        />
+                      )}
+                    />
+                    <p className="ff-hint">Independiente de las UOMs de compra. Dejar vacío = sin restricción.</p>
+                  </div>
+                  <div className="ff-wrap">
                     <label className="ff-label" htmlFor="trackingType">Seguimiento</label>
                     <Controller
                       name="trackingType"
@@ -856,6 +949,20 @@ export default function ItemForm() {
                     />
                     <p className="ff-hint">
                       Si se omite la fecha de vencimiento al crear un lote, se calcula sumando estos días a la fecha de fabricación.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {fixedType === 'product' && watch('trackingType') !== 'none' && (
+                <div className="form-row">
+                  <div className="ff-wrap">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                      <input type="checkbox" className="ff-check" {...register('custom_asignar_serial_en_despacho')} />
+                      Asignar serial/lote al vender o despachar
+                    </label>
+                    <p className="ff-hint">
+                      Si está activo, el serial/lote de este artículo se pide al confirmar despacho (venta), no en la compra.
                     </p>
                   </div>
                 </div>
@@ -1091,6 +1198,29 @@ export default function ItemForm() {
                     />
                   )}
                 />
+              </div>
+
+              <div className="ff-wrap">
+                <label className="ff-label" htmlFor="actualizarCostoEnCompraOverride">Actualizar costo al comprar</label>
+                <Controller
+                  name="actualizarCostoEnCompraOverride"
+                  control={control}
+                  render={({ field }) => (
+                    <SearchSelect
+                      id="actualizarCostoEnCompraOverride"
+                      value={field.value ?? ''}
+                      onChange={(val) => field.onChange(val)}
+                      options={actualizarCostoOptions}
+                      onSearch={setActualizarCostoSearch}
+                      selectedLabel={actualizarCostoOptionsAll.find((o) => o.value === (field.value ?? ''))?.label ?? ''}
+                    />
+                  )}
+                />
+                <p className="ff-hint">
+                  Si está activo (a nivel de empresa o por esta excepción), someter una compra de este artículo
+                  actualiza su "Costo de Valoración" con el precio de esa compra. No afecta el recálculo del precio
+                  de venta en modo "Sobre costo", que sigue igual sin importar este ajuste.
+                </p>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

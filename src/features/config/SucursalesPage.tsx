@@ -5,8 +5,9 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { listSucursales, createSucursal, updateSucursal, deleteSucursal } from '@/shared/api/sucursales'
+import { listAlmacenes } from '@/shared/api/config'
 import type { Sucursal } from '@/shared/api/types'
-import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, Warehouse } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { useDebounce } from '@/lib/useDebounce'
@@ -14,11 +15,14 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
 const PAGE_SIZE = 20
 
 const sucursalSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
+  almacenVenta: z.string().optional(),
 })
 
 type SucursalFormValues = z.infer<typeof sucursalSchema>
@@ -54,13 +58,26 @@ export default function SucursalesPage() {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<SucursalFormValues>({
     resolver: zodResolver(sucursalSchema),
-    defaultValues: { name: '' },
+    defaultValues: { name: '', almacenVenta: '' },
   })
 
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, closeDialog)
+
+  // Almacenes de la sucursal en edición — solo estos son elegibles como "Almacén de venta"
+  // (el backend igual valida, pero filtrar acá evita que se elija algo que se va a rechazar).
+  const { data: almacenesSucursal, isLoading: loadingAlmacenes } = useQuery({
+    queryKey: ['almacenes', { branch: editTarget?.name }],
+    queryFn: () => listAlmacenes({ branch: editTarget!.name }),
+    enabled: !!editTarget,
+  })
+  const almacenVentaOptions: SearchSelectOption[] = (almacenesSucursal ?? [])
+    .filter((a) => !a.disabled)
+    .map((a) => ({ value: a.id, label: a.name }))
 
   const createMutation = useMutation({
     mutationFn: createSucursal,
@@ -73,7 +90,7 @@ export default function SucursalesPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data: d }: { id: string; data: { name?: string } }) => updateSucursal(id, d),
+    mutationFn: ({ id, data: d }: { id: string; data: { name?: string; almacenVenta?: string } }) => updateSucursal(id, d),
     onSuccess: () => {
       toast.success('Sucursal actualizada')
       queryClient.invalidateQueries({ queryKey: ['sucursales'] })
@@ -94,13 +111,13 @@ export default function SucursalesPage() {
 
   function openCreate() {
     setEditTarget(null)
-    reset({ name: '' })
+    reset({ name: '', almacenVenta: '' })
     setDialogOpen(true)
   }
 
   function openEdit(s: Sucursal) {
     setEditTarget(s)
-    reset({ name: s.name })
+    reset({ name: s.name, almacenVenta: s.almacenVenta ?? '' })
     setDialogOpen(true)
   }
 
@@ -112,7 +129,17 @@ export default function SucursalesPage() {
 
   function onSubmit(values: SucursalFormValues) {
     if (editTarget) {
-      updateMutation.mutate({ id: editTarget.id, data: { name: values.name } })
+      updateMutation.mutate({
+        id: editTarget.id,
+        data: {
+          name: values.name,
+          // "" = quitar el almacén de venta (vuelve a sin restricción) — solo se manda cuando
+          // cambió respecto al valor original, para no pisar nada si el campo no se tocó.
+          ...((values.almacenVenta ?? '') !== (editTarget.almacenVenta ?? '')
+            ? { almacenVenta: values.almacenVenta ?? '' }
+            : {}),
+        },
+      })
     } else {
       createMutation.mutate({ name: values.name })
     }
@@ -159,6 +186,7 @@ export default function SucursalesPage() {
               <tr>
                 <SortableTh label="Nombre" sortKey="name" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
                 <th>Almacenes</th>
+                <th>Almacén de venta</th>
                 <th style={{ width: 48 }} />
               </tr>
             </thead>
@@ -166,7 +194,7 @@ export default function SucursalesPage() {
               {isLoading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 3 }).map((__, j) => (
+                      {Array.from({ length: 4 }).map((__, j) => (
                         <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                       ))}
                     </tr>
@@ -174,7 +202,7 @@ export default function SucursalesPage() {
                 : isError
                   ? (
                       <tr>
-                        <td colSpan={3} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
+                        <td colSpan={4} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-error)' }}>
                           Error al cargar sucursales
                         </td>
                       </tr>
@@ -182,7 +210,7 @@ export default function SucursalesPage() {
                   : sucursales.length === 0
                     ? (
                         <tr>
-                          <td colSpan={3}>
+                          <td colSpan={4}>
                             <div className="empty-state">
                               <p className="empty-title">Sin sucursales</p>
                               <p className="empty-sub">Crea la primera sucursal del negocio.</p>
@@ -194,6 +222,15 @@ export default function SucursalesPage() {
                         <tr key={s.id}>
                           <td style={{ fontWeight: 500 }}>{s.name}</td>
                           <td className="td-muted">{s.warehouseCount} almacén{s.warehouseCount === 1 ? '' : 'es'}</td>
+                          <td>
+                            {s.almacenVenta ? (
+                              <span className="badge badge-info" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                <Warehouse size={12} /> {s.almacenVenta}
+                              </span>
+                            ) : (
+                              <span className="td-muted">Sin restricción</span>
+                            )}
+                          </td>
                           <td onClick={(e) => e.stopPropagation()} className="actions-cell">
                             <ActionsMenu>
                               <ActionsMenuItem onClick={() => openEdit(s)}>
@@ -244,6 +281,31 @@ export default function SucursalesPage() {
                   <input id="sucName" className={`ff-input${errors.name ? ' ff-input-error' : ''}`} placeholder="Ej: Sucursal Santo Domingo" {...register('name')} />
                   {errors.name && <p className="ff-error">{errors.name.message}</p>}
                 </div>
+
+                {editTarget && (
+                  <div className="ff-wrap">
+                    <label className="ff-label">Almacén de venta</label>
+                    <p className="ff-hint" style={{ marginBottom: 8 }}>
+                      Opcional. Si se configura, toda venta de esta sucursal debe salir de este
+                      almacén — si no hay suficiente stock ahí, hay que transferirlo primero desde
+                      otro almacén de la compañía, aunque pertenezca a la misma sucursal.
+                    </p>
+                    {almacenVentaOptions.length === 0 ? (
+                      <p className="ff-hint">
+                        {loadingAlmacenes ? 'Cargando almacenes…' : 'Asigne almacenes a esta sucursal primero (desde Almacenes) para poder elegir uno como almacén de venta.'}
+                      </p>
+                    ) : (
+                      <SearchSelect
+                        value={watch('almacenVenta') ?? ''}
+                        onChange={(val) => setValue('almacenVenta', val, { shouldDirty: true })}
+                        options={almacenVentaOptions}
+                        onSearch={() => {}}
+                        placeholder="Sin restricción — cualquier almacén de la sucursal sirve"
+                        loading={loadingAlmacenes}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
               <div className="modal-foot">
                 <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>

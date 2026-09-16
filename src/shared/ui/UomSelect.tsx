@@ -27,6 +27,11 @@ interface UomSelectProps {
   onChange: (value: string, conversionFactor: number) => void
   /** Cuando se provee, muestra primero las UOMs del artículo */
   itemCode?: string
+  /** Compra o venta — docs/tasks/75_almacen_venta_confirmar_stock_uoms_permitidas.md §3.4. Si el
+   *  artículo tiene `purchaseUoms`/`saleUoms` configurado para esta dirección, el selector se
+   *  limita a esa lista (oculta "Más opciones") en vez de mostrar todas las UOM del sistema —
+   *  evita que el operador elija algo que el backend va a rechazar con UOM_NOT_ALLOWED. */
+  direction?: 'purchase' | 'sale'
   className?: string
   disabled?: boolean
   error?: boolean
@@ -75,7 +80,7 @@ function SimpleUomSelect({ value, onChange, disabled, error }: Omit<UomSelectPro
 
 // ─── Modo artículo: dropdown portal con UOMs del artículo + "Más opciones" ────
 
-function ItemUomSelect({ value, onChange, itemCode, className = 'items-input', disabled, error }: UomSelectProps & { itemCode: string }) {
+function ItemUomSelect({ value, onChange, itemCode, direction, className = 'items-input', disabled, error }: UomSelectProps & { itemCode: string }) {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const { open, style, toggle, close, portalRef } = useFloatingDropdown(triggerRef)
   const [showAll, setShowAll] = useState(false)
@@ -105,19 +110,24 @@ function ItemUomSelect({ value, onChange, itemCode, className = 'items-input', d
     }
   }
 
-  // Combina stockUom + uoms del artículo en un Set sin duplicados
+  const restrictedUoms = direction === 'purchase' ? itemData?.purchaseUoms : direction === 'sale' ? itemData?.saleUoms : undefined
+  const isRestricted = !!restrictedUoms && restrictedUoms.length > 0
+
+  // Combina stockUom + uoms del artículo en un Set sin duplicados — o, si el artículo restringe
+  // esta dirección (compra/venta), solo esas UOMs permitidas (ni "Más opciones" tiene sentido acá).
   const itemUoms = useMemo(() => {
     if (!itemData) return []
+    if (isRestricted) return [...restrictedUoms!]
     const set = new Set<string>()
     if (itemData.stockUom) set.add(itemData.stockUom)
     itemData.uoms?.forEach((u) => set.add(u.uom))
     return [...set].filter(Boolean)
-  }, [itemData])
+  }, [itemData, isRestricted, restrictedUoms])
 
-  // UOMs de config que NO están ya en las del artículo
+  // UOMs de config que NO están ya en las del artículo — vacío si la dirección está restringida.
   const extraUoms = useMemo(
-    () => (allUoms ?? []).filter((u) => !itemUoms.includes(u.name)),
-    [allUoms, itemUoms],
+    () => (isRestricted ? [] : (allUoms ?? []).filter((u) => !itemUoms.includes(u.name))),
+    [allUoms, itemUoms, isRestricted],
   )
 
   function select(v: string) {
@@ -194,8 +204,8 @@ function ItemUomSelect({ value, onChange, itemCode, className = 'items-input', d
             </>
           )}
 
-          {/* Botón "Más opciones" / lista expandida */}
-          {!showAll ? (
+          {/* Botón "Más opciones" / lista expandida — oculto si la dirección está restringida */}
+          {isRestricted ? null : !showAll ? (
             <button
               type="button"
               className="select-item"
