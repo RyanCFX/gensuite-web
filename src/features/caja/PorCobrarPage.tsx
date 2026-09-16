@@ -26,6 +26,8 @@ import {
   sumPayments,
   cashAmount,
   emptyPaymentLine,
+  resolveDefaultModeOfPago,
+  friendlyPaymentError,
   PAYMENT_LINES_TOLERANCE,
   type PaymentLinesValue,
 } from '@/lib/paymentLines'
@@ -207,7 +209,7 @@ const [directoMop, setDirectoMop] = useState('')
         toast.error(err.message, { duration: 8000 })
         return
       }
-      toast.error(err?.message ?? 'Error al completar el cobro')
+      toast.error(friendlyPaymentError(err?.message, 'Error al completar el cobro'))
     },
   })
 
@@ -235,19 +237,20 @@ function openModal(invoice: PendienteCobroItem) {
      } else {
        setCondicionFiscal('CONSUMO')
      }
+     const invoiceCurrency = invoice.currency ?? monedaBase
      if (flujoCobro === 'directo') {
-       setDirectoMop('')
+       setDirectoMop(resolveDefaultModeOfPago(facturacion, invoiceCurrency))
      } else {
        // El método de caja por defecto del turno solo se prellena si opera en la misma moneda
-       // que esta factura — si no, se deja en blanco para que el cajero elija uno compatible.
+       // que esta factura — si no, se cae al default configurado en Facturacion Config para esa
+       // moneda (modoPagoCajaUsd/modoPagoCajaEur).
        const cashMethod = turno?.modeOfPayment ?? turno?.modoPagoCaja ?? ''
-       const invoiceCurrency = invoice.currency ?? monedaBase
        const cashMethodCurrency = metodoCurrencies[cashMethod] ?? monedaBase
        setPaymentsValue({
          ...EMPTY_PAYMENT_LINES_VALUE,
          payments: [{
            ...emptyPaymentLine(),
-           modeOfPayment: cashMethodCurrency === invoiceCurrency ? cashMethod : '',
+           modeOfPayment: cashMethodCurrency === invoiceCurrency ? cashMethod : resolveDefaultModeOfPago(facturacion, invoiceCurrency),
            amount: String(montoACobrarDe(invoice)),
          }],
        })

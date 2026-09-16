@@ -47,6 +47,8 @@ import {
   buildSubmitPayload,
   sumPayments,
   emptyPaymentLine,
+  resolveDefaultModeOfPago,
+  friendlyPaymentError,
 } from "@/lib/paymentLines";
 import {
   ArrowLeft,
@@ -480,17 +482,19 @@ export default function InvoiceDetail() {
   useEffect(() => {
     if (!invoice || paymentsSeededFor === invoice.id) return;
     if (paymentRequired && !usaModuloPos && pendingAmount > 0) {
+      const defaultMop = resolveDefaultModeOfPago(facturacionConfig, invoiceCurrency);
       if (flujoCobro === "directo") {
+        setDirectoMop(defaultMop);
         setDirectoAmount(String(pendingAmount));
       } else {
         setPayments({
           ...EMPTY_PAYMENT_LINES_VALUE,
-          payments: [{ ...emptyPaymentLine(), amount: String(pendingAmount) }],
+          payments: [{ ...emptyPaymentLine(), modeOfPayment: defaultMop, amount: String(pendingAmount) }],
         });
       }
       setPaymentsSeededFor(invoice.id);
     }
-  }, [invoice, paymentRequired, usaModuloPos, pendingAmount, flujoCobro, paymentsSeededFor]);
+  }, [invoice, paymentRequired, usaModuloPos, pendingAmount, flujoCobro, paymentsSeededFor, facturacionConfig, invoiceCurrency]);
 
   function paymentsAreValid(): boolean {
     if (flujoCobro === "directo") {
@@ -606,7 +610,7 @@ export default function InvoiceDetail() {
         toast.error(formatStockInsufficientMessage(err), { duration: 8000 });
         return;
       }
-      toast.error(msg || "Error al someter la factura");
+      toast.error(friendlyPaymentError(msg, "Error al someter la factura"));
     },
   });
 
@@ -818,17 +822,18 @@ export default function InvoiceDetail() {
     setReturnModalOpen(true);
   }
 
-  function toggleReturnRow(itemCode: string) {
+  // Por índice, no por itemCode — una factura puede tener dos líneas del mismo artículo
+  // (p. ej. mismo producto con descuentos distintos), y ambas deben poder marcarse/editarse
+  // de forma independiente.
+  function toggleReturnRow(index: number) {
     setReturnRows((prev) =>
-      prev.map((r) =>
-        r.itemCode === itemCode ? { ...r, checked: !r.checked } : r,
-      ),
+      prev.map((r, i) => (i === index ? { ...r, checked: !r.checked } : r)),
     );
   }
 
-  function setReturnRowQty(itemCode: string, qty: number) {
+  function setReturnRowQty(index: number, qty: number) {
     setReturnRows((prev) =>
-      prev.map((r) => (r.itemCode === itemCode ? { ...r, qty } : r)),
+      prev.map((r, i) => (i === index ? { ...r, qty } : r)),
     );
   }
 
@@ -2715,16 +2720,16 @@ export default function InvoiceDetail() {
                       </tr>
                     </thead>
                     <tbody>
-                      {returnRows.map((row) => (
+                      {returnRows.map((row, rowIndex) => (
                         <tr
-                          key={row.itemCode}
+                          key={`${row.itemCode}-${rowIndex}`}
                           style={{ opacity: row.checked ? 1 : 0.6 }}
                         >
                           <td style={{ textAlign: "center" }}>
                             <input
                               type="checkbox"
                               checked={row.checked}
-                              onChange={() => toggleReturnRow(row.itemCode)}
+                              onChange={() => toggleReturnRow(rowIndex)}
                               style={{
                                 cursor: "pointer",
                                 accentColor: "var(--color-brand)",
@@ -2761,7 +2766,7 @@ export default function InvoiceDetail() {
                               disabled={!row.checked}
                               onChange={(e) =>
                                 setReturnRowQty(
-                                  row.itemCode,
+                                  rowIndex,
                                   parseFloat(e.target.value) || 0,
                                 )
                               }

@@ -108,6 +108,31 @@ export function isPaymentLinesValid(
   return true
 }
 
+/** Método de pago default configurado en Facturacion Config para la moneda de una factura
+ *  (docs/tasks/PROMPT_METODO_PAGO_DEFAULT_MULTIMONEDA_FRONTEND.md §3.3, Opción B) — usado para
+ *  pre-seleccionar el método de pago al cobrar, dejando que el usuario lo cambie. '' si no hay
+ *  ningún default configurado para esa moneda. */
+export function resolveDefaultModeOfPago(
+  config: { modoPagoCaja?: string | null; modoPagoCajaUsd?: string | null; modoPagoCajaEur?: string | null } | undefined,
+  currency: string,
+): string {
+  if (!config) return ''
+  if (currency === 'USD') return config.modoPagoCajaUsd || ''
+  if (currency === 'EUR') return config.modoPagoCajaEur || ''
+  return config.modoPagoCaja || ''
+}
+
+/** Mapea el 400 de "falta modeOfPayment y no hay default configurado" (§4.1 del doc de arriba) a
+ *  un texto más amigable. El backend no manda un código de error dedicado para este caso — se
+ *  detecta por el texto del mensaje, que siempre lo nombra igual. Cualquier otro mensaje se
+ *  devuelve tal cual (el mensaje del backend ya es específico y accionable, ver §4.2). */
+export function friendlyPaymentError(message: string | undefined, fallback = 'Error al procesar el cobro'): string {
+  if (!message) return fallback
+  if (!message.includes('no tiene un método de pago default configurado')) return message
+  const moneda = /configurado para (\w+)/.exec(message)?.[1] ?? 'esa moneda'
+  return `No se pudo cobrar: esta factura está en ${moneda} y no hay un método de pago seleccionado ni un default configurado para esa moneda. Selecciona un método de pago, o configura uno por defecto en Configuración > Facturación.`
+}
+
 export function buildSubmitPayload(
   value: PaymentLinesValue,
 ): { payments: PaymentLine[]; vuelto?: VueltoLine[]; tenderedCash?: number } {

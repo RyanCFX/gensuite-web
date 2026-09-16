@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { listMetodosPago, listBancos, listDenominaciones } from '@/shared/api/config'
 import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import {
@@ -15,7 +16,7 @@ import {
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { formatMoney } from '@/lib/formatters'
 import { useMetodoPagoCurrencies } from '@/shared/hooks/useMetodoPagoCurrencies'
-import { Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 
 function calcularVuelto(monto: number, denominaciones: { denominacion: string; valor: number }[]): VueltoLineDraft[] {
   const sorted = [...denominaciones].sort((a, b) => b.valor - a.valor)
@@ -120,6 +121,20 @@ export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <span className="form-section-title">Métodos de pago</span>
+
+        {metodosActivos.length === 0 && (
+          <div className="inline-alert inline-alert-warn">
+            <AlertTriangle size={16} />
+            <span>
+              No hay ningún método de pago configurado en {currency} — Caja/POS nunca convierte
+              moneda, así que un método solo sirve acá si la cuenta bancaria o contable que tiene
+              asociada está denominada en {currency}.{' '}
+              <Link to="/config/metodos-pago" style={{ fontWeight: 600, textDecoration: 'underline' }}>
+                Configurar en Métodos de Pago
+              </Link>
+            </span>
+          </div>
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {value.payments.map((p, idx) => (

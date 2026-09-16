@@ -44,7 +44,7 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { formatDate } from '@/lib/formatters'
-import { Plus, Trash2, Save, FileWarning, X, Pencil, ChevronLeft, ChevronRight, Info, ChevronDown, Check } from 'lucide-react'
+import { Plus, Trash2, Save, FileWarning, X, Pencil, ChevronLeft, ChevronRight, Info, ChevronDown, Check, Search } from 'lucide-react'
 import EjercicioFiscalSection from './EjercicioFiscalSection'
 import { DGII_UOM_CODES, dgiiUomLabel, ECF_TIPOS, TIPO_PAGO_DEFAULT_OPTIONS, TIPO_INGRESOS_DEFAULT_OPTIONS } from '@/lib/dgii'
 
@@ -427,6 +427,7 @@ function AlmacenesSection() {
 // ---- Metodos de Pago Section ----
 function MetodosPagoSection() {
   const queryClient = useQueryClient()
+  const [search, setSearch] = useState('')
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
   const [newType, setNewType] = useState<MetodoPago['type']>('Cash')
@@ -475,30 +476,70 @@ function MetodosPagoSection() {
     setShowNew(false)
   }
 
+  const metodos = (data ?? []).filter((m) => !search || m.name.toLowerCase().includes(search.toLowerCase()))
+
   return (
     <>
-      <div className="card">
-        <div className="card-header">
-          <span className="card-title">Métodos de Pago</span>
-          <button className="btn btn-primary btn-size-sm" onClick={() => setShowNew(true)}>
-            <Plus size={14} />Nuevo
-          </button>
-        </div>
+      <div className="page-header">
         <div>
-          {isLoading
-            ? <span className="skeleton-box" style={{ height: 128, display: 'block', margin: 16 }} />
-            : (
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Nombre</th>
-                      <th>Tipo</th>
-                      <th>Estado</th>
-                      <th style={{ width: 48 }} />
+          <h1 className="page-title"><span className="page-title-dot" />Métodos de Pago</h1>
+          <p className="page-sub">Efectivo, tarjetas, transferencias y demás formas de cobro/pago disponibles</p>
+        </div>
+        <button className="btn btn-navy" onClick={() => setShowNew(true)}>
+          <Plus size={16} />Nuevo Método de Pago
+        </button>
+      </div>
+
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div className="search-input-wrap">
+                <Search size={14} className="search-input-icon" />
+                <input
+                  className="search-input"
+                  placeholder="Buscar por nombre…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card navy-table-card">
+        <div className="table-scroll">
+          <table className="data-table navy-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th style={{ width: 48 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading
+                ? Array.from({ length: 4 }).map((_, i) => (
+                    <tr key={i}>
+                      {Array.from({ length: 4 }).map((__, j) => (
+                        <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
+                      ))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {data?.map((m) => (
+                  ))
+                : metodos.length === 0
+                  ? (
+                      <tr>
+                        <td colSpan={4}>
+                          <div className="empty-state">
+                            <p className="empty-title">Sin métodos de pago</p>
+                            <p className="empty-sub">Crea el primer método de pago para comenzar.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  : metodos.map((m) => (
                       <tr key={m.name}>
                         <td style={{ fontWeight: 500 }}>
                           {m.name}
@@ -517,9 +558,8 @@ function MetodosPagoSection() {
                         </td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
-              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -1251,46 +1291,88 @@ function UomSection() {
 
 // ---- Listas de Precio Section ----
 function ListasPrecioSection() {
+  const [search, setSearch] = useState('')
   const { data, isLoading } = useQuery({ queryKey: ['listas-precio'], queryFn: listListasPrecio })
 
+  const listas = (data ?? []).filter((l) => !search || l.name.toLowerCase().includes(search.toLowerCase()))
+
   return (
-    <div className="card">
-      <div className="card-header">
-        <span className="card-title">Listas de Precio</span>
+    <>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title"><span className="page-title-dot" />Listas de Precio</h1>
+          <p className="page-sub">Listas de precio de compra/venta disponibles para artículos y clientes</p>
+        </div>
       </div>
-      <div>
-        {isLoading
-          ? <span className="skeleton-box" style={{ height: 128, display: 'block', margin: 16 }} />
-          : (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Nombre</th>
-                    <th>Moneda</th>
-                    <th>Compra</th>
-                    <th>Venta</th>
-                    <th>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data?.map((l) => (
-                    <tr key={l.name}>
-                      <td style={{ fontWeight: 500 }}>{l.name}</td>
-                      <td>{l.currency}</td>
-                      <td>{l.buying ? 'Sí' : '—'}</td>
-                      <td>{l.selling ? 'Sí' : '—'}</td>
-                      <td>
-                        {l.enabled
-                          ? <span className="badge badge-success">Activa</span>
-                          : <span className="badge badge-default">Inactiva</span>}
-                      </td>
+
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div className="search-input-wrap">
+                <Search size={14} className="search-input-icon" />
+                <input
+                  className="search-input"
+                  placeholder="Buscar por nombre…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card navy-table-card">
+        <div className="table-scroll">
+          <table className="data-table navy-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Moneda</th>
+                <th>Compra</th>
+                <th>Venta</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading
+                ? Array.from({ length: 4 }).map((_, i) => (
+                    <tr key={i}>
+                      {Array.from({ length: 5 }).map((__, j) => (
+                        <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                  ))
+                : listas.length === 0
+                  ? (
+                      <tr>
+                        <td colSpan={5}>
+                          <div className="empty-state">
+                            <p className="empty-title">Sin listas de precio</p>
+                            <p className="empty-sub">No hay listas de precio configuradas.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  : listas.map((l) => (
+                      <tr key={l.name}>
+                        <td style={{ fontWeight: 500 }}>{l.name}</td>
+                        <td className="td-muted">{l.currency}</td>
+                        <td>{l.buying ? 'Sí' : '—'}</td>
+                        <td>{l.selling ? 'Sí' : '—'}</td>
+                        <td>
+                          {l.enabled
+                            ? <span className="badge badge-success">Activa</span>
+                            : <span className="badge badge-default">Inactiva</span>}
+                        </td>
+                      </tr>
+                    ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -1588,6 +1670,7 @@ function emptyComponente(): TasaImpuestoComponente {
 
 function TasasImpuestoSection() {
   const queryClient = useQueryClient()
+  const [search, setSearch] = useState('')
   const { data, isLoading } = useQuery({ queryKey: ['tasas-impuesto'], queryFn: listTasasImpuesto })
   const { data: facturacionConfig } = useQuery({ queryKey: ['facturacion-config'], queryFn: getFacturacionConfig })
   const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
@@ -1695,80 +1778,107 @@ function TasasImpuestoSection() {
   const formValid = !!formNombre.trim() && !!formAccount
     && (formEsCombo ? formComponentes.some((c) => c.impuestoBaseId) : true)
 
+  const tasas = (data ?? []).filter((t) => !search || t.nombre.toLowerCase().includes(search.toLowerCase()))
+
   return (
     <>
-      <div className="card">
-        <div className="card-header">
-          <span className="card-title">Tasas de Impuesto</span>
-          <button className="btn btn-primary btn-size-sm" onClick={openCreate}>
-            <Plus size={14} /> Nuevo
-          </button>
-        </div>
-        <div className="card-body" style={{ paddingTop: 0, paddingBottom: 12 }}>
-          <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>
-            Catálogo central de impuestos base (ej. ITBIS, ISR) y combos (suma de otros impuestos del
-            catálogo). Al editar la tasa de un impuesto base, todos los combos que lo usan — y las
-            plantillas de impuestos donde estén asignados — se recalculan automáticamente en el servidor.
+      <div className="page-header">
+        <div>
+          <h1 className="page-title"><span className="page-title-dot" />Tasas de Impuesto</h1>
+          <p className="page-sub">
+            Catálogo central de impuestos base (ej. ITBIS, ISR) y combos — al editar la tasa de un
+            impuesto base, los combos y plantillas que lo usan se recalculan automáticamente.
           </p>
         </div>
-        <div>
-          {isLoading
-            ? <span className="skeleton-box" style={{ height: 128, display: 'block', margin: 16 }} />
-            : !data || data.length === 0
-              ? (
-                  <div className="card-body">
-                    <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                      No hay tasas de impuesto configuradas. Crea una con el botón <strong>Nuevo</strong>.
-                    </p>
-                  </div>
-                )
-              : (
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Nombre</th>
-                        <th>Cuenta</th>
-                        <th>Tipo</th>
-                        <th>Tasa</th>
-                        <th>Descripción</th>
-                        <th style={{ width: 80 }} />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.map((t) => (
-                        <tr key={t.id}>
-                          <td style={{ fontWeight: 500 }}>{t.nombre}</td>
-                          <td className="td-muted">
-                            {t.accountCompras && t.accountCompras !== t.account
-                              ? `Ventas: ${t.account} · Compras: ${t.accountCompras}`
-                              : t.account}
-                          </td>
-                          <td>
-                            <span className={`badge ${t.esCombo ? 'badge-info' : 'badge-default'}`}>
-                              {t.esCombo ? 'Combo' : 'Base'}
-                            </span>
-                          </td>
-                          <td>{t.tasa != null ? `${t.tasa}%` : '—'}</td>
-                          <td className="td-muted">{t.descripcion || '—'}</td>
-                          <td>
-                            <div style={{ display: 'flex', gap: 4 }}>
-                              <button className="btn btn-ghost btn-size-icon-sm" onClick={() => openEdit(t)}>
-                                <Pencil size={13} />
-                              </button>
-                              <button
-                                className="btn btn-ghost btn-size-icon-sm"
-                                style={{ color: 'var(--icon-muted)' }}
-                                onClick={() => setToDelete(t)}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
+        <button className="btn btn-navy" onClick={openCreate}>
+          <Plus size={16} /> Nueva Tasa de Impuesto
+        </button>
+      </div>
+
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <div className="search-input-wrap">
+                <Search size={14} className="search-input-icon" />
+                <input
+                  className="search-input"
+                  placeholder="Buscar por nombre…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card navy-table-card">
+        <div className="table-scroll">
+          <table className="data-table navy-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Cuenta</th>
+                <th>Tipo</th>
+                <th>Tasa</th>
+                <th>Descripción</th>
+                <th style={{ width: 80 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading
+                ? Array.from({ length: 4 }).map((_, i) => (
+                    <tr key={i}>
+                      {Array.from({ length: 6 }).map((__, j) => (
+                        <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                       ))}
-                    </tbody>
-                  </table>
-                )}
+                    </tr>
+                  ))
+                : tasas.length === 0
+                  ? (
+                      <tr>
+                        <td colSpan={6}>
+                          <div className="empty-state">
+                            <p className="empty-title">Sin tasas de impuesto</p>
+                            <p className="empty-sub">Crea la primera tasa de impuesto para comenzar.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  : tasas.map((t) => (
+                      <tr key={t.id}>
+                        <td style={{ fontWeight: 500 }}>{t.nombre}</td>
+                        <td className="td-muted">
+                          {t.accountCompras && t.accountCompras !== t.account
+                            ? `Ventas: ${t.account} · Compras: ${t.accountCompras}`
+                            : t.account}
+                        </td>
+                        <td>
+                          <span className={`badge ${t.esCombo ? 'badge-info' : 'badge-default'}`}>
+                            {t.esCombo ? 'Combo' : 'Base'}
+                          </span>
+                        </td>
+                        <td>{t.tasa != null ? `${t.tasa}%` : '—'}</td>
+                        <td className="td-muted">{t.descripcion || '—'}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button className="btn btn-ghost btn-size-icon-sm" onClick={() => openEdit(t)}>
+                              <Pencil size={13} />
+                            </button>
+                            <button
+                              className="btn btn-ghost btn-size-icon-sm"
+                              style={{ color: 'var(--icon-muted)' }}
+                              onClick={() => setToDelete(t)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -2329,9 +2439,18 @@ function FacturacionConfigSection() {
   const modoPagoCajaOptions: SearchSelectOption[] = (metodosPago ?? [])
     .filter((m) => !modoPagoCajaSearch || m.name.toLowerCase().includes(modoPagoCajaSearch.toLowerCase()))
     .map((m) => ({ value: m.name, label: m.name }))
+  const [modoPagoCajaUsdSearch, setModoPagoCajaUsdSearch] = useState('')
+  const modoPagoCajaUsdOptions: SearchSelectOption[] = (metodosPago ?? [])
+    .filter((m) => !modoPagoCajaUsdSearch || m.name.toLowerCase().includes(modoPagoCajaUsdSearch.toLowerCase()))
+    .map((m) => ({ value: m.name, label: m.name }))
+  const [modoPagoCajaEurSearch, setModoPagoCajaEurSearch] = useState('')
+  const modoPagoCajaEurOptions: SearchSelectOption[] = (metodosPago ?? [])
+    .filter((m) => !modoPagoCajaEurSearch || m.name.toLowerCase().includes(modoPagoCajaEurSearch.toLowerCase()))
+    .map((m) => ({ value: m.name, label: m.name }))
   const [flujoCobro, setFlujoCobro] = useState<'directo' | 'caja'>('directo')
   const [requiereUbicacionVenta, setRequiereUbicacionVenta] = useState(false)
   const [requiereSerialLoteCompra, setRequiereSerialLoteCompra] = useState(false)
+  const [actualizarCostoEnCompra, setActualizarCostoEnCompra] = useState(true)
   const [usaDepartamentos, setUsaDepartamentos] = useState(true)
   const [usaImpuestoDocumento, setUsaImpuestoDocumento] = useState(true)
   const [plantillaImpuestoVentasDefault, setPlantillaImpuestoVentasDefault] = useState('')
@@ -2345,12 +2464,16 @@ function FacturacionConfigSection() {
   const [despachoFuturoHabilitado, setDespachoFuturoHabilitado] = useState(true)
   const [despachoFuturoBloqueaVenta, setDespachoFuturoBloqueaVenta] = useState(true)
   const [despachoConfirmarStockAsignaSeriales, setDespachoConfirmarStockAsignaSeriales] = useState(false)
+   const [pedidoRequiereConfirmacionDespacho, setPedidoRequiereConfirmacionDespacho] = useState(false)
+   const [pedidoConduceIncluyePrecios, setPedidoConduceIncluyePrecios] = useState(true)
    const [arqueoEfectivoRequerido, setArqueoEfectivoRequerido] = useState(false)
    const [formatoImpresionDefault, setFormatoImpresionDefault] = useState<FormatoImpresion>("a4")
    const [formatosPermitidos, setFormatosPermitidos] = useState<FormatoImpresion[]>(ALL_FORMATOS_IMPRESION)
     const [turnoMaxHoras, setTurnoMaxHoras] = useState(24)
    const [ncfAlertaMinimo, setNcfAlertaMinimo] = useState(50)
    const [modoPagoCaja, setModoPagoCaja] = useState<string | null>(null)
+   const [modoPagoCajaUsd, setModoPagoCajaUsd] = useState<string | null>(null)
+   const [modoPagoCajaEur, setModoPagoCajaEur] = useState<string | null>(null)
    const [modosPagoConciliar, setModosPagoConciliar] = useState<string[]>([])
    const [rolesCierreCajaAjena, setRolesCierreCajaAjena] = useState<string[]>([])
    const [redondearTotales, setRedondearTotales] = useState(true)
@@ -2367,6 +2490,7 @@ function FacturacionConfigSection() {
        setFlujoCobro(data.flujoCobro ?? "directo")
        setRequiereUbicacionVenta(data.requiereUbicacionVenta ?? false)
        setRequiereSerialLoteCompra(data.requiereSerialLoteCompra ?? false)
+       setActualizarCostoEnCompra(data.actualizarCostoEnCompra ?? true)
        setUsaDepartamentos(data.usaDepartamentos ?? true)
        setUsaImpuestoDocumento(data.usaImpuestoDocumento ?? true)
        setPlantillaImpuestoVentasDefault(data.plantillaImpuestoVentasDefault ?? '')
@@ -2374,12 +2498,16 @@ function FacturacionConfigSection() {
         setDespachoFuturoHabilitado(data.despachoFuturoHabilitado ?? true)
         setDespachoFuturoBloqueaVenta(data.despachoFuturoBloqueaVenta ?? true)
         setDespachoConfirmarStockAsignaSeriales(data.despachoConfirmarStockAsignaSeriales ?? false)
+        setPedidoRequiereConfirmacionDespacho(data.pedidoRequiereConfirmacionDespacho ?? false)
+        setPedidoConduceIncluyePrecios(data.pedidoConduceIncluyePrecios ?? true)
         setArqueoEfectivoRequerido(data.arqueoEfectivoRequerido ?? false)
         setFormatoImpresionDefault(data.formatoImpresionDefault ?? "a4")
         setFormatosPermitidos(data.formatosPermitidos && data.formatosPermitidos.length > 0 ? data.formatosPermitidos : ALL_FORMATOS_IMPRESION)
         setTurnoMaxHoras(data.turnoMaxHoras ?? 24)
         setNcfAlertaMinimo(data.ncfAlertaMinimo ?? 50)
         setModoPagoCaja(data.modoPagoCaja ?? null)
+        setModoPagoCajaUsd(data.modoPagoCajaUsd ?? null)
+        setModoPagoCajaEur(data.modoPagoCajaEur ?? null)
         setModosPagoConciliar(data.modosPagoConciliar ?? [])
         setRolesCierreCajaAjena(data.rolesCierreCajaAjena ?? [])
         setRedondearTotales(!(data.redondeoTotalDeshabilitado ?? false))
@@ -2616,6 +2744,25 @@ function FacturacionConfigSection() {
             <input
               type="checkbox"
               className="ff-check"
+              checked={actualizarCostoEnCompra}
+              onChange={(e) => setActualizarCostoEnCompra(e.target.checked)}
+            />
+            <span style={{ fontSize: 13 }}>Actualizar costo del artículo al comprar</span>
+          </label>
+          <p className="ff-hint" style={{ marginTop: 4 }}>
+            Si está activo, cada compra sometida actualiza el "Costo de Valoración" del artículo con el precio de esa
+            compra. Si lo desactivas, el costo se mantiene fijo hasta que lo edites manualmente — útil si preferís
+            controlar el costo de tus artículos a mano en vez de que se mueva con cada compra. No afecta el precio de
+            venta en modo "Sobre Costo": ese sigue recalculándose con cada compra sin importar este ajuste. Un
+            artículo puntual puede tener su propia excepción a esta regla desde su ficha (Catálogo).
+          </p>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-check-wrap">
+            <input
+              type="checkbox"
+              className="ff-check"
               checked={usaDepartamentos}
               onChange={(e) => setUsaDepartamentos(e.target.checked)}
             />
@@ -2803,7 +2950,10 @@ function FacturacionConfigSection() {
                     </p>
                   </div>
 
-                  <div className="ff-wrap" style={{ opacity: despachoFuturoHabilitado ? 1 : 0.5 }}>
+                  {/* Sin atenuar por despachoFuturoHabilitado: este switch controla las ventas
+                      INMEDIATAS (§4.2 del prompt) — son todas las ventas cuando el despacho a
+                      futuro está apagado, así que acá es donde más importa, no menos. */}
+                  <div className="ff-wrap">
                     <label className="ff-check-wrap">
                       <input
                         type="checkbox"
@@ -2844,6 +2994,44 @@ function FacturacionConfigSection() {
           )}
         </div>
 
+        <div className="ff-wrap" style={{ borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
+          <label className="ff-label">Pedidos</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <label className="ff-check-wrap" style={{ opacity: data?.despachoHabilitado ? 1 : 0.5 }}>
+                <input
+                  type="checkbox"
+                  className="ff-check"
+                  checked={pedidoRequiereConfirmacionDespacho}
+                  disabled={!data?.despachoHabilitado}
+                  onChange={(e) => setPedidoRequiereConfirmacionDespacho(e.target.checked)}
+                />
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Pedido requiere confirmación de despacho</span>
+              </label>
+              <p className="ff-hint">
+                {data?.despachoHabilitado
+                  ? 'Un pedido inmediato (no apartado, no despacho a futuro) no se puede facturar sin que despacho confirme antes la existencia física de los artículos.'
+                  : 'Requiere el módulo de Despacho activado arriba.'}
+              </p>
+            </div>
+            <div>
+              <label className="ff-check-wrap">
+                <input
+                  type="checkbox"
+                  className="ff-check"
+                  checked={pedidoConduceIncluyePrecios}
+                  onChange={(e) => setPedidoConduceIncluyePrecios(e.target.checked)}
+                />
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Conduce incluye precios</span>
+              </label>
+              <p className="ff-hint">
+                Si está apagado, el PDF del Pedido omite columnas de precio/ITBIS/total y la sección de
+                totales — queda como un conduce sin montos (descripción, cantidad, nota).
+              </p>
+            </div>
+          </div>
+        </div>
+
         {data?.usaModuloPos && (
           <div className="ff-wrap">
             <label className="ff-check-wrap">
@@ -2862,14 +3050,14 @@ function FacturacionConfigSection() {
            </div>
          )}
 
-         {data?.usaModuloPos && (
-           <div className="ff-wrap">
-             <label className="ff-label">Método de pago de Caja</label>
-             <p className="ff-hint" style={{ marginTop: 4 }}>
-               El método de pago cuyo cobrado se compara contra el efectivo físico al cuadrar el turno.
-               Solo tiene sentido cuando el módulo POS está activo.
-             </p>
-             <div style={{ maxWidth: 320 }}>
+         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+           <div className="ff-wrap" style={{ maxWidth: 320 }}>
+               <label className="ff-label">Método de Pago Default (DOP)</label>
+               <p className="ff-hint" style={{ marginTop: 4 }}>
+                 {data?.usaModuloPos
+                   ? 'Se usa para comparar el efectivo físico en caja al cerrar turno, y como método de pago por defecto al cobrar una factura en pesos si no se especifica ninguno.'
+                   : 'Método de pago que se usa por defecto al cobrar una factura en pesos si no se especifica ninguno.'}
+               </p>
                <SearchSelect
                  value={modoPagoCaja ?? ''}
                  onChange={(val) => setModoPagoCaja(val || null)}
@@ -2879,8 +3067,45 @@ function FacturacionConfigSection() {
                  placeholder="No configurado"
                />
              </div>
+
+             {data?.monedasHabilitadas?.includes('USD') && (
+               <div className="ff-wrap" style={{ maxWidth: 320 }}>
+                 <label className="ff-label">Método de Pago Default (USD)</label>
+                 <p className="ff-hint" style={{ marginTop: 4 }}>
+                   Método de pago que se usa por defecto al cobrar una factura en dólares si no se
+                   especifica ninguno. Opcional — si no se configura, hay que elegir el método de pago
+                   manualmente en cada cobro en USD.
+                 </p>
+                 <SearchSelect
+                   value={modoPagoCajaUsd ?? ''}
+                   onChange={(val) => setModoPagoCajaUsd(val || null)}
+                   options={modoPagoCajaUsdOptions}
+                   onSearch={setModoPagoCajaUsdSearch}
+                   selectedLabel={modoPagoCajaUsd ?? ''}
+                   placeholder="No configurado"
+                 />
+               </div>
+             )}
+
+             {data?.monedasHabilitadas?.includes('EUR') && (
+               <div className="ff-wrap" style={{ maxWidth: 320 }}>
+                 <label className="ff-label">Método de Pago Default (EUR)</label>
+                 <p className="ff-hint" style={{ marginTop: 4 }}>
+                   Método de pago que se usa por defecto al cobrar una factura en euros si no se
+                   especifica ninguno. Opcional — si no se configura, hay que elegir el método de pago
+                   manualmente en cada cobro en EUR.
+                 </p>
+                 <SearchSelect
+                   value={modoPagoCajaEur ?? ''}
+                   onChange={(val) => setModoPagoCajaEur(val || null)}
+                   options={modoPagoCajaEurOptions}
+                   onSearch={setModoPagoCajaEurSearch}
+                   selectedLabel={modoPagoCajaEur ?? ''}
+                   placeholder="No configurado"
+                 />
+               </div>
+             )}
             </div>
-          )}
 
           {data?.usaModuloPos && (
             <div className="ff-wrap">
@@ -3157,6 +3382,7 @@ function FacturacionConfigSection() {
                 flujoCobro,
                 requiereUbicacionVenta,
                 requiereSerialLoteCompra,
+                actualizarCostoEnCompra,
                 usaDepartamentos,
                 usaImpuestoDocumento,
                 plantillaImpuestoVentasDefault: plantillaImpuestoVentasDefault || null,
@@ -3167,6 +3393,8 @@ function FacturacionConfigSection() {
                 turnoMaxHoras,
                 ncfAlertaMinimo,
                 modoPagoCaja,
+                modoPagoCajaUsd,
+                modoPagoCajaEur,
                 modosPagoConciliar,
                 rolesCierreCajaAjena,
                 redondeoTotalDeshabilitado: !redondearTotales,
@@ -3176,6 +3404,8 @@ function FacturacionConfigSection() {
                 tasasActualizacionAutomatica,
                 tasasHoraActualizacion,
                 tasasProveedor,
+                pedidoRequiereConfirmacionDespacho,
+                pedidoConduceIncluyePrecios,
               })}
             disabled={saveMutation.isPending}
           >
@@ -3881,6 +4111,14 @@ const IMPUESTOS_SECTIONS = new Set([
   'tasas-impuesto', 'impuestos-ventas', 'impuestos-compras', 'impuestos-articulo',
 ])
 
+/** Secciones rediseñadas con la misma estructura de las vistas de tabla (Facturas, Cotizaciones,
+ * Clientes, etc.) — cada una arma su propio encabezado (título + descripción + acción) y su
+ * propia tabla "navy", así que no usan el `<PageHeader>` genérico de acá ni el ancho angosto
+ * (760px) pensado para los formularios de configuración simples. */
+const NAVY_LIST_SECTIONS = new Set([
+  'metodos-pago', 'listas-precio', 'tasas-impuesto', 'ejercicio-fiscal',
+])
+
 export default function ConfigPage() {
   const { seccion = 'cobros' } = useParams<{ seccion?: string }>()
   const title = SECTION_TITLES[seccion] ?? 'Configuración'
@@ -3905,12 +4143,14 @@ export default function ConfigPage() {
     farmacia: <FarmaciaArsConfigSection />,
   }
 
+  const isNavyList = NAVY_LIST_SECTIONS.has(seccion)
+
   return (
     <div className="page-container">
-      <PageHeader title={title} />
+      {!isNavyList && <PageHeader title={title} />}
       {seccion === 'ecf' && <EcfTabs />}
       {IMPUESTOS_SECTIONS.has(seccion) && <ImpuestosTabs />}
-      <div style={{ maxWidth: 760 }}>
+      <div style={isNavyList ? undefined : { maxWidth: 760 }}>
         {sectionMap[seccion] ?? (
           <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: '48px 0' }}>
             Sección no encontrada.
