@@ -92,7 +92,7 @@ const B17_MAX = 50
  *  por Pagar: la cuenta configurada en el concepto o, si no tiene una, la cuenta de gastos por
  *  defecto de la Empresa. Ya no es editable por línea — para desviarse de esta cuenta hay que
  *  usar "Dividir" y repartir el monto entre las cuentas deseadas. */
-function ItemCuentaContableText({ accountId }: { accountId?: string }) {
+function ItemCuentaContableText({ accountId }: { accountId?: string | null }) {
   const { data: cuenta, isLoading: loadingCuenta } = useQuery({
     queryKey: ['cuenta', accountId],
     queryFn: () => getCuenta(accountId!),
