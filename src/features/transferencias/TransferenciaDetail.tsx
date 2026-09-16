@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getTransferencia, confirmarTransferencia, cancelarTransferencia } from '@/shared/api/transferencias'
 import { getUsuarioAlmacenesPermitidos } from '@/shared/api/usuarios'
-import { getUser } from '@/shared/api/storage'
+import { getCachedUser } from '@/shared/api/storage'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { formatDate } from '@/lib/formatters'
 import { ArrowLeft, Check, X, Loader2 } from 'lucide-react'
@@ -26,7 +26,7 @@ export default function TransferenciaDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const currentUserEmail = getUser()?.email
+  const currentUserEmail = getCachedUser()?.email
 
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)

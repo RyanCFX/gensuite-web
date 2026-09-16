@@ -240,6 +240,16 @@ button {
   grid-template-columns: var(--sidebar-collapsed) 1fr;
 }
 
+/* Panel categorizado de Configuración — tercera columna persistente, ver AppLayout.tsx */
+.app-shell.with-config-panel {
+  grid-template-columns: var(--sidebar-width) 220px 1fr;
+  grid-template-areas: 'topbar topbar topbar' 'sidebar config-panel main';
+}
+
+.app-shell.collapsed.with-config-panel {
+  grid-template-columns: var(--sidebar-collapsed) 220px 1fr;
+}
+
 /* ─── TOPBAR ─── */
 .topbar {
   grid-area: topbar;
@@ -559,6 +569,32 @@ button {
   flex-shrink: 0;
   width: 16px;
   height: 16px;
+}
+
+/* ─── Panel categorizado de Configuración — ver AppLayout.tsx ─── */
+.config-nav-panel {
+  grid-area: config-panel;
+  background: var(--surface-page);
+  border-right: 1px solid var(--border-default);
+  overflow-y: auto;
+  position: sticky;
+  top: var(--navbar-height);
+  height: calc(100vh - var(--navbar-height));
+  padding: 12px 0;
+}
+
+.config-nav-group {
+  margin-bottom: 4px;
+  padding: 0 10px;
+}
+
+.config-nav-group-label {
+  padding: 6px 12px 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
 }
 
 .nav-label { flex: 1; }

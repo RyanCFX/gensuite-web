@@ -18,18 +18,21 @@ interface AccountSelectProps {
   ledgerOnly?: boolean
   // If true, filter to accounts already used as tax_type/account_head in tax templates
   soloImpuesto?: boolean
+  // If true, only group accounts (ej. selector de "cuenta padre" al crear una cuenta nueva) —
+  // toma precedencia sobre `ledgerOnly`.
+  groupOnly?: boolean
 }
 
-export function AccountSelect({ value, onChange, placeholder = 'Buscar cuenta…', error, disabled, id, accountType, rootType, ledgerOnly = true, soloImpuesto }: AccountSelectProps) {
+export function AccountSelect({ value, onChange, placeholder = 'Buscar cuenta…', error, disabled, id, accountType, rootType, ledgerOnly = true, soloImpuesto, groupOnly }: AccountSelectProps) {
   const [query, setQuery] = useState('')
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['accounts-search', query, accountType, rootType, soloImpuesto],
+    queryKey: ['accounts-search', query, accountType, rootType, soloImpuesto, groupOnly],
     queryFn: () => listCuentas({
       search: query || undefined,
       accountType: accountType || undefined,
       rootType: rootType || undefined,
-      isGroup: ledgerOnly ? false : undefined,  // exclude groups when ledgerOnly
+      isGroup: groupOnly ? true : ledgerOnly ? false : undefined,  // exclude groups when ledgerOnly
       soloImpuesto: soloImpuesto || undefined,
       // limit: 300
     }),
