@@ -183,11 +183,14 @@ export default function DevolucionForm() {
     setMotivoAnulacionDetalle('')
   }
 
-  function toggleReturnRow(itemCode: string) {
-    setReturnRows((prev) => prev.map((r) => (r.itemCode === itemCode ? { ...r, checked: !r.checked } : r)))
+  // Por índice, no por itemCode — una factura puede tener dos líneas del mismo artículo (p. ej.
+  // mismo producto con descuentos distintos), y ambas deben poder marcarse/editarse de forma
+  // independiente en vez de quedar ligadas por compartir itemCode.
+  function toggleReturnRow(index: number) {
+    setReturnRows((prev) => prev.map((r, i) => (i === index ? { ...r, checked: !r.checked } : r)))
   }
-  function setReturnRowQty(itemCode: string, qty: number) {
-    setReturnRows((prev) => prev.map((r) => (r.itemCode === itemCode ? { ...r, qty } : r)))
+  function setReturnRowQty(index: number, qty: number) {
+    setReturnRows((prev) => prev.map((r, i) => (i === index ? { ...r, qty } : r)))
   }
 
   // Regla fiscal (la controla el backend): pasados los 30 días de la factura original, la
@@ -468,13 +471,13 @@ export default function DevolucionForm() {
                       </tr>
                     </thead>
                     <tbody>
-                      {returnRows.map((row) => (
-                        <tr key={row.itemCode} style={{ opacity: row.checked ? 1 : 0.6 }}>
+                      {returnRows.map((row, rowIndex) => (
+                        <tr key={`${row.itemCode}-${rowIndex}`} style={{ opacity: row.checked ? 1 : 0.6 }}>
                           <td style={{ textAlign: 'center' }}>
                             <input
                               type="checkbox"
                               checked={row.checked}
-                              onChange={() => toggleReturnRow(row.itemCode)}
+                              onChange={() => toggleReturnRow(rowIndex)}
                               style={{ cursor: 'pointer', accentColor: 'var(--color-brand)' }}
                             />
                           </td>
@@ -494,7 +497,7 @@ export default function DevolucionForm() {
                               style={{ textAlign: 'right' }}
                               value={row.qty}
                               disabled={!row.checked}
-                              onChange={(e) => setReturnRowQty(row.itemCode, parseFloat(e.target.value) || 0)}
+                              onChange={(e) => setReturnRowQty(rowIndex, parseFloat(e.target.value) || 0)}
                             />
                           </td>
                         </tr>
