@@ -9,9 +9,10 @@ import { forgotPassword, isApiError } from '@/shared/api/auth'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+// docs/tasks/PROMPT_IDENTIDAD_GLOBAL_FRONTEND.md §7.3 — recuperar contraseña es global ahora,
+// no hace falta ningún tenant (ni header ni campo) para pedir el link.
 const schema = z.object({
   email: z.string().min(1, 'El correo es obligatorio').email('Correo inválido'),
-  tenant: z.string().min(1, 'La empresa es obligatoria'),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -26,13 +27,12 @@ export default function ForgotPasswordPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { tenant: '' },
   })
 
   async function onSubmit(values: FormValues) {
     setServerError(null)
     try {
-      const result = await forgotPassword({ email: values.email }, values.tenant)
+      const result = await forgotPassword({ email: values.email })
       setSuccessMessage(result.message)
     } catch (error) {
       if (isApiError(error)) {
@@ -78,19 +78,6 @@ export default function ForgotPasswordPage() {
                 data-error={!!errors.email}
               />
               {errors.email?.message && <span className="form-error">{errors.email.message}</span>}
-            </div>
-
-            <div className="form-field">
-              <Label htmlFor="tenant">Empresa</Label>
-              <Input
-                id="tenant"
-                type="text"
-                placeholder="mi-empresa"
-                autoComplete="organization"
-                {...register('tenant')}
-                data-error={!!errors.tenant}
-              />
-              {errors.tenant?.message && <span className="form-error">{errors.tenant.message}</span>}
             </div>
 
             {serverError && (

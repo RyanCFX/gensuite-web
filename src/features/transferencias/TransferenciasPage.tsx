@@ -7,7 +7,7 @@ import type { Transferencia } from '@/shared/api/types'
 import { listAlmacenes } from '@/shared/api/config'
 import { listSucursales } from '@/shared/api/sucursales'
 import { getUsuarioAlmacenesPermitidos } from '@/shared/api/usuarios'
-import { getUser } from '@/shared/api/storage'
+import { getCachedUser } from '@/shared/api/storage'
 import { formatDate } from '@/lib/formatters'
 import { Plus, Eye, Check, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -39,7 +39,7 @@ export default function TransferenciasPage() {
   const [toConfirm, setToConfirm] = useState<Transferencia | null>(null)
   const [toCancel, setToCancel] = useState<Transferencia | null>(null)
 
-  const currentUserEmail = getUser()?.email
+  const currentUserEmail = getCachedUser()?.email
 
   const { data: warehousesData } = useQuery({
     queryKey: ['almacenes-all'],

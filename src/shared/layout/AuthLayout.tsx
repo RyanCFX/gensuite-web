@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import { Shield, Lock, Fingerprint } from 'lucide-react'
+import { Shield, Lock } from 'lucide-react'
 import bgImage from '@/assets/login_background.jpg'
 
 interface AuthLayoutProps {
@@ -25,16 +25,16 @@ export function AuthLayout({ children, maxWidth = 400 }: AuthLayoutProps) {
           <div className="auth-panel-badges">
             <span className="auth-panel-badge">
               <Shield size={12} />
-              SSO + MFA
+              Facturación electrónica
             </span>
             <span className="auth-panel-badge">
               <Lock size={12} />
               Cumplimiento DGII
             </span>
-            <span className="auth-panel-badge">
+            {/*<span className="auth-panel-badge">
               <Fingerprint size={12} />
               Zero Trust
-            </span>
+            </span>*/}
           </div>
         </div>
       </div>

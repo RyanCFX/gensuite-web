@@ -7,7 +7,8 @@ import LoginPage from '@/pages/LoginPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
-import CompletarRegistroPage from '@/pages/CompletarRegistroPage'
+import InvitationPage from '@/pages/InvitationPage'
+import OauthCallbackPage from '@/pages/OauthCallbackPage'
 import StartPage from '@/pages/StartPage'
 
 // Lazy-loaded pages
@@ -48,6 +49,9 @@ const AperturaComprasPage = lazy(() => import('@/features/apertura/ComprasListPa
 const AperturaCompraForm = lazy(() => import('@/features/apertura/CompraForm'))
 const AperturaCompraDetail = lazy(() => import('@/features/apertura/CompraDetail'))
 const AperturaComprasImportarPage = lazy(() => import('@/features/apertura/ComprasImportarPage'))
+const AperturaInventarioPage = lazy(() => import('@/features/apertura/InventarioListPage'))
+const AperturaInventarioForm = lazy(() => import('@/features/apertura/InventarioForm'))
+const AperturaInventarioDetail = lazy(() => import('@/features/apertura/InventarioDetail'))
 const AperturaResumenPage = lazy(() => import('@/features/apertura/ResumenPage'))
 // Despachos (Delivery Note) — docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md
 const DespachosListPage = lazy(() => import('@/features/despachos/DespachosListPage'))
@@ -59,6 +63,9 @@ const StockPage       = lazy(() => import('@/features/inventory/StockPage'))
 const HistoryPage     = lazy(() => import('@/features/inventory/HistoryPage'))
 const CountsPage      = lazy(() => import('@/features/inventory/CountsPage'))
 const ZonasPage       = lazy(() => import('@/features/inventory/ZonasPage'))
+const CargaInicialListPage = lazy(() => import('@/features/inventory/CargaInicialListPage'))
+const CargaInicialForm     = lazy(() => import('@/features/inventory/CargaInicialForm'))
+const CargaInicialDetail   = lazy(() => import('@/features/inventory/CargaInicialDetail'))
 const ComprasPage     = lazy(() => import('@/features/compras/ComprasPage'))
 const CompraDetail    = lazy(() => import('@/features/compras/CompraDetail'))
 const CompraForm      = lazy(() => import('@/features/compras/CompraForm'))
@@ -134,6 +141,7 @@ const AjustesAvanzadosPage = lazy(() => import('@/features/config/AjustesAvanzad
 const RepostValuacionPage  = lazy(() => import('@/features/inventory/RepostValuacionPage'))
 const NotificacionesPage   = lazy(() => import('@/features/config/NotificacionesPage'))
 const PermisosPage         = lazy(() => import('@/features/config/PermisosPage'))
+const MiCuentaPage         = lazy(() => import('@/pages/MiCuentaPage'))
 const RolesPage            = lazy(() => import('@/features/config/RolesPage'))
 const RoleDetailPage       = lazy(() => import('@/features/config/RoleDetailPage'))
 const AdminPinLogPage      = lazy(() => import('@/features/config/AdminPinLogPage'))
@@ -183,7 +191,8 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/completar-registro" element={<CompletarRegistroPage />} />
+        <Route path="/invitacion" element={<InvitationPage />} />
+        <Route path="/oauth/callback" element={<OauthCallbackPage />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
         <Route element={<ProtectedRoute />}>
@@ -253,6 +262,9 @@ export default function App() {
             <Route path="/inventario/historial" element={<Suspense fallback={<PageLoader />}><HistoryPage /></Suspense>} />
             <Route path="/inventario/conteos" element={<Suspense fallback={<PageLoader />}><CountsPage /></Suspense>} />
             <Route path="/inventario/zonas" element={<Suspense fallback={<PageLoader />}><ZonasPage /></Suspense>} />
+            <Route path="/inventario/carga-inicial" element={<Suspense fallback={<PageLoader />}><CargaInicialListPage /></Suspense>} />
+            <Route path="/inventario/carga-inicial/nueva" element={<Suspense fallback={<PageLoader />}><CargaInicialForm /></Suspense>} />
+            <Route path="/inventario/carga-inicial/:id" element={<Suspense fallback={<PageLoader />}><CargaInicialDetail /></Suspense>} />
 
             {/* Compras */}
             <Route path="/compras" element={<Suspense fallback={<PageLoader />}><ComprasPage /></Suspense>} />
@@ -384,11 +396,15 @@ export default function App() {
             <Route path="/apertura/compras/nueva" element={<Suspense fallback={<PageLoader />}><AperturaCompraForm /></Suspense>} />
             <Route path="/apertura/compras/importar" element={<Suspense fallback={<PageLoader />}><AperturaComprasImportarPage /></Suspense>} />
             <Route path="/apertura/compras/:id" element={<Suspense fallback={<PageLoader />}><AperturaCompraDetail /></Suspense>} />
+            <Route path="/apertura/inventario" element={<Suspense fallback={<PageLoader />}><AperturaInventarioPage /></Suspense>} />
+            <Route path="/apertura/inventario/nueva" element={<Suspense fallback={<PageLoader />}><AperturaInventarioForm /></Suspense>} />
+            <Route path="/apertura/inventario/:id" element={<Suspense fallback={<PageLoader />}><AperturaInventarioDetail /></Suspense>} />
             <Route path="/apertura/resumen" element={<Suspense fallback={<PageLoader />}><AperturaResumenPage /></Suspense>} />
 
-            {/* Despachos (Delivery Note) — ruta específica antes que /:id */}
+            {/* Despachos (Delivery Note) — rutas específicas antes que /:id */}
             <Route path="/despachos" element={<Suspense fallback={<PageLoader />}><DespachosListPage /></Suspense>} />
             <Route path="/despachos/nuevo" element={<Suspense fallback={<PageLoader />}><DespachoForm /></Suspense>} />
+            <Route path="/despachos/pendientes" element={<Suspense fallback={<PageLoader />}><DespachosListPage /></Suspense>} />
             <Route path="/despachos/:id" element={<Suspense fallback={<PageLoader />}><DespachoDetail /></Suspense>} />
 
             {/* Configuración */}
@@ -417,6 +433,7 @@ export default function App() {
             <Route path="/config/recalculo-valuacion" element={<Suspense fallback={<PageLoader />}><RepostValuacionPage /></Suspense>} />
             <Route path="/config/notificaciones" element={<Suspense fallback={<PageLoader />}><NotificacionesPage /></Suspense>} />
             <Route path="/config/permisos" element={<Suspense fallback={<PageLoader />}><PermisosPage /></Suspense>} />
+            <Route path="/mi-cuenta" element={<Suspense fallback={<PageLoader />}><MiCuentaPage /></Suspense>} />
             <Route path="/config/roles" element={<Suspense fallback={<PageLoader />}><RolesPage /></Suspense>} />
             <Route path="/config/roles/:name" element={<Suspense fallback={<PageLoader />}><RoleDetailPage /></Suspense>} />
             <Route path="/config/auditoria-pin" element={<Suspense fallback={<PageLoader />}><AdminPinLogPage /></Suspense>} />

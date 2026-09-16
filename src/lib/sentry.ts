@@ -12,8 +12,8 @@ import {
   createRoutesFromChildren,
   matchRoutes,
 } from 'react-router-dom'
-import { useAuthStore } from '@/stores/auth.store'
-import type { AuthTenant, AuthUser } from '@/shared/api/types'
+import { useAuthStore, type StoreUser } from '@/stores/auth.store'
+import type { AuthTenant } from '@/shared/api/types'
 
 /** `<Routes>` instrumentado — úsalo en vez del `Routes` de react-router-dom en App.tsx para que
  *  las transacciones de performance queden nombradas por ruta (ej. "/facturas/:id") en vez del
@@ -61,12 +61,12 @@ export function initSentry(): void {
   // para poder filtrar por cliente en GlitchTip — indispensable en un proyecto multitenant donde
   // un mismo error puede venir de tenants distintos. Se sincroniza solo, en cada login/logout/
   // hydrate, sin tener que tocar cada pantalla.
-  const syncScope = (state: { tenant: AuthTenant | null; user: AuthUser | null }) => {
+  const syncScope = (state: { tenant: AuthTenant | null; user: StoreUser | null }) => {
     Sentry.setTag('tenant', state.tenant?.slug ?? null)
     if (state.user) {
       Sentry.setUser({
         email: state.user.email,
-        username: state.user.full_name,
+        username: state.user.fullName,
         tenant: state.tenant?.slug,
       })
     } else {

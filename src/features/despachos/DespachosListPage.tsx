@@ -2,11 +2,12 @@
 // PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md §2.3-§2.4.
 
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, ChevronLeft, ChevronRight, Truck } from 'lucide-react'
 import { listDespachos, listDespachosPendientes, crearDespachoDesdeFactura, crearDespachoDesdePedido } from '@/shared/api/despachos'
+import { getFacturacionConfig } from '@/shared/api/config'
 import type { DespachoStatus } from '@/shared/api/types'
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate } from '@/lib/formatters'
@@ -22,8 +23,19 @@ const PAGE_SIZE = 20
 
 export default function DespachosListPage() {
   const navigate = useNavigate()
-  const [tab, setTab] = useState<'despachos' | 'pendientes'>('despachos')
+  const location = useLocation()
+  // /despachos/pendientes es una ruta real (registrada antes de /despachos/:id en App.tsx) que
+  // abre esta misma pantalla directo en la pestaña "Pendientes" — antes caía en /despachos/:id
+  // con id="pendientes" y renderizaba el detalle equivocado.
+  const [tab, setTab] = useState<'despachos' | 'pendientes'>(
+    location.pathname === '/despachos/pendientes' ? 'pendientes' : 'despachos',
+  )
   const puedeCrear = usePuede('despachos.crear')
+
+  function selectTab(next: 'despachos' | 'pendientes') {
+    setTab(next)
+    navigate(next === 'pendientes' ? '/despachos/pendientes' : '/despachos', { replace: true })
+  }
 
   return (
     <div className="page-container">
@@ -40,10 +52,10 @@ export default function DespachosListPage() {
       />
 
       <div className="tabs-bar" style={{ marginBottom: 16 }}>
-        <button className={`tab-btn${tab === 'despachos' ? ' on' : ''}`} onClick={() => setTab('despachos')}>
+        <button className={`tab-btn${tab === 'despachos' ? ' on' : ''}`} onClick={() => selectTab('despachos')}>
           Despachos
         </button>
-        <button className={`tab-btn${tab === 'pendientes' ? ' on' : ''}`} onClick={() => setTab('pendientes')}>
+        <button className={`tab-btn${tab === 'pendientes' ? ' on' : ''}`} onClick={() => selectTab('pendientes')}>
           Pendientes de despachar
         </button>
       </div>
@@ -172,8 +184,11 @@ function PendientesTable() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const puedeCrear = usePuede('despachos.crear')
+  const [searchParams] = useSearchParams()
   const [customer, setCustomer] = useState('')
-  const [itemCode, setItemCode] = useState('')
+  // Prellenado desde ?itemCode=... — atajo usado por el detalle de artículo (docs/tasks/
+  // 76_disponibilidad_stock_detalle_item.md) para llevar directo a los pendientes de ESE artículo.
+  const [itemCode, setItemCode] = useState(() => searchParams.get('itemCode') ?? '')
   const [page, setPage] = useState(1)
   const offset = (page - 1) * PAGE_SIZE
 
@@ -186,6 +201,17 @@ function PendientesTable() {
       offset,
     }),
   })
+
+  // docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §5.2 — aviso informativo (no bloqueante): con
+  // el switch apagado, una venta a futuro no reserva stock en firme, así que este pendiente puede
+  // perder el stock frente a otro cliente antes de despacharse. Se lee una sola vez por pantalla,
+  // no por despacho individual.
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const stockNoReservado = facturacionConfig?.despachoFuturoBloqueaVenta === false
 
   const crearMutation = useMutation({
     mutationFn: (linea: { origen: 'factura' | 'pedido'; documentoId: string }) =>
@@ -204,6 +230,13 @@ function PendientesTable() {
 
   return (
     <>
+      {stockNoReservado && (
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
+          Este stock no está reservado — otro cliente podría comprarlo antes de que se despache (el
+          despacho a futuro no bloquea venta en esta empresa).
+        </div>
+      )}
+
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>

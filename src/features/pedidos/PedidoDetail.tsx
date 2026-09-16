@@ -1,19 +1,27 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getPedido, submitPedido, cancelPedido, amendPedido, downloadPedidoPdf, facturarApartado, cancelarApartado } from '@/shared/api/pedidos'
-import { listMetodosPago, getFacturacionConfig } from '@/shared/api/config'
+import { getPedido, submitPedido, cancelPedido, amendPedido, downloadPedidoPdf, facturarApartado, cancelarApartado, confirmarDespachoPedido } from '@/shared/api/pedidos'
+import { listMetodosPago, getFacturacionConfig, listAlmacenes } from '@/shared/api/config'
 import { crearDespachoDesdePedido } from '@/shared/api/despachos'
+import { getItem } from '@/shared/api/catalog'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
 import { RelatedDocsCard } from '@/components/shared/RelatedDocsCard'
 import { displayId, formatDate, formatMoney } from '@/lib/formatters'
-import type { ApiError } from '@/shared/api/types'
-import { ArrowLeft, Download, Send, Trash2, GitBranch, FileText, History, Copy, PackageOpen, AlertTriangle, Ban, Truck } from 'lucide-react'
+import type { ApiError, ConfirmarStockDespachoItemDto, ConfirmarStockDespachoResult, Item, PedidoItem } from '@/shared/api/types'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
+import { formatStockInsufficientMessage } from '@/lib/stockAlerts'
+import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
+import { ArrowLeft, Download, Send, Trash2, GitBranch, FileText, History, Copy, PackageOpen, AlertTriangle, Ban, Truck, ClipboardCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { Modal } from '@/shared/ui/Modal'
+import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
+import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
+import { ESTADO_FLUJO_BADGE, ESTADO_FLUJO_LABEL } from './estadoFlujo'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -36,6 +44,7 @@ export default function PedidoDetail() {
   const [apartadoReason, setApartadoReason] = useState('')
   const [apartadoRemanente, setApartadoRemanente] = useState<'' | 'saldo_favor' | 'devolucion'>('')
   const [apartadoModeOfPayment, setApartadoModeOfPayment] = useState('')
+  const [confirmarDespachoOpen, setConfirmarDespachoOpen] = useState(false)
 
   const { data: pedido, isLoading } = useQuery({
     queryKey: ['pedido', id],
@@ -50,6 +59,16 @@ export default function PedidoDetail() {
   })
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
   const despachoHabilitado = facturacionConfig?.despachoHabilitado ?? false
+
+  // docs/tasks/79_confirmacion_despacho_pedido.md §4.1 — solo aplica a un pedido inmediato
+  // (nunca apartado ni despacho a futuro) en Borrador, con el tenant exigiéndolo.
+  const requiereConfirmacionDespacho = facturacionConfig?.pedidoRequiereConfirmacionDespacho ?? false
+  const elegibleParaConfirmarDespacho = !!pedido
+    && requiereConfirmacionDespacho
+    && pedido.status === 'draft'
+    && !pedido.isLayaway
+    && !pedido.despachoFuturo
+  const pendienteConfirmarDespacho = elegibleParaConfirmarDespacho && !pedido?.despachoConfirmado
 
   const { data: metodos } = useQuery({
     queryKey: ['metodos-pago'],
@@ -77,6 +96,42 @@ export default function PedidoDetail() {
       }
     },
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al someter el pedido'),
+  })
+
+  // Detección de líneas cuyo artículo exige serial/lote AL CONFIRMAR DESPACHO (no en la compra) —
+  // §9 del prompt. Igual patrón que DespachoDetail: se resuelve por itemCode único, solo mientras
+  // hace falta mostrar la acción (nunca en un pedido que ya no la necesita).
+  const uniquePedidoItemCodes = [...new Set((pedido?.items ?? []).map((i) => i.itemCode))]
+  const pedidoItemQueries = useQueries({
+    queries: uniquePedidoItemCodes.map((code) => ({
+      queryKey: ['item-asignar-serial-despacho', code],
+      queryFn: () => getItem(code),
+      staleTime: 5 * 60_000,
+      enabled: elegibleParaConfirmarDespacho,
+    })),
+  })
+  const itemsConSerialEnDespacho = new Map(
+    pedidoItemQueries
+      .map((q) => q.data)
+      .filter((it): it is NonNullable<typeof it> => !!it?.custom_asignar_serial_en_despacho && !!it.trackingType && it.trackingType !== 'none')
+      .map((it) => [it.id, it] as const),
+  )
+
+  const confirmarDespachoMutation = useMutation({
+    mutationFn: (items: ConfirmarStockDespachoItemDto[]) => confirmarDespachoPedido(id!, { items }),
+    onSuccess: (res: ConfirmarStockDespachoResult) => {
+      toast.success(res.message, { duration: 6000 })
+      queryClient.invalidateQueries({ queryKey: ['pedido', id] })
+      queryClient.invalidateQueries({ queryKey: ['pedidos'] })
+      setConfirmarDespachoOpen(false)
+    },
+    onError: (err: ApiError) => {
+      if (isApiErrorCode(err, ERROR_CODES.STOCK_INSUFFICIENT_OR_RESERVED)) {
+        toast.error(formatStockInsufficientMessage(err), { duration: 8000 })
+        return
+      }
+      toast.error(err?.message ?? 'Error al confirmar el despacho')
+    },
   })
 
   const cancelMutation = useMutation({
@@ -157,6 +212,7 @@ export default function PedidoDetail() {
 
   const isPending = submitMutation.isPending || cancelMutation.isPending || amendMutation.isPending
     || downloadMutation.isPending || facturarApartadoMutation.isPending || cancelarApartadoMutation.isPending
+    || confirmarDespachoMutation.isPending
 
   if (isLoading) return <div className="page-container"><div className="skeleton-box" style={{ width: 280, height: 28 }} /><div className="skeleton-box" style={{ width: '100%', height: 128, marginTop: 12 }} /></div>
   if (!pedido) return <div className="page-container"><div className="empty-state"><p className="empty-title">Pedido no encontrado</p></div></div>
@@ -174,6 +230,9 @@ export default function PedidoDetail() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             Pedido {displayId(pedido.id, pedido.sequence)}
             <span className={`badge ${STATUS_BADGE[pedido.status] ?? 'badge-neutral'}`}>{STATUS_LABEL[pedido.status] ?? pedido.status}</span>
+            {pedido.estadoFlujo && (
+              <span className={`badge ${ESTADO_FLUJO_BADGE[pedido.estadoFlujo]}`}>{ESTADO_FLUJO_LABEL[pedido.estadoFlujo]}</span>
+            )}
             {pedido.sequence > 0 && <span className="badge badge-info">seq {pedido.sequence}</span>}
             {pedido.amendedFrom && <span className="badge badge-neutral">Enmienda</span>}
             {pedido.currency && pedido.currency !== monedaBase && (
@@ -221,7 +280,21 @@ export default function PedidoDetail() {
         </button>
         {pedido.status === 'draft' && (
           <>
-            <button className="btn btn-primary btn-size-sm" onClick={() => submitMutation.mutate()} disabled={isPending}>
+            {pendienteConfirmarDespacho && (
+              <button
+                className="btn btn-navy btn-size-sm"
+                onClick={() => setConfirmarDespachoOpen(true)}
+                disabled={isPending}
+              >
+                <ClipboardCheck size={14} /> Confirmar despacho
+              </button>
+            )}
+            <button
+              className="btn btn-primary btn-size-sm"
+              onClick={() => submitMutation.mutate()}
+              disabled={isPending || pendienteConfirmarDespacho}
+              title={pendienteConfirmarDespacho ? 'Primero confirma la existencia física de los artículos' : undefined}
+            >
               <Send size={14} /> {pedido.isLayaway ? 'Someter Apartado' : 'Facturar'}
             </button>
             <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/pedidos/${id}/editar`)} disabled={isPending}>
@@ -420,6 +493,17 @@ export default function PedidoDetail() {
         </div>
       )}
 
+      {/* Modal: confirmar despacho (§4.5) */}
+      {confirmarDespachoOpen && (
+        <ConfirmarDespachoPedidoModal
+          items={pedido.items}
+          itemsConSerialEnDespacho={itemsConSerialEnDespacho}
+          onClose={() => setConfirmarDespachoOpen(false)}
+          onConfirm={(items) => confirmarDespachoMutation.mutate(items)}
+          loading={confirmarDespachoMutation.isPending}
+        />
+      )}
+
       {/* Modal: cancelar apartado */}
       {cancelApartadoOpen && (
         <div className="modal-overlay" onClick={() => setCancelApartadoOpen(false)}>
@@ -486,5 +570,141 @@ export default function PedidoDetail() {
         </div>
       )}
     </div>
+  )
+}
+
+// docs/tasks/79_confirmacion_despacho_pedido.md §4.5. Reutiliza el mismo patrón de
+// DespachoDetail.ConfirmarStockModal (§75) para el almacén origen del faltante, y
+// TrackedComponentEditor (§ComponentTrackingModal) para serial/lote de artículos que lo exigen al
+// confirmar despacho — combinados en UN solo request (a diferencia de Despachos, que separa
+// confirmar-stock y asignar-tracking en dos llamadas distintas).
+function ConfirmarDespachoPedidoModal({
+  items, itemsConSerialEnDespacho, onClose, onConfirm, loading,
+}: {
+  items: PedidoItem[]
+  itemsConSerialEnDespacho: Map<string, Item>
+  onClose: () => void
+  onConfirm: (items: ConfirmarStockDespachoItemDto[]) => void
+  loading: boolean
+}) {
+  const [sources, setSources] = useState<Record<number, string>>({})
+  const [warehouseSearch, setWarehouseSearch] = useState('')
+  const [serialsByItem, setSerialsByItem] = useState<Record<string, string[]>>({})
+  const [batchesByItem, setBatchesByItem] = useState<Record<string, { batchId: string; qty: number }[]>>({})
+
+  const { data: almacenesData } = useQuery({
+    queryKey: ['almacenes-confirmar-despacho-pedido'],
+    queryFn: () => listAlmacenes(),
+  })
+  const warehouseOptions = (almacenesData ?? [])
+    .filter((a) => !a.disabled)
+    .filter((a) => !warehouseSearch || a.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
+    .map((a) => ({ value: a.id, label: a.name }))
+
+  const stockMap = useItemsStock(items.map((i) => i.itemCode))
+
+  function isTrackingComplete(itemCode: string, qtyNeeded: number): boolean {
+    const item = itemsConSerialEnDespacho.get(itemCode)
+    if (!item) return true
+    if (item.trackingType === 'serial') return (serialsByItem[itemCode]?.length ?? 0) === qtyNeeded
+    const sum = (batchesByItem[itemCode] ?? []).reduce((s, b) => s + Number(b.qty || 0), 0)
+    return sum === qtyNeeded && (batchesByItem[itemCode]?.length ?? 0) > 0
+  }
+
+  const allTrackingComplete = items.every((it) => isTrackingComplete(it.itemCode, it.qty))
+
+  function handleConfirm() {
+    const payload: ConfirmarStockDespachoItemDto[] = items
+      .map((it, i) => {
+        const trackedItem = itemsConSerialEnDespacho.get(it.itemCode)
+        const sourceWarehouse = sources[i] || undefined
+        if (!trackedItem && !sourceWarehouse) return null
+        return {
+          itemCode: it.itemCode,
+          ...(sourceWarehouse ? { sourceWarehouse } : {}),
+          ...(trackedItem?.trackingType === 'serial' ? { serials: serialsByItem[it.itemCode] ?? [] } : {}),
+          ...(trackedItem?.trackingType === 'batch' ? { batches: batchesByItem[it.itemCode] ?? [] } : {}),
+        }
+      })
+      .filter((x): x is ConfirmarStockDespachoItemDto => !!x)
+    onConfirm(payload)
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Confirmar despacho"
+      subtitle="Confirma la existencia física de los artículos antes de facturar el pedido. Esto NO somete el pedido — sigue siendo un paso aparte."
+      size="lg"
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button
+            className="btn btn-primary"
+            disabled={loading || !allTrackingComplete}
+            onClick={handleConfirm}
+          >
+            {loading ? 'Confirmando…' : 'Confirmar despacho'}
+          </button>
+        </>
+      }
+    >
+      <div className="table-scroll">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Artículo</th>
+              <th style={{ textAlign: 'right' }}>Cantidad</th>
+              <th style={{ width: 260 }}>Traer faltante desde (opcional)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it, i) => {
+              const stock = stockMap.get(it.itemCode)
+              const sourceStock = sources[i] ? resolveDisponible(stock, sources[i]) : undefined
+              const trackedItem = itemsConSerialEnDespacho.get(it.itemCode)
+              return (
+                <tr key={i}>
+                  <td>
+                    <div>{it.description || it.itemCode} <span className="td-muted">({it.itemCode})</span></div>
+                    {trackedItem && (
+                      <div style={{ marginTop: 8 }}>
+                        <TrackedComponentEditor
+                          component={{
+                            itemCode: it.itemCode,
+                            itemName: it.description,
+                            trackingType: trackedItem.trackingType === 'batch' ? 'batch' : 'serial',
+                            qtyNeeded: it.qty,
+                          } as TrackedComponent}
+                          serials={serialsByItem[it.itemCode] ?? []}
+                          onChangeSerials={(s) => setSerialsByItem((prev) => ({ ...prev, [it.itemCode]: s }))}
+                          batches={batchesByItem[it.itemCode] ?? []}
+                          onChangeBatches={(b) => setBatchesByItem((prev) => ({ ...prev, [it.itemCode]: b }))}
+                        />
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>{it.qty}</td>
+                  <td>
+                    <SearchSelect
+                      value={sources[i] ?? ''}
+                      onChange={(v) => setSources((prev) => ({ ...prev, [i]: v }))}
+                      options={warehouseOptions}
+                      onSearch={setWarehouseSearch}
+                      selectedLabel={almacenesData?.find((a) => a.id === sources[i])?.name ?? sources[i]}
+                      placeholder="Dejar vacío si ya hay stock suficiente"
+                    />
+                    {sourceStock !== undefined && (
+                      <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Disponible ahí: {sourceStock.disponible}</span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Modal>
   )
 }

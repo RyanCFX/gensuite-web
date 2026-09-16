@@ -25,7 +25,7 @@ import { ItemSelect } from '@/shared/ui/ItemSelect'
 import type { Item, CuentaPorPagar } from '@/shared/api/types'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
-import { getUser } from '@/shared/api/storage'
+import { getCachedUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
@@ -192,7 +192,7 @@ export default function GastoForm() {
     staleTime: 5 * 60_000,
   })
 
-  const currentUserEmail = getUser()?.email
+  const currentUserEmail = getCachedUser()?.email
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser', currentUserEmail],
     queryFn: () => getUsuario(currentUserEmail!),

@@ -4,16 +4,18 @@ import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, Pencil, Wrench, Send, Ban, Receipt, RotateCcw, Download, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Pencil, Wrench, Send, Ban, Receipt, RotateCcw, Download, AlertTriangle, PackageCheck, Trash2 } from 'lucide-react'
 import {
   getDespacho, updateDespacho, asignarTrackingDespacho, submitDespacho, cancelarDespacho,
-  facturarDespacho, devolucionDespacho, downloadDespachoPdf,
+  facturarDespacho, devolucionDespacho, downloadDespachoPdf, confirmarStockDespacho, deleteDespacho,
 } from '@/shared/api/despachos'
 import { getItem } from '@/shared/api/catalog'
 import { listWarehouses } from '@/shared/api/inventory'
-import type { ComponentTracking, DespachoItemDto, ApiError } from '@/shared/api/types'
+import { listAlmacenes } from '@/shared/api/config'
+import type { ComponentTracking, DespachoItemDto, ApiError, ConfirmarStockDespachoResult } from '@/shared/api/types'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { formatStockInsufficientMessage } from '@/lib/stockAlerts'
+import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate } from '@/lib/formatters'
 import { Modal, ConfirmModal } from '@/shared/ui/Modal'
@@ -36,11 +38,13 @@ export default function DespachoDetail() {
 
   const [editOpen, setEditOpen] = useState(false)
   const [trackingOpen, setTrackingOpen] = useState(false)
+  const [confirmarStockOpen, setConfirmarStockOpen] = useState(false)
   const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [confirmFacturar, setConfirmFacturar] = useState(false)
   const [confirmDevolucion, setConfirmDevolucion] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [facturaRedirect, setFacturaRedirect] = useState<{ id: string; msg: string } | null>(null)
   const [downloading, setDownloading] = useState(false)
 
@@ -151,6 +155,37 @@ export default function DespachoDetail() {
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al actualizar el despacho'),
   })
 
+  // docs/tasks/75_almacen_venta_confirmar_stock_uoms_permitidas.md §2 — no somete el despacho,
+  // solo resuelve el faltante de stock. "Someter" sigue siendo un paso separado después.
+  const confirmarStockMutation = useMutation({
+    mutationFn: (items: { itemCode: string; sourceWarehouse: string }[]) => confirmarStockDespacho(id!, { items }),
+    onSuccess: (res: ConfirmarStockDespachoResult) => {
+      toast.success(res.message)
+      invalidateAll()
+      setConfirmarStockOpen(false)
+    },
+    onError: (err: ApiError) => {
+      if (isApiErrorCode(err, ERROR_CODES.STOCK_INSUFFICIENT_OR_RESERVED)) {
+        toast.error(formatStockInsufficientMessage(err), { duration: 8000 })
+        return
+      }
+      toast.error(err?.message ?? 'Error al confirmar el stock')
+    },
+  })
+
+  // DELETE /despachos/:id — solo para Borrador (nunca sometido). Un despacho sometido se cancela
+  // con cancelarDespacho, nunca se elimina — docs/tasks/75_....md §2.4.
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteDespacho(id!),
+    onSuccess: () => {
+      toast.success('Despacho eliminado')
+      queryClient.invalidateQueries({ queryKey: ['despachos'] })
+      queryClient.invalidateQueries({ queryKey: ['despachos-pendientes'] })
+      navigate('/despachos')
+    },
+    onError: (err: { message?: string }) => { toast.error(err?.message ?? 'Error al eliminar el despacho'); setConfirmDelete(false) },
+  })
+
   async function handleDownload() {
     setDownloading(true)
     try {
@@ -224,9 +259,19 @@ export default function DespachoDetail() {
             <Wrench size={14} /> Asignar serial/lote
           </button>
         )}
+        {despacho.status === 'draft' && puedeEditar && (
+          <button className="btn btn-ghost btn-size-sm" onClick={() => setConfirmarStockOpen(true)}>
+            <PackageCheck size={14} /> Confirmar stock
+          </button>
+        )}
         {despacho.status === 'draft' && puedeSometer && (
           <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmSubmit(true)} disabled={submitMutation.isPending}>
             <Send size={14} /> Someter
+          </button>
+        )}
+        {despacho.status === 'draft' && puedeEditar && (
+          <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmDelete(true)} disabled={deleteMutation.isPending}>
+            <Trash2 size={14} /> Eliminar
           </button>
         )}
         {despacho.status === 'submitted' && puedeCancelar && (
@@ -342,6 +387,15 @@ export default function DespachoDetail() {
         />
       )}
 
+      {confirmarStockOpen && (
+        <ConfirmarStockModal
+          items={despacho.items}
+          onClose={() => setConfirmarStockOpen(false)}
+          onConfirm={(items) => confirmarStockMutation.mutate(items)}
+          loading={confirmarStockMutation.isPending}
+        />
+      )}
+
       {trackingOpen && (
         <ComponentTrackingModal
           bundleName={despacho.id}
@@ -385,6 +439,17 @@ export default function DespachoDetail() {
         confirmLabel="Crear Devolución"
         variant="default"
         loading={devolucionMutation.isPending}
+      />
+
+      <ConfirmModal
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={() => deleteMutation.mutate()}
+        title="Eliminar Despacho"
+        description={`¿Confirmas eliminar ${despacho.id}? Es un Borrador — nunca se sometió, así que no hay salida de inventario que revertir. Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+        loading={deleteMutation.isPending}
       />
 
       {confirmCancel && (
@@ -448,6 +513,109 @@ export default function DespachoDetail() {
   )
 }
 
+// docs/tasks/75_almacen_venta_confirmar_stock_uoms_permitidas.md §2.3 — un selector de almacén
+// origen por línea (cualquier almacén de la compañía, a propósito no restringido a la sucursal
+// del despacho). Solo hace falta elegir origen para las líneas que realmente tienen faltante en
+// el almacén destino — se marcan las demás como "ya disponible" y su origen queda vacío/opcional
+// (mandarlas igual no rompe nada: el backend las marca `transferido: false`).
+function ConfirmarStockModal({
+  items, onClose, onConfirm, loading,
+}: {
+  items: { itemCode: string; itemName: string; qty: number; warehouse: string }[]
+  onClose: () => void
+  onConfirm: (items: { itemCode: string; sourceWarehouse: string }[]) => void
+  loading: boolean
+}) {
+  const [sources, setSources] = useState<Record<number, string>>({})
+  const [warehouseSearch, setWarehouseSearch] = useState('')
+
+  const { data: almacenesData } = useQuery({
+    queryKey: ['almacenes-confirmar-stock'],
+    queryFn: () => listAlmacenes(),
+  })
+  const warehouseOptions = (almacenesData ?? [])
+    .filter((a) => !a.disabled)
+    .filter((a) => !warehouseSearch || a.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
+    .map((a) => ({ value: a.id, label: a.name }))
+
+  const stockMap = useItemsStock(items.map((i) => i.itemCode))
+
+  const rowsToConfirm = Object.entries(sources).filter(([, w]) => !!w)
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Confirmar stock"
+      subtitle="Elige de qué almacén traer el faltante de cada línea — el sistema calcula exactamente cuánto falta y transfiere. Esto NO somete el despacho; sigue siendo un paso aparte."
+      size="lg"
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button
+            className="btn btn-primary"
+            disabled={loading || rowsToConfirm.length === 0}
+            onClick={() => onConfirm(rowsToConfirm.map(([idx, sourceWarehouse]) => ({ itemCode: items[Number(idx)].itemCode, sourceWarehouse })))}
+          >
+            {loading ? 'Confirmando…' : 'Confirmar stock'}
+          </button>
+        </>
+      }
+    >
+      <div className="table-scroll">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Artículo</th>
+              <th style={{ textAlign: 'right' }}>Pendiente</th>
+              <th>Almacén destino</th>
+              <th style={{ width: 260 }}>Traer faltante desde</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it, i) => {
+              const info = resolveDisponible(stockMap.get(it.itemCode), it.warehouse)
+              const yaDisponible = info !== undefined && info.disponible >= it.qty
+              const sourceStock = sources[i] ? resolveDisponible(stockMap.get(it.itemCode), sources[i]) : undefined
+              return (
+                <tr key={i}>
+                  <td>{it.itemName} <span className="td-muted">({it.itemCode})</span></td>
+                  <td style={{ textAlign: 'right' }}>{it.qty}</td>
+                  <td className="td-muted">
+                    {it.warehouse}
+                    {info !== undefined && (
+                      <><br /><span style={{ fontSize: 11 }}>Disponible ahí: {info.disponible}</span></>
+                    )}
+                  </td>
+                  <td>
+                    {yaDisponible ? (
+                      <span className="badge badge-success">Ya disponible en destino</span>
+                    ) : (
+                      <>
+                        <SearchSelect
+                          value={sources[i] ?? ''}
+                          onChange={(v) => setSources((prev) => ({ ...prev, [i]: v }))}
+                          options={warehouseOptions.filter((o) => o.value !== it.warehouse)}
+                          onSearch={setWarehouseSearch}
+                          selectedLabel={almacenesData?.find((a) => a.id === sources[i])?.name ?? sources[i]}
+                          placeholder="Elegir almacén origen"
+                        />
+                        {sourceStock !== undefined && (
+                          <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Disponible ahí: {sourceStock.disponible}</span>
+                        )}
+                      </>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Modal>
+  )
+}
+
 function EditDespachoModal({
   items, onClose, onSave, loading,
 }: {
@@ -502,7 +670,7 @@ function EditDespachoModal({
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={r.itemCode}>
+              <tr key={`${r.itemCode}-${i}`}>
                 <td>{r.itemName} <span className="td-muted">({r.itemCode})</span></td>
                 <td>
                   <input

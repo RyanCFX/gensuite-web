@@ -34,7 +34,7 @@ export function SortableTh({ label, sortKey, orderBy, onSort, style, align = 'le
           cursor: 'pointer',
           fontWeight: 600,
           fontSize: 'inherit',
-          color: isActive ? 'var(--color-primary, #4f46e5)' : 'inherit',
+          color: isActive ? 'var(--sidebar-label)' : 'inherit',
           whiteSpace: 'nowrap',
         }}
       >

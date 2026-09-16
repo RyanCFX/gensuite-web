@@ -7,7 +7,7 @@ import { createTransferencia } from '@/shared/api/transferencias'
 import { listAlmacenes } from '@/shared/api/config'
 import { listUbicaciones } from '@/shared/api/ubicaciones'
 import { getUsuarioAlmacenesPermitidos } from '@/shared/api/usuarios'
-import { getUser } from '@/shared/api/storage'
+import { getCachedUser } from '@/shared/api/storage'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -28,7 +28,7 @@ export default function TransferenciaForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { multiTab, activeId, closeTab } = useTabs()
-  const currentUserEmail = getUser()?.email
+  const currentUserEmail = getCachedUser()?.email
 
   const [fromAlmacen, setFromAlmacen] = useState('')
   const [fromAlmacenLabel, setFromAlmacenLabel] = useState('')

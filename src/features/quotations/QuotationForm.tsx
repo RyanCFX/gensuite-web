@@ -8,12 +8,15 @@ import { createQuotation, updateQuotation, getQuotation, getQuotationDuplicateSo
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getDefaultPriceTier } from '@/shared/api/catalog'
 import { listImpuestosVentas, listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
-import type { CreateQuotationDto, ItemPrices, Bundle, Customer } from '@/shared/api/types'
+import type { CreateQuotationDto, ItemPrices, Bundle, Customer, MonedaCode } from '@/shared/api/types'
 import type { Item } from '@/shared/api/types'
+import { getTasaVigente } from '@/shared/api/monedas'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
-import { formatDOP, formatMoney, displayId, round2 } from '@/lib/formatters'
+import { formatMoney, displayId, round2 } from '@/lib/formatters'
+import { formatUomNotAllowedMessage } from '@/lib/stockAlerts'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { Select, SelectItem } from '@/components/ui/select'
 import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus, ChevronDown } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
@@ -31,7 +34,7 @@ import { listItems } from '@/shared/api/catalog'
 import { client } from '@/shared/api/client'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
-import { getUser } from '@/shared/api/storage'
+import { getCachedUser } from '@/shared/api/storage'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
@@ -47,11 +50,16 @@ interface LineItem {
   description: string
   qty: number
   rate: number
+  /** Precio en `monedaBase` (catálogo), ya ajustado por UDM pero SIN convertir a la moneda
+   *  elegida — es el anchor a partir del cual se recalcula `rate` al cambiar moneda/tasa/UDM. */
+  baseRate: number
   amount: number
   discountPct: number
   salesTaxPct: number
   salesTaxTemplate: string
   uom: string
+  /** UDM de venta vs. UDM de stock — 1 = misma unidad, ver `saleRate()`. */
+  conversionFactor: number
   _prices?: ItemPrices
   maxDiscountPct?: number
   autoDiscountPct?: number
@@ -161,6 +169,50 @@ export default function QuotationForm() {
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
   const monedasHabilitadas = facturacionConfig?.monedasHabilitadas ?? ['DOP']
 
+  // Tasa vigente configurada para el par (moneda elegida → moneda base) — se autocompleta el
+  // campo "Tasa de cambio" con esto la primera vez que el usuario elige una moneda distinta a la
+  // base, sin pisar un valor que el usuario ya haya tocado a mano.
+  const { data: tasaVigente } = useQuery({
+    queryKey: ['monedas-tasa-vigente', currency, monedaBase],
+    queryFn: () => getTasaVigente({ from: currency as MonedaCode, to: monedaBase as MonedaCode }),
+    enabled: multimonedaHabilitada && !!currency && currency !== monedaBase,
+    retry: false,
+  })
+  useEffect(() => {
+    if (currency && currency !== monedaBase && tasaVigente && conversionRate === '') {
+      setConversionRate(tasaVigente.tasa)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasaVigente])
+
+  // El catálogo (prices/standardRate) siempre está en `monedaBase` — `baseRate` guarda ese precio
+  // sin tocar; `saleRate` es lo que efectivamente se cobra/muestra por línea: convertido a la
+  // moneda elegida (si no es la base) y ajustado por la UDM de venta (`factor`, 1 = UDM de stock).
+  function saleRate(base: number, factor: number = 1): number {
+    const converted = base * factor
+    const rate = currency && currency !== monedaBase && conversionRate !== '' && Number(conversionRate) > 0
+      ? converted / Number(conversionRate)
+      : converted
+    return Math.round(rate * 10000) / 10000
+  }
+
+  // Al elegir/cambiar moneda o tasa, se reconvierten los precios de las líneas ya cargadas en esta
+  // sesión (con `_prices`, es decir, elegidas desde el catálogo) — no toca líneas hidratadas de una
+  // cotización existente, que ya vienen en la moneda con la que se guardaron originalmente.
+  useEffect(() => {
+    setItems((prev) =>
+      prev.map((row) => {
+        if (!row._prices || !row.itemCode) return row
+        const rate = saleRate(row.baseRate, row.conversionFactor)
+        const amount = row.discountMode === 'amount'
+          ? calcAmount(row.qty, rate, 0, row.discountAmount)
+          : calcAmount(row.qty, rate, row.discountPct)
+        return { ...row, rate, amount }
+      }),
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currency, conversionRate, monedaBase])
+
   // ── Load existing quotation when editing ─────────────────────────────────
   const { data: existingQuotation, isLoading: loadingQuotation } = useQuery({
     queryKey: ['quotation', id],
@@ -191,6 +243,8 @@ useEffect(() => {
           description: i.description ?? '',
           qty: i.qty,
           rate: i.rate,
+          baseRate: i.rate,
+          conversionFactor: 1,
           amount: i.amount,
           discountPct,
           discountMode,
@@ -238,6 +292,8 @@ useEffect(() => {
         description: i.description ?? '',
         qty: i.qty,
         rate: i.rate,
+        baseRate: i.rate,
+        conversionFactor: 1,
         amount: calcAmount(i.qty, i.rate, discountPct, discountAmount),
         discountPct,
         discountMode,
@@ -297,7 +353,7 @@ useEffect(() => {
     staleTime: 5 * 60_000,
   })
 
-  const currentUserEmail = getUser()?.email
+  const currentUserEmail = getCachedUser()?.email
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser', currentUserEmail],
     queryFn: () => getUsuario(currentUserEmail!),
@@ -473,6 +529,14 @@ function submitDto() {
 
   function handleError(err: { message?: string }) {
     const msg = err?.message ?? ''
+    if (isApiErrorCode(err, ERROR_CODES.SALE_WAREHOUSE_MISMATCH)) {
+      toast.error(msg, { duration: 8000 })
+      return
+    }
+    if (isApiErrorCode(err, ERROR_CODES.UOM_NOT_ALLOWED)) {
+      toast.error(formatUomNotAllowedMessage(err), { duration: 8000 })
+      return
+    }
     if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) {
       setPinModalOpen(true)
       return
@@ -539,7 +603,8 @@ function submitDto() {
     setItems((prev) => [
       ...prev,
       ...selections.map((s) => {
-        const rate = s.item.prices?.[tier] ?? s.item.standardRate ?? 0
+        const baseRate = s.item.prices?.[tier] ?? s.item.standardRate ?? 0
+        const rate = saleRate(baseRate)
         return {
           itemCode: s.item.id,
           itemLabel: s.item.itemName,
@@ -547,6 +612,8 @@ function submitDto() {
           description: s.item.internalDescription ?? s.item.itemName,
           qty: s.qty,
           rate,
+          baseRate,
+          conversionFactor: 1,
           amount: calcAmount(s.qty, rate, 0),
           discountPct: 0,
           discountMode: 'pct' as const,
@@ -575,7 +642,8 @@ function submitDto() {
       wasLastRow = index === prev.length - 1
       return prev.map((row, i) => {
         if (i !== index) return row
-        const rate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
+        const baseRate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
+        const rate = saleRate(baseRate)
         return {
           ...row,
           itemCode: catalogItem.id,
@@ -583,6 +651,8 @@ function submitDto() {
           itemType: catalogItem.type,
           description: catalogItem.internalDescription ?? catalogItem.itemName,
           rate,
+          baseRate,
+          conversionFactor: 1,
           amount: calcAmount(row.qty, rate, 0, 0),
           maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
           autoDiscountPct: catalogItem.autoDiscount?.discountType === 'Discount Percentage' ? catalogItem.autoDiscount.discountPercentage : undefined,
@@ -611,7 +681,8 @@ function submitDto() {
       wasLastRow = index === prev.length - 1
       return prev.map((row, i) => {
         if (i !== index) return row
-        const rate = bundle.prices?.[tier] ?? 0
+        const baseRate = bundle.prices?.[tier] ?? 0
+        const rate = saleRate(baseRate)
         return {
           ...row,
           itemCode: bundle.id,
@@ -619,6 +690,8 @@ function submitDto() {
           itemType: 'combo',
           description: bundle.itemName,
           rate,
+          baseRate,
+          conversionFactor: 1,
           amount: row.discountMode === 'amount'
             ? calcAmount(row.qty, rate, 0, row.discountAmount)
             : calcAmount(row.qty, rate, row.discountPct),
@@ -646,13 +719,15 @@ function submitDto() {
     setItems((prev) =>
       prev.map((row) => {
         if (!row._prices) return row
-        const rate = row._prices[tier] ?? row.rate
+        const baseRate = row._prices[tier] ?? row.baseRate
+        const rate = saleRate(baseRate, row.conversionFactor)
         const amount = row.discountMode === 'amount'
           ? calcAmount(row.qty, rate, 0, row.discountAmount)
           : calcAmount(row.qty, rate, row.discountPct)
-        return { ...row, rate, amount }
+        return { ...row, rate, baseRate, amount }
       }),
     )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerPriceTier, defaultPriceTier])
 
   function addRow() {
@@ -660,7 +735,7 @@ function submitDto() {
       toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
       return
     }
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', warehouse: '' }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, conversionFactor: 1, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', uom: 'Unidad', warehouse: '' }])
   }
   function removeRow(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index))
@@ -1144,7 +1219,7 @@ if (esClienteOcasional) {
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount, { trimZeros: true })}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount, currency || monedaBase, { trimZeros: true })}</td>
 
                       <td>
                         {item.itemType === 'service' || item.itemType === 'combo' ? (
@@ -1152,9 +1227,10 @@ if (esClienteOcasional) {
                         ) : (
                           <UomSelect
                             value={item.uom}
-                            onChange={(v) => updateItem(index, { uom: v })}
+                            onChange={(v, factor) => updateItem(index, { uom: v, rate: saleRate(item.baseRate, factor), conversionFactor: factor })}
                             itemCode={item.itemCode || undefined}
                             error={submitted && !item.uom}
+                            direction="sale"
                           />
                         )}
                       </td>
@@ -1199,25 +1275,25 @@ if (esClienteOcasional) {
             <div className="items-total-row">
             <div className="items-total-line">
                 <span>Subtotal bruto</span>
-                <span>{formatDOP(grossTotal)}</span>
+                <span>{formatMoney(grossTotal, currency || monedaBase)}</span>
               </div>
 
               {totalDiscount > 0 && (
                 <div className="items-total-line" style={{ color: 'var(--text-danger)' }}>
                   <span>Descuento total</span>
-                  <span>-{formatDOP(totalDiscount)}</span>
+                  <span>-{formatMoney(totalDiscount, currency || monedaBase)}</span>
                 </div>
               )}
 
               {taxTotal > 0 && (
                 <div className="items-total-line" style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
                   <span>Impuesto</span>
-                  <span>{formatDOP(taxTotal)}</span>
+                  <span>{formatMoney(taxTotal, currency || monedaBase)}</span>
                 </div>
               )}
               <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
                 <span>Total</span>
-                <span>{formatDOP(total)}</span>
+                <span>{formatMoney(total, currency || monedaBase)}</span>
               </div>
             </div>
           </div>

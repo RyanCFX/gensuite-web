@@ -79,6 +79,10 @@ export default function DespachoForm() {
         toast.error(formatStockInsufficientMessage(err), { duration: 8000 })
         return
       }
+      if (isApiErrorCode(err, ERROR_CODES.SALE_WAREHOUSE_MISMATCH)) {
+        toast.error(err?.message ?? '', { duration: 8000 })
+        return
+      }
       toast.error(err?.message ?? 'Error al crear el despacho')
     },
   })

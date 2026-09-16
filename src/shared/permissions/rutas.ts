@@ -76,6 +76,12 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/inventario/historial', accion: 'inventario.historial.consultar' },
   { pattern: '/inventario/conteos', accion: 'inventario.conteos.listar' },
   { pattern: '/inventario/zonas', accion: 'inventario.zonas.listar' },
+  // Carga Inicial de Inventario — docs/tasks/PROMPT_CARGA_INICIAL_INVENTARIO_FRONTEND.md §2.
+  // NO confundir con /apertura/inventario (Migración de Saldos): cuenta contable, semántica de
+  // qty y permisos son independientes entre ambas pantallas.
+  { pattern: '/inventario/carga-inicial/nueva', accion: 'inventario.carga-inicial.crear' },
+  { pattern: '/inventario/carga-inicial/*', accion: 'inventario.carga-inicial.listar' },
+  { pattern: '/inventario/carga-inicial', accion: 'inventario.carga-inicial.listar' },
 
   // Compras (marcador Compras RD ya resuelto en acciones; la lectura no lo exige)
   { pattern: '/compras/recepciones/*', accion: 'compras.recepcion.listar' },
@@ -180,6 +186,11 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/apertura/compras/*', accion: 'apertura.compras.listar' },
   { pattern: '/apertura/compras', accion: 'apertura.compras.listar' },
   { pattern: '/apertura/resumen', accion: 'apertura.resumen.ver' },
+  // Inventario — docs/tasks/PROMPT_APERTURA_INVENTARIO_FRONTEND.md §2. Permiso independiente del
+  // de Ventas/Compras (requiere perfil Inventario/Administrador, no alcanza con Contabilidad).
+  { pattern: '/apertura/inventario/nueva', accion: 'apertura.inventario.crear' },
+  { pattern: '/apertura/inventario/*', accion: 'apertura.inventario.listar' },
+  { pattern: '/apertura/inventario', accion: 'apertura.inventario.listar' },
 
   // Contabilidad
   { pattern: '/cuentas/*', accion: 'contabilidad.cuentas.listar' },

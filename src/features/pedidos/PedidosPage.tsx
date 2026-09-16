@@ -17,6 +17,8 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
+import { ESTADO_FLUJO_BADGE, ESTADO_FLUJO_LABEL } from './estadoFlujo'
+import type { PedidoEstadoFlujo } from '@/shared/api/types'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -41,6 +43,9 @@ export default function PedidosPage() {
   const [toCancel, setToCancel] = useState<Pedido | null>(null)
   const [onlyLayaway, setOnlyLayaway] = useState(false)
   const [branch, setBranch] = useState('')
+  // docs/tasks/79_confirmacion_despacho_pedido.md §5 — no hay filtro de estadoFlujo del lado del
+  // servidor, se filtra en el cliente sobre la página ya traída.
+  const [estadoFlujoFilter, setEstadoFlujoFilter] = useState<PedidoEstadoFlujo | 'all'>('all')
   const { orderBy, sort } = useSortState()
 
   const { data: sucursalesData } = useQuery({
@@ -80,7 +85,7 @@ export default function PedidosPage() {
     queryFn: () => listPedidos(params),
   })
 
-  const pedidos = data?.items ?? []
+  const pedidos = (data?.items ?? []).filter((p) => estadoFlujoFilter === 'all' || p.estadoFlujo === estadoFlujoFilter)
 
   const cancelMutation = useMutation({
     mutationFn: () => cancelPedido(toCancel!.id),
@@ -122,6 +127,14 @@ export default function PedidosPage() {
                   <SelectItem value="draft">Borrador</SelectItem>
                   <SelectItem value="submitted">En Proceso</SelectItem>
                   <SelectItem value="cancelled">Cancelado</SelectItem>
+                </Select>
+              </FilterField>
+              <FilterField label="En qué está">
+                <Select value={estadoFlujoFilter} onValueChange={(v) => setEstadoFlujoFilter(v as PedidoEstadoFlujo | 'all')}>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {(Object.keys(ESTADO_FLUJO_LABEL) as PedidoEstadoFlujo[]).map((v) => (
+                    <SelectItem key={v} value={v}>{ESTADO_FLUJO_LABEL[v]}</SelectItem>
+                  ))}
                 </Select>
               </FilterField>
               <FilterField label="Sucursal" style={{ width: 200 }}>
@@ -214,9 +227,15 @@ export default function PedidosPage() {
                     <td>{p.deliveryDate ? formatDate(p.deliveryDate) : <span className="td-dim">—</span>}</td>
                     <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(itemTotal)}</td>
                     <td style={{ display: 'flex', flexWrap: 'wrap', alignItems:'center', gap: 4 }}>
-                      <span className={`badge ${STATUS_BADGE[p.status] ?? 'badge-neutral'}`}>
-                        {STATUS_LABEL[p.status] ?? p.status}
-                      </span>
+                      {p.estadoFlujo ? (
+                        <span className={`badge ${ESTADO_FLUJO_BADGE[p.estadoFlujo]}`}>
+                          {ESTADO_FLUJO_LABEL[p.estadoFlujo]}
+                        </span>
+                      ) : (
+                        <span className={`badge ${STATUS_BADGE[p.status] ?? 'badge-neutral'}`}>
+                          {STATUS_LABEL[p.status] ?? p.status}
+                        </span>
+                      )}
 
                       {p.isLayaway && (
                         <span

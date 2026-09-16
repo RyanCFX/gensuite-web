@@ -7,8 +7,8 @@ export interface TemplateFormatOption {
   comingSoon?: boolean
 }
 
-// 576px @ 203dpi = 72mm imprimibles (el estándar real de una térmica de rollo de 80mm, ej.
-// Star TSP100: el papel es de 80mm pero el área imprimible efectiva es ~72mm/576 dots).
+// 600px @ 203dpi = 75mm imprimibles (el estándar real de una térmica de rollo de 80mm, ej.
+// Star TSP100: el papel es de 80mm pero el área imprimible efectiva es ~75mm/600 dots).
 // Etiqueta 5x2cm ~= 400x160px @203dpi (50mm x 20mm exactos). El alto de pos_invoice es
 // dinámico (null) porque el ticket crece según el contenido — se usa una guía de altura
 // mínima para trabajar cómodamente en el canvas.
@@ -16,7 +16,7 @@ export const TEMPLATE_FORMATS: TemplateFormatOption[] = [
   {
     type: 'pos_invoice',
     label: 'Factura POS — 80mm térmica',
-    page: { width: 576, height: null, unit: 'px', dpi: 203 },
+    page: { width: 600, height: null, unit: 'px', dpi: 203 },
   },
   {
     type: 'label_5x2',

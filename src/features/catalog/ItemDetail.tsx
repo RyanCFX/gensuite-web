@@ -3,12 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getItem, toggleItem, listItemVariants, generateVariants, createVariant, getAttribute, updateItemPrices } from '@/shared/api/catalog'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listZonas } from '@/shared/api/zonas'
 import { listUbicaciones, getItemUbicaciones, assignItemUbicacion, unassignItemUbicacion, moverStockUbicacion } from '@/shared/api/ubicaciones'
 import { formatDOP } from '@/lib/formatters'
 import { PrintLabelsModal } from '@/components/shared/PrintLabelsModal'
-import { ToggleLeft, ToggleRight, Package, ArrowLeft, X, MapPin, Trash2, Info, DollarSign, ArrowRightLeft, Pencil, Printer } from 'lucide-react'
+import { ToggleLeft, ToggleRight, Package, ArrowLeft, X, MapPin, Trash2, Info, DollarSign, ArrowRightLeft, Pencil, Printer, Truck } from 'lucide-react'
 import type { Item, GenerateVariantsResult, ItemAttribute, ApiError, UpdateItemPricesDto, ItemPricesResult } from '@/shared/api/types'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -28,10 +29,12 @@ function costPlusPreview(purchasePrice: string, margin: string): number | undefi
 
 function UpdatePricesModal({
   item,
+  actualizarCostoEnCompraDefault,
   onClose,
   onSuccess,
 }: {
   item: Item
+  actualizarCostoEnCompraDefault: boolean
   onClose: () => void
   onSuccess: (updated: ItemPricesResult) => void
 }) {
@@ -44,11 +47,13 @@ function UpdatePricesModal({
   const [marginA, setMarginA] = useState(item.marginA?.toString() ?? '')
   const [marginB, setMarginB] = useState(item.marginB?.toString() ?? '')
   const [marginC, setMarginC] = useState(item.marginC?.toString() ?? '')
+  // docs/tasks/77_actualizar_costo_en_compra_configurable.md §2
+  const [actualizarCostoOverride, setActualizarCostoOverride] = useState<'' | 'si' | 'no'>(item.actualizarCostoEnCompraOverride ?? '')
 
   const isCostPlus = priceMode === 'cost_plus'
 
   const isDirty = useDirtyCheck(
-    { purchasePrice, standardRate, priceMode, priceA, priceB, priceC, marginA, marginB, marginC },
+    { purchasePrice, standardRate, priceMode, priceA, priceB, priceC, marginA, marginB, marginC, actualizarCostoOverride },
     true,
   )
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
@@ -76,6 +81,9 @@ function UpdatePricesModal({
     const sr = num(standardRate)
     if (sr !== undefined && sr !== item.standardRate) data.standardRate = sr
     if (priceMode !== (item.priceMode ?? 'manual')) data.priceMode = priceMode
+    if (actualizarCostoOverride !== (item.actualizarCostoEnCompraOverride ?? '')) {
+      data.actualizarCostoEnCompraOverride = actualizarCostoOverride
+    }
 
     if (isCostPlus) {
       const ma = num(marginA)
@@ -146,6 +154,17 @@ function UpdatePricesModal({
               <Select value={priceMode} onValueChange={(val) => setPriceMode(val as 'manual' | 'cost_plus')}>
                 <SelectItem value="manual">Manual</SelectItem>
                 <SelectItem value="cost_plus">Sobre Costo</SelectItem>
+              </Select>
+            </div>
+
+            <div className="ff-wrap">
+              <label className="ff-label">Actualizar costo al comprar</label>
+              <Select value={actualizarCostoOverride} onValueChange={(val) => setActualizarCostoOverride(val as '' | 'si' | 'no')}>
+                <SelectItem value="">
+                  Usar configuración de la empresa (actualmente: {actualizarCostoEnCompraDefault ? 'activado' : 'desactivado'})
+                </SelectItem>
+                <SelectItem value="si">Sí, siempre actualizar</SelectItem>
+                <SelectItem value="no">No, nunca actualizar</SelectItem>
               </Select>
             </div>
 
@@ -989,6 +1008,13 @@ export default function ItemDetail() {
     enabled: Boolean(id),
   })
 
+  const { data: facturacionConfig } = useQuery({
+    queryKey: ['facturacion-config'],
+    queryFn: getFacturacionConfig,
+    staleTime: 5 * 60_000,
+  })
+  const actualizarCostoEnCompraDefault = facturacionConfig?.actualizarCostoEnCompra ?? true
+
   const [showPricesModal, setShowPricesModal] = useState(false)
   const [showPrintLabels, setShowPrintLabels] = useState(false)
 
@@ -1390,6 +1416,54 @@ export default function ItemDetail() {
         </div>
       )}
 
+      {/* docs/tasks/76_disponibilidad_stock_detalle_item.md — solo vienen en el detalle, nunca en
+          el listado, y ausentes del todo en Servicios: si falta cualquiera de los 3, se oculta la
+          sección entera en vez de mostrar "undefined"/"0" engañoso. */}
+      {item.enPedido !== undefined && item.reservado !== undefined && item.disponible !== undefined && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header">
+            <h2 className="card-title">Disponibilidad</h2>
+          </div>
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                En pedido <span style={{ color: 'var(--text-tertiary)' }}>(sin cobrar — informativo, no resta de lo disponible)</span>
+              </span>
+              <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{item.enPedido} unidades</span>
+            </div>
+            {item.entregado !== undefined && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                  Entregado histórico <span style={{ color: 'var(--text-tertiary)' }}>(ya vendido y despachado — informativo)</span>
+                </span>
+                <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{item.entregado} unidades</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, fontWeight: 500 }}>
+                Reservado <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>(ya cobrado — pendiente de entrega física)</span>
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 500 }}>{item.reservado} unidades</span>
+                {item.reservado > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-size-xs"
+                    onClick={() => navigate(`/despachos/pendientes?itemCode=${encodeURIComponent(item.id)}`)}
+                  >
+                    <Truck size={12} /> Ver pendientes de despacho
+                  </button>
+                )}
+              </span>
+            </div>
+            <div style={{ borderTop: '1px solid var(--border-default)', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Disponible para vender</span>
+              <span className="stat-value" style={{ fontSize: 28, color: 'var(--color-success)' }}>{item.disponible}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {item.type === 'product' && !item.hasVariants && !item.variantOf && (
         <UbicacionesPanel itemCode={item.id} />
       )}
@@ -1469,6 +1543,7 @@ export default function ItemDetail() {
       {showPricesModal && (
         <UpdatePricesModal
           item={item}
+          actualizarCostoEnCompraDefault={actualizarCostoEnCompraDefault}
           onClose={() => setShowPricesModal(false)}
           onSuccess={(result) => {
             queryClient.setQueryData(['item', id], (old: Item | undefined) =>
@@ -1482,6 +1557,9 @@ export default function ItemDetail() {
                   }
                 : old,
             )
+            // El parche optimista de arriba no cubre actualizarCostoEnCompraOverride (no viene en
+            // ItemPricesResult) — se refresca del servidor para que quede reflejado sin recargar.
+            queryClient.invalidateQueries({ queryKey: ['item', id] })
             queryClient.invalidateQueries({ queryKey: ['items'] })
           }}
         />

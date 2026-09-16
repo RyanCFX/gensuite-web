@@ -84,3 +84,21 @@ export function cloneDocument(doc: TemplateDocument): TemplateDocument {
 export function createEmptyPage(): TemplatePage {
   return { id: createElementId('page'), elements: [] }
 }
+
+/** Clona un conjunto suelto de elementos (no necesariamente una página completa) con ids nuevos
+ * — usado por copiar/pegar. Remapea `childIds` de los grupos solo entre los elementos copiados;
+ * una referencia a un hijo que no fue copiado junto con su grupo se descarta para no dejar ids
+ * colgantes. */
+export function cloneElements(elements: TemplateElement[]): TemplateElement[] {
+  const idMap = new Map<string, string>()
+  const cloned = elements.map((el) => {
+    const newId = createElementId()
+    idMap.set(el.id, newId)
+    return { ...el, id: newId }
+  })
+  return cloned.map((el) =>
+    el.type === 'group'
+      ? { ...el, childIds: el.childIds.map((id) => idMap.get(id)).filter((id): id is string => !!id) }
+      : el,
+  )
+}

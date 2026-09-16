@@ -1,10 +1,13 @@
 // GENERADO automáticamente por scripts/gen-acciones.mjs — NO editar a mano.
-// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (417 acciones). Regenerar: node scripts/gen-acciones.mjs
+// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (424 acciones). Regenerar: node scripts/gen-acciones.mjs
 
 export type AccionId =
   | 'apertura.compras.anular'
   | 'apertura.compras.crear'
   | 'apertura.compras.listar'
+  | 'apertura.inventario.anular'
+  | 'apertura.inventario.crear'
+  | 'apertura.inventario.listar'
   | 'apertura.preparar.ejecutar'
   | 'apertura.preparar.ver'
   | 'apertura.resumen.ver'
@@ -124,6 +127,7 @@ export type AccionId =
   | 'config.denominaciones.crear'
   | 'config.denominaciones.editar'
   | 'config.denominaciones.listar'
+  | 'config.despacho.configurar'
   | 'config.despacho.deshabilitar'
   | 'config.despacho.habilitar'
   | 'config.ecf.contingencia.administrar'
@@ -248,6 +252,9 @@ export type AccionId =
   | 'inventario.almacenes.editar'
   | 'inventario.almacenes.eliminar'
   | 'inventario.almacenes.listar'
+  | 'inventario.carga-inicial.anular'
+  | 'inventario.carga-inicial.crear'
+  | 'inventario.carga-inicial.listar'
   | 'inventario.conteos.crear'
   | 'inventario.conteos.listar'
   | 'inventario.conteos.someter'
@@ -424,6 +431,9 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'apertura.compras.anular',
   'apertura.compras.crear',
   'apertura.compras.listar',
+  'apertura.inventario.anular',
+  'apertura.inventario.crear',
+  'apertura.inventario.listar',
   'apertura.preparar.ejecutar',
   'apertura.preparar.ver',
   'apertura.resumen.ver',
@@ -543,6 +553,7 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'config.denominaciones.crear',
   'config.denominaciones.editar',
   'config.denominaciones.listar',
+  'config.despacho.configurar',
   'config.despacho.deshabilitar',
   'config.despacho.habilitar',
   'config.ecf.contingencia.administrar',
@@ -667,6 +678,9 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'inventario.almacenes.editar',
   'inventario.almacenes.eliminar',
   'inventario.almacenes.listar',
+  'inventario.carga-inicial.anular',
+  'inventario.carga-inicial.crear',
+  'inventario.carga-inicial.listar',
   'inventario.conteos.crear',
   'inventario.conteos.listar',
   'inventario.conteos.someter',

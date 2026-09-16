@@ -22,6 +22,15 @@ export interface StockInsufficientOrReservedDetails {
   faltante: number;
 }
 
+/** `details` de un error `UOM_NOT_ALLOWED` — docs/tasks/
+ *  75_almacen_venta_confirmar_stock_uoms_permitidas.md §3.4. */
+export interface UomNotAllowedDetails {
+  itemCode: string;
+  uom: string;
+  direction: "purchase" | "sale";
+  permitidas: string[];
+}
+
 export interface ApiResponse<T> {
   success: true;
   data: T;
@@ -59,32 +68,118 @@ export interface PaginationParams {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
+// ─── Identidad Global — docs/tasks/PROMPT_IDENTIDAD_GLOBAL_FRONTEND.md ────────
+// Reemplaza por completo el modelo anterior de un solo JWT atado a un tenant: ahora un login
+// devuelve un `refresh_token` (la sesión, global, 30 días) + un `access_token` (JWT, 8h, por
+// TENANT ACTIVO, puede venir `null`) — ver §1 del prompt para el modelo mental completo.
+
 export interface LoginRequest {
   email: string;
   password: string;
+  /** Opcional — slug del tenant a activar de una vez. Si el usuario no tiene una membresía
+   *  `accepted` con ese slug, el login sigue siendo válido pero responde sin `access_token`. */
   tenant?: string | null;
 }
 
+/** Tenant activo resuelto por el login/refresh/switch-tenant — NUNCA null cuando viene dentro de
+ *  un `AuthResult.tenant` con `access_token` no nulo (van siempre juntos). */
 export interface AuthTenant {
   slug: string;
   siteUrl: string;
   id: string;
+  vertical: "general" | "farmacia";
 }
 
 export interface AuthUser {
+  id: string;
   email: string;
-  full_name: string;
-  roles: string[];
-  defaultWarehouse?: string;
-  warehouses?: string[];
+  fullName: string;
+  firstName: string;
+  lastName: string;
 }
 
-export interface LoginResponse {
+/** Una fila de `AuthResult.tenants[]` — TODAS las membresías de la persona, sin filtrar, sin
+ *  importar el estado (§3.3). Solo `status === 'accepted'` da acceso real. */
+export interface AuthMembership {
+  slug: string;
+  name: string;
+  vertical: "general" | "farmacia";
+  status: MembershipStatus;
+  isDefault: boolean;
+  roles: string[];
+}
+
+export type MembershipStatus = "invited" | "accepted" | "rejected" | "revoked" | "suspended";
+
+/** Shape completo devuelto por los 5 endpoints que autologuean: /auth/login (sin 2FA),
+ *  /auth/mfa/verify, /auth/invitations/:token/accept, /auth/oauth/exchange, /auth/reset-password. */
+export interface AuthResult {
+  refresh_token: string;
+  /** `null` si el backend no pudo determinar automáticamente qué tenant activar — ver §3.4/§3.5
+   *  del prompt. En ese caso `tenant` también viene `null` y hay que mostrar un selector. */
+  access_token: string | null;
+  token_type: string;
+  expires_in: number;
+  user: AuthUser;
+  tenants: AuthMembership[];
+  tenant: AuthTenant | null;
+}
+
+/** `POST /auth/login` responde esto (200, no 401) cuando la contraseña era correcta pero la
+ *  cuenta tiene 2FA confirmado — no hay tokens todavía, hay que completar POST /auth/mfa/verify. */
+export interface MfaRequiredResult {
+  mfaRequired: true;
+  mfaToken: string;
+  factors: { id: string; type: MfaFactorType; label?: string }[];
+}
+
+export type LoginResult = AuthResult | MfaRequiredResult;
+
+export function isMfaRequired(result: LoginResult): result is MfaRequiredResult {
+  return (result as MfaRequiredResult).mfaRequired === true;
+}
+
+export interface MfaVerifyDto {
+  mfaToken: string;
+  /** Solo hace falta si `factors` del login traía más de uno. */
+  factorId?: string;
+  /** TOTP de 6 dígitos, código de email de 6 dígitos, o código de recuperación (XXXXX-XXXXX) —
+   *  un solo campo de texto en la UI, el backend distingue el formato. */
+  code: string;
+  /** Mismo valor (si lo hubo) que se mandó en el POST /auth/login original. */
+  tenant?: string | null;
+}
+
+export interface RefreshTokenDto {
+  refreshToken: string;
+}
+
+/** `POST /auth/refresh` — mismo criterio de resolución de tenant que el login sin `tenant`
+ *  explícito (§3.4 puntos 3-5), nunca el §3.4 punto 1/2 (no hay forma de pedir un tenant acá). */
+export interface RefreshTokenResult {
+  refresh_token: string;
+  access_token: string | null;
+  token_type: string;
+  expires_in: number;
+  tenant: AuthTenant | null;
+}
+
+export interface LogoutDto {
+  refreshToken: string;
+  /** `true` = cerrar TODAS las sesiones de la persona, en todos los dispositivos. */
+  all?: boolean;
+}
+
+export interface SwitchTenantDto {
+  refreshToken: string;
+  tenant: string;
+}
+
+export interface SwitchTenantResult {
   access_token: string;
   token_type: string;
   expires_in: number;
   tenant: AuthTenant;
-  user: AuthUser;
 }
 
 export interface ForgotPasswordDto {
@@ -95,21 +190,95 @@ export interface ForgotPasswordResult {
   message: string;
 }
 
+/** Global — ya no lleva `email`/`key`/`tenant`, un solo `token` de la URL del correo. */
 export interface ResetPasswordDto {
-  email: string;
-  key: string;
+  token: string;
   newPassword: string;
 }
 
-export interface JwtPayload {
-  sub: string;
-  tenant: string;
-  ak: string;
-  ask: string;
-  defaultWarehouse?: string;
-  warehouses?: string[];
-  iat: number;
-  exp: number;
+// ─── 2FA (Doble factor de autenticación) — §5 ─────────────────────────────────
+
+export type MfaFactorType = "totp" | "email";
+
+export interface MfaFactor {
+  id: string;
+  type: MfaFactorType;
+  label?: string;
+  /** `false` = alta de TOTP iniciada pero nunca confirmada — no cuenta para el login todavía. */
+  confirmed: boolean;
+  /** Cuál factor se usa por defecto si hay más de uno confirmado — lo asigna el backend solo. */
+  isPreferred: boolean;
+}
+
+export interface TotpEnrollResult {
+  secret: string;
+  otpauthUrl: string;
+}
+
+export interface TotpConfirmDto {
+  code: string;
+}
+
+/** `recoveryCodes` viene UNA SOLA VEZ en esta respuesta — no se puede volver a pedir. */
+export interface TotpConfirmResult {
+  message: string;
+  recoveryCodes: string[];
+  recoveryCodesWarning: string;
+}
+
+// ─── Perfil propio — §7 ────────────────────────────────────────────────────────
+
+export interface MeProfile {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  locale?: string;
+  timeZone?: string;
+  mfaEnabled: boolean;
+  tenants: AuthMembership[];
+}
+
+export interface PatchMeProfileDto {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+}
+
+export interface ChangeMyPasswordDto {
+  currentPassword: string;
+  newPassword: string;
+}
+
+// ─── Invitaciones — §6.3, §7.4 ─────────────────────────────────────────────────
+
+export interface InvitationDetail {
+  tenantName: string;
+  tenantSlug: string;
+  email: string;
+  purpose: "registration" | "invitation";
+  /** `true` = la persona todavía no tiene contraseña fijada, hay que pedirla al aceptar. */
+  requiresPassword: boolean;
+  expiresAt: string;
+}
+
+export interface AcceptInvitationDto {
+  /** Solo si `InvitationDetail.requiresPassword` era `true`. */
+  password?: string;
+}
+
+// ─── Login con Google (OAuth2) — §8 ────────────────────────────────────────────
+
+export interface OauthExchangeDto {
+  ticket: string;
+}
+
+export interface LinkedIdentity {
+  id: string;
+  provider: "google";
+  emailAtLink: string;
+  linkedAt: string;
 }
 
 // ─── Customer ─────────────────────────────────────────────────────────────────
@@ -523,6 +692,11 @@ export interface CreateInvoiceDto {
    *  cobertura que ya estaba en el borrador. Una factura con cobertura NO puede llevar
    *  `taxesTemplate` (el servidor responde 400). */
   aseguradora?: AseguradoraInvoiceDto | null;
+  /** docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §3 — solo mandar si el selector "Despachar
+   *  ahora/después" está visible (despachoHabilitado && despachoFuturoHabilitado). Omitido =
+   *  conserva el comportamiento por defecto del tenant. `true` sin despacho habilitado, o sin
+   *  despachoFuturoHabilitado, responde 400. */
+  despachoFuturo?: boolean;
 }
 
 /**
@@ -1133,6 +1307,28 @@ export interface Item {
    * Solo cantidades (sin valuación); para valor de inventario por almacén usar GET /catalog/items/:id/stock.
    */
   stockByWarehouse?: Record<string, number>;
+  /** Solo vienen en el detalle (GET /catalog/items/:id) — NUNCA en el listado (GET /catalog/items),
+   *  a propósito, para no disparar consultas extra por fila en una lista paginada. `undefined` en
+   *  un Servicio (no aplica). Ver docs/tasks/76_disponibilidad_stock_detalle_item.md.
+   *
+   *  No son intercambiables:
+   *  - `enPedido`: comprometido en Pedidos de venta SIN facturar todavía — solo informativo, NO
+   *    resta de `disponible` (una venta sin cobrar aún podría no concretarse).
+   *  - `reservado`: YA facturado (cobrado) pero sin despacho físico todavía — sí resta de
+   *    `disponible`. Se calcula directo desde la factura, exista o no el despacho — por eso puede
+   *    diferir del `reservedStock`/`disponibleParaVender` de GET /inventory o
+   *    GET /catalog/items/:id/stock (esos vienen de Bin.reserved_stock vía Stock Reservation
+   *    Entry, que puede estar subcontado si el despacho aún no se creó). Son dos preguntas
+   *    distintas, no un bug si difieren para el mismo artículo.
+   *  - `disponible` = `currentStock - reservado` (nunca resta `enPedido`). */
+  enPedido?: number;
+  reservado?: number;
+  disponible?: number;
+  /** Unidades de este artículo ya vendidas Y despachadas físicamente (Delivery Notes sometidos) —
+   *  puramente histórico/informativo, no afecta `disponible`. Mismas reglas que enPedido/reservado/
+   *  disponible: solo en el detalle, nunca en el listado, `undefined` en un Servicio. Ver
+   *  docs/tasks/79_confirmacion_despacho_pedido.md §8. */
+  entregado?: number;
   internalDescription?: string;
   shortName?: string;
   notes?: string;
@@ -1146,10 +1342,23 @@ export interface Item {
   defaultWarehouse?: string;
   stockUom?: string;
   uoms?: ItemUomConversion[];
+  /** UOMs permitidas para comprar/vender este artículo — docs/tasks/
+   *  75_almacen_venta_confirmar_stock_uoms_permitidas.md §3. Listas independientes entre sí,
+   *  ambas opcionales; vacío = sin restricción (cualquier UOM con conversión válida contra
+   *  `stockUom` sirve, como siempre). Solo tiene efecto en artículos type === "product". Siempre
+   *  vienen como array (nunca null/undefined) en las respuestas. */
+  purchaseUoms?: string[];
+  saleUoms?: string[];
   hasVariants?: boolean;
   variantOf?: string;
   attributes?: TemplateAttribute[];
   priceMode?: "manual" | "cost_plus";
+  /** Override por artículo de `FacturacionConfig.actualizarCostoEnCompra` — docs/tasks/
+   *  77_actualizar_costo_en_compra_configurable.md §2. `'si'`/`'no'` siempre gana sobre el default
+   *  del tenant; ausente = usa el default. Nunca viene como `''` en las respuestas — solo en los
+   *  DTOs de request se manda `''` para borrar el override. Independiente de `priceMode`: no
+   *  afecta el recálculo del precio de venta en modo `cost_plus`. */
+  actualizarCostoEnCompraOverride?: "si" | "no";
   marginA?: number;
   marginB?: number;
   marginC?: number;
@@ -1160,6 +1369,10 @@ export interface Item {
    *  ver docs/FARMACIA_ARS_FRONTEND.md §6.1. Rechazado con 400 si se envían con otro trackingType. */
   hasExpiryDate?: boolean;
   shelfLifeInDays?: number;
+  /** Solo tiene sentido con trackingType !== "none". Si está activo, el serial/lote de este
+   *  artículo se pide al confirmar despacho (venta) en vez de en la compra. Ver
+   *  docs/tasks/79_confirmacion_despacho_pedido.md §9. */
+  custom_asignar_serial_en_despacho?: boolean;
   purchaseTaxTemplate?: string;
   purchaseTaxPct?: number;
   salesTaxTemplate?: string;
@@ -1206,9 +1419,16 @@ export interface CreateItemDto {
   image?: string;
   defaultWarehouse?: string;
   stockUom?: string;
+  /** Cada UOM de ambas listas debe tener conversión configurada contra `stockUom` — el backend
+   *  responde 400 si no. Solo aplica a type === "product". */
+  purchaseUoms?: string[];
+  saleUoms?: string[];
   hasVariants?: boolean;
   attributes?: { attribute: string }[]; // for templates: just attribute names
   priceMode?: "manual" | "cost_plus";
+  /** `''` (edición) = quita el override, vuelve a seguir el default del tenant. Ausente en una
+   *  edición = no toca el override actual. Ver docs/tasks/77_actualizar_costo_en_compra_configurable.md §2. */
+  actualizarCostoEnCompraOverride?: "" | "si" | "no";
   marginA?: number;
   marginB?: number;
   marginC?: number;
@@ -1217,6 +1437,7 @@ export interface CreateItemDto {
   trackingType?: "none" | "batch" | "serial";
   hasExpiryDate?: boolean;
   shelfLifeInDays?: number;
+  custom_asignar_serial_en_despacho?: boolean;
   purchaseTaxTemplate?: string;
   salesTaxTemplate?: string;
 }
@@ -1279,6 +1500,9 @@ export interface UpdateItemPricesDto {
   marginA?: number;
   marginB?: number;
   marginC?: number;
+  /** Ver `CreateItemDto.actualizarCostoEnCompraOverride` — docs/tasks/
+   *  77_actualizar_costo_en_compra_configurable.md §2. `''` quita el override. */
+  actualizarCostoEnCompraOverride?: "" | "si" | "no";
 }
 
 export interface ItemPricesResult {
@@ -1395,7 +1619,27 @@ export interface Pedido {
    *  desde una Cotización (nunca se re-resuelve). No hay `baseGrandTotal` en Pedidos. */
   currency?: string;
   conversionRate?: number;
+  /** docs/tasks/79_confirmacion_despacho_pedido.md — nunca junto con `isLayaway: true` (ambos
+   *  ya difieren la entrega por su cuenta, son mutuamente excluyentes). */
+  despachoFuturo?: boolean;
+  /** true si ya pasó por POST /pedidos/:id/confirmar-despacho (o si no le hacía falta: apartado,
+   *  despacho a futuro, o el tenant no tiene `pedidoRequiereConfirmacionDespacho` activo). */
+  despachoConfirmado?: boolean;
+  /** Fuente única de verdad de "en qué está" el pedido — ver PedidoEstadoFlujo. */
+  estadoFlujo?: PedidoEstadoFlujo;
 }
+
+/** docs/tasks/79_confirmacion_despacho_pedido.md §6 */
+export type PedidoEstadoFlujo =
+  | "borrador"
+  | "pendiente_confirmacion_despacho"
+  | "apartado_reservado"
+  | "facturando"
+  | "facturado"
+  | "despachado"
+  | "cerrado"
+  | "sometido"
+  | "cancelado";
 
 export interface CreatePedidoDto {
   customer?: string;
@@ -1425,9 +1669,17 @@ export interface CreatePedidoDto {
   quotation?: string;
   /** Marca el pedido como apartado (layaway) — reserva stock al someter, no genera factura de inmediato */
   isLayaway?: boolean;
+  /** Requiere `despachoHabilitado && despachoFuturoHabilitado` en el tenant — 400 si no. Mutuamente
+   *  excluyente con `isLayaway`: un pedido a futuro nunca pide confirmación de despacho (§2/§4.1
+   *  de docs/tasks/79_confirmacion_despacho_pedido.md). */
+  despachoFuturo?: boolean;
 }
 
 export type UpdatePedidoDto = Partial<CreatePedidoDto>;
+
+// POST /pedidos/:id/confirmar-despacho — docs/tasks/79_confirmacion_despacho_pedido.md §4. Mismo
+// DTO/resultado que POST /despachos/:id/confirmar-stock — ver ConfirmarStockDespachoDto/Result
+// más abajo (§75), reutilizados a propósito para compartir componentes de UI entre ambos flujos.
 
 // POST /pedidos/:id/submit — respuesta distinta cuando el pedido es un apartado
 export interface SubmitPedidoResult {
@@ -1868,10 +2120,17 @@ export interface Sucursal {
   id: string;
   name: string;
   warehouseCount: number;
+  /** Almacén al que se restringe toda venta de esta sucursal — docs/tasks/
+   *  75_almacen_venta_confirmar_stock_uoms_permitidas.md §1. `null` = sin restricción (cualquier
+   *  almacén de la sucursal sirve, como siempre). Siempre presente en las respuestas. */
+  almacenVenta: string | null;
 }
 
 export interface CreateSucursalDto {
   name: string;
+  /** Debe pertenecer a esta misma sucursal — el backend valida y responde 400 si no. En el PUT,
+   *  mandar `""` lo quita (vuelve a sin restricción). */
+  almacenVenta?: string;
 }
 
 export type UpdateSucursalDto = Partial<CreateSucursalDto>;
@@ -2689,16 +2948,22 @@ export interface AsientoPreviewRow {
 
 // ─── Usuario ──────────────────────────────────────────────────────────────────
 
+// docs/tasks/PROMPT_IDENTIDAD_GLOBAL_FRONTEND.md §6 — cada fila es una MEMBRESÍA (persona +
+// tenant), no solo un `User` de ERPNext. `enabled` ya no existe — reemplazado por `status`, 5
+// valores en vez de 2 (ver MembershipStatus más arriba, §6.1).
 export interface Usuario {
   email: string;
   firstName: string;
   lastName?: string;
   fullName: string;
-  enabled: boolean;
+  status: MembershipStatus;
+  isDefault: boolean;
   roles: string[];
+  invitedAt?: string;
+  acceptedAt?: string;
+  phone?: string;
   language?: string;
   timeZone?: string;
-  mobileNo?: string;
   lastActive?: string;
   maxDiscountPct?: number;
   warehouses?: string[];
@@ -2711,30 +2976,46 @@ export interface Usuario {
   adminCode?: string | null;
 }
 
-export interface CreateUsuarioDto {
-  email: string;
-  firstName: string;
+// GET /usuarios/lookup?email= — paso previo obligatorio antes de invitar (§6.2).
+export interface UsuarioLookupResult {
+  exists: boolean;
+  /** Solo si exists:true — de solo lectura, es la persona, no la fija este tenant. */
+  firstName?: string;
   lastName?: string;
-  mobileNo?: string;
-  roles: string[];
-  language?: string;
-  timeZone?: string;
-  sendWelcomeEmail?: boolean;
-  warehouses?: string[];
-  maxDiscountPct?: number;
-  /** Código de carnet/QR/barcode del empleado — permite buscarlo luego con GET /usuarios/buscar-codigo/:codigo. */
-  adminCode?: string;
-  /** Contraseña inicial del usuario. Solo se usa (y es obligatoria) cuando el tenant tiene
-   *  GET /config/facturacion → modoCreacionPassword="directo" — el administrador la define aquí
-   *  mismo y se la entrega en persona, en vez de mandar un correo con link. Se ignora si el
-   *  tenant está en modo "email". */
-  password?: string;
+  phone?: string;
+  /** Solo `true` si `membershipStatus === 'accepted'`. */
+  alreadyMember?: boolean;
+  membershipStatus?: MembershipStatus | null;
 }
 
-export interface UpdateUsuarioDto {
+// POST /usuarios — invita (nunca crea con contraseña). `perfiles` o `roles`, uno de los dos
+// obligatorio, mutuamente excluyentes (§6.3). `firstName`/`lastName` solo hacen falta (y son
+// obligatorios) cuando el email NO existía todavía (`UsuarioLookupResult.exists === false`).
+export interface InviteUsuarioDto {
+  email: string;
   firstName?: string;
   lastName?: string;
   mobileNo?: string;
+  /** Forma recomendada — GET /roles/perfiles. Excluyente con `roles`, autoritativo. */
+  perfiles?: string[];
+  roles?: string[];
+  adminCode?: string;
+}
+
+export interface InviteUsuarioResult {
+  email: string;
+  firstName: string;
+  lastName?: string;
+  status: "invited";
+  /** Informativo — qué tipo de correo se le mandó a la persona invitada (§6.3). */
+  purpose: "registration" | "invitation";
+}
+
+// PUT /usuarios/:email — YA NO acepta firstName/lastName (§6.6, el backend rechaza con 400 si
+// se mandan — `forbidNonWhitelisted`). El nombre es de la persona, se edita en PATCH /me/profile.
+export interface UpdateUsuarioDto {
+  mobileNo?: string;
+  perfiles?: string[];
   roles?: string[];
   warehouses?: string[];
   defaultWarehouse?: string;
@@ -2742,16 +3023,9 @@ export interface UpdateUsuarioDto {
   branches?: string[];
   defaultBranch?: string;
   defaultPosProfile?: string;
+  adminPin?: string;
   /** Código de carnet/QR/barcode del empleado — permite buscarlo luego con GET /usuarios/buscar-codigo/:codigo. */
   adminCode?: string;
-}
-
-export interface ResetPasswordUsuarioDto {
-  /** Nueva contraseña. Solo se usa (y es obligatoria) cuando el tenant tiene
-   *  GET /config/facturacion → modoCreacionPassword="directo" — el administrador la define aquí
-   *  mismo y se la entrega en persona, en vez de mandar un correo con link. Se ignora si el
-   *  tenant está en modo "email". */
-  newPassword?: string;
 }
 
 export interface Role {
@@ -2833,6 +3107,14 @@ export interface RoleUserSummary {
   email: string;
   fullName: string;
   enabled: boolean;
+}
+
+/** GET /roles/perfiles — Role Profile de ERPNext, con los roles planos que agrupa cada uno. Forma
+ *  recomendada de asignar permisos (`InviteUsuarioDto.perfiles`/`UpdateUsuarioDto.perfiles`) en
+ *  vez de armar la lista de `roles` sueltos a mano — sin schema documentado en openapi.json. */
+export interface RolePerfil {
+  name: string;
+  roles: string[];
 }
 
 export interface RoleDetail {
@@ -3008,6 +3290,12 @@ export interface FacturacionConfig {
   requiereUbicacionVenta?: boolean;
   /** Si está activo, al comprar un artículo con tracking de serial/lote exige capturar los mismos en la línea de compra. */
   requiereSerialLoteCompra?: boolean;
+  /** Default true — docs/tasks/77_actualizar_costo_en_compra_configurable.md. Si está activo, someter una compra
+   *  actualiza `Item.valuation_rate` ("Costo de Valoración") del artículo comprado con la tasa de esa compra. Un
+   *  artículo puntual puede salirse de este default con `Item.actualizarCostoEnCompraOverride` ('si'/'no' siempre
+   *  gana sobre este valor). No afecta el recálculo del precio de venta en modo `cost_plus` — eso sigue igual
+   *  independientemente de este ajuste. */
+  actualizarCostoEnCompra?: boolean;
   /** "email" (default): al crear un usuario (POST /usuarios) o resetear su contraseña (POST /usuarios/:email/reset-password)
    *  se genera un link y se manda por correo (comportamiento histórico). "directo": el administrador escribe la contraseña
    *  él mismo en el momento (`password` en la creación, `newPassword` en el reset) y se fija de una vez en ERPNext sin
@@ -3025,8 +3313,12 @@ export interface FacturacionConfig {
   usaModuloPos?: boolean;
   /** Nombre del POS Profile provisionado — solo informativo, no editable desde aquí. */
   posProfileDefault?: string | null;
-  /** Nombre exacto del método de pago que representa "la caja" — se compara contra el efectivo físico al cuadrar. Solo tiene sentido cuando usaModuloPos está activo. */
+  /** Nombre exacto del método de pago que representa "la caja" — se compara contra el efectivo físico al cuadrar, y se usa como default para cobrar/pagar facturas en DOP (moneda base) cuando no se especifica ninguno. Solo tiene sentido cuando usaModuloPos está activo. */
   modoPagoCaja?: string | null;
+  /** Método de pago default para facturas en USD — se usa como fallback cuando una línea de pago no trae `modeOfPayment` explícito. Solo mostrar el campo si `monedasHabilitadas` incluye "USD". */
+  modoPagoCajaUsd?: string | null;
+  /** Igual que `modoPagoCajaUsd`, pero para EUR. Solo mostrar el campo si `monedasHabilitadas` incluye "EUR". */
+  modoPagoCajaEur?: string | null;
   /** Nombres exactos de Mode of Payment que requieren conteo manual al cerrar turno. Si no se configura, el backend usa por defecto los métodos type="Cash". */
   modosPagoConciliar?: string[];
   /** Si está activo, cerrar un turno de caja exige el desglose de denominaciones contadas para el/los modos de pago en efectivo. */
@@ -3075,6 +3367,37 @@ export interface FacturacionConfig {
    *  Despacho (Delivery Note). No se edita con PUT directo — usar POST /config/despacho/habilitar
    *  y /deshabilitar (ver despachos.ts), y volver a pedir este endpoint después para refrescar. */
   despachoHabilitado?: boolean
+  /** Con despacho habilitado, permite elegir "despachar ahora" vs. "despachar después" por venta
+   *  (`despachoFuturo` en Create/UpdateInvoiceDto). Default true (preserva el comportamiento
+   *  previo: con despacho activo, todo era a futuro). No se edita con PUT directo — usar
+   *  PUT /config/despacho/futuro (ver despachos.ts) y refrescar este endpoint después. */
+  despachoFuturoHabilitado?: boolean
+  /** Si una venta a futuro reserva stock en firme (Stock Reservation Entry) contra otros clientes
+   *  al crear el despacho pendiente. Default true. Ver PUT /config/despacho/futuro. */
+  despachoFuturoBloqueaVenta?: boolean
+  /** Solo ventas inmediatas (no a futuro): si true, al someter la factura el sistema auto-asigna
+   *  seriales/lotes disponibles (FIFO/FEFO) en vez de exigir que el usuario los asigne a mano.
+   *  Default false. Ver PUT /config/despacho/futuro. */
+  despachoConfirmarStockAsignaSeriales?: boolean
+
+  // ─── Confirmación de despacho de Pedidos — docs/tasks/79_confirmacion_despacho_pedido.md ───
+  /** Si está activo, un Pedido inmediato (no apartado, no despacho a futuro) no se puede someter
+   *  sin antes pasar por POST /pedidos/:id/confirmar-despacho. Default false (apagado): el flujo
+   *  de Pedidos no cambia. Se edita con el PUT /config/facturacion normal (no un endpoint aparte). */
+  pedidoRequiereConfirmacionDespacho?: boolean
+  /** Si el PDF del Pedido (GET /pedidos/:id/pdf, "conduce") incluye columnas de precio/ITBIS/total
+   *  y la sección de totales. Default true. En false queda como un conduce sin montos. */
+  pedidoConduceIncluyePrecios?: boolean
+}
+
+/** PUT /config/despacho/futuro — docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §2.1. Los 3 campos
+ *  son independientes y opcionales: mandar solo los que el usuario tocó. 400 si no se manda
+ *  ninguno. La respuesta es solo un mensaje — volver a pedir GET /config/facturacion después para
+ *  refrescar los valores reales. */
+export interface UpdateDespachoFuturoDto {
+  futuroHabilitado?: boolean;
+  futuroBloqueaVenta?: boolean;
+  confirmarStockAsignaSeriales?: boolean;
 }
 
 // ─── Facturación Electrónica (e-CF) ────────────────────────────────────────────
@@ -3950,7 +4273,10 @@ export interface UpdateDenominacionDto {
 }
 
 export interface PaymentLine {
-  modeOfPayment: string;
+  /** Opcional — si se omite, el backend usa el método de pago default configurado en
+   *  Facturacion Config para la moneda del documento (modoPagoCaja/modoPagoCajaUsd/modoPagoCajaEur).
+   *  Si esa moneda no tiene un default configurado, la línea se rechaza con 400. */
+  modeOfPayment?: string;
   amount: number;
   cardNumber?: string;
   authorizationCode?: string;
@@ -4604,18 +4930,20 @@ export interface ItemProps {
 }
 
 export interface CuentasEmpresa {
-  defaultReceivableAccount?: string;
-  defaultPayableAccount?: string;
-  defaultIncomeAccount?: string;
-  defaultExpenseAccount?: string;
-  defaultBankAccount?: string;
-  writeOffAccount?: string;
-  roundOffAccount?: string;
+  /** `null` explícito limpia el campo (a diferencia de omitirlo, que lo deja sin tocar) — igual
+   *  criterio que el resto de los campos de esta interfaz. */
+  defaultReceivableAccount?: string | null;
+  defaultPayableAccount?: string | null;
+  defaultIncomeAccount?: string | null;
+  defaultExpenseAccount?: string | null;
+  defaultBankAccount?: string | null;
+  writeOffAccount?: string | null;
+  roundOffAccount?: string | null;
   // 🆕 16 campos nuevos (ver plan/IMPLEMENTACION.md sección 6)
-  defaultCashAccount?: string;
-  defaultInventoryAccount?: string;
-  stockReceivedButNotBilled?: string;
-  stockAdjustmentAccount?: string;
+  defaultCashAccount?: string | null;
+  defaultInventoryAccount?: string | null;
+  stockReceivedButNotBilled?: string | null;
+  stockAdjustmentAccount?: string | null;
   defaultDeferredRevenueAccount?: string | null;
   defaultDeferredExpenseAccount?: string | null;
   exchangeGainLossAccount?: string | null;
@@ -4867,14 +5195,14 @@ export interface BuyingSettings {
 }
 export type UpdateBuyingSettingsDto = Partial<BuyingSettings>;
 
+// docs/tasks/PROMPT_IDENTIDAD_GLOBAL_FRONTEND.md §9 — mucho más chico que antes: ya no hay
+// `modoCreacionPassword` (toda alta es por invitación) ni `resetPasswordLinkExpiryMinutes`
+// editable. Lo único que queda es de solo lectura, viene de una variable de entorno global del
+// backend (INVITATION_TTL_HOURS), no configurable por tenant — `PUT /config/seguridad` ya no
+// acepta ningún campo (siempre 400).
 export interface SeguridadSettings {
-  /** Minutos de vigencia del link para restablecer contraseña y para crear la contraseña la
-   *  primera vez (usuario nuevo) — es EL MISMO mecanismo en ERPNext (mismo reset_password_key),
-   *  un solo valor gobierna ambos casos. `0` desactiva la expiración (el link nunca vence). */
-  resetPasswordLinkExpiryMinutes?: number;
-  [key: string]: unknown;
+  invitationLinkExpiryHours?: number;
 }
-export type UpdateSeguridadSettingsDto = Partial<SeguridadSettings>;
 
 // ─── Retenciones (Tax Withholding Category) ───────────────────────────────────
 
@@ -6265,15 +6593,127 @@ export interface ImportarAperturaComprasResult {
 export interface AperturaResumen {
   ventas: { cantidad: number; montoMigrado: number; saldoPendiente: number };
   compras: { cantidad: number; montoMigrado: number; saldoPendiente: number };
+  /** Sin `saldoPendiente` — no aplica a un ajuste de stock (docs/tasks/PROMPT_APERTURA_INVENTARIO_FRONTEND.md §10). */
+  inventario: { cantidad: number; montoMigrado: number };
   cuentaApertura: {
     cuenta: string | null;
     saldo: number;
     esperado: number;
     cuadra: boolean;
   };
-  porAnio: { anio: number; ventas: number; compras: number }[];
+  porAnio: { anio: number; ventas: number; compras: number; inventario: number }[];
   /** true mientras la cuenta puente tenga saldo distinto de cero — el cierre es manual, fuera de este módulo. */
   pendienteDeCierre: boolean;
+}
+
+// ─── Apertura de Inventario (dentro de Migración de Saldos) ───────────────────
+// docs/tasks/PROMPT_APERTURA_INVENTARIO_FRONTEND.md — migra el saldo FÍSICO inicial (stock por
+// ítem/almacén) del sistema anterior. `qty` es el saldo FINAL absoluto, no se suma (§3). Crea y
+// confirma en una sola llamada, igual que Ventas/Compras — no hay borrador ni edición ni /importar
+// (§6, un Stock Reconciliation es un documento atómico). Anular SÍ revierte stock real (§7).
+
+export interface AperturaInventarioItemDto {
+  itemCode: string;
+  warehouse: string;
+  /** Saldo FINAL absoluto de este ítem en este almacén — 0 es válido. */
+  qty: number;
+  /** Estrictamente > 0, a diferencia de qty. */
+  valuationRate: number;
+}
+
+export interface CrearAperturaInventarioDto {
+  fechaApertura: string;
+  /** Si se omite, el backend usa "Apertura de inventario — saldo inicial del sistema anterior". */
+  remarks?: string;
+  /** Un documento no puede mezclar almacenes de sucursales distintas (§5). */
+  items: AperturaInventarioItemDto[];
+  branch?: string;
+  department?: string;
+}
+
+export interface AperturaInventarioItem extends AperturaInventarioItemDto {
+  /** qty × valuationRate, calculado por el servidor — no recalcular en el cliente. */
+  amount: number;
+}
+
+export interface AperturaInventarioListItem {
+  id: string;
+  fechaApertura: string;
+  company: string;
+  branch: string | null;
+  department: string | null;
+  cuentaApertura: string;
+  estado: AperturaEstado;
+  esApertura: true;
+}
+
+/** Shape del detalle (§4.3/§8.2) — el listado (§8.1) NO trae `items`/`montoTotal`, a propósito. */
+export interface AperturaInventario extends AperturaInventarioListItem {
+  items: AperturaInventarioItem[];
+  montoTotal: number;
+}
+
+export interface ListAperturaInventarioParams extends PaginationParams {
+  branch?: string;
+  fromDate?: string;
+  toDate?: string;
+}
+
+// ─── Carga Inicial de Inventario (Stock Entry / Material Receipt) ─────────────
+// docs/tasks/PROMPT_CARGA_INICIAL_INVENTARIO_FRONTEND.md — agrega existencias a un almacén SIN
+// que haya una compra de por medio (hallazgos, donaciones, ajustes). NO es lo mismo que Apertura
+// de Inventario (`AperturaInventario` arriba): acá `qty` se SUMA a lo que ya existe (nunca fija
+// un saldo absoluto) y por eso `qty: 0` es inválido — a diferencia de Apertura, donde 0 sí es
+// válido. Contabiliza contra `Company.stock_adjustment_account`, una cuenta DISTINTA de la
+// `14-03 APERTURA TEMPORAL` que usa Apertura de Inventario. Crea y confirma en una sola llamada,
+// sin borrador ni edición ni /importar por lote.
+
+export type CargaInicialStatus = "submitted" | "cancelled";
+
+export interface CargaInicialItemDto {
+  itemCode: string;
+  warehouse: string;
+  /** Estrictamente > 0 — a diferencia de Apertura de Inventario, 0 NO es válido acá. */
+  qty: number;
+  valuationRate: number;
+}
+
+export interface CrearCargaInicialDto {
+  postingDate: string;
+  /** Si se omite, el backend guarda cadena vacía (no un texto por defecto). */
+  remarks?: string;
+  /** Un documento no puede mezclar almacenes de sucursales distintas. */
+  items: CargaInicialItemDto[];
+  branch?: string;
+  department?: string;
+}
+
+export interface CargaInicialItem extends CargaInicialItemDto {
+  /** qty × valuationRate, calculado por ERPNext — no recalcular en el cliente. */
+  amount: number;
+}
+
+export interface CargaInicialListItem {
+  id: string;
+  status: CargaInicialStatus;
+  postingDate: string;
+  company: string;
+  branch: string | null;
+  department: string | null;
+  remarks: string;
+  createdAt: string;
+}
+
+/** Shape del detalle (§3.3/§7.2) — el listado (§7.1) NO trae `items`/`totalValue`, a propósito. */
+export interface CargaInicialInventario extends CargaInicialListItem {
+  items: CargaInicialItem[];
+  totalValue: number;
+}
+
+export interface ListCargaInicialParams extends PaginationParams {
+  branch?: string;
+  department?: string;
+  status?: CargaInicialStatus;
 }
 
 // ─── Despachos (Delivery Note) ─────────────────────────────────────────────────
@@ -6422,6 +6862,54 @@ export interface FacturarDespachoResult {
   despachoId: string;
   message: string;
 }
+
+/** POST /despachos/:id/confirmar-stock — docs/tasks/75_almacen_venta_confirmar_stock_uoms_permitidas.md
+ *  §2. Solo aplica a un despacho en Borrador. No somete el despacho — eso sigue siendo un paso
+ *  separado y explícito (POST /despachos/:id/submit) después de confirmar.
+ *
+ *  Mismo DTO reutilizado por POST /pedidos/:id/confirmar-despacho (docs/tasks/
+ *  79_confirmacion_despacho_pedido.md §4) — ahí sí importan `serials`/`batches` (solo para un
+ *  artículo con `Item.custom_asignar_serial_en_despacho` activo); la confirmación de un Despacho
+ *  existente los ignora si se envían. */
+export interface ConfirmarStockDespachoItemDto {
+  itemCode: string;
+  /** Solo hace falta si el ítem realmente tiene faltante en su almacén destino — se puede omitir
+   *  si ya hay suficiente ahí. Cualquier almacén de la compañía, no restringido a la sucursal. */
+  sourceWarehouse?: string;
+  /** Solo para POST /pedidos/:id/confirmar-despacho, con `trackingType: 'serial'`. */
+  serials?: string[];
+  /** Solo para POST /pedidos/:id/confirmar-despacho, con `trackingType: 'batch'`. */
+  batches?: { batchId: string; qty: number }[];
+}
+
+export interface ConfirmarStockDespachoDto {
+  items: ConfirmarStockDespachoItemDto[];
+}
+
+export interface ConfirmarStockDespachoResultItem {
+  itemCode: string;
+  warehouse: string;
+  /** Cuánto realmente hacía falta (actual_qty - reserved_stock en el almacén destino, contra la
+   *  cantidad pendiente del despacho). */
+  faltante: number;
+  /** `false` = ya había suficiente stock en el almacén destino, no hizo falta transferir nada
+   *  para esta línea — no es un error, es informativo. */
+  transferido: boolean;
+  sourceWarehouse: string;
+}
+
+export interface ConfirmarStockDespachoResult {
+  /** Solo en la respuesta de POST /pedidos/:id/confirmar-despacho. */
+  pedidoId?: string;
+  /** `null` si ninguna línea necesitaba transferencia (todo ya estaba disponible). */
+  stockEntryId: string | null;
+  items: ConfirmarStockDespachoResultItem[];
+  message: string;
+}
+
+/** `details` del 400 de POST /despachos/:id/confirmar-stock cuando el almacén origen indicado no
+ *  tiene suficiente stock — mismo shape que `STOCK_INSUFFICIENT_OR_RESERVED` de §73. */
+export type ConfirmarStockDespachoInsufficientDetails = StockInsufficientOrReservedDetails;
 
 /** `details` del 409 de POST /config/despacho/deshabilitar — cada categoría no vacía es una lista
  *  de IDs concretos que el operador debe resolver antes de poder desactivar. */

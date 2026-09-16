@@ -36,6 +36,7 @@ import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEdit
 import type { ComponentTracking } from '@/shared/api/types'
 import { useAuthStore } from '@/stores/auth.store'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
+import { formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
@@ -298,6 +299,7 @@ function SerialBatchRow({
               ))
             }}
             itemCode={item.itemCode || undefined}
+            direction="purchase"
           />
         </td>
         <td style={{ textAlign: 'center' }}>
@@ -866,6 +868,10 @@ export default function CompraForm() {
       if (apiErr?.message?.toLowerCase().includes('no tienes acceso a la sucursal')) {
         refetchMyBranches()
         toast.error(`${apiErr.message} Tus sucursales asignadas se actualizaron, vuelve a intentar.`)
+        return
+      }
+      if (isApiErrorCode(error, ERROR_CODES.UOM_NOT_ALLOWED)) {
+        toast.error(formatUomNotAllowedMessage(error), { duration: 8000 })
         return
       }
       if (apiErr?.statusCode === 400 && apiErr?.message) {

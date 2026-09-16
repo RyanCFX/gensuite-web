@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { esClienteEmisorNoEncontrado, ECF_ADMIN_ROUTE } from '@/lib/ecfErrors'
-import { Search, DollarSign, ChevronLeft, ChevronRight, X, Clock } from 'lucide-react'
+import { Search, DollarSign, ChevronLeft, ChevronRight, X, Clock, AlertTriangle } from 'lucide-react'
 import { listPendientes, cobrarFactura } from '@/shared/api/caja'
 import { getFacturacionConfig, listMetodosPago } from '@/shared/api/config'
 import { getTurnoActual } from '@/shared/api/pos'
@@ -26,6 +26,8 @@ import {
   sumPayments,
   cashAmount,
   emptyPaymentLine,
+  resolveDefaultModeOfPago,
+  friendlyPaymentError,
   PAYMENT_LINES_TOLERANCE,
   type PaymentLinesValue,
 } from '@/lib/paymentLines'
@@ -162,7 +164,7 @@ const [directoMop, setDirectoMop] = useState('')
         toast.error(err.message, { duration: 8000 })
         return
       }
-      const msg = err?.message ?? 'Error al procesar el cobro'
+      const msg = friendlyPaymentError(err?.message)
       if (esClienteEmisorNoEncontrado(msg)) {
         toast.error(msg, {
           duration: 10000,
@@ -186,21 +188,21 @@ function openModal(invoice: Invoice) {
      } else {
        setCondicionFiscal('CONSUMO')
      }
+     const invoiceCurrency = invoice.currency ?? monedaBase
      if (flujoCobro === 'directo') {
-       setDirectoMop('')
+       setDirectoMop(resolveDefaultModeOfPago(facturacion, invoiceCurrency))
        setDirectoAmount(String(invoice.outstandingAmount))
      } else {
        // El método de caja por defecto del turno solo se prellena si opera en la misma moneda
-       // que esta factura — si no (ej. turno en DOP, factura en USD), se deja en blanco para que
-       // el cajero elija un método compatible en vez de mostrar una selección inválida.
+       // que esta factura — si no (ej. turno en DOP, factura en USD), se cae al default
+       // configurado en Facturacion Config para esa moneda (modoPagoCajaUsd/modoPagoCajaEur).
        const cashMethod = turno?.modeOfPayment ?? turno?.modoPagoCaja ?? ''
-       const invoiceCurrency = invoice.currency ?? monedaBase
        const cashMethodCurrency = metodoCurrencies[cashMethod] ?? monedaBase
        setPaymentsValue({
          ...EMPTY_PAYMENT_LINES_VALUE,
          payments: [{
            ...emptyPaymentLine(),
-           modeOfPayment: cashMethodCurrency === invoiceCurrency ? cashMethod : '',
+           modeOfPayment: cashMethodCurrency === invoiceCurrency ? cashMethod : resolveDefaultModeOfPago(facturacion, invoiceCurrency),
            amount: String(invoice.outstandingAmount),
          }],
        })
@@ -444,6 +446,19 @@ function validateAndSubmit() {
                {flujoCobro === 'directo' ? (
                  /* ── Flujo directo ─────────────────────────────────── */
                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                   {metodosCompatibles.length === 0 && (
+                     <div className="inline-alert inline-alert-warn">
+                       <AlertTriangle size={16} />
+                       <span>
+                         No hay ningún método de pago configurado en {selectedInvoiceCurrency} — Caja/POS
+                         nunca convierte moneda, así que un método solo sirve acá si la cuenta bancaria o
+                         contable que tiene asociada está denominada en {selectedInvoiceCurrency}.{' '}
+                         <Link to="/config/metodos-pago" style={{ fontWeight: 600, textDecoration: 'underline' }}>
+                           Configurar en Métodos de Pago
+                         </Link>
+                       </span>
+                     </div>
+                   )}
                    <div className="ff-wrap">
                      <label className="ff-label ff-required">Método de pago</label>
                      <SearchSelect

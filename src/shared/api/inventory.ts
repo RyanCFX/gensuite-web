@@ -23,6 +23,9 @@ export interface InventoryFilterParams extends PaginationParams {
   brand?: string
   stockStatus?: 'all' | 'in_stock' | 'low_stock' | 'out_of_stock'
   sortBy?: 'investment' | 'value' | 'profit'
+  /** docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §7.1 — sin `warehouse`, una fila por almacén
+   *  con movimiento de este artículo; con `warehouse` además, como máximo una fila. */
+  itemCode?: string
 }
 
 export interface HistoryFilterParams extends PaginationParams {

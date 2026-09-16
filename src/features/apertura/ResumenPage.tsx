@@ -23,7 +23,7 @@ export default function ResumenPage() {
         <span className="skeleton-box" style={{ height: 320, width: '100%', display: 'block' }} />
       ) : (
         <>
-          <div className="form-row form-row-3" style={{ marginBottom: 16 }}>
+          <div className="form-row form-row-4" style={{ marginBottom: 16 }}>
             <div className="card">
               <div className="card-header"><h2 className="card-title">Ventas migradas</h2></div>
               <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -38,6 +38,14 @@ export default function ResumenPage() {
                 <span style={{ fontSize: 22, fontWeight: 700 }}>{formatMoney(resumen.compras.montoMigrado)}</span>
                 <span className="td-muted" style={{ fontSize: 13 }}>{formatNumber(resumen.compras.cantidad)} facturas confirmadas</span>
                 <span className="td-muted" style={{ fontSize: 13 }}>Saldo pendiente: {formatMoney(resumen.compras.saldoPendiente)}</span>
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-header"><h2 className="card-title">Inventario migrado</h2></div>
+              <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 22, fontWeight: 700 }}>{formatMoney(resumen.inventario.montoMigrado)}</span>
+                <span className="td-muted" style={{ fontSize: 13 }}>{formatNumber(resumen.inventario.cantidad)} documentos confirmados</span>
+                {/* Sin "saldo pendiente" — no aplica a un ajuste de stock (§10 del prompt de inventario). */}
               </div>
             </div>
             <div className="card">
@@ -94,6 +102,7 @@ export default function ResumenPage() {
                       <th>Año</th>
                       <th style={{ textAlign: 'right' }}>Ventas</th>
                       <th style={{ textAlign: 'right' }}>Compras</th>
+                      <th style={{ textAlign: 'right' }}>Inventario</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -102,6 +111,7 @@ export default function ResumenPage() {
                         <td>{row.anio}</td>
                         <td style={{ textAlign: 'right' }}>{formatMoney(row.ventas)}</td>
                         <td style={{ textAlign: 'right' }}>{formatMoney(row.compras)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatMoney(row.inventario)}</td>
                       </tr>
                     ))}
                   </tbody>

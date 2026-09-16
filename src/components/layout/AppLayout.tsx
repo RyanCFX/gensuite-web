@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Users,
   Package,
+  PackagePlus,
   FileText,
   Receipt,
   Warehouse,
@@ -215,6 +216,14 @@ const NAV_OPS: NavEntry[] = [
         label: "Transferencias",
         icon: <Truck size={14} />,
         path: "/transferencias",
+      },
+      {
+        // Carga Inicial (Stock Entry / Material Receipt) — docs/tasks/
+        // PROMPT_CARGA_INICIAL_INVENTARIO_FRONTEND.md. NO confundir con "Inventario" bajo
+        // Migración de Saldos (Configuración): cuentas contables y semántica de qty distintas.
+        label: "Carga Inicial",
+        icon: <PackagePlus size={14} />,
+        path: "/inventario/carga-inicial",
       },
       {
         label: "Valoración de Stock",
@@ -557,10 +566,13 @@ const NAV_CONFIG: NavEntry = {
       icon: <Calendar size={14} />,
       path: "/config/ejercicio-fiscal",
     },
-    // Migración de Saldos (Facturas de Apertura) — docs/tasks/PROMPT_APERTURA_FRONTEND.md §2.
+    // Migración de Saldos (Facturas de Apertura) — docs/tasks/PROMPT_APERTURA_FRONTEND.md §2 y
+    // docs/tasks/PROMPT_APERTURA_INVENTARIO_FRONTEND.md §2 (pestaña "Inventario").
     // Grupo anidado (soportado por NavGroupBtn/filtrarNavPorPermisos de forma recursiva) para que
-    // sus 4 pantallas queden agrupadas; si el usuario no tiene ninguna acción "ver" de este
+    // sus 5 pantallas queden agrupadas; si el usuario no tiene ninguna acción "ver" de este
     // módulo, filtrarNavPorPermisos oculta cada hijo y el grupo entero desaparece del menú.
+    // "Inventario" usa un permiso independiente (apertura.inventario.*, doctype Stock
+    // Reconciliation) — un usuario puede ver Ventas/Compras y no ver Inventario, no es un bug.
     {
       label: "Migración de Saldos",
       icon: <History size={14} />,
@@ -569,6 +581,7 @@ const NAV_CONFIG: NavEntry = {
         { label: "Diagnóstico", icon: <Wrench size={14} />, path: "/apertura/diagnostico" },
         { label: "Ventas", icon: <Receipt size={14} />, path: "/apertura/ventas" },
         { label: "Compras", icon: <ShoppingCart size={14} />, path: "/apertura/compras" },
+        { label: "Inventario", icon: <Package size={14} />, path: "/apertura/inventario" },
         { label: "Cuadre", icon: <BarChart3 size={14} />, path: "/apertura/resumen" },
       ],
     },
@@ -610,6 +623,70 @@ const NAV_CONFIG: NavEntry = {
     { label: "Mi Perfil", icon: <UserCog size={14} />, path: "/config/perfil" },
   ],
 };
+
+// ─── Panel categorizado de Configuración ───────────────────────────────────────
+// Mismo criterio visual que el listado de Reportes (REPORT_NAV en ReportesPage.tsx: columna con
+// encabezados de categoría), pero acá el panel vive en AppLayout — no dentro de una sola pantalla
+// — porque Configuración son ~30 rutas distintas (no una sola pantalla con :tipo como parámetro),
+// así que el panel no se desmonta al pasar de una sección de configuración a otra: se muestra
+// mientras la ruta actual esté bajo /config, /apertura o /usuarios, sin importar cuál subsección.
+//
+// Se deriva de `configNavPermFiltered` (el árbol ya filtrado por rol/vertical/permisos) en vez de
+// mantener una lista aparte — así no hay riesgo de que este panel muestre un ítem que el árbol
+// normal del sidebar ya oculta para ese usuario.
+const CONFIG_ITEM_GROUP: Record<string, string> = {
+  "/config/empresa": "General",
+  "/config/sucursales": "General",
+  "/config/departamentos": "General",
+  "/config/impresoras": "General",
+  "/config/cajas": "Tesorería",
+  "/config/bancos": "Tesorería",
+  "/config/cuentas-bancarias": "Tesorería",
+  "/config/tesoreria/tipos-documento": "Tesorería",
+  "/config/cobros": "Tesorería",
+  "/config/metodos-pago": "Tesorería",
+  "/config/denominaciones": "Tesorería",
+  "/config/centros-costo": "Contabilidad",
+  "/config/ejercicio-fiscal": "Contabilidad",
+  "/config/retenciones": "Contabilidad",
+  "/config/facturacion": "Facturación",
+  "/config/monedas": "Facturación",
+  "/config/ecf": "Facturación",
+  "/config/plantillas-facturas": "Facturación",
+  "/config/ncf": "Facturación",
+  "/config/tasas-impuesto": "Facturación",
+  "/config/listas-precio": "Facturación",
+  "/config/grupos-clientes": "Facturación",
+  "/config/almacenes": "Inventario",
+  "/config/uom": "Inventario",
+  "/config/recalculo-valuacion": "Inventario",
+  "/config/ajustes-avanzados": "Sistema",
+  "/config/notificaciones": "Sistema",
+  "/config/farmacia": "Sistema",
+  "/usuarios": "Sistema",
+  "/config/permisos": "Sistema",
+  "/config/roles": "Sistema",
+  "/config/auditoria-pin": "Sistema",
+  "/config/perfil": "Sistema",
+};
+
+// Aplana el árbol (1 solo nivel de anidamiento hoy: "Migración de Saldos") en pares {group, item}
+// — un subgrupo usa su propio label como categoría; un ítem suelto sin entrada en
+// CONFIG_ITEM_GROUP cae en "General" en vez de desaparecer, para que un ítem nuevo que alguien
+// olvide categorizar siga siendo visible.
+function flattenConfigNav(root: NavGroup): { group: string; item: NavItem }[] {
+  const out: { group: string; item: NavItem }[] = [];
+  for (const child of root.children) {
+    if (isGroup(child)) {
+      for (const grandchild of child.children) {
+        if (!isGroup(grandchild)) out.push({ group: child.label, item: grandchild });
+      }
+    } else {
+      out.push({ group: CONFIG_ITEM_GROUP[child.path] ?? "General", item: child });
+    }
+  }
+  return out;
+}
 
 // Nota: esta pantalla también la puede ver el rol "Auditor" (así lo exige el backend), pero el
 // filtro de menú de abajo solo distingue System Manager — el frontend no rastrea roles finos
@@ -760,6 +837,34 @@ function NavChildBtn({
   );
 }
 
+// Botón del panel categorizado de Configuración — variante clara (.report-nav-item, mismo estilo
+// que ya usa el listado de Reportes), no la variante oscura de .nav-item/.nav-child del sidebar.
+function ConfigNavLinkBtn({
+  item,
+  onNav,
+  pathname,
+}: {
+  item: NavItem;
+  onNav: (p: string) => void;
+  pathname: string;
+}) {
+  const active = item.activePrefixes
+    ? item.activePrefixes.some((p) => pathname === p || pathname.startsWith(p + "/"))
+    : item.exact
+      ? pathname === item.path
+      : pathname === item.path || pathname.startsWith(item.path + "/");
+  return (
+    <button
+      className={`report-nav-item${active ? " active" : ""}`}
+      aria-current={active ? "page" : undefined}
+      onClick={() => onNav(item.path)}
+    >
+      {item.icon}
+      <span>{item.label}</span>
+    </button>
+  );
+}
+
 function NavGroupBtn({
   group,
   onNav,
@@ -897,9 +1002,11 @@ function renderEntry(
 function TabCloseButton({
   label,
   onClose,
+  active,
 }: {
   label: string;
   onClose: () => void;
+  active?: boolean;
 }) {
   const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -927,10 +1034,10 @@ function TabCloseButton({
         border: "none",
         background: "transparent",
         cursor: "pointer",
-        color: "var(--text-tertiary)",
+        color: active ? "#ffffff" : "var(--text-tertiary)",
         padding: 0,
         flexShrink: 0,
-        opacity: 0.7,
+        opacity: active ? 0.85 : 0.7,
       }}
       onClick={(e) => {
         e.stopPropagation();
@@ -1042,7 +1149,7 @@ function TabBar() {
               cursor: "pointer",
               borderRight: "1px solid var(--border-default)",
               borderTopRightRadius: 10,
-              background: "transparent",
+              background: isActive ? "#208591" : "transparent",
               borderBottom: isActive
                 ? "none"
                 : "2px solid transparent",
@@ -1066,10 +1173,10 @@ function TabBar() {
             <span
               style={{
                 flex: 1,
-                fontSize: 12,
-                fontWeight: isActive ? 500 : 400,
+                fontSize: 14,
+                fontWeight: isActive ? 600 : 400,
                 color: isActive
-                  ? "#208591"
+                  ? "#ffffff"
                   : "var(--text-secondary)",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -1080,6 +1187,7 @@ function TabBar() {
             </span>
             <TabCloseButton
               label={`Cerrar ${tab.title}`}
+              active={isActive}
               onClose={() => {
                 if (tab.isDirty) {
                   if (
@@ -1204,6 +1312,23 @@ function AppLayoutInner() {
   const outlet = useOutlet();
   const activeTabPath = location.pathname + (location.search || "");
 
+  // Panel categorizado de Configuración (persistente mientras la ruta esté bajo /config,
+  // /apertura o /usuarios) — reemplaza la lista de submenú anidada que se expandía/colapsaba
+  // dentro del propio sidebar.
+  const configNavFlat = configNavPermFiltered ? flattenConfigNav(configNavPermFiltered as NavGroup) : [];
+  const configGroups = [...new Set(configNavFlat.map((x) => x.group))];
+  const configPanelVisible =
+    !!configNavPermFiltered &&
+    (location.pathname.startsWith("/config") ||
+      location.pathname.startsWith("/apertura") ||
+      location.pathname === "/usuarios");
+  const configEntryItem: NavItem = {
+    label: "Configuración",
+    icon: <Settings size={16} aria-hidden="true" />,
+    path: "/config/empresa",
+    activePrefixes: ["/config", "/apertura", "/usuarios"],
+  };
+
   // Auto-collapse sidebar al ENTRAR a una vista de pantalla completa (Reportes, Editor de
   // Plantillas) — transición desde fuera de esas rutas — y auto-expand al SALIR, siempre que
   // el colapso actual siga siendo el automático (el usuario no lo tocó a mano). Si el usuario
@@ -1225,7 +1350,7 @@ function AppLayoutInner() {
     prevPathRef.current = location.pathname;
   }, [location.pathname]);
 
-  const displayName = user?.full_name ?? user?.email ?? "Usuario";
+  const displayName = user?.fullName ?? user?.email ?? "Usuario";
   const initials = displayName.slice(0, 2).toUpperCase();
 
   // Apply theme to root element
@@ -1345,14 +1470,18 @@ function AppLayoutInner() {
           renderEntry(reportesNav, handleNav, collapsed, {
             floatWhenCollapsed: true,
           })}
-        {configNavPermFiltered && renderEntry(configNavPermFiltered, handleNav, collapsed)}
+        {configNavPermFiltered && (
+          <NavItemBtn item={configEntryItem} onNav={handleNav} collapsed={collapsed} />
+        )}
       </div>
     </>
   );
 
   return (
     <>
-      <div className={`app-shell${collapsed ? " collapsed" : ""}`}>
+      <div
+        className={`app-shell${collapsed ? " collapsed" : ""}${configPanelVisible ? " with-config-panel" : ""}`}
+      >
         {/* ── Topbar ── */}
         <header className="topbar">
           {/* Mobile menu / collapse toggle */}
@@ -1466,7 +1595,7 @@ function AppLayoutInner() {
               >
                 <div className="dd-header">
                   <div className="dd-name">
-                    {user?.full_name ?? displayName}
+                    {user?.fullName ?? displayName}
                   </div>
                   <div className="dd-email">{user?.email}</div>
                 </div>
@@ -1480,6 +1609,16 @@ function AppLayoutInner() {
                     }}
                   >
                     <UserCog size={14} aria-hidden="true" /> Mi perfil
+                  </button>
+                  <button
+                    className="dd-item"
+                    role="menuitem"
+                    onClick={() => {
+                      setUserOpen(false);
+                      navigate("/mi-cuenta");
+                    }}
+                  >
+                    <ShieldCheck size={14} aria-hidden="true" /> Mi cuenta y seguridad
                   </button>
                   <button
                     className="dd-item"
@@ -1511,6 +1650,27 @@ function AppLayoutInner() {
         <nav className="sidebar" aria-label="Navegación principal">
           <div style={{ flex: 1, overflowY: "auto" }}>{sidebarContent}</div>
         </nav>
+
+        {/* ── Panel de Configuración — persistente, no se desmonta al navegar entre secciones ── */}
+        {configPanelVisible && (
+          <aside className="config-nav-panel" aria-label="Secciones de Configuración">
+            {configGroups.map((group) => (
+              <div key={group} className="config-nav-group">
+                <div className="config-nav-group-label">{group}</div>
+                {configNavFlat
+                  .filter((x) => x.group === group)
+                  .map(({ item }) => (
+                    <ConfigNavLinkBtn
+                      key={item.path}
+                      item={item}
+                      onNav={handleNav}
+                      pathname={location.pathname}
+                    />
+                  ))}
+              </div>
+            ))}
+          </aside>
+        )}
 
         {/* ── Main ── */}
         <main

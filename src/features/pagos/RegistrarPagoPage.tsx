@@ -16,7 +16,7 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { formatDOP } from '@/lib/formatters'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
-import { getUser } from '@/shared/api/storage'
+import { getCachedUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
@@ -72,7 +72,7 @@ export default function RegistrarPagoPage() {
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
 
-  const currentUserEmail = getUser()?.email
+  const currentUserEmail = getCachedUser()?.email
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser', currentUserEmail],
     queryFn: () => getUsuario(currentUserEmail!),

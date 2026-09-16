@@ -1,7 +1,7 @@
 import { create, type StoreApi } from 'zustand'
 import { DEFAULT_ZOOM, TEMPLATE_FORMATS, ZOOM_LEVELS } from './constants'
 import { fetchDefaultTemplate } from './mocks'
-import { createDefaultElement, createElementFromField, createEmptyPage, cloneDocument } from './elementFactory'
+import { createDefaultElement, createElementFromField, createEmptyPage, cloneDocument, cloneElements } from './elementFactory'
 import { deleteDraft as deleteDraftStorage, getDraft, listDrafts, saveDraft as saveDraftStorage } from './drafts'
 import { toApiType, fromApiType } from './typeMapping'
 import { mapCamposToFieldCategories, mapGaleriaItemToTemplateGalleryItem } from './apiAdapters'
@@ -60,6 +60,9 @@ interface EditorState {
   availableFieldsByType: Partial<Record<TemplateType, TemplateFieldCategory[]>>
   fieldsLoading: boolean
   selectedIds: string[]
+  /** Portapapeles interno (copiar/pegar) — vive solo en memoria, no persiste entre recargas ni
+   * cruza pestañas; se pega en la página activa, offset unas pocas px del original. */
+  clipboard: TemplateElement[]
   zoom: number
   saving: boolean
   lastSavedAt: string | null
@@ -91,6 +94,11 @@ interface EditorState {
   listSavedTemplates: (type: TemplateType) => Promise<TemplateSummary[]>
 
   addPage: () => void
+  /** Agrega al documento activo las páginas de `document` (con ids nuevos, vía `cloneDocument`)
+   * en vez de reemplazarlo — usado por el diálogo "¿Reemplazar la plantilla actual?" cuando el
+   * usuario elige "Agregar página" para conservar el canvas actual y sumar el contenido de la
+   * plantilla elegida como página(s) nueva(s). */
+  appendDocumentPages: (document: TemplateDocument) => void
   removePage: (pageId: string) => void
 
   addElement: (type: ElementType, position?: { x: number; y: number }, pageId?: string) => string
@@ -98,6 +106,11 @@ interface EditorState {
   updateElement: (id: string, patch: Partial<TemplateElement>) => void
   removeElement: (id: string) => void
   duplicateElement: (id: string) => void
+  /** Copia la selección actual (uno o varios elementos, incluso de páginas distintas) al
+   * portapapeles interno. */
+  copySelection: () => void
+  /** Pega el portapapeles (si tiene algo) en la página activa, con ids nuevos y offset. */
+  pasteClipboard: () => void
   bringToFront: (id: string) => void
   sendToBack: (id: string) => void
 
@@ -254,6 +267,7 @@ export const useTemplateEditorStore = create<EditorState>((set, get) => ({
   availableFieldsByType: {},
   fieldsLoading: false,
   selectedIds: [],
+  clipboard: [],
   zoom: DEFAULT_ZOOM,
   saving: false,
   lastSavedAt: null,
@@ -354,6 +368,20 @@ export const useTemplateEditorStore = create<EditorState>((set, get) => ({
     })
   },
 
+  appendDocumentPages: (document) => {
+    get().beginTransaction()
+    set((state) => {
+      const doc = activeDocOf(state)
+      const cloned = cloneDocument(document)
+      const pages = [...doc.pages, ...cloned.pages]
+      return {
+        documents: { ...state.documents, [state.format]: { ...doc, pages } },
+        activePageId: { ...state.activePageId, [state.format]: cloned.pages[0]?.id },
+        selectedIds: [],
+      }
+    })
+  },
+
   removePage: (pageId) => {
     get().beginTransaction()
     set((state) => {
@@ -438,6 +466,31 @@ export const useTemplateEditorStore = create<EditorState>((set, get) => ({
       return [...elements, copy]
     }))
     if (newId) set({ selectedIds: [newId] })
+  },
+
+  copySelection: () => {
+    const state = get()
+    const doc = activeDocOf(state)
+    const allElements = doc.pages.flatMap((p) => p.elements)
+    const selected = allElements.filter((el) => state.selectedIds.includes(el.id))
+    if (selected.length === 0) return
+    set({ clipboard: selected.map((el) => ({ ...el })) })
+  },
+
+  pasteClipboard: () => {
+    const state = get()
+    if (state.clipboard.length === 0) return
+    get().beginTransaction()
+    const pasted = cloneElements(state.clipboard).map((el) => ({ ...el, x: el.x + 16, y: el.y + 16 }))
+    set((state2) => {
+      const doc = activeDocOf(state2)
+      const targetPageId = fallbackPageId(state2, doc)
+      return {
+        ...withPageElements(state2, targetPageId, (elements) => [...elements, ...pasted]),
+        activePageId: { ...state2.activePageId, [state2.format]: targetPageId },
+        selectedIds: pasted.map((el) => el.id),
+      }
+    })
   },
 
   bringToFront: (id) => {

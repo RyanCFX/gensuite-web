@@ -104,7 +104,10 @@ export default function DevolucionForm() {
     }))
 
   const today = new Date().toISOString().slice(0, 10)
-  const [qtys, setQtys] = useState<Record<string, string>>({})
+  // Por índice de línea, no por itemCode — una compra puede tener dos líneas del mismo artículo
+  // (p. ej. mismo producto a costos distintos), y ambas deben poder devolverse de forma
+  // independiente en vez de compartir la misma cantidad tecleada.
+  const [qtys, setQtys] = useState<Record<number, string>>({})
   const [postingDate, setPostingDate] = useState('')
   const [reason, setReason] = useState('')
 
@@ -113,8 +116,8 @@ export default function DevolucionForm() {
       const devByCode = new Map(
         (isEdit && devolucion ? devolucion.items : []).map((it) => [it.itemCode, it.qty] as const),
       )
-      return sourceCompra.items.map((it) => {
-        const typed = qtys[it.itemCode]
+      return sourceCompra.items.map((it, idx) => {
+        const typed = qtys[idx]
         const parsed = typed !== undefined ? Number(typed) : 0
         const returnQty = isNaN(parsed) ? 0 : Math.min(Math.max(parsed, 0), it.qty)
         const initialQty = isEdit ? Math.abs(devByCode.get(it.itemCode) ?? 0) : 0
@@ -360,8 +363,8 @@ export default function DevolucionForm() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((it) => (
-                <tr key={it.itemCode} style={it.returnQty > 0 ? { background: 'var(--info-bg, var(--surface-sunken))' } : undefined}>
+              {rows.map((it, idx) => (
+                <tr key={`${it.itemCode}-${idx}`} style={it.returnQty > 0 ? { background: 'var(--info-bg, var(--surface-sunken))' } : undefined}>
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{it.itemCode}</td>
                   <td style={{ textAlign: 'right' }}>{it.stockQty}</td>
                   <td style={{ textAlign: 'right' }}>{formatDOP(it.rate, { trimZeros: true })}</td>
@@ -377,7 +380,7 @@ export default function DevolucionForm() {
                       onChange={(e) => {
                         const v = parseFloat(e.target.value)
                         const next = isNaN(v) ? 0 : Math.min(Math.max(v, 0), it.stockQty)
-                        setQtys((prev) => ({ ...prev, [it.itemCode]: String(next) }))
+                        setQtys((prev) => ({ ...prev, [idx]: String(next) }))
                       }}
                     />
                   </td>

@@ -17,7 +17,8 @@ import { client } from '@/shared/api/client'
 import { listItems, getDefaultPriceTier, getItem } from '@/shared/api/catalog'
 import { listImpuestosVentas, listAlmacenes, getCatalogosFiscales, getStockSettings, getFacturacionConfig } from '@/shared/api/config'
 import { getItemUbicaciones } from '@/shared/api/ubicaciones'
-import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking, ItemStock } from '@/shared/api/types'
+import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking, ItemStock, MonedaCode } from '@/shared/api/types'
+import { getTasaVigente } from '@/shared/api/monedas'
 import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingModal'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
@@ -42,15 +43,16 @@ import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
-import { listSucursales } from '@/shared/api/sucursales'
-import { getUser } from '@/shared/api/storage'
+import { listSucursales, getSucursal } from '@/shared/api/sucursales'
+import { getCachedUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
-import { formatStockInsufficientMessage } from '@/lib/stockAlerts'
+import { useItemInventory } from '@/shared/hooks/useItemInventory'
+import { formatStockInsufficientMessage, formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -272,6 +274,10 @@ export default function InvoiceForm() {
   const stockMap = useItemsStock(
     items.map((i) => (i.itemCode && i.itemType !== 'service' && i.itemType !== 'combo' ? i.itemCode : undefined)),
   )
+  // "En pedido" (reservedQty, informativo, NO bloqueante) — docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §7.4.
+  const inventoryMap = useItemInventory(
+    items.map((i) => (i.itemCode && i.warehouse && i.itemType !== 'service' && i.itemType !== 'combo' ? { itemCode: i.itemCode, warehouse: i.warehouse } : undefined)),
+  )
   const [highlightedRow, setHighlightedRow] = useState<number | null>(null)
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
   const flashRow = useCallback((index: number) => {
@@ -308,7 +314,13 @@ export default function InvoiceForm() {
   // El vertical no cambia en caliente (§11): se lee una vez de los permisos de la sesión.
   const esFarmacia = usePermissionsStore((s) => s.vertical) === 'farmacia'
   const [arsEnabled, setArsEnabled] = useState(false)
-  const [ars, setArs] = useState<AseguradoraFormState>(EMPTY_ASEGURADORA_FORM)
+  // Fecha de aprobación y de indicación de la receta arrancan en hoy — el usuario casi siempre
+  // aprueba/indica el mismo día que factura, y así evita tener que llenarlas a mano cada vez.
+  const [ars, setArs] = useState<AseguradoraFormState>({
+    ...EMPTY_ASEGURADORA_FORM,
+    fechaAprobacion: todayIso(),
+    fechaIndicacionReceta: todayIso(),
+  })
   /** Bloque calculado por el servidor del borrador que se está editando — nunca se recalcula acá. */
   const arsServidor = esCoberturaCompleta(editingInvoice?.aseguradora) ? editingInvoice.aseguradora : null
   /** `Facturado` = bloque inmutable; el resto de los estados de un borrador son editables. */
@@ -329,6 +341,32 @@ export default function InvoiceForm() {
   const mostrarImpuestoDocumento = usaImpuestoDocumento && !(esFarmacia && arsEnabled)
   // Si está inactivo, se permite capturar un serial/lote nuevo al vender en vez de exigir que ya exista.
   const requiereSerialLoteCompra = facturacionConfig?.requiereSerialLoteCompra ?? false
+
+  // Tasa vigente configurada para el par (moneda elegida → moneda base) — se autocompleta el
+  // campo "Tasa de cambio" con esto la primera vez que el usuario elige una moneda distinta a la
+  // base, sin pisar un valor que el usuario ya haya tocado a mano.
+  const { data: tasaVigente } = useQuery({
+    queryKey: ['monedas-tasa-vigente', currency, monedaBase],
+    queryFn: () => getTasaVigente({ from: currency as MonedaCode, to: monedaBase as MonedaCode }),
+    enabled: multimonedaHabilitada && !!currency && currency !== monedaBase,
+    retry: false,
+  })
+  useEffect(() => {
+    if (currency && currency !== monedaBase && tasaVigente && conversionRate === '') {
+      setConversionRate(tasaVigente.tasa)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasaVigente])
+  // ── Despacho a futuro (docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md) ─────
+  const despachoHabilitado = facturacionConfig?.despachoHabilitado ?? false
+  const despachoFuturoHabilitado = facturacionConfig?.despachoFuturoHabilitado ?? true
+  const despachoConfirmarStockAsignaSeriales = facturacionConfig?.despachoConfirmarStockAsignaSeriales ?? false
+  // Selector visible solo si despachoHabilitado && despachoFuturoHabilitado (§3.1). Cuando no está
+  // visible, el valor efectivo es siempre "inmediato" (§3.2: omitido resuelve a futuro SOLO si
+  // habilitado && permitido — en cualquier otro caso resuelve a inmediato).
+  const mostrarSelectorDespachoFuturo = despachoHabilitado && despachoFuturoHabilitado
+  const [despachoFuturo, setDespachoFuturo] = useState(false)
+  const esInmediata = mostrarSelectorDespachoFuturo ? !despachoFuturo : true
 
   // ── Stock settings: define si los seriales/lotes se capturan inline en la fila (useSerialBatchFields)
   //    o vía diálogo emergente (ComponentTrackingModal). El catálogo es fijo, se cachea 1h.
@@ -377,7 +415,7 @@ export default function InvoiceForm() {
     staleTime: 5 * 60_000,
   })
 
-  const currentUserEmail = getUser()?.email
+  const currentUserEmail = getCachedUser()?.email
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser', currentUserEmail],
     queryFn: () => getUsuario(currentUserEmail!),
@@ -447,6 +485,18 @@ export default function InvoiceForm() {
     staleTime: 60_000,
   })
 
+  // docs/tasks/75_almacen_venta_confirmar_stock_uoms_permitidas.md §1.4 — si la sucursal tiene
+  // almacén de venta configurado, TODA venta debe salir de ahí sin excepción: se oculta el
+  // selector por línea y se fuerza ese almacén, en vez de dejar elegir y recién enterarse con el
+  // 400 de SALE_WAREHOUSE_MISMATCH al someter.
+  const { data: sucursalActual } = useQuery({
+    queryKey: ['sucursal', branch],
+    queryFn: () => getSucursal(branch),
+    enabled: !!branch,
+    staleTime: 60_000,
+  })
+  const almacenVentaSucursal = sucursalActual?.almacenVenta || null
+
   // Al cambiar de sucursal, el almacén elegido en cada línea deja de ser válido.
   // En edición se ignora el cambio de sucursal que produce la propia hidratación del borrador,
   // para no borrar los almacenes que vienen en GET /invoices/:id.
@@ -463,8 +513,37 @@ export default function InvoiceForm() {
   }, [branchWarehouses, warehouseSearch])
 
   function defaultWarehouse(): string {
+    if (almacenVentaSucursal) return almacenVentaSucursal
     return branchWarehouses?.length === 1 ? branchWarehouses[0].id : ''
   }
+
+  // El catálogo (prices/standardRate) siempre está en `monedaBase` — `baseRate` guarda ese precio
+  // sin tocar; `saleRate` es lo que efectivamente se cobra/muestra por línea: convertido a la
+  // moneda elegida (si no es la base) y ajustado por la UDM de venta (`factor`, 1 = UDM de stock).
+  function saleRate(base: number, factor: number = 1): number {
+    const converted = base * factor
+    const rate = currency && currency !== monedaBase && conversionRate !== '' && Number(conversionRate) > 0
+      ? converted / Number(conversionRate)
+      : converted
+    return Math.round(rate * 10000) / 10000
+  }
+
+  // Al elegir/cambiar moneda o tasa, se reconvierten los precios de las líneas ya cargadas en esta
+  // sesión (con `_prices`, es decir, elegidas desde el catálogo) — no toca líneas hidratadas de una
+  // factura en edición, que ya vienen en la moneda con la que se guardaron originalmente.
+  useEffect(() => {
+    setItems((prev) =>
+      prev.map((row) => {
+        if (!row._prices || !row.itemCode) return row
+        const rate = saleRate(row.baseRate, row.conversionFactor)
+        const amount = row.discountMode === 'amount'
+          ? calcAmount(row.qty, rate, 0, row.discountAmount)
+          : calcAmount(row.qty, rate, row.discountPct)
+        return { ...row, rate, amount }
+      }),
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currency, conversionRate, monedaBase])
 
   // Si la sucursal solo tiene un almacén, se autoselecciona en las líneas que no tengan uno.
   useEffect(() => {
@@ -477,6 +556,15 @@ export default function InvoiceForm() {
       }),
     )
   }, [branchWarehouses])
+
+  // Con almacén de venta configurado, se fuerza en TODAS las líneas (no solo en las vacías) — no
+  // hay atajo posible desde otro almacén de la misma sucursal.
+  useEffect(() => {
+    if (!almacenVentaSucursal) return
+    setItems((prev) =>
+      prev.map((row) => (row.warehouse === almacenVentaSucursal ? row : { ...row, warehouse: almacenVentaSucursal })),
+    )
+  }, [almacenVentaSucursal])
 
   // Si solo hay una sucursal disponible, se selecciona sola y el select se bloquea.
   useEffect(() => {
@@ -588,6 +676,14 @@ export default function InvoiceForm() {
       }
       if (isApiErrorCode(err, ERROR_CODES.STOCK_INSUFFICIENT_OR_RESERVED)) {
         toast.error(formatStockInsufficientMessage(err), { duration: 8000 })
+        return
+      }
+      if (isApiErrorCode(err, ERROR_CODES.SALE_WAREHOUSE_MISMATCH)) {
+        toast.error(msg, { duration: 8000 })
+        return
+      }
+      if (isApiErrorCode(err, ERROR_CODES.UOM_NOT_ALLOWED)) {
+        toast.error(formatUomNotAllowedMessage(err), { duration: 8000 })
         return
       }
       if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) { setPinModalOpen(true); return }
@@ -814,15 +910,16 @@ export default function InvoiceForm() {
         if (i !== index) return row
         const tier = selectedCustomer?.priceTier ?? defaultPriceTier ?? 'B'
         const baseRate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
+        const rate = saleRate(baseRate)
         return {
           ...row,
           itemCode: catalogItem.id,
           itemLabel: catalogItem.itemName,
           itemType: catalogItem.type,
           description: catalogItem.internalDescription ?? catalogItem.itemName,
-          rate: baseRate,
+          rate,
           baseRate,
-           amount: calcAmount(row.qty, baseRate, 0, 0),
+           amount: calcAmount(row.qty, rate, 0, 0),
           uom: catalogItem.stockUom ?? row.uom,
           conversionFactor: 1,
           maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
@@ -859,17 +956,18 @@ export default function InvoiceForm() {
         if (i !== index) return row
         const tier = selectedCustomer?.priceTier ?? defaultPriceTier ?? 'B'
         const baseRate = bundle.prices?.[tier] ?? 0
+        const rate = saleRate(baseRate)
         return {
           ...row,
           itemCode: bundle.id,
           itemLabel: bundle.itemName,
           itemType: 'combo',
           description: bundle.itemName,
-          rate: baseRate,
+          rate,
           baseRate,
           amount: row.discountMode === 'amount'
-            ? calcAmount(row.qty, baseRate, 0, row.discountAmount)
-            : calcAmount(row.qty, baseRate, row.discountPct),
+            ? calcAmount(row.qty, rate, 0, row.discountAmount)
+            : calcAmount(row.qty, rate, row.discountPct),
           uom: bundle.itemUom ?? '',
           conversionFactor: 1,
           maxDiscountPct: undefined,
@@ -914,7 +1012,8 @@ export default function InvoiceForm() {
     setItems((prev) => [
       ...prev,
       ...selections.map((s) => {
-        const rate = s.item.prices?.[tier] ?? s.item.standardRate ?? 0
+        const baseRate = s.item.prices?.[tier] ?? s.item.standardRate ?? 0
+        const rate = saleRate(baseRate)
         return {
           itemCode: s.item.id,
           itemLabel: s.item.itemName,
@@ -922,7 +1021,7 @@ export default function InvoiceForm() {
           description: s.item.internalDescription ?? s.item.itemName,
           qty: s.qty,
           rate,
-          baseRate: rate,
+          baseRate,
           amount: calcAmount(s.qty, rate, 0),
           discountPct: 0,
           discountMode: 'pct' as const,
@@ -952,13 +1051,15 @@ export default function InvoiceForm() {
     setItems((prev) =>
       prev.map((row) => {
         if (!row._prices) return row
-        const rate = row._prices[tier] ?? row.rate
+        const baseRate = row._prices[tier] ?? row.baseRate
+        const rate = saleRate(baseRate, row.conversionFactor)
         const amount = row.discountMode === 'amount'
           ? calcAmount(row.qty, rate, 0, row.discountAmount)
           : calcAmount(row.qty, rate, row.discountPct)
-        return { ...row, rate, baseRate: rate, amount }
+        return { ...row, rate, baseRate, amount }
       }),
     )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCustomer?.priceTier, defaultPriceTier])
 
   function addRow() {
@@ -982,7 +1083,7 @@ export default function InvoiceForm() {
   // ── Cobertura ARS: armado del payload (§3.2/§3.3) ─────────────────────────
   const arsActiva = esFarmacia && arsEnabled
   /** 11 columnas base + las 5 de cobertura ARS — para los `colSpan` de las filas especiales. */
-  const columnCount = arsActiva ? 16 : 11
+  const columnCount = (arsActiva ? 16 : 11) - (almacenVentaSucursal ? 1 : 0)
 
   /**
    * Campos ARS de una línea. Solo se envían si el usuario realmente los tocó: si NINGUNA línea
@@ -1055,12 +1156,17 @@ if (esClienteOcasional) {
         toast.error(`Línea ${i + 1}: el descuento supera el límite de ${effectiveLimit}%`)
         return
       }
+      // El chequeo real de stock físico al someter solo aplica a ventas inmediatas (§4.1 de
+      // docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md) — una venta a futuro no descuenta
+      // inventario al someterse, así que no tiene sentido bloquear la creación por esto acá.
       const stockError = validateLineStock(item, stockMap)
-      if (stockError) {
+      if (stockError && esInmediata) {
         toast.error(`Línea ${i + 1}: ${stockError}`)
         return
       }
-      if (!isTrackingComplete(item)) {
+      // Auto-asignación de seriales/lotes (§4.2): solo aplica a ventas inmediatas. Con el switch
+      // activo, el backend elige el serial/lote al someter — no hace falta exigirlo acá.
+      if (!(despachoConfirmarStockAsignaSeriales && esInmediata) && !isTrackingComplete(item)) {
         toast.error(`Línea ${i + 1}: selecciona las series/lotes de los componentes del combo antes de continuar`)
         return
       }
@@ -1119,6 +1225,7 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
         taxesTemplate: mostrarImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
         currency: currency || undefined,
         conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
+        despachoFuturo: mostrarSelectorDespachoFuturo ? despachoFuturo : undefined,
         ...arsBloqueDto(),
       }
 
@@ -1435,7 +1542,7 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
                   <th style={{ textAlign: 'right', width: 80 }}>Impuesto</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 56 }}>UDM</th>
-                  <th style={{ width: 140 }}>Almacén</th>
+                  {!almacenVentaSucursal && <th style={{ width: 140 }}>Almacén</th>}
                   <th style={{ width: 140 }}>Ubicación</th>
                   {arsActiva && (
                     <>
@@ -1485,6 +1592,10 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
                         {(() => {
                           const stockError = validateLineStock(item, stockMap)
                           const info = item.itemCode && item.warehouse ? resolveDisponible(stockMap.get(item.itemCode), item.warehouse) : undefined
+                          const invItem = item.itemCode && item.warehouse ? inventoryMap.get(`${item.itemCode}::${item.warehouse}`) : undefined
+                          // "En pedido" es puramente informativo — nunca bloquea, no confundir con
+                          // reservedStock (que sí resta de disponible y sí puede bloquear la venta).
+                          const enPedido = invItem?.reservedQty ?? 0
                           return (
                             <>
                               <QtyInput className={`items-input${stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
@@ -1495,6 +1606,11 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
                               ) : info && info.reservedStock > 0 ? (
                                 <span style={{ fontSize: 11, color: 'var(--warning-text)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
                                   Disponible: {info.disponible} ({info.reservedStock} reservadas para otro cliente)
+                                  {enPedido > 0 ? ` · En pedido: ${enPedido} (informativo)` : ''}
+                                </span>
+                              ) : enPedido > 0 ? (
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                  En pedido: {enPedido} (informativo)
                                 </span>
                               ) : null}
                             </>
@@ -1599,7 +1715,7 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount, { trimZeros: true })}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount, currency || monedaBase, { trimZeros: true })}</td>
                       <td>
                         {item.itemType === 'service' || item.itemType === 'combo' ? (
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
@@ -1607,24 +1723,26 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
                           <UomSelect
                             value={item.uom}
                             onChange={(v, factor) => {
-                              const newRate = Math.round(item.baseRate * factor * 10000) / 10000
-                              updateItem(index, { uom: v, rate: newRate, conversionFactor: factor })
+                              updateItem(index, { uom: v, rate: saleRate(item.baseRate, factor), conversionFactor: factor })
                             }}
                             itemCode={item.itemCode || undefined}
+                            direction="sale"
                           />
                         )}
                       </td>
-                      <td>
-                        <SearchSelect
-                          value={item.warehouse}
-                          onChange={(val) => updateWarehouse(index, val)}
-                          options={warehouseSelectOptions}
-                          onSearch={setWarehouseSearch}
-                          selectedLabel={branchWarehouses?.find((w) => w.id === item.warehouse)?.name ?? item.warehouse ?? ''}
-                          placeholder="Almacén por defecto"
-                          disabled={!item.itemCode}
-                        />
-                      </td>
+                      {!almacenVentaSucursal && (
+                        <td>
+                          <SearchSelect
+                            value={item.warehouse}
+                            onChange={(val) => updateWarehouse(index, val)}
+                            options={warehouseSelectOptions}
+                            onSearch={setWarehouseSearch}
+                            selectedLabel={branchWarehouses?.find((w) => w.id === item.warehouse)?.name ?? item.warehouse ?? ''}
+                            placeholder="Almacén por defecto"
+                            disabled={!item.itemCode}
+                          />
+                        </td>
+                      )}
                       <td>
                         {item.itemCode && item.warehouse ? (
                           <LineUbicacionCell
@@ -1766,22 +1884,22 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
               {totalDiscount > 0 && (
                 <div className="items-total-line" style={{ color: 'var(--text-danger)' }}>
                   <span>Descuento total</span>
-                  <span>-{formatDOP(totalDiscount)}</span>
+                  <span>-{formatMoney(totalDiscount, currency || monedaBase)}</span>
                 </div>
               )}
               <div className="items-total-line">
                 <span>Subtotal</span>
-                <span>{formatDOP(subtotal)}</span>
+                <span>{formatMoney(subtotal, currency || monedaBase)}</span>
               </div>
               {taxTotal > 0 && (
                 <div className="items-total-line" style={{ fontSize: 13 }}>
                   <span>Impuesto</span>
-                  <span>{formatDOP(taxTotal)}</span>
+                  <span>{formatMoney(taxTotal, currency || monedaBase)}</span>
                 </div>
               )}
               <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, fontSize: 15 }}>
                 <span>Total</span>
-                <span>{formatDOP(total)}</span>
+                <span>{formatMoney(total, currency || monedaBase)}</span>
               </div>
               {arsActiva && arsServidor && (
                 <>
@@ -1798,6 +1916,37 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
             </div>
           </div>
         </div>
+
+        {mostrarSelectorDespachoFuturo && (
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="card-header navy-card-header">
+              <h2 className="card-title">Despacho</h2>
+            </div>
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className={`btn btn-size-sm ${!despachoFuturo ? 'btn-navy' : 'btn-secondary'}`}
+                  onClick={() => setDespachoFuturo(false)}
+                >
+                  Despachar ahora
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-size-sm ${despachoFuturo ? 'btn-navy' : 'btn-secondary'}`}
+                  onClick={() => setDespachoFuturo(true)}
+                >
+                  Despachar después
+                </button>
+              </div>
+              <p className="ff-hint" style={{ margin: 0 }}>
+                {despachoFuturo
+                  ? 'La factura no descontará inventario al someterse — la salida física se registra después con un Despacho.'
+                  : 'La factura descontará inventario al someterse — se confirma que exista stock físico en el almacén de cada línea.'}
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="card">
           <div className="card-header navy-card-header">
@@ -1861,6 +2010,7 @@ onAuthorized={(userId) => {
              taxesTemplate: mostrarImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
              currency: currency || undefined,
              conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
+             despachoFuturo: mostrarSelectorDespachoFuturo ? despachoFuturo : undefined,
              ...arsBloqueDto(),
            }
 persistInvoice(baseDto as CreateInvoiceDto)

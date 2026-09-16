@@ -55,11 +55,13 @@ interface ConfirmModalProps {
   confirmLabel?: string
   variant?: 'danger' | 'default'
   loading?: boolean
+  /** Botón extra opcional entre "Cancelar" y el de confirmación, para una tercera acción. */
+  secondaryAction?: { label: string; onClick: () => void }
 }
 
 export function ConfirmModal({
   open, onClose, onConfirm, title, description,
-  confirmLabel = 'Confirmar', variant = 'danger', loading = false,
+  confirmLabel = 'Confirmar', variant = 'danger', loading = false, secondaryAction,
 }: ConfirmModalProps) {
   if (!open) return null
 
@@ -81,6 +83,11 @@ export function ConfirmModal({
           <button className="btn btn-secondary btn-size-sm" onClick={onClose} disabled={loading}>
             Cancelar
           </button>
+          {secondaryAction && (
+            <button className="btn btn-secondary btn-size-sm" onClick={secondaryAction.onClick} disabled={loading}>
+              {secondaryAction.label}
+            </button>
+          )}
           <button
             className={`btn ${variant === 'danger' ? 'btn-danger' : 'btn-primary'} btn-size-sm`}
             onClick={onConfirm}

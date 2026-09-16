@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, type Resolver } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { Pencil, Trash2, Plus, RefreshCw, Calculator } from 'lucide-react'
+import { Pencil, Trash2, Plus, RefreshCw, Calculator, Wallet } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import {
   listMonedas,
@@ -16,8 +17,10 @@ import {
   sincronizarTasas,
   convertirMoneda,
 } from '@/shared/api/monedas'
+import { listCuentas, createCuenta } from '@/shared/api/cuentas'
 import type { Moneda, MonedaCode, TasaCambio, ApiError } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { AccountSelect } from '@/components/shared/AccountSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
@@ -37,17 +40,35 @@ function CatalogoMonedasSection() {
   const queryClient = useQueryClient()
   const puedeHabilitar = usePuede('monedas.habilitar')
   const [pendingToggle, setPendingToggle] = useState<Moneda | null>(null)
+  // Moneda recién habilitada sin ninguna cuenta de Caja/Banco todavía — dispara el modal opcional
+  // de docs/tasks/78_validar_cuenta_caja_al_habilitar_moneda.md. `null` = no mostrar nada.
+  const [promptCuentaFor, setPromptCuentaFor] = useState<MonedaCode | null>(null)
 
   const { data, isLoading } = useQuery({ queryKey: ['monedas'], queryFn: listMonedas })
 
   const habilitarMutation = useMutation({
     mutationFn: ({ code, habilitada }: { code: MonedaCode; habilitada: boolean }) =>
       habilitarMoneda(code, { habilitada }),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       toast.success(result.enabled ? `${result.currency} habilitada` : `${result.currency} deshabilitada`)
       queryClient.invalidateQueries({ queryKey: ['monedas'] })
       queryClient.invalidateQueries({ queryKey: ['facturacion-config'] })
       setPendingToggle(null)
+      // Solo al HABILITAR (nunca al deshabilitar, §3 del doc de la tarea) — verifica si ya existe
+      // una cuenta de Caja/Banco en esta moneda; si no, ofrece crear una ahí mismo. Nunca bloquea
+      // ni retrasa el toast de éxito de arriba: es un chequeo posterior e informativo.
+      if (result.enabled) {
+        try {
+          const cuentas = await listCuentas()
+          const yaExiste = cuentas.items.some(
+            (c) => (c.accountType === 'Cash' || c.accountType === 'Bank') && c.currency === result.currency,
+          )
+          if (!yaExiste) setPromptCuentaFor(result.currency)
+        } catch {
+          // No hace falta molestar al usuario si este chequeo informativo falla — la moneda ya
+          // quedó habilitada correctamente, que es lo que le importa al flujo principal.
+        }
+      }
     },
     onError: (err: ApiError) => {
       toast.error(err?.message ?? 'Error al cambiar el estado de la moneda')
@@ -125,6 +146,136 @@ function CatalogoMonedasSection() {
         variant="default"
         loading={habilitarMutation.isPending}
       />
+
+      {promptCuentaFor && (
+        <CuentaCajaBancoModal code={promptCuentaFor} onClose={() => setPromptCuentaFor(null)} />
+      )}
+    </div>
+  )
+}
+
+// ─── Modal: crear cuenta de Caja/Banco tras habilitar una moneda extranjera ────
+// docs/tasks/78_validar_cuenta_caja_al_habilitar_moneda.md — no bloqueante: el usuario puede
+// cerrarlo sin crear nada, la moneda ya quedó habilitada de todas formas.
+
+interface CuentaCajaBancoModalProps {
+  code: MonedaCode
+  onClose: () => void
+}
+
+function CuentaCajaBancoModal({ code, onClose }: CuentaCajaBancoModalProps) {
+  const queryClient = useQueryClient()
+  const [accountName, setAccountName] = useState(`Caja ${code}`)
+  const [accountType, setAccountType] = useState<'Cash' | 'Bank'>('Cash')
+  const [parentAccount, setParentAccount] = useState('')
+  const [created, setCreated] = useState(false)
+
+  const createMutation = useMutation({
+    mutationFn: () => createCuenta({
+      accountName: accountName.trim(),
+      parentAccount,
+      accountType,
+      currency: code,
+    }),
+    onSuccess: () => {
+      toast.success('Cuenta creada')
+      queryClient.invalidateQueries({ queryKey: ['cuentas'] })
+      queryClient.invalidateQueries({ queryKey: ['cuentas-tree'] })
+      setCreated(true)
+    },
+    onError: (err: ApiError) => toast.error(err?.message ?? 'Error al crear la cuenta'),
+  })
+
+  const canSubmit = !!accountName.trim() && !!parentAccount
+
+  if (created) {
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-head">
+            <h2 className="modal-title">Cuenta creada</h2>
+            <button className="modal-close" type="button" onClick={onClose}>×</button>
+          </div>
+          <div className="modal-body">
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+              Recuerda vincularla a un método de pago (ej. "Efectivo {code}") en{' '}
+              <Link to="/config/metodos-pago" onClick={onClose} style={{ fontWeight: 600, textDecoration: 'underline' }}>
+                Configuración → Métodos de Pago
+              </Link>{' '}
+              para poder usarla al cobrar.
+            </p>
+          </div>
+          <div className="modal-foot">
+            <button className="btn btn-primary" onClick={onClose}>Listo</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Wallet size={17} /> No tienes una cuenta de Caja o Banco en {code}
+          </h2>
+          <button className="modal-close" type="button" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+            Vas a poder facturar en {code}, pero para poder <strong>cobrar</strong> esas facturas en
+            caja necesitas una cuenta de Caja o Banco en esta moneda — sin ella, alguien podría
+            configurar por error un método de pago apuntando a la cuenta de Cuentas por Cobrar, lo
+            que rompe el cobro más adelante con un error confuso. ¿Quieres crear una cuenta de Caja
+            o Banco en {code} ahora?
+          </p>
+
+          <div className="ff-wrap">
+            <label className="ff-label ff-required">Nombre de la cuenta</label>
+            <input
+              className="ff-input"
+              value={accountName}
+              onChange={(e) => setAccountName(e.target.value)}
+              placeholder={`Caja ${code}`}
+            />
+          </div>
+
+          <div className="ff-wrap">
+            <label className="ff-label ff-required">Tipo</label>
+            <Select value={accountType} onValueChange={(v) => setAccountType(v as 'Cash' | 'Bank')} clearable={false}>
+              <SelectItem value="Cash">Caja</SelectItem>
+              <SelectItem value="Bank">Banco</SelectItem>
+            </Select>
+          </div>
+
+          <div className="ff-wrap">
+            <label className="ff-label ff-required">Cuenta padre</label>
+            <AccountSelect
+              value={parentAccount}
+              onChange={setParentAccount}
+              rootType="Asset"
+              groupOnly
+              placeholder="Buscar grupo de cuentas de Activo…"
+            />
+          </div>
+
+          <div className="ff-wrap">
+            <label className="ff-label">Moneda</label>
+            <input className="ff-input" value={code} disabled />
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-ghost" onClick={onClose}>Más tarde</button>
+          <button
+            className="btn btn-primary"
+            onClick={() => createMutation.mutate()}
+            disabled={!canSubmit || createMutation.isPending}
+          >
+            {createMutation.isPending ? 'Creando…' : 'Crear cuenta'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

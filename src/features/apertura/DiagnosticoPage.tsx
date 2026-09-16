@@ -154,6 +154,9 @@ export default function DiagnosticoPage() {
             <button className="btn btn-secondary" onClick={() => navigate('/apertura/compras')}>
               Ir a Compras <ArrowRight size={14} />
             </button>
+            <button className="btn btn-secondary" onClick={() => navigate('/apertura/inventario')}>
+              Ir a Inventario <ArrowRight size={14} />
+            </button>
             <button className="btn btn-secondary" onClick={() => navigate('/apertura/resumen')}>
               Ver Cuadre <ArrowRight size={14} />
             </button>

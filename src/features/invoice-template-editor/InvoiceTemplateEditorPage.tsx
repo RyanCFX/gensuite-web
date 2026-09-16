@@ -35,8 +35,8 @@ export default function InvoiceTemplateEditorPage({ fixedType }: Props) {
   const {
     format, documents, loadingDocuments, availableFields, fieldsLoading, selectedIds, zoom, saving, history,
     templateGallery, galleryLoading, drafts,
-    init, setFormat, setPageHeight, addPage, removePage,
-    addElement, addElementFromField, updateElement, removeElement, duplicateElement,
+    init, setFormat, setPageHeight, addPage, appendDocumentPages, removePage,
+    addElement, addElementFromField, updateElement, removeElement, duplicateElement, copySelection, pasteClipboard,
     bringToFront, sendToBack, selectIds, beginTransaction, zoomIn, zoomOut, zoomByFactor, undo, redo, save,
     applyDocument, saveDraft, removeDraft, setDefaultTemplate, deleteTemplate,
   } = useTemplateEditorStore()
@@ -72,6 +72,16 @@ export default function InvoiceTemplateEditorPage({ fixedType }: Props) {
         redo()
         return
       }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && selectedIds.length > 0) {
+        e.preventDefault()
+        copySelection()
+        return
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        e.preventDefault()
+        pasteClipboard()
+        return
+      }
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0) {
         e.preventDefault()
         selectedIds.forEach((id) => removeElement(id))
@@ -80,7 +90,7 @@ export default function InvoiceTemplateEditorPage({ fixedType }: Props) {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedIds, undo, redo, removeElement, selectIds])
+  }, [selectedIds, undo, redo, removeElement, selectIds, copySelection, pasteClipboard])
 
   const doc = documents[format]
   const selectedElement = selectedIds.length === 1
@@ -126,6 +136,13 @@ export default function InvoiceTemplateEditorPage({ fixedType }: Props) {
     applyDocument(pendingApply.document, pendingApply.meta)
     setPendingApply(null)
     toast.success('Plantilla aplicada al canvas')
+  }
+
+  function addPageInsteadOfApply() {
+    if (!pendingApply) return
+    appendDocumentPages(pendingApply.document)
+    setPendingApply(null)
+    toast.success('Página agregada al canvas')
   }
 
   if (loadingDocuments || !doc) {
@@ -289,6 +306,7 @@ export default function InvoiceTemplateEditorPage({ fixedType }: Props) {
         description={`La plantilla que estás editando ahora mismo se perderá (a menos que la hayas guardado). ¿Deseas reemplazarla por "${pendingApply?.label ?? ''}"?`}
         confirmLabel="Sí, reemplazar"
         variant="danger"
+        secondaryAction={{ label: 'Agregar página', onClick: addPageInsteadOfApply }}
       />
 
       <TemplateEditorPrintTarget doc={doc} fields={availableFields} />

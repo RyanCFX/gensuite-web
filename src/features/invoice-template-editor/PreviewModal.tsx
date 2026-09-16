@@ -15,16 +15,20 @@ function pageContentHeight(doc: TemplateDocument, elements: TemplateElement[]) {
 }
 
 export function PreviewModal({ doc, fields, values, onClose }: Props) {
+  // El ancho del modal debe acomodar el ticket real (p. ej. 600px la térmica de 80mm) más el
+  // padding del cuerpo; de lo contrario el modal-box (overflow: hidden) recorta el ticket y da
+  // la impresión de un zoom excesivo.
+  const previewMaxWidth = Math.min(720, doc.page.width + 96)
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-box" style={{ maxWidth: previewMaxWidth }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Printer size={17} /> Vista previa de impresión
           </h2>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
-        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, background: 'var(--surface-sunken, #e5e7eb)', padding: 24, maxHeight: '70vh', overflowY: 'auto' }}>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, background: 'var(--surface-sunken, #e5e7eb)', padding: 24, maxHeight: '70vh', overflow: 'auto' }}>
           {doc.pages.map((page, i) => (
             <div key={page.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
               {doc.pages.length > 1 && (
