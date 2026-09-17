@@ -2432,6 +2432,8 @@ button {
 
 .spinner-white { border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff; }
 .spinner-brand { border: 2px solid rgba(255,69,56,0.2); border-top-color: var(--brand-primary); }
+
+.spin { animation: spin 800ms linear infinite; }
 .spinner-sm { width: 14px; height: 14px; }
 .spinner-md { width: 20px; height: 20px; }
 .spinner-lg { width: 32px; height: 32px; }

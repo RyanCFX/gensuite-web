@@ -21,6 +21,8 @@ import {
   LogOut,
   Menu,
   Building2,
+  Check,
+  Loader2,
   UserCog,
   Sun,
   Moon,
@@ -51,8 +53,9 @@ import {
 import { useAuthStore } from "@/stores/auth.store";
 import { usePermissionsStore } from "@/stores/permissions.store";
 import { resolverRuta } from "@/shared/permissions/rutas";
+import { switchTenant, isApiError } from "@/shared/api/auth";
 import { CommandPalette } from "./CommandPalette";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { TabsProvider, useTabs } from "@/contexts/TabsContext";
 import { KeepAlive } from "keepalive-for-react";
 import { TurnoCajaIndicator } from "@/components/shared/TurnoCajaIndicator";
@@ -1227,8 +1230,12 @@ function AppLayoutInner() {
       : "light";
   });
   const [userOpen, setUserOpen] = useState(false);
+  const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
+  const [switchingSlug, setSwitchingSlug] = useState<string | null>(null);
   const userRef = useRef<HTMLDivElement>(null);
-  const { user, logout } = useAuthStore();
+  const { user, logout, tenant, memberships, refreshToken, applySwitchTenantResult } = useAuthStore();
+  const activeCompanies = memberships.filter((m) => m.status === "accepted");
+  const canSwitchCompany = activeCompanies.length > 1;
   const isSystemManager = user?.roles?.includes("System Manager") ?? false;
   const vertical = usePermissionsStore((s) => s.vertical);
   const esFarmacia = vertical === "farmacia";
@@ -1362,8 +1369,10 @@ function AppLayoutInner() {
   // Close user dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (userRef.current && !userRef.current.contains(e.target as Node))
+      if (userRef.current && !userRef.current.contains(e.target as Node)) {
         setUserOpen(false);
+        setCompanyMenuOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -1408,6 +1417,25 @@ function AppLayoutInner() {
   const handleLogout = () => {
     logout();
     navigate("/login", { replace: true });
+  };
+
+  const handleSwitchCompany = async (slug: string) => {
+    if (slug === tenant?.slug || !refreshToken || switchingSlug) return;
+    setSwitchingSlug(slug);
+    try {
+      const result = await switchTenant({ refreshToken, tenant: slug });
+      applySwitchTenantResult(result);
+      setUserOpen(false);
+      setCompanyMenuOpen(false);
+      // Recarga completa: el resto de la app (queries de react-query, tabs abiertas, permisos)
+      // no está escopeado por tenant, así que el cambio de empresa necesita un estado limpio. Si
+      // por lo que sea la navegación no llega a completarse, igual liberamos el botón abajo.
+      window.location.href = "/dashboard";
+      setSwitchingSlug(null);
+    } catch (error) {
+      toast.error(isApiError(error) ? error.message : "No se pudo cambiar de empresa.");
+      setSwitchingSlug(null);
+    }
   };
 
   const handleNav = (path: string) => {
@@ -1620,7 +1648,7 @@ function AppLayoutInner() {
                   >
                     <ShieldCheck size={14} aria-hidden="true" /> Mi cuenta y seguridad
                   </button>
-                  <button
+                  {/*<button
                     className="dd-item"
                     role="menuitem"
                     onClick={() => {
@@ -1629,7 +1657,56 @@ function AppLayoutInner() {
                     }}
                   >
                     <Building2 size={14} aria-hidden="true" /> Empresa
-                  </button>
+                  </button>*/}
+                  {canSwitchCompany && (
+                    <>
+                      <button
+                        className="dd-item"
+                        role="menuitem"
+                        aria-haspopup="true"
+                        aria-expanded={companyMenuOpen}
+                        onClick={() => setCompanyMenuOpen((o) => !o)}
+                      >
+                        <Building2 size={14} aria-hidden="true" /> Cambiar empresa
+                        <ChevronRight
+                          size={12}
+                          style={{
+                            marginLeft: "auto",
+                            transform: companyMenuOpen ? "rotate(90deg)" : undefined,
+                            transition: "transform 0.15s",
+                          }}
+                          aria-hidden="true"
+                        />
+                      </button>
+                      {companyMenuOpen && (
+                        <div style={{ padding: "2px 0 2px 8px" }}>
+                          {activeCompanies.map((m) => {
+                            const isActive = m.slug === tenant?.slug;
+                            const isSwitching = switchingSlug === m.slug;
+                            return (
+                              <button
+                                key={m.slug}
+                                className="dd-item"
+                                role="menuitemradio"
+                                aria-checked={isActive}
+                                disabled={isActive || !!switchingSlug}
+                                onClick={() => handleSwitchCompany(m.slug)}
+                              >
+                                {isSwitching ? (
+                                  <Loader2 size={14} className="spin" aria-hidden="true" />
+                                ) : isActive ? (
+                                  <Check size={14} aria-hidden="true" />
+                                ) : (
+                                  <span style={{ width: 14 }} aria-hidden="true" />
+                                )}
+                                {m.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
                 <div className="dd-sep" />
                 <div style={{ padding: "4px 0" }}>
