@@ -2339,10 +2339,7 @@ export default function InvoiceDetail() {
                     <span>{formatMoney(gross, invoice.currency)}</span>
                   </div>
                   {discount > 0 && (
-                    <div
-                      className="items-total-line"
-                      style={{ color: "var(--text-danger)" }}
-                    >
+                    <div className="items-total-line">
                       <span>Descuento total</span>
                       <span>-{formatMoney(discount, invoice.currency)}</span>
                     </div>

@@ -1882,7 +1882,7 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
                 <span>{formatDOP(grossTotal)}</span>
               </div> */}
               {totalDiscount > 0 && (
-                <div className="items-total-line" style={{ color: 'var(--text-danger)' }}>
+                <div className="items-total-line">
                   <span>Descuento total</span>
                   <span>-{formatMoney(totalDiscount, currency || monedaBase)}</span>
                 </div>
