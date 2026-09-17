@@ -24,7 +24,7 @@ import type { TrackedComponent } from '@/components/shared/ComponentTrackingModa
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP, formatMoney, round2 } from '@/lib/formatters'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus, Lock, LockOpen, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, Info, UserPlus, Lock, LockOpen, ChevronDown } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
@@ -290,6 +290,7 @@ export default function InvoiceForm() {
     }, 400)
   }, [])
   const [notes, setNotes] = useState('')
+  const [notesOpen, setNotesOpen] = useState(false)
   const [semaforo, setSemaforo] = useState<SemaforoEntry | null>(null)
   const [loadingSemaforo, setLoadingSemaforo] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
@@ -1949,18 +1950,40 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
         )}
 
         <div className="card">
-          <div className="card-header navy-card-header">
-            <h2 className="card-title">Notas</h2>
+          <div
+            className="card-header navy-card-header"
+            style={{ cursor: 'pointer' }}
+            onClick={() => setNotesOpen((o) => !o)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 className="card-title">Notas Adicionales</h2>
+              <button
+                type="button"
+                className="navy-header-toggle-btn icon-swap"
+                aria-expanded={notesOpen}
+                aria-label={notesOpen ? 'Ocultar notas' : 'Mostrar notas'}
+                onClick={(e) => { e.stopPropagation(); setNotesOpen((o) => !o) }}
+              >
+                {notesOpen ? <Minus size={13} /> : <Plus size={13} />}
+              </button>
+            </div>
+            {!notesOpen && (
+              <span className="navy-header-hint">
+                Agrega comentarios para aclarar datos de la factura, serán visibles PDF.
+              </span>
+            )}
           </div>
-          <div className="card-body">
-            <textarea
-              className="ff-textarea"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Observaciones, términos de pago, instrucciones especiales..."
-              rows={3}
-            />
-          </div>
+          {notesOpen && (
+            <div className="card-body">
+              <textarea
+                className="ff-textarea"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Observaciones, términos de pago, instrucciones especiales..."
+                rows={3}
+              />
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>

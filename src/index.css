@@ -2108,6 +2108,9 @@ button {
 
 .navy-header-toggle-btn[aria-expanded="true"] { transform: rotate(45deg); }
 
+/* Variante que cambia el ícono (+/-) en vez de rotar el botón — igual a .pill-plus-trigger-icon (ItemForm) */
+.navy-header-toggle-btn.icon-swap[aria-expanded="true"] { transform: none; }
+
 /* ─── Item image upload box (ItemForm) — cuadro con borde + icono, no botón separado ─── */
 .item-image-upload {
   width: 128px;
