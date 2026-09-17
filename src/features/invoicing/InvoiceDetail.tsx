@@ -1026,6 +1026,7 @@ export default function InvoiceDetail() {
             className="page-title"
             style={{ display: "flex", alignItems: "center", gap: 8 }}
           >
+            <span className="page-title-dot" />
             Factura {displayId(invoice.id, invoice.sequence)}
             <span
               className={`badge ${STATUS_BADGE[invoice.status] ?? "badge-neutral"}`}
@@ -1411,6 +1412,7 @@ export default function InvoiceDetail() {
       {(ecfResult ?? invoice.ecf) && <EcfStatusCard ecf={ecfResult ?? invoice.ecf!} />}
 
       <RelatedDocsCard
+        navy
         rows={[
           {
             label: "Pedido de venta",
@@ -1422,7 +1424,7 @@ export default function InvoiceDetail() {
       />
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Información de la Factura</h2>
         </div>
         <div
@@ -1678,7 +1680,7 @@ export default function InvoiceDetail() {
 
       {invoice.status === "draft" && saldoFavor && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <h2
               className="card-title"
               style={{ display: "flex", alignItems: "center", gap: 6 }}
@@ -1845,7 +1847,7 @@ export default function InvoiceDetail() {
 
       {invoice.status === "draft" && creditNoteSaldo && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <h2
               className="card-title"
               style={{ display: "flex", alignItems: "center", gap: 6 }}
@@ -2086,7 +2088,7 @@ export default function InvoiceDetail() {
         invoice.pendingTracking &&
         invoice.pendingTracking.length > 0 && (
           <div className="card">
-            <div className="card-header">
+            <div className="card-header navy-card-header">
               <h2
                 className="modal-title"
                 style={{
@@ -2164,8 +2166,8 @@ export default function InvoiceDetail() {
 
       {arsCobertura && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <ShieldCheck size={16} style={{ color: "var(--icon-muted)" }} />
+          <div className="card-header navy-card-header" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ShieldCheck size={16} style={{ color: "var(--on-dark-ink)" }} />
             <h2 className="card-title" style={{ flex: 1 }}>Cobertura de seguro (ARS)</h2>
             <EstadoArsBadge estado={arsCobertura.estadoArs} />
           </div>
@@ -2233,11 +2235,11 @@ export default function InvoiceDetail() {
       )}
 
       <div className="card">
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Artículos</h2>
         </div>
         <div className="items-table-wrap">
-          <table className="items-table">
+          <table className="items-table navy-table">
             <thead>
               <tr>
                 <th>Código</th>
@@ -2325,7 +2327,7 @@ export default function InvoiceDetail() {
               ))}
             </tbody>
           </table>
-          <div className="items-total-row">
+          <div className="items-total-row navy-totals">
             {(() => {
               const gross = invoice.items.reduce(
                 (s, i) => s + i.qty * i.rate,

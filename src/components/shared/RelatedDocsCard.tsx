@@ -16,13 +16,13 @@ const linkStyle: React.CSSProperties = {
   width: 'fit-content',
 }
 
-export function RelatedDocsCard({ rows }: { rows: RelatedDocRow[] }) {
+export function RelatedDocsCard({ rows, navy = false }: { rows: RelatedDocRow[]; navy?: boolean }) {
   const visibles = rows.filter((r) => r.links.length > 0)
   if (visibles.length === 0) return null
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
-      <div className="card-header">
+      <div className={`card-header${navy ? ' navy-card-header' : ''}`}>
         <h2 className="card-title">Documentos relacionados</h2>
       </div>
       <div className="card-body">
