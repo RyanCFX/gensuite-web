@@ -1,13 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  listRelacionesComerciales,
-  getRelacionComercial,
   listTransaccionesB2B,
   enviarVentaASocio,
   igualarConEnmiendaTransaccion,
 } from "@/shared/api/relaciones";
+import { useRelacionComercialPorContraparte } from "@/shared/hooks/useRelacionComercialPorContraparte";
 import { Badge } from "@/shared/ui/Badge";
 import { Modal } from "@/shared/ui/Modal";
 import {
@@ -223,34 +222,16 @@ export default function InvoiceDetail() {
   });
 
   // ─── Relaciones Comerciales (B2B) — Fase 08/10 ───────────────────────────
-  // No hay un endpoint "relación por cliente" ni "estado B2B de esta factura" — se resuelve
-  // buscando, entre las relaciones activas del tenant, cuál tiene este Customer como espejo, y
-  // luego (solo si aplica) buscando en la bandeja de transacciones salientes de tipo Venta la que
-  // corresponde a esta factura. docs/tasks/relaciones_comerciales/FASE_08_FLUJO_VENTA_FRONTEND.md §5.
+  // No hay un endpoint "estado B2B de esta factura" — se resuelve buscando en la bandeja de
+  // transacciones salientes de tipo Venta la que corresponde a esta factura. El lookup de la
+  // relación en sí (¿este Customer es el espejo de algún socio?) vive en
+  // `useRelacionComercialPorContraparte` (compartido con `CompraDetail`).
+  // docs/tasks/relaciones_comerciales/FASE_08_FLUJO_VENTA_FRONTEND.md §5.
   const puedeEnviarVenta = usePuede("relaciones.venta.enviar");
   const puedeIgualarVenta = usePuede("relaciones.venta.igualar");
   const necesitaLookupB2B = (puedeEnviarVenta || puedeIgualarVenta) && invoice?.status === "submitted";
 
-  const { data: relacionesActivasB2B } = useQuery({
-    queryKey: ["relaciones-comerciales-activas-lookup"],
-    queryFn: () => listRelacionesComerciales({ limit: 100 }),
-    staleTime: 5 * 60_000,
-    enabled: necesitaLookupB2B,
-  });
-  const relacionesActivasIdsB2B = (relacionesActivasB2B?.items ?? [])
-    .filter((r) => r.status === "activa")
-    .map((r) => r.id);
-  const relacionesDetalleB2B = useQueries({
-    queries: relacionesActivasIdsB2B.map((relId) => ({
-      queryKey: ["relacion-comercial-lookup", relId],
-      queryFn: () => getRelacionComercial(relId),
-      staleTime: 5 * 60_000,
-      enabled: necesitaLookupB2B,
-    })),
-  });
-  const relacionClienteSocio = relacionesDetalleB2B
-    .map((q) => q.data)
-    .find((r) => r && r.customer === invoice?.customer);
+  const relacionClienteSocio = useRelacionComercialPorContraparte("customer", invoice?.customer, necesitaLookupB2B);
 
   const { data: transaccionVentaB2B } = useQuery({
     queryKey: ["transaccion-b2b-por-venta", invoice?.id],

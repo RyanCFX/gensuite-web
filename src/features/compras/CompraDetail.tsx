@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   getCompra, submitCompra, cancelCompra, amendCompra, deleteCompra, downloadCompraPdf, getCompraPdfBlobUrl,
   previewAsientosCompra, updateCompra,
 } from '@/shared/api/compras-gastos'
 import {
-  listRelacionesComerciales, getRelacionComercial,
   enviarCompraAProveedor, cancelarEnvioCompra, getEstadoSocioCompra, enlazarYEnviarCompra,
   igualarBorradorTransaccion,
 } from '@/shared/api/relaciones'
+import { useRelacionComercialPorContraparte } from '@/shared/hooks/useRelacionComercialPorContraparte'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Badge } from '@/shared/ui/Badge'
@@ -158,32 +158,17 @@ export default function CompraDetail() {
   // ─── Relaciones Comerciales (B2B) — Fase 09/10/11 ─────────────────────────
   // El endpoint de "enviar a proveedor" (borrador) resuelve la relación desde el proveedor de la
   // compra internamente — no hace falta el relacionId. Pero "enlazar y enviar" (compra ya
-  // sometida, Fase 11) sí lo necesita en el body, y no existe un endpoint "relación por
-  // proveedor" — se busca entre las relaciones activas del tenant cuál tiene este Supplier como
-  // espejo. El tenant típico tiene pocas relaciones comerciales, así que el costo de resolverlas
-  // todas es aceptable.
+  // sometida, Fase 11) sí lo necesita en el body — de ahí el lookup de
+  // `useRelacionComercialPorContraparte` (ver ese archivo para el porqué).
   const puedeEnviarAProveedor = usePuede('relaciones.compra.enviar-a-proveedor')
   const puedeEnlazarYEnviar = usePuede('relaciones.compra.enlazar-y-enviar')
   const puedeIgualarBorrador = usePuede('relaciones.compra.igualar')
 
-  const { data: relacionesActivas } = useQuery({
-    queryKey: ['relaciones-comerciales-activas-lookup'],
-    queryFn: () => listRelacionesComerciales({ limit: 100 }),
-    staleTime: 5 * 60_000,
-    enabled: (puedeEnviarAProveedor || puedeEnlazarYEnviar) && !compra?.esProveedorOcasional,
-  })
-  const relacionesActivasIds = (relacionesActivas?.items ?? []).filter((r) => r.status === 'activa').map((r) => r.id)
-  const relacionesDetalleQueries = useQueries({
-    queries: relacionesActivasIds.map((relId) => ({
-      queryKey: ['relacion-comercial-lookup', relId],
-      queryFn: () => getRelacionComercial(relId),
-      staleTime: 5 * 60_000,
-      enabled: !!compra && !compra.esProveedorOcasional,
-    })),
-  })
-  const relacionSocio = relacionesDetalleQueries
-    .map((q) => q.data)
-    .find((r) => r && r.supplier === compra?.supplier)
+  const relacionSocio = useRelacionComercialPorContraparte(
+    'supplier',
+    compra?.supplier,
+    (puedeEnviarAProveedor || puedeEnlazarYEnviar) && !!compra && !compra.esProveedorOcasional,
+  )
 
   const { data: estadoSocio, isLoading: loadingEstadoSocio } = useQuery({
     queryKey: ['compra-estado-socio', id],
