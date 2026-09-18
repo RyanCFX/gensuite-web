@@ -4,6 +4,7 @@ import { useEffectOnActive } from 'keepalive-for-react'
 import { useTabs } from '@/contexts/TabsContext'
 import { getAseguradora } from '@/shared/api/aseguradoras'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { AseguradoraFormPanel } from './AseguradoraFormPanel'
 
 export default function AseguradoraForm() {
@@ -38,7 +39,10 @@ export default function AseguradoraForm() {
         ← Aseguradoras
       </button>
 
-      <PageHeader title={isEdit ? 'Editar Aseguradora' : 'Nueva Aseguradora'} />
+      <PageHeader
+        title={isEdit ? 'Editar Aseguradora' : 'Nueva Aseguradora'}
+        action={isEdit ? <RecargarButton label="Actualizar" /> : undefined}
+      />
 
       <AseguradoraFormPanel
         aseguradora={aseguradora}

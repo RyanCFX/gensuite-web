@@ -18,6 +18,7 @@ import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { CheckCircle2, XCircle, Info, HelpCircle, Plus, Trash2 } from 'lucide-react'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 // NOTE: tipoIdentificacion does NOT exist in CreateCustomerDto/UpdateCustomerDto.
 // It is only used here as a local UI helper to decide which field to show.
@@ -795,6 +796,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
 
       {/* ── Botones ── */}
       <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <RecargarButton label="Actualizar" />
         <button type="submit" className="btn btn-primary" disabled={isSubmitting || isSystemManaged}>
           {isSubmitting
             ? <><span className="spinner spinner-white spinner-sm" /> Guardando…</>

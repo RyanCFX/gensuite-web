@@ -11,6 +11,7 @@ import { listSucursales } from '@/shared/api/sucursales'
 import { listCajas } from '@/shared/api/cajas'
 import type { ApiError, Usuario, InviteUsuarioDto, UpdateUsuarioDto, MembershipStatus, UsuarioLookupResult } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
@@ -289,10 +290,13 @@ export default function UsuariosPage() {
         title="Usuarios"
         description="Gestiona los usuarios del sistema — la alta ahora es por invitación, no se fija contraseña desde acá."
         action={
-          <button className="btn btn-primary" onClick={openInvite}>
-            <Plus size={16} />
-            Invitar Usuario
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-primary" onClick={openInvite}>
+              <Plus size={16} />
+              Invitar Usuario
+            </button>
+          </>
         }
       />
 

@@ -7,6 +7,7 @@ import type { Supplier } from '@/shared/api/types'
 import { formatDOP } from '@/lib/formatters'
 import { useDebounce } from '@/lib/useDebounce'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { Plus, ChevronLeft, ChevronRight, Search, Pencil, Ban, SlidersHorizontal } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -91,10 +92,13 @@ export default function SuppliersPage() {
         title={<><span className="page-title-dot" />Proveedores</>}
         description={data ? `${data.meta.total} proveedores en total` : ''}
         action={
-          <button className="btn btn-navy" onClick={() => navigate('/proveedores/nuevo')}>
-            <Plus size={16} />
-            Nuevo Proveedor
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={() => navigate('/proveedores/nuevo')}>
+              <Plus size={16} />
+              Nuevo Proveedor
+            </button>
+          </>
         }
       />
 

@@ -10,6 +10,7 @@ import { getAperturaPreflight, prepararApertura } from '@/shared/api/apertura'
 import { usePuede } from '@/shared/permissions/can'
 import { ocultarErp } from '@/lib/ocultarErp'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { Select, SelectItem } from '@/components/ui/select'
 import { opcionesAnio, anioDesdeDefault, anioActual, rangoAnioToFechas } from './lib'
 
@@ -50,6 +51,7 @@ export default function DiagnosticoPage() {
       <PageHeader
         title={<><span className="page-title-dot" />Migración de Saldos — Diagnóstico</>}
         description="Verifica que tu empresa esté lista antes de cargar facturas de apertura (saldos pendientes del sistema anterior)."
+        action={<RecargarButton />}
       />
 
       <div className="card" style={{ marginBottom: 16 }}>

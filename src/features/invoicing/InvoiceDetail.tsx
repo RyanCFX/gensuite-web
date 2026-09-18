@@ -39,7 +39,7 @@ import { ECF_SUBMIT_UNAVAILABLE_MSG } from "@/shared/api/ecf";
 import { esClienteEmisorNoEncontrado } from "@/lib/ecfErrors";
 import { formatStockInsufficientMessage } from "@/lib/stockAlerts";
 import { usePosTicketPrinter } from "@/shared/hooks/usePosTicketPrinter";
-import { useAuthStore } from "@/stores/auth.store";
+import { useIsSystemManager } from "@/shared/hooks/useIsSystemManager";
 import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion, EcfSubmitResult } from "@/shared/api/types";
 import { esCoberturaCompleta } from "@/shared/api/types";
 import { usePuede } from "@/shared/permissions/can";
@@ -121,7 +121,7 @@ export default function InvoiceDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const isSystemManager = useAuthStore((s) => s.user?.roles?.includes("System Manager") ?? false);
+  const isSystemManager = useIsSystemManager();
 
   // Bloque opcional (u obligatorio si el cliente no tiene crédito) de "¿Cómo se cobra?"
   // al someter — ver escenarios en handleSubmitClick. La forma del bloque depende de

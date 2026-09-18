@@ -14,7 +14,7 @@ import { SaldoFavorCxpSection } from '@/features/devoluciones-compras/SaldoFavor
 import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
 import { PagoContadoModal } from '@/components/shared/PagoContadoModal'
 import { ECF_SUBMIT_UNAVAILABLE_MSG } from '@/shared/api/ecf'
-import { useAuthStore } from '@/stores/auth.store'
+import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import type { ImpuestoDistribucionDto, EcfSubmitResult, ApiError, PagoContadoDto } from '@/shared/api/types'
 
 function apiErrorMessage(error: unknown, fallback: string) {
@@ -28,7 +28,7 @@ export default function GastoDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const isSystemManager = useAuthStore((s) => s.user?.roles?.includes('System Manager') ?? false)
+  const isSystemManager = useIsSystemManager()
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [showAsientosPreview, setShowAsientosPreview] = useState(false)
   const [showPagoContadoModal, setShowPagoContadoModal] = useState(false)

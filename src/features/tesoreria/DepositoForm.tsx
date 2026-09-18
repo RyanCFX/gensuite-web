@@ -13,6 +13,7 @@ import { LiquidacionFacturasTable } from './components/LiquidacionFacturasTable'
 import { CuentaContableOverrideSection } from './components/CuentaContableOverrideSection'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -223,7 +224,11 @@ export default function DepositoForm() {
         <ArrowLeft size={14} /> Depósitos
       </a>
 
-      <PageHeader title="Nuevo Depósito" description="Depósito bancario, cobro de cliente, liquidación de tarjeta o reembolso de proveedor" />
+      <PageHeader
+        title="Nuevo Depósito"
+        description="Depósito bancario, cobro de cliente, liquidación de tarjeta o reembolso de proveedor"
+        action={<RecargarButton label="Actualizar" />}
+      />
 
       <form onSubmit={handleSubmit}>
         <div className="card" style={{ marginBottom: 16 }}>

@@ -4,6 +4,7 @@ import { Plus, Pencil, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { listChequePrintTemplates } from '@/shared/api/tesoreria'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { PlantillasTabs } from '@/shared/ui/PlantillasTabs'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 export default function PlantillasChequePage() {
   const navigate = useNavigate()
@@ -21,10 +22,13 @@ export default function PlantillasChequePage() {
         title="Plantillas de Cheque"
         description="Coordenadas para imprimir cheques sobre el papel pre-impreso de un talonario, usando el motor nativo de generación de PDF del sistema"
         action={
-          <button className="btn btn-primary" onClick={() => navigate('/config/tesoreria/plantillas-cheque/nueva')}>
-            <Plus size={16} />
-            Nueva Plantilla
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-primary" onClick={() => navigate('/config/tesoreria/plantillas-cheque/nueva')}>
+              <Plus size={16} />
+              Nueva Plantilla
+            </button>
+          </>
         }
       />
       <PlantillasTabs />

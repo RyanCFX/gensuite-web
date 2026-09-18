@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getPagosPendientes } from '@/shared/api/pagos'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Search, Wallet } from 'lucide-react'
 
@@ -23,6 +24,7 @@ export default function PendientesPagoPage() {
       <PageHeader
         title={<><span className="page-title-dot" />Facturas Pendientes de Pago</>}
         description="Facturas de compra con saldo pendiente a proveedores"
+        action={<RecargarButton />}
       />
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

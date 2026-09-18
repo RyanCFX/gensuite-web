@@ -10,6 +10,7 @@ import { ChevronLeft, ChevronRight, RotateCw, Ban, X, ArrowDownLeft, ArrowUpRigh
 import { listTransaccionesB2B, reintentarTransaccionB2B, cancelarTransaccionB2B } from '@/shared/api/relaciones'
 import type { ApiError, EstadoTransaccionB2B } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { Badge } from '@/shared/ui/Badge'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { FilterField } from '@/shared/ui/FilterField'
@@ -98,6 +99,7 @@ export default function TransaccionesPage() {
       <PageHeader
         title={<><span className="page-title-dot" />Transacciones B2B</>}
         description="Facturas de venta/compra intercambiadas automáticamente con tus socios comerciales"
+        action={<RecargarButton />}
       />
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

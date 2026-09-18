@@ -16,6 +16,7 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Drawer } from '@/shared/ui/Drawer'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
@@ -114,10 +115,13 @@ export default function CobrosPage() {
           <h1 className="page-title"><span className="page-title-dot" />Cobros</h1>
           <p className="page-sub">Historial de pagos recibidos de clientes</p>
         </div>
-        <button className="btn btn-navy" onClick={() => navigate('/cobros/pago')}>
-          <Plus size={16} />
-          Registrar Cobro
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <button className="btn btn-navy" onClick={() => navigate('/cobros/pago')}>
+            <Plus size={16} />
+            Registrar Cobro
+          </button>
+        </div>
       </div>
 
       {/* ── Filtros ─────────────────────────────────────────────────────── */}

@@ -1,11 +1,10 @@
-import { useAuthStore } from '@/stores/auth.store'
+import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { RouteTabs } from './RouteTabs'
 
 // Avanzado / Certificación DGII / Contingencia son ADMIN_ONLY_PATHS en el sidebar (AppLayout) —
 // se ocultan aquí también para un usuario sin rol System Manager.
 export function EcfTabs() {
-  const user = useAuthStore((s) => s.user)
-  const isSystemManager = user?.roles?.includes('System Manager') ?? false
+  const isSystemManager = useIsSystemManager()
 
   return (
     <RouteTabs

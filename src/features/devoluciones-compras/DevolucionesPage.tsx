@@ -7,6 +7,7 @@ import {
 } from '@/shared/api/devoluciones-compras'
 import { listSucursales } from '@/shared/api/sucursales'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, ChevronLeft, ChevronRight, Search, Banknote, SlidersHorizontal } from 'lucide-react'
@@ -92,10 +93,13 @@ export default function DevolucionesPage() {
         title={<><span className="page-title-dot" />Devoluciones de Compras</>}
         description="Notas de crédito de compra y su aplicación a cuentas por pagar"
         action={
-          <button className="btn btn-navy" onClick={() => navigate('/devoluciones-compras/nueva')}>
-            <Plus size={16} />
-            Nueva Devolución
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={() => navigate('/devoluciones-compras/nueva')}>
+              <Plus size={16} />
+              Nueva Devolución
+            </button>
+          </>
         }
       />
 

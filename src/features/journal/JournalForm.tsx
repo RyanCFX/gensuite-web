@@ -7,6 +7,7 @@ import { createJournalEntry, submitJournalEntry } from '@/shared/api/journal-ent
 import { getFacturacionConfig } from '@/shared/api/config'
 import type { CreateJournalEntryDto, JournalEntryLine, ItemProps } from '@/shared/api/types'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { CostCenterSelect } from '@/components/shared/CostCenterSelect'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -209,6 +210,9 @@ export default function JournalForm() {
             <ArrowLeft size={14} /> Asientos Contables
           </button>
           <h1 className="page-title">Nuevo Asiento</h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton label="Actualizar" />
         </div>
       </div>
 

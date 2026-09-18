@@ -15,6 +15,7 @@ import { getFacturacionConfig } from '@/shared/api/config'
 import type { AperturaInventarioItemDto, CrearAperturaInventarioDto, AperturaInventario, Item } from '@/shared/api/types'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -186,6 +187,7 @@ export default function InventarioForm() {
       <PageHeader
         title="Cargar inventario inicial"
         description="Migra el saldo físico (stock por artículo/almacén) que existía en el sistema anterior."
+        action={<RecargarButton label="Actualizar" />}
       />
 
       {!loadingPreflight && !listo && (

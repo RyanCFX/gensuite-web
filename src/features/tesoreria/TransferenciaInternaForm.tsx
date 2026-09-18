@@ -10,6 +10,7 @@ import { CuentaBancariaSelect } from './components/CuentaBancariaSelect'
 import { DistribucionCuentasEditor } from './components/DistribucionCuentasEditor'
 import { CuentaContableOverrideSection } from './components/CuentaContableOverrideSection'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { formatMoney } from '@/lib/formatters'
@@ -145,7 +146,11 @@ export default function TransferenciaInternaForm() {
         <ArrowLeft size={14} /> Transferencias Internas
       </a>
 
-      <PageHeader title="Nueva Transferencia Interna" description="Mover dinero entre dos cuentas bancarias propias de la empresa" />
+      <PageHeader
+        title="Nueva Transferencia Interna"
+        description="Mover dinero entre dos cuentas bancarias propias de la empresa"
+        action={<RecargarButton label="Actualizar" />}
+      />
 
       <form onSubmit={handleSubmit}>
         <div className="card" style={{ marginBottom: 16 }}>

@@ -9,6 +9,7 @@ import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { formatDate, formatNumber } from '@/lib/formatters'
 import type { InventoryCount } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -180,9 +181,12 @@ export default function CountsPage() {
         title={<><span className="page-title-dot" />Conteos de Inventario</>}
         description="Gestiona los conteos físicos de inventario"
         action={
-          <button className="btn btn-navy" onClick={() => setShowNewDialog(true)}>
-            <Plus size={16} /> Nuevo Conteo
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={() => setShowNewDialog(true)}>
+              <Plus size={16} /> Nuevo Conteo
+            </button>
+          </>
         }
       />
 

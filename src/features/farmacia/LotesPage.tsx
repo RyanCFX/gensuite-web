@@ -11,6 +11,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Permitido } from '@/components/shared/Permitido'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { LoteCreateModal } from './LoteCreateModal'
 import type { LoteFarmaciaEstado } from '@/shared/api/types'
 
@@ -58,11 +59,14 @@ export default function LotesPage() {
           <h1 className="page-title"><span className="page-title-dot" />Lotes de Facturación ARS</h1>
           <p className="page-sub">Agrupa la cobertura neta de facturas ya cobradas de una misma ARS para facturarlas juntas</p>
         </div>
-        <Permitido accion="farmacia.lotes.crear">
-          <button className="btn btn-navy" onClick={() => setShowCreate(true)}>
-            <Plus size={16} /> Nuevo Lote
-          </button>
-        </Permitido>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <Permitido accion="farmacia.lotes.crear">
+            <button className="btn btn-navy" onClick={() => setShowCreate(true)}>
+              <Plus size={16} /> Nuevo Lote
+            </button>
+          </Permitido>
+        </div>
       </div>
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

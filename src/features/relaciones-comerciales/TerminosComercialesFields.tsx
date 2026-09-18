@@ -1,10 +1,21 @@
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import type { TerminosComercialesDto } from '@/shared/api/types'
+import { listGruposProveedores, getCatalogosFiscales } from '@/shared/api/config'
+import { listCustomerGroups } from '@/shared/api/customers'
+import { listUsuarios } from '@/shared/api/usuarios'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { AccountSelect } from '@/components/shared/AccountSelect'
+import { Select, SelectItem } from '@/components/ui/select'
 
 // Formulario compartido de "Términos comerciales" — mismo shape (`TerminosComercialesDto`, Fase
 // 01 §2.3) que usan tres pantallas distintas: el paso 2 del wizard de "Nueva relación comercial",
 // el modal de "Aceptar invitación" (Invitaciones → Recibidas) y la sección "Términos vigentes" del
-// detalle de una relación ya activa. Todos los campos son opcionales — texto libre, sin resolver
-// contra catálogos reales (fuera de alcance de esta iteración).
+// detalle de una relación ya activa. Los selects (grupo de cliente/proveedor, cuenta CxC/CxP
+// alterna, encargado de CxC, forma de pago por defecto, clasificación fiscal 606) reutilizan los
+// mismos catálogos que SupplierFormPanel/CustomerFormPanel — ver
+// docs/plans/relaciones_comerciales/ESTADO_Y_PENDIENTES.md.
 
 interface TerminosComercialesFieldsProps {
   value: TerminosComercialesDto
@@ -22,6 +33,52 @@ export function TerminosComercialesFields({ value, onChange, disabled = false }:
   function set<K extends keyof TerminosComercialesDto>(key: K, next: TerminosComercialesDto[K]) {
     onChange({ ...value, [key]: next })
   }
+
+  const { data: gruposClientesData, isLoading: gruposClientesLoading } = useQuery({
+    queryKey: ['customer-groups'],
+    queryFn: listCustomerGroups,
+    staleTime: 60_000,
+  })
+  const gruposClientesOptions: SearchSelectOption[] = (gruposClientesData ?? []).map((g) => ({
+    value: g.name,
+    label: g.name,
+  }))
+
+  const { data: gruposProveedoresData, isLoading: gruposProveedoresLoading } = useQuery({
+    queryKey: ['grupos-proveedores'],
+    queryFn: listGruposProveedores,
+    staleTime: 60_000,
+  })
+  const gruposProveedoresOptions: SearchSelectOption[] = (gruposProveedoresData ?? []).map((g) => ({
+    value: g.name,
+    label: g.name,
+    sublabel: g.parentGroup ? `Sub de: ${g.parentGroup}` : undefined,
+  }))
+
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+  const [tipoBienes606Search, setTipoBienes606Search] = useState('')
+  const tipoBienes606Options: SearchSelectOption[] = (catalogos?.tipoBienes606 ?? [])
+    .filter((t) => !tipoBienes606Search || t.label.toLowerCase().includes(tipoBienes606Search.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
+
+  const [formaPago606Search, setFormaPago606Search] = useState('')
+  const formaPago606Options: SearchSelectOption[] = (catalogos?.formaPago606 ?? [])
+    .filter((t) => !formaPago606Search || t.label.toLowerCase().includes(formaPago606Search.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
+
+  const { data: usuariosData } = useQuery({
+    queryKey: ['usuarios-all'],
+    queryFn: () => listUsuarios({ limit: 100 }),
+    staleTime: 60_000,
+  })
+  const [encargadoCxcSearch, setEncargadoCxcSearch] = useState('')
+  const encargadoCxcOptions: SearchSelectOption[] = (usuariosData?.items ?? [])
+    .filter((u) => !encargadoCxcSearch || u.fullName.toLowerCase().includes(encargadoCxcSearch.toLowerCase()) || u.email.toLowerCase().includes(encargadoCxcSearch.toLowerCase()))
+    .map((u) => ({ value: u.email, label: u.fullName, sublabel: u.email }))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -68,50 +125,54 @@ export function TerminosComercialesFields({ value, onChange, disabled = false }:
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-grupoCliente">Grupo de cliente</label>
-          <input
+          <SearchSelect
             id="tc-grupoCliente"
-            type="text"
-            className="ff-input"
-            disabled={disabled}
             value={value.grupoCliente ?? ''}
-            onChange={(e) => set('grupoCliente', e.target.value || undefined)}
+            onChange={(id) => set('grupoCliente', id || undefined)}
+            options={gruposClientesOptions}
+            onSearch={() => {}}
+            loading={gruposClientesLoading}
+            disabled={disabled}
+            placeholder="Buscar grupo…"
           />
         </div>
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-cuentaCxcAlterna">Cuenta CxC alterna</label>
-          <input
+          <AccountSelect
             id="tc-cuentaCxcAlterna"
-            type="text"
-            className="ff-input"
-            disabled={disabled}
             value={value.cuentaCxcAlterna ?? ''}
-            onChange={(e) => set('cuentaCxcAlterna', e.target.value || undefined)}
+            onChange={(id) => set('cuentaCxcAlterna', id || undefined)}
+            rootType="Asset"
+            disabled={disabled}
+            placeholder="Buscar cuenta…"
           />
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div className="ff-wrap">
-          <label className="ff-label" htmlFor="tc-encargadoCxc">Encargado de CxC (email)</label>
-          <input
+          <label className="ff-label" htmlFor="tc-encargadoCxc">Encargado de CxC</label>
+          <SearchSelect
             id="tc-encargadoCxc"
-            type="email"
-            className="ff-input"
-            disabled={disabled}
             value={value.encargadoCxc ?? ''}
-            onChange={(e) => set('encargadoCxc', e.target.value || undefined)}
+            onChange={(id) => set('encargadoCxc', id || undefined)}
+            options={encargadoCxcOptions}
+            onSearch={setEncargadoCxcSearch}
+            disabled={disabled}
+            placeholder="Buscar usuario…"
           />
         </div>
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-formaPagoDefault">Forma de pago por defecto</label>
-          <input
-            id="tc-formaPagoDefault"
-            type="text"
-            className="ff-input"
-            disabled={disabled}
+          <Select
             value={value.formaPagoDefault ?? ''}
-            onChange={(e) => set('formaPagoDefault', e.target.value || undefined)}
-          />
+            onValueChange={(v) => set('formaPagoDefault', v || undefined)}
+            placeholder="Sin configurar"
+            disabled={disabled}
+          >
+            <SelectItem value="Contado">Contado</SelectItem>
+            <SelectItem value="Crédito">Crédito</SelectItem>
+          </Select>
         </div>
       </div>
 
@@ -121,13 +182,15 @@ export function TerminosComercialesFields({ value, onChange, disabled = false }:
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-grupoProveedor">Grupo de proveedor</label>
-          <input
+          <SearchSelect
             id="tc-grupoProveedor"
-            type="text"
-            className="ff-input"
-            disabled={disabled}
             value={value.grupoProveedor ?? ''}
-            onChange={(e) => set('grupoProveedor', e.target.value || undefined)}
+            onChange={(id) => set('grupoProveedor', id || undefined)}
+            options={gruposProveedoresOptions}
+            onSearch={() => {}}
+            loading={gruposProveedoresLoading}
+            disabled={disabled}
+            placeholder="Buscar grupo…"
           />
         </div>
         <div className="ff-wrap">
@@ -147,37 +210,41 @@ export function TerminosComercialesFields({ value, onChange, disabled = false }:
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-cuentaCxpAlterna">Cuenta CxP alterna</label>
-          <input
+          <AccountSelect
             id="tc-cuentaCxpAlterna"
-            type="text"
-            className="ff-input"
-            disabled={disabled}
             value={value.cuentaCxpAlterna ?? ''}
-            onChange={(e) => set('cuentaCxpAlterna', e.target.value || undefined)}
+            onChange={(id) => set('cuentaCxpAlterna', id || undefined)}
+            rootType="Liability"
+            disabled={disabled}
+            placeholder="Buscar cuenta…"
           />
         </div>
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-tipoBienes606">Tipo de bienes (606)</label>
-          <input
+          <SearchSelect
             id="tc-tipoBienes606"
-            type="text"
-            className="ff-input"
-            disabled={disabled}
             value={value.tipoBienes606 ?? ''}
-            onChange={(e) => set('tipoBienes606', e.target.value || undefined)}
+            onChange={(id) => set('tipoBienes606', id || undefined)}
+            options={tipoBienes606Options}
+            onSearch={setTipoBienes606Search}
+            selectedLabel={catalogos?.tipoBienes606?.find((t) => t.value === value.tipoBienes606)?.label ?? ''}
+            disabled={disabled}
+            placeholder="Sin configurar"
           />
         </div>
       </div>
 
       <div className="ff-wrap">
         <label className="ff-label" htmlFor="tc-formaPago606">Forma de pago (606)</label>
-        <input
+        <SearchSelect
           id="tc-formaPago606"
-          type="text"
-          className="ff-input"
-          disabled={disabled}
           value={value.formaPago606 ?? ''}
-          onChange={(e) => set('formaPago606', e.target.value || undefined)}
+          onChange={(id) => set('formaPago606', id || undefined)}
+          options={formaPago606Options}
+          onSearch={setFormaPago606Search}
+          selectedLabel={catalogos?.formaPago606?.find((t) => t.value === value.formaPago606)?.label ?? ''}
+          disabled={disabled}
+          placeholder="Sin configurar"
         />
       </div>
     </div>

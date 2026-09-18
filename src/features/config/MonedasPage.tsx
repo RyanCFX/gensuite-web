@@ -20,6 +20,7 @@ import {
 import { listCuentas, createCuenta } from '@/shared/api/cuentas'
 import type { Moneda, MonedaCode, TasaCambio, ApiError } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -691,6 +692,7 @@ export default function MonedasPage() {
       <PageHeader
         title={<><span className="page-title-dot" />Monedas</>}
         description="Catálogo de monedas soportadas, tasas de cambio y calculadora de conversión"
+        action={<RecargarButton />}
       />
       <CatalogoMonedasSection />
       <TasasCambioSection />

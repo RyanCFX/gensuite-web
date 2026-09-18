@@ -13,6 +13,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 const STATUS_BADGE: Record<TesoreriaEstado, string> = {
   draft: 'badge-draft',
@@ -71,10 +72,13 @@ export default function DepositosPage() {
         title={<><span className="page-title-dot" />Depósitos</>}
         description="Depósitos bancarios, cobros de clientes, liquidaciones de tarjeta y reembolsos de proveedores"
         action={
-          <button className="btn btn-navy" onClick={() => navigate('/tesoreria/depositos/nuevo')}>
-            <Plus size={16} />
-            Nuevo Depósito
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={() => navigate('/tesoreria/depositos/nuevo')}>
+              <Plus size={16} />
+              Nuevo Depósito
+            </button>
+          </>
         }
       />
 

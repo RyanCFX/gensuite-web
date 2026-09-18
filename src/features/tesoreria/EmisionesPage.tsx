@@ -14,6 +14,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 const STATUS_BADGE: Record<TesoreriaEstado, string> = {
   draft: 'badge-draft',
@@ -66,10 +67,13 @@ export default function EmisionesPage() {
         title={<><span className="page-title-dot" />Emisiones</>}
         description="Cheques, transferencias salientes, pagos a proveedores y ajustes que reducen el saldo bancario"
         action={
-          <button className="btn btn-navy" onClick={() => navigate('/tesoreria/emisiones/nueva')}>
-            <Plus size={16} />
-            Nueva Emisión
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={() => navigate('/tesoreria/emisiones/nueva')}>
+              <Plus size={16} />
+              Nueva Emisión
+            </button>
+          </>
         }
       />
 

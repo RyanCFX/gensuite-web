@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { listPurchaseReceipts } from '@/shared/api/purchase-receipt'
 import { listSucursales } from '@/shared/api/sucursales'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Badge } from '@/shared/ui/Badge'
 import { formatDate } from '@/lib/formatters'
@@ -83,10 +84,13 @@ export default function RecepcionesPage() {
         title={<><span className="page-title-dot" />Recepción de Mercancía</>}
         description="Registra la mercancía recibida antes de que llegue la factura final del proveedor"
         action={
-          <button className="btn btn-navy" onClick={() => navigate('/compras/recepciones/nueva')}>
-            <Plus size={16} />
-            Nueva Recepción
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={() => navigate('/compras/recepciones/nueva')}>
+              <Plus size={16} />
+              Nueva Recepción
+            </button>
+          </>
         }
       />
 

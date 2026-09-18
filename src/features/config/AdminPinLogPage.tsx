@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ShieldOff, ChevronLeft, ChevronRight, CheckCircle2, XCircle } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { listAdminPinLog } from '@/shared/api/auth'
 import { formatDateTime } from '@/lib/formatters'
-import { useAuthStore } from '@/stores/auth.store'
+import { usePermissionsStore } from '@/stores/permissions.store'
 
 const PAGE_SIZE = 30
 
@@ -14,7 +15,7 @@ const ACCION_LABELS: Record<string, string> = {
 }
 
 export default function AdminPinLogPage() {
-  const roles = useAuthStore((s) => s.user?.roles) ?? []
+  const roles = usePermissionsStore((s) => s.roles)
   const canView = roles.includes('System Manager') || roles.includes('Auditor')
   const [page, setPage] = useState(1)
   const offset = (page - 1) * PAGE_SIZE
@@ -47,6 +48,7 @@ export default function AdminPinLogPage() {
       <PageHeader
         title={<><span className="page-title-dot" />Auditoría de PIN</>}
         description="Cada intento de autorización con PIN de administrador (override de descuento, etc.) — éxito o fallo, quién lo pidió y quién autorizó"
+        action={<RecargarButton />}
       />
 
       <div className="card navy-table-card">

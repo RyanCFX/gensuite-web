@@ -8,6 +8,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { validateCedulaDetailed } from '@/lib/validators/dgii'
 import { formatDOP } from '@/lib/formatters'
 import type { AseguradoraFormState } from './aseguradoraForm'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 /**
  * Panel "Aseguradora (ARS)" del formulario de factura — vertical farmacia
@@ -84,6 +85,7 @@ export function AseguradoraPanel({
         </button>
         <ShieldCheck size={15} style={{ color: 'var(--icon-muted)' }} />
         <h2 className="card-title" style={{ flex: 1 }}>Aseguradora (ARS)</h2>
+        <RecargarButton />
         <label className="ff-toggle-wrap" style={{ cursor: readOnly ? 'default' : 'pointer', opacity: readOnly ? 0.6 : 1 }}>
           <span className="ff-toggle">
             <input

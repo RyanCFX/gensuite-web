@@ -40,6 +40,7 @@ import { listUsuarios } from '@/shared/api/usuarios'
 import { listItems } from '@/shared/api/catalog'
 import { getFacturacionConfig, listAlmacenes } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { formatDate, formatDateTime, formatDOP, formatMoney } from '@/lib/formatters'
 import { BarChart3, AlertCircle, Download, FileText, Loader2, RefreshCw } from 'lucide-react'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -2959,6 +2960,7 @@ export default function ReportesPage() {
           overline="Reportes"
           title={<><span className="page-title-dot" />{meta?.label ?? active}</>}
           description={meta?.description}
+          action={<RecargarButton />}
         />
         {renderReport()}
       </div>

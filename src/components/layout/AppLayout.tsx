@@ -54,6 +54,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { usePermissionsStore } from "@/stores/permissions.store";
+import { useIsSystemManager } from "@/shared/hooks/useIsSystemManager";
 import { resolverRuta } from "@/shared/permissions/rutas";
 import { switchTenant, isApiError } from "@/shared/api/auth";
 import { CommandPalette } from "./CommandPalette";
@@ -1247,7 +1248,7 @@ function AppLayoutInner() {
   const { user, logout, tenant, memberships, refreshToken, applySwitchTenantResult } = useAuthStore();
   const activeCompanies = memberships.filter((m) => m.status === "accepted");
   const canSwitchCompany = activeCompanies.length > 1;
-  const isSystemManager = user?.roles?.includes("System Manager") ?? false;
+  const isSystemManager = useIsSystemManager();
   const vertical = usePermissionsStore((s) => s.vertical);
   const esFarmacia = vertical === "farmacia";
   const acciones = usePermissionsStore((s) => s.acciones);

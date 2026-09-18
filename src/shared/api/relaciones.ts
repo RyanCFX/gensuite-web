@@ -27,6 +27,7 @@ import type {
   TerminosComercialesDto,
   MaestrosCandidatosRelacion,
   AdoptarMaestrosDto,
+  EstadoActivacionRelacion,
   TransaccionB2BListItem,
   TransaccionB2BDetalle,
   ListTransaccionesParams,
@@ -168,9 +169,18 @@ export async function actualizarTerminosRelacion(id: string, data: TerminosComer
   return unwrapAny<RelacionComercialDetalle>(res)
 }
 
+export async function getEstadoActivacionRelacion(id: string) {
+  const res = await client.get(ENDPOINTS.relaciones.estadoActivacion(id))
+  return unwrapAny<EstadoActivacionRelacion>(res)
+}
+
+/** Solo re-encola el lado local (`activate_relationship`) — no valida el motivo del error antes
+ *  de reintentar. Un `lastError` de conflicto de maestro/RNC duplicado (ver
+ *  `GET /estado-activacion`) va a volver a fallar igual; para eso usar primero
+ *  `getMaestrosCandidatosRelacion` → `adoptarMaestrosRelacion`, que también re-encola. */
 export async function reintentarActivacionRelacion(id: string) {
   const res = await client.post(ENDPOINTS.relaciones.reintentarActivacion(id))
-  return unwrapAny<RelacionComercialDetalle>(res)
+  return unwrapAny<{ message: string }>(res)
 }
 
 export async function getMaestrosCandidatosRelacion(id: string) {

@@ -4,6 +4,7 @@ import { useEffectOnActive } from 'keepalive-for-react'
 import { useTabs } from '@/contexts/TabsContext'
 import { getCustomer } from '@/shared/api/customers'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { CustomerFormPanel } from './CustomerFormPanel'
 
 export default function CustomerForm() {
@@ -40,7 +41,10 @@ export default function CustomerForm() {
         ← Clientes
       </button>
 
-      <PageHeader title={isEdit ? 'Editar Cliente' : 'Nuevo Cliente'} />
+      <PageHeader
+        title={isEdit ? 'Editar Cliente' : 'Nuevo Cliente'}
+        action={<RecargarButton label="Actualizar" />}
+      />
 
       <CustomerFormPanel
         customer={customer}

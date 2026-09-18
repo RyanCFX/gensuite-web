@@ -7,6 +7,7 @@ import type { Quotation } from '@/shared/api/types'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listCustomers } from '@/shared/api/customers'
 import { Plus, Eye, GitBranch, Copy, X, Loader2 } from 'lucide-react'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { toast } from 'sonner'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -99,10 +100,13 @@ export default function QuotationsPage() {
           <h1 className="page-title"><span className="page-title-dot" />Cotizaciones</h1>
           <p className="page-sub">Gestiona tus cotizaciones y presupuestos</p>
         </div>
-        <button className="btn btn-navy" onClick={() => navigate('/cotizaciones/nueva')}>
-          <Plus size={16} />
-          Nueva Cotización
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <button className="btn btn-navy" onClick={() => navigate('/cotizaciones/nueva')}>
+            <Plus size={16} />
+            Nueva Cotización
+          </button>
+        </div>
       </div>
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

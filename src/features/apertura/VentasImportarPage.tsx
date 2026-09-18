@@ -12,6 +12,7 @@ import { importarAperturaVentas } from '@/shared/api/apertura'
 import { listCustomers } from '@/shared/api/customers'
 import type { ImportarAperturaVentasResultadoFila } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -111,6 +112,7 @@ export default function VentasImportarPage() {
       <PageHeader
         title="Carga masiva de ventas"
         description="Hasta 200 filas por envío. Para campos avanzados (moneda, sucursal, descripción) usa el formulario individual."
+        action={<RecargarButton />}
       />
 
       {!listo && (

@@ -12,6 +12,7 @@ import type { AperturaInventarioListItem } from '@/shared/api/types'
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { FilterField } from '@/shared/ui/FilterField'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -78,11 +79,14 @@ export default function InventarioListPage() {
         title={<><span className="page-title-dot" />Inventario — Migración de Saldos</>}
         description="Saldo físico inicial (stock por artículo/almacén) migrado del sistema anterior."
         action={
-          puedeCrear ? (
-            <button className="btn btn-navy" onClick={() => navigate('/apertura/inventario/nueva')}>
-              <Plus size={16} /> Cargar inventario inicial
-            </button>
-          ) : undefined
+          <>
+            <RecargarButton />
+            {puedeCrear && (
+              <button className="btn btn-navy" onClick={() => navigate('/apertura/inventario/nueva')}>
+                <Plus size={16} /> Cargar inventario inicial
+              </button>
+            )}
+          </>
         }
       />
 

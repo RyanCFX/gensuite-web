@@ -12,6 +12,7 @@ import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateOrdenCompraDto, Item } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { Plus, Trash2 } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -314,6 +315,7 @@ export default function OrdenForm() {
       <PageHeader
         title={isEdit ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'}
         description="El pedido formal a un proveedor específico, con precios"
+        action={<RecargarButton label="Actualizar" />}
       />
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>

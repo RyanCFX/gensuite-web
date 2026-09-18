@@ -11,10 +11,11 @@ import { listAlmacenes, listImpuestosCompras, getCatalogosFiscales, getFacturaci
 import { listMonedas, getTasaVigente } from '@/shared/api/monedas'
 import type { MonedaCode } from '@/shared/api/types'
 import { listRetenciones } from '@/shared/api/retenciones'
-import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
+import { getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateCompraDto, Supplier, DistribucionCuentaDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { Plus, Trash2, Info, UserPlus } from 'lucide-react'
 import { SupplierQuickCreateModal } from '@/features/suppliers/SupplierQuickCreateModal'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -43,6 +44,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 
 interface ItemRow {
   itemCode: string
@@ -76,7 +78,6 @@ function emptyItem(defaultWh?: string): ItemRow {
 }
 
 const NCF_REGEX = /^[BE]\d{10}$/
-const SYSTEM_MANAGER_ROLE = 'System Manager'
 
 function onVariantConfirm(
   selections: VariantSelection[],
@@ -662,13 +663,7 @@ export default function CompraForm() {
   }, [warehouses])
 
   // ── Sucursal (branch) selector ────────────────────────────────────────────
-  const { data: currentUserDetail } = useQuery({
-    queryKey: ['currentUser', authUser?.email],
-    queryFn: () => getUsuario(authUser!.email),
-    enabled: !!authUser?.email,
-    staleTime: 5 * 60_000,
-  })
-  const isSystemManager = currentUserDetail?.roles?.includes(SYSTEM_MANAGER_ROLE) ?? false
+  const isSystemManager = useIsSystemManager()
   const { data: myBranches, refetch: refetchMyBranches } = useQuery({
     queryKey: ['usuarioSucursales', authUser?.email],
     queryFn: () => getUsuarioSucursales(authUser!.email),
@@ -1135,6 +1130,7 @@ export default function CompraForm() {
       <PageHeader
         title={isEdit ? 'Editar Compra' : 'Nueva Compra'}
         description="Registra una compra de inventario"
+        action={<RecargarButton label="Actualizar" />}
       />
 
       {isReturn && (

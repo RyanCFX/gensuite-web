@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { listOrdenesCompra } from '@/shared/api/ordenes-compra'
 import { listSucursales } from '@/shared/api/sucursales'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Badge } from '@/shared/ui/Badge'
 import { formatDate, formatDOP } from '@/lib/formatters'
@@ -88,10 +89,13 @@ export default function OrdenesPage() {
         title={<><span className="page-title-dot" />Órdenes de Compra</>}
         description="El pedido formal a un proveedor específico, con precios — se genera desde una solicitud o se crea directa"
         action={
-          <button className="btn btn-navy" onClick={() => navigate('/compras/ordenes/nueva')}>
-            <Plus size={16} />
-            Nueva Orden
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={() => navigate('/compras/ordenes/nueva')}>
+              <Plus size={16} />
+              Nueva Orden
+            </button>
+          </>
         }
       />
 

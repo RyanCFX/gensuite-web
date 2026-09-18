@@ -12,6 +12,7 @@ import type { CreateItemDto } from '@/shared/api/types'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listUOMs, getEmpresa, listItemTaxTemplates, getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { MultiSearchSelect } from '@/shared/ui/MultiSearchSelect'
@@ -637,6 +638,7 @@ export default function ItemForm() {
         title={isEdit ? `Editar ${existingItem?.itemName ?? moduleLabel}` : `Nuevo ${moduleLabel}`}
         description={isEdit ? `Modifica los datos del ${moduleLabel.toLowerCase()}` : `Registra un nuevo ${moduleLabel.toLowerCase()} en el catálogo`}
         overline={isProduct ? 'Inventario' : 'Catálogo'}
+        action={isEdit ? <RecargarButton label="Actualizar" /> : undefined}
       />
 
       {isTemplate && (

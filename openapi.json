@@ -156,7 +156,7 @@
     },
     "/api/v1/auth/invitations/{token}": {
       "get": {
-        "description": "Un cliente de correo que pre-carga links no debe aceptar/rechazar nada — por eso este GET es de solo lectura. Usarlo para pintar la pantalla \"¿Acepta unirse a <tenant>?\".",
+        "description": "Un cliente de correo que pre-carga links no debe aceptar/rechazar nada — por eso este GET es de solo lectura. Usarlo para pintar la pantalla \"¿Acepta unirse a \u003Ctenant\u003E?\".",
         "operationId": "AuthController_getInvitation",
         "parameters": [
           {
@@ -3500,7 +3500,7 @@
             "bearer": []
           }
         ],
-        "summary": "Item Shortage Report — artículos con projected_qty < 0 en un almacén",
+        "summary": "Item Shortage Report — artículos con projected_qty \u003C 0 en un almacén",
         "tags": [
           "Reportes"
         ]
@@ -5227,7 +5227,7 @@
             "name": "overdueOnly",
             "required": false,
             "in": "query",
-            "description": "Solo facturas vencidas (due_date < hoy)",
+            "description": "Solo facturas vencidas (due_date \u003C hoy)",
             "schema": {
               "type": "boolean"
             }
@@ -5635,7 +5635,7 @@
             "bearer": []
           }
         ],
-        "summary": "Saldo a favor disponible del cliente (Payment Entries con unallocated_amount > 0, ej. anticipos sin aplicar a ninguna factura). Sin expiración.",
+        "summary": "Saldo a favor disponible del cliente (Payment Entries con unallocated_amount \u003E 0, ej. anticipos sin aplicar a ninguna factura). Sin expiración.",
         "tags": [
           "Cuentas por Cobrar"
         ]
@@ -6054,7 +6054,7 @@
             "name": "overdueOnly",
             "required": false,
             "in": "query",
-            "description": "Solo facturas vencidas (due_date < hoy)",
+            "description": "Solo facturas vencidas (due_date \u003C hoy)",
             "schema": {
               "type": "boolean"
             }
@@ -6322,7 +6322,7 @@
             "bearer": []
           }
         ],
-        "summary": "Saldo a favor disponible con el proveedor (Payment Entries con unallocated_amount > 0, ej. anticipos pagados sin aplicar a ninguna factura). Sin expiración.",
+        "summary": "Saldo a favor disponible con el proveedor (Payment Entries con unallocated_amount \u003E 0, ej. anticipos pagados sin aplicar a ninguna factura). Sin expiración.",
         "tags": [
           "Cuentas por Pagar"
         ]
@@ -13276,7 +13276,7 @@
             "name": "from",
             "required": false,
             "in": "query",
-            "description": "Fecha/hora mínima de apertura (period_start_date >=)",
+            "description": "Fecha/hora mínima de apertura (period_start_date \u003E=)",
             "schema": {
               "type": "string"
             }
@@ -13285,7 +13285,7 @@
             "name": "to",
             "required": false,
             "in": "query",
-            "description": "Fecha/hora máxima de apertura (period_start_date <=)",
+            "description": "Fecha/hora máxima de apertura (period_start_date \u003C=)",
             "schema": {
               "type": "string"
             }
@@ -13294,7 +13294,7 @@
             "name": "grandTotalMin",
             "required": false,
             "in": "query",
-            "description": "Solo turnos cerrados (Closed) con grand_total de cierre >= este valor",
+            "description": "Solo turnos cerrados (Closed) con grand_total de cierre \u003E= este valor",
             "schema": {
               "type": "number"
             }
@@ -13303,7 +13303,7 @@
             "name": "grandTotalMax",
             "required": false,
             "in": "query",
-            "description": "Solo turnos cerrados (Closed) con grand_total de cierre <= este valor",
+            "description": "Solo turnos cerrados (Closed) con grand_total de cierre \u003C= este valor",
             "schema": {
               "type": "number"
             }
@@ -15049,9 +15049,1832 @@
         ]
       }
     },
-    "/api/v1/catalog/categories": {
+    "/api/v1/relaciones/directorio/buscar": {
+      "post": {
+        "description": "POST y no GET, deliberado: el RNC buscado es dato sensible de un tercero y no debe quedar en logs de acceso, historiales de navegador ni referers. Nunca revela si existe un bloqueo — un tenant no invitable por bloqueo se ve igual que uno no invitable por cualquier otra razón (ver `motivoNoInvitable`).",
+        "operationId": "DirectorioController_buscar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuscarEmpresaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuscarEmpresaResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Buscar una empresa por RNC en el directorio de relaciones comerciales",
+        "tags": [
+          "Relaciones Comerciales — Directorio"
+        ]
+      }
+    },
+    "/api/v1/relaciones/invitaciones": {
+      "post": {
+        "operationId": "InvitacionesController_crear",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearInvitacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Invitar a otro tenant a una relación comercial",
+        "tags": [
+          "Relaciones Comerciales — Invitaciones"
+        ]
+      },
       "get": {
-        "operationId": "CategoriesController_findAll",
+        "operationId": "InvitacionesController_listar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "direccion",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar invitaciones enviadas y/o recibidas",
+        "tags": [
+          "Relaciones Comerciales — Invitaciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/invitaciones/{id}": {
+      "get": {
+        "operationId": "InvitacionesController_detalle",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una invitación",
+        "tags": [
+          "Relaciones Comerciales — Invitaciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/invitaciones/{id}/cancelar": {
+      "post": {
+        "operationId": "InvitacionesController_cancelar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar una invitación enviada (solo si sigue pendiente)",
+        "tags": [
+          "Relaciones Comerciales — Invitaciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/invitaciones/{id}/reenviar": {
+      "post": {
+        "operationId": "InvitacionesController_reenviar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reenviar una invitación (crea una nueva, con token nuevo)",
+        "tags": [
+          "Relaciones Comerciales — Invitaciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/invitaciones/{id}/aceptar": {
+      "post": {
+        "operationId": "InvitacionesController_aceptar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AceptarInvitacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Aceptar una invitación recibida, con términos completos",
+        "tags": [
+          "Relaciones Comerciales — Invitaciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/invitaciones/{id}/rechazar": {
+      "post": {
+        "operationId": "InvitacionesController_rechazar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RechazarInvitacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rechazar una invitación recibida, con motivo y bloqueo opcional",
+        "tags": [
+          "Relaciones Comerciales — Invitaciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/invitaciones/token/{token}": {
+      "get": {
+        "description": "Un cliente de correo que pre-carga links no debe aceptar/rechazar nada — por eso este GET es de solo lectura. Respuesta mínima a propósito: nunca ids de tenant, emails ni catálogos.",
+        "operationId": "InvitacionesPublicasController_obtener",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Resumen de una invitación por token — NO la consume",
+        "tags": [
+          "Relaciones Comerciales — Invitaciones (público)"
+        ]
+      }
+    },
+    "/api/v1/relaciones/invitaciones/token/{token}/aceptar": {
+      "post": {
+        "operationId": "InvitacionesPublicasController_aceptar",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AceptarInvitacionPublicaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Aceptar una invitación con el token del correo, sin login",
+        "tags": [
+          "Relaciones Comerciales — Invitaciones (público)"
+        ]
+      }
+    },
+    "/api/v1/relaciones/invitaciones/token/{token}/rechazar": {
+      "post": {
+        "operationId": "InvitacionesPublicasController_rechazar",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RechazarInvitacionPublicaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Rechazar una invitación con el token del correo, sin login",
+        "tags": [
+          "Relaciones Comerciales — Invitaciones (público)"
+        ]
+      }
+    },
+    "/api/v1/relaciones/bloqueos": {
+      "get": {
+        "operationId": "BloqueosController_listar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incluirLevantados",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar empresas que YO bloqueé",
+        "tags": [
+          "Relaciones Comerciales — Bloqueos"
+        ]
+      },
+      "post": {
+        "operationId": "BloqueosController_crear",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearBloqueoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bloquear una empresa (sin que haya invitación de por medio)",
+        "tags": [
+          "Relaciones Comerciales — Bloqueos"
+        ]
+      }
+    },
+    "/api/v1/relaciones/bloqueos/{id}/levantar": {
+      "post": {
+        "operationId": "BloqueosController_levantar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Desbloquear una empresa",
+        "tags": [
+          "Relaciones Comerciales — Bloqueos"
+        ]
+      }
+    },
+    "/api/v1/relaciones": {
+      "get": {
+        "operationId": "RelacionesController_listar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar los socios comerciales del tenant actual (paginado)",
+        "tags": [
+          "Relaciones Comerciales"
+        ]
+      }
+    },
+    "/api/v1/relaciones/{id}": {
+      "get": {
+        "operationId": "RelacionesController_ver",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una relación comercial: contraparte, espejos y configuración",
+        "tags": [
+          "Relaciones Comerciales"
+        ]
+      }
+    },
+    "/api/v1/relaciones/{id}/configuracion": {
+      "put": {
+        "operationId": "RelacionesController_actualizarConfiguracion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarConfiguracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar almacén, defaults 606 y automatización de la relación",
+        "tags": [
+          "Relaciones Comerciales"
+        ]
+      }
+    },
+    "/api/v1/relaciones/{id}/terminos": {
+      "put": {
+        "operationId": "RelacionesController_actualizarTerminos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminosComercialesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reescribir los términos comerciales sobre el Customer/Supplier locales",
+        "tags": [
+          "Relaciones Comerciales"
+        ]
+      }
+    },
+    "/api/v1/relaciones/{id}/reintentar-activacion": {
+      "post": {
+        "operationId": "RelacionesController_reintentarActivacion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Re-encolar la activación de este lado (espejos Customer/Supplier)",
+        "tags": [
+          "Relaciones Comerciales"
+        ]
+      }
+    },
+    "/api/v1/relaciones/{id}/estado-activacion": {
+      "get": {
+        "operationId": "RelacionesController_estadoActivacion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Diagnóstico de una relación en \"activando\": filas del outbox de este lado (estado, intentos, próximo intento, último error) sin tener que consultar la base directamente",
+        "tags": [
+          "Relaciones Comerciales"
+        ]
+      }
+    },
+    "/api/v1/relaciones/{id}/maestros-candidatos": {
+      "get": {
+        "operationId": "RelacionesController_maestrosCandidatos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Clientes/proveedores locales con el RNC de la contraparte, para RNC_DUPLICADO_EN_SITE",
+        "tags": [
+          "Relaciones Comerciales"
+        ]
+      }
+    },
+    "/api/v1/relaciones/{id}/adoptar-maestros": {
+      "post": {
+        "operationId": "RelacionesController_adoptarMaestros",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdoptarMaestrosDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Elegir a mano cuál Customer/Supplier adoptar y relanzar la activación",
+        "tags": [
+          "Relaciones Comerciales"
+        ]
+      }
+    },
+    "/api/v1/relaciones/{id}/suspender": {
+      "post": {
+        "operationId": "RelacionesController_suspender",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suspender: no se envían ni aceptan transacciones nuevas",
+        "tags": [
+          "Relaciones Comerciales"
+        ]
+      }
+    },
+    "/api/v1/relaciones/{id}/reactivar": {
+      "post": {
+        "operationId": "RelacionesController_reactivar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reactivar una relación suspendida",
+        "tags": [
+          "Relaciones Comerciales"
+        ]
+      }
+    },
+    "/api/v1/relaciones/{id}/terminar": {
+      "post": {
+        "operationId": "RelacionesController_terminar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Terminar la relación (no borra los espejos, solo desvincula)",
+        "tags": [
+          "Relaciones Comerciales"
+        ]
+      }
+    },
+    "/api/v1/relaciones/{id}/documentos-enlazables": {
+      "get": {
+        "operationId": "RelacionesController_documentosEnlazables",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fase 11 §3.1 — facturas de venta ya sometidas para enlazar en vez de enviar una nueva",
+        "tags": [
+          "Relaciones Comerciales"
+        ]
+      }
+    },
+    "/api/v1/relaciones/transacciones": {
+      "get": {
+        "operationId": "TransaccionesController_listar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "direccion",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "relacionId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bandeja de transacciones B2B (entrantes y salientes)",
+        "tags": [
+          "Relaciones Comerciales — Transacciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/transacciones/{uid}": {
+      "get": {
+        "operationId": "TransaccionesController_detalle",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una transacción: snapshot, documento local e historial",
+        "tags": [
+          "Relaciones Comerciales — Transacciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/transacciones/{uid}/reintentar": {
+      "post": {
+        "operationId": "TransaccionesController_reintentar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reintentar la entrega de una transacción en estado \"error\"",
+        "tags": [
+          "Relaciones Comerciales — Transacciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/transacciones/{uid}/cancelar": {
+      "post": {
+        "operationId": "TransaccionesController_cancelar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar un envío propio, antes de que el destino responda",
+        "tags": [
+          "Relaciones Comerciales — Transacciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/transacciones/{uid}/aceptar": {
+      "post": {
+        "operationId": "TransaccionesController_aceptar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AceptarTransaccionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Aceptar una transacción entrante — confirma mapeo y somete el documento local",
+        "tags": [
+          "Relaciones Comerciales — Transacciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/transacciones/{uid}/rechazar": {
+      "post": {
+        "operationId": "TransaccionesController_rechazar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RechazarTransaccionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rechazar una transacción entrante — borra el borrador materializado",
+        "tags": [
+          "Relaciones Comerciales — Transacciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/transacciones/{uid}/diff": {
+      "get": {
+        "operationId": "TransaccionesController_diff",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Diff recalculado en vivo entre el snapshot del socio y el documento local",
+        "tags": [
+          "Relaciones Comerciales — Transacciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/transacciones/{uid}/igualar": {
+      "post": {
+        "operationId": "TransaccionesController_igualarBorrador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IgualarBorradorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Igualar un documento local en BORRADOR a lo que registró el socio",
+        "tags": [
+          "Relaciones Comerciales — Transacciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/transacciones/{uid}/igualar-con-enmienda": {
+      "post": {
+        "operationId": "TransaccionesController_igualarConEnmienda",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IgualarConEnmiendaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Igualar un documento local ya SOMETIDO — anula y enmienda, con NCF nuevo al someter",
+        "tags": [
+          "Relaciones Comerciales — Transacciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/transacciones/{uid}/candidatos-enlace": {
+      "get": {
+        "operationId": "TransaccionesController_candidatosEnlace",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Documentos propios sometidos, candidatos a enlazar con esta transacción",
+        "tags": [
+          "Relaciones Comerciales — Transacciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/transacciones/{uid}/enlazar": {
+      "post": {
+        "operationId": "TransaccionesController_enlazar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnlazarTransaccionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enlazar un documento propio YA SOMETIDO en vez de aceptar el borrador (D17)",
+        "tags": [
+          "Relaciones Comerciales — Transacciones"
+        ]
+      }
+    },
+    "/api/v1/relaciones/transacciones/{uid}/mapeo": {
+      "get": {
+        "operationId": "MapeoController_ver",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resultado del mapeo (recalculado en vivo) para una transacción",
+        "tags": [
+          "Relaciones Comerciales — Mapeo de Catálogo"
+        ]
+      },
+      "put": {
+        "operationId": "MapeoController_confirmar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmarMapeoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirmar decisiones de mapeo (y opcionalmente sincronizar barcodes)",
+        "tags": [
+          "Relaciones Comerciales — Mapeo de Catálogo"
+        ]
+      }
+    },
+    "/api/v1/relaciones/transacciones/{uid}/mapeo/crear-articulo": {
+      "post": {
+        "operationId": "MapeoController_crearArticulo",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearArticuloDesdeSocioDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear el artículo local desde los datos del socio y confirmar la línea",
+        "tags": [
+          "Relaciones Comerciales — Mapeo de Catálogo"
+        ]
+      }
+    },
+    "/api/v1/relaciones/{id}/mapeo": {
+      "get": {
+        "operationId": "MapeoController_verAcumulado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mapeo acumulado de la relación (pantalla de mantenimiento)",
+        "tags": [
+          "Relaciones Comerciales — Mapeo de Catálogo"
+        ]
+      },
+      "put": {
+        "operationId": "MapeoController_actualizarAcumulado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarMapeoAcumuladoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar el mapeo acumulado de la relación (reemplaza todas las filas)",
+        "tags": [
+          "Relaciones Comerciales — Mapeo de Catálogo"
+        ]
+      }
+    },
+    "/api/v1/relaciones/ventas/{invoiceId}/enviar": {
+      "post": {
+        "operationId": "VentasController_enviar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnviarVentaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enviar manualmente una factura sometida a un socio comercial",
+        "tags": [
+          "Relaciones Comerciales — Ventas B2B"
+        ]
+      }
+    },
+    "/api/v1/compras": {
+      "get": {
+        "operationId": "ComprasController_findAll",
         "parameters": [
           {
             "name": "X-Tenant",
@@ -15084,7 +16907,6 @@
             "name": "search",
             "required": false,
             "in": "query",
-            "description": "Search by name (partial match)",
             "schema": {
               "type": "string"
             }
@@ -15098,35 +16920,93 @@
             }
           },
           {
-            "name": "tree",
+            "name": "supplier",
             "required": false,
             "in": "query",
-            "description": "Return full hierarchy tree (fetches all, ignores pagination)",
             "schema": {
-              "type": "boolean"
+              "type": "string"
             }
           },
           {
-            "name": "isGroup",
+            "name": "ncf",
             "required": false,
             "in": "query",
-            "description": "Filter: only group categories (can have children)",
+            "description": "Búsqueda aproximada por NCF del proveedor",
             "schema": {
-              "type": "boolean"
+              "type": "string"
             }
           },
           {
-            "name": "type",
+            "name": "grandTotalMin",
             "required": false,
             "in": "query",
-            "description": "Filtra a categorías que apliquen a este tipo de artículo (aplicaA = \"Ambas\" o el tipo pedido).",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "grandTotalMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
             "schema": {
               "type": "string",
               "enum": [
-                "product",
-                "service"
+                "draft",
+                "submitted",
+                "cancelled",
+                "all"
               ]
             }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipoComprobante",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Sucursal Norte",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -15139,13 +17019,13 @@
             "bearer": []
           }
         ],
-        "summary": "List categories (flat or tree with ?tree=true)",
+        "summary": "Listar facturas de compra (afectan inventario)",
         "tags": [
-          "Catalog - Categories"
+          "Compras"
         ]
       },
       "post": {
-        "operationId": "CategoriesController_create",
+        "operationId": "ComprasController_create",
         "parameters": [
           {
             "name": "X-Tenant",
@@ -15161,7 +17041,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateCategoryDto"
+                "$ref": "#/components/schemas/CreateCompraDto"
               }
             }
           }
@@ -15176,15 +17056,15 @@
             "bearer": []
           }
         ],
-        "summary": "Create category",
+        "summary": "Crear factura de compra (Draft) — actualiza inventario al someter",
         "tags": [
-          "Catalog - Categories"
+          "Compras"
         ]
       }
     },
-    "/api/v1/catalog/categories/{id}": {
+    "/api/v1/compras/{id}": {
       "get": {
-        "operationId": "CategoriesController_findOne",
+        "operationId": "ComprasController_findOne",
         "parameters": [
           {
             "name": "X-Tenant",
@@ -15213,13 +17093,13 @@
             "bearer": []
           }
         ],
-        "summary": "Get category by ID",
+        "summary": "Detalle de factura de compra",
         "tags": [
-          "Catalog - Categories"
+          "Compras"
         ]
       },
       "put": {
-        "operationId": "CategoriesController_update",
+        "operationId": "ComprasController_update",
         "parameters": [
           {
             "name": "X-Tenant",
@@ -15243,7 +17123,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateCategoryDto"
+                "$ref": "#/components/schemas/UpdateCompraDto"
               }
             }
           }
@@ -15258,13 +17138,13 @@
             "bearer": []
           }
         ],
-        "summary": "Update category",
+        "summary": "Actualizar factura de compra en Draft",
         "tags": [
-          "Catalog - Categories"
+          "Compras"
         ]
       },
       "delete": {
-        "operationId": "CategoriesController_remove",
+        "operationId": "ComprasController_remove",
         "parameters": [
           {
             "name": "X-Tenant",
@@ -15293,15 +17173,16 @@
             "bearer": []
           }
         ],
-        "summary": "Delete category",
+        "summary": "Eliminar factura de compra en Draft",
         "tags": [
-          "Catalog - Categories"
+          "Compras"
         ]
       }
     },
-    "/api/v1/catalog/brands": {
+    "/api/v1/compras/{id}/preview-asientos": {
       "get": {
-        "operationId": "BrandsController_findAll",
+        "description": "Solo funciona mientras la compra siga en Draft — no somete ni persiste nada, es 100% de lectura (misma lógica nativa que el botón \"Preview → Accounting Ledger\" del Desk de ERPNext). Útil para revisar a qué cuentas va a impactar antes de confirmar, y decidir si hace falta ajustar `cuentaContable`/`cuentaCxpOverride` primero. Cada fila trae `origen` (\"impuesto\" | \"retencion\" | \"costo\") — solo las de `origen: \"impuesto\"` son válidas como `cuentaOrigen` en `impuestoDistribucion`; las de \"retencion\" viven en la misma tabla interna pero se regeneran aparte y no son redistribuibles, y las de \"costo\" (inventario, CxP, la del artículo) nunca vienen de ahí.",
+        "operationId": "ComprasController_previewAsientos",
         "parameters": [
           {
             "name": "X-Tenant",
@@ -15312,45 +17193,9 @@
             }
           },
           {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "default": 20,
-              "type": "number"
-            }
-          },
-          {
-            "name": "offset",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": 0,
-              "type": "number"
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "orderBy",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "category",
-            "required": false,
-            "in": "query",
-            "description": "Filter by category ID (Item Group name)",
+            "name": "id",
+            "required": true,
+            "in": "path",
             "schema": {
               "type": "string"
             }
@@ -15366,18 +17211,81 @@
             "bearer": []
           }
         ],
-        "summary": "List brands, optionally filtered by category",
+        "summary": "Preview de los asientos contables (GL) que se generarían al someter esta compra",
         "tags": [
-          "Catalog - Brands"
+          "Compras"
         ]
-      },
-      "post": {
-        "operationId": "BrandsController_create",
+      }
+    },
+    "/api/v1/compras/{id}/pdf": {
+      "get": {
+        "description": "`formato`: \"a4\", \"carta\" o \"a6\" (página completa) o \"pos\" (ticket angosto 80mm). Si se omite, usa el default configurable del tenant (Facturacion Config.formato_impresion_default).",
+        "operationId": "ComprasController_getPdf",
         "parameters": [
           {
             "name": "X-Tenant",
             "in": "header",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "formato",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "a4",
+                "carta",
+                "a6",
+                "pos"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Factura de compra en PDF",
+        "tags": [
+          "Compras"
+        ]
+      }
+    },
+    "/api/v1/compras/{id}/submit": {
+      "post": {
+        "description": "Si la compra es de tipoPago \"Contado\", debe enviarse el body con la información de pago (modeOfPayment y, si aplica, esCheque/referenceNo/referenceDate/remarks/bankAccount) — se crea y somete el Payment Entry por el saldo pendiente en el mismo request, para que la compra no quede como un pago pendiente.",
+        "operationId": "ComprasController_submit",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
             "schema": {
               "type": "string"
             }
@@ -15388,7 +17296,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateBrandDto"
+                "$ref": "#/components/schemas/PagoContadoDto"
               }
             }
           }
@@ -15403,15 +17311,15 @@
             "bearer": []
           }
         ],
-        "summary": "Create brand",
+        "summary": "Someter factura — actualiza inventario y crea asientos contables",
         "tags": [
-          "Catalog - Brands"
+          "Compras"
         ]
       }
     },
-    "/api/v1/catalog/brands/{id}": {
-      "get": {
-        "operationId": "BrandsController_findOne",
+    "/api/v1/compras/{id}/cancel": {
+      "post": {
+        "operationId": "ComprasController_cancel",
         "parameters": [
           {
             "name": "X-Tenant",
@@ -15431,7 +17339,7 @@
           }
         ],
         "responses": {
-          "200": {
+          "201": {
             "description": ""
           }
         },
@@ -15440,13 +17348,52 @@
             "bearer": []
           }
         ],
-        "summary": "Get brand by ID",
+        "summary": "Cancelar factura de compra sometida",
         "tags": [
-          "Catalog - Brands"
+          "Compras"
         ]
-      },
-      "put": {
-        "operationId": "BrandsController_update",
+      }
+    },
+    "/api/v1/compras/{id}/amend": {
+      "post": {
+        "operationId": "ComprasController_amend",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enmendar factura cancelada (crea Draft con amended_from)",
+        "tags": [
+          "Compras"
+        ]
+      }
+    },
+    "/api/v1/compras/{id}/enviar-a-proveedor": {
+      "post": {
+        "operationId": "ComprasController_enviarAProveedor",
         "parameters": [
           {
             "name": "X-Tenant",
@@ -15470,13 +17417,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateBrandDto"
+                "$ref": "#/components/schemas/EnviarAProveedorDto"
               }
             }
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": ""
           }
         },
@@ -15485,13 +17432,52 @@
             "bearer": []
           }
         ],
-        "summary": "Update brand",
+        "summary": "Enviar el borrador al proveedor (relación comercial B2B) — Fase 09",
         "tags": [
-          "Catalog - Brands"
+          "Compras"
         ]
-      },
-      "delete": {
-        "operationId": "BrandsController_remove",
+      }
+    },
+    "/api/v1/compras/{id}/cancelar-envio": {
+      "post": {
+        "operationId": "ComprasController_cancelarEnvio",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retirar el envío al proveedor si todavía no respondió",
+        "tags": [
+          "Compras"
+        ]
+      }
+    },
+    "/api/v1/compras/{id}/estado-socio": {
+      "get": {
+        "operationId": "ComprasController_estadoSocio",
         "parameters": [
           {
             "name": "X-Tenant",
@@ -15520,9 +17506,56 @@
             "bearer": []
           }
         ],
-        "summary": "Delete brand",
+        "summary": "Estado B2B del borrador (Fase 09), sin ir a la bandeja de transacciones",
         "tags": [
-          "Catalog - Brands"
+          "Compras"
+        ]
+      }
+    },
+    "/api/v1/compras/{id}/enlazar-y-enviar": {
+      "post": {
+        "operationId": "ComprasController_enlazarYEnviar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnlazarYEnviarDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fase 11 §3.2 — enviar una compra YA SOMETIDA al proveedor para conciliar (sin pedir NCF)",
+        "tags": [
+          "Compras"
         ]
       }
     },
@@ -15644,7 +17677,7 @@
             "name": "validateStock",
             "required": false,
             "in": "query",
-            "description": "true = solo devolver artículos con stock disponible (> 0) en algún almacén. Solo aplica a productos.",
+            "description": "true = solo devolver artículos con stock disponible (\u003E 0) en algún almacén. Solo aplica a productos.",
             "schema": {
               "default": false,
               "type": "boolean"
@@ -15672,7 +17705,7 @@
             "name": "hasWarranty",
             "required": false,
             "in": "query",
-            "description": "true = solo artículos con garantía (warranty_period > 0). false = sin garantía.",
+            "description": "true = solo artículos con garantía (warranty_period \u003E 0). false = sin garantía.",
             "schema": {
               "type": "boolean"
             }
@@ -16199,6 +18232,483 @@
         "summary": "Generar TODAS las variantes posibles de un template automáticamente",
         "tags": [
           "Catalog - Items"
+        ]
+      }
+    },
+    "/api/v1/catalog/categories": {
+      "get": {
+        "operationId": "CategoriesController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search by name (partial match)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tree",
+            "required": false,
+            "in": "query",
+            "description": "Return full hierarchy tree (fetches all, ignores pagination)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "isGroup",
+            "required": false,
+            "in": "query",
+            "description": "Filter: only group categories (can have children)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Filtra a categorías que apliquen a este tipo de artículo (aplicaA = \"Ambas\" o el tipo pedido).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "product",
+                "service"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List categories (flat or tree with ?tree=true)",
+        "tags": [
+          "Catalog - Categories"
+        ]
+      },
+      "post": {
+        "operationId": "CategoriesController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create category",
+        "tags": [
+          "Catalog - Categories"
+        ]
+      }
+    },
+    "/api/v1/catalog/categories/{id}": {
+      "get": {
+        "operationId": "CategoriesController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get category by ID",
+        "tags": [
+          "Catalog - Categories"
+        ]
+      },
+      "put": {
+        "operationId": "CategoriesController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update category",
+        "tags": [
+          "Catalog - Categories"
+        ]
+      },
+      "delete": {
+        "operationId": "CategoriesController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete category",
+        "tags": [
+          "Catalog - Categories"
+        ]
+      }
+    },
+    "/api/v1/catalog/brands": {
+      "get": {
+        "operationId": "BrandsController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "description": "Filter by category ID (Item Group name)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List brands, optionally filtered by category",
+        "tags": [
+          "Catalog - Brands"
+        ]
+      },
+      "post": {
+        "operationId": "BrandsController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBrandDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create brand",
+        "tags": [
+          "Catalog - Brands"
+        ]
+      }
+    },
+    "/api/v1/catalog/brands/{id}": {
+      "get": {
+        "operationId": "BrandsController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get brand by ID",
+        "tags": [
+          "Catalog - Brands"
+        ]
+      },
+      "put": {
+        "operationId": "BrandsController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBrandDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update brand",
+        "tags": [
+          "Catalog - Brands"
+        ]
+      },
+      "delete": {
+        "operationId": "BrandsController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete brand",
+        "tags": [
+          "Catalog - Brands"
         ]
       }
     },
@@ -17420,525 +19930,6 @@
         "summary": "List purchase invoices for a supplier",
         "tags": [
           "Suppliers"
-        ]
-      }
-    },
-    "/api/v1/compras": {
-      "get": {
-        "operationId": "ComprasController_findAll",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "default": 20,
-              "type": "number"
-            }
-          },
-          {
-            "name": "offset",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": 0,
-              "type": "number"
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "orderBy",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "supplier",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "ncf",
-            "required": false,
-            "in": "query",
-            "description": "Búsqueda aproximada por NCF del proveedor",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "grandTotalMin",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "grandTotalMax",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "draft",
-                "submitted",
-                "cancelled",
-                "all"
-              ]
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "tipoComprobante",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "branch",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "example": "Sucursal Norte",
-              "type": "string"
-            }
-          },
-          {
-            "name": "department",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "example": "Ventas - JBC",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Listar facturas de compra (afectan inventario)",
-        "tags": [
-          "Compras"
-        ]
-      },
-      "post": {
-        "operationId": "ComprasController_create",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateCompraDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Crear factura de compra (Draft) — actualiza inventario al someter",
-        "tags": [
-          "Compras"
-        ]
-      }
-    },
-    "/api/v1/compras/{id}": {
-      "get": {
-        "operationId": "ComprasController_findOne",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Detalle de factura de compra",
-        "tags": [
-          "Compras"
-        ]
-      },
-      "put": {
-        "operationId": "ComprasController_update",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateCompraDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Actualizar factura de compra en Draft",
-        "tags": [
-          "Compras"
-        ]
-      },
-      "delete": {
-        "operationId": "ComprasController_remove",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Eliminar factura de compra en Draft",
-        "tags": [
-          "Compras"
-        ]
-      }
-    },
-    "/api/v1/compras/{id}/preview-asientos": {
-      "get": {
-        "description": "Solo funciona mientras la compra siga en Draft — no somete ni persiste nada, es 100% de lectura (misma lógica nativa que el botón \"Preview → Accounting Ledger\" del Desk de ERPNext). Útil para revisar a qué cuentas va a impactar antes de confirmar, y decidir si hace falta ajustar `cuentaContable`/`cuentaCxpOverride` primero. Cada fila trae `origen` (\"impuesto\" | \"retencion\" | \"costo\") — solo las de `origen: \"impuesto\"` son válidas como `cuentaOrigen` en `impuestoDistribucion`; las de \"retencion\" viven en la misma tabla interna pero se regeneran aparte y no son redistribuibles, y las de \"costo\" (inventario, CxP, la del artículo) nunca vienen de ahí.",
-        "operationId": "ComprasController_previewAsientos",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Preview de los asientos contables (GL) que se generarían al someter esta compra",
-        "tags": [
-          "Compras"
-        ]
-      }
-    },
-    "/api/v1/compras/{id}/pdf": {
-      "get": {
-        "description": "`formato`: \"a4\", \"carta\" o \"a6\" (página completa) o \"pos\" (ticket angosto 80mm). Si se omite, usa el default configurable del tenant (Facturacion Config.formato_impresion_default).",
-        "operationId": "ComprasController_getPdf",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "formato",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "enum": [
-                "a4",
-                "carta",
-                "a6",
-                "pos"
-              ],
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Factura de compra en PDF",
-        "tags": [
-          "Compras"
-        ]
-      }
-    },
-    "/api/v1/compras/{id}/submit": {
-      "post": {
-        "description": "Si la compra es de tipoPago \"Contado\", debe enviarse el body con la información de pago (modeOfPayment y, si aplica, esCheque/referenceNo/referenceDate/remarks/bankAccount) — se crea y somete el Payment Entry por el saldo pendiente en el mismo request, para que la compra no quede como un pago pendiente.",
-        "operationId": "ComprasController_submit",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PagoContadoDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Someter factura — actualiza inventario y crea asientos contables",
-        "tags": [
-          "Compras"
-        ]
-      }
-    },
-    "/api/v1/compras/{id}/cancel": {
-      "post": {
-        "operationId": "ComprasController_cancel",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Cancelar factura de compra sometida",
-        "tags": [
-          "Compras"
-        ]
-      }
-    },
-    "/api/v1/compras/{id}/amend": {
-      "post": {
-        "operationId": "ComprasController_amend",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Enmendar factura cancelada (crea Draft con amended_from)",
-        "tags": [
-          "Compras"
         ]
       }
     },
@@ -24956,7 +26947,7 @@
             "name": "billingStatus",
             "required": false,
             "in": "query",
-            "description": "pending = per_billed < 100 (aún falta facturar total o parcialmente). billed = per_billed = 100.",
+            "description": "pending = per_billed \u003C 100 (aún falta facturar total o parcialmente). billed = per_billed = 100.",
             "schema": {
               "type": "string",
               "enum": [
@@ -25389,7 +27380,7 @@
             "name": "receiptStatus",
             "required": false,
             "in": "query",
-            "description": "pending = per_received < 100. received = per_received = 100.",
+            "description": "pending = per_received \u003C 100. received = per_received = 100.",
             "schema": {
               "type": "string",
               "enum": [
@@ -25403,7 +27394,7 @@
             "name": "billingStatus",
             "required": false,
             "in": "query",
-            "description": "pending = per_billed < 100. billed = per_billed = 100.",
+            "description": "pending = per_billed \u003C 100. billed = per_billed = 100.",
             "schema": {
               "type": "string",
               "enum": [
@@ -25504,7 +27495,7 @@
     },
     "/api/v1/compras/ordenes/pendientes-abastecimiento": {
       "get": {
-        "description": "Distinto de GET /despachos/pendientes (que mide qty > delivered_qty, lo que falta entregar): esto mide lo que falta COMPRAR. Ordenado por transaction_date ascendente (FIFO).",
+        "description": "Distinto de GET /despachos/pendientes (que mide qty \u003E delivered_qty, lo que falta entregar): esto mide lo que falta COMPRAR. Ordenado por transaction_date ascendente (FIFO).",
         "operationId": "OrdenesController_pendientesAbastecimiento",
         "parameters": [
           {
@@ -25577,7 +27568,7 @@
             "bearer": []
           }
         ],
-        "summary": "Líneas de pedidos pendientes de comprar (qty > ordered_qty)",
+        "summary": "Líneas de pedidos pendientes de comprar (qty \u003E ordered_qty)",
         "tags": [
           "Compras — Órdenes de Compra (Purchase Order)"
         ]
@@ -25585,7 +27576,7 @@
     },
     "/api/v1/compras/ordenes/desde-pedidos": {
       "post": {
-        "description": "Cada línea queda vinculada a su pedido de origen (sales_order/sales_order_item) — nunca fusionada con la de otro pedido aunque sea el mismo artículo. Si alguna línea tiene costo de compra >= precio de venta del pedido de origen, no crea nada y responde requiereConfirmacion:true con el detalle; reenvíe con confirmarMargenNegativo:true para crearla de todas formas.",
+        "description": "Cada línea queda vinculada a su pedido de origen (sales_order/sales_order_item) — nunca fusionada con la de otro pedido aunque sea el mismo artículo. Si alguna línea tiene costo de compra \u003E= precio de venta del pedido de origen, no crea nada y responde requiereConfirmacion:true con el detalle; reenvíe con confirmarMargenNegativo:true para crearla de todas formas.",
         "operationId": "OrdenesController_crearDesdePedidos",
         "parameters": [
           {
@@ -26179,7 +28170,7 @@
             "name": "orderingStatus",
             "required": false,
             "in": "query",
-            "description": "pending = per_ordered = 0. partial = 0 < per_ordered < 100. ordered = per_ordered = 100.",
+            "description": "pending = per_ordered = 0. partial = 0 \u003C per_ordered \u003C 100. ordered = per_ordered = 100.",
             "schema": {
               "type": "string",
               "enum": [
@@ -26823,7 +28814,7 @@
     },
     "/api/v1/despachos/pendientes": {
       "get": {
-        "description": "Une líneas de Sales Invoice (update_stock=0, ya facturadas) y Sales Order (confirmado pero aún sin facturar) con qty > delivered_qty.",
+        "description": "Une líneas de Sales Invoice (update_stock=0, ya facturadas) y Sales Order (confirmado pero aún sin facturar) con qty \u003E delivered_qty.",
         "operationId": "DespachosController_pendientes",
         "parameters": [
           {
@@ -31861,7 +33852,7 @@
     },
     "/api/v1/farmacia/lotes/facturas-elegibles": {
       "get": {
-        "description": "Sometidas, con esta aseguradora, estado ARS \"Pendiente\", cobertura neta > 0, sin lote y con la cobertura ya cobrada/posteada a la cuenta puente. Opcionalmente acotadas por período (posting_date). Es exactamente lo que acepta POST /:id/facturas.",
+        "description": "Sometidas, con esta aseguradora, estado ARS \"Pendiente\", cobertura neta \u003E 0, sin lote y con la cobertura ya cobrada/posteada a la cuenta puente. Opcionalmente acotadas por período (posting_date). Es exactamente lo que acepta POST /:id/facturas.",
         "operationId": "LotesController_facturasElegibles",
         "parameters": [
           {
@@ -31885,7 +33876,7 @@
             "name": "periodoInicio",
             "required": false,
             "in": "query",
-            "description": "posting_date >= (inclusive)",
+            "description": "posting_date \u003E= (inclusive)",
             "schema": {
               "example": "2026-09-01",
               "type": "string"
@@ -31895,7 +33886,7 @@
             "name": "periodoFin",
             "required": false,
             "in": "query",
-            "description": "posting_date <= (inclusive)",
+            "description": "posting_date \u003C= (inclusive)",
             "schema": {
               "example": "2026-09-30",
               "type": "string"
@@ -32274,7 +34265,7 @@
             "name": "desde",
             "required": false,
             "in": "query",
-            "description": "periodo_inicio >= desde (YYYY-MM-DD)",
+            "description": "periodo_inicio \u003E= desde (YYYY-MM-DD)",
             "schema": {
               "type": "string"
             }
@@ -32283,7 +34274,7 @@
             "name": "hasta",
             "required": false,
             "in": "query",
-            "description": "periodo_fin <= hasta (YYYY-MM-DD)",
+            "description": "periodo_fin \u003C= hasta (YYYY-MM-DD)",
             "schema": {
               "type": "string"
             }
@@ -32381,7 +34372,7 @@
             "name": "desde",
             "required": false,
             "in": "query",
-            "description": "posting_date de la factura >= desde (YYYY-MM-DD)",
+            "description": "posting_date de la factura \u003E= desde (YYYY-MM-DD)",
             "schema": {
               "type": "string"
             }
@@ -32390,7 +34381,7 @@
             "name": "hasta",
             "required": false,
             "in": "query",
-            "description": "posting_date de la factura <= hasta (YYYY-MM-DD)",
+            "description": "posting_date de la factura \u003C= hasta (YYYY-MM-DD)",
             "schema": {
               "type": "string"
             }
@@ -33472,7 +35463,9 @@
     "title": "ERP RD API",
     "description": "Backend API del ERP localizado para República Dominicana",
     "version": "1.0",
-    "contact": {}
+    "contact": {
+
+    }
   },
   "tags": [],
   "servers": [
@@ -33827,7 +35820,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del cobro. Si se omite, se toma de las facturas/pedidos referenciados (si todos coinciden en una sola) o se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente)."
+            "description": "Sucursal del cobro. Si se omite, se toma de las facturas/pedidos referenciados (si todos coinciden en una sola) o se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente)."
           },
           "department": {
             "type": "string",
@@ -33837,7 +35830,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) a la que se acredita este cobro. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) a la que se acredita este cobro. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
           },
           "conversionRate": {
             "type": "number",
@@ -33868,7 +35861,7 @@
           "paymentEntryId": {
             "type": "string",
             "example": "ACC-PAY-2026-00003",
-            "description": "Payment Entry con saldo a favor (unallocated_amount > 0) del mismo proveedor de la factura"
+            "description": "Payment Entry con saldo a favor (unallocated_amount \u003E 0) del mismo proveedor de la factura"
           },
           "amount": {
             "type": "number",
@@ -33978,7 +35971,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del pago. Si se omite, se toma de las facturas referenciadas (si todas coinciden en una sola) o se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente)."
+            "description": "Sucursal del pago. Si se omite, se toma de las facturas referenciadas (si todas coinciden en una sola) o se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente)."
           },
           "department": {
             "type": "string",
@@ -33988,7 +35981,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) desde la que se hace este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) desde la que se hace este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
           },
           "conversionRate": {
             "type": "number",
@@ -34559,7 +36552,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -34679,7 +36672,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -34799,7 +36792,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) a la que se acredita este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) a la que se acredita este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
           }
         },
         "required": [
@@ -36104,7 +38097,9 @@
       },
       "UpdateSeguridadSettingsDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+
+        }
       },
       "RetencionRateDto": {
         "type": "object",
@@ -36715,11 +38710,7 @@
           },
           "tipoPagoDefault": {
             "type": "number",
-            "enum": [
-              1,
-              2,
-              3
-            ],
+            "enum": [1, 2, 3],
             "description": "TipoPago DGII por defecto: 1=Contado, 2=Crédito, 3=Gratuito."
           },
           "tipoIngresosDefault": {
@@ -36917,7 +38908,7 @@
           },
           "apiKey": {
             "type": "string",
-            "description": "API Key completa generada en el panel de Vega (formato vega_<mode>_<hex>_<secret>). Se valida contra Vega y se cifra antes de persistirse — nunca se devuelve de vuelta."
+            "description": "API Key completa generada en el panel de Vega (formato vega_\u003Cmode\u003E_\u003Chex\u003E_\u003Csecret\u003E). Se valida contra Vega y se cifra antes de persistirse — nunca se devuelve de vuelta."
           }
         },
         "required": [
@@ -37089,154 +39080,1008 @@
           "status"
         ]
       },
-      "CreateCategoryDto": {
+      "BuscarEmpresaDto": {
+        "type": "object",
+        "properties": {
+          "rnc": {
+            "type": "string",
+            "example": "131234567",
+            "description": "RNC de 9 dígitos (con o sin guiones) de la empresa a buscar"
+          }
+        },
+        "required": [
+          "rnc"
+        ]
+      },
+      "EmpresaDirectorioDto": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "description": "UUID opaco del tenant — es lo que se manda al crear la invitación"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "rnc": {
+            "type": "string"
+          },
+          "estadoRelacion": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "invitada",
+              "activa",
+              "rechazada",
+              "revocada",
+              "suspendida"
+            ]
+          },
+          "invitacion": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "enviada",
+              "recibida"
+            ]
+          },
+          "puedeInvitar": {
+            "type": "boolean"
+          },
+          "motivoNoInvitable": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "tenantId",
+          "nombre",
+          "rnc",
+          "estadoRelacion",
+          "invitacion",
+          "puedeInvitar",
+          "motivoNoInvitable"
+        ]
+      },
+      "PadronDgiiDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "nombre"
+        ]
+      },
+      "MaestroLocalDto": {
         "type": "object",
         "properties": {
           "name": {
-            "type": "string",
-            "example": "Electrónicos"
+            "type": "string"
           },
-          "parentCategory": {
-            "type": "string",
-            "example": "Tecnología",
-            "description": "ID de la categoría padre. Omitir = raíz."
+          "nombre": {
+            "type": "string"
           },
-          "isGroup": {
-            "type": "boolean",
-            "default": false,
-            "description": "true = puede tener sub-categorías hijas"
+          "disabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "nombre",
+          "disabled"
+        ]
+      },
+      "MaestrosLocalesDto": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MaestroLocalDto"
+              }
+            ]
           },
-          "itemCodePrefix": {
-            "type": "string",
-            "example": "ELEC",
-            "maxLength": 5,
-            "description": "Prefijo (máx 5 chars) para generación automática de códigos cuando el modo es prefix_auto"
+          "supplier": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MaestroLocalDto"
+              }
+            ]
           },
-          "aplicaA": {
-            "type": "string",
-            "enum": [
-              "Ambas",
-              "Productos",
-              "Servicios"
-            ],
-            "default": "Ambas",
-            "description": "Restringe qué tipo de artículo puede usar esta categoría/subcategoría. \"Ambas\" no restringe nada."
+          "duplicados": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "customer",
+          "supplier",
+          "duplicados"
+        ]
+      },
+      "BuscarEmpresaResponseDto": {
+        "type": "object",
+        "properties": {
+          "rnc": {
+            "type": "string"
           },
-          "rolesPermitidosVenta": {
-            "example": [
-              "Dispensador Controlados"
-            ],
-            "description": "Roles (nombres exactos de Frappe) autorizados a vender artículos de esta categoría. Vacío u omitido = cualquiera con permiso de venta puede vender artículos de esta categoría (default, sin restricción). Aplicado por ERPNext en cada línea de la Sales Invoice (ver localizacion_rd/permissions_hooks.py::sales_invoice_has_permission).",
+          "enGenSuite": {
+            "type": "boolean"
+          },
+          "empresas": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/EmpresaDirectorioDto"
+            }
+          },
+          "padronDgii": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PadronDgiiDto"
+              }
+            ]
+          },
+          "maestrosLocales": {
+            "$ref": "#/components/schemas/MaestrosLocalesDto"
+          }
+        },
+        "required": [
+          "rnc",
+          "enGenSuite",
+          "empresas",
+          "maestrosLocales"
+        ]
+      },
+      "TerminosComercialesDto": {
+        "type": "object",
+        "properties": {
+          "tieneCredito": {
+            "type": "boolean",
+            "description": "Habilita crédito en el Customer que se cree/adopte"
+          },
+          "diasCredito": {
+            "type": "number"
+          },
+          "limiteCredito": {
+            "type": "number"
+          },
+          "grupoCliente": {
+            "type": "string",
+            "description": "Customer Group del propio site"
+          },
+          "cuentaCxcAlterna": {
+            "type": "string",
+            "description": "Account (CxC alterna) del propio site"
+          },
+          "encargadoCxc": {
+            "type": "string",
+            "description": "Email de un User del propio site"
+          },
+          "formaPagoDefault": {
+            "type": "string",
+            "description": "Mode of Payment del propio site"
+          },
+          "grupoProveedor": {
+            "type": "string",
+            "description": "Supplier Group del propio site"
+          },
+          "diasCreditoProveedor": {
+            "type": "number"
+          },
+          "cuentaCxpAlterna": {
+            "type": "string",
+            "description": "Account (CxP alterna) del propio site"
+          },
+          "tipoBienes606": {
+            "type": "string",
+            "description": "Default 606 — tipo de bienes"
+          },
+          "formaPago606": {
+            "type": "string",
+            "description": "Default 606 — forma de pago"
+          }
+        }
+      },
+      "CrearInvitacionDto": {
+        "type": "object",
+        "properties": {
+          "tenantDestinoId": {
+            "type": "string",
+            "description": "tenantId del directorio (Fase 03) — nunca un slug ni un RNC"
+          },
+          "mensaje": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "terminos": {
+            "$ref": "#/components/schemas/TerminosComercialesDto"
+          }
+        },
+        "required": [
+          "tenantDestinoId"
+        ]
+      },
+      "AceptarInvitacionDto": {
+        "type": "object",
+        "properties": {
+          "terminos": {
+            "$ref": "#/components/schemas/TerminosComercialesDto"
+          }
+        }
+      },
+      "RechazarInvitacionDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "bloquear": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "AceptarInvitacionPublicaDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Informativo, no verificado"
+          }
+        }
+      },
+      "RechazarInvitacionPublicaDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "bloquear": {
+            "type": "boolean",
+            "default": false
+          },
+          "email": {
+            "type": "string",
+            "description": "Informativo, no verificado"
+          }
+        }
+      },
+      "CrearBloqueoDto": {
+        "type": "object",
+        "properties": {
+          "tenantBloqueadoId": {
+            "type": "string",
+            "description": "tenantId de la empresa a bloquear"
+          },
+          "motivo": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "tenantBloqueadoId"
+        ]
+      },
+      "ActualizarConfiguracionDto": {
+        "type": "object",
+        "properties": {
+          "almacenDestino": {
+            "type": "string",
+            "description": "Warehouse del propio site"
+          },
+          "tipoBienes606": {
+            "type": "string"
+          },
+          "formaPago606": {
+            "type": "string"
+          },
+          "autoEnviarVentas": {
+            "type": "boolean"
+          },
+          "autoEnviarCompras": {
+            "type": "boolean"
+          },
+          "mapeoEstricto": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AdoptarMaestrosDto": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "type": "string",
+            "description": "name del Customer local a adoptar"
+          },
+          "supplier": {
+            "type": "string",
+            "description": "name del Supplier local a adoptar"
+          }
+        }
+      },
+      "DecisionMapeoDto": {
+        "type": "object",
+        "properties": {
+          "indiceLinea": {
+            "type": "number"
+          },
+          "itemCodeLocal": {
+            "type": "string"
+          },
+          "uomLocal": {
+            "type": "string"
+          },
+          "factorConversion": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "indiceLinea",
+          "itemCodeLocal"
+        ]
+      },
+      "AceptarTransaccionDto": {
+        "type": "object",
+        "properties": {
+          "mapeo": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DecisionMapeoDto"
+            }
+          },
+          "sincronizarBarcodes": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mapeo"
+        ]
+      },
+      "RechazarTransaccionDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "description": "Motivo obligatorio (Fase 08 §4.2)"
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
+      "IgualarBorradorDto": {
+        "type": "object",
+        "properties": {
+          "aplicar": {
+            "type": "array",
+            "description": "Qué aplicar del diff — por defecto, todo.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "lineas",
+                "cabecera"
+              ]
+            }
+          }
+        }
+      },
+      "IgualarConEnmiendaDto": {
+        "type": "object",
+        "properties": {
+          "confirmoAnulacion": {
+            "type": "boolean",
+            "description": "Confirmación explícita: se anula la factura y se emite otra con NCF nuevo."
+          },
+          "motivoAnulacion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirmoAnulacion",
+          "motivoAnulacion"
+        ]
+      },
+      "EnlazarTransaccionDto": {
+        "type": "object",
+        "properties": {
+          "docname": {
+            "type": "string",
+            "description": "name del documento sometido a enlazar"
+          },
+          "mapeo": {
+            "description": "Emparejamiento de líneas del snapshot con las del documento enlazado (§6)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DecisionMapeoDto"
+            }
+          },
+          "sincronizarBarcodes": {
+            "type": "boolean"
+          },
+          "notaParaElSocio": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "docname",
+          "mapeo"
+        ]
+      },
+      "ConfirmarMapeoDto": {
+        "type": "object",
+        "properties": {
+          "decisiones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DecisionMapeoDto"
+            }
+          },
+          "sincronizarBarcodes": {
+            "type": "boolean",
+            "description": "Copia los códigos de barra del socio a los artículos locales equivalentes (§4)"
+          }
+        },
+        "required": [
+          "decisiones"
+        ]
+      },
+      "CrearArticuloDesdeSocioDto": {
+        "type": "object",
+        "properties": {
+          "indiceLinea": {
+            "type": "number"
+          },
+          "itemGroup": {
+            "type": "string"
+          },
+          "isStockItem": {
+            "type": "boolean"
+          },
+          "itemCode": {
+            "type": "string"
+          },
+          "crearPrecioCompra": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "indiceLinea",
+          "itemGroup",
+          "isStockItem"
+        ]
+      },
+      "FilaMapeoAcumuladoDto": {
+        "type": "object",
+        "properties": {
+          "itemCodeOrigen": {
+            "type": "string"
+          },
+          "itemNameOrigen": {
+            "type": "string"
+          },
+          "barcodeOrigen": {
+            "type": "string"
+          },
+          "itemCodeLocal": {
+            "type": "string"
+          },
+          "uomOrigen": {
+            "type": "string"
+          },
+          "uomLocal": {
+            "type": "string"
+          },
+          "factorConversion": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "itemCodeOrigen",
+          "itemCodeLocal"
+        ]
+      },
+      "ActualizarMapeoAcumuladoDto": {
+        "type": "object",
+        "properties": {
+          "filas": {
+            "description": "Reemplaza el mapeo acumulado completo de la relación",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilaMapeoAcumuladoDto"
             }
           }
         },
         "required": [
-          "name"
+          "filas"
         ]
       },
-      "UpdateCategoryDto": {
+      "EnviarVentaDto": {
         "type": "object",
         "properties": {
-          "name": {
+          "reenvioDe": {
             "type": "string",
-            "example": "Electrónicos"
-          },
-          "parentCategory": {
+            "description": "transaccionUid que se está reenviando, tras un rechazo"
+          }
+        }
+      },
+      "DistribucionCuentaDto": {
+        "type": "object",
+        "properties": {
+          "cuenta": {
             "type": "string",
-            "example": "Tecnología",
-            "description": "ID de la categoría padre. Omitir = raíz."
+            "example": "61-05-003 - Fletes y Acarreos - JBC"
           },
-          "isGroup": {
-            "type": "boolean",
-            "default": false,
-            "description": "true = puede tener sub-categorías hijas"
-          },
-          "itemCodePrefix": {
+          "monto": {
+            "type": "number",
+            "example": 2000
+          }
+        },
+        "required": [
+          "cuenta",
+          "monto"
+        ]
+      },
+      "BatchLineDto": {
+        "type": "object",
+        "properties": {
+          "batchId": {
             "type": "string",
-            "example": "ELEC",
-            "maxLength": 5,
-            "description": "Prefijo (máx 5 chars) para generación automática de códigos cuando el modo es prefix_auto"
+            "example": "LOTE-2024-001"
           },
-          "aplicaA": {
+          "expiryDate": {
             "type": "string",
-            "enum": [
-              "Ambas",
-              "Productos",
-              "Servicios"
-            ],
-            "default": "Ambas",
-            "description": "Restringe qué tipo de artículo puede usar esta categoría/subcategoría. \"Ambas\" no restringe nada."
+            "example": "2026-12",
+            "description": "Fecha de vencimiento MM/YYYY o YYYY-MM-DD"
           },
-          "rolesPermitidosVenta": {
+          "qty": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "batchId",
+          "qty"
+        ]
+      },
+      "CompraItemDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "description": "Descripción/nombre del artículo en la factura"
+          },
+          "qty": {
+            "type": "number",
+            "description": "Positiva para una compra normal. Negativa SOLO al editar el borrador de una devolución (Purchase Invoice con is_return=1, creada vía POST /compras/:id/return) — el servicio valida el signo contra el estado real del documento."
+          },
+          "rate": {
+            "type": "number"
+          },
+          "warehouse": {
+            "type": "string"
+          },
+          "uom": {
+            "type": "string"
+          },
+          "cuentaContable": {
+            "type": "string",
+            "example": "61-05-003 - Fletes y Acarreos - JBC",
+            "description": "Cuenta contable alterna para esta línea (Purchase Invoice Item.expense_account). Solo tiene efecto real en líneas que no afectan valorización de inventario (ej. servicios/fletes dentro de una compra, o cuando el inventario perpetuo está desactivado) — en una línea de stock normal, ERPNext sigue debitando la cuenta de inventario/\"Stock Received But Not Billed\" sin importar este campo. Si se omite, usa el default del artículo."
+          },
+          "distribucionCuenta": {
+            "description": "Divide el monto de ESTA línea (qty × rate) entre varias cuentas contables — la suma debe coincidir exactamente con el monto de la línea. Pensado para conceptos de servicio/costo (Gastos, o líneas no inventariables de una Compra), no para partir la cantidad de un artículo de inventario: la línea se expande en N líneas reales con qty=1 cada una. Si se envía, `cuentaContable` de esta línea se ignora (la cuenta la define cada entrada de la distribución).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DistribucionCuentaDto"
+            }
+          },
+          "serials": {
             "example": [
-              "Dispensador Controlados"
+              "SN-001",
+              "SN-002"
             ],
-            "description": "Roles (nombres exactos de Frappe) autorizados a vender artículos de esta categoría. Vacío u omitido = cualquiera con permiso de venta puede vender artículos de esta categoría (default, sin restricción). Aplicado por ERPNext en cada línea de la Sales Invoice (ver localizacion_rd/permissions_hooks.py::sales_invoice_has_permission).",
+            "description": "Números de serie para artículos con trackingType=\"serial\". Cantidad debe coincidir con qty.",
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "incomeAccount": {
-            "type": "string",
-            "example": "Ventas - JB",
-            "description": "Cuenta GL de ingresos por defecto para artículos de esta categoría"
+          "batches": {
+            "description": "Lotes para artículos con trackingType=\"batch\". La suma de qty debe coincidir con qty de la línea.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchLineDto"
+            }
           },
-          "expenseAccount": {
-            "type": "string",
-            "example": "Costo sobre ventas - JB",
-            "description": "Cuenta GL de gasto por defecto para artículos de esta categoría"
+          "componentTracking": {
+            "description": "Solo cuando itemCode es un Combo y alguno de sus componentes tiene tracking de serial/lote — indica qué serial(es)/lote(s) específicos de ese componente se están comprando. La expansión del combo (expandComboLines) no asigna tracking automáticamente a los componentes.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComponentTrackingDto"
+            }
           },
-          "defaultCogsAccount": {
+          "ordenCompra": {
             "type": "string",
-            "example": "COSTO DE MERCANCIA VENDIDA - JBC",
-            "description": "Cuenta de Costo de Mercancía Vendida (COGS) — es la que realmente controla el costo en Sales Invoice / Delivery Note en ERPNext v16"
+            "description": "Orden de compra a la que pertenece esta línea (enlace manual). Requiere también \"ordenCompraItem\". El BFF rechaza la compra si esa orden ya tiene mercancía recibida por conduce (per_received \u003E 0) — en ese caso factúrela desde POST /compras/purchase-receipt/:id/facturar para no duplicar el inventario. No usar en una línea de combo ni junto con distribucionCuenta."
+          },
+          "ordenCompraItem": {
+            "type": "string",
+            "description": "name (id) de la fila \"Purchase Order Item\" que esta línea liquida — acompaña a \"ordenCompra\"."
+          }
+        },
+        "required": [
+          "itemCode",
+          "qty",
+          "rate"
+        ]
+      },
+      "ImpuestoDistribucionDto": {
+        "type": "object",
+        "properties": {
+          "cuentaOrigen": {
+            "type": "string",
+            "example": "ITBIS 18% - JB",
+            "description": "Cuenta de impuesto ya calculada por ERPNext (de documento o de artículo) que se va a redistribuir."
+          },
+          "distribucion": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DistribucionCuentaDto"
+            }
+          }
+        },
+        "required": [
+          "cuentaOrigen",
+          "distribucion"
+        ]
+      },
+      "CreateCompraDto": {
+        "type": "object",
+        "properties": {
+          "supplier": {
+            "type": "string",
+            "example": "PROV-0001",
+            "description": "Proveedor registrado. Exactamente uno de `supplier`/`proveedorOcasionalNombre` es requerido."
+          },
+          "proveedorOcasionalNombre": {
+            "type": "string",
+            "example": "Juan Pérez",
+            "description": "Nombre del vendedor cuando la compra es a alguien sin registrar como proveedor. No enviar junto con `supplier`."
+          },
+          "proveedorOcasionalRnc": {
+            "type": "string",
+            "example": "132456785",
+            "description": "RNC/Cédula del vendedor ocasional (sin registrar como proveedor). Se usa en el reporte 606 en vez del RNC del Supplier genérico. Sin efecto para proveedores registrados (supplier)."
+          },
+          "postingDate": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "default": "DOP"
+          },
+          "conversionRate": {
+            "type": "number",
+            "default": 1
+          },
+          "items": {
+            "description": "Las líneas sin itemCode (vacío/omitido) se descartan silenciosamente antes de validar — no generan error, simplemente no se incluyen en la compra.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompraItemDto"
+            }
+          },
+          "ncfProveedor": {
+            "type": "string",
+            "description": "NCF del comprobante del proveedor (B01, E31, etc.). Obligatorio si el proveedor está registrado (no ocasional). Para un proveedor ocasional puede omitirse: el sistema genera el comprobante automáticamente al someter (POST /compras/:id/submit) usando `tipoComprobante` — electrónico vía Vega si el tenant emite e-CF para ese tipo, o el siguiente NCF físico disponible si no."
+          },
+          "tipoComprobante": {
+            "type": "string",
+            "enum": [
+              "B01",
+              "B02",
+              "B03",
+              "B04",
+              "B11",
+              "B12",
+              "B13",
+              "B14",
+              "B15",
+              "B16",
+              "B17",
+              "E31",
+              "E32",
+              "E33",
+              "E34",
+              "E41",
+              "E43",
+              "E44",
+              "E45",
+              "E46",
+              "E47"
+            ],
+            "description": "Tipo de comprobante de esta compra — B01=Crédito Fiscal, B02=Consumo, B11=Compras/Informal, B13=Gastos Menores, B17=Pagos al Exterior, etc. (o su equivalente electrónico E31/E41/...). Siempre obligatorio. Cuando el proveedor es ocasional y se omite `ncfProveedor`, el sistema usa este tipo para auto-generar el comprobante al someter — sin efecto en ese sentido si `ncfProveedor` viene lleno o el proveedor está registrado (esos casos nunca auto-generan, pero el tipo se guarda igual)."
+          },
+          "billNo": {
+            "type": "string",
+            "description": "Número o ID de la factura del vendedor/proveedor (mapea al campo nativo \"Supplier Invoice No\" de ERPNext)."
+          },
+          "tipoBienes606": {
+            "type": "string",
+            "description": "Tipo de bienes/servicios según categoría 606"
+          },
+          "formaPago606": {
+            "type": "string",
+            "description": "Forma de pago 606: 01=Efectivo, 02=Cheque, etc."
+          },
+          "retenciones": {
+            "example": [
+              "Retención ISR Servicios 10%"
+            ],
+            "description": "Retenciones (ids de Tax Withholding Category) que aplican a esta Compra — el monto de custom_retencion_itbis/custom_retencion_isr se calcula a partir de estas (tasa × net_total o grand_total según cada categoría). Si se omite, se usan las retenciones por defecto del proveedor (Supplier.custom_retenciones_default). Nunca se acepta un monto/porcentaje manual.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tipoPago": {
+            "type": "string",
+            "enum": [
+              "Contado",
+              "Crédito"
+            ]
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+          },
+          "department": {
+            "type": "string",
+            "example": "Ventas - JBC",
+            "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
+          },
+          "taxesTemplate": {
+            "example": [
+              "Dominican Republic Tax - JB"
+            ],
+            "description": "IDs de template(s) de impuestos del documento (Purchase Taxes and Charges Template, ver /config/impuestos-compras) — admite varios, las líneas de todos se combinan en el documento. Si se omite, se usan los default configurados en el proveedor (Supplier.custom_impuesto_compras_default) o, en su ausencia, el template marcado como default para la compañía.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cuentaCxpOverride": {
+            "type": "string",
+            "example": "21-01-002 - CXP PROVEEDORES EXTERIOR - JBC",
+            "description": "Cuenta por Pagar (credit_to) alterna para ESTE documento puntual — gana sobre Supplier.custom_cuenta_cxp_default. Úsese con cuidado: una devolución solo puede aplicarse/reconciliarse contra facturas que compartan la misma cuenta CxP (ver POST /devoluciones-compras/:id/aplicar-a-cxp)."
+          },
+          "impuestoDistribucion": {
+            "description": "Redistribuye un impuesto ya calculado por ERPNext (de documento o de artículo) entre varias cuentas — cubre tanto ITBIS de documento (taxesTemplate) como ITBIS por artículo (Item Tax Template): ambos terminan como filas de la misma tabla de impuestos antes de guardar. La suma de cada `distribucion` debe coincidir exactamente con lo que ERPNext ya calculó para esa cuenta — el BFF nunca calcula impuestos, solo redistribuye el monto real. Se aplica DESPUÉS de crear/actualizar el documento (necesita el monto real ya calculado).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImpuestoDistribucionDto"
+            }
+          }
+        },
+        "required": [
+          "postingDate",
+          "items",
+          "tipoComprobante"
+        ]
+      },
+      "UpdateCompraDto": {
+        "type": "object",
+        "properties": {
+          "supplier": {
+            "type": "string",
+            "example": "PROV-0001",
+            "description": "Proveedor registrado. Exactamente uno de `supplier`/`proveedorOcasionalNombre` es requerido."
+          },
+          "proveedorOcasionalNombre": {
+            "type": "string",
+            "example": "Juan Pérez",
+            "description": "Nombre del vendedor cuando la compra es a alguien sin registrar como proveedor. No enviar junto con `supplier`."
+          },
+          "proveedorOcasionalRnc": {
+            "type": "string",
+            "example": "132456785",
+            "description": "RNC/Cédula del vendedor ocasional (sin registrar como proveedor). Se usa en el reporte 606 en vez del RNC del Supplier genérico. Sin efecto para proveedores registrados (supplier)."
+          },
+          "postingDate": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "default": "DOP"
+          },
+          "conversionRate": {
+            "type": "number",
+            "default": 1
+          },
+          "items": {
+            "description": "Las líneas sin itemCode (vacío/omitido) se descartan silenciosamente antes de validar — no generan error, simplemente no se incluyen en la compra.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompraItemDto"
+            }
+          },
+          "ncfProveedor": {
+            "type": "string",
+            "description": "NCF del comprobante del proveedor (B01, E31, etc.). Obligatorio si el proveedor está registrado (no ocasional). Para un proveedor ocasional puede omitirse: el sistema genera el comprobante automáticamente al someter (POST /compras/:id/submit) usando `tipoComprobante` — electrónico vía Vega si el tenant emite e-CF para ese tipo, o el siguiente NCF físico disponible si no."
+          },
+          "tipoComprobante": {
+            "type": "string",
+            "enum": [
+              "B01",
+              "B02",
+              "B03",
+              "B04",
+              "B11",
+              "B12",
+              "B13",
+              "B14",
+              "B15",
+              "B16",
+              "B17",
+              "E31",
+              "E32",
+              "E33",
+              "E34",
+              "E41",
+              "E43",
+              "E44",
+              "E45",
+              "E46",
+              "E47"
+            ],
+            "description": "Tipo de comprobante de esta compra — B01=Crédito Fiscal, B02=Consumo, B11=Compras/Informal, B13=Gastos Menores, B17=Pagos al Exterior, etc. (o su equivalente electrónico E31/E41/...). Siempre obligatorio. Cuando el proveedor es ocasional y se omite `ncfProveedor`, el sistema usa este tipo para auto-generar el comprobante al someter — sin efecto en ese sentido si `ncfProveedor` viene lleno o el proveedor está registrado (esos casos nunca auto-generan, pero el tipo se guarda igual)."
+          },
+          "billNo": {
+            "type": "string",
+            "description": "Número o ID de la factura del vendedor/proveedor (mapea al campo nativo \"Supplier Invoice No\" de ERPNext)."
+          },
+          "tipoBienes606": {
+            "type": "string",
+            "description": "Tipo de bienes/servicios según categoría 606"
+          },
+          "formaPago606": {
+            "type": "string",
+            "description": "Forma de pago 606: 01=Efectivo, 02=Cheque, etc."
+          },
+          "retenciones": {
+            "example": [
+              "Retención ISR Servicios 10%"
+            ],
+            "description": "Retenciones (ids de Tax Withholding Category) que aplican a esta Compra — el monto de custom_retencion_itbis/custom_retencion_isr se calcula a partir de estas (tasa × net_total o grand_total según cada categoría). Si se omite, se usan las retenciones por defecto del proveedor (Supplier.custom_retenciones_default). Nunca se acepta un monto/porcentaje manual.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tipoPago": {
+            "type": "string",
+            "enum": [
+              "Contado",
+              "Crédito"
+            ]
+          },
+          "branch": {
+            "type": "string",
+            "example": "Sucursal Norte",
+            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+          },
+          "department": {
+            "type": "string",
+            "example": "Ventas - JBC",
+            "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
+          },
+          "taxesTemplate": {
+            "example": [
+              "Dominican Republic Tax - JB"
+            ],
+            "description": "IDs de template(s) de impuestos del documento (Purchase Taxes and Charges Template, ver /config/impuestos-compras) — admite varios, las líneas de todos se combinan en el documento. Si se omite, se usan los default configurados en el proveedor (Supplier.custom_impuesto_compras_default) o, en su ausencia, el template marcado como default para la compañía.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cuentaCxpOverride": {
+            "type": "string",
+            "example": "21-01-002 - CXP PROVEEDORES EXTERIOR - JBC",
+            "description": "Cuenta por Pagar (credit_to) alterna para ESTE documento puntual — gana sobre Supplier.custom_cuenta_cxp_default. Úsese con cuidado: una devolución solo puede aplicarse/reconciliarse contra facturas que compartan la misma cuenta CxP (ver POST /devoluciones-compras/:id/aplicar-a-cxp)."
+          },
+          "impuestoDistribucion": {
+            "description": "Redistribuye un impuesto ya calculado por ERPNext (de documento o de artículo) entre varias cuentas — cubre tanto ITBIS de documento (taxesTemplate) como ITBIS por artículo (Item Tax Template): ambos terminan como filas de la misma tabla de impuestos antes de guardar. La suma de cada `distribucion` debe coincidir exactamente con lo que ERPNext ya calculó para esa cuenta — el BFF nunca calcula impuestos, solo redistribuye el monto real. Se aplica DESPUÉS de crear/actualizar el documento (necesita el monto real ya calculado).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImpuestoDistribucionDto"
+            }
           }
         }
       },
-      "CreateBrandDto": {
+      "PagoContadoDto": {
         "type": "object",
         "properties": {
-          "name": {
+          "modeOfPayment": {
             "type": "string",
-            "example": "Samsung"
+            "example": "Efectivo"
           },
-          "description": {
+          "referenceNo": {
+            "type": "string",
+            "description": "Número de cheque, transferencia, etc."
+          },
+          "esCheque": {
+            "type": "boolean",
+            "default": false,
+            "description": "Marca este pago como cheque — activa la numeración por cuenta bancaria (manual o automática) y lo registra en el historial de cheques (/tesoreria/cheques). Requiere \"bankAccount\"."
+          },
+          "referenceDate": {
             "type": "string"
           },
-          "categoryId": {
-            "type": "string",
-            "description": "Category ID (Item Group) the brand belongs to"
+          "remarks": {
+            "type": "string"
           },
-          "image": {
+          "bankAccount": {
+            "type": "string",
+            "example": "BA-00001",
+            "description": "Cuenta bancaria (Bank Account) desde la que se hace este pago. Obligatorio si el método de pago requiere cuenta bancaria y no tiene una configurada por defecto."
+          }
+        },
+        "required": [
+          "modeOfPayment"
+        ]
+      },
+      "EnviarAProveedorDto": {
+        "type": "object",
+        "properties": {
+          "autoSometer": {
+            "type": "boolean",
+            "description": "Si el socio acepta sin editar, esta compra se somete sola con el NCF que vuelva (D14)."
+          },
+          "nota": {
+            "type": "string"
+          },
+          "reenvioDe": {
+            "type": "string",
+            "description": "transaccionUid que se está reenviando, tras un rechazo"
+          }
+        }
+      },
+      "EnlazarYEnviarDto": {
+        "type": "object",
+        "properties": {
+          "relacionId": {
+            "type": "string"
+          },
+          "nota": {
             "type": "string"
           }
         },
         "required": [
-          "name"
+          "relacionId"
         ]
-      },
-      "UpdateBrandDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "example": "Samsung"
-          },
-          "description": {
-            "type": "string"
-          },
-          "categoryId": {
-            "type": "string",
-            "description": "Category ID (Item Group) the brand belongs to"
-          },
-          "image": {
-            "type": "string"
-          }
-        }
       },
       "CreateItemDto": {
         "type": "object",
@@ -37721,6 +40566,155 @@
               "no"
             ],
             "description": "Anula, solo para este artículo, el default del tenant (config/facturacion → actualizarCostoEnCompra) que decide si comprarlo actualiza purchasePrice (valuation_rate) automáticamente. `\"\"` explícito quita el override y vuelve a usar el default del tenant."
+          }
+        }
+      },
+      "CreateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Electrónicos"
+          },
+          "parentCategory": {
+            "type": "string",
+            "example": "Tecnología",
+            "description": "ID de la categoría padre. Omitir = raíz."
+          },
+          "isGroup": {
+            "type": "boolean",
+            "default": false,
+            "description": "true = puede tener sub-categorías hijas"
+          },
+          "itemCodePrefix": {
+            "type": "string",
+            "example": "ELEC",
+            "maxLength": 5,
+            "description": "Prefijo (máx 5 chars) para generación automática de códigos cuando el modo es prefix_auto"
+          },
+          "aplicaA": {
+            "type": "string",
+            "enum": [
+              "Ambas",
+              "Productos",
+              "Servicios"
+            ],
+            "default": "Ambas",
+            "description": "Restringe qué tipo de artículo puede usar esta categoría/subcategoría. \"Ambas\" no restringe nada."
+          },
+          "rolesPermitidosVenta": {
+            "example": [
+              "Dispensador Controlados"
+            ],
+            "description": "Roles (nombres exactos de Frappe) autorizados a vender artículos de esta categoría. Vacío u omitido = cualquiera con permiso de venta puede vender artículos de esta categoría (default, sin restricción). Aplicado por ERPNext en cada línea de la Sales Invoice (ver localizacion_rd/permissions_hooks.py::sales_invoice_has_permission).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Electrónicos"
+          },
+          "parentCategory": {
+            "type": "string",
+            "example": "Tecnología",
+            "description": "ID de la categoría padre. Omitir = raíz."
+          },
+          "isGroup": {
+            "type": "boolean",
+            "default": false,
+            "description": "true = puede tener sub-categorías hijas"
+          },
+          "itemCodePrefix": {
+            "type": "string",
+            "example": "ELEC",
+            "maxLength": 5,
+            "description": "Prefijo (máx 5 chars) para generación automática de códigos cuando el modo es prefix_auto"
+          },
+          "aplicaA": {
+            "type": "string",
+            "enum": [
+              "Ambas",
+              "Productos",
+              "Servicios"
+            ],
+            "default": "Ambas",
+            "description": "Restringe qué tipo de artículo puede usar esta categoría/subcategoría. \"Ambas\" no restringe nada."
+          },
+          "rolesPermitidosVenta": {
+            "example": [
+              "Dispensador Controlados"
+            ],
+            "description": "Roles (nombres exactos de Frappe) autorizados a vender artículos de esta categoría. Vacío u omitido = cualquiera con permiso de venta puede vender artículos de esta categoría (default, sin restricción). Aplicado por ERPNext en cada línea de la Sales Invoice (ver localizacion_rd/permissions_hooks.py::sales_invoice_has_permission).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "incomeAccount": {
+            "type": "string",
+            "example": "Ventas - JB",
+            "description": "Cuenta GL de ingresos por defecto para artículos de esta categoría"
+          },
+          "expenseAccount": {
+            "type": "string",
+            "example": "Costo sobre ventas - JB",
+            "description": "Cuenta GL de gasto por defecto para artículos de esta categoría"
+          },
+          "defaultCogsAccount": {
+            "type": "string",
+            "example": "COSTO DE MERCANCIA VENDIDA - JBC",
+            "description": "Cuenta de Costo de Mercancía Vendida (COGS) — es la que realmente controla el costo en Sales Invoice / Delivery Note en ERPNext v16"
+          }
+        }
+      },
+      "CreateBrandDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Samsung"
+          },
+          "description": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "Category ID (Item Group) the brand belongs to"
+          },
+          "image": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateBrandDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Samsung"
+          },
+          "description": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "Category ID (Item Group) the brand belongs to"
+          },
+          "image": {
+            "type": "string"
           }
         }
       },
@@ -38485,442 +41479,6 @@
           }
         }
       },
-      "DistribucionCuentaDto": {
-        "type": "object",
-        "properties": {
-          "cuenta": {
-            "type": "string",
-            "example": "61-05-003 - Fletes y Acarreos - JBC"
-          },
-          "monto": {
-            "type": "number",
-            "example": 2000
-          }
-        },
-        "required": [
-          "cuenta",
-          "monto"
-        ]
-      },
-      "BatchLineDto": {
-        "type": "object",
-        "properties": {
-          "batchId": {
-            "type": "string",
-            "example": "LOTE-2024-001"
-          },
-          "expiryDate": {
-            "type": "string",
-            "example": "2026-12",
-            "description": "Fecha de vencimiento MM/YYYY o YYYY-MM-DD"
-          },
-          "qty": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "batchId",
-          "qty"
-        ]
-      },
-      "CompraItemDto": {
-        "type": "object",
-        "properties": {
-          "itemCode": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string",
-            "description": "Descripción/nombre del artículo en la factura"
-          },
-          "qty": {
-            "type": "number",
-            "description": "Positiva para una compra normal. Negativa SOLO al editar el borrador de una devolución (Purchase Invoice con is_return=1, creada vía POST /compras/:id/return) — el servicio valida el signo contra el estado real del documento."
-          },
-          "rate": {
-            "type": "number"
-          },
-          "warehouse": {
-            "type": "string"
-          },
-          "uom": {
-            "type": "string"
-          },
-          "cuentaContable": {
-            "type": "string",
-            "example": "61-05-003 - Fletes y Acarreos - JBC",
-            "description": "Cuenta contable alterna para esta línea (Purchase Invoice Item.expense_account). Solo tiene efecto real en líneas que no afectan valorización de inventario (ej. servicios/fletes dentro de una compra, o cuando el inventario perpetuo está desactivado) — en una línea de stock normal, ERPNext sigue debitando la cuenta de inventario/\"Stock Received But Not Billed\" sin importar este campo. Si se omite, usa el default del artículo."
-          },
-          "distribucionCuenta": {
-            "description": "Divide el monto de ESTA línea (qty × rate) entre varias cuentas contables — la suma debe coincidir exactamente con el monto de la línea. Pensado para conceptos de servicio/costo (Gastos, o líneas no inventariables de una Compra), no para partir la cantidad de un artículo de inventario: la línea se expande en N líneas reales con qty=1 cada una. Si se envía, `cuentaContable` de esta línea se ignora (la cuenta la define cada entrada de la distribución).",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DistribucionCuentaDto"
-            }
-          },
-          "serials": {
-            "example": [
-              "SN-001",
-              "SN-002"
-            ],
-            "description": "Números de serie para artículos con trackingType=\"serial\". Cantidad debe coincidir con qty.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "batches": {
-            "description": "Lotes para artículos con trackingType=\"batch\". La suma de qty debe coincidir con qty de la línea.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/BatchLineDto"
-            }
-          },
-          "componentTracking": {
-            "description": "Solo cuando itemCode es un Combo y alguno de sus componentes tiene tracking de serial/lote — indica qué serial(es)/lote(s) específicos de ese componente se están comprando. La expansión del combo (expandComboLines) no asigna tracking automáticamente a los componentes.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ComponentTrackingDto"
-            }
-          },
-          "ordenCompra": {
-            "type": "string",
-            "description": "Orden de compra a la que pertenece esta línea (enlace manual). Requiere también \"ordenCompraItem\". El BFF rechaza la compra si esa orden ya tiene mercancía recibida por conduce (per_received > 0) — en ese caso factúrela desde POST /compras/purchase-receipt/:id/facturar para no duplicar el inventario. No usar en una línea de combo ni junto con distribucionCuenta."
-          },
-          "ordenCompraItem": {
-            "type": "string",
-            "description": "name (id) de la fila \"Purchase Order Item\" que esta línea liquida — acompaña a \"ordenCompra\"."
-          }
-        },
-        "required": [
-          "itemCode",
-          "qty",
-          "rate"
-        ]
-      },
-      "ImpuestoDistribucionDto": {
-        "type": "object",
-        "properties": {
-          "cuentaOrigen": {
-            "type": "string",
-            "example": "ITBIS 18% - JB",
-            "description": "Cuenta de impuesto ya calculada por ERPNext (de documento o de artículo) que se va a redistribuir."
-          },
-          "distribucion": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DistribucionCuentaDto"
-            }
-          }
-        },
-        "required": [
-          "cuentaOrigen",
-          "distribucion"
-        ]
-      },
-      "CreateCompraDto": {
-        "type": "object",
-        "properties": {
-          "supplier": {
-            "type": "string",
-            "example": "PROV-0001",
-            "description": "Proveedor registrado. Exactamente uno de `supplier`/`proveedorOcasionalNombre` es requerido."
-          },
-          "proveedorOcasionalNombre": {
-            "type": "string",
-            "example": "Juan Pérez",
-            "description": "Nombre del vendedor cuando la compra es a alguien sin registrar como proveedor. No enviar junto con `supplier`."
-          },
-          "proveedorOcasionalRnc": {
-            "type": "string",
-            "example": "132456785",
-            "description": "RNC/Cédula del vendedor ocasional (sin registrar como proveedor). Se usa en el reporte 606 en vez del RNC del Supplier genérico. Sin efecto para proveedores registrados (supplier)."
-          },
-          "postingDate": {
-            "type": "string"
-          },
-          "dueDate": {
-            "type": "string"
-          },
-          "currency": {
-            "type": "string",
-            "default": "DOP"
-          },
-          "conversionRate": {
-            "type": "number",
-            "default": 1
-          },
-          "items": {
-            "description": "Las líneas sin itemCode (vacío/omitido) se descartan silenciosamente antes de validar — no generan error, simplemente no se incluyen en la compra.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CompraItemDto"
-            }
-          },
-          "ncfProveedor": {
-            "type": "string",
-            "description": "NCF del comprobante del proveedor (B01, E31, etc.). Obligatorio si el proveedor está registrado (no ocasional). Para un proveedor ocasional puede omitirse: el sistema genera el comprobante automáticamente al someter (POST /compras/:id/submit) usando `tipoComprobante` — electrónico vía Vega si el tenant emite e-CF para ese tipo, o el siguiente NCF físico disponible si no."
-          },
-          "tipoComprobante": {
-            "type": "string",
-            "enum": [
-              "B01",
-              "B02",
-              "B03",
-              "B04",
-              "B11",
-              "B12",
-              "B13",
-              "B14",
-              "B15",
-              "B16",
-              "B17",
-              "E31",
-              "E32",
-              "E33",
-              "E34",
-              "E41",
-              "E43",
-              "E44",
-              "E45",
-              "E46",
-              "E47"
-            ],
-            "description": "Tipo de comprobante de esta compra — B01=Crédito Fiscal, B02=Consumo, B11=Compras/Informal, B13=Gastos Menores, B17=Pagos al Exterior, etc. (o su equivalente electrónico E31/E41/...). Siempre obligatorio. Cuando el proveedor es ocasional y se omite `ncfProveedor`, el sistema usa este tipo para auto-generar el comprobante al someter — sin efecto en ese sentido si `ncfProveedor` viene lleno o el proveedor está registrado (esos casos nunca auto-generan, pero el tipo se guarda igual)."
-          },
-          "billNo": {
-            "type": "string",
-            "description": "Número o ID de la factura del vendedor/proveedor (mapea al campo nativo \"Supplier Invoice No\" de ERPNext)."
-          },
-          "tipoBienes606": {
-            "type": "string",
-            "description": "Tipo de bienes/servicios según categoría 606"
-          },
-          "formaPago606": {
-            "type": "string",
-            "description": "Forma de pago 606: 01=Efectivo, 02=Cheque, etc."
-          },
-          "retenciones": {
-            "example": [
-              "Retención ISR Servicios 10%"
-            ],
-            "description": "Retenciones (ids de Tax Withholding Category) que aplican a esta Compra — el monto de custom_retencion_itbis/custom_retencion_isr se calcula a partir de estas (tasa × net_total o grand_total según cada categoría). Si se omite, se usan las retenciones por defecto del proveedor (Supplier.custom_retenciones_default). Nunca se acepta un monto/porcentaje manual.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "tipoPago": {
-            "type": "string",
-            "enum": [
-              "Contado",
-              "Crédito"
-            ]
-          },
-          "branch": {
-            "type": "string",
-            "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
-          },
-          "department": {
-            "type": "string",
-            "example": "Ventas - JBC",
-            "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
-          },
-          "taxesTemplate": {
-            "example": [
-              "Dominican Republic Tax - JB"
-            ],
-            "description": "IDs de template(s) de impuestos del documento (Purchase Taxes and Charges Template, ver /config/impuestos-compras) — admite varios, las líneas de todos se combinan en el documento. Si se omite, se usan los default configurados en el proveedor (Supplier.custom_impuesto_compras_default) o, en su ausencia, el template marcado como default para la compañía.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "cuentaCxpOverride": {
-            "type": "string",
-            "example": "21-01-002 - CXP PROVEEDORES EXTERIOR - JBC",
-            "description": "Cuenta por Pagar (credit_to) alterna para ESTE documento puntual — gana sobre Supplier.custom_cuenta_cxp_default. Úsese con cuidado: una devolución solo puede aplicarse/reconciliarse contra facturas que compartan la misma cuenta CxP (ver POST /devoluciones-compras/:id/aplicar-a-cxp)."
-          },
-          "impuestoDistribucion": {
-            "description": "Redistribuye un impuesto ya calculado por ERPNext (de documento o de artículo) entre varias cuentas — cubre tanto ITBIS de documento (taxesTemplate) como ITBIS por artículo (Item Tax Template): ambos terminan como filas de la misma tabla de impuestos antes de guardar. La suma de cada `distribucion` debe coincidir exactamente con lo que ERPNext ya calculó para esa cuenta — el BFF nunca calcula impuestos, solo redistribuye el monto real. Se aplica DESPUÉS de crear/actualizar el documento (necesita el monto real ya calculado).",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ImpuestoDistribucionDto"
-            }
-          }
-        },
-        "required": [
-          "postingDate",
-          "items",
-          "tipoComprobante"
-        ]
-      },
-      "UpdateCompraDto": {
-        "type": "object",
-        "properties": {
-          "supplier": {
-            "type": "string",
-            "example": "PROV-0001",
-            "description": "Proveedor registrado. Exactamente uno de `supplier`/`proveedorOcasionalNombre` es requerido."
-          },
-          "proveedorOcasionalNombre": {
-            "type": "string",
-            "example": "Juan Pérez",
-            "description": "Nombre del vendedor cuando la compra es a alguien sin registrar como proveedor. No enviar junto con `supplier`."
-          },
-          "proveedorOcasionalRnc": {
-            "type": "string",
-            "example": "132456785",
-            "description": "RNC/Cédula del vendedor ocasional (sin registrar como proveedor). Se usa en el reporte 606 en vez del RNC del Supplier genérico. Sin efecto para proveedores registrados (supplier)."
-          },
-          "postingDate": {
-            "type": "string"
-          },
-          "dueDate": {
-            "type": "string"
-          },
-          "currency": {
-            "type": "string",
-            "default": "DOP"
-          },
-          "conversionRate": {
-            "type": "number",
-            "default": 1
-          },
-          "items": {
-            "description": "Las líneas sin itemCode (vacío/omitido) se descartan silenciosamente antes de validar — no generan error, simplemente no se incluyen en la compra.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CompraItemDto"
-            }
-          },
-          "ncfProveedor": {
-            "type": "string",
-            "description": "NCF del comprobante del proveedor (B01, E31, etc.). Obligatorio si el proveedor está registrado (no ocasional). Para un proveedor ocasional puede omitirse: el sistema genera el comprobante automáticamente al someter (POST /compras/:id/submit) usando `tipoComprobante` — electrónico vía Vega si el tenant emite e-CF para ese tipo, o el siguiente NCF físico disponible si no."
-          },
-          "tipoComprobante": {
-            "type": "string",
-            "enum": [
-              "B01",
-              "B02",
-              "B03",
-              "B04",
-              "B11",
-              "B12",
-              "B13",
-              "B14",
-              "B15",
-              "B16",
-              "B17",
-              "E31",
-              "E32",
-              "E33",
-              "E34",
-              "E41",
-              "E43",
-              "E44",
-              "E45",
-              "E46",
-              "E47"
-            ],
-            "description": "Tipo de comprobante de esta compra — B01=Crédito Fiscal, B02=Consumo, B11=Compras/Informal, B13=Gastos Menores, B17=Pagos al Exterior, etc. (o su equivalente electrónico E31/E41/...). Siempre obligatorio. Cuando el proveedor es ocasional y se omite `ncfProveedor`, el sistema usa este tipo para auto-generar el comprobante al someter — sin efecto en ese sentido si `ncfProveedor` viene lleno o el proveedor está registrado (esos casos nunca auto-generan, pero el tipo se guarda igual)."
-          },
-          "billNo": {
-            "type": "string",
-            "description": "Número o ID de la factura del vendedor/proveedor (mapea al campo nativo \"Supplier Invoice No\" de ERPNext)."
-          },
-          "tipoBienes606": {
-            "type": "string",
-            "description": "Tipo de bienes/servicios según categoría 606"
-          },
-          "formaPago606": {
-            "type": "string",
-            "description": "Forma de pago 606: 01=Efectivo, 02=Cheque, etc."
-          },
-          "retenciones": {
-            "example": [
-              "Retención ISR Servicios 10%"
-            ],
-            "description": "Retenciones (ids de Tax Withholding Category) que aplican a esta Compra — el monto de custom_retencion_itbis/custom_retencion_isr se calcula a partir de estas (tasa × net_total o grand_total según cada categoría). Si se omite, se usan las retenciones por defecto del proveedor (Supplier.custom_retenciones_default). Nunca se acepta un monto/porcentaje manual.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "tipoPago": {
-            "type": "string",
-            "enum": [
-              "Contado",
-              "Crédito"
-            ]
-          },
-          "branch": {
-            "type": "string",
-            "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se registra la compra. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
-          },
-          "department": {
-            "type": "string",
-            "example": "Ventas - JBC",
-            "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
-          },
-          "taxesTemplate": {
-            "example": [
-              "Dominican Republic Tax - JB"
-            ],
-            "description": "IDs de template(s) de impuestos del documento (Purchase Taxes and Charges Template, ver /config/impuestos-compras) — admite varios, las líneas de todos se combinan en el documento. Si se omite, se usan los default configurados en el proveedor (Supplier.custom_impuesto_compras_default) o, en su ausencia, el template marcado como default para la compañía.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "cuentaCxpOverride": {
-            "type": "string",
-            "example": "21-01-002 - CXP PROVEEDORES EXTERIOR - JBC",
-            "description": "Cuenta por Pagar (credit_to) alterna para ESTE documento puntual — gana sobre Supplier.custom_cuenta_cxp_default. Úsese con cuidado: una devolución solo puede aplicarse/reconciliarse contra facturas que compartan la misma cuenta CxP (ver POST /devoluciones-compras/:id/aplicar-a-cxp)."
-          },
-          "impuestoDistribucion": {
-            "description": "Redistribuye un impuesto ya calculado por ERPNext (de documento o de artículo) entre varias cuentas — cubre tanto ITBIS de documento (taxesTemplate) como ITBIS por artículo (Item Tax Template): ambos terminan como filas de la misma tabla de impuestos antes de guardar. La suma de cada `distribucion` debe coincidir exactamente con lo que ERPNext ya calculó para esa cuenta — el BFF nunca calcula impuestos, solo redistribuye el monto real. Se aplica DESPUÉS de crear/actualizar el documento (necesita el monto real ya calculado).",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ImpuestoDistribucionDto"
-            }
-          }
-        }
-      },
-      "PagoContadoDto": {
-        "type": "object",
-        "properties": {
-          "modeOfPayment": {
-            "type": "string",
-            "example": "Efectivo"
-          },
-          "referenceNo": {
-            "type": "string",
-            "description": "Número de cheque, transferencia, etc."
-          },
-          "esCheque": {
-            "type": "boolean",
-            "default": false,
-            "description": "Marca este pago como cheque — activa la numeración por cuenta bancaria (manual o automática) y lo registra en el historial de cheques (/tesoreria/cheques). Requiere \"bankAccount\"."
-          },
-          "referenceDate": {
-            "type": "string"
-          },
-          "remarks": {
-            "type": "string"
-          },
-          "bankAccount": {
-            "type": "string",
-            "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) desde la que se hace este pago. Obligatorio si el método de pago requiere cuenta bancaria y no tiene una configurada por defecto."
-          }
-        },
-        "required": [
-          "modeOfPayment"
-        ]
-      },
       "DevolucionCompraItemDto": {
         "type": "object",
         "properties": {
@@ -39195,7 +41753,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -39343,7 +41901,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal del gasto. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -39812,13 +42370,7 @@
           },
           "modificationCode": {
             "type": "number",
-            "enum": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
+            "enum": [1, 2, 3, 4, 5],
             "description": "Código de modificación DGII (Tabla VI) — solo obligatorio si el tenant emite esta nota como e-CF (E34): 1=Anula, 2=Corrige texto, 3=Corrige montos, 4=Reemplazo contingencia, 5=Referencia a Factura de Consumo. Sin efecto en el flujo físico (NCF B04)."
           }
         },
@@ -39842,7 +42394,7 @@
           "bankAccount": {
             "type": "string",
             "example": "BA-00001",
-            "description": "Cuenta bancaria (Bank Account) involucrada en el reembolso. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config > Métodos de Pago)."
+            "description": "Cuenta bancaria (Bank Account) involucrada en el reembolso. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
           }
         },
         "required": [
@@ -39889,7 +42441,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal de la nota de débito. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal de la nota de débito. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente). Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -39903,13 +42455,7 @@
           },
           "modificationCode": {
             "type": "number",
-            "enum": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
+            "enum": [1, 2, 3, 4, 5],
             "description": "Código de modificación DGII (Tabla VI) — solo obligatorio si el tenant emite esta nota como e-CF (E33). Ver CreateCreditNoteDto.modificationCode para el detalle de cada código."
           }
         },
@@ -40138,7 +42684,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal por defecto para las líneas que no especifiquen la suya. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente)."
+            "description": "Sucursal por defecto para las líneas que no especifiquen la suya. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente)."
           },
           "department": {
             "type": "string",
@@ -40303,7 +42849,7 @@
           "branch": {
             "type": "string",
             "example": "Sucursal Norte",
-            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -> dimensión por defecto -> única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
+            "description": "Sucursal desde la que se emite el documento. Si se omite, se resuelve en cascada (usuario -\u003E dimensión por defecto -\u003E única sucursal existente) y se valida contra las sucursales asignadas al usuario. Obligatoria si la dimensión \"Sucursal\" está marcada como requerida para Estado de Resultados."
           },
           "department": {
             "type": "string",
@@ -40395,13 +42941,7 @@
           },
           "modificationCode": {
             "type": "number",
-            "enum": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
+            "enum": [1, 2, 3, 4, 5],
             "description": "Código de modificación DGII (Tabla VI) — solo obligatorio si el tenant emite esta nota como e-CF (E34): 1=Anula, 2=Corrige texto, 3=Corrige montos, 4=Reemplazo contingencia, 5=Referencia a Factura de Consumo. Sin efecto en el flujo físico (NCF B04)."
           },
           "motivoAnulacionArs": {
@@ -40432,13 +42972,7 @@
         "properties": {
           "modificationCode": {
             "type": "number",
-            "enum": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
+            "enum": [1, 2, 3, 4, 5],
             "description": "Código de modificación DGII (Tabla VI) para el e-CF E34 a la aseguradora, si el tenant emite electrónico."
           }
         }
@@ -40540,7 +43074,7 @@
           "label": {
             "type": "string",
             "example": "Caja 1",
-            "description": "Nombre/etiqueta de la caja. El documento en ERPNext se crea como \"POS <label>\"."
+            "description": "Nombre/etiqueta de la caja. El documento en ERPNext se crea como \"POS \u003Clabel\u003E\"."
           },
           "warehouse": {
             "type": "string",
@@ -40974,7 +43508,7 @@
           },
           "confirmarMargenNegativo": {
             "type": "boolean",
-            "description": "Confirma someter aunque alguna línea tenga costo de compra >= precio de venta del pedido vinculado (margen negativo o nulo). Sin esto, si hay margen negativo la orden NO se crea — la respuesta trae `requiereConfirmacion: true` y el detalle en `warnings`."
+            "description": "Confirma someter aunque alguna línea tenga costo de compra \u003E= precio de venta del pedido vinculado (margen negativo o nulo). Sin esto, si hay margen negativo la orden NO se crea — la respuesta trae `requiereConfirmacion: true` y el detalle en `warnings`."
           }
         },
         "required": [
@@ -41284,7 +43818,7 @@
           },
           "scheduleDate": {
             "type": "string",
-            "description": "Fecha por defecto en que se necesita la mercancía, aplicada a toda línea que no traiga la suya propia. Debe ser >= transactionDate."
+            "description": "Fecha por defecto en que se necesita la mercancía, aplicada a toda línea que no traiga la suya propia. Debe ser \u003E= transactionDate."
           },
           "branch": {
             "type": "string",
@@ -41315,7 +43849,7 @@
           },
           "scheduleDate": {
             "type": "string",
-            "description": "Fecha por defecto en que se necesita la mercancía, aplicada a toda línea que no traiga la suya propia. Debe ser >= transactionDate."
+            "description": "Fecha por defecto en que se necesita la mercancía, aplicada a toda línea que no traiga la suya propia. Debe ser \u003E= transactionDate."
           },
           "branch": {
             "type": "string",
@@ -43227,7 +45761,7 @@
             "example": [
               "ACC-SINV-2026-00003"
             ],
-            "description": "Facturas de paciente a agregar al lote. Cada una debe ser elegible (ver GET /farmacia/lotes/facturas-elegibles): sometida, de esta aseguradora, estado ARS \"Pendiente\", con cobertura neta > 0 y con la cobertura ya cobrada/posteada. Las que no lo sean se reportan en `rechazadas` con su motivo, sin abortar el resto.",
+            "description": "Facturas de paciente a agregar al lote. Cada una debe ser elegible (ver GET /farmacia/lotes/facturas-elegibles): sometida, de esta aseguradora, estado ARS \"Pendiente\", con cobertura neta \u003E 0 y con la cobertura ya cobrada/posteada. Las que no lo sean se reportan en `rechazadas` con su motivo, sin abortar el resto.",
             "type": "array",
             "items": {
               "type": "string"

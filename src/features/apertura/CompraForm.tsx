@@ -15,6 +15,7 @@ import { getFacturacionConfig, getCatalogosFiscales } from '@/shared/api/config'
 import { listMonedas } from '@/shared/api/monedas'
 import type { CrearFacturaAperturaCompraDto, FacturaAperturaCompra } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -191,6 +192,7 @@ export default function CompraForm() {
       <PageHeader
         title="Cargar saldo de proveedor"
         description="Migra el saldo pendiente de una factura de compra del sistema anterior — sin generar NCF nuevo ni afectar los reportes del período actual."
+        action={<RecargarButton label="Actualizar" />}
       />
 
       {!loadingPreflight && !listo && (

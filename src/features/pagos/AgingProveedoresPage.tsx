@@ -6,6 +6,7 @@ import type { AgingGroupBy, AgingProveedorInvoiceEntry } from '@/shared/api/type
 import { listSuppliers } from '@/shared/api/suppliers'
 import { downloadCxpAgingPdf } from '@/shared/api/reportes'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Info, Download, Loader2 } from 'lucide-react'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -56,14 +57,17 @@ export default function AgingProveedoresPage() {
         title={<><span className="page-title-dot" />Antiguedad de saldos por Pagar</>}
         description="Análisis de saldos vencidos a proveedores, según fecha de vencimiento"
         action={
-          <button
-            className="btn btn-secondary btn-size-sm"
-            onClick={() => downloadPdfMutation.mutate()}
-            disabled={downloadPdfMutation.isPending}
-          >
-            {downloadPdfMutation.isPending ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
-            {' '}Descargar PDF
-          </button>
+          <>
+            <RecargarButton />
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => downloadPdfMutation.mutate()}
+              disabled={downloadPdfMutation.isPending}
+            >
+              {downloadPdfMutation.isPending ? <Loader2 size={13} className="spin" /> : <Download size={13} aria-hidden="true" />}
+              {' '}Descargar PDF
+            </button>
+          </>
         }
       />
 

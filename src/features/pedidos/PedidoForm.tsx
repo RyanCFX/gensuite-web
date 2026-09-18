@@ -22,6 +22,7 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, PackageOpen, UserPlus, ChevronDown } from 'lucide-react'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { toast } from 'sonner'
@@ -38,8 +39,7 @@ import { getCachedUser } from '@/shared/api/storage'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
-
-const SYSTEM_MANAGER_ROLE = 'System Manager'
+import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 
 interface LineItem {
   itemCode: string
@@ -397,7 +397,7 @@ useEffect(() => {
   }
 
   // ── Sucursal (branch) selector ────────────────────────────────────────────
-  const isSystemManager = currentUser?.roles?.includes(SYSTEM_MANAGER_ROLE) ?? false
+  const isSystemManager = useIsSystemManager()
   const { data: myBranches, refetch: refetchMyBranches } = useQuery({
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
@@ -806,6 +806,9 @@ try {
         <div>
           <a className="page-back-link" onClick={() => navigate('/pedidos')}><ArrowLeft size={14} /> Pedidos</a>
           <h1 className="page-title">{isEdit ? 'Editar Pedido' : 'Nuevo Pedido'}</h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton label="Actualizar" />
         </div>
       </div>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>

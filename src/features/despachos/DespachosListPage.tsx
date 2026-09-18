@@ -12,6 +12,7 @@ import type { DespachoStatus, SolicitudConfirmacionDespachoStatus } from '@/shar
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { FilterField } from '@/shared/ui/FilterField'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -51,11 +52,14 @@ export default function DespachosListPage() {
         title={<><span className="page-title-dot" />Despachos</>}
         description="Salida física de mercancía — separada de la factura cuando el despacho está activo."
         action={
-          puedeCrear ? (
-            <button className="btn btn-navy" onClick={() => navigate('/despachos/nuevo')}>
-              <Plus size={16} /> Nuevo despacho
-            </button>
-          ) : undefined
+          <>
+            <RecargarButton />
+            {puedeCrear && (
+              <button className="btn btn-navy" onClick={() => navigate('/despachos/nuevo')}>
+                <Plus size={16} /> Nuevo despacho
+              </button>
+            )}
+          </>
         }
       />
 

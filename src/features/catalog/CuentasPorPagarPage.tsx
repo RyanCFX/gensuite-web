@@ -21,6 +21,7 @@ import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 const TIPO_DOCUMENTO_OPTIONS: TipoDocumentoCuentaPorPagar[] = [
   'Factura',
@@ -169,10 +170,13 @@ export default function CuentasPorPagarPage() {
             solo sirven para prellenar un Gasto.
           </p>
         </div>
-        <button className="btn btn-navy" onClick={openCreate}>
-          <Plus size={16} />
-          Nuevo Concepto
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <button className="btn btn-navy" onClick={openCreate}>
+            <Plus size={16} />
+            Nuevo Concepto
+          </button>
+        </div>
       </div>
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

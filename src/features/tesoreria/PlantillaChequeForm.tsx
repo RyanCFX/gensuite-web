@@ -11,6 +11,7 @@ import {
 } from '@/shared/api/tesoreria'
 import type { CreateChequePrintTemplateDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { ChequeCanvas } from './cheque-template-editor/ChequeCanvas'
@@ -255,6 +256,7 @@ export default function PlantillaChequeForm() {
         <PageHeader
           title={isEdit ? `Editar Plantilla: ${id}` : 'Nueva Plantilla de Cheque'}
           description="Arrastra cada elemento sobre el cheque para posicionarlo, o ajusta las coordenadas exactas en el panel derecho"
+          action={<RecargarButton label="Actualizar" />}
         />
       </div>
 

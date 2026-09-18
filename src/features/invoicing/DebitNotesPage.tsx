@@ -12,6 +12,7 @@ import { getEcfTipos } from '@/shared/api/ecf'
 import { listSucursales } from '@/shared/api/sucursales'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import type { Invoice, CreateDebitNoteDto, EcfModificationCode } from '@/shared/api/types'
 import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -280,9 +281,12 @@ export default function DebitNotesPage() {
           <h1 className="page-title"><span className="page-title-dot" />Notas de Débito</h1>
           <p className="page-sub">Gestiona cargos adicionales y ajustes al alza (NCF B03)</p>
         </div>
-        <button className="btn btn-navy" onClick={() => setModalOpen(true)}>
-          <Plus size={16} /> Nueva Nota de Débito
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <button className="btn btn-navy" onClick={() => setModalOpen(true)}>
+            <Plus size={16} /> Nueva Nota de Débito
+          </button>
+        </div>
       </div>
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

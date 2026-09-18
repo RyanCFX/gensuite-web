@@ -8,6 +8,7 @@ import { listMetodosPago } from '@/shared/api/config'
 import { listSucursales } from '@/shared/api/sucursales'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, SlidersHorizontal } from 'lucide-react'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -110,10 +111,13 @@ export default function PagosPage() {
           <h1 className="page-title"><span className="page-title-dot" />Pagos a Proveedores</h1>
           <p className="page-sub">Historial de pagos registrados a proveedores</p>
         </div>
-        <button className="btn btn-navy" onClick={() => navigate('/pagos/nuevo')}>
-          <Plus size={16} />
-          Registrar Pago
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <button className="btn btn-navy" onClick={() => navigate('/pagos/nuevo')}>
+            <Plus size={16} />
+            Registrar Pago
+          </button>
+        </div>
       </div>
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

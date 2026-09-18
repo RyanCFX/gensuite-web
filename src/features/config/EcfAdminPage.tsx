@@ -17,6 +17,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Check, ChevronDown, Eye, EyeOff, Info, Lock, ShieldCheck, Unlink } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { EcfTabs } from '@/shared/ui/EcfTabs'
 import { Select, SelectItem } from '@/components/ui/select'
 import { ConfirmModal } from '@/shared/ui/Modal'
@@ -26,7 +27,7 @@ import {
   listEcfClients, linkEcfClient, unlinkEcfClient,
 } from '@/shared/api/ecf'
 import type { ApiError, EcfClient, EcfMode } from '@/shared/api/types'
-import { useAuthStore } from '@/stores/auth.store'
+import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { formatDate } from '@/lib/formatters'
 
 function fileToBase64(file: File): Promise<string> {
@@ -666,7 +667,7 @@ function WebhookStep({ locked, activeMode }: { locked: boolean; activeMode: EcfM
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EcfAdminPage() {
-  const isSystemManager = useAuthStore((s) => s.user?.roles?.includes('System Manager') ?? false)
+  const isSystemManager = useIsSystemManager()
   const { data, isLoading } = useQuery({ queryKey: ['ecf-config'], queryFn: getEcfConfig })
   const { data: empresa } = useQuery({ queryKey: ['empresa'], queryFn: getEmpresa, enabled: isSystemManager })
 
@@ -698,7 +699,12 @@ export default function EcfAdminPage() {
         overline="Facturación Electrónica"
         title={<><span className="page-title-dot" />Avanzado</>}
         description="Conexión de esta empresa con Vega — provisioning de Facturación Electrónica"
-        action={<Link className="btn btn-ghost btn-size-sm" to="/config/ecf"><ShieldCheck size={14} /> Ir a Administración</Link>}
+        action={
+          <>
+            <RecargarButton label="Actualizar" />
+            <Link className="btn btn-ghost btn-size-sm" to="/config/ecf"><ShieldCheck size={14} /> Ir a Administración</Link>
+          </>
+        }
       />
       <EcfTabs />
 

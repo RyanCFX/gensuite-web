@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { listCompras } from '@/shared/api/compras-gastos'
 import { listSucursales } from '@/shared/api/sucursales'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, ChevronLeft, ChevronRight, Search, SlidersHorizontal } from 'lucide-react'
@@ -82,10 +83,13 @@ export default function ComprasPage() {
         title={<><span className="page-title-dot" />Compras</>}
         description="Registro de compras con actualización de inventario"
         action={
-          <button className="btn btn-navy" onClick={() => navigate('/compras/nueva')}>
-            <Plus size={16} />
-            Nueva Compra
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={() => navigate('/compras/nueva')}>
+              <Plus size={16} />
+              Nueva Compra
+            </button>
+          </>
         }
       />
 

@@ -9,6 +9,7 @@ import type { CuentaBancaria } from '@/shared/api/types'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 const PAGE_SIZE = 30
 
@@ -72,6 +73,7 @@ export default function MovimientosBancoPage() {
       <PageHeader
         title={<><span className="page-title-dot" />Movimientos Bancarios</>}
         description="Estado de cuenta / kardex con saldo corrido — se alimenta de todo lo que afecta la cuenta, no solo lo registrado desde Tesorería"
+        action={<RecargarButton />}
       />
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

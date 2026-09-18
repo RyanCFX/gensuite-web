@@ -9,6 +9,7 @@ import { createGasto, updateGasto, getGasto } from '@/shared/api/compras-gastos'
 import { listSuppliers, getSupplier } from '@/shared/api/suppliers'
 import type { CreateGastoDto, DistribucionCuentaDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { getCatalogosFiscales, getFacturacionConfig, getCuentasEmpresa, listImpuestosCompras } from '@/shared/api/config'
 import { listMonedas, getTasaVigente } from '@/shared/api/monedas'
 import type { MonedaCode } from '@/shared/api/types'
@@ -23,7 +24,7 @@ import { MultiSearchSelect } from '@/shared/ui/MultiSearchSelect'
 import type { MultiSearchSelectOption } from '@/shared/ui/MultiSearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import type { Item, CuentaPorPagar } from '@/shared/api/types'
-import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
+import { getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import { getCachedUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
@@ -35,8 +36,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { DistribucionCuentaEditor } from '@/components/shared/DistribucionCuentaEditor'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
-
-const SYSTEM_MANAGER_ROLE = 'System Manager'
+import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 
 interface ItemRow {
   itemCode: string
@@ -193,15 +193,9 @@ export default function GastoForm() {
   })
 
   const currentUserEmail = getCachedUser()?.email
-  const { data: currentUser } = useQuery({
-    queryKey: ['currentUser', currentUserEmail],
-    queryFn: () => getUsuario(currentUserEmail!),
-    enabled: !!currentUserEmail,
-    staleTime: 5 * 60_000,
-  })
 
   // ── Sucursal (branch) selector ────────────────────────────────────────────
-  const isSystemManager = currentUser?.roles?.includes(SYSTEM_MANAGER_ROLE) ?? false
+  const isSystemManager = useIsSystemManager()
   const { data: myBranches } = useQuery({
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
@@ -687,6 +681,7 @@ export default function GastoForm() {
       <PageHeader
         title={isEdit ? 'Editar Gasto' : 'Nuevo Gasto'}
         description="Registra un gasto sin movimiento de inventario"
+        action={<RecargarButton label="Actualizar" />}
       />
 
       {isEdit && serverMessage && (

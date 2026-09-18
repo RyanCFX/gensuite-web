@@ -13,12 +13,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { AlertTriangle, Check, Info, RefreshCw, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { EcfTabs } from '@/shared/ui/EcfTabs'
 import { ConfirmModal, Modal } from '@/shared/ui/Modal'
 import { getEcfConfig } from '@/shared/api/config'
 import { getContingenciaPendientes, activarContingencia, desactivarContingencia, flushContingencia } from '@/shared/api/ecf'
 import type { ApiError, FlushContingenciaResult } from '@/shared/api/types'
-import { useAuthStore } from '@/stores/auth.store'
+import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { formatDateTime } from '@/lib/formatters'
 import { ecfTipoLabel, ecfDiferidoUrgencia } from '@/lib/dgii'
 
@@ -252,7 +253,7 @@ function ContingenciaContent({ company }: { company: string }) {
 }
 
 export default function EcfContingenciaPage() {
-  const isSystemManager = useAuthStore((s) => s.user?.roles?.includes('System Manager') ?? false)
+  const isSystemManager = useIsSystemManager()
   const { data, isLoading } = useQuery({ queryKey: ['ecf-config'], queryFn: getEcfConfig })
 
   if (!isSystemManager) {
@@ -277,7 +278,12 @@ export default function EcfContingenciaPage() {
         overline="Facturación Electrónica"
         title={<><span className="page-title-dot" />Contingencia</>}
         description="Decreto 587-24 — gestión manual de e-CF diferidos"
-        action={<Link className="btn btn-ghost btn-size-sm" to="/config/ecf/admin"><ShieldCheck size={14} /> Provisioning</Link>}
+        action={
+          <>
+            <RecargarButton />
+            <Link className="btn btn-ghost btn-size-sm" to="/config/ecf/admin"><ShieldCheck size={14} /> Provisioning</Link>
+          </>
+        }
       />
       <EcfTabs />
 

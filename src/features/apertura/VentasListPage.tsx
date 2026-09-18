@@ -12,6 +12,7 @@ import type { FacturaAperturaVenta } from '@/shared/api/types'
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate, formatMoney } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { FilterField } from '@/shared/ui/FilterField'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -79,16 +80,19 @@ export default function VentasListPage() {
         title={<><span className="page-title-dot" />Ventas — Migración de Saldos</>}
         description="Facturas de apertura de venta (CxC) — saldos pendientes migrados del sistema anterior."
         action={
-          puedeCrear ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-secondary" onClick={() => navigate('/apertura/ventas/importar')}>
-                <Upload size={16} /> Importar
-              </button>
-              <button className="btn btn-navy" onClick={() => navigate('/apertura/ventas/nueva')}>
-                <Plus size={16} /> Cargar saldo de cliente
-              </button>
-            </div>
-          ) : undefined
+          <>
+            <RecargarButton />
+            {puedeCrear && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-secondary" onClick={() => navigate('/apertura/ventas/importar')}>
+                  <Upload size={16} /> Importar
+                </button>
+                <button className="btn btn-navy" onClick={() => navigate('/apertura/ventas/nueva')}>
+                  <Plus size={16} /> Cargar saldo de cliente
+                </button>
+              </div>
+            )}
+          </>
         }
       />
 

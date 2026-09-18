@@ -22,6 +22,7 @@ import { listCustomerGroups } from '@/shared/api/customers'
 import { listUsuarios, listRoles } from '@/shared/api/usuarios'
 import type { AccountsSettings, StockSettings, SellingSettings, BuyingSettings } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { TagInput } from '@/shared/ui/TagInput'
@@ -38,6 +39,7 @@ export default function AjustesAvanzadosPage() {
       <PageHeader
         title="Ajustes Avanzados"
         description="Configuraciones globales poco frecuentes por módulo"
+        action={<RecargarButton label="Actualizar" />}
       />
 
       <div className="tabs-bar" style={{ marginBottom: 20 }}>

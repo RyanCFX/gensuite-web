@@ -12,6 +12,7 @@ import type { CargaInicialListItem, CargaInicialStatus } from '@/shared/api/type
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -76,11 +77,14 @@ export default function CargaInicialListPage() {
         title={<><span className="page-title-dot" />Carga Inicial de Inventario</>}
         description="Existencias agregadas a un almacén sin compra de por medio — hallazgos, donaciones, ajustes."
         action={
-          puedeCrear ? (
-            <button className="btn btn-navy" onClick={() => navigate('/inventario/carga-inicial/nueva')}>
-              <Plus size={16} /> Registrar entrada
-            </button>
-          ) : undefined
+          <>
+            <RecargarButton />
+            {puedeCrear && (
+              <button className="btn btn-navy" onClick={() => navigate('/inventario/carga-inicial/nueva')}>
+                <Plus size={16} /> Registrar entrada
+              </button>
+            )}
+          </>
         }
       />
 

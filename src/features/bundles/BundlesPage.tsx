@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { listBundles, getBundle, createBundle, updateBundle, deleteBundle } from '@/shared/api/bundles'
 import type { Bundle } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDOP } from '@/lib/formatters'
@@ -66,9 +67,12 @@ export default function BundlesPage() {
         title={<><span className="page-title-dot" />Combos / Paquetes</>}
         description="Agrupaciones de artículos que se venden como un solo producto"
         action={
-          <button className="btn btn-navy btn-size-sm" onClick={() => { setEditId(null); setShowForm(true) }}>
-            <Plus size={14} /> Nuevo Combo
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy btn-size-sm" onClick={() => { setEditId(null); setShowForm(true) }}>
+              <Plus size={14} /> Nuevo Combo
+            </button>
+          </>
         }
       />
 

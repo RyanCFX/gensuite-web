@@ -7,6 +7,7 @@ import { listEjerciciosFiscales } from '@/shared/api/ejercicioFiscal'
 import type { CierrePeriodo, CreateCierrePeriodoDto } from '@/shared/api/types'
 import { formatDate } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
@@ -165,6 +166,7 @@ export default function CierrePeriodoPage() {
       <PageHeader
         title={<><span className="page-title-dot" />Cierre de Período</>}
         description="Gestión de cierres contables por ejercicio fiscal"
+        action={<RecargarButton />}
       />
 
       {/* Filter bar */}

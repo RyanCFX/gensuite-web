@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { createInvoice, updateInvoice, getInvoice } from '@/shared/api/invoices'
 import { usePermissionsStore } from '@/stores/permissions.store'
 import { AseguradoraPanel, CoberturaArsResumen } from './AseguradoraPanel'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import {
   EMPTY_ASEGURADORA_FORM,
   aseguradoraFormFromInvoice,
@@ -53,9 +54,7 @@ import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { useItemInventory } from '@/shared/hooks/useItemInventory'
 import { formatStockInsufficientMessage, formatUomNotAllowedMessage } from '@/lib/stockAlerts'
-
-const SYSTEM_MANAGER_ROLE = 'System Manager'
-
+import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 
 type NcfType = string
 
@@ -425,7 +424,7 @@ export default function InvoiceForm() {
   })
 
   // ── Sucursal (branch) selector ────────────────────────────────────────────
-  const isSystemManager = currentUser?.roles?.includes(SYSTEM_MANAGER_ROLE) ?? false
+  const isSystemManager = useIsSystemManager()
   const { data: myBranches, refetch: refetchMyBranches } = useQuery({
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
@@ -1252,6 +1251,9 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
             <ArrowLeft size={14} /> {isEdit ? 'Factura' : 'Facturas'}
           </a>
           <h1 className="page-title"><span className="page-title-dot" />{isEdit ? 'Editar Factura' : 'Nueva Factura'}</h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton label="Actualizar" />
         </div>
       </div>
 

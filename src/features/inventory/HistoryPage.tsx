@@ -5,6 +5,7 @@ import { listSucursales } from '@/shared/api/sucursales'
 import { formatDate, formatNumber } from '@/lib/formatters'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -71,6 +72,7 @@ export default function HistoryPage() {
       <PageHeader
         title={<><span className="page-title-dot" />Historial de Movimientos</>}
         description="Entradas y salidas de inventario"
+        action={<RecargarButton />}
       />
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

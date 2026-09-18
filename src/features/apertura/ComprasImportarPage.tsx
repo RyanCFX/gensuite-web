@@ -9,6 +9,7 @@ import { importarAperturaCompras } from '@/shared/api/apertura'
 import { listSuppliers } from '@/shared/api/suppliers'
 import type { ImportarAperturaComprasResultadoFila } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -106,6 +107,7 @@ export default function ComprasImportarPage() {
       <PageHeader
         title="Carga masiva de compras"
         description="Hasta 200 filas por envío. Para campos avanzados (moneda, sucursal, tipo de comprobante, descripción) usa el formulario individual."
+        action={<RecargarButton />}
       />
 
       {!listo && (

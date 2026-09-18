@@ -4,6 +4,7 @@ import { listInventory, listWarehouses } from '@/shared/api/inventory'
 import { listSucursales } from '@/shared/api/sucursales'
 import { formatDOP, formatNumber } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DollarSign, TrendingUp, Package } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -85,6 +86,7 @@ export default function StockPage() {
       <PageHeader
         title={<><span className="page-title-dot" />Stock Actual</>}
         description="Vista del inventario por almacén"
+        action={<RecargarButton />}
       />
 
       <div className="stats-row">

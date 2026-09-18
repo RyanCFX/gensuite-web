@@ -12,6 +12,7 @@ import { formatDate } from '@/lib/formatters'
 import { Plus, Eye, Check, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -126,10 +127,13 @@ export default function TransferenciasPage() {
         title="Transferencias entre Almacenes"
         description="Mueve artículos entre almacenes o sucursales"
         action={
-          <button className="btn btn-primary" onClick={() => navigate('/transferencias/nueva')}>
-            <Plus size={16} />
-            Nueva Transferencia
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-primary" onClick={() => navigate('/transferencias/nueva')}>
+              <Plus size={16} />
+              Nueva Transferencia
+            </button>
+          </>
         }
       />
 

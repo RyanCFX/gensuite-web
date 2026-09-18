@@ -15,6 +15,7 @@ import type { CostCenter } from '@/shared/api/types'
 import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightIcon, List, Network } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useDebounce } from '@/lib/useDebounce'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -185,10 +186,13 @@ export default function CentrosCostoPage() {
         title={<><span className="page-title-dot" />Centros de Costo</>}
         description={view === 'list' && data ? `${data.meta.total ?? 0} centros de costo` : undefined}
         action={
-          <button className="btn btn-navy" onClick={openCreate}>
-            <Plus size={16} />
-            Nuevo Centro de Costo
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={openCreate}>
+              <Plus size={16} />
+              Nuevo Centro de Costo
+            </button>
+          </>
         }
       />
 

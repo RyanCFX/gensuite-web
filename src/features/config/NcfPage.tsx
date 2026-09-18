@@ -11,6 +11,7 @@ import type { NcfSerie, CreateNcfSerieDto, UpdateNcfSerieDto } from '@/shared/ap
 
 type NcfType = CreateNcfSerieDto['ncfType']
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { formatDate } from '@/lib/formatters'
 import {
   AlertTriangle, AlertCircle, Plus, Eye, Pencil,
@@ -750,13 +751,14 @@ export default function NcfPage() {
         title={<><span className="page-title-dot" />Secuencias NCF</>}
         description="Números de Comprobante Fiscal — DGII República Dominicana"
         action={
-          tab === 'fisico'
-            ? (
-                <button className="btn btn-navy" onClick={() => setModal({ type: 'create' })}>
-                  <Plus size={14} aria-hidden="true" /> Nueva Secuencia
-                </button>
-              )
-            : undefined
+          <>
+            <RecargarButton />
+            {tab === 'fisico' && (
+              <button className="btn btn-navy" onClick={() => setModal({ type: 'create' })}>
+                <Plus size={14} aria-hidden="true" /> Nueva Secuencia
+              </button>
+            )}
+          </>
         }
       />
 

@@ -20,6 +20,7 @@ import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { Select, SelectItem } from '@/components/ui/select'
 import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus, ChevronDown } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -38,8 +39,7 @@ import { getCachedUser } from '@/shared/api/storage'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
-
-const SYSTEM_MANAGER_ROLE = 'System Manager'
+import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -83,8 +83,6 @@ function validateLineStock(row: LineItem): string | undefined {
   }
   return undefined
 }
-
-
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -362,7 +360,7 @@ useEffect(() => {
   })
 
   // ── Sucursal (branch) selector ────────────────────────────────────────────
-  const isSystemManager = currentUser?.roles?.includes(SYSTEM_MANAGER_ROLE) ?? false
+  const isSystemManager = useIsSystemManager()
   const { data: myBranches, refetch: refetchMyBranches } = useQuery({
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
@@ -850,6 +848,9 @@ if (esClienteOcasional) {
             <ArrowLeft size={14} /> Cotizaciones
           </a>
           <h1 className="page-title">{id ? 'Editar Cotización' : 'Nueva Cotización'}</h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton label="Actualizar" />
         </div>
       </div>
 

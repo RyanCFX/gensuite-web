@@ -13,6 +13,7 @@ import { RefreshCw, ChevronLeft, ChevronRight, Wrench, ExternalLink, AlertTriang
 import { createRepostValuacion, listRepostsValuacion, listWarehouses } from '@/shared/api/inventory'
 import type { RepostValuacionItem, RepostValuacionStatus, ApiError, Item } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -112,6 +113,7 @@ export default function RepostValuacionPage() {
       <PageHeader
         title="Recálculo de Valuación de Inventario"
         description="Repara la cola de valuación (FIFO/Moving Average) de un artículo cuando queda corrupta por movimientos retroactivos o stock negativo — usa el mecanismo nativo de recálculo de valuación del sistema. Herramienta de soporte técnico, no del flujo normal de inventario."
+        action={<RecargarButton />}
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

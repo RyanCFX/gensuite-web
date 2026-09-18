@@ -14,6 +14,7 @@ import {
 import type { ItemAttribute, AttributeValue, CreateAttributeDto, UpdateAttributeDto } from '@/shared/api/types'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -476,10 +477,15 @@ export default function AttributesPage() {
   return (
     <div className="page-container">
       <div className="page-header">
-        <h1 className="page-title"><span className="page-title-dot" />Atributos</h1>
-        <button className="btn btn-navy" onClick={openCreate}>
-          <Plus size={14} /> Nuevo Atributo
-        </button>
+        <div>
+          <h1 className="page-title"><span className="page-title-dot" />Atributos</h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <button className="btn btn-navy" onClick={openCreate}>
+            <Plus size={14} /> Nuevo Atributo
+          </button>
+        </div>
       </div>
 
       <div className="card navy-table-card">

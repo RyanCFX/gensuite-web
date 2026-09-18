@@ -15,6 +15,7 @@ import { Plus, Pencil, Ban, Search, ChevronLeft, ChevronRight } from 'lucide-rea
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { Select, SelectItem } from '@/components/ui/select'
 import { FilterField } from '@/shared/ui/FilterField'
 import { useDebounce } from '@/lib/useDebounce'
@@ -227,10 +228,13 @@ export default function TiposDocumentoPage() {
         title="Tipos de Documento Bancario"
         description={data ? `${data.meta.total ?? 0} tipos de documento` : 'Catálogo de Tesorería'}
         action={
-          <button className="btn btn-primary" onClick={openCreate}>
-            <Plus size={16} />
-            Nuevo Tipo de Documento
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-primary" onClick={openCreate}>
+              <Plus size={16} />
+              Nuevo Tipo de Documento
+            </button>
+          </>
         }
       />
 

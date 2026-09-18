@@ -18,6 +18,7 @@ import { LiquidacionFacturasTable } from './components/LiquidacionFacturasTable'
 import { CuentaContableOverrideSection } from './components/CuentaContableOverrideSection'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -265,7 +266,11 @@ export default function EmisionForm() {
         <ArrowLeft size={14} /> Emisiones
       </a>
 
-      <PageHeader title="Nueva Emisión" description="Cheque, transferencia saliente, pago a proveedor o ajuste bancario" />
+      <PageHeader
+        title="Nueva Emisión"
+        description="Cheque, transferencia saliente, pago a proveedor o ajuste bancario"
+        action={<RecargarButton label="Actualizar" />}
+      />
 
       <form onSubmit={handleSubmit}>
         <div className="card" style={{ marginBottom: 16 }}>

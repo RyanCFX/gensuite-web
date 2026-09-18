@@ -5,6 +5,7 @@ import { listDevoluciones } from '@/shared/api/devoluciones'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listDepartamentos } from '@/shared/api/departamentos'
 import { listCustomers } from '@/shared/api/customers'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { getCatalogosFiscales } from '@/shared/api/config'
 import { useDebounce } from '@/lib/useDebounce'
 import { ChevronLeft, ChevronRight, Search, Plus, SlidersHorizontal } from 'lucide-react'
@@ -187,10 +188,13 @@ export default function DevolucionesPage() {
           <h1 className="page-title"><span className="page-title-dot" />Devoluciones</h1>
           {data && <p className="page-sub">{data.meta.total} devoluciones en total</p>}
         </div>
-        <button className="btn btn-navy" onClick={() => navigate('/devoluciones/nueva')}>
-          <Plus size={16} />
-          Nueva Devolución
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <button className="btn btn-navy" onClick={() => navigate('/devoluciones/nueva')}>
+            <Plus size={16} />
+            Nueva Devolución
+          </button>
+        </div>
       </div>
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

@@ -18,6 +18,7 @@ import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { usePosTicketPrinter } from '@/shared/hooks/usePosTicketPrinter'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useMetodoPagoCurrencies } from '@/shared/hooks/useMetodoPagoCurrencies'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import {
@@ -304,6 +305,9 @@ function validateAndSubmit() {
            <p className="page-sub">
              {data?.meta ? `${data.meta.total} factura(s) pendiente(s) de cobro` : 'Cola de cobros pendientes'}
            </p>
+         </div>
+         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+           <RecargarButton />
          </div>
        </div>
          <TurnoCajaIndicator />

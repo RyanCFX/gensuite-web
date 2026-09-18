@@ -10,6 +10,7 @@ import {
 } from '@/shared/api/ubicaciones'
 import type { ZonaResponseDto, UbicacionResponseDto, ApiError, DistribuirUbicacionItemDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
@@ -935,6 +936,7 @@ export default function ZonasPage() {
       <PageHeader
         title={<><span className="page-title-dot" />Zonas y Ubicaciones</>}
         description="Organiza físicamente cada almacén en zonas y ubicaciones/racks, y distribuye el stock sin ubicar."
+        action={<RecargarButton />}
       />
 
       <div className="tabs-bar" style={{ marginBottom: 20 }}>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listGastos, getGastoResumen } from '@/shared/api/compras-gastos'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { getCatalogosFiscales } from '@/shared/api/config'
@@ -113,10 +114,13 @@ export default function GastosPage() {
         title={<><span className="page-title-dot" />Gastos</>}
         description="Registro de gastos sin movimiento de inventario"
         action={
-          <button className="btn btn-navy" onClick={() => navigate('/gastos/nuevo')}>
-            <Plus size={16} />
-            Nuevo Gasto
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={() => navigate('/gastos/nuevo')}>
+              <Plus size={16} />
+              Nuevo Gasto
+            </button>
+          </>
         }
       />
 

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ShieldOff, Plus, ChevronRight } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { listRoles } from '@/shared/api/usuarios'
 import { createRole } from '@/shared/api/roles'
@@ -62,9 +63,12 @@ export default function RolesPage() {
         title={<><span className="page-title-dot" />Roles</>}
         description="Roles del sistema y usuarios asignados"
         action={
-          <button className="btn btn-navy" onClick={() => setShowCreate(true)}>
-            <Plus size={16} /> Nuevo Rol
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={() => setShowCreate(true)}>
+              <Plus size={16} /> Nuevo Rol
+            </button>
+          </>
         }
       />
 

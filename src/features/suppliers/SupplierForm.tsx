@@ -4,6 +4,7 @@ import { useEffectOnActive } from 'keepalive-for-react'
 import { useTabs } from '@/contexts/TabsContext'
 import { getSupplier } from '@/shared/api/suppliers'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { SupplierFormPanel } from './SupplierFormPanel'
 
 export default function SupplierForm() {
@@ -40,7 +41,7 @@ export default function SupplierForm() {
         ← Proveedores
       </button>
 
-      <PageHeader title={isEdit ? 'Editar Proveedor' : 'Nuevo Proveedor'} />
+      <PageHeader title={isEdit ? 'Editar Proveedor' : 'Nuevo Proveedor'} action={<RecargarButton label="Actualizar" />} />
 
       <SupplierFormPanel
         supplier={supplier}

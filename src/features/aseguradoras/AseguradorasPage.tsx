@@ -12,6 +12,7 @@ import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Permitido } from '@/components/shared/Permitido'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 const PAGE_SIZE = 20
 
@@ -65,12 +66,15 @@ export default function AseguradorasPage() {
           <h1 className="page-title"><span className="page-title-dot" />Aseguradoras</h1>
           {data && <p className="page-sub">{data.meta.total} aseguradoras en total</p>}
         </div>
-        <Permitido accion="aseguradoras.crear">
-          <button className="btn btn-navy" onClick={() => navigate('/farmacia/aseguradoras/nueva')}>
-            <Plus size={16} />
-            Nueva Aseguradora
-          </button>
-        </Permitido>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <Permitido accion="aseguradoras.crear">
+            <button className="btn btn-navy" onClick={() => navigate('/farmacia/aseguradoras/nueva')}>
+              <Plus size={16} />
+              Nueva Aseguradora
+            </button>
+          </Permitido>
+        </div>
       </div>
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

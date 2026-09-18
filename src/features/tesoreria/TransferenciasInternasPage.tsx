@@ -13,6 +13,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 const STATUS_BADGE: Record<TesoreriaEstado, string> = {
   draft: 'badge-draft',
@@ -57,10 +58,13 @@ export default function TransferenciasInternasPage() {
         title={<><span className="page-title-dot" />Transferencias Internas</>}
         description="Traspasos de dinero entre cuentas bancarias propias de la empresa"
         action={
-          <button className="btn btn-navy" onClick={() => navigate('/tesoreria/transferencias/nueva')}>
-            <Plus size={16} />
-            Nueva Transferencia
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={() => navigate('/tesoreria/transferencias/nueva')}>
+              <Plus size={16} />
+              Nueva Transferencia
+            </button>
+          </>
         }
       />
 

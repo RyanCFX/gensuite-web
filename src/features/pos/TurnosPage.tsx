@@ -11,6 +11,7 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { CerrarTurnoModal } from '@/components/shared/CerrarTurnoModal'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import type { TurnoListItem } from '@/shared/api/types'
 
 const PAGE_SIZE = 20
@@ -80,6 +81,9 @@ export default function TurnosPage() {
             Historial de turnos de caja (POS)
             {data?.meta ? ` — ${data.meta.total} turno(s)` : ''}
           </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
         </div>
       </div>
 

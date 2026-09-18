@@ -8,6 +8,7 @@ import { useDebounce } from '@/lib/useDebounce'
 import { Plus, Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightSmall, Folder, FileText, BarChart2 } from 'lucide-react'
 import { CuentaMovimientosModal } from '@/features/contabilidad/CuentaMovimientosModal'
 import { Select, SelectItem } from '@/components/ui/select'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 const PAGE_SIZE = 25
 
@@ -194,10 +195,13 @@ export default function CuentasPage() {
             <p className="page-sub">{data.meta.total} cuentas en total</p>
           )}
         </div>
-        <button className="btn btn-navy" onClick={() => navigate('/cuentas/nueva')}>
-          <Plus size={16} />
-          Nueva Cuenta
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <button className="btn btn-navy" onClick={() => navigate('/cuentas/nueva')}>
+            <Plus size={16} />
+            Nueva Cuenta
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}

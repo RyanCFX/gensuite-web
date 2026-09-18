@@ -8,11 +8,12 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, Info, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { EcfTabs } from '@/shared/ui/EcfTabs'
 import { getEcfConfig } from '@/shared/api/config'
 import { getEcfCertificacion } from '@/shared/api/ecf'
 import type { EcfMode } from '@/shared/api/types'
-import { useAuthStore } from '@/stores/auth.store'
+import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 
 function CertificacionContent({ company, activeMode }: { company: string; activeMode: EcfMode | null }) {
   const { data, isLoading, isError } = useQuery({
@@ -91,7 +92,7 @@ function CertificacionContent({ company, activeMode }: { company: string; active
 }
 
 export default function EcfCertificacionPage() {
-  const isSystemManager = useAuthStore((s) => s.user?.roles?.includes('System Manager') ?? false)
+  const isSystemManager = useIsSystemManager()
   const { data, isLoading } = useQuery({ queryKey: ['ecf-config'], queryFn: getEcfConfig })
 
   if (!isSystemManager) {
@@ -117,7 +118,12 @@ export default function EcfCertificacionPage() {
         overline="Facturación Electrónica"
         title="Certificación DGII"
         description="Progreso del trámite de certificación (solo lectura)"
-        action={<Link className="btn btn-ghost btn-size-sm" to="/config/ecf/admin"><ShieldCheck size={14} /> Provisioning</Link>}
+        action={
+          <>
+            <RecargarButton label="Actualizar" />
+            <Link className="btn btn-ghost btn-size-sm" to="/config/ecf/admin"><ShieldCheck size={14} /> Provisioning</Link>
+          </>
+        }
       />
       <EcfTabs />
 

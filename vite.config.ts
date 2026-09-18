@@ -53,6 +53,14 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
         },
+        // Socket.IO (namespace /realtime) — mismo problema de Mixed Content que /api: el
+        // handshake y el upgrade a WebSocket deben salir del servidor de dev, no del navegador.
+        "/socket.io": {
+          target: apiTarget,
+          changeOrigin: true,
+          secure: false,
+          ws: true,
+        },
         ...glitchtipProxy,
       },
     },
@@ -69,6 +77,12 @@ export default defineConfig(({ mode }) => {
           target: apiTarget,
           changeOrigin: true,
           secure: false,
+        },
+        "/socket.io": {
+          target: apiTarget,
+          changeOrigin: true,
+          secure: false,
+          ws: true,
         },
         ...glitchtipProxy,
       },

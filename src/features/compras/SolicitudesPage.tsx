@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listSolicitudesCompra } from '@/shared/api/solicitudes-compra'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Badge } from '@/shared/ui/Badge'
 import { formatDate } from '@/lib/formatters'
@@ -54,10 +55,13 @@ export default function SolicitudesPage() {
         title={<><span className="page-title-dot" />Solicitudes de Compra</>}
         description="Pedidos internos de intención — sin proveedor ni precio obligatorios. Se generan órdenes de compra a partir de ellas."
         action={
-          <button className="btn btn-navy" onClick={() => navigate('/compras/solicitudes/nueva')}>
-            <Plus size={16} />
-            Nueva Solicitud
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={() => navigate('/compras/solicitudes/nueva')}>
+              <Plus size={16} />
+              Nueva Solicitud
+            </button>
+          </>
         }
       />
 

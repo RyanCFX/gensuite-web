@@ -7249,6 +7249,27 @@ export interface AdoptarMaestrosDto {
   supplier?: string;
 }
 
+// ─── Diagnóstico de activación (GET /relaciones/:id/estado-activacion) ─────
+// Sin schema documentado en openapi.json (solo prosa) — ver
+// docs/plans/relaciones_comerciales/ESTADO_Y_PENDIENTES.md.
+
+export type EstadoActivacionOutboxState = 'pending' | 'processing' | 'done' | 'failed';
+
+export interface EstadoActivacionOutboxEntry {
+  id: string;
+  op: string;
+  state: EstadoActivacionOutboxState;
+  attempts: number;
+  nextAttemptAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+}
+
+export interface EstadoActivacionRelacion {
+  status: EstadoRelacionComercialListado;
+  outbox: EstadoActivacionOutboxEntry[];
+}
+
 // ─── Transacciones B2B — bandeja (Fase 06) ─────────────────────────────────
 
 export interface TransaccionContraparte {

@@ -5,6 +5,7 @@ import { usePermissionsStore } from '@/stores/permissions.store'
 import { toast } from 'sonner'
 import { ShieldOff, Ban, CheckCircle2, Trash2, Info } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { getRoleDetail, updateRole, deleteRole } from '@/shared/api/roles'
 import type { ApiError } from '@/shared/api/types'
@@ -123,7 +124,8 @@ export default function RoleDetailPage() {
                 {data.isCustom ? 'Rol personalizado' : 'Rol estándar del sistema'}
               </p>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <RecargarButton label="Actualizar" />
               <button
                 className="btn btn-secondary"
                 onClick={() => toggleDisabledMutation.mutate(!data.disabled)}

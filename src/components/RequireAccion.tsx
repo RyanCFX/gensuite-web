@@ -1,6 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { usePermissionsStore } from '@/stores/permissions.store'
-import { useAuthStore } from '@/stores/auth.store'
 import { SYSTEM_MANAGER_ROLE } from '@/shared/hooks/useIsSystemManager'
 import { resolverRuta } from '@/shared/permissions/rutas'
 import SinAccesoPage from '@/features/_shared/SinAccesoPage'
@@ -19,7 +18,7 @@ export function RequireAccion() {
   const { pathname } = useLocation()
   const acciones = usePermissionsStore((s) => s.acciones)
   const vertical = usePermissionsStore((s) => s.vertical)
-  const roles = useAuthStore((s) => s.user?.roles)
+  const roles = usePermissionsStore((s) => s.roles)
 
   const ruta = resolverRuta(pathname)
 
@@ -34,7 +33,7 @@ export function RequireAccion() {
     return <Navigate to="/dashboard" replace />
   }
 
-  if (ruta.soloSystemManager && !(roles?.includes(SYSTEM_MANAGER_ROLE) ?? false)) {
+  if (ruta.soloSystemManager && !roles.includes(SYSTEM_MANAGER_ROLE)) {
     return <Navigate to="/dashboard" replace />
   }
 

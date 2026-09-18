@@ -22,6 +22,7 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { Drawer } from '@/shared/ui/Drawer'
 import { Select, SelectItem } from '@/components/ui/select'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 const PAGE_SIZE = 20
 
@@ -117,6 +118,9 @@ export default function EcfEmitidosPage() {
         <div>
           <h1 className="page-title"><span className="page-title-dot" />e-CF Emitidos</h1>
           {data && <p className="page-sub">{data.meta.total} comprobantes electrónicos emitidos</p>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
         </div>
       </div>
 

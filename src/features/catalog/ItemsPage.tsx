@@ -10,6 +10,7 @@ import { formatDOP } from '@/lib/formatters'
 import { Plus, Eye, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight, Search, SlidersHorizontal } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -200,10 +201,13 @@ export default function ItemsPage() {
         title={<><span className="page-title-dot" />{moduleLabel}</>}
         description={data ? `${data.meta.total} ${isProduct ? 'productos' : 'servicios'}` : undefined}
         action={
-          <button className="btn btn-navy" onClick={() => navigate(`${basePath}/nuevo`)}>
-            <Plus size={16} />
-            Nuevo {isProduct ? 'Producto' : 'Servicio'}
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={() => navigate(`${basePath}/nuevo`)}>
+              <Plus size={16} />
+              Nuevo {isProduct ? 'Producto' : 'Servicio'}
+            </button>
+          </>
         }
       />
 

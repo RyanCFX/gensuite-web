@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { listInvoices } from '@/shared/api/invoices'
 import type { ListInvoicesParams } from '@/shared/api/invoices'
 import { listSucursales } from '@/shared/api/sucursales'
@@ -174,10 +175,13 @@ export default function InvoicesPage() {
           <h1 className="page-title"><span className="page-title-dot" />Facturas</h1>
           <p className="page-sub">Gestiona tus facturas de venta y comprobantes fiscales</p>
         </div>
-        <button className="btn btn-navy" onClick={() => navigate('/facturas/nueva')}>
-          <Plus size={16} />
-          Nueva Factura
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <button className="btn btn-navy" onClick={() => navigate('/facturas/nueva')}>
+            <Plus size={16} />
+            Nueva Factura
+          </button>
+        </div>
       </div>
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

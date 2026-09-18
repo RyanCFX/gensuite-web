@@ -5,6 +5,7 @@ import { Mail, Plus, Trash2, AlertTriangle, Clock, CheckCircle2, XCircle, AlertC
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useTabActiva } from '@/shared/hooks/useTabActiva'
@@ -48,6 +49,7 @@ export default function NotificacionesPage() {
       <PageHeader
         title={<><span className="page-title-dot" />Notificaciones</>}
         description="Configura qué eventos notifican por correo y quién los recibe"
+        action={<RecargarButton />}
       />
 
       <div className="tabs-bar" style={{ marginBottom: 20 }}>

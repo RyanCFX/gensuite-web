@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { getSemaforo } from '@/shared/api/cobros'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { formatDOP, formatPct } from '@/lib/formatters'
 
 export default function SemaforoPage() {
@@ -14,6 +15,7 @@ export default function SemaforoPage() {
       <PageHeader
         title={<><span className="page-title-dot" />Semáforo de Crédito</>}
         description="Estado de crédito por cliente"
+        action={<RecargarButton />}
       />
 
       <div>

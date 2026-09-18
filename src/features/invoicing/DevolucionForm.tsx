@@ -11,6 +11,7 @@ import { createDevolucion } from '@/shared/api/devoluciones'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { formatDOP, formatDate, daysSince } from '@/lib/formatters'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
@@ -317,6 +318,7 @@ export default function DevolucionForm() {
       <PageHeader
         title="Nueva Devolución"
         description="Busca al cliente y selecciona la factura sometida a devolver (pagada o pendiente)."
+        action={<RecargarButton label="Actualizar" />}
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720 }}>

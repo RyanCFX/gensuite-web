@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { Permitido } from '@/components/shared/Permitido'
 import { usePuede } from '@/shared/permissions/can'
 import { Badge } from '@/shared/ui/Badge'
@@ -44,12 +45,15 @@ export default function RelacionesComercialesPage() {
         title={<><span className="page-title-dot" />Relaciones Comerciales</>}
         description="Invita, gestiona y da seguimiento a tus socios comerciales B2B"
         action={
-          puedeInvitar ? (
-            <button className="btn btn-navy" onClick={() => setWizardOpen(true)}>
-              <Plus size={16} />
-              Nueva relación comercial
-            </button>
-          ) : undefined
+          <>
+            <RecargarButton />
+            {puedeInvitar && (
+              <button className="btn btn-navy" onClick={() => setWizardOpen(true)}>
+                <Plus size={16} />
+                Nueva relación comercial
+              </button>
+            )}
+          </>
         }
       />
 

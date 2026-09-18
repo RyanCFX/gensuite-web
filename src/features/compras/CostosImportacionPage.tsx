@@ -8,6 +8,7 @@ import { listPurchaseReceipts } from '@/shared/api/purchase-receipt'
 import { listCompras } from '@/shared/api/compras-gastos'
 import type { CreateLandedCostVoucherDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
@@ -206,10 +207,13 @@ export default function CostosImportacionPage() {
         title={<><span className="page-title-dot" />Costos de Importación</>}
         description="Prorratea cargos e impuestos de importación sobre los artículos recibidos"
         action={
-          <button className="btn btn-navy" onClick={openCreate}>
-            <Plus size={16} />
-            Nuevo Costo de Importación
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={openCreate}>
+              <Plus size={16} />
+              Nuevo Costo de Importación
+            </button>
+          </>
         }
       />
 

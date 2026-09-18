@@ -27,6 +27,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 const PAGE_SIZE = 20
 
@@ -394,10 +395,13 @@ export default function PricingRulesPage() {
             Estos descuentos se aplican automáticamente en cada factura o cotización — el vendedor no necesita tocarlos.
           </p>
         </div>
-        <button className="btn btn-navy" onClick={openCreate}>
-          <Plus size={16} />
-          Nueva Regla
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <button className="btn btn-navy" onClick={openCreate}>
+            <Plus size={16} />
+            Nueva Regla
+          </button>
+        </div>
       </div>
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

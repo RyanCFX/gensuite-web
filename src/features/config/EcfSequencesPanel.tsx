@@ -21,6 +21,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 const ECF_TYPE_IDS = ECF_TIPOS.map((t) => t.typeId) as EcfTipoElectronico[]
 
@@ -441,7 +442,8 @@ export function EcfSequencesPanel() {
         </span>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <RecargarButton />
         <button className="btn btn-navy btn-size-sm" onClick={() => setModal({ type: 'create' })}>
           <Plus size={14} aria-hidden="true" /> Nuevo rango
         </button>

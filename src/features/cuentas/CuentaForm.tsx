@@ -11,6 +11,7 @@ import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { Select, SelectItem } from '@/components/ui/select'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 const ACCOUNT_TYPES = [
   'Bank',
@@ -220,6 +221,9 @@ export default function CuentaForm() {
             <ArrowLeft size={14} /> Volver
           </button>
           <h1 className="page-title">{isEdit ? 'Editar Cuenta' : 'Nueva Cuenta'}</h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton label="Actualizar" />
         </div>
       </div>
 

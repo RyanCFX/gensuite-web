@@ -8,6 +8,7 @@ import { listDenominaciones } from '@/shared/api/config'
 import { formatDateTime, formatDOP } from '@/lib/formatters'
 import { CorteCajaView } from '@/components/shared/CorteCajaView'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import type { TurnoClosing } from '@/shared/api/types'
 
 export default function TurnoDetailPage() {
@@ -59,16 +60,21 @@ export default function TurnoDetailPage() {
   return (
     <div className="page-container">
       <div className="page-header">
-        <button className="page-back-link" onClick={() => navigate('/turnos')}>
-          <ArrowLeft size={14} /> Turnos de caja
-        </button>
-        <h1 className="page-title">Turno {turno.id}</h1>
-        <p className="page-sub">
-          <span className={`badge ${turno.status === 'Open' ? 'badge-success' : 'badge-draft'}`}>
-            {turno.status === 'Open' ? 'Abierto' : 'Cerrado'}
-          </span>
-          {' — '}Apertura: {formatDateTime(turno.periodStartDate)}
-        </p>
+        <div>
+          <button className="page-back-link" onClick={() => navigate('/turnos')}>
+            <ArrowLeft size={14} /> Turnos de caja
+          </button>
+          <h1 className="page-title">Turno {turno.id}</h1>
+          <p className="page-sub">
+            <span className={`badge ${turno.status === 'Open' ? 'badge-success' : 'badge-draft'}`}>
+              {turno.status === 'Open' ? 'Abierto' : 'Cerrado'}
+            </span>
+            {' — '}Apertura: {formatDateTime(turno.periodStartDate)}
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton label="Actualizar" />
+        </div>
       </div>
 
       {turno.closing && (

@@ -8,6 +8,7 @@ import type { Caja } from '@/shared/api/types'
 import { Plus, Pencil, Trash2, Search, Ban, CheckCircle } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { Badge } from '@/shared/ui/Badge'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -140,10 +141,13 @@ export default function CajasPage() {
         title={<><span className="page-title-dot" />Cajas</>}
         description={data ? `${data.length} caja(s) — soporta turnos abiertos simultáneamente` : undefined}
         action={
-          <button className="btn btn-navy" onClick={openCreate}>
-            <Plus size={16} />
-            Nueva Caja
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={openCreate}>
+              <Plus size={16} />
+              Nueva Caja
+            </button>
+          </>
         }
       />
 

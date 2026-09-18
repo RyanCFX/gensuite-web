@@ -15,6 +15,7 @@ import {
 } from '@/shared/api/devoluciones-compras'
 import type { CreateDevolucionCompraDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { Save, X, Building2, FileText, Undo2, Check, AlertTriangle } from 'lucide-react'
@@ -198,6 +199,7 @@ export default function DevolucionForm() {
         <PageHeader
           title="Nueva Devolución"
           description="Busca al proveedor y luego selecciona la factura de compra a devolver."
+          action={<RecargarButton label="Actualizar" />}
         />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 560 }}>
@@ -305,6 +307,7 @@ export default function DevolucionForm() {
         }
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <RecargarButton label="Actualizar" />
             {isEdit && <StatusBadge status={devolucion?.status ?? 'draft'} />}
             <button className="btn btn-ghost btn-size-sm" onClick={confirmClose.requestClose}>
               <X size={14} />Cancelar

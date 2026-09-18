@@ -15,6 +15,7 @@ import { listMetodosPago, getCatalogosFiscales } from '@/shared/api/config'
 import { getEcfTipos } from '@/shared/api/ecf'
 import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listDepartamentos } from '@/shared/api/departamentos'
 import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo, EcfModificationCode } from '@/shared/api/types'
@@ -544,9 +545,12 @@ export default function CreditNotesPage() {
           <h1 className="page-title"><span className="page-title-dot" />Notas de Crédito</h1>
           <p className="page-sub">Gestiona devoluciones y ajustes (NCF B04)</p>
         </div>
-        <button className="btn btn-navy" onClick={() => setModalOpen(true)}>
-          <Plus size={16} /> Nueva Nota de Crédito
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <button className="btn btn-navy" onClick={() => setModalOpen(true)}>
+            <Plus size={16} /> Nueva Nota de Crédito
+          </button>
+        </div>
       </div>
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

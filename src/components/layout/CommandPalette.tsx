@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getFacturacionConfig } from '@/shared/api/config'
 import { usePermissionsStore } from '@/stores/permissions.store'
-import { useAuthStore } from '@/stores/auth.store'
+import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { resolverRuta } from '@/shared/permissions/rutas'
 import {
   LayoutDashboard, Users, Package, PackagePlus, FileText, Receipt, Warehouse,
@@ -246,7 +246,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
   const acciones = usePermissionsStore((s) => s.acciones)
   const esFarmacia = usePermissionsStore((s) => s.vertical) === 'farmacia'
-  const isSystemManager = useAuthStore((s) => s.user?.roles?.includes('System Manager') ?? false)
+  const isSystemManager = useIsSystemManager()
 
   const results = useMemo(
     () => filterItems(query, usaModuloPos, { acciones, esFarmacia, isSystemManager }),

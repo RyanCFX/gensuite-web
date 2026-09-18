@@ -13,6 +13,7 @@ import type { MargenNegativoWarning, PendienteAbastecimientoLinea, CreateOrdenDe
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate, formatMoney } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { FilterField } from '@/shared/ui/FilterField'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -116,6 +117,7 @@ export default function AbastecimientoPage() {
       <PageHeader
         title={<><span className="page-title-dot" />Abastecimiento</>}
         description="Líneas de pedidos de venta pendientes de comprar — consolidá varias en una sola orden a un proveedor."
+        action={<RecargarButton />}
       />
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, AlertTriangle } from 'lucide-react'
 import { getAperturaResumen } from '@/shared/api/apertura'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { formatMoney, formatNumber } from '@/lib/formatters'
 
 export default function ResumenPage() {
@@ -17,6 +18,7 @@ export default function ResumenPage() {
       <PageHeader
         title={<><span className="page-title-dot" />Cuadre de la Migración</>}
         description="Verifica que el saldo contable de la cuenta de apertura coincida con lo migrado."
+        action={<RecargarButton />}
       />
 
       {isLoading || !resumen ? (

@@ -10,18 +10,18 @@ import { listSuppliers } from '@/shared/api/suppliers'
 import { listMetodosPago, getFacturacionConfig } from '@/shared/api/config'
 import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { CheckCircle2, AlertTriangle, Wallet } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { formatDOP } from '@/lib/formatters'
-import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
+import { getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import { getCachedUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
-
-const SYSTEM_MANAGER_ROLE = 'System Manager'
+import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 
 interface ReferenciaRow {
   invoiceId: string
@@ -73,15 +73,9 @@ export default function RegistrarPagoPage() {
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
 
   const currentUserEmail = getCachedUser()?.email
-  const { data: currentUser } = useQuery({
-    queryKey: ['currentUser', currentUserEmail],
-    queryFn: () => getUsuario(currentUserEmail!),
-    enabled: !!currentUserEmail,
-    staleTime: 5 * 60_000,
-  })
 
   // ── Sucursal (branch) selector ────────────────────────────────────────────
-  const isSystemManager = currentUser?.roles?.includes(SYSTEM_MANAGER_ROLE) ?? false
+  const isSystemManager = useIsSystemManager()
   const { data: myBranches } = useQuery({
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
@@ -374,6 +368,7 @@ export default function RegistrarPagoPage() {
       <PageHeader
         title="Registrar Pago"
         description="Registra un pago realizado a un proveedor"
+        action={<RecargarButton label="Actualizar" />}
       />
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>

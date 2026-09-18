@@ -17,6 +17,7 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Drawer } from '@/shared/ui/Drawer'
 import { Printer, SlidersHorizontal } from 'lucide-react'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 const STATUS_BADGE: Record<ChequeEstado, string> = {
   Reservado: 'badge-draft',
@@ -82,6 +83,7 @@ export default function ChequesPage() {
       <PageHeader
         title={<><span className="page-title-dot" />Cheques</>}
         description="Historial de cheques emitidos a proveedores desde Emisiones o Pagos"
+        action={<RecargarButton />}
       />
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

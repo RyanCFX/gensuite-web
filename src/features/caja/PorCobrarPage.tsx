@@ -18,6 +18,7 @@ import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { usePosTicketPrinter } from '@/shared/hooks/usePosTicketPrinter'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useMetodoPagoCurrencies } from '@/shared/hooks/useMetodoPagoCurrencies'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import {
@@ -341,6 +342,9 @@ function validateAndSubmit() {
                ? `${data.meta.total} factura(s) pendiente(s) de completar cobro`
                : 'Facturas enviadas a Caja que aún no tienen NCF'}
            </p>
+         </div>
+         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+           <RecargarButton />
          </div>
        </div>
 

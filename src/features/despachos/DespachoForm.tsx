@@ -15,6 +15,7 @@ import type { Item, DespachoItemDto, ApiError } from '@/shared/api/types'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { formatStockInsufficientMessage } from '@/lib/stockAlerts'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
@@ -129,6 +130,7 @@ export default function DespachoForm() {
       <PageHeader
         title="Nuevo despacho"
         description="Venta mostrador sin pedido previo — el operador arma las líneas a mano. Queda en Borrador para revisar antes de someter."
+        action={<RecargarButton label="Actualizar" />}
       />
 
       <form onSubmit={handleSubmit}>

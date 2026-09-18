@@ -23,6 +23,7 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { Drawer } from '@/shared/ui/Drawer'
 import { Select, SelectItem } from '@/components/ui/select'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { CargarXmlModal } from './CargarXmlModal'
 
 const PAGE_SIZE = 20
@@ -98,9 +99,12 @@ export default function EcfRecibidosPage() {
           <h1 className="page-title"><span className="page-title-dot" />e-CF Recibidos</h1>
           {data && <p className="page-sub">{data.meta.total} comprobantes recibidos de terceros</p>}
         </div>
-        <button className="btn btn-secondary" onClick={() => setShowCargarXml(true)}>
-          <Upload size={16} /> Cargar XML manualmente
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <button className="btn btn-secondary" onClick={() => setShowCargarXml(true)}>
+            <Upload size={16} /> Cargar XML manualmente
+          </button>
+        </div>
       </div>
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

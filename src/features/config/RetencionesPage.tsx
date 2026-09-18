@@ -17,6 +17,7 @@ import type { RetencionListItem, CreateRetencionDto, TasaImpuesto } from '@/shar
 import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { useDebounce } from '@/lib/useDebounce'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -250,10 +251,13 @@ export default function RetencionesPage() {
         title={<><span className="page-title-dot" />Retenciones</>}
         description={data?.meta ? `${data.meta.total ?? 0} categorías de retención` : undefined}
         action={
-          <button className="btn btn-navy" onClick={openCreate}>
-            <Plus size={16} />
-            Nueva Retención
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={openCreate}>
+              <Plus size={16} />
+              Nueva Retención
+            </button>
+          </>
         }
       />
 

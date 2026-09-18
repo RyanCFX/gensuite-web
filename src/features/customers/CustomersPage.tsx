@@ -15,6 +15,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { TIPO_IDENTIFICACION } from '@/lib/constants'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 const PAGE_SIZE = 20
 
@@ -121,10 +122,13 @@ export default function CustomersPage() {
           <h1 className="page-title"><span className="page-title-dot" />Clientes</h1>
           {data && <p className="page-sub">{data.meta.total} clientes en total</p>}
         </div>
-        <button className="btn btn-navy" onClick={() => navigate('/clientes/nuevo')}>
-          <Plus size={16} />
-          Nuevo Cliente
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <button className="btn btn-navy" onClick={() => navigate('/clientes/nuevo')}>
+            <Plus size={16} />
+            Nuevo Cliente
+          </button>
+        </div>
       </div>
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

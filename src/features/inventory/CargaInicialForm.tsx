@@ -15,6 +15,7 @@ import { getFacturacionConfig } from '@/shared/api/config'
 import type { CargaInicialItemDto, CrearCargaInicialDto, CargaInicialInventario, Item } from '@/shared/api/types'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -191,6 +192,7 @@ export default function CargaInicialForm() {
       <PageHeader
         title="Registrar entrada"
         description="Agrega existencias a un almacén sin que haya una compra de por medio — hallazgos, donaciones, ajustes puntuales."
+        action={<RecargarButton label="Actualizar" />}
       />
 
       {!loadingCuentas && !cuentaAjusteConfigurada && (

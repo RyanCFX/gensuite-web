@@ -8,10 +8,11 @@ import { createPurchaseReceipt, updatePurchaseReceipt, getPurchaseReceipt } from
 import { listSuppliers } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
-import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
+import { getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import type { CreatePurchaseReceiptDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { Plus, Trash2 } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -31,6 +32,7 @@ import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 
 interface ItemRow {
   itemCode: string
@@ -54,8 +56,6 @@ interface ItemRow {
 function emptyItem(defaultWh?: string): ItemRow {
   return { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, warehouse: defaultWh ?? '', uom: 'Nos', trackingType: 'none', serials: [], batches: [] }
 }
-
-const SYSTEM_MANAGER_ROLE = 'System Manager'
 
 function onVariantConfirm(
   selections: VariantSelection[],
@@ -497,13 +497,7 @@ export default function RecepcionForm() {
   }, [warehouses])
 
   // ── Sucursal (branch) selector ────────────────────────────────────────────
-  const { data: currentUserDetail } = useQuery({
-    queryKey: ['currentUser', authUser?.email],
-    queryFn: () => getUsuario(authUser!.email),
-    enabled: !!authUser?.email,
-    staleTime: 5 * 60_000,
-  })
-  const isSystemManager = currentUserDetail?.roles?.includes(SYSTEM_MANAGER_ROLE) ?? false
+  const isSystemManager = useIsSystemManager()
   const { data: myBranches, refetch: refetchMyBranches } = useQuery({
     queryKey: ['usuarioSucursales', authUser?.email],
     queryFn: () => getUsuarioSucursales(authUser!.email),
@@ -779,6 +773,7 @@ export default function RecepcionForm() {
       <PageHeader
         title={isEdit ? 'Editar Recepción' : 'Nueva Recepción de Mercancía'}
         description="Registra la mercancía recibida — sin datos fiscales, esos se capturan al facturar"
+        action={<RecargarButton label="Actualizar" />}
       />
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>

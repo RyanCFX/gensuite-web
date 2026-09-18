@@ -6,6 +6,7 @@ import { listSucursales } from '@/shared/api/sucursales'
 import { listDepartamentos } from '@/shared/api/departamentos'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { Plus, Search, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react'
 import { useDebounce } from '@/lib/useDebounce'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -73,10 +74,13 @@ export default function JournalPage() {
           <h1 className="page-title"><span className="page-title-dot" />Asientos Contables</h1>
           {data && <p className="page-sub">{data.meta.total} asientos en total</p>}
         </div>
-        <button className="btn btn-navy" onClick={() => navigate('/asientos/nuevo')}>
-          <Plus size={16} />
-          Nuevo Asiento
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
+          <button className="btn btn-navy" onClick={() => navigate('/asientos/nuevo')}>
+            <Plus size={16} />
+            Nuevo Asiento
+          </button>
+        </div>
       </div>
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>

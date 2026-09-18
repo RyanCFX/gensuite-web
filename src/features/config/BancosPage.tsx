@@ -9,6 +9,7 @@ import type { BancoCatalogo } from '@/shared/api/types'
 import { Plus, Pencil, Search } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 
@@ -102,10 +103,13 @@ export default function BancosPage() {
         title={<><span className="page-title-dot" />Bancos</>}
         description={data ? `${data.length} bancos` : undefined}
         action={
-          <button className="btn btn-navy" onClick={openCreate}>
-            <Plus size={16} />
-            Nuevo Banco
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={openCreate}>
+              <Plus size={16} />
+              Nuevo Banco
+            </button>
+          </>
         }
       />
 

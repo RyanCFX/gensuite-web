@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, RefreshCw, Printer, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
@@ -151,6 +152,7 @@ export default function ImpresorasPage() {
         description="Configura impresoras para imprimir directo (sin diálogo del navegador) vía QZ Tray — cada usuario elige cuál usar."
         action={
           <div style={{ display: 'flex', gap: 8 }}>
+            <RecargarButton />
             <button className="btn btn-secondary" onClick={() => setCertModalOpen(true)}>
               <ShieldCheck size={16} /> Certificado QZ Tray
             </button>

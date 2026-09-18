@@ -15,6 +15,7 @@ import type { Departamento } from '@/shared/api/types'
 import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, ChevronDown, List, GitBranch } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useDebounce } from '@/lib/useDebounce'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -167,10 +168,13 @@ export default function DepartamentosPage() {
         title={<><span className="page-title-dot" />Departamentos</>}
         description={data ? `${data.meta.total ?? 0} departamentos` : undefined}
         action={
-          <button className="btn btn-navy" onClick={openCreate}>
-            <Plus size={16} />
-            Nuevo Departamento
-          </button>
+          <>
+            <RecargarButton />
+            <button className="btn btn-navy" onClick={openCreate}>
+              <Plus size={16} />
+              Nuevo Departamento
+            </button>
+          </>
         }
       />
 

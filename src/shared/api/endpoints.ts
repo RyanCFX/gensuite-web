@@ -695,6 +695,7 @@ export const ENDPOINTS = {
     byId: (id: string) => `/relaciones/${encodeURIComponent(id)}`,
     configuracion: (id: string) => `/relaciones/${encodeURIComponent(id)}/configuracion`,
     terminos: (id: string) => `/relaciones/${encodeURIComponent(id)}/terminos`,
+    estadoActivacion: (id: string) => `/relaciones/${encodeURIComponent(id)}/estado-activacion`,
     reintentarActivacion: (id: string) => `/relaciones/${encodeURIComponent(id)}/reintentar-activacion`,
     maestrosCandidatos: (id: string) => `/relaciones/${encodeURIComponent(id)}/maestros-candidatos`,
     adoptarMaestros: (id: string) => `/relaciones/${encodeURIComponent(id)}/adoptar-maestros`,

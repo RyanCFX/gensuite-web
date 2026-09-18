@@ -12,6 +12,7 @@ import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 
 function firstOfMonth(): string {
   const d = new Date()
@@ -137,6 +138,9 @@ export default function LibroMayorPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title"><span className="page-title-dot" />Libro Mayor</h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton />
         </div>
       </div>
 

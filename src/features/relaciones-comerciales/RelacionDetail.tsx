@@ -2,17 +2,24 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus, Trash2, ArrowRight } from 'lucide-react'
+import { Plus, Minus, Trash2, ArrowRight } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { Permitido } from '@/components/shared/Permitido'
 import { usePuede } from '@/shared/permissions/can'
 import { Modal, ConfirmModal } from '@/shared/ui/Modal'
-import { formatDate } from '@/lib/formatters'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { ItemSelect } from '@/shared/ui/ItemSelect'
+import { UomSelect } from '@/shared/ui/UomSelect'
+import { formatDate, formatDateTime } from '@/lib/formatters'
 import { isApiErrorCode } from '@/shared/api/client'
+import { listAlmacenes, getCatalogosFiscales } from '@/shared/api/config'
 import {
   getRelacionComercial,
   actualizarConfiguracionRelacion,
   actualizarTerminosRelacion,
+  getEstadoActivacionRelacion,
   reintentarActivacionRelacion,
   getMaestrosCandidatosRelacion,
   adoptarMaestrosRelacion,
@@ -24,7 +31,9 @@ import {
 } from '@/shared/api/relaciones'
 import type {
   ActualizarConfiguracionRelacionDto,
+  EstadoActivacionOutboxEntry,
   FilaMapeoAcumulado,
+  Item,
   MaestroCandidatoRelacion,
   TerminosComercialesDto,
 } from '@/shared/api/types'
@@ -37,6 +46,33 @@ const ESTADO_ACTIVANDO = new Set(['invitada', 'activando'])
 // "Activando…" se mostraba incorrectamente para una relación ya revocada (encontrado probando en
 // vivo: terminar una relación que nunca se activó la deja en este estado).
 const ESTADO_TERMINAL_SIN_ACTIVAR = new Set(['revocada', 'rechazada'])
+
+const OUTBOX_ESTADO_LABEL: Record<string, string> = {
+  pending: 'Pendiente',
+  processing: 'Procesando',
+  done: 'Completado',
+  failed: 'Falló',
+}
+const OUTBOX_ESTADO_BADGE: Record<string, string> = {
+  pending: 'badge-neutral',
+  processing: 'badge-info',
+  done: 'badge-success',
+  failed: 'badge-error',
+}
+
+/** Heurística de texto sobre `lastError` — el endpoint no expone un código estructurado (a
+ *  diferencia de `reintentar-activacion`, que sí responde con `RNC_DUPLICADO_EN_SITE` como código
+ *  de error), así que buscamos las mismas palabras clave en el mensaje libre para poder ofrecer el
+ *  mismo flujo de "adoptar maestros" en vez de un simple reintento. Ajustar si el texto real del
+ *  backend no calza (confirmar contra un caso real en vivo). */
+function pareceConflictoDeMaestro(lastError: string | null): boolean {
+  if (!lastError) return false
+  const t = lastError.toLowerCase()
+  return t.includes('rnc_duplicado_en_site') || (t.includes('rnc') && /duplicad|ambig|m[aá]s de un/.test(t))
+}
+
+/** `itemNameLocal` es un campo solo de UI (el DTO no lo tiene) — ver comentario junto a `filas`. */
+type FilaMapeoAcumuladoUI = FilaMapeoAcumulado & { itemNameLocal?: string }
 
 export default function RelacionDetail() {
   const { id } = useParams<{ id: string }>()
@@ -58,13 +94,22 @@ export default function RelacionDetail() {
 
   const invalidarRelacion = () => queryClient.invalidateQueries({ queryKey: ['relacion-comercial', id] })
 
+  // ─── Diagnóstico de activación (relación colgada en "activando") ────────────
+  const [diagnosticoOpen, setDiagnosticoOpen] = useState(false)
+  const diagnosticoQuery = useQuery({
+    queryKey: ['estado-activacion-relacion', id],
+    queryFn: () => getEstadoActivacionRelacion(id!),
+    enabled: diagnosticoOpen && puedeVer && !!id && relacion?.status === 'activando',
+  })
+  const invalidarDiagnostico = () => queryClient.invalidateQueries({ queryKey: ['estado-activacion-relacion', id] })
+
   // ─── Candidatos (RNC_DUPLICADO_EN_SITE) / vinculado a otra relación (MAESTRO_YA_VINCULADO) ────
   const [candidatosOpen, setCandidatosOpen] = useState(false)
   const [vinculadoMensaje, setVinculadoMensaje] = useState<string | null>(null)
 
   const reintentarMutation = useMutation({
     mutationFn: () => reintentarActivacionRelacion(id!),
-    onSuccess: () => { toast.success('Activación reintentada'); invalidarRelacion() },
+    onSuccess: () => { toast.success('Activación reintentada'); invalidarRelacion(); invalidarDiagnostico() },
     onError: (err) => {
       if (isApiErrorCode(err, 'RNC_DUPLICADO_EN_SITE')) {
         setCandidatosOpen(true)
@@ -119,6 +164,30 @@ export default function RelacionDetail() {
     onError: (err) => toast.error((err as { message?: string })?.message ?? 'Error al guardar la configuración'),
   })
 
+  // Catálogos para los selects de "Configuración de automatización" — no hay contexto de
+  // sucursal en esta pantalla (es una configuración a nivel de relación, no de documento), así
+  // que "Almacén destino" ofrece todos los almacenes del tenant en vez de filtrar por sucursal.
+  const { data: almacenesData } = useQuery({
+    queryKey: ['almacenes-todos'],
+    queryFn: () => listAlmacenes(),
+    staleTime: 60_000,
+  })
+  const almacenOptions: SearchSelectOption[] = (almacenesData ?? []).map((w) => ({ value: w.id, label: w.name }))
+
+  const { data: catalogosFiscales } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+  const [cfgTipoBienes606Search, setCfgTipoBienes606Search] = useState('')
+  const cfgTipoBienes606Options: SearchSelectOption[] = (catalogosFiscales?.tipoBienes606 ?? [])
+    .filter((t) => !cfgTipoBienes606Search || t.label.toLowerCase().includes(cfgTipoBienes606Search.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
+  const [cfgFormaPago606Search, setCfgFormaPago606Search] = useState('')
+  const cfgFormaPago606Options: SearchSelectOption[] = (catalogosFiscales?.formaPago606 ?? [])
+    .filter((t) => !cfgFormaPago606Search || t.label.toLowerCase().includes(cfgFormaPago606Search.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
+
   // ─── Ciclo de vida ───────────────────────────────────────────────────────────
   const [confirmAccion, setConfirmAccion] = useState<'suspender' | 'reactivar' | 'terminar' | null>(null)
 
@@ -145,7 +214,9 @@ export default function RelacionDetail() {
     queryFn: () => getMapeoAcumuladoRelacion(id!),
     enabled: relacionActiva && !!id,
   })
-  const [filas, setFilas] = useState<FilaMapeoAcumulado[]>([])
+  // `itemNameLocal` es solo de UI (para que el ItemSelect muestre el nombre en vez del código
+  // crudo) — nunca se manda al backend, se descarta al guardar.
+  const [filas, setFilas] = useState<FilaMapeoAcumuladoUI[]>([])
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- precarga la tabla editable al llegar el mapeo acumulado
     if (mapeoData) setFilas(mapeoData.filas)
@@ -214,7 +285,20 @@ export default function RelacionDetail() {
   function removeFila(index: number) {
     setFilas((f) => f.filter((_, i) => i !== index))
   }
-  function updateFila(index: number, patch: Partial<FilaMapeoAcumulado>) {
+  /** Descarta `itemNameLocal` (solo de UI) antes de mandar al backend. */
+  function sinNombreLocal(fila: FilaMapeoAcumuladoUI): FilaMapeoAcumulado {
+    return {
+      itemCodeOrigen: fila.itemCodeOrigen,
+      itemNameOrigen: fila.itemNameOrigen,
+      barcodeOrigen: fila.barcodeOrigen,
+      itemCodeLocal: fila.itemCodeLocal,
+      uomOrigen: fila.uomOrigen,
+      uomLocal: fila.uomLocal,
+      factorConversion: fila.factorConversion,
+    }
+  }
+
+  function updateFila(index: number, patch: Partial<FilaMapeoAcumuladoUI>) {
     setFilas((f) => f.map((row, i) => (i === index ? { ...row, ...patch } : row)))
   }
 
@@ -224,9 +308,12 @@ export default function RelacionDetail() {
         title={<>{relacion.contraparte.nombre} <EstadoRelacionBadge status={relacion.status} /></>}
         description={relacion.contraparte.rnc ? `RNC ${relacion.contraparte.rnc}` : undefined}
         action={
-          <button className="btn btn-ghost btn-size-sm" onClick={() => navigate('/relaciones-comerciales')}>
-            Volver
-          </button>
+          <>
+            <RecargarButton label="Actualizar" />
+            <button className="btn btn-ghost btn-size-sm" onClick={() => navigate('/relaciones-comerciales')}>
+              Volver
+            </button>
+          </>
         }
       />
 
@@ -321,6 +408,114 @@ export default function RelacionDetail() {
           </div>
         </div>
 
+        {/* ── Diagnóstico de activación ───────────────────────────────────── */}
+        {relacion.status === 'activando' && (
+          <div className="card">
+            <div
+              className="card-header navy-card-header"
+              style={{ cursor: 'pointer' }}
+              onClick={() => setDiagnosticoOpen((o) => !o)}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <h2 className="card-title">Diagnóstico de activación</h2>
+                <button
+                  type="button"
+                  className="navy-header-toggle-btn icon-swap"
+                  aria-expanded={diagnosticoOpen}
+                  aria-label={diagnosticoOpen ? 'Ocultar diagnóstico' : 'Ver detalle'}
+                  onClick={(e) => { e.stopPropagation(); setDiagnosticoOpen((o) => !o) }}
+                >
+                  {diagnosticoOpen ? <Minus size={13} /> : <Plus size={13} />}
+                </button>
+              </div>
+              {!diagnosticoOpen && (
+                <span className="navy-header-hint">Por qué esta relación no termina de activarse</span>
+              )}
+            </div>
+            {diagnosticoOpen && (
+              <div className="card-body">
+                {diagnosticoQuery.isLoading ? (
+                  <p className="ff-hint" style={{ margin: 0 }}>Cargando diagnóstico…</p>
+                ) : diagnosticoQuery.isError ? (
+                  <div className="inline-alert inline-alert-error">
+                    No se pudo cargar el diagnóstico de activación.
+                  </div>
+                ) : !diagnosticoQuery.data || diagnosticoQuery.data.outbox.length === 0 ? (
+                  <p className="ff-hint" style={{ margin: 0 }}>La activación no se ha iniciado todavía.</p>
+                ) : (
+                  (() => {
+                    const outbox: EstadoActivacionOutboxEntry[] = diagnosticoQuery.data.outbox
+                    const ultimo = [...outbox].sort(
+                      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+                    )[0]
+                    const conflictoMaestro = pareceConflictoDeMaestro(ultimo.lastError)
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+                          <div className="detail-field">
+                            <span className="detail-label">Operación</span>
+                            <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{ultimo.op}</span>
+                          </div>
+                          <div className="detail-field">
+                            <span className="detail-label">Estado</span>
+                            <span className={`badge ${OUTBOX_ESTADO_BADGE[ultimo.state] ?? 'badge-neutral'}`}>
+                              {OUTBOX_ESTADO_LABEL[ultimo.state] ?? ultimo.state}
+                            </span>
+                          </div>
+                          <div className="detail-field">
+                            <span className="detail-label">Intentos</span>
+                            <span className="detail-value">{ultimo.attempts}</span>
+                          </div>
+                          <div className="detail-field">
+                            <span className="detail-label">Próximo intento</span>
+                            <span className="detail-value">
+                              {ultimo.nextAttemptAt ? formatDateTime(ultimo.nextAttemptAt) : '—'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {ultimo.lastError && (
+                          <div className="inline-alert inline-alert-error" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                            <strong>Último error</strong>
+                            <p style={{ margin: '4px 0 0', fontFamily: 'var(--font-mono)', fontSize: 12, whiteSpace: 'pre-wrap' }}>
+                              {ultimo.lastError}
+                            </p>
+                          </div>
+                        )}
+
+                        {(ultimo.state === 'failed' || (ultimo.state === 'pending' && ultimo.lastError)) && (
+                          <div>
+                            {conflictoMaestro ? (
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-size-sm"
+                                onClick={() => setCandidatosOpen(true)}
+                              >
+                                Ver candidatos para adoptar
+                              </button>
+                            ) : (
+                              <Permitido accion="relaciones.configurar">
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-size-sm"
+                                  onClick={() => reintentarMutation.mutate()}
+                                  disabled={reintentarMutation.isPending}
+                                >
+                                  {reintentarMutation.isPending ? <span className="spinner spinner-sm" /> : 'Reintentar activación'}
+                                </button>
+                              </Permitido>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Términos vigentes (editables) ───────────────────────────────── */}
         <div className="card">
           <div className="card-body">
@@ -358,37 +553,41 @@ export default function RelacionDetail() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="cfg-almacen">Almacén destino</label>
-                <input
+                <SearchSelect
                   id="cfg-almacen"
-                  type="text"
-                  className="ff-input"
-                  disabled={!puedeConfigurar}
                   value={configForm.almacenDestino}
-                  onChange={(e) => setConfigForm((f) => ({ ...f, almacenDestino: e.target.value }))}
-                  placeholder="Ej. Almacén Principal - GS"
+                  onChange={(v) => setConfigForm((f) => ({ ...f, almacenDestino: v }))}
+                  options={almacenOptions}
+                  onSearch={() => {}}
+                  disabled={!puedeConfigurar}
+                  placeholder="Buscar almacén…"
                 />
               </div>
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="cfg-tipoBienes606">Tipo de bienes (606)</label>
-                <input
+                <SearchSelect
                   id="cfg-tipoBienes606"
-                  type="text"
-                  className="ff-input"
-                  disabled={!puedeConfigurar}
                   value={configForm.tipoBienes606}
-                  onChange={(e) => setConfigForm((f) => ({ ...f, tipoBienes606: e.target.value }))}
+                  onChange={(v) => setConfigForm((f) => ({ ...f, tipoBienes606: v }))}
+                  options={cfgTipoBienes606Options}
+                  onSearch={setCfgTipoBienes606Search}
+                  selectedLabel={catalogosFiscales?.tipoBienes606?.find((t) => t.value === configForm.tipoBienes606)?.label ?? ''}
+                  disabled={!puedeConfigurar}
+                  placeholder="Sin configurar"
                 />
               </div>
             </div>
             <div className="ff-wrap" style={{ maxWidth: 280, marginBottom: 12 }}>
               <label className="ff-label" htmlFor="cfg-formaPago606">Forma de pago (606)</label>
-              <input
+              <SearchSelect
                 id="cfg-formaPago606"
-                type="text"
-                className="ff-input"
-                disabled={!puedeConfigurar}
                 value={configForm.formaPago606}
-                onChange={(e) => setConfigForm((f) => ({ ...f, formaPago606: e.target.value }))}
+                onChange={(v) => setConfigForm((f) => ({ ...f, formaPago606: v }))}
+                options={cfgFormaPago606Options}
+                onSearch={setCfgFormaPago606Search}
+                selectedLabel={catalogosFiscales?.formaPago606?.find((t) => t.value === configForm.formaPago606)?.label ?? ''}
+                disabled={!puedeConfigurar}
+                placeholder="Sin configurar"
               />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
@@ -493,9 +692,23 @@ export default function RelacionDetail() {
                             <td><input className="ff-input" style={{ minWidth: 110 }} value={fila.itemCodeOrigen} onChange={(e) => updateFila(index, { itemCodeOrigen: e.target.value })} /></td>
                             <td><input className="ff-input" style={{ minWidth: 130 }} value={fila.itemNameOrigen ?? ''} onChange={(e) => updateFila(index, { itemNameOrigen: e.target.value || undefined })} /></td>
                             <td><input className="ff-input" style={{ minWidth: 110 }} value={fila.barcodeOrigen ?? ''} onChange={(e) => updateFila(index, { barcodeOrigen: e.target.value || undefined })} /></td>
-                            <td><input className="ff-input" style={{ minWidth: 110 }} value={fila.itemCodeLocal} onChange={(e) => updateFila(index, { itemCodeLocal: e.target.value })} /></td>
+                            <td style={{ minWidth: 160 }}>
+                              <ItemSelect
+                                value={fila.itemCodeLocal}
+                                selectedLabel={fila.itemNameLocal}
+                                onSelect={(item: Item) => updateFila(index, { itemCodeLocal: item.id, itemNameLocal: item.itemName })}
+                                onClear={() => updateFila(index, { itemCodeLocal: '', itemNameLocal: undefined })}
+                                placeholder="Buscar artículo…"
+                              />
+                            </td>
                             <td><input className="ff-input" style={{ minWidth: 80 }} value={fila.uomOrigen ?? ''} onChange={(e) => updateFila(index, { uomOrigen: e.target.value || undefined })} /></td>
-                            <td><input className="ff-input" style={{ minWidth: 80 }} value={fila.uomLocal ?? ''} onChange={(e) => updateFila(index, { uomLocal: e.target.value || undefined })} /></td>
+                            <td style={{ minWidth: 110 }}>
+                              <UomSelect
+                                value={fila.uomLocal ?? ''}
+                                onChange={(v) => updateFila(index, { uomLocal: v || undefined })}
+                                itemCode={fila.itemCodeLocal || undefined}
+                              />
+                            </td>
                             <td>
                               <input
                                 type="number"
@@ -524,7 +737,7 @@ export default function RelacionDetail() {
                     <button
                       type="button"
                       className="btn btn-navy btn-size-sm"
-                      onClick={() => mapeoMutation.mutate(filas)}
+                      onClick={() => mapeoMutation.mutate(filas.map(sinNombreLocal))}
                       disabled={mapeoMutation.isPending}
                     >
                       {mapeoMutation.isPending ? <span className="spinner spinner-white spinner-sm" /> : 'Guardar'}
@@ -575,7 +788,7 @@ export default function RelacionDetail() {
           relacionId={id!}
           onClose={() => setCandidatosOpen(false)}
           onVinculado={(mensaje) => { setCandidatosOpen(false); setVinculadoMensaje(mensaje) }}
-          onAdoptado={() => { invalidarRelacion() }}
+          onAdoptado={() => { invalidarRelacion(); invalidarDiagnostico() }}
         />
       )}
 

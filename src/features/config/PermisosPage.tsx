@@ -4,6 +4,7 @@ import { usePermissionsStore } from '@/stores/permissions.store'
 import { toast } from 'sonner'
 import { ShieldOff, RotateCcw, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecargarButton } from '@/components/shared/RecargarButton'
 import { SearchSelect, type SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import {
@@ -136,7 +137,11 @@ export default function PermisosPage() {
 
   return (
     <div className="page-container">
-      <PageHeader title={<><span className="page-title-dot" />Permisos</>} description="Control fino de permisos por DocType y Rol" />
+      <PageHeader
+        title={<><span className="page-title-dot" />Permisos</>}
+        description="Control fino de permisos por DocType y Rol"
+        action={<RecargarButton />}
+      />
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
         <div className="card-body">
