@@ -6,8 +6,12 @@
 >
 > **Resumen de la sesión de continuación**: se hizo el commit del trabajo previo, se resolvieron
 > las dos dudas abiertas (§3.1 y §4 — una era un bug real de backend, la otra no era bug), y se
-> probó bastante más de Fase 04/05 en vivo (cancelar/reenviar invitación, guardar términos,
-> guardar configuración). Se sigue bloqueado en las Fases 06-11 por el bug de backend de §3.1.
+> probó bastante más de Fase 04/05 en vivo (cancelar/reenviar invitación, guardar términos, guardar
+> configuración, terminar relación). Se encontraron 2 bugs de backend adicionales (§3.3, el más
+> serio de todos: una acción reporta error pero sí se aplica) y 1 bug de frontend que ya se arregló
+> (§3.4). Se refactorizó la lógica duplicada de lookup de relación en un hook compartido
+> (`useRelacionComercialPorContraparte`). Se sigue bloqueado en las Fases 06-11 por el bug de
+> backend de §3.1.
 
 ## 0. Contexto rápido
 
@@ -237,6 +241,64 @@ del lado del frontend mientras tanto, se podría interceptar este caso puntual e
 `terminos`), pero no se implementó porque es indistinguible de un verdadero 404 sin ese contexto
 adicional y no vale la pena el acoplamiento por un mensaje de error.
 
+## 3.3 Bug de backend (grave): `POST /relaciones/:id/terminar` da 500 pero SÍ aplica el cambio
+
+Probado en vivo sobre la relación de prueba (`invitada`, nunca llegó a activarse). Al confirmar
+"Terminar relación":
+
+```
+POST /api/v1/relaciones/802cd87b.../terminar
+→ 500 {"code":"INTERNAL_ERROR","message":"Failed query: update \"b2b_outbox\" set \"state\" = $1 where (\"b2b_outbox\".\"id\" = $2 and \"b2b_outbox\".\"state\" = $3) returning ...\nparams: processing,b4afdaa3-...,pending","statusCode":500}
+```
+
+El mensaje de error **filtra SQL crudo** (nombres de tabla/columnas internas: `b2b_outbox`,
+`state`, `transaction_id`, etc.) — un problema de higiene de errores aparte del bug funcional.
+
+Pero al volver a consultar `GET /relaciones/:id` inmediatamente después, **el estado sí había
+cambiado a `revocada`** — es decir, **la acción principal se aplicó correctamente**, pero un paso
+secundario (parece ser cancelar un job pendiente en la tabla `b2b_outbox`, probablemente el reintento
+de activación) falló con un error de SQL y tumbó toda la respuesta HTTP a 500. El frontend, al
+recibir un 500, correctamente interpreta "la acción falló" (no invalida la query, no actualiza el
+estado local) — así que la pantalla se queda mostrando el estado viejo (`Invitada`) hasta que el
+usuario navegue de nuevo o refresque, momento en el que aparece `Revocada` sin explicación de por
+qué cambió solo.
+
+**Esto es un bug real y más serio que el de §3.1**: no es solo "una pantalla no carga", es
+"el backend le dice al usuario que su acción falló cuando en realidad sí funcionó" — el usuario
+podría reintentar "Terminar relación" pensando que no se aplicó, y ese reintento fallaría de nuevo
+(la relación ya no está en un estado donde `terminar` tenga sentido), generando confusión. Hay que
+pedirle al backend que:
+1. Haga esta operación atómica (si el paso de cancelar el outbox falla, debería revertir el cambio
+   de estado también, o al menos no fallar en primer lugar si no hay nada que cancelar), y
+2. Nunca exponga el texto crudo de una query SQL en el `message` de un error de cara al cliente.
+
+No se implementó ninguna mitigación en el frontend para este caso — no hay forma confiable de
+distinguir desde el cliente "el 500 significa que en realidad sí se aplicó" de un 500 genuino sin
+efecto, así que intentar adivinarlo sería peor que dejar el comportamiento actual (mostrar el error
+tal cual, el usuario puede refrescar para ver el estado real).
+
+## 3.4 Bug de frontend encontrado y arreglado: banner "Activando…" en una relación `revocada`
+
+Consecuencia de probar el bug de §3.3: al terminar una relación que nunca se activó, quedó en
+estado `revocada` con `configuracion: null` (nunca tuvo espejos). La condición original de
+`RelacionDetail.tsx` para decidir "¿esta relación está activándose?" era:
+
+```ts
+const activando = ESTADO_ACTIVANDO.has(relacion.status) || relacion.configuracion === null
+```
+
+`ESTADO_ACTIVANDO` es `{'invitada', 'activando'}` — no incluye `'revocada'` ni `'rechazada'`, pero
+como esas dos también dejan `configuracion: null` para siempre (nunca se van a activar), la
+condición completa igual daba `true` — la pantalla mostraba "Activando… los registros de cliente y
+proveedor se están creando." para una relación que **nunca** se va a activar, y las secciones de
+Términos/Configuración decían "podrás guardar cuando termine de activarse", una promesa falsa.
+
+**Arreglado**: se agregó `ESTADO_TERMINAL_SIN_ACTIVAR = new Set(['revocada', 'rechazada'])`, y
+`activando` ahora es `false` para esos dos estados sin importar `configuracion`. La sección
+"Registros vinculados" muestra en su lugar: *"Esta relación nunca se activó (quedó **revocada**) —
+no hay registros de cliente ni proveedor vinculados."* Verificado visualmente que renderiza
+correctamente tras el cambio.
+
 ## 4. [RESUELTO] Anomalía del campo "Días de crédito" con valor `13`
 
 Confirmado en la sesión de continuación: **no es un bug de la app.** Al volver a abrir
@@ -291,10 +353,11 @@ ningún cambio de código.
       encontrado y mitigado (§3, con un punto abierto por confirmar para invitaciones recibidas).
 - [~] Fase 05 (activación) — implementado, pantalla se ve y carga bien contra datos reales
       (estado `invitada`, "Reintentar activación" presente). **Probado en vivo**: guardar términos
-      y guardar configuración con la relación aún `invitada` — ambos rechazan correctamente con el
-      mensaje del backend (ver §3.2 por la inconsistencia de mensajes entre los dos). **Sin
+      y guardar configuración con la relación aún `invitada` (ambos rechazan correctamente con el
+      mensaje del backend, ver §3.2 por la inconsistencia entre los dos), y **terminar relación**
+      (encontró un bug serio de backend, §3.3, más un bug de frontend ya arreglado, §3.4). **Sin
       probar** (necesita que la relación llegue a `activa`, bloqueado por permisos en `jbc`, ver
-      §5): guardar términos/configuración con éxito real, suspender/reactivar/terminar,
+      §5): guardar términos/configuración con éxito real, suspender/reactivar,
       `RNC_DUPLICADO_EN_SITE`/`MAESTRO_YA_VINCULADO`. Anomalía del campo "Días de crédito" — **ya
       descartada, no era un bug** (§4).
 - [ ] Fase 06 (bandeja de transacciones) — implementado (`TransaccionesPage`/`TransaccionDetail`),
@@ -316,9 +379,16 @@ ningún cambio de código.
 
 ## 7. Siguiente pasos recomendados (en orden)
 
-1. **Bloqueante principal**: reportar/arreglar el bug de backend de §3.1 (`GET
-   /relaciones/transacciones` → 500 "Field not permitted in query: advertencia_totales"). Sin esto,
-   las Fases 06-11 no se pueden probar sin importar qué permisos tenga la cuenta de prueba.
+1. **Bloqueantes de backend a reportar/arreglar antes de seguir, por orden de gravedad**:
+   a. §3.3 — `POST /relaciones/:id/terminar` (y posiblemente otras acciones de ciclo de vida,
+      valdría la pena auditar `suspender`/`reactivar`/`adoptar-maestros` también) reporta `500`
+      mientras SÍ aplica el cambio de estado — el más grave, porque engaña al usuario sobre si su
+      acción funcionó.
+   b. §3.1 — `GET /relaciones/transacciones` siempre da `500` ("Field not permitted in query:
+      advertencia_totales"). Sin esto, las Fases 06-11 no se pueden probar sin importar qué
+      permisos tenga la cuenta de prueba.
+   c. §3.2 — mensaje de error confuso en `PUT /relaciones/:id/configuracion` (404 "not found" en
+      vez de un mensaje claro tipo el de `terminos`).
 2. Confirmar con el usuario cómo conseguir una segunda cuenta/tenant con permisos suficientes en el
    lado receptor (o que otorgue permisos a `jbc`/complete el rol "Relaciones Comerciales Admin RD"
    ahí, y complete los 7 permisos de "compra" faltantes en `far-dev`, ver §5), para poder probar el

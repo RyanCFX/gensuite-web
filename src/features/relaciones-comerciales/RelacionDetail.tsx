@@ -32,6 +32,11 @@ import { EstadoRelacionBadge } from './shared'
 import { TerminosComercialesFields } from './TerminosComercialesFields'
 
 const ESTADO_ACTIVANDO = new Set(['invitada', 'activando'])
+// `revocada`/`rechazada` también dejan `configuracion: null` (nunca llegaron a activarse), pero no
+// están "activando" — son terminales, nunca van a tener espejos. Sin esta distinción, el banner de
+// "Activando…" se mostraba incorrectamente para una relación ya revocada (encontrado probando en
+// vivo: terminar una relación que nunca se activó la deja en este estado).
+const ESTADO_TERMINAL_SIN_ACTIVAR = new Set(['revocada', 'rechazada'])
 
 export default function RelacionDetail() {
   const { id } = useParams<{ id: string }>()
@@ -184,7 +189,8 @@ export default function RelacionDetail() {
     )
   }
 
-  const activando = ESTADO_ACTIVANDO.has(relacion.status) || relacion.configuracion === null
+  const terminalSinActivar = ESTADO_TERMINAL_SIN_ACTIVAR.has(relacion.status)
+  const activando = !terminalSinActivar && (ESTADO_ACTIVANDO.has(relacion.status) || relacion.configuracion === null)
   const faltaAlmacen = relacion.status === 'activa' && relacion.configuracion !== null && !relacion.configuracion.almacenDestino
 
   function handleGuardarTerminos() {
@@ -255,7 +261,12 @@ export default function RelacionDetail() {
         <div className="card">
           <div className="card-body">
             <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Registros vinculados</h3>
-            {activando ? (
+            {terminalSinActivar ? (
+              <div className="inline-alert inline-alert-warn">
+                Esta relación nunca se activó (quedó <strong>{relacion.status}</strong>) — no hay
+                registros de cliente ni proveedor vinculados.
+              </div>
+            ) : activando ? (
               <div className="inline-alert inline-alert-info">
                 Activando… los registros de cliente y proveedor se están creando.
               </div>
