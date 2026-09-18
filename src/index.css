@@ -13,7 +13,7 @@
   --brand-secondary: #1a69ab;
   --brand-secondary-hover: #155a95;
 
-  --surface-app: #fafafa;
+  --surface-app: #F4F6F8;
   --surface-page: #ffffff;
   --surface-overlay: #ffffff;
   --surface-sunken: #f5f5f5;
@@ -88,7 +88,7 @@
   --brand-primary-subtle: #430b07;
   --brand-secondary: #389bef;
 
-  --surface-app: #0d0d0d;
+  --surface-app: #0D0D0D;
   --surface-page: #171717;
   --surface-overlay: #1c1c1c;
   --surface-sunken: #000000;
@@ -2107,6 +2107,9 @@ button {
 }
 
 .navy-header-toggle-btn[aria-expanded="true"] { transform: rotate(45deg); }
+
+/* Variante que cambia el ícono (+/-) en vez de rotar el botón — igual a .pill-plus-trigger-icon (ItemForm) */
+.navy-header-toggle-btn.icon-swap[aria-expanded="true"] { transform: none; }
 
 /* ─── Item image upload box (ItemForm) — cuadro con borde + icono, no botón separado ─── */
 .item-image-upload {
