@@ -8,6 +8,7 @@ import NotFoundPage from '@/pages/NotFoundPage'
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import InvitationPage from '@/pages/InvitationPage'
+import RelacionInvitacionPublicPage from '@/pages/RelacionInvitacionPublicPage'
 import OauthCallbackPage from '@/pages/OauthCallbackPage'
 import StartPage from '@/pages/StartPage'
 
@@ -170,6 +171,12 @@ const ChequeDetail = lazy(() => import('@/features/tesoreria/ChequeDetail'))
 const PlantillasChequePage = lazy(() => import('@/features/tesoreria/PlantillasChequePage'))
 const PlantillaChequeForm = lazy(() => import('@/features/tesoreria/PlantillaChequeForm'))
 
+// Relaciones Comerciales (B2B) — docs/tasks/relaciones_comerciales
+const RelacionesComercialesPage = lazy(() => import('@/features/relaciones-comerciales/RelacionesComercialesPage'))
+const RelacionDetail = lazy(() => import('@/features/relaciones-comerciales/RelacionDetail'))
+const TransaccionesPage = lazy(() => import('@/features/relaciones-comerciales/TransaccionesPage'))
+const TransaccionDetail = lazy(() => import('@/features/relaciones-comerciales/TransaccionDetail'))
+
 function PageLoader() {
   return (
     <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -193,6 +200,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/invitacion" element={<InvitationPage />} />
+        <Route path="/relaciones/invitacion" element={<RelacionInvitacionPublicPage />} />
         <Route path="/oauth/callback" element={<OauthCallbackPage />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
@@ -321,6 +329,12 @@ export default function App() {
             <Route path="/proveedores/nuevo" element={<Suspense fallback={<PageLoader />}><SupplierForm /></Suspense>} />
             <Route path="/proveedores/:id" element={<Suspense fallback={<PageLoader />}><SupplierDetail /></Suspense>} />
             <Route path="/proveedores/:id/editar" element={<Suspense fallback={<PageLoader />}><SupplierForm /></Suspense>} />
+
+            {/* Relaciones Comerciales (B2B) — rutas específicas antes que /:id */}
+            <Route path="/relaciones-comerciales" element={<Suspense fallback={<PageLoader />}><RelacionesComercialesPage /></Suspense>} />
+            <Route path="/relaciones-comerciales/transacciones" element={<Suspense fallback={<PageLoader />}><TransaccionesPage /></Suspense>} />
+            <Route path="/relaciones-comerciales/transacciones/:uid" element={<Suspense fallback={<PageLoader />}><TransaccionDetail /></Suspense>} />
+            <Route path="/relaciones-comerciales/:id" element={<Suspense fallback={<PageLoader />}><RelacionDetail /></Suspense>} />
 
             {/* Caja / Cobros */}
             <Route path="/caja/pendientes" element={<Suspense fallback={<PageLoader />}><CajaPage /></Suspense>} />

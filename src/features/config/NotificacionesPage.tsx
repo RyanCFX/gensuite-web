@@ -35,6 +35,7 @@ const CATEGORIAS: NotificacionCategoria[] = [
   'Ventas',
   'Logística',
   'Seguridad',
+  'Relaciones Comerciales',
 ]
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/

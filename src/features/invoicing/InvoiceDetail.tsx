@@ -1,6 +1,15 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
+import {
+  listRelacionesComerciales,
+  getRelacionComercial,
+  listTransaccionesB2B,
+  enviarVentaASocio,
+  igualarConEnmiendaTransaccion,
+} from "@/shared/api/relaciones";
+import { Badge } from "@/shared/ui/Badge";
+import { Modal } from "@/shared/ui/Modal";
 import {
   getInvoice,
   submitInvoice,
@@ -69,6 +78,7 @@ import {
   Archive,
   Printer,
   Truck,
+  Scale,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -210,6 +220,89 @@ export default function InvoiceDetail() {
     queryKey: ["customer", invoice?.customer],
     queryFn: () => getCustomer(invoice!.customer),
     enabled: !!invoice?.customer && invoice.status === "draft",
+  });
+
+  // ─── Relaciones Comerciales (B2B) — Fase 08/10 ───────────────────────────
+  // No hay un endpoint "relación por cliente" ni "estado B2B de esta factura" — se resuelve
+  // buscando, entre las relaciones activas del tenant, cuál tiene este Customer como espejo, y
+  // luego (solo si aplica) buscando en la bandeja de transacciones salientes de tipo Venta la que
+  // corresponde a esta factura. docs/tasks/relaciones_comerciales/FASE_08_FLUJO_VENTA_FRONTEND.md §5.
+  const puedeEnviarVenta = usePuede("relaciones.venta.enviar");
+  const puedeIgualarVenta = usePuede("relaciones.venta.igualar");
+  const necesitaLookupB2B = (puedeEnviarVenta || puedeIgualarVenta) && invoice?.status === "submitted";
+
+  const { data: relacionesActivasB2B } = useQuery({
+    queryKey: ["relaciones-comerciales-activas-lookup"],
+    queryFn: () => listRelacionesComerciales({ limit: 100 }),
+    staleTime: 5 * 60_000,
+    enabled: necesitaLookupB2B,
+  });
+  const relacionesActivasIdsB2B = (relacionesActivasB2B?.items ?? [])
+    .filter((r) => r.status === "activa")
+    .map((r) => r.id);
+  const relacionesDetalleB2B = useQueries({
+    queries: relacionesActivasIdsB2B.map((relId) => ({
+      queryKey: ["relacion-comercial-lookup", relId],
+      queryFn: () => getRelacionComercial(relId),
+      staleTime: 5 * 60_000,
+      enabled: necesitaLookupB2B,
+    })),
+  });
+  const relacionClienteSocio = relacionesDetalleB2B
+    .map((q) => q.data)
+    .find((r) => r && r.customer === invoice?.customer);
+
+  const { data: transaccionVentaB2B } = useQuery({
+    queryKey: ["transaccion-b2b-por-venta", invoice?.id],
+    queryFn: async () => {
+      const { items } = await listTransaccionesB2B({ direccion: "Saliente", tipo: "Venta", limit: 50 });
+      return items.find((t) => t.documentoOrigen?.name === invoice!.id) ?? null;
+    },
+    enabled: !!relacionClienteSocio && invoice?.status === "submitted",
+  });
+
+  const mostrarEnviarAlCliente =
+    !!relacionClienteSocio &&
+    invoice?.status === "submitted" &&
+    (relacionClienteSocio.configuracion?.autoEnviarVentas === false ||
+      transaccionVentaB2B?.estado === "Error");
+
+  const [showEnviarClienteModal, setShowEnviarClienteModal] = useState(false);
+  const [showIgualarVentaModal, setShowIgualarVentaModal] = useState(false);
+  const [motivoAnulacionVenta, setMotivoAnulacionVenta] = useState("");
+  const [confirmoAnulacionVenta, setConfirmoAnulacionVenta] = useState(false);
+
+  const enviarVentaMutation = useMutation({
+    mutationFn: () => enviarVentaASocio(invoice!.id, { reenvioDe: transaccionVentaB2B?.transaccionUid }),
+    onSuccess: () => {
+      toast.success("Factura enviada al cliente");
+      queryClient.invalidateQueries({ queryKey: ["transaccion-b2b-por-venta", invoice?.id] });
+      setShowEnviarClienteModal(false);
+    },
+    onError: (err: ApiError) => toast.error(err?.message ?? "No se pudo enviar la factura al cliente"),
+  });
+
+  const igualarVentaMutation = useMutation({
+    mutationFn: () =>
+      igualarConEnmiendaTransaccion(transaccionVentaB2B!.transaccionUid, {
+        confirmoAnulacion: confirmoAnulacionVenta,
+        motivoAnulacion: motivoAnulacionVenta,
+      }),
+    onSuccess: (res) => {
+      toast.success("La enmienda quedó en borrador, sin NCF todavía — revísela y sométala a mano.");
+      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      setShowIgualarVentaModal(false);
+      if (res.nuevoDocname) navigate(`/facturas/${res.nuevoDocname}`);
+    },
+    onError: (err: ApiError) => {
+      const sugerencias: Record<string, string> = {
+        FACTURA_COBRADA: "Revierta el cobro antes de igualar, o emita una nota de crédito por la diferencia.",
+        NOTAS_CREDITO_ENLAZADAS: "Resuélvalas antes, o emita una nota de crédito adicional.",
+        ECF_YA_EMITIDO: "Anular un e-CF tiene su propio procedimiento — use una nota de crédito por la diferencia.",
+        PERMISOS_INSUFICIENTES: err?.message ?? "Permisos insuficientes.",
+      };
+      toast.error(sugerencias[err?.code ?? ""] ?? err?.message ?? "No se pudo igualar la factura", { duration: 8000 });
+    },
   });
 
   // Usado por el selector de método de pago del reembolso en el modal de Devolución,
@@ -1033,6 +1126,18 @@ export default function InvoiceDetail() {
               {STATUS_LABEL[invoice.status] ?? invoice.status}
             </span>
             <EstadoArsBadge estado={estadoArs} />
+            {relacionClienteSocio && (
+              <Badge variant="info">Cliente socio</Badge>
+            )}
+            {transaccionVentaB2B && (
+              <Badge variant={
+                transaccionVentaB2B.estado === "Aceptada" ? "success"
+                  : transaccionVentaB2B.estado === "Rechazada" || transaccionVentaB2B.estado === "Error" ? "error"
+                  : "warning"
+              }>
+                Envío B2B: {transaccionVentaB2B.estado}
+              </Badge>
+            )}
             {invoice.sequence > 0 && (
               <span
                 className="badge badge-info"
@@ -1274,6 +1379,27 @@ export default function InvoiceDetail() {
           >
             <Truck size={14} /> {despacharMutation.isPending ? "Creando despacho…" : "Despachar"}
           </button>
+        )}
+        {mostrarEnviarAlCliente && puedeEnviarVenta && (
+          <button
+            className="btn btn-secondary btn-size-sm"
+            onClick={() => setShowEnviarClienteModal(true)}
+          >
+            <Send size={14} /> Enviar al cliente
+          </button>
+        )}
+        {transaccionVentaB2B?.estado === "Editada" && puedeIgualarVenta && (
+          <button
+            className="btn btn-secondary btn-size-sm"
+            onClick={() => setShowIgualarVentaModal(true)}
+          >
+            <Scale size={14} /> Igualar factura al cliente
+          </button>
+        )}
+        {transaccionVentaB2B?.estado === "Editada" && !puedeIgualarVenta && (
+          <span className="td-muted" style={{ fontSize: 12 }} title="El ciclo Cancelar → Enmendar no está habilitado para este usuario">
+            El cliente editó esta factura al aceptarla — falta permiso para igualarla
+          </span>
         )}
         {invoice.status === "submitted" && (
           <>
@@ -2933,6 +3059,72 @@ export default function InvoiceDetail() {
         variant="danger"
       />
       <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
+
+      <Modal
+        open={showEnviarClienteModal}
+        onClose={() => setShowEnviarClienteModal(false)}
+        title="Enviar al cliente"
+        subtitle={relacionClienteSocio?.contraparte.nombre}
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setShowEnviarClienteModal(false)} disabled={enviarVentaMutation.isPending}>
+              Cancelar
+            </button>
+            <button className="btn btn-navy" onClick={() => enviarVentaMutation.mutate()} disabled={enviarVentaMutation.isPending}>
+              {enviarVentaMutation.isPending ? <span className="spinner spinner-white spinner-sm" /> : <><Send size={14} />Enviar</>}
+            </button>
+          </>
+        }
+      >
+        <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+          El cliente recibirá esta factura en su bandeja de Relaciones Comerciales, con un borrador de compra ya
+          armado para revisar y aceptar.
+        </p>
+      </Modal>
+
+      <Modal
+        open={showIgualarVentaModal}
+        onClose={() => setShowIgualarVentaModal(false)}
+        title="Igualar factura al cliente"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setShowIgualarVentaModal(false)} disabled={igualarVentaMutation.isPending}>
+              Cancelar
+            </button>
+            <button
+              className="btn btn-danger"
+              onClick={() => igualarVentaMutation.mutate()}
+              disabled={igualarVentaMutation.isPending || !confirmoAnulacionVenta || !motivoAnulacionVenta.trim()}
+            >
+              {igualarVentaMutation.isPending ? <span className="spinner spinner-white spinner-sm" /> : "Anular y crear enmienda"}
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="inline-alert inline-alert-error">
+            <AlertTriangle size={16} />
+            <span>
+              Esto anulará la factura {invoice.ncf ?? invoice.id} y creará una nueva versión en borrador con un NCF
+              distinto. La factura anulada no se puede recuperar.
+            </span>
+          </div>
+          <div className="form-field">
+            <label>Motivo de la anulación</label>
+            <textarea
+              className="input"
+              rows={2}
+              value={motivoAnulacionVenta}
+              onChange={(e) => setMotivoAnulacionVenta(e.target.value)}
+            />
+          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+            <input type="checkbox" checked={confirmoAnulacionVenta} onChange={(e) => setConfirmoAnulacionVenta(e.target.checked)} />
+            Confirmo que quiero anular la factura actual y crear una enmienda
+          </label>
+        </div>
+      </Modal>
+
       {printTargetNode}
     </div>
   );

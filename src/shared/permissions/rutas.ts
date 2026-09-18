@@ -113,6 +113,13 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/proveedores/*', accion: 'proveedores.listar' },
   { pattern: '/proveedores', accion: 'proveedores.listar' },
 
+  // Relaciones Comerciales (B2B) — docs/tasks/relaciones_comerciales. Rutas específicas antes que
+  // el catch-all /relaciones-comerciales/* (detalle de relación).
+  { pattern: '/relaciones-comerciales/transacciones/*', accion: 'relaciones.transacciones.ver' },
+  { pattern: '/relaciones-comerciales/transacciones', accion: 'relaciones.transacciones.listar' },
+  { pattern: '/relaciones-comerciales/*', accion: 'relaciones.ver' },
+  { pattern: '/relaciones-comerciales', accion: 'relaciones.listar' },
+
   // Caja / Cobros / Pagos
   { pattern: '/caja/pendientes', accion: 'caja.listar' },
   { pattern: '/caja/por-cobrar', accion: 'caja.listar' },

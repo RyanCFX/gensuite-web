@@ -1,18 +1,27 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   getCompra, submitCompra, cancelCompra, amendCompra, deleteCompra, downloadCompraPdf, getCompraPdfBlobUrl,
   previewAsientosCompra, updateCompra,
 } from '@/shared/api/compras-gastos'
+import {
+  listRelacionesComerciales, getRelacionComercial,
+  enviarCompraAProveedor, cancelarEnvioCompra, getEstadoSocioCompra, enlazarYEnviarCompra,
+  igualarBorradorTransaccion,
+} from '@/shared/api/relaciones'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { Badge } from '@/shared/ui/Badge'
+import { Modal } from '@/shared/ui/Modal'
+import { Permitido } from '@/components/shared/Permitido'
+import { usePuede } from '@/shared/permissions/can'
 import { EcfStatusCard } from '@/components/shared/EcfStatusCard'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
 import { listRetenciones } from '@/shared/api/retenciones'
-import { Send, X, RotateCcw, Undo2, Info, FileText, Trash2, Eye, BookOpen } from 'lucide-react'
+import { Send, X, RotateCcw, Undo2, Info, FileText, Trash2, Eye, BookOpen, Link2, Scale } from 'lucide-react'
 import { PdfFormatButton } from '@/components/shared/PdfFormatButton'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import { SaldoFavorCxpSection } from '@/features/devoluciones-compras/SaldoFavorCxpSection'
@@ -146,6 +155,99 @@ export default function CompraDetail() {
     else if (confirmAction === 'delete') deleteMutation.mutate()
   }
 
+  // ─── Relaciones Comerciales (B2B) — Fase 09/10/11 ─────────────────────────
+  // El endpoint de "enviar a proveedor" (borrador) resuelve la relación desde el proveedor de la
+  // compra internamente — no hace falta el relacionId. Pero "enlazar y enviar" (compra ya
+  // sometida, Fase 11) sí lo necesita en el body, y no existe un endpoint "relación por
+  // proveedor" — se busca entre las relaciones activas del tenant cuál tiene este Supplier como
+  // espejo. El tenant típico tiene pocas relaciones comerciales, así que el costo de resolverlas
+  // todas es aceptable.
+  const puedeEnviarAProveedor = usePuede('relaciones.compra.enviar-a-proveedor')
+  const puedeEnlazarYEnviar = usePuede('relaciones.compra.enlazar-y-enviar')
+  const puedeIgualarBorrador = usePuede('relaciones.compra.igualar')
+
+  const { data: relacionesActivas } = useQuery({
+    queryKey: ['relaciones-comerciales-activas-lookup'],
+    queryFn: () => listRelacionesComerciales({ limit: 100 }),
+    staleTime: 5 * 60_000,
+    enabled: (puedeEnviarAProveedor || puedeEnlazarYEnviar) && !compra?.esProveedorOcasional,
+  })
+  const relacionesActivasIds = (relacionesActivas?.items ?? []).filter((r) => r.status === 'activa').map((r) => r.id)
+  const relacionesDetalleQueries = useQueries({
+    queries: relacionesActivasIds.map((relId) => ({
+      queryKey: ['relacion-comercial-lookup', relId],
+      queryFn: () => getRelacionComercial(relId),
+      staleTime: 5 * 60_000,
+      enabled: !!compra && !compra.esProveedorOcasional,
+    })),
+  })
+  const relacionSocio = relacionesDetalleQueries
+    .map((q) => q.data)
+    .find((r) => r && r.supplier === compra?.supplier)
+
+  const { data: estadoSocio, isLoading: loadingEstadoSocio } = useQuery({
+    queryKey: ['compra-estado-socio', id],
+    queryFn: () => getEstadoSocioCompra(id!),
+    enabled: !!id && compra?.status === 'submitted',
+  })
+
+  const [showEnviarProveedorModal, setShowEnviarProveedorModal] = useState(false)
+  const [showEnlazarYEnviarModal, setShowEnlazarYEnviarModal] = useState(false)
+  const [showIgualarModal, setShowIgualarModal] = useState(false)
+  const [autoSometer, setAutoSometer] = useState(false)
+  const [notaSocio, setNotaSocio] = useState('')
+
+  const enviarAProveedorMutation = useMutation({
+    mutationFn: (reenvioDe?: string) => enviarCompraAProveedor(id!, { autoSometer, nota: notaSocio || undefined, reenvioDe }),
+    onSuccess: () => {
+      toast.success('Compra enviada al proveedor')
+      queryClient.invalidateQueries({ queryKey: ['compra-estado-socio', id] })
+      queryClient.invalidateQueries({ queryKey: ['compra', id] })
+      setShowEnviarProveedorModal(false)
+      setNotaSocio('')
+    },
+    onError: (err: ApiError) => toast.error(err?.message ?? 'No se pudo enviar la compra al proveedor'),
+  })
+
+  const cancelarEnvioMutation = useMutation({
+    mutationFn: () => cancelarEnvioCompra(id!),
+    onSuccess: () => {
+      toast.success('Envío retirado')
+      queryClient.invalidateQueries({ queryKey: ['compra-estado-socio', id] })
+    },
+    onError: (err: ApiError) => toast.error(err?.message ?? 'No se pudo retirar el envío'),
+  })
+
+  const enlazarYEnviarMutation = useMutation({
+    mutationFn: () => enlazarYEnviarCompra(id!, { relacionId: relacionSocio!.id, nota: notaSocio || undefined }),
+    onSuccess: () => {
+      toast.success('Compra enviada al proveedor para conciliar')
+      queryClient.invalidateQueries({ queryKey: ['compra-estado-socio', id] })
+      setShowEnlazarYEnviarModal(false)
+      setNotaSocio('')
+    },
+    onError: (err: ApiError) => toast.error(err?.message ?? 'No se pudo enviar la compra al proveedor'),
+  })
+
+  const igualarBorradorMutation = useMutation({
+    mutationFn: () => igualarBorradorTransaccion(estadoSocio!.transaccionUid!),
+    onSuccess: (res) => {
+      toast.success(res.message ?? 'Documento actualizado. Revíselo y sométalo cuando esté listo.')
+      queryClient.invalidateQueries({ queryKey: ['compra', id] })
+      queryClient.invalidateQueries({ queryKey: ['compra-estado-socio', id] })
+      setShowIgualarModal(false)
+    },
+    onError: (err: ApiError) => {
+      if (err?.code === 'MAPEO_INCOMPLETO') {
+        toast.error('Faltan artículos por mapear — revise la transacción en la bandeja de Relaciones Comerciales.', {
+          action: { label: 'Ver transacción', onClick: () => navigate(`/relaciones-comerciales/transacciones/${estadoSocio!.transaccionUid}`) },
+        })
+        return
+      }
+      toast.error(err?.message ?? 'No se pudo igualar la compra')
+    },
+  })
+
   const isPending = submitMutation.isPending || cancelMutation.isPending || amendMutation.isPending || deleteMutation.isPending
 
   function getTipoBienesLabel(value?: string) {
@@ -210,6 +312,11 @@ export default function CompraDetail() {
                 <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmAction('delete')}>
                   <Trash2 size={14} />Eliminar
                 </button>
+                {puedeEnviarAProveedor && relacionSocio && (
+                  <button className="btn btn-secondary btn-size-sm" onClick={() => setShowEnviarProveedorModal(true)}>
+                    <Send size={14} />Enviar a proveedor
+                  </button>
+                )}
               </>
             )}
             {compra.status === 'submitted' && (
@@ -248,6 +355,21 @@ export default function CompraDetail() {
                 >
                   <BookOpen size={14} />Ver asientos
                 </button>
+                {puedeEnlazarYEnviar && !loadingEstadoSocio && !estadoSocio?.transaccionUid && relacionSocio && (
+                  <button className="btn btn-secondary btn-size-sm" onClick={() => setShowEnlazarYEnviarModal(true)}>
+                    <Link2 size={14} />Enviar al proveedor
+                  </button>
+                )}
+                {estadoSocio?.estadoSocio === 'Rechazada' && puedeEnviarAProveedor && (
+                  <button className="btn btn-secondary btn-size-sm" onClick={() => enviarAProveedorMutation.mutate(estadoSocio.transaccionUid ?? undefined)}>
+                    <Send size={14} />Reenviar al proveedor
+                  </button>
+                )}
+                {estadoSocio?.estadoSocio === 'Editada' && puedeIgualarBorrador && (
+                  <button className="btn btn-secondary btn-size-sm" onClick={() => setShowIgualarModal(true)}>
+                    <Scale size={14} />Igualar factura al proveedor
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -255,10 +377,26 @@ export default function CompraDetail() {
       />
 
       <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <StatusBadge status={compra.status} />
           {compra.amendedFrom && (
             <span className="badge badge-default">Enmendada de {compra.amendedFrom}</span>
+          )}
+          {estadoSocio?.estadoSocio && (
+            <>
+              <Badge variant={
+                estadoSocio.estadoSocio === 'Aceptada' ? 'success'
+                  : estadoSocio.estadoSocio === 'Rechazada' ? 'error'
+                  : 'warning'
+              }>
+                Socio: {estadoSocio.estadoSocio}
+              </Badge>
+              {estadoSocio.estadoSocio === 'Enviada' && puedeEnviarAProveedor && (
+                <button className="btn btn-ghost btn-size-xs" onClick={() => cancelarEnvioMutation.mutate()} disabled={cancelarEnvioMutation.isPending}>
+                  Retirar envío
+                </button>
+              )}
+            </>
           )}
         </div>
 
@@ -481,6 +619,95 @@ export default function CompraDetail() {
         loading={submitMutation.isPending}
         onConfirm={(body) => submitMutation.mutate(body)}
       />
+      <Modal
+        open={showEnviarProveedorModal}
+        onClose={() => setShowEnviarProveedorModal(false)}
+        title="Enviar a proveedor"
+        subtitle={relacionSocio?.contraparte.nombre}
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setShowEnviarProveedorModal(false)} disabled={enviarAProveedorMutation.isPending}>Cancelar</button>
+            <button className="btn btn-navy" onClick={() => enviarAProveedorMutation.mutate(undefined)} disabled={enviarAProveedorMutation.isPending}>
+              {enviarAProveedorMutation.isPending ? <span className="spinner spinner-white spinner-sm" /> : <><Send size={14} />Enviar</>}
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            El proveedor recibirá esta compra en su bandeja de Relaciones Comerciales para revisarla y facturarla.
+            El sometimiento automático de su lado ocurre solo cuando el proveedor acepte, que puede ser horas
+            después — nunca en el momento de enviar.
+          </p>
+          <Permitido
+            accion="relaciones.compra.enviar-a-proveedor"
+            fallback={
+              <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+                Necesita permiso para someter compras para poder activar el sometimiento automático.
+              </p>
+            }
+          >
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <input type="checkbox" checked={autoSometer} onChange={(e) => setAutoSometer(e.target.checked)} />
+              Someter automáticamente al aceptar
+            </label>
+          </Permitido>
+          <div className="form-field">
+            <label>Nota (opcional)</label>
+            <textarea className="input" rows={2} value={notaSocio} onChange={(e) => setNotaSocio(e.target.value)} />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={showEnlazarYEnviarModal}
+        onClose={() => setShowEnlazarYEnviarModal(false)}
+        title="Enviar al proveedor"
+        subtitle={relacionSocio?.contraparte.nombre}
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setShowEnlazarYEnviarModal(false)} disabled={enlazarYEnviarMutation.isPending}>Cancelar</button>
+            <button className="btn btn-navy" onClick={() => enlazarYEnviarMutation.mutate()} disabled={enlazarYEnviarMutation.isPending}>
+              {enlazarYEnviarMutation.isPending ? <span className="spinner spinner-white spinner-sm" /> : <><Link2 size={14} />Enviar</>}
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            Esta compra ya está sometida — se enviará al proveedor solo para conciliar, sin pedir un NCF nuevo
+            (no hay sometimiento automático posible, ya está sometida).
+          </p>
+          <div className="form-field">
+            <label>Nota (opcional)</label>
+            <textarea className="input" rows={2} value={notaSocio} onChange={(e) => setNotaSocio(e.target.value)} placeholder="Ej. Factura recibida en físico el …" />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={showIgualarModal}
+        onClose={() => setShowIgualarModal(false)}
+        title="Igualar factura al proveedor"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setShowIgualarModal(false)} disabled={igualarBorradorMutation.isPending}>Cancelar</button>
+            <button className="btn btn-navy" onClick={() => igualarBorradorMutation.mutate()} disabled={igualarBorradorMutation.isPending}>
+              {igualarBorradorMutation.isPending ? <span className="spinner spinner-white spinner-sm" /> : 'Igualar'}
+            </button>
+          </>
+        }
+      >
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          El proveedor editó esta factura antes de aceptar. Esta acción actualiza el borrador de esta compra para
+          que coincida con lo que el proveedor realmente registró — no somete nada, usted revisa y somete cuando
+          esté listo.{' '}
+          <a href={`/relaciones-comerciales/transacciones/${estadoSocio?.transaccionUid}`} target="_blank" rel="noreferrer">
+            Ver el detalle completo de la diferencia
+          </a>.
+        </p>
+      </Modal>
+
       <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
       <AsientosPreviewModal
         open={showAsientosPreview}

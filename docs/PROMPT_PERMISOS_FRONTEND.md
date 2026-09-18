@@ -1382,6 +1382,43 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 |---|---|---|---|
 | `cobros.pago.crear` | Guardar | `Payment Entry.create` | — |
 
+#### Relaciones Comerciales
+
+Módulo B2B — docs/tasks/relaciones_comerciales/*.md. Ver Fase 02 §2 para el mapeo completo
+botón→acción.
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `relaciones.directorio.buscar` | Campo de búsqueda por RNC — Nueva relación comercial | `Relacion Comercial.read` | — |
+| `relaciones.listar` | Ver — tab Socios | `Relacion Comercial.read` | — |
+| `relaciones.ver` | Abrir detalle de relación | `Relacion Comercial.read` | — |
+| `relaciones.configurar` | Guardar configuración / términos / suspender / reactivar / adoptar maestros | `Relacion Comercial.write` | — |
+| `relaciones.terminar` | Terminar relación | `Relacion Comercial.write` | — |
+| `relaciones.invitacion.crear` | Enviar invitación / Reenviar | `Invitacion Comercial.create` | — |
+| `relaciones.invitacion.cancelar` | Cancelar invitación enviada | `Invitacion Comercial.write` | — |
+| `relaciones.invitacion.listar` | Ver — tab Invitaciones | `Invitacion Comercial.read` | — |
+| `relaciones.invitacion.responder` | Aceptar / Rechazar invitación recibida | `Invitacion Comercial.write` | — |
+| `relaciones.bloqueo.listar` | Ver — tab Bloqueadas | `Bloqueo Comercial.read` | — |
+| `relaciones.bloqueo.crear` | Bloquear empresa | `Bloqueo Comercial.create` | — |
+| `relaciones.bloqueo.levantar` | Desbloquear | `Bloqueo Comercial.write` | — |
+| `relaciones.transacciones.listar` | Ver bandeja de transacciones B2B | `Transaccion B2B.read` | — |
+| `relaciones.transacciones.ver` | Abrir detalle de transacción | `Transaccion B2B.read` | — |
+| `relaciones.venta.enviar` | Enviar al cliente (factura de venta) | `Sales Invoice.write` | — |
+| `relaciones.compra.enviar-a-proveedor` | Enviar a proveedor (compra en borrador) | `Purchase Invoice.write` | — |
+| `relaciones.transaccion.aceptar-compra` | Aceptar (transacción de compra entrante) | `Transaccion B2B.write + Purchase Invoice.submit` | — |
+| `relaciones.transaccion.aceptar-venta` | Aceptar (transacción de venta entrante) | `Transaccion B2B.write + Sales Invoice.submit` | — |
+| `relaciones.transaccion.rechazar` | Rechazar transacción | `Transaccion B2B.write` | — |
+| `relaciones.transaccion.reenviar` | Reintentar / Cancelar envío | `Transaccion B2B.write` | — |
+| `relaciones.compra.igualar` | Igualar factura al proveedor (borrador) | `Purchase Invoice.write` | — |
+| `relaciones.venta.igualar` | Igualar factura al cliente (sometida — anula y enmienda) | `Sales Invoice.cancel + Sales Invoice.amend` | — |
+| `relaciones.mapeo.guardar` | Guardar mapeo de artículos | `Transaccion B2B.write` | — |
+| `relaciones.mapeo.crear-articulo` | Crear artículo desde el socio | `Item.create` | — |
+| `relaciones.mapeo.sincronizar-barcodes` | Checkbox "Sincronizar códigos de barra" | `Item.write` | — |
+| `relaciones.transaccion.enlazar-compra` | Enlazar mi compra existente | `Transaccion B2B.write` | — |
+| `relaciones.transaccion.enlazar-venta` | Enlazar mi factura existente | `Transaccion B2B.write` | — |
+| `relaciones.transaccion.buscar-candidatos` | Buscador de documentos para enlazar | `Transaccion B2B.read` | — |
+| `relaciones.compra.enlazar-y-enviar` | Enviar al proveedor (compra ya sometida) | `Purchase Invoice.read` | — |
+
 #### Reporte de Ventas
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |

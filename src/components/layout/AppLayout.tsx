@@ -49,6 +49,8 @@ import {
   ScrollText,
   Pill,
   History,
+  Handshake,
+  ArrowLeftRight,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { usePermissionsStore } from "@/stores/permissions.store";
@@ -298,6 +300,15 @@ const NAV_OPS: NavEntry[] = [
     label: "Proveedores",
     icon: <Truck size={16} aria-hidden="true" />,
     path: "/proveedores",
+  },
+  {
+    label: "Relaciones Comerciales",
+    icon: <Handshake size={16} aria-hidden="true" />,
+    prefix: "/relaciones-comerciales",
+    children: [
+      { label: "Socios y Solicitudes", icon: <Handshake size={14} />, path: "/relaciones-comerciales" },
+      { label: "Transacciones B2B", icon: <ArrowLeftRight size={14} />, path: "/relaciones-comerciales/transacciones" },
+    ],
   },
 ];
 

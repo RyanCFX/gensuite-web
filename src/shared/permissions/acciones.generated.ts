@@ -1,5 +1,5 @@
 // GENERADO automáticamente por scripts/gen-acciones.mjs — NO editar a mano.
-// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (424 acciones). Regenerar: node scripts/gen-acciones.mjs
+// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (453 acciones). Regenerar: node scripts/gen-acciones.mjs
 
 export type AccionId =
   | 'apertura.compras.anular'
@@ -318,6 +318,35 @@ export type AccionId =
   | 'proveedores.crear'
   | 'proveedores.editar'
   | 'proveedores.listar'
+  | 'relaciones.bloqueo.crear'
+  | 'relaciones.bloqueo.levantar'
+  | 'relaciones.bloqueo.listar'
+  | 'relaciones.compra.enlazar-y-enviar'
+  | 'relaciones.compra.enviar-a-proveedor'
+  | 'relaciones.compra.igualar'
+  | 'relaciones.configurar'
+  | 'relaciones.directorio.buscar'
+  | 'relaciones.invitacion.cancelar'
+  | 'relaciones.invitacion.crear'
+  | 'relaciones.invitacion.listar'
+  | 'relaciones.invitacion.responder'
+  | 'relaciones.listar'
+  | 'relaciones.mapeo.crear-articulo'
+  | 'relaciones.mapeo.guardar'
+  | 'relaciones.mapeo.sincronizar-barcodes'
+  | 'relaciones.terminar'
+  | 'relaciones.transaccion.aceptar-compra'
+  | 'relaciones.transaccion.aceptar-venta'
+  | 'relaciones.transaccion.buscar-candidatos'
+  | 'relaciones.transaccion.enlazar-compra'
+  | 'relaciones.transaccion.enlazar-venta'
+  | 'relaciones.transaccion.rechazar'
+  | 'relaciones.transaccion.reenviar'
+  | 'relaciones.transacciones.listar'
+  | 'relaciones.transacciones.ver'
+  | 'relaciones.venta.enviar'
+  | 'relaciones.venta.igualar'
+  | 'relaciones.ver'
   | 'reportes.caja.cuadre.imprimir'
   | 'reportes.caja.cuadre.ver'
   | 'reportes.compras.analitica.imprimir'
@@ -744,6 +773,35 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'proveedores.crear',
   'proveedores.editar',
   'proveedores.listar',
+  'relaciones.bloqueo.crear',
+  'relaciones.bloqueo.levantar',
+  'relaciones.bloqueo.listar',
+  'relaciones.compra.enlazar-y-enviar',
+  'relaciones.compra.enviar-a-proveedor',
+  'relaciones.compra.igualar',
+  'relaciones.configurar',
+  'relaciones.directorio.buscar',
+  'relaciones.invitacion.cancelar',
+  'relaciones.invitacion.crear',
+  'relaciones.invitacion.listar',
+  'relaciones.invitacion.responder',
+  'relaciones.listar',
+  'relaciones.mapeo.crear-articulo',
+  'relaciones.mapeo.guardar',
+  'relaciones.mapeo.sincronizar-barcodes',
+  'relaciones.terminar',
+  'relaciones.transaccion.aceptar-compra',
+  'relaciones.transaccion.aceptar-venta',
+  'relaciones.transaccion.buscar-candidatos',
+  'relaciones.transaccion.enlazar-compra',
+  'relaciones.transaccion.enlazar-venta',
+  'relaciones.transaccion.rechazar',
+  'relaciones.transaccion.reenviar',
+  'relaciones.transacciones.listar',
+  'relaciones.transacciones.ver',
+  'relaciones.venta.enviar',
+  'relaciones.venta.igualar',
+  'relaciones.ver',
   'reportes.caja.cuadre.imprimir',
   'reportes.caja.cuadre.ver',
   'reportes.compras.analitica.imprimir',

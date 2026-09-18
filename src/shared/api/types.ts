@@ -5365,7 +5365,8 @@ export type NotificacionCategoria =
   | "Compras"
   | "Ventas"
   | "Logística"
-  | "Seguridad";
+  | "Seguridad"
+  | "Relaciones Comerciales";
 
 export interface NotificacionDestinatario {
   email: string;
@@ -7020,4 +7021,518 @@ export interface OrdenDesdePedidosMargenResult {
   requiereConfirmacion: true;
   warnings: MargenNegativoWarning[];
   message?: string;
+}
+
+// ─── Relaciones Comerciales (B2B) — docs/tasks/relaciones_comerciales/*.md ─────────────────────
+
+export type EstadoRelacionComercial = 'invitada' | 'activa' | 'rechazada' | 'revocada' | 'suspendida';
+/** `activando` es derivado (Fase 05 §3): la invitación se aceptó y los espejos Customer/Supplier
+ *  se están creando — nunca es un valor real del enum del backend, solo aparece en el listado. */
+export type EstadoRelacionComercialListado = EstadoRelacionComercial | 'activando';
+
+export type EstadoTransaccionB2B =
+  | 'Pendiente de entrega'
+  | 'Pendiente'
+  | 'Requiere Mapeo'
+  | 'Requiere Configuración'
+  | 'Aceptada'
+  | 'Editada'
+  | 'Enlazada'
+  | 'Rechazada'
+  | 'Cancelada'
+  | 'Error';
+
+/** Fase 01 §2.3 — mismo shape en invitar, aceptar invitación y editar términos de una relación. */
+export interface TerminosComercialesDto {
+  tieneCredito?: boolean;
+  diasCredito?: number;
+  /** Aceptado por el backend pero SIN efecto todavía (Fase 05 §6) — no mostrarlo como si aplicara. */
+  limiteCredito?: number;
+  grupoCliente?: string;
+  cuentaCxcAlterna?: string;
+  encargadoCxc?: string;
+  formaPagoDefault?: string;
+  grupoProveedor?: string;
+  diasCreditoProveedor?: number;
+  cuentaCxpAlterna?: string;
+  tipoBienes606?: string;
+  formaPago606?: string;
+}
+
+export interface MaestroLocalRelacion {
+  name: string;
+  nombre: string;
+  disabled: boolean;
+}
+
+export interface MaestrosLocalesRelacion {
+  customer: MaestroLocalRelacion | null;
+  supplier: MaestroLocalRelacion | null;
+  duplicados: { customer: boolean; supplier: boolean };
+}
+
+// ─── Directorio (Fase 03) ───────────────────────────────────────────────────
+
+export interface EmpresaDirectorioRelacion {
+  tenantId: string;
+  nombre: string;
+  rnc: string;
+  estadoRelacion: EstadoRelacionComercial | null;
+  invitacion: 'enviada' | 'recibida' | null;
+  puedeInvitar: boolean;
+  /** Mostrar SIEMPRE tal cual — nunca inferir el motivo real a partir de `estadoRelacion` (Fase 03 §5). */
+  motivoNoInvitable: string | null;
+}
+
+export interface PadronDgiiInfo {
+  nombre: string;
+  estado: string | null;
+}
+
+export interface BuscarEmpresaRelacionResponse {
+  rnc: string;
+  enGenSuite: boolean;
+  empresas: EmpresaDirectorioRelacion[];
+  /** Solo viene cuando `enGenSuite: false` y el RNC existe en el padrón local (Fase 03 §3). */
+  padronDgii?: PadronDgiiInfo | null;
+  maestrosLocales: MaestrosLocalesRelacion;
+}
+
+// ─── Invitaciones y Bloqueos (Fase 04) ──────────────────────────────────────
+
+export type EstadoInvitacionRelacion = 'pendiente' | 'aceptada' | 'rechazada' | 'cancelada' | 'expirada';
+
+export interface InvitacionRelacion {
+  id: string;
+  status: EstadoInvitacionRelacion;
+  fromTenantId: string;
+  toTenantId: string;
+  mensaje?: string | null;
+  expiresAt: string;
+  createdAt: string;
+  maestrosLocales?: MaestrosLocalesRelacion;
+  contraparte?: { tenantId: string; nombre: string; rnc?: string };
+  direccion?: 'enviada' | 'recibida';
+  terminos?: TerminosComercialesDto | null;
+}
+
+export interface CrearInvitacionRelacionDto {
+  /** Sale del directorio (Fase 03) — nunca un slug ni un RNC. */
+  tenantDestinoId: string;
+  mensaje?: string;
+  terminos?: TerminosComercialesDto;
+}
+
+export interface RechazarInvitacionRelacionDto {
+  motivo?: string;
+  bloquear?: boolean;
+}
+
+export interface AceptarInvitacionRelacionDto {
+  terminos?: TerminosComercialesDto;
+}
+
+export interface ListInvitacionesRelacionParams {
+  direccion?: 'enviadas' | 'recibidas';
+  estado?: EstadoInvitacionRelacion;
+}
+
+// Pantalla pública (sin login) — GET/POST /relaciones/invitaciones/token/:token
+
+export interface InvitacionPublicaEmpresa {
+  nombre: string;
+  rnc?: string;
+}
+
+export type InvitacionPublicaEstado = 'pendiente' | 'aceptada' | 'rechazada' | 'cancelada' | 'expirada';
+
+export interface InvitacionPublicaResumen {
+  estado: InvitacionPublicaEstado;
+  empresaOrigen: InvitacionPublicaEmpresa;
+  empresaDestino: InvitacionPublicaEmpresa;
+  mensaje?: string | null;
+  expiraEl?: string;
+  terminosPropuestos?: TerminosComercialesDto;
+  /** Solo cuando `estado` ya no es `pendiente`/`expirada`. */
+  resultado?: { respondidoEl: string; motivo: string | null };
+}
+
+export interface AceptarInvitacionPublicaDto {
+  email?: string;
+}
+
+export interface RechazarInvitacionPublicaDto {
+  motivo?: string;
+  bloquear?: boolean;
+  email?: string;
+}
+
+// Bloqueos
+
+export interface BloqueoComercial {
+  id: string;
+  tenantBloqueadoId: string;
+  nombreBloqueado?: string;
+  rncBloqueado?: string;
+  motivo?: string | null;
+  levantado?: boolean;
+  createdAt: string;
+}
+
+export interface CrearBloqueoDto {
+  tenantBloqueadoId: string;
+  motivo?: string;
+}
+
+// ─── Relaciones — activación, configuración y maestros (Fase 05) ───────────
+
+export interface RelacionComercialContraparte {
+  tenantId: string;
+  nombre: string;
+  rnc?: string;
+}
+
+export interface RelacionComercialListItem {
+  id: string;
+  status: EstadoRelacionComercialListado;
+  contraparte: RelacionComercialContraparte;
+  activatedAt: string | null;
+  createdAt: string;
+}
+
+export interface RelacionComercialConfiguracion {
+  almacenDestino: string | null;
+  tipoBienes606: string | null;
+  formaPago606: string | null;
+  autoEnviarVentas: boolean;
+  autoEnviarCompras: boolean;
+  mapeoEstricto: boolean;
+}
+
+export interface RelacionComercialDetalle {
+  id: string;
+  status: EstadoRelacionComercialListado;
+  contraparte: RelacionComercialContraparte;
+  customer: string | null;
+  supplier: string | null;
+  /** `null` mientras este lado no se haya activado todavía (recién invitada). */
+  configuracion: RelacionComercialConfiguracion | null;
+  activatedAt: string | null;
+  createdAt: string;
+}
+
+export interface ActualizarConfiguracionRelacionDto {
+  almacenDestino?: string;
+  tipoBienes606?: string;
+  formaPago606?: string;
+  autoEnviarVentas?: boolean;
+  autoEnviarCompras?: boolean;
+  mapeoEstricto?: boolean;
+}
+
+export interface MaestroCandidatoRelacion {
+  name: string;
+  nombre: string;
+  disabled: boolean;
+  yaVinculadoAOtraRelacion: boolean;
+  documentos: number;
+  saldo: number;
+}
+
+export interface MaestrosCandidatosRelacion {
+  customers: MaestroCandidatoRelacion[];
+  suppliers: MaestroCandidatoRelacion[];
+}
+
+export interface AdoptarMaestrosDto {
+  customer?: string;
+  supplier?: string;
+}
+
+// ─── Transacciones B2B — bandeja (Fase 06) ─────────────────────────────────
+
+export interface TransaccionContraparte {
+  tenant: string;
+  nombre: string;
+}
+
+export interface DocumentoOrigenTransaccion {
+  name: string;
+  ncf?: string | null;
+  fecha: string;
+  total: number;
+}
+
+export interface TransaccionB2BListItem {
+  transaccionUid: string;
+  relacionUid: string;
+  direccion: 'Entrante' | 'Saliente';
+  tipo: 'Venta' | 'Compra';
+  estado: EstadoTransaccionB2B;
+  contraparte: TransaccionContraparte;
+  documentoLocal: string | null;
+  documentoOrigen: DocumentoOrigenTransaccion | null;
+  advertenciaTotales?: string | null;
+  motivoEstado?: string | null;
+  creation: string;
+}
+
+export interface TransaccionB2BHistorialEvento {
+  fecha: string;
+  evento: string;
+  actor: string;
+  detalle?: string;
+}
+
+export interface TransaccionB2BDetalle extends TransaccionB2BListItem {
+  payloadSnapshot: Record<string, unknown>;
+  payloadHash: string;
+  mapeoPendiente: unknown | null;
+  resumenCambios: string | null;
+  motivoRechazo: string | null;
+  respondidoPor: string | null;
+  respondidoEl: string | null;
+  reenvioDe: string | null;
+  autoSometer: boolean;
+  historial: TransaccionB2BHistorialEvento[];
+  /** Fase 11 §4 — cuando es `true` en una transacción de compra, el botón "Aceptar" no debe
+   *  mostrarse: solo "Enlazar mi factura"/"Rechazar" (emitir un comprobante nuevo duplicaría el NCF). */
+  origenYaSometido?: boolean;
+}
+
+export interface ListTransaccionesParams extends PaginationParams {
+  direccion?: 'Entrante' | 'Saliente';
+  tipo?: 'Venta' | 'Compra';
+  estado?: EstadoTransaccionB2B;
+  relacionId?: string;
+  desde?: string;
+  hasta?: string;
+}
+
+// ─── Mapeo de catálogo (Fase 07) ────────────────────────────────────────────
+
+export type EstadoLineaMapeo = 'confirmada' | 'sugerida' | 'sin_sugerencia' | 'ambigua';
+
+export interface ItemOrigenMapeo {
+  itemCode: string;
+  itemName: string;
+  barcodes?: string[];
+  uom: string;
+  cantidad: number;
+  precioUnitario: number;
+}
+
+export interface ItemSugeridoMapeo {
+  itemCode: string;
+  itemName: string;
+  motivo: string;
+}
+
+export interface ItemLocalMapeo {
+  itemCode: string;
+  itemName: string;
+  uom: string;
+  conversionFactor: number;
+  isStockItem: boolean;
+}
+
+export interface LineaMapeo {
+  indice: number;
+  estado: EstadoLineaMapeo;
+  origen: ItemOrigenMapeo;
+  /** Solo cuando `estado === 'sugerida'`. Nunca preseleccionar por nombre/código igual (Fase 07 §6). */
+  sugerencia?: ItemSugeridoMapeo | null;
+  /** Solo cuando `estado === 'ambigua'` — nunca preseleccionar ninguno (Fase 07 §4). */
+  candidatos?: ItemSugeridoMapeo[];
+  local?: ItemLocalMapeo | null;
+  advertencias: string[];
+  barcodesACopiar?: string[];
+}
+
+export interface ResumenMapeo {
+  confirmadas: number;
+  sugeridas: number;
+  sinSugerencia: number;
+  ambiguas: number;
+}
+
+export interface ResultadoMapeo {
+  lineas: LineaMapeo[];
+  puedeAceptar: boolean;
+  resumen: ResumenMapeo;
+}
+
+export interface DecisionMapeoDto {
+  indiceLinea: number;
+  itemCodeLocal: string;
+  uomLocal?: string;
+  factorConversion?: number;
+}
+
+export interface ConfirmarMapeoDto {
+  decisiones: DecisionMapeoDto[];
+  sincronizarBarcodes?: boolean;
+}
+
+export interface BarcodeSincronizado {
+  itemCode: string;
+  agregados: string[];
+  omitidos: Array<{ barcode: string; motivo: string } | string>;
+}
+
+export interface ConfirmarMapeoResponse extends ResultadoMapeo {
+  barcodesSincronizados?: BarcodeSincronizado[];
+  /** Viene con texto cuando se pidió sincronizar pero faltó permiso — mostrar como aviso, no error. */
+  sincronizacionOmitida?: string | null;
+}
+
+export interface CrearArticuloDesdeSocioDto {
+  indiceLinea: number;
+  itemGroup: string;
+  isStockItem: boolean;
+  itemCode?: string | null;
+  crearPrecioCompra?: boolean;
+}
+
+export interface CrearArticuloDesdeSocioResponse {
+  itemCode: string;
+  mapeo: ResultadoMapeo;
+}
+
+export interface FilaMapeoAcumulado {
+  itemCodeOrigen: string;
+  itemNameOrigen?: string;
+  barcodeOrigen?: string;
+  itemCodeLocal: string;
+  uomOrigen?: string;
+  uomLocal?: string;
+  factorConversion?: number;
+}
+
+// ─── Ventas B2B (Fase 08) ───────────────────────────────────────────────────
+
+export interface EnviarVentaDto {
+  reenvioDe?: string;
+}
+
+export interface AceptarTransaccionDto {
+  mapeo: DecisionMapeoDto[];
+  sincronizarBarcodes?: boolean;
+}
+
+export interface RechazarTransaccionDto {
+  motivo: string;
+}
+
+// ─── Compras B2B (Fase 09) ──────────────────────────────────────────────────
+
+export interface EnviarAProveedorDto {
+  autoSometer?: boolean;
+  nota?: string;
+  reenvioDe?: string;
+}
+
+export type EstadoSocioCompra = 'Enviada' | 'Aceptada' | 'Editada' | 'Rechazada';
+
+export interface EstadoSocioCompraResponse {
+  transaccionUid: string | null;
+  estadoSocio: EstadoSocioCompra | null;
+  autoSometerAutorizadoPor: string | null;
+  ncf: string | null;
+  billNo: string | null;
+}
+
+// ─── Diferencias e Igualar (Fase 10) ────────────────────────────────────────
+
+export type EstadoLineaDiff = 'igual' | 'modificada' | 'agregada' | 'eliminada';
+
+export interface CampoDiff {
+  campo: string;
+  origen: unknown;
+  destino: unknown;
+}
+
+export interface CambioLineaDiff {
+  campo: string;
+  origen: unknown;
+  destino: unknown;
+  deltaPct?: number;
+}
+
+export interface ItemDiffRef {
+  itemCode: string;
+  itemName: string;
+}
+
+export interface LineaDiff {
+  estado: EstadoLineaDiff;
+  indiceOrigen?: number;
+  itemOrigen?: ItemDiffRef | null;
+  itemDestino?: ItemDiffRef | null;
+  cambios: CambioLineaDiff[];
+}
+
+export interface TotalesDiff {
+  origen: number;
+  destino: number;
+  diferencia: number;
+  diferenciaPct: number;
+}
+
+export interface DiffTransaccion {
+  huboCambios: boolean;
+  cabecera: CampoDiff[];
+  lineas: LineaDiff[];
+  totales: TotalesDiff;
+  resumenTexto: string;
+}
+
+export interface IgualarBorradorDto {
+  aplicar?: ('lineas' | 'cabecera')[];
+}
+
+export interface IgualarBorradorResponse {
+  message: string;
+  diff: DiffTransaccion;
+}
+
+export interface IgualarConEnmiendaDto {
+  confirmoAnulacion: boolean;
+  motivoAnulacion: string;
+}
+
+export interface IgualarConEnmiendaResponse {
+  message: string;
+  nuevoDocname: string;
+  diff: DiffTransaccion;
+}
+
+// ─── Enlazar documentos existentes (Fase 11) ────────────────────────────────
+
+export interface DocumentoEnlazable {
+  name: string;
+  fecha: string;
+  total: number;
+  ncf?: string | null;
+  billNo?: string | null;
+  score: number;
+  coincidencias: string[];
+}
+
+export interface EnlazarYEnviarDto {
+  relacionId: string;
+  nota?: string;
+}
+
+export interface EnlazarTransaccionDto {
+  docname: string;
+  mapeo: DecisionMapeoDto[];
+  sincronizarBarcodes?: boolean;
+  notaParaElSocio?: string;
+}
+
+export interface EnlazarTransaccionResponse {
+  message: string;
+  diff: DiffTransaccion;
+  advertenciaFiscal?: string | null;
 }
