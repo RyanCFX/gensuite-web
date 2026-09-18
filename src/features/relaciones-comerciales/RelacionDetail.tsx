@@ -317,6 +317,12 @@ export default function RelacionDetail() {
             <p className="ff-hint" style={{ marginTop: 0, marginBottom: 16 }}>
               Se aplican sobre el cliente/proveedor local de este lado. Solo se guardan los campos que llenes.
             </p>
+            {activando && (
+              <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
+                Esta relación todavía no tiene espejos de este lado — podrás guardar términos cuando
+                termine de activarse.
+              </div>
+            )}
             <TerminosComercialesFields value={terminosForm} onChange={setTerminosForm} disabled={!puedeConfigurar || terminosMutation.isPending} />
             <Permitido accion="relaciones.configurar">
               <div style={{ marginTop: 16 }}>
@@ -332,6 +338,12 @@ export default function RelacionDetail() {
         <div className="card" ref={configRef}>
           <div className="card-body">
             <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Configuración de automatización</h3>
+            {activando && (
+              <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
+                Esta relación todavía no tiene espejos de este lado — podrás guardar la configuración
+                cuando termine de activarse.
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="cfg-almacen">Almacén destino</label>

@@ -1,8 +1,13 @@
 # Relaciones Comerciales (B2B) — estado de la implementación frontend y pendientes
 
-> Escrito al cortar sesión el 2026-09-18. Continuar desde acá en una sesión nueva. Todo lo descrito
-> abajo es sobre **este repo** (gensuite-web, frontend). El backend (BFF) ya está completo (Fases
-> 01-11) y en vivo contra un entorno de desarrollo real — no es un mock.
+> Escrito al cortar sesión el 2026-09-18, actualizado en una sesión de continuación el mismo día.
+> Todo lo descrito abajo es sobre **este repo** (gensuite-web, frontend). El backend (BFF) ya está
+> completo (Fases 01-11) y en vivo contra un entorno de desarrollo real — no es un mock.
+>
+> **Resumen de la sesión de continuación**: se hizo el commit del trabajo previo, se resolvieron
+> las dos dudas abiertas (§3.1 y §4 — una era un bug real de backend, la otra no era bug), y se
+> probó bastante más de Fase 04/05 en vivo (cancelar/reenviar invitación, guardar términos,
+> guardar configuración). Se sigue bloqueado en las Fases 06-11 por el bug de backend de §3.1.
 
 ## 0. Contexto rápido
 
@@ -118,13 +123,42 @@ Confirmado funcionando end-to-end:
 7. Tab Invitaciones → Enviadas: la fila aparecía con **"Contraparte: —"** (bug real, ver §3, ya
    arreglado).
 
-**No se llegó a probar** (interrumpido antes): Cancelar invitación, tab Bloqueadas (crear/listar/
-levantar bloqueo), `RelacionDetail` completo (se abrió y se veía bien — ver captura mental en §4 —
-pero no se guardó ningún formulario), `TransaccionesPage`/`TransaccionDetail` (nunca se llegó a
-tener una transacción real que probar — hace falta que la relación se active primero, lo cual
-requiere que **ambos lados** tengan la activación funcionando, y el lado `jbc` no tiene permiso para
-aceptar la invitación con esta cuenta de prueba), el flujo de compra/venta B2B completo, Igualar/
-Enlazar, y la pantalla pública de invitación (no se pudo recuperar el token — ver §5).
+### 2.1 Continuación (mismo día) — más pruebas en vivo
+
+8. **Cancelar invitación** (`Enviadas`): confirma con `ConfirmModal`, `POST .../cancelar` real,
+   fila pasa a badge rojo "Cancelada", aparece botón "Reenviar" — **funciona correctamente**.
+9. **Reenviar invitación**: crea una fila NUEVA en estado "Pendiente" con expiración nueva,
+   dejando la cancelada como está (histórico) — **funciona correctamente**, coincide con el
+   checklist de la Fase 04 ("el link viejo queda inválido, pero el `GET` público lo sigue
+   mostrando con su resultado histórico").
+10. **Tab Bloqueadas**: estado vacío ("Sin empresas bloqueadas") se ve bien. No se pudo probar
+    crear/levantar un bloqueo real (requiere responder una invitación como receptor, bloqueado por
+    permisos en `jbc`, ver §5) — sigue sin probar.
+11. **Wizard — reintentar invitar a una empresa con invitación pendiente**: buscar el mismo RNC
+    (`130959994`) mientras había una invitación `pendiente` mostró `puedeInvitar: false` con el
+    texto genérico exacto *"Esta empresa no está aceptando solicitudes por ahora."*, sin botón de
+    invitar — **confirma el diseño de privacidad de la Fase 03 §5** (no se distingue el motivo).
+12. **`RelacionDetail` — Guardar términos**: con la relación todavía en `invitada` (sin espejos
+    creados), el backend responde `400` con mensaje claro: *"Esta relación todavía no tiene espejos
+    de este lado — espere a que termine de activarse."* — el frontend lo muestra tal cual en el
+    toast, **correcto**.
+13. **`RelacionDetail` — Guardar configuración**: mismo escenario (relación `invitada`), pero acá
+    el backend responde **`404` con `"Relacion Comercial <id> not found"`** — un mensaje mucho
+    menos claro que el de "términos" para la misma situación de fondo (relación aún no activada).
+    Es una **inconsistencia menor del backend** (ver §3.2) — el frontend igual lo muestra
+    correctamente tal cual, no hay nada que arreglar de este lado salvo, opcionalmente, un mensaje
+    más amable en el propio frontend si el backend no lo arregla (ver §3.2).
+14. Nota de proceso: al verificar toasts con Playwright-style scripting, un chequeo inmediato
+    después del click (sin esperar) siempre veía 0 toasts — **falso positivo por carrera de
+    tiempos** (el toast aparece después de que la promesa HTTP se resuelve, no instantáneamente).
+    Con una espera de 1s antes de verificar, los toasts aparecen siempre con el texto correcto.
+    Anotado por si alguien más se confunde igual probando esto.
+
+**Sigue sin probarse**: todo lo que dependa de que la relación llegue a `activa` (Fase 05
+completa: `RNC_DUPLICADO_EN_SITE`/`MAESTRO_YA_VINCULADO`/suspender/reactivar/terminar), y **toda la
+Fase 06 en adelante**, ahora bloqueado de raíz por el bug de backend de §3.1 (no por permisos) —
+aunque se resolvieran los permisos de `jbc`, la bandeja de transacciones seguiría sin cargar. La
+pantalla pública de invitación tampoco se probó (no se pudo recuperar un token real, ver §5).
 
 ## 3. Bug encontrado y arreglado: nombre de contraparte ausente en Invitaciones
 
@@ -157,35 +191,60 @@ se implemente otra fuente. **Revisar esto con la cuenta de `far-dev` invitando y
 real en `jbc` con permisos, o pedirle al equipo de backend que agregue `contraparte` a la respuesta
 de invitaciones** (sería el arreglo correcto de raíz, mejor que este cruce del lado del cliente).
 
-## 4. Anomalía sin resolver: campo "Días de crédito" con valor `13` en `RelacionDetail`
+## 3.1 [RESUELTO] Bug del backend: `GET /relaciones/transacciones` siempre da 500
 
-Al abrir `/relaciones-comerciales/:id` para la relación recién creada (`JORGES BUSINESS
-CONSULTING`, estado `Invitada`), la sección "Términos comerciales" — que según el código de
-`RelacionDetail.tsx` inicializa `terminosForm` en `useState<TerminosComercialesDto>({})` (vacío,
-comentario explícito: *"este formulario empieza en blanco... nunca pretende mostrar un valor
-'actual' que el backend no entrega"*) — **mostraba `"13"` en el campo "Días de crédito
-(cliente)"**, con el resto de los campos vacíos como se esperaba.
+**Confirmado en la sesión de continuación (2026-09-18, después del commit inicial).** La bandeja de
+transacciones (`/relaciones-comerciales/transacciones`) **nunca carga**, con o sin filtros —
+probado en `far-dev` (System Manager) tanto sin ningún filtro como filtrando por `relacionId`:
 
-No se alcanzó a investigar la causa antes de cortar sesión. Cosas a revisar en la próxima:
+```
+GET /api/v1/relaciones/transacciones?limit=20&offset=0
+→ 500 {"success":false,"error":{"code":"INTERNAL_ERROR","message":"Field not permitted in query: advertencia_totales","statusCode":500}}
+```
 
-1. ¿Es autocompletado del navegador (Chrome guardando/sugiriendo valores previos para un
-   `<input type="number">` con el mismo `name`/label en otra parte de la sesión)? — probar en una
-   pestaña nueva/incógnito, o inspeccionar el DOM (`value` vs atributo `value` inicial) para
-   distinguir "React lo puso ahí" de "el navegador lo autorellenó visualmente sin disparar
-   `onChange`".
-2. ¿El campo `<input>` en `TerminosComercialesFields.tsx` tiene `name` o `id` genérico que colisiona
-   con otro campo de la página (la barra lateral, el buscador global, etc.) vía autofill heurístico
-   del navegador?
-3. Descartar que sea el propio wizard (`NuevaRelacionWizard.tsx`) filtrando algún valor por defecto
-   — se revisó el código y `terminos` arranca en `{}` ahí también, y el paso 3 mostró el resumen sin
-   mencionar días de crédito, así que probablemente no viene de ahí, pero no se confirmó al 100%.
-4. Repro exacto: login con las credenciales de prueba → tenant `far-dev` → `/relaciones-comerciales`
-   → abrir la relación con "JORGES BUSINESS CONSULTING" → bajar a "Términos comerciales" → mirar el
-   campo "Días de crédito (cliente)".
+El mismo error exacto ocurre con y sin `relacionId` en el query — **no es un problema del filtro,
+es el endpoint entero**. Por el nombre del campo (`advertencia_totales`, snake_case) huele a un
+mismatch entre el nombre de campo usado en la query interna (ORM/Frappe) y la lista de campos
+permitidos (`fields` whitelist) del doctype `Transaccion B2B` en el backend — el campo que el
+handoff de la Fase 06 llama `advertenciaTotales` (camelCase) en la respuesta.
 
-Si resulta ser autofill del navegador (no un bug de la app), no hace falta ningún cambio de código
-— solo confirmar y descartar. Si el valor lo está poniendo React, es un bug real que hay que
-arreglar en `TerminosComercialesFields.tsx` o `RelacionDetail.tsx`.
+**Esto es 100% un bug de backend, no de este frontend** — el frontend arma la URL correctamente
+(`GET /relaciones/transacciones` con query params estándar) y el shape de la request coincide con
+lo documentado. `TransaccionesPage.tsx` maneja el 500 correctamente (muestra "Error al cargar las
+transacciones" en vez de romper la pantalla), así que no hay nada que arreglar de este lado.
+
+**Impacto**: bloquea probar el 100% de las Fases 06, 07, 08, 09, 10 y 11 — ninguna transacción B2B
+se puede listar ni ver mientras este endpoint devuelva 500, independientemente de los permisos de
+la cuenta de prueba. **Hay que reportarle esto al equipo de backend antes de poder continuar las
+pruebas de esas fases.** No se pudo confirmar si el detalle (`GET
+/relaciones/transacciones/:uid`) tiene el mismo problema (no hay ningún `uid` real disponible para
+probarlo — la lista nunca carga para conseguir uno).
+
+## 3.2 Inconsistencia menor de backend: mensajes de error distintos para el mismo caso
+
+Con una relación en estado `invitada` (sin espejos Customer/Supplier creados todavía), guardar
+**términos** y guardar **configuración** deberían fallar por la misma razón de fondo, pero dan
+respuestas muy distintas:
+
+- `PUT /relaciones/:id/terminos` → `400 {"message":"Esta relación todavía no tiene espejos de este lado — espere a que termine de activarse."}` — claro, orientado al usuario.
+- `PUT /relaciones/:id/configuracion` → `404 {"code":"NOT_FOUND","message":"Relacion Comercial <id> not found"}` — confuso: el `id` sí existe (el `GET` del mismo id responde 200 en el mismo momento), así que un usuario o desarrollador leyendo ese mensaje pensaría que hay un problema con el id, no que la relación simplemente no está activa todavía.
+
+**No es nada que haya que arreglar en el frontend** (ya se muestra el mensaje del backend tal cual,
+como corresponde) — es una sugerencia para el equipo de backend: unificar el mensaje de
+`configuracion` para que sea tan claro como el de `terminos`. Si se prefiere una mitigación rápida
+del lado del frontend mientras tanto, se podría interceptar este caso puntual en
+`RelacionDetail.tsx` (código `NOT_FOUND` + `status !== 'activa'` → mostrar el mismo texto que
+`terminos`), pero no se implementó porque es indistinguible de un verdadero 404 sin ese contexto
+adicional y no vale la pena el acoplamiento por un mensaje de error.
+
+## 4. [RESUELTO] Anomalía del campo "Días de crédito" con valor `13`
+
+Confirmado en la sesión de continuación: **no es un bug de la app.** Al volver a abrir
+`/relaciones-comerciales/:id` en una navegación limpia, el campo "Días de crédito (cliente)" aparece
+vacío como se esperaba (`useState<TerminosComercialesDto>({})` funciona bien). El "13" que se vio
+antes de cortar la sesión anterior era casi con certeza una sugerencia de autocompletado del propio
+navegador (Chrome), no algo que React haya puesto ahí — se descarta como bug real, no requiere
+ningún cambio de código.
 
 ## 5. Limitaciones del entorno de prueba (no son bugs de la app)
 
@@ -225,45 +284,56 @@ arreglar en `TerminosComercialesFields.tsx` o `RelacionDetail.tsx`.
 - [x] Fase 02 (permisos y notificaciones) — catálogo de acciones y categoría de notificaciones
       agregados y verificados contra el backend real.
 - [x] Fase 03 (directorio RNC) — implementado y **probado en vivo** (búsqueda real exitosa).
-- [~] Fase 04 (invitaciones y bloqueos) — implementado. Crear invitación **probado en vivo**.
-      Cancelar/reenviar, aceptar/rechazar (recibida), bloqueos (crear/listar/levantar), y la
-      pantalla pública **sin probar**. Bug de nombre de contraparte encontrado y mitigado (§3, con
-      un punto abierto por confirmar).
+- [~] Fase 04 (invitaciones y bloqueos) — implementado. **Probado en vivo**: crear, cancelar,
+      reenviar invitación, y el bloqueo de re-invitar mientras hay una pendiente. **Sin probar**:
+      aceptar/rechazar (recibida), bloqueos (crear/levantar — listar sí se probó, vacío), y la
+      pantalla pública (bloqueado por permisos/token, ver §5). Bug de nombre de contraparte
+      encontrado y mitigado (§3, con un punto abierto por confirmar para invitaciones recibidas).
 - [~] Fase 05 (activación) — implementado, pantalla se ve y carga bien contra datos reales
-      (estado `invitada`, "Reintentar activación" presente). Suspender/reactivar/terminar,
-      `RNC_DUPLICADO_EN_SITE`/`MAESTRO_YA_VINCULADO`, guardar configuración/términos: **sin
+      (estado `invitada`, "Reintentar activación" presente). **Probado en vivo**: guardar términos
+      y guardar configuración con la relación aún `invitada` — ambos rechazan correctamente con el
+      mensaje del backend (ver §3.2 por la inconsistencia de mensajes entre los dos). **Sin
       probar** (necesita que la relación llegue a `activa`, bloqueado por permisos en `jbc`, ver
-      §5). Anomalía del campo "Días de crédito" sin resolver (§4).
+      §5): guardar términos/configuración con éxito real, suspender/reactivar/terminar,
+      `RNC_DUPLICADO_EN_SITE`/`MAESTRO_YA_VINCULADO`. Anomalía del campo "Días de crédito" — **ya
+      descartada, no era un bug** (§4).
 - [ ] Fase 06 (bandeja de transacciones) — implementado (`TransaccionesPage`/`TransaccionDetail`),
-      **cero pruebas en vivo** — no hubo ninguna transacción real disponible todavía.
+      **bloqueado por el bug de backend de §3.1** (`GET /relaciones/transacciones` siempre da 500)
+      — no es un problema de permisos ni de datos de prueba, el endpoint no funciona todavía.
 - [ ] Fase 07 (mapeo de catálogo) — `MapeoForm.tsx` implementado y usado en dos flujos, **sin
-      probar** contra datos reales (necesita una transacción con líneas).
+      probar** contra datos reales — bloqueado por §3.1 (no hay forma de llegar a una transacción).
 - [ ] Fase 08 (flujo de venta) — botón "Enviar al cliente"/"Igualar factura al cliente" agregados a
-      `InvoiceDetail.tsx`, **sin probar** (necesita relación activa + factura sometida a un socio).
-- [ ] Fase 09 (flujo de compra) — botones agregados a `CompraDetail.tsx`, **sin probar**, y además
-      bloqueado por permisos (`relaciones.compra.enviar-a-proveedor` en `false` incluso para
-      System Manager en `far-dev`, ver §5).
+      `InvoiceDetail.tsx`, **sin probar** — bloqueado por §3.1 y por permisos en `jbc` (§5).
+- [ ] Fase 09 (flujo de compra) — botones agregados a `CompraDetail.tsx`, **sin probar** —
+      bloqueado por §3.1, y además por permisos (`relaciones.compra.enviar-a-proveedor` en `false`
+      incluso para System Manager en `far-dev`, ver §5).
 - [ ] Fase 10 (diferencias e igualar) — `DiffView.tsx` + botones Igualar/Igualar-con-enmienda
       implementados en `TransaccionDetail.tsx` y en `CompraDetail.tsx`/`InvoiceDetail.tsx`, **sin
-      probar** (necesita una transacción en estado `Editada`).
+      probar** — bloqueado por §3.1.
 - [ ] Fase 11 (enlazar documentos) — flujo de enlazar implementado dentro de `TransaccionDetail.tsx`
-      (buscar candidatos → mapeo → confirmar) y botones en `CompraDetail.tsx`, **sin probar**.
+      (buscar candidatos → mapeo → confirmar) y botones en `CompraDetail.tsx`, **sin probar** —
+      bloqueado por §3.1.
 
 ## 7. Siguiente pasos recomendados (en orden)
 
-1. Verificar/resolver la anomalía del §4 (campo "Días de crédito" con `13`).
+1. **Bloqueante principal**: reportar/arreglar el bug de backend de §3.1 (`GET
+   /relaciones/transacciones` → 500 "Field not permitted in query: advertencia_totales"). Sin esto,
+   las Fases 06-11 no se pueden probar sin importar qué permisos tenga la cuenta de prueba.
 2. Confirmar con el usuario cómo conseguir una segunda cuenta/tenant con permisos suficientes en el
-   lado receptor (o que otorgue permisos a `jbc`/complete el rol "Relaciones Comerciales Admin RD"),
-   para poder probar el ciclo completo: aceptar invitación → activación → relación `activa` en
-   ambos lados → enviar una venta/compra real → aceptar/rechazar/mapear → diff/igualar → enlazar.
-3. Con una relación activa en ambos lados, probar en orden: Fase 05 (configuración/suspender/
-   reactivar/terminar), Fase 08 (enviar factura, aceptar como compra en el otro lado), Fase 09
-   (enviar compra, aceptar como venta), Fase 07 (mapeo real con artículos), Fase 10 (forzar una
-   edición para generar `Editada` y probar ambos botones de Igualar), Fase 11 (enlazar un documento
-   ya registrado a mano).
-4. Repasar los 2 issues marcados como "pendiente de confirmar" en §3 (nombre de contraparte para
+   lado receptor (o que otorgue permisos a `jbc`/complete el rol "Relaciones Comerciales Admin RD"
+   ahí, y complete los 7 permisos de "compra" faltantes en `far-dev`, ver §5), para poder probar el
+   ciclo completo: aceptar invitación → activación → relación `activa` en ambos lados → enviar una
+   venta/compra real → aceptar/rechazar/mapear → diff/igualar → enlazar.
+3. Con el bug de §3.1 arreglado y una relación activa en ambos lados, probar en orden: resto de
+   Fase 05 (suspender/reactivar/terminar, `RNC_DUPLICADO_EN_SITE`/`MAESTRO_YA_VINCULADO`, guardar
+   términos/configuración con éxito real), Fase 06 (bandeja), Fase 08 (enviar factura, aceptar como
+   compra en el otro lado), Fase 09 (enviar compra, aceptar como venta), Fase 07 (mapeo real con
+   artículos), Fase 10 (forzar una edición para generar `Editada` y probar ambos botones de
+   Igualar), Fase 11 (enlazar un documento ya registrado a mano).
+4. Repasar el issue marcado como "pendiente de confirmar" en §3 (nombre de contraparte para
    invitaciones recibidas) y decidir si vale la pena pedirle al backend que agregue `contraparte` a
-   la respuesta de invitaciones en vez de mantener el cruce del lado del cliente.
+   la respuesta de invitaciones en vez de mantener el cruce del lado del cliente. Considerar también
+   pedirle que unifique el mensaje de error de "configuración" con el de "términos" (§3.2).
 5. Correr `npx tsc --noEmit -p .` y `npm run lint` una vez más al terminar cualquier cambio — al
    cortar esta sesión ambos estaban limpios (0 errores) para todos los archivos de este módulo.
 6. Revisar si conviene mover la lógica de "buscar relación por customer/supplier" (duplicada de
