@@ -306,7 +306,24 @@ Confirmado en la sesión de continuación: **no es un bug de la app.** Al volver
 vacío como se esperaba (`useState<TerminosComercialesDto>({})` funciona bien). El "13" que se vio
 antes de cortar la sesión anterior era casi con certeza una sugerencia de autocompletado del propio
 navegador (Chrome), no algo que React haya puesto ahí — se descarta como bug real, no requiere
-ningún cambio de código.
+ningún cambio de código. Consistente con esto: `TerminosComercialesFields.tsx` usa un `id`
+genérico (`tc-diasCredito`) que Chrome puede asociar por heurística de label — no hay nada que
+cambiar salvo, si molesta, agregar `autoComplete="off"` a esos inputs (no se hizo, es cosmético).
+
+## 4.1 Revisión de código estática de las pantallas nuevas (sin poder ejecutarlas en vivo)
+
+Con las Fases 06-11 bloqueadas por los bugs de backend de arriba, se hizo una lectura completa
+línea por línea de **todos** los archivos nuevos del módulo (los que escribieron los subagentes:
+`RelacionesComercialesPage.tsx`, `NuevaRelacionWizard.tsx`, `TerminosComercialesFields.tsx`,
+`shared.tsx`, `RelacionDetail.tsx`, `TransaccionesPage.tsx`, `TransaccionDetail.tsx`,
+`estadoTransaccion.ts`) para compensar no poder probarlos contra datos reales. **No se encontraron
+bugs adicionales** — el manejo de estados/permisos/errores coincide con el detalle de cada fase
+(incluyendo casos finos como que `mostrarAceptar` en `TransaccionDetail.tsx` respeta
+`origenYaSometido`, que el mapeo se comparte correctamente entre el flujo de Aceptar y el de
+Enlazar vía la misma query, y que `PayloadSnapshotView` nunca usa `dangerouslySetInnerHTML`). Esto
+da bastante confianza en que, una vez desbloqueados los bugs de backend, la mayoría de las Fases
+06-11 debería funcionar sin sorpresas grandes — pero **sigue siendo lectura de código, no
+reemplaza la prueba real** contra una transacción B2B de verdad.
 
 ## 5. Limitaciones del entorno de prueba (no son bugs de la app)
 
