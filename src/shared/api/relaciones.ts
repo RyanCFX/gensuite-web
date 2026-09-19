@@ -215,6 +215,16 @@ export async function getMapeoTransaccion(uid: string) {
   return unwrapAny<ResultadoMapeo>(res)
 }
 
+// Le vuelve a preguntar al emisor su catálogo actual antes de recalcular sugerencias (ej. si
+// agregó un barcode después de someter el documento) — mismo ResultadoMapeo que getMapeoTransaccion.
+// POST (no GET): persiste el snapshot refrescado en la transacción, así que el GET .../mapeo
+// normal ya trae la sugerencia actualizada en visitas futuras, sin volver a apretar el botón.
+// Puede tardar más que el GET normal porque le pega al servidor del socio. Sin body.
+export async function refrescarMapeoTransaccion(uid: string) {
+  const res = await client.post(ENDPOINTS.relaciones.transacciones.mapeoRefrescar(uid))
+  return unwrapAny<ResultadoMapeo>(res)
+}
+
 export async function confirmarMapeoTransaccion(uid: string, data: ConfirmarMapeoDto) {
   const res = await client.put(ENDPOINTS.relaciones.transacciones.mapeo(uid), data)
   return unwrapAny<ConfirmarMapeoResponse>(res)

@@ -7,10 +7,10 @@ import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { AlertTriangle, ArrowLeft, Ban, RotateCw } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Ban, RefreshCw, RotateCw } from 'lucide-react'
 import {
   getTransaccionB2B, reintentarTransaccionB2B, cancelarTransaccionB2B,
-  getMapeoTransaccion, confirmarMapeoTransaccion, crearArticuloDesdeSocio,
+  getMapeoTransaccion, refrescarMapeoTransaccion, confirmarMapeoTransaccion, crearArticuloDesdeSocio,
   aceptarTransaccionB2B, rechazarTransaccionB2B,
   getDiffTransaccion, igualarBorradorTransaccion, igualarConEnmiendaTransaccion,
   getCandidatosEnlaceTransaccion, enlazarTransaccionB2B,
@@ -33,8 +33,8 @@ import { ESTADO_TRANSACCION_BADGE, estadoNecesitaAccion } from './estadoTransacc
 
 type EnlazarStep = 'buscar' | 'mapeo' | 'confirmar' | 'exito'
 
-async function fetchDocumentoLocal(tipo: 'Venta' | 'Compra', docId: string): Promise<Compra | Invoice> {
-  return tipo === 'Compra' ? getCompra(docId) : getInvoice(docId)
+async function fetchDocumentoLocal(esVenta: boolean, docId: string): Promise<Compra | Invoice> {
+  return esVenta ? getInvoice(docId) : getCompra(docId)
 }
 
 export default function TransaccionDetail() {
@@ -65,19 +65,39 @@ export default function TransaccionDetail() {
 
   const necesitaAccion = !!transaccion && estadoNecesitaAccion(transaccion.estado)
 
-  const mostrarAceptar = !!transaccion && necesitaAccion && transaccion.origenYaSometido !== true &&
+  // El mapeo (y todo lo que depende de él — Aceptar, Enlazar) es responsabilidad exclusiva del
+  // lado que RECIBE el documento. El lado que lo originó ve el mismo `estado` ("Requiere Mapeo"
+  // incluido) pero es puramente informativo: ya conoce sus propios artículos, no tiene nada que
+  // mapear. Nunca derivar esto de `estado` — se repite igual en ambos lados. Ver prompt de fix
+  // "pantalla de mapeo se muestra al lado equivocado".
+  const esEntrante = transaccion?.direccion === 'Entrante'
+
+  const mostrarAceptar = !!transaccion && necesitaAccion && esEntrante && transaccion.origenYaSometido !== true &&
     ((transaccion.tipo === 'Compra' && puedeAceptarCompra) || (transaccion.tipo === 'Venta' && puedeAceptarVenta))
   const mostrarRechazar = !!transaccion && necesitaAccion && puedeRechazar
-  const mostrarEnlazar = !!transaccion && necesitaAccion &&
+  const mostrarEnlazar = !!transaccion && necesitaAccion && esEntrante &&
     ((transaccion.tipo === 'Compra' && puedeEnlazarCompra) || (transaccion.tipo === 'Venta' && puedeEnlazarVenta))
   const mostrarReintentar = !!transaccion && transaccion.estado === 'Error' && puedeReenviar
   const mostrarCancelar = !!transaccion && transaccion.estado === 'Pendiente de entrega' && puedeReenviar
+  // Informativo puro para el lado Saliente — sin formulario, sin botones de mapeo.
+  const mostrarEsperandoContraparte = !!transaccion && necesitaAccion && !esEntrante
 
   // ─── Mapeo de artículos (compartido entre el flujo de Aceptar y el de Enlazar) ─────────────
+  // GET/PUT .../mapeo solo aplican al lado Entrante — nunca dispararlos para una transacción
+  // Saliente, aunque por algún motivo se llegue a esta pantalla con `necesitaAccion` true.
   const mapeoQuery = useQuery({
     queryKey: ['mapeo-transaccion', uid],
     queryFn: () => getMapeoTransaccion(uid!),
-    enabled: !!uid && necesitaAccion,
+    enabled: !!uid && necesitaAccion && esEntrante,
+  })
+
+  // Le vuelve a preguntar al emisor su catálogo actual (ej. si agregó un barcode después de
+  // someter) y recalcula sugerencias — mismo shape que mapeoQuery, se reusa la misma vista/tabla.
+  // No es un error si el socio no aportó nada nuevo: devuelve el mismo resultado en silencio.
+  const refrescarMapeoMutation = useMutation({
+    mutationFn: () => refrescarMapeoTransaccion(uid!),
+    onSuccess: (r) => queryClient.setQueryData(['mapeo-transaccion', uid], r),
+    onError: (err: ApiError) => toast.error(err.message ?? 'Error al actualizar las sugerencias'),
   })
 
   const confirmarMapeoMutation = useMutation({
@@ -104,6 +124,23 @@ export default function TransaccionDetail() {
   const [aceptarError, setAceptarError] = useState<string | null>(null)
 
   const aceptarMutation = useMutation({
+    // aceptar() no lee el mapeo guardado por un PUT .../mapeo anterior — recalcula todo con lo
+    // que llega en este mismo body, así que el `mapeo` se arma acá mismo a partir de las líneas
+    // ya `confirmada` en pantalla.
+    //
+    // OJO — verificado contra el backend real (transacción 9bb4b6f2-...): un GET .../mapeo
+    // "fresco" NUNCA devuelve `estado: "confirmada"` para una línea, ni siquiera immediatamente
+    // después de un PUT que sí la confirmó — GET siempre la recalcula como "sugerida" con
+    // `motivo: "mapeo_guardado"` (la sugerencia más fuerte, pero sigue siendo sugerencia, tal
+    // como documenta el propio backend). El único momento en que una línea aparece como
+    // `"confirmada"` es en la respuesta directa de ese PUT. Por eso este mutationFn usa
+    // `mapeoQuery.data` (que `confirmarMapeoMutation`/`confirmarTodasLasSugerencias` actualizan
+    // vía `setQueryData` con la respuesta real del PUT) y NO vuelve a pedir un GET antes de
+    // aceptar — hacerlo reintroduce el bug original (manda `mapeo: []`) porque el GET siempre
+    // "desconfirma" las líneas. Si el usuario navegó a otra pantalla y volvió, un remount de
+    // `mapeoQuery` sí puede haber vuelto a mostrar "sugerida" — pero en ese caso `puedeAceptar`
+    // también vuelve a `false` (mismo GET), así que el botón "Aceptar" queda deshabilitado hasta
+    // que el usuario reconfirme desde la pantalla de mapeo — no hace falta lógica extra acá.
     mutationFn: () => aceptarTransaccionB2B(uid!, {
       mapeo: (mapeoQuery.data?.lineas ?? [])
         .filter((l) => l.estado === 'confirmada' && l.local)
@@ -168,21 +205,50 @@ export default function TransaccionDetail() {
   })
 
   // ─── Mi documento local (para saber si sigue en Borrador o ya está Sometido) ───────────────
+  // Verificado contra un caso real: el backend puede devolver este campo como id plano o como
+  // `{ doctype, name }` — normalizar siempre acá, nunca asumir que es un string ni renderizarlo
+  // directo (React tira "Objects are not valid as a React child" si se le pasa el objeto).
+  const documentoLocalId = typeof transaccion?.documentoLocal === 'string'
+    ? transaccion.documentoLocal
+    : (transaccion?.documentoLocal?.name ?? null)
+  // `tipo` describe el TRATO (quién compró/vendió originalmente), no necesariamente el doctype
+  // del documento de ESTE lado — verificado con un caso real: `direccion:"Entrante"` +
+  // `tipo:"Compra"` con `documentoLocal.doctype: "Sales Invoice"` (el emisor recibe la compra del
+  // socio y factura como venta). Cuando el backend manda el doctype, es la fuente de verdad; el
+  // fallback a `tipo` queda solo para el shape viejo (string plano, sin doctype).
+  const documentoLocalDoctype = transaccion?.documentoLocal && typeof transaccion.documentoLocal === 'object'
+    ? transaccion.documentoLocal.doctype
+    : undefined
+  const documentoLocalEsVenta = documentoLocalDoctype
+    ? documentoLocalDoctype === 'Sales Invoice'
+    : transaccion?.tipo === 'Venta'
+
   const documentoLocalQuery = useQuery({
-    queryKey: ['documento-local-transaccion', transaccion?.tipo, transaccion?.documentoLocal],
-    queryFn: () => fetchDocumentoLocal(transaccion!.tipo, transaccion!.documentoLocal!),
-    enabled: !!transaccion?.documentoLocal,
+    queryKey: ['documento-local-transaccion', documentoLocalEsVenta, documentoLocalId],
+    queryFn: () => fetchDocumentoLocal(documentoLocalEsVenta, documentoLocalId!),
+    enabled: !!documentoLocalId,
   })
 
-  const ncfActual = transaccion?.tipo === 'Compra'
+  const ncfActual = !documentoLocalEsVenta
     ? (documentoLocalQuery.data as Compra | undefined)?.ncfProveedor
     : (documentoLocalQuery.data as Invoice | undefined)?.ncf
+
+  // Factura de venta local con saldo pendiente — el caso de "aceptada, falta cobro" (cobro
+  // diferido en Caja: verificado contra un caso real que la factura queda en "draft" hasta que
+  // se cobra — completar-cobro es lo que la somete y le asigna el NCF real, no algo de esta
+  // pantalla — así que `outstandingAmount` es la señal correcta, no `status`).
+  const facturaVentaPendienteDeCobro = documentoLocalEsVenta
+    ? (documentoLocalQuery.data as Invoice | undefined)
+    : undefined
+  const mostrarPendienteDeCobro = esEntrante && !!documentoLocalId && !!facturaVentaPendienteDeCobro &&
+    facturaVentaPendienteDeCobro.status !== 'cancelled' &&
+    facturaVentaPendienteDeCobro.outstandingAmount > 0
 
   // ─── Diferencias / Igualar ──────────────────────────────────────────────────────────────────
   const diffQuery = useQuery({
     queryKey: ['diff-transaccion', uid],
     queryFn: () => getDiffTransaccion(uid!),
-    enabled: !!uid && !!transaccion?.documentoLocal,
+    enabled: !!uid && !!documentoLocalId,
   })
 
   const [igualarBorradorOpen, setIgualarBorradorOpen] = useState(false)
@@ -419,9 +485,9 @@ export default function TransaccionDetail() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header"><h2 className="card-title">Mi documento</h2></div>
         <div className="card-body">
-          {transaccion.documentoLocal ? (
-            <Link to={transaccion.tipo === 'Compra' ? `/compras/${transaccion.documentoLocal}` : `/facturas/${transaccion.documentoLocal}`}>
-              {transaccion.documentoLocal}
+          {documentoLocalId ? (
+            <Link to={documentoLocalEsVenta ? `/facturas/${documentoLocalId}` : `/compras/${documentoLocalId}`}>
+              {documentoLocalId}
             </Link>
           ) : (
             <span className="td-muted">Aún no se ha generado un documento local</span>
@@ -429,10 +495,60 @@ export default function TransaccionDetail() {
         </div>
       </div>
 
+      {/* Factura de venta ya aceptada y sometida, pendiente de cobro en Caja — el paso pendiente
+          real no es de Relaciones Comerciales, así que se linkea directo a la pantalla de cobro
+          en vez de duplicar el flujo acá. Al cobrar, el NCF se le manda solo al socio. */}
+      {mostrarPendienteDeCobro && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-body">
+            <div className="inline-alert inline-alert-info">
+              <AlertTriangle size={14} />
+              <span>
+                Factura aceptada, pendiente de cobro en Caja.{' '}
+                <Link to={`/caja/por-cobrar?invoiceId=${encodeURIComponent(documentoLocalId!)}`}>
+                  Ir a cobrar {documentoLocalId}
+                </Link>
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lado Saliente con "Requiere Mapeo"/"Pendiente" (o cualquier estado que necesita acción):
+          esa acción es responsabilidad exclusiva de la contraparte que recibió el documento —
+          acá solo se informa, sin formulario ni botones. El texto cambia según qué está
+          esperando puntualmente (mapeo vs. que la contraparte cobre para poder emitir el NCF) —
+          nunca inferir esto de una sola frase genérica, `estado` ya lo distingue. */}
+      {mostrarEsperandoContraparte && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-body">
+            <div className="inline-alert inline-alert-info">
+              <AlertTriangle size={14} />
+              <span>
+                {transaccion.estado === 'Pendiente'
+                  ? 'Esperando que el vendedor complete el cobro para recibir el comprobante fiscal (NCF).'
+                  : 'Esperando que la contraparte mapee los artículos de esta transacción.'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mapeo de artículos — flujo de Aceptar */}
       {mostrarAceptar && (
         <div className="card" style={{ marginBottom: 16 }} ref={mapeoRef}>
-          <div className="card-header"><h2 className="card-title">Mapeo de artículos</h2></div>
+          <div className="card-header">
+            <h2 className="card-title">Mapeo de artículos</h2>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              disabled={refrescarMapeoMutation.isPending}
+              onClick={() => refrescarMapeoMutation.mutate()}
+              title="Vuelve a preguntarle al socio su catálogo actual — puede tardar un poco más que la carga normal"
+            >
+              <RefreshCw size={14} style={refrescarMapeoMutation.isPending ? { animation: 'spin 1s linear infinite' } : undefined} />
+              {refrescarMapeoMutation.isPending ? 'Actualizando…' : 'Actualizar sugerencias'}
+            </button>
+          </div>
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {mapeoQuery.isLoading && <span className="skeleton-box" style={{ height: 120, width: '100%', display: 'block' }} />}
             {mapeoQuery.isError && (
@@ -593,7 +709,7 @@ export default function TransaccionDetail() {
           <div className="inline-alert inline-alert-warn">
             <AlertTriangle size={16} />
             <span>
-              Esto anulará la factura {ncfActual || transaccion.documentoLocal} y creará una nueva versión en
+              Esto anulará la factura {ncfActual || documentoLocalId} y creará una nueva versión en
               borrador con un NCF distinto. La factura anulada no se puede recuperar.
             </span>
           </div>
@@ -697,11 +813,22 @@ export default function TransaccionDetail() {
 
         {enlazarStep === 'mapeo' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {candidatoElegido && (
-              <div className="td-muted" style={{ fontSize: 13 }}>
-                Emparejando contra: <strong>{candidatoElegido.name}</strong> ({formatDate(candidatoElegido.fecha)}, {formatDOP(candidatoElegido.total)})
-              </div>
-            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              {candidatoElegido ? (
+                <div className="td-muted" style={{ fontSize: 13 }}>
+                  Emparejando contra: <strong>{candidatoElegido.name}</strong> ({formatDate(candidatoElegido.fecha)}, {formatDOP(candidatoElegido.total)})
+                </div>
+              ) : <div />}
+              <button
+                className="btn btn-secondary btn-size-sm"
+                disabled={refrescarMapeoMutation.isPending}
+                onClick={() => refrescarMapeoMutation.mutate()}
+                title="Vuelve a preguntarle al socio su catálogo actual — puede tardar un poco más que la carga normal"
+              >
+                <RefreshCw size={14} style={refrescarMapeoMutation.isPending ? { animation: 'spin 1s linear infinite' } : undefined} />
+                {refrescarMapeoMutation.isPending ? 'Actualizando…' : 'Actualizar sugerencias'}
+              </button>
+            </div>
             {mapeoQuery.isLoading && <span className="skeleton-box" style={{ height: 120, width: '100%', display: 'block' }} />}
             {mapeoQuery.data && (
               <MapeoForm

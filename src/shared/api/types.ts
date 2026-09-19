@@ -7291,7 +7291,9 @@ export interface TransaccionB2BListItem {
   tipo: 'Venta' | 'Compra';
   estado: EstadoTransaccionB2B;
   contraparte: TransaccionContraparte;
-  documentoLocal: string | null;
+  /** Verificado contra un caso real: el backend puede devolver el id plano o
+   *  `{ doctype, name }` — normalizar siempre con el id (nunca renderizar este campo directo). */
+  documentoLocal: string | { doctype: string; name: string } | null;
   documentoOrigen: DocumentoOrigenTransaccion | null;
   advertenciaTotales?: string | null;
   motivoEstado?: string | null;

@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, AlertTriangle } from 'lucide-react'
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
@@ -25,7 +26,12 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', footer, chi
 
   const sizeClass = size === 'sm' ? 'modal-box-sm' : size === 'lg' ? 'modal-box-lg' : ''
 
-  return (
+  // Portal a document.body: si se renderiza inline, cualquier ancestro con una animación de
+  // entrada que toque translate/transform (ej. `.card`, ver src/index.css) queda establecido
+  // como containing block permanente de este `position: fixed` — el overlay termina encerrado
+  // en esa tarjeta en vez de cubrir la pantalla. Mismo patrón ya usado en
+  // SaldoFavorProveedorPagosSection.tsx.
+  return createPortal(
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
       <div className={`modal-box ${sizeClass}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
@@ -40,7 +46,8 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', footer, chi
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -65,7 +72,7 @@ export function ConfirmModal({
 }: ConfirmModalProps) {
   if (!open) return null
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
         <div className="modal-body" style={{ gap: 12, paddingTop: 24 }}>
@@ -97,6 +104,7 @@ export function ConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

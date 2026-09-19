@@ -712,6 +712,7 @@ export const ENDPOINTS = {
       reintentar: (uid: string) => `/relaciones/transacciones/${encodeURIComponent(uid)}/reintentar`,
       cancelar: (uid: string) => `/relaciones/transacciones/${encodeURIComponent(uid)}/cancelar`,
       mapeo: (uid: string) => `/relaciones/transacciones/${encodeURIComponent(uid)}/mapeo`,
+      mapeoRefrescar: (uid: string) => `/relaciones/transacciones/${encodeURIComponent(uid)}/mapeo/refrescar`,
       crearArticulo: (uid: string) => `/relaciones/transacciones/${encodeURIComponent(uid)}/mapeo/crear-articulo`,
       diff: (uid: string) => `/relaciones/transacciones/${encodeURIComponent(uid)}/diff`,
       igualar: (uid: string) => `/relaciones/transacciones/${encodeURIComponent(uid)}/igualar`,

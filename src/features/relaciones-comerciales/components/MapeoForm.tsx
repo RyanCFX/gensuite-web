@@ -7,6 +7,8 @@
 import { useState } from 'react'
 import { Search, Plus, Check } from 'lucide-react'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Badge } from '@/shared/ui/Badge'
 import { Modal } from '@/shared/ui/Modal'
 import { useQuery } from '@tanstack/react-query'
@@ -19,6 +21,15 @@ const ESTADO_BADGE: Record<EstadoLineaMapeo, { label: string; variant: 'success'
   sugerida: { label: 'Sugerida', variant: 'warning' },
   sin_sugerencia: { label: 'Sin sugerencia', variant: 'neutral' },
   ambigua: { label: 'Ambigua', variant: 'error' },
+}
+
+// `motivo` es texto libre del backend (§2 de FASE_07_MAPEO_CATALOGO_FRONTEND.md) — el frontend
+// nunca decide la sugerencia, solo explica por qué llegó. Un motivo desconocido simplemente no
+// muestra explicación (no romper si el backend agrega uno nuevo).
+const MOTIVO_SUGERENCIA_LABEL: Record<string, string> = {
+  mapeo_guardado: 'Ya se había mapeado este artículo antes con este socio',
+  barcode: 'Coincide por código de barra',
+  item_code: 'Mismo código de artículo en su catálogo',
 }
 
 interface FilaSeleccion {
@@ -144,25 +155,26 @@ export function MapeoForm({
                           ))}
                         </div>
                       )}
-                      {linea.estado === 'sugerida' && !sel && linea.sugerencia && (
-                        <div style={{ marginBottom: 8, fontSize: 13 }}>
-                          Sugerido: <strong>{linea.sugerencia.itemName}</strong>{' '}
-                          <span className="td-muted">({linea.sugerencia.itemCode})</span>
-                        </div>
-                      )}
                       {linea.estado === 'confirmada' && linea.local && (
                         <div style={{ fontSize: 13 }}>
                           <strong>{linea.local.itemName}</strong> <span className="td-muted">({linea.local.itemCode})</span>
                         </div>
                       )}
                       {linea.estado !== 'confirmada' && (
-                        <ItemSelect
-                          value={sel?.itemCode ?? ''}
-                          selectedLabel={sel?.itemName}
-                          onSelect={(item: Item) => elegir(linea, { itemCode: item.id, itemName: item.itemName, uom: item.stockUom })}
-                          onClear={() => setSeleccion((s) => { const n = { ...s }; delete n[linea.indice]; return n })}
-                          placeholder="Buscar otro artículo…"
-                        />
+                        <>
+                          <ItemSelect
+                            value={sel?.itemCode ?? (linea.estado === 'sugerida' ? linea.sugerencia?.itemCode : undefined) ?? ''}
+                            selectedLabel={sel?.itemName ?? (linea.estado === 'sugerida' ? linea.sugerencia?.itemName : undefined)}
+                            onSelect={(item: Item) => elegir(linea, { itemCode: item.id, itemName: item.itemName, uom: item.stockUom })}
+                            onClear={() => setSeleccion((s) => { const n = { ...s }; delete n[linea.indice]; return n })}
+                            placeholder="Buscar otro artículo…"
+                          />
+                          {linea.estado === 'sugerida' && !sel && linea.sugerencia && MOTIVO_SUGERENCIA_LABEL[linea.sugerencia.motivo] && (
+                            <div className="td-muted" style={{ fontSize: 11, marginTop: 4 }}>
+                              {MOTIVO_SUGERENCIA_LABEL[linea.sugerencia.motivo]}
+                            </div>
+                          )}
+                        </>
                       )}
                       {mostrarFactor && (
                         <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
@@ -260,14 +272,20 @@ function CrearArticuloModal({
   loading?: boolean
 }) {
   const [itemGroup, setItemGroup] = useState('')
+  const [itemGroupLabel, setItemGroupLabel] = useState('')
+  const [categoriaQuery, setCategoriaQuery] = useState('')
   const [isStockItem, setIsStockItem] = useState(true)
   const [itemCode, setItemCode] = useState('')
   const [crearPrecioCompra, setCrearPrecioCompra] = useState(false)
 
-  const { data: categorias } = useQuery({
-    queryKey: ['categorias-all-relaciones'],
-    queryFn: () => listCategories({ limit: 100 }),
+  const { data: categorias, isLoading: categoriasLoading } = useQuery({
+    queryKey: ['categorias-all-relaciones', categoriaQuery],
+    queryFn: () => listCategories({ search: categoriaQuery || undefined, limit: 100 }),
   })
+  const categoriaOptions: SearchSelectOption[] = (categorias?.items ?? []).map((c) => ({
+    value: c.id,
+    label: c.name,
+  }))
 
   return (
     <Modal
@@ -288,23 +306,35 @@ function CrearArticuloModal({
         </>
       }
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div className="form-field">
-          <label>Categoría</label>
-          <select className="input" value={itemGroup} onChange={(e) => setItemGroup(e.target.value)}>
-            <option value="">Seleccionar…</option>
-            {categorias?.items.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="ff-wrap">
+          <label className="ff-label ff-required" htmlFor="crear-articulo-categoria">Categoría</label>
+          <SearchSelect
+            id="crear-articulo-categoria"
+            value={itemGroup}
+            selectedLabel={itemGroupLabel}
+            onChange={(val, opt) => { setItemGroup(val); setItemGroupLabel(opt?.label ?? '') }}
+            options={categoriaOptions}
+            onSearch={setCategoriaQuery}
+            loading={categoriasLoading}
+            placeholder="Buscar categoría…"
+          />
         </div>
-        <div className="form-field">
-          <label>Código (opcional — se genera uno si se deja vacío)</label>
-          <input className="input" value={itemCode} onChange={(e) => setItemCode(e.target.value)} />
+        <div className="ff-wrap">
+          <label className="ff-label" htmlFor="crear-articulo-codigo">Código</label>
+          <input
+            id="crear-articulo-codigo"
+            className="ff-input"
+            value={itemCode}
+            onChange={(e) => setItemCode(e.target.value)}
+            placeholder="Se genera uno si se deja vacío"
+          />
         </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
           <input type="checkbox" checked={isStockItem} onChange={(e) => setIsStockItem(e.target.checked)} />
           Es artículo de inventario (controla stock)
         </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
           <input type="checkbox" checked={crearPrecioCompra} onChange={(e) => setCrearPrecioCompra(e.target.checked)} />
           Crear precio de compra con el precio unitario del socio
         </label>
