@@ -16696,6 +16696,43 @@
         ]
       }
     },
+    "/api/v1/relaciones/transacciones/{uid}/mapeo/refrescar": {
+      "post": {
+        "operationId": "MapeoController_refrescar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Igual que GET .../mapeo, pero además vuelve a consultar el catálogo del EMISOR en vivo para refrescar los barcodes de cada línea (el snapshot del documento los congela al momento de someterlo) y persiste el resultado en esta bandeja local. Best-effort — si el emisor no responde, sigue con el snapshot que ya había.",
+        "tags": [
+          "Relaciones Comerciales — Mapeo de Catálogo"
+        ]
+      }
+    },
     "/api/v1/relaciones/transacciones/{uid}/mapeo/crear-articulo": {
       "post": {
         "operationId": "MapeoController_crearArticulo",
@@ -18232,6 +18269,51 @@
         "summary": "Generar TODAS las variantes posibles de un template automáticamente",
         "tags": [
           "Catalog - Items"
+        ]
+      }
+    },
+    "/api/v1/dgii/taxpayers/{rnc}": {
+      "get": {
+        "operationId": "DgiiTaxpayersController_findByRnc",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "rnc",
+            "required": true,
+            "in": "path",
+            "description": "RNC (9 dígitos) o Cédula (11 dígitos)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DgiiTaxpayerResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Buscar un contribuyente en el padrón de la DGII por RNC/Cédula",
+        "tags": [
+          "DGII - Padrón de Contribuyentes"
         ]
       }
     },
@@ -19928,6 +20010,44 @@
           }
         ],
         "summary": "List purchase invoices for a supplier",
+        "tags": [
+          "Suppliers"
+        ]
+      }
+    },
+    "/api/v1/suppliers/{id}/verificar-emisor-electronico": {
+      "get": {
+        "description": "Consulta el RNC del proveedor (Megaplus, con fallback a scraping directo de la DGII si Megaplus no responde — ver RncConsultaService) y guarda el resultado en el caché local `dgii_taxpayers` (compartido entre tenants por RNC). El usuario ya no marca \"esEmisorElectronico\" a mano: se resuelve solo al crear el proveedor, y el frontend debe llamar este endpoint cuando detecte `esEmisorElectronico` en `null`/`false` al seleccionar un proveedor en Compras/Gastos. Falla con 400 si el proveedor no tiene RNC registrado, o si el RNC no aparece inscrito como contribuyente en la DGII.",
+        "operationId": "ProveedoresController_verificarEmisorElectronico",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verificar/refrescar si este proveedor es emisor electrónico (e-CF)",
         "tags": [
           "Suppliers"
         ]
@@ -33682,51 +33802,6 @@
         ]
       }
     },
-    "/api/v1/dgii/taxpayers/{rnc}": {
-      "get": {
-        "operationId": "DgiiTaxpayersController_findByRnc",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "rnc",
-            "required": true,
-            "in": "path",
-            "description": "RNC (9 dígitos) o Cédula (11 dígitos)",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DgiiTaxpayerResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Buscar un contribuyente en el padrón de la DGII por RNC/Cédula",
-        "tags": [
-          "DGII - Padrón de Contribuyentes"
-        ]
-      }
-    },
     "/api/v1/farmacia/lotes": {
       "get": {
         "operationId": "LotesController_findAll",
@@ -38561,7 +38636,7 @@
         "type": "object",
         "properties": {
           "payments": {
-            "description": "Líneas de pago (uno o más métodos: efectivo, tarjetas, cheques). La suma no puede exceder el saldo pendiente de la factura — puede ser menor (cobro parcial).",
+            "description": "Líneas de pago (uno o más métodos: efectivo, tarjetas, cheques). La suma no puede exceder el saldo pendiente de la factura — puede ser menor (cobro parcial). Puede venir vacío SOLO en POST /caja/facturas/:id/completar-cobro cuando la cobertura ARS ya cubre el 100% del total (nada que cobrarle al paciente) — en cualquier otro caso, con saldo pendiente real, el servicio rechaza un array vacío.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PaymentLineDto"
@@ -40568,6 +40643,43 @@
             "description": "Anula, solo para este artículo, el default del tenant (config/facturacion → actualizarCostoEnCompra) que decide si comprarlo actualiza purchasePrice (valuation_rate) automáticamente. `\"\"` explícito quita el override y vuelve a usar el default del tenant."
           }
         }
+      },
+      "DgiiTaxpayerResponseDto": {
+        "type": "object",
+        "properties": {
+          "rnc": {
+            "type": "string",
+            "description": "RNC o cédula del contribuyente"
+          },
+          "name": {
+            "type": "string",
+            "description": "Razón social"
+          },
+          "tradeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "businessActivity": {
+            "type": "string",
+            "nullable": true
+          },
+          "registrationDate": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "rnc",
+          "name"
+        ]
       },
       "CreateCategoryDto": {
         "type": "object",
@@ -45691,43 +45803,6 @@
         },
         "required": [
           "request"
-        ]
-      },
-      "DgiiTaxpayerResponseDto": {
-        "type": "object",
-        "properties": {
-          "rnc": {
-            "type": "string",
-            "description": "RNC o cédula del contribuyente"
-          },
-          "name": {
-            "type": "string",
-            "description": "Razón social"
-          },
-          "tradeName": {
-            "type": "string",
-            "nullable": true
-          },
-          "businessActivity": {
-            "type": "string",
-            "nullable": true
-          },
-          "registrationDate": {
-            "type": "string",
-            "nullable": true
-          },
-          "status": {
-            "type": "string",
-            "nullable": true
-          },
-          "type": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "rnc",
-          "name"
         ]
       },
       "CreateLoteDto": {
