@@ -625,6 +625,29 @@ export default function InvoiceForm() {
     }
   }, [esClienteOcasional, clienteOcasionalRnc])
 
+  // ── Sugerir cédula/teléfono del paciente en el panel de ARS a partir del cliente de
+  // "Información General" (vertical farmacia, factura con seguro). Es solo una sugerencia — igual
+  // que la tasa de cambio (líneas ~354-359), nunca pisa un valor que el usuario ya haya escrito.
+  useEffect(() => {
+    if (!esFarmacia || !arsEnabled || !customerTouchedRef.current) return
+    // El RNC de un cliente ocasional puede ser una cédula (11 dígitos) o un RNC de empresa (9
+    // dígitos) — solo se sugiere cuando de verdad parece una cédula de persona física.
+    const cedulaSugerida = esClienteOcasional
+      ? (/^\d{11}$/.test(clienteOcasionalRnc.replace(/[-\s]/g, '')) ? clienteOcasionalRnc : '')
+      : (selectedCustomer?.cedula ?? '')
+    // No hay campo de teléfono para cliente ocasional en Información General.
+    const telefonoSugerido = esClienteOcasional
+      ? ''
+      : (selectedCustomer?.telefonos?.[0]?.telefono ?? selectedCustomer?.phone ?? '')
+    if (!cedulaSugerida && !telefonoSugerido) return
+    setArs((prev) => {
+      const cedula = prev.cedula || cedulaSugerida
+      const telefonoPaciente = prev.telefonoPaciente || telefonoSugerido
+      if (cedula === prev.cedula && telefonoPaciente === prev.telefonoPaciente) return prev
+      return { ...prev, cedula, telefonoPaciente }
+    })
+  }, [esFarmacia, arsEnabled, selectedCustomer, esClienteOcasional, clienteOcasionalRnc])
+
   // ── Mutations ─────────────────────────────────────────────────────────────
   /** Cuando el backend rechaza la venta por tener stock repartido en varias ubicaciones del mismo
    *  almacén, marca la línea afectada para que el cajero elija una ahí mismo en vez de un toast genérico. */
