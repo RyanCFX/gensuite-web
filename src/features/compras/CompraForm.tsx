@@ -11,6 +11,7 @@ import { listAlmacenes, listImpuestosCompras, getCatalogosFiscales, getFacturaci
 import { listMonedas, getTasaVigente } from '@/shared/api/monedas'
 import type { MonedaCode } from '@/shared/api/types'
 import { listRetenciones } from '@/shared/api/retenciones'
+import { useSupplierEmisorElectronico } from '@/shared/hooks/useSupplierEmisorElectronico'
 import { getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateCompraDto, Supplier, DistribucionCuentaDto } from '@/shared/api/types'
@@ -721,6 +722,8 @@ export default function CompraForm() {
     enabled: !!supplierId && !esProveedorOcasional,
   })
 
+  useSupplierEmisorElectronico(supplierDetail, !!supplierId && !esProveedorOcasional)
+
   // Al resolver el proveedor, pre-llenamos los campos 606 e impuestos/retenciones que trae.
   // No sobre-escribimos valores que el usuario ya haya definido (ni en modo edición desde el
   // draft). Cada vez que se cambie de proveedor, los defaults del nuevo proveedor se aplican.
@@ -1328,6 +1331,13 @@ export default function CompraForm() {
             </div>
 
             {/* ── Impuestos y retenciones ── */}
+            {supplierDetail?.excepcion0226Aplicable && (
+              <div className="inline-alert inline-alert-info" style={{ marginTop: 16 }}>
+                <Info size={16} />
+                Este proveedor es elegible para la excepción de la Norma 02-26 — si el comprobante
+                de esta compra es un e-CF, no se retendrá ITBIS.
+              </div>
+            )}
             <div className="form-row form-row-3" style={{ borderTop: '1px solid var(--border-subtle)', marginTop: 16, paddingTop: 16 }}>
               {usaImpuestoDocumento && (
                 <div className="ff-wrap">

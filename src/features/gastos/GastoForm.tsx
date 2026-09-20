@@ -16,6 +16,7 @@ import type { MonedaCode } from '@/shared/api/types'
 import { getCuenta } from '@/shared/api/cuentas'
 import { CATEGORIA_GASTO } from '@/lib/constants'
 import { listRetenciones } from '@/shared/api/retenciones'
+import { useSupplierEmisorElectronico } from '@/shared/hooks/useSupplierEmisorElectronico'
 import { Plus, Trash2, Pencil, Info, AlertCircle, AlertTriangle } from 'lucide-react'
 import { Modal } from '@/shared/ui/Modal'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -355,6 +356,8 @@ export default function GastoForm() {
     queryFn: () => getSupplier(supplierId),
     enabled: !!supplierId && !esProveedorOcasional,
   })
+
+  useSupplierEmisorElectronico(supplierDetail, !!supplierId && !esProveedorOcasional)
 
   // ── Catálogos de impuestos y retenciones (multiselect) ────────────────────────
   const { data: retencionesData } = useQuery({
@@ -1110,6 +1113,13 @@ export default function GastoForm() {
             </div>
 
             {/* ── Impuestos y retenciones ── */}
+            {supplierDetail?.excepcion0226Aplicable && (
+              <div className="inline-alert inline-alert-info" style={{ marginTop: 16 }}>
+                <Info size={16} />
+                Este proveedor es elegible para la excepción de la Norma 02-26 — si el comprobante
+                de este gasto es un e-CF, no se retendrá ITBIS.
+              </div>
+            )}
             {showDuplicateTaxWarning && (
               <div className="inline-alert inline-alert-error" style={{ marginTop: 16 }}>
                 <AlertCircle size={16} />

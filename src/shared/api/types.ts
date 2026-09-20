@@ -472,8 +472,33 @@ export interface Supplier {
   impuestoComprasDefault?: ProveedorIdTasa[];
   /** Igual que `impuestoComprasDefault` pero para Gastos (mismo catálogo de templates). */
   impuestoGastosDefault?: ProveedorIdTasa[];
+  /** SOLO LECTURA — nunca se manda en `POST`/`PUT /suppliers`. Se resuelve solo consultando el
+   *  RNC del proveedor (Megaplus, con fallback a scraping de la DGII) al crearlo, o bajo demanda
+   *  vía `verificarEmisorElectronico`. `null` = todavía no se pudo verificar (NO equivale a
+   *  `false`); `false` = verificado, no es emisor electrónico; `true` = verificado, sí lo es. */
+  esEmisorElectronico?: boolean | null;
+  /** SOLO LECTURA, calculada por el backend: `true` si `supplierType === 'Company'` y
+   *  `esEmisorElectronico === true` — 2 de las 3 condiciones de la excepción de la Norma 02-26
+   *  sobre retención de ITBIS (la tercera, que el comprobante de cada Compra/Gasto sea un e-CF,
+   *  se evalúa por documento al crearlo). */
+  excepcion0226Aplicable?: boolean;
   createdAt: string;
   modifiedAt: string;
+}
+
+/** Respuesta de `GET /suppliers/:id/verificar-emisor-electronico` — refresca y devuelve el
+ *  resultado fresco de la consulta a Megaplus/DGII (el backend ya actualizó su caché al
+ *  responder, no hace falta que el frontend persista nada más). */
+export interface VerificarEmisorElectronicoResponse {
+  esEmisorElectronico: boolean;
+  emisorElectronicoVerificadoEn: string;
+  excepcion0226Aplicable: boolean;
+  dgii: {
+    razonSocial: string | null;
+    estado: string | null;
+    categoria: string | null;
+    regimenPagos: string | null;
+  };
 }
 
 export interface CreateProveedorDto {

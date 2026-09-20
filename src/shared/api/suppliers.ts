@@ -7,6 +7,7 @@ import type {
   PaginatedResponse,
   PaginationParams,
   Invoice,
+  VerificarEmisorElectronicoResponse,
 } from './types'
 
 export interface ListSuppliersParams extends PaginationParams {
@@ -46,4 +47,15 @@ export async function updateSupplier(id: string, data: UpdateProveedorDto) {
 
 export async function deleteSupplier(id: string) {
   await client.delete(ENDPOINTS.suppliers.byId(id))
+}
+
+/** Refresca si el proveedor es emisor electrónico (Norma 02-26) consultando Megaplus/DGII en
+ *  vivo — el backend ya actualiza su caché al responder. Solo llamar cuando `esEmisorElectronico`
+ *  del proveedor viene en `null`/`false`; puede rechazar con 400 si el proveedor no tiene RNC o
+ *  el RNC no está inscrito en la DGII. */
+export async function verificarEmisorElectronico(id: string) {
+  const res = await client.get<{ success: true; data: VerificarEmisorElectronicoResponse }>(
+    ENDPOINTS.suppliers.verificarEmisorElectronico(id),
+  )
+  return unwrap(res)
 }

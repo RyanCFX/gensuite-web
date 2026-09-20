@@ -2,14 +2,15 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { getSupplier, deleteSupplier, getSupplierPurchases } from '@/shared/api/suppliers'
+import { getSupplier, deleteSupplier, getSupplierPurchases, verificarEmisorElectronico } from '@/shared/api/suppliers'
 import { getHistorialPagos } from '@/shared/api/pagos'
 import { listImpuestosCompras } from '@/shared/api/config'
 import { listRetenciones } from '@/shared/api/retenciones'
+import type { Supplier } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
-import { Pencil, Ban, Building2, Globe, Wallet } from 'lucide-react'
+import { Pencil, Ban, Building2, Globe, Wallet, RefreshCw } from 'lucide-react'
 
 const PAGO_STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -177,6 +178,25 @@ export default function SupplierDetail() {
   const retencionTitulo = (retencionId: string) =>
     retencionesData?.items?.find((r) => r.id === retencionId)?.categoryName ?? retencionId
 
+  const verificarEmisorMutation = useMutation({
+    mutationFn: () => verificarEmisorElectronico(id!),
+    onSuccess: (data) => {
+      queryClient.setQueryData<Supplier | undefined>(['supplier', id], (prev) =>
+        prev
+          ? { ...prev, esEmisorElectronico: data.esEmisorElectronico, excepcion0226Aplicable: data.excepcion0226Aplicable }
+          : prev,
+      )
+      toast.success(
+        data.esEmisorElectronico
+          ? 'Verificado: es emisor electrónico'
+          : 'Verificado: no es emisor electrónico',
+      )
+    },
+    onError: () => {
+      toast.error('No se pudo verificar — el proveedor no tiene RNC registrado o el RNC no aparece inscrito en la DGII')
+    },
+  })
+
   const disableMutation = useMutation({
     mutationFn: () => deleteSupplier(id!),
     onSuccess: () => {
@@ -225,6 +245,9 @@ export default function SupplierDetail() {
             {supplier.supplierName}
             {supplier.disabled && <span className="badge badge-error">Inactivo</span>}
             {supplier.esProveedorExterior && <span className="badge badge-info">Exterior</span>}
+            {supplier.excepcion0226Aplicable && (
+              <span className="badge badge-success">Elegible excepción ITBIS (Norma 02-26)</span>
+            )}
           </span>
         }
         description={
@@ -262,6 +285,29 @@ export default function SupplierDetail() {
                 <span className="detail-label">Tipo</span>
                 <span className="detail-value">{supplier.supplierType === 'Company' ? 'Empresa' : 'Individual'}</span>
               </div>
+              {supplier.supplierType === 'Company' && (
+                <div className="detail-field">
+                  <span className="detail-label">Emisor Electrónico (DGII)</span>
+                  <span className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {supplier.esEmisorElectronico === true && <span className="badge badge-success">Sí</span>}
+                    {supplier.esEmisorElectronico === false && <span className="badge badge-neutral">No</span>}
+                    {(supplier.esEmisorElectronico === null || supplier.esEmisorElectronico === undefined) && (
+                      <span className="badge badge-warning">Sin verificar</span>
+                    )}
+                    {supplier.esEmisorElectronico !== true && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-size-sm"
+                        disabled={verificarEmisorMutation.isPending}
+                        onClick={() => verificarEmisorMutation.mutate()}
+                      >
+                        <RefreshCw size={14} className={verificarEmisorMutation.isPending ? 'spin' : undefined} />
+                        Revalidar
+                      </button>
+                    )}
+                  </span>
+                </div>
+              )}
               <div className="detail-field">
                 <span className="detail-label">Tipo Identificación</span>
                 <span className="detail-value">{supplier.tipoIdentificacion ?? '—'}</span>

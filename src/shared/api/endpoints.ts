@@ -141,6 +141,7 @@ export const ENDPOINTS = {
     list: '/suppliers',
     byId: (id: string) => `/suppliers/${id}`,
     purchases: (id: string) => `/suppliers/${id}/purchases`,
+    verificarEmisorElectronico: (id: string) => `/suppliers/${id}/verificar-emisor-electronico`,
   },
   inventory: {
     list: '/inventory',
