@@ -1,0 +1,3 @@
+[submodule "vendor/gensuite-ui-kit"]
+	path = vendor/gensuite-ui-kit
+	url = https://github.com/RyanCFX/gensuite-ui-kit.git
