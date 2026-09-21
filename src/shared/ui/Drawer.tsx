@@ -10,15 +10,21 @@ interface DrawerProps {
   /** 'md' (default, 420px) para filtros secundarios; 'lg' (720px) cuando el contenido es una
    *  tabla u otra vista que necesita más espacio horizontal. */
   size?: 'md' | 'lg'
+  /** Sobrescribe el max-width del panel (ej. 300) cuando 'size' no ajusta lo suficiente. */
+  width?: number | string
 }
 
 // Panel lateral derecho reutilizable — usado, por ejemplo, para agrupar filtros secundarios
 // que no caben en la barra de filtros principal sin saturarla.
-export function Drawer({ open, onClose, title, subtitle, children, footer, size = 'md' }: DrawerProps) {
+export function Drawer({ open, onClose, title, subtitle, children, footer, size = 'md', width }: DrawerProps) {
   if (!open) return null
   return (
     <div className="drawer-overlay" onClick={onClose}>
-      <div className={`drawer-panel${size === 'lg' ? ' drawer-panel-lg' : ''}`} onClick={(e) => e.stopPropagation()}>
+      <div
+        className={`drawer-panel${size === 'lg' ? ' drawer-panel-lg' : ''}`}
+        style={width !== undefined ? { maxWidth: width } : undefined}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-head">
           <div>
             <h2 className="modal-title">{title}</h2>

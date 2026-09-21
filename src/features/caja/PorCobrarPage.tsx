@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Search, DollarSign, Trash2, ChevronLeft, ChevronRight, X, Clock } from 'lucide-react'
+import { Search, DollarSign, Trash2, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 import { listPorCobrar, completarCobro, descartarFactura } from '@/shared/api/caja'
 import { getFacturacionConfig, listMetodosPago } from '@/shared/api/config'
 import { getCustomer } from '@/shared/api/customers'
@@ -15,6 +15,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { TurnoCajaIndicator } from '@/components/shared/TurnoCajaIndicator'
 import { ConfirmModal } from '@/shared/ui/Modal'
+import { Drawer } from '@/shared/ui/Drawer'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { usePosTicketPrinter } from '@/shared/hooks/usePosTicketPrinter'
@@ -336,7 +337,7 @@ function validateAndSubmit() {
     <div className="page-container">
        <div className="page-header">
          <div>
-           <h1 className="page-title">Caja</h1>
+           <h1 className="page-title"><span className="page-title-dot" />Caja</h1>
            <p className="page-sub">
              {data?.meta
                ? `${data.meta.total} factura(s) pendiente(s) de completar cobro`
@@ -369,23 +370,27 @@ function validateAndSubmit() {
           </div>
         )}
 
-        <div className="filter-bar">
-          <div className="filter-bar-left">
-            <div className="search-input-wrap">
-              <Search size={15} className="search-input-icon" />
-              <input
-                className="search-input"
-                placeholder="Buscar factura o cliente…"
-                value={search}
-                onChange={handleSearchChange}
-              />
+        <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+          <div className="card-body">
+            <div className="filter-bar" style={{ margin: 0 }}>
+              <div className="filter-bar-left">
+                <div className="search-input-wrap">
+                  <Search size={14} className="search-input-icon" />
+                  <input
+                    className="search-input"
+                    placeholder="Buscar factura o cliente…"
+                    value={search}
+                    onChange={handleSearchChange}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-      <div className="card">
+      <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table navy-table">
             <thead>
               <tr>
                 <th>Factura</th>
@@ -477,16 +482,31 @@ function validateAndSubmit() {
       </>
       )}
 
-       {/* ── Modal: completar cobro ──────────────────────────────── */}
+       {/* ── Drawer: completar cobro ─────────────────────────────── */}
        {selectedInvoice && (
-         <div className="modal-overlay" onClick={requestCloseModal}>
-           <div className="modal-box" style={{ maxWidth: flujoCobro === 'caja' ? 640 : 480 }} onClick={(e) => e.stopPropagation()}>
-             <div className="modal-head">
-               <h2 className="modal-title">Completar cobro — {selectedInvoice.id}</h2>
-               <button className="modal-close" type="button" onClick={requestCloseModal}><X size={16} /></button>
-             </div>
-
-             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+         <Drawer
+           open={!!selectedInvoice}
+           onClose={requestCloseModal}
+           title={`Completar cobro — ${selectedInvoice.id}`}
+           size="md"
+           width={600}
+           footer={
+             <>
+               <button className="btn btn-ghost" onClick={requestCloseModal}>Cancelar</button>
+               <button
+                 className="btn btn-primary"
+                 onClick={validateAndSubmit}
+                 disabled={completarMutation.isPending || (flujoCobro === 'caja' && !canSubmitCaja)}
+               >
+                 {completarMutation.isPending ? 'Procesando…' : `Cobrar ${formatMoney(
+                   flujoCobro === 'directo' ? selectedRoundedTotal : sumPayments(paymentsValue.payments),
+                   selectedInvoiceCurrency,
+                 )}`}
+               </button>
+             </>
+           }
+         >
+           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 13 }}>
                  <span style={{ color: 'var(--text-secondary)' }}>Cliente:</span>
                  <span style={{ fontWeight: 500 }}>{selectedInvoice.customerName}</span>
@@ -613,23 +633,8 @@ function validateAndSubmit() {
                    />
                  </>
                )}
-             </div>
-
-             <div className="modal-foot">
-               <button className="btn btn-ghost" onClick={requestCloseModal}>Cancelar</button>
-               <button
-                 className="btn btn-primary"
-                 onClick={validateAndSubmit}
-                 disabled={completarMutation.isPending || (flujoCobro === 'caja' && !canSubmitCaja)}
-               >
-                 {completarMutation.isPending ? 'Procesando…' : `Cobrar ${formatMoney(
-                   flujoCobro === 'directo' ? selectedRoundedTotal : sumPayments(paymentsValue.payments),
-                   selectedInvoiceCurrency,
-                 )}`}
-               </button>
-             </div>
            </div>
-         </div>
+         </Drawer>
        )}
 
        {/* ── Modal: confirmar descartar ──────────────────────────── */}
