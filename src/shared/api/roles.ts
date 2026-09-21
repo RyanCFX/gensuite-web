@@ -11,8 +11,8 @@ import type { RoleDetail, RolePerfil, CreateRoleDto, UpdateRoleDto } from './typ
 export async function getPerfiles(): Promise<RolePerfil[]> {
   // El backend responde cada perfil con la clave `nombre` (no `name`) — se normaliza acá para
   // que el resto del front pueda seguir tipando `RolePerfil.name` sin sorpresas.
-  const res = await client.get<{ success: true; data: { nombre: string; roles: string[] }[] }>(ENDPOINTS.roles.perfiles)
-  return unwrap(res).map(({ nombre, roles }) => ({ name: nombre, roles }))
+  const res = await client.get<{ success: true; data: { nombre: string; roles: string[]; rolesEs?: string[] }[] }>(ENDPOINTS.roles.perfiles)
+  return unwrap(res).map(({ nombre, roles, rolesEs }) => ({ name: nombre, roles, rolesEs }))
 }
 
 export async function getRoleDetail(name: string): Promise<RoleDetail> {

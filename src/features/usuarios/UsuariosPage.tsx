@@ -741,7 +741,7 @@ export default function UsuariosPage() {
 }
 
 function PerfilesChecklist({ perfiles, isError, selected, onToggle, onSelectAll, hint }: {
-  perfiles: { name: string; roles: string[] }[]
+  perfiles: { name: string; roles: string[]; rolesEs?: string[] }[]
   isError?: boolean
   selected: string[]
   onToggle: (name: string) => void
@@ -779,7 +779,7 @@ function PerfilesChecklist({ perfiles, isError, selected, onToggle, onSelectAll,
         ) : perfiles.length === 0 ? (
           <p style={{ fontSize: 13, color: 'var(--text-tertiary)', gridColumn: '1 / -1' }}>No hay perfiles de rol configurados.</p>
         ) : perfiles.map((p) => (
-          <label key={p.name} className="ff-check-wrap" title={p.roles.join(', ')}>
+          <label key={p.name} className="ff-check-wrap" title={(p.rolesEs ?? p.roles).join(', ')}>
             <input type="checkbox" className="ff-check" checked={selected.includes(p.name)} onChange={() => onToggle(p.name)} />
             <span style={{ fontSize: 13 }}>{p.name}</span>
           </label>

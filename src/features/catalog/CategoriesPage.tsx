@@ -628,17 +628,17 @@ export default function CategoriesPage() {
                   <label className="ff-label">Roles autorizados a vender (opcional)</label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {(permisosCatalogo?.roles ?? []).map((role) => (
-                      <label key={role} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+                      <label key={role.value} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
-                          checked={rolesPermitidosVenta.includes(role)}
+                          checked={rolesPermitidosVenta.includes(role.value)}
                           onChange={(e) =>
                             setRolesPermitidosVenta((prev) =>
-                              e.target.checked ? [...prev, role] : prev.filter((r) => r !== role),
+                              e.target.checked ? [...prev, role.value] : prev.filter((r) => r !== role.value),
                             )
                           }
                         />
-                        {role}
+                        {role.label_es ?? role.value}
                       </label>
                     ))}
                   </div>

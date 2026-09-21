@@ -8,6 +8,7 @@ import type {
   RemovePermisoDto,
   AssignPermisoDto,
   PermisosCatalogo,
+  PermisoCatalogoItem,
 } from './types'
 
 export const PERMISO_PTYPES: PermisoPtype[] = [
@@ -34,31 +35,33 @@ export const PERMISO_PTYPE_LABELS: Record<PermisoPtype, string> = {
 
 /**
  * `GET /permisos/catalogo` no tiene schema documentado en openapi.json. En la
- * práctica ERPNext (`get_roles_and_doctypes`) devuelve `{ label, value }[]` —
- * pero normalizamos defensivamente también strings sueltos u objetos `{name}`,
- * por si el shape cambia entre versiones.
+ * práctica ERPNext (`get_roles_and_doctypes`) devuelve `{ label, value, label_es }[]` —
+ * `label_es` es la traducción al español que usamos para mostrar en los
+ * selects, pero normalizamos defensivamente también strings sueltos u
+ * objetos `{name}` sin `label_es`, por si el shape cambia entre versiones.
  */
-function normalizeNameList(raw: unknown): string[] {
+function normalizeCatalogoItems(raw: unknown): PermisoCatalogoItem[] {
   if (!Array.isArray(raw)) return []
   return raw
     .map((item) => {
-      if (typeof item === 'string') return item
+      if (typeof item === 'string') return { value: item }
       if (item && typeof item === 'object') {
-        const obj = item as { value?: unknown; name?: unknown; label?: unknown }
+        const obj = item as { value?: unknown; name?: unknown; label?: unknown; label_es?: unknown }
         const val = obj.value ?? obj.name ?? obj.label
-        return typeof val === 'string' ? val : null
+        if (typeof val !== 'string') return null
+        return { value: val, label_es: typeof obj.label_es === 'string' ? obj.label_es : undefined }
       }
       return null
     })
-    .filter((v): v is string => v !== null)
+    .filter((v): v is PermisoCatalogoItem => v !== null)
 }
 
 export async function getPermisosCatalogo(): Promise<PermisosCatalogo> {
   const res = await client.get<{ success: true; data: unknown }>(ENDPOINTS.permisos.catalogo)
   const data = (res.data.data ?? {}) as { doctypes?: unknown; roles?: unknown }
   return {
-    doctypes: normalizeNameList(data.doctypes),
-    roles: normalizeNameList(data.roles),
+    doctypes: normalizeCatalogoItems(data.doctypes),
+    roles: normalizeCatalogoItems(data.roles),
   }
 }
 

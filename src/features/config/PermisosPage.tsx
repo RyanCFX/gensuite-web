@@ -11,13 +11,13 @@ import {
   getPermisosCatalogo, getPermisos, assignPermiso, deletePermiso, resetPermisos,
   PERMISO_PTYPES, PERMISO_PTYPE_LABELS,
 } from '@/shared/api/permisos'
-import type { PermisoRow, PermisoPtype, ApiError, AssignPermisoDto } from '@/shared/api/types'
+import type { PermisoRow, PermisoPtype, PermisoCatalogoItem, ApiError, AssignPermisoDto } from '@/shared/api/types'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 
-function toOptions(names: string[]): SearchSelectOption[] {
-  return names.map((n) => ({ value: n, label: n }))
+function toOptions(items: PermisoCatalogoItem[]): SearchSelectOption[] {
+  return items.map((it) => ({ value: it.value, label: it.label_es ?? it.value }))
 }
 
 function apiMessage(err: unknown, fallback: string): string {
@@ -60,7 +60,7 @@ export default function PermisosPage() {
   const doctypeOptions = useMemo(() => {
     const all = catalogoQuery.data?.doctypes ?? []
     const filtered = doctypeSearch
-      ? all.filter((d) => d.toLowerCase().includes(doctypeSearch.toLowerCase()))
+      ? all.filter((d) => (d.label_es ?? d.value).toLowerCase().includes(doctypeSearch.toLowerCase()))
       : all
     return toOptions(filtered.slice(0, 50))
   }, [catalogoQuery.data, doctypeSearch])
@@ -119,7 +119,7 @@ export default function PermisosPage() {
 
   const rows = permisosQuery.data ?? []
   const usedRoles = new Set(rows.map((r) => r.role))
-  const availableRolesForAdd = (catalogoQuery.data?.roles ?? []).filter((r) => !usedRoles.has(r))
+  const availableRolesForAdd = (catalogoQuery.data?.roles ?? []).filter((r) => !usedRoles.has(r.value))
   const catalogoForbidden = (catalogoQuery.error as unknown as ApiError | null)?.statusCode === 403
 
   if (catalogoForbidden) {
@@ -213,7 +213,7 @@ export default function PermisosPage() {
                 <tbody>
                   {rows.map((row) => (
                     <tr key={`${row.role}-${row.permlevel}`}>
-                      <td style={{ fontWeight: 500 }}>{row.role}</td>
+                      <td style={{ fontWeight: 500 }}>{row.role_label_es ?? row.role}</td>
                       <td className="td-muted" style={{ textAlign: 'center' }}>{row.permlevel}</td>
                       {PERMISO_PTYPES.map((pt) => (
                         <td key={pt} style={{ textAlign: 'center' }}>
@@ -294,7 +294,7 @@ export default function PermisosPage() {
             </div>
             <div className="modal-body">
               <p style={{ fontSize: 14 }}>
-                Se eliminará la regla de permiso de <strong>{rowToDelete.role}</strong> (nivel{' '}
+                Se eliminará la regla de permiso de <strong>{rowToDelete.role_label_es ?? rowToDelete.role}</strong> (nivel{' '}
                 {rowToDelete.permlevel}) sobre <strong>{doctype}</strong>. Esta acción puede
                 rechazarse si es la única regla de permiso del DocType.
               </p>
@@ -323,14 +323,14 @@ function AddRoleModal({
   onAssigned,
 }: {
   doctype: string
-  roles: string[]
+  roles: PermisoCatalogoItem[]
   onClose: () => void
   onAssigned: (row: PermisoRow) => void
 }) {
   const [role, setRole] = useState('')
   const [roleSearch, setRoleSearch] = useState('')
   const roleOptions = toOptions(
-    roles.filter((r) => !roleSearch || r.toLowerCase().includes(roleSearch.toLowerCase())),
+    roles.filter((r) => !roleSearch || (r.label_es ?? r.value).toLowerCase().includes(roleSearch.toLowerCase())),
   )
   const [flags, setFlags] = useState<Record<PermisoPtype, boolean>>(() =>
     Object.fromEntries(PERMISO_PTYPES.map((pt) => [pt, pt === 'read'])) as Record<PermisoPtype, boolean>,
@@ -342,7 +342,7 @@ function AddRoleModal({
   const mutation = useMutation({
     mutationFn: (dto: AssignPermisoDto) => assignPermiso(dto),
     onSuccess: (row) => {
-      toast.success(`Rol ${row.role} agregado a ${doctype}`)
+      toast.success(`Rol ${row.role_label_es ?? row.role} agregado a ${doctype}`)
       onAssigned(row)
     },
     onError: (err) => toast.error(apiMessage(err, 'No se pudo agregar el rol')),

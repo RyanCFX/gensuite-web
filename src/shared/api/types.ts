@@ -3084,6 +3084,8 @@ export type PermisoPtype = keyof PermisoFlagValues;
 
 export interface PermisoRow extends PermisoFlagValues {
   role: string;
+  /** Traducción al español del rol, solo para presentación — usar `role` para mutaciones. */
+  role_label_es?: string;
   permlevel: number;
   ifOwner?: boolean;
 }
@@ -3123,9 +3125,14 @@ export interface AssignPermisoDto extends Partial<PermisoFlagValues> {
 
 /** La forma exacta la define ERPNext (get_roles_and_doctypes) — normalizada
  * defensivamente en el cliente, ver normalizeCatalogo() en shared/api/permisos.ts */
+export interface PermisoCatalogoItem {
+  value: string;
+  label_es?: string;
+}
+
 export interface PermisosCatalogo {
-  doctypes: string[];
-  roles: string[];
+  doctypes: PermisoCatalogoItem[];
+  roles: PermisoCatalogoItem[];
 }
 
 export interface RoleUserSummary {
@@ -3140,6 +3147,8 @@ export interface RoleUserSummary {
 export interface RolePerfil {
   name: string;
   roles: string[];
+  /** Traducción al español de cada entrada de `roles` (mismo orden) — solo para presentación. */
+  rolesEs?: string[];
 }
 
 export interface RoleDetail {
