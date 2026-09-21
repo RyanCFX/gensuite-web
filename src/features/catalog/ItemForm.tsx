@@ -647,7 +647,7 @@ export default function ItemForm() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 420px', gap: 20, alignItems: 'start' }}>
+      <form onSubmit={handleSubmit(onSubmit)} className="item-form-grid">
 
         {/* ════════════════ COLUMNA IZQUIERDA ════════════════ */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -1078,11 +1078,11 @@ export default function ItemForm() {
                           key={idx}
                           ref={(el) => { barcodeRowRefs.current[idx] = el }}
                           className={highlightedBarcode === idx ? 'row-flash-block' : undefined}
-                          style={{ display: 'flex', gap: 8, alignItems: 'center' }}
+                          style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}
                         >
                           <input
                             className="ff-input"
-                            style={{ flex: 1 }}
+                            style={{ flex: 1, minWidth: 120 }}
                             placeholder="Código"
                             value={bc.barcode}
                             onChange={(e) => setBarcodes(prev => prev.map((b, i) => i === idx ? { ...b, barcode: e.target.value } : b))}

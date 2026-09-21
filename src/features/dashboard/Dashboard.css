@@ -474,8 +474,36 @@
 
 @media (width <= 640px) {
   .dashboard-page { padding: 16px; }
-  .kpi-grid { grid-template-columns: 1fr; }
+  /* Los KPI (montos) siguen alcanzando en 2 columnas hasta teléfonos bien angostos — solo se
+   * apilan en 1 columna más abajo (ver tier de 380px). */
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); row-gap: 12px; column-gap: 12px; }
   .dash-bottom-grid { grid-template-columns: 1fr; }
+
+  /* Letras más legibles en pantallas de teléfono — el diseño original las pensó para desktop. */
+  .kpi-label { font-size: 14px; }
+  .kpi-value { font-size: 30px; }
+  .kpi-caption { font-size: 14px; }
+  .dashboard-subtitle { font-size: 15px; }
+  .card-title-dash { font-size: 19px; }
+  .card-title-sm { font-size: 15px; }
+  .chart-subtitle { font-size: 14px; }
+  .chart-legend-item { font-size: 15px; }
+  .list-row-name { font-size: 16px; }
+  .list-row-sub { font-size: 14px; }
+  .list-row-value { font-size: 16px; }
+  .dash-activity-table { font-size: 15px; }
+  .dash-activity-table th { font-size: 14px; }
+  .dash-txn-badge { font-size: 13px; }
+  .pending-row-label { font-size: 16px; }
+  .pending-row-sub { font-size: 15px; }
+  .pending-row-date { font-size: 13px; }
+  .ig-summary-label { font-size: 14px; }
+  .ig-summary-row-label { font-size: 13px; }
+  .ig-summary-row-value { font-size: 19px; }
+}
+
+@media (width <= 380px) {
+  .kpi-grid { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

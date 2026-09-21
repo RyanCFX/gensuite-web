@@ -249,7 +249,7 @@ export default function OrdenDetail() {
         title={`Orden ${orden.id}`}
         description={orden.supplierName}
         action={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {orden.status === 'draft' && (
               <>
                 <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/compras/ordenes/${id}/editar`)}>

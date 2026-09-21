@@ -140,13 +140,13 @@ export function ApplyToCxpModal({ devolucionId, supplier, supplierName, availabl
           )}
         </div>
 
-        <div className="modal-foot" style={{ gap: 8, alignItems: 'center' }}>
+        <div className="modal-foot" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
             Monto a aplicar
             <input
               type="number"
               className="ff-input ff-input-sm"
-              style={{ width: 120, marginLeft: 8 }}
+              style={{ width: 120, maxWidth: '100%', marginLeft: 8 }}
               min={0}
               max={maxApply}
               value={amount}

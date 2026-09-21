@@ -403,6 +403,10 @@ button {
     object-fit: contain;
 }
 
+/* Desktop/tablet: logo horizontal completo; el isotipo solo se usa en celular (ver breakpoint
+ * de 640px más abajo). */
+.dd-logo-iso { display: none; }
+
 .dd-header {
   padding: 12px 14px 10px;
   border-bottom: 1px solid var(--border-default);
@@ -1915,6 +1919,16 @@ button {
   grid-template-columns: 1fr 1fr 1fr;
 }
 
+/* Layout del formulario de Producto/Servicio (ItemForm) — columna principal + panel lateral
+ * de ancho fijo (categorización, imagen, estado). Colapsa a 1 columna en tablet/móvil (ver
+ * RESPONSIVE). */
+.item-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 20px;
+  align-items: start;
+}
+
 /* ─── DOCUMENT ACTIONS BAR ─── */
 .doc-actions-bar {
   display: flex;
@@ -2628,6 +2642,9 @@ button {
   .stats-row { grid-template-columns: 1fr 1fr; }
   .detail-grid { grid-template-columns: 1fr; }
   .form-row { grid-template-columns: 1fr; }
+  .fields-grid,
+  .fields-grid-3 { grid-template-columns: 1fr; }
+  .item-form-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {
@@ -2639,6 +2656,66 @@ button {
   .auth-shell { grid-template-columns: 1fr; }
   .auth-panel-left { display: none; }
   .auth-panel-right { padding: 32px 20px; min-height: 100vh; }
+}
+
+/* Topbar: en pantallas angostas el logo + buscador + usuario no caben en una sola fila —
+ * se recorta a lo esencial (el buscador se achica pero sigue siendo clickeable, para no
+ * perder el atajo a la Command Palette). */
+/* Por defecto (desktop/tablet): el turno de caja vive en el topbar, no en el dropdown. */
+.dd-turno-mobile { display: none; }
+
+@media (max-width: 640px) {
+  /* Algunas pantallas ponen el botón de acción como hijo directo de .page-header en vez de
+   * envolverlo en el div flex con flexShrink:0 que usan la mayoría de las páginas (ej.
+   * Pedidos) — sin wrap, título largo + botón pueden no caber en una sola fila a 375px. */
+  .page-header { flex-wrap: wrap; }
+  /* Igual que .page-header — encabezados de card con título + botón(es) a la derecha. */
+  .card-header { flex-wrap: wrap; row-gap: 8px; }
+  .topbar { gap: 8px; padding: 0 10px; }
+  .dd-logo-full { display: none; }
+  .dd-logo-iso { display: block; width: 22px; }
+  .topbar .divider-v { display: none; }
+  .search-shortcut { display: none; }
+  .user-btn { gap: 0; padding: 0; border: none; background: transparent; }
+  .user-btn > span:not(.avatar-sm) { display: none; }
+
+  /* En celular el header solo deja: botón de menú, logo, buscador y usuario — el turno de caja
+   * se mueve al dropdown de usuario. */
+  .topbar-turno-desktop { display: none; }
+  .dd-turno-mobile { display: block; }
+  .dd-turno-mobile > div { flex-wrap: wrap; }
+  .dropdown-panel { max-width: min(88vw, 320px); }
+
+  /* Menú de navegación móvil (drawer de pantalla completa) — textos e íconos más grandes que
+   * el sidebar de escritorio, pensado para dedo/táctil en vez de mouse. */
+  .sidebar.mobile-open .logo-text { font-size: 17px; }
+  .sidebar.mobile-open .icon-btn { width: 36px; height: 36px; }
+  .sidebar.mobile-open .icon-btn svg { width: 20px; height: 20px; }
+  .sidebar.mobile-open .sb-label { font-size: 13px; padding: 16px 12px 8px; }
+  .sidebar.mobile-open .nav-item {
+    height: auto;
+    min-height: 52px;
+    padding: 8px 14px;
+    gap: 14px;
+    border-radius: 12px;
+    font-size: 16px;
+  }
+  .sidebar.mobile-open .nav-item svg { width: 22px; height: 22px; }
+  .sidebar.mobile-open .nav-group-chevron { width: 18px; height: 18px; }
+  .sidebar.mobile-open .nav-child {
+    padding-left: 40px;
+    height: auto;
+    min-height: 42px;
+    font-size: 15px;
+  }
+  .sidebar.mobile-open .nav-child::before { left: 3px; width: 6px; height: 6px; }
+  .sidebar.mobile-open .nav-children { gap: 3px; margin-top: 3px; }
+
+  /* Tablas de líneas dentro de modales (notas de crédito/débito, facturas, etc.) — a diferencia
+   * de .table-scroll (page-level), .items-table-wrap usa overflow:hidden para recortar las
+   * esquinas redondeadas y no trae scroll propio; sus columnas con ancho fijo (código/cant./
+   * precio/importe) se recortan en vez de deslizarse en pantallas angostas. */
+  .items-table-wrap { overflow-x: auto; }
 }
 
 /* ─── SEARCH SELECT (Combobox) ─── */
@@ -2868,6 +2945,7 @@ button {
 .search-wrap {
   position: relative;
   flex: 1;
+  min-width: 0;
   max-width: 300px;
 }
 

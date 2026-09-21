@@ -64,6 +64,7 @@ import { KeepAlive } from "keepalive-for-react";
 import { TurnoCajaIndicator } from "@/components/shared/TurnoCajaIndicator";
 
 import logo from "@/assets/logo.png";
+import logoIso from "@/assets/iso.png";
 
 // ─── Nav definitions ─────────────────────────────────────────────────────────
 
@@ -1553,7 +1554,12 @@ function AppLayoutInner() {
             <span className="logo-text">GenSuite</span>*/}
             <img
               src={logo}
-              className="dd-logo"
+              className="dd-logo dd-logo-full"
+            />
+            {/* En celular se usa el isotipo (más compacto) en vez del logo horizontal completo. */}
+            <img
+              src={logoIso}
+              className="dd-logo dd-logo-iso"
             />
           </div>
 
@@ -1591,7 +1597,11 @@ function AppLayoutInner() {
 
           {/* Right actions */}
           <div className="topbar-right">
-            <TurnoCajaIndicator />
+            {/* En celular el turno de caja se muestra dentro del dropdown de usuario (ver más abajo) —
+             * acá solo queda visible en desktop. */}
+            <div className="topbar-turno-desktop">
+              <TurnoCajaIndicator />
+            </div>
 
             {/* Theme toggle — oculto mientras DARK_MODE_ENABLED sea false */}
             {DARK_MODE_ENABLED && (
@@ -1639,6 +1649,11 @@ function AppLayoutInner() {
                   </div>
                   <div className="dd-email">{user?.email}</div>
                 </div>
+                {/* Solo celular — en desktop el turno de caja vive en el topbar (topbar-turno-desktop). */}
+                <div className="dd-turno-mobile" style={{ padding: "10px 12px" }}>
+                  <TurnoCajaIndicator />
+                </div>
+                <div className="dd-sep dd-turno-mobile" />
                 <div style={{ padding: "4px 0" }}>
                   <button
                     className="dd-item"
@@ -1830,13 +1845,11 @@ function AppLayoutInner() {
         style={{
           display: mobileOpen ? "flex" : "none",
           position: "fixed",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: "var(--sidebar-width)",
+          inset: 0,
+          width: "100%",
+          height: "100%",
           zIndex: 300,
           flexDirection: "column",
-          background: "var(--surface-app)",
         }}
         aria-label="Navegación móvil"
       >
@@ -1847,14 +1860,16 @@ function AppLayoutInner() {
             justifyContent: "space-between",
             padding: "0 12px",
             height: "var(--navbar-height)",
-            borderBottom: "1px solid var(--border-default)",
+            flexShrink: 0,
+            borderBottom: "1px solid var(--sidebar-border)",
           }}
         >
-          <span className="logo-text">GenSuite</span>
+          <span className="logo-text" style={{ color: "var(--sidebar-text-hover)" }}>GenSuite</span>
           <button
             className="icon-btn"
             onClick={() => setMobileOpen(false)}
             aria-label="Cerrar menú"
+            style={{ color: "var(--sidebar-text)" }}
           >
             <X size={16} />
           </button>

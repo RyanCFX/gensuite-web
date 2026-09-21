@@ -550,7 +550,7 @@ export default function RelacionDetail() {
                 cuando termine de activarse.
               </div>
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div className="form-row" style={{ marginBottom: 12 }}>
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="cfg-almacen">Almacén destino</label>
                 <SearchSelect

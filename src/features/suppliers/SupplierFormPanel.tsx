@@ -316,7 +316,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
   const cedulaValid = cedulaDetail?.valid ?? null
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+    <form onSubmit={handleSubmit(onSubmit)} className="detail-grid">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* General info */}
         <div className="card">

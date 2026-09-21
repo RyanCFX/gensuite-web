@@ -172,6 +172,7 @@ function ZonasSection({
           </div>
         </div>
       ) : (
+        <div className="table-scroll">
         <table className="data-table navy-table">
           <thead>
             <tr>
@@ -233,6 +234,7 @@ function ZonasSection({
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {showForm && (
@@ -421,6 +423,7 @@ function UbicacionesSection({ zona }: { zona: ZonaResponseDto }) {
           </div>
         </div>
       ) : (
+        <div className="table-scroll">
         <table className="data-table navy-table">
           <thead>
             <tr>
@@ -469,6 +472,7 @@ function UbicacionesSection({ zona }: { zona: ZonaResponseDto }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {showForm && (
@@ -674,6 +678,7 @@ function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
         </div>
       ) : (
         <>
+          <div className="table-scroll">
           <table className="data-table navy-table">
             <thead>
               <tr>
@@ -728,6 +733,7 @@ function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
               })}
             </tbody>
           </table>
+          </div>
           {!readOnly && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', padding: 16 }}>
               <button
@@ -835,6 +841,7 @@ function HistorialMovimientosSection({ warehouse }: { warehouse: string }) {
         </div>
       ) : (
         <>
+          <div className="table-scroll">
           <table className="data-table navy-table">
             <thead>
               <tr>
@@ -867,6 +874,7 @@ function HistorialMovimientosSection({ warehouse }: { warehouse: string }) {
               ))}
             </tbody>
           </table>
+          </div>
           {meta && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16 }}>
               <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>

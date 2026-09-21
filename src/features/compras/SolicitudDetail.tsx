@@ -116,7 +116,7 @@ export default function SolicitudDetail() {
         title={`Solicitud ${solicitud.id}`}
         description={`Creada el ${formatDate(solicitud.transactionDate)}`}
         action={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {solicitud.status === 'draft' && (
               <>
                 <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/compras/solicitudes/${id}/editar`)}>
@@ -349,6 +349,7 @@ function GenerarOrdenModal({ solicitudId, remanentes, onClose, onSuccess }: Gene
             />
           </div>
 
+          <div className="table-scroll">
           <table className="items-table">
             <thead>
               <tr>
@@ -392,6 +393,7 @@ function GenerarOrdenModal({ solicitudId, remanentes, onClose, onSuccess }: Gene
               ))}
             </tbody>
           </table>
+          </div>
         </div>
         <div className="modal-foot">
           <button className="btn btn-secondary" onClick={onClose} disabled={generarMutation.isPending}>Cancelar</button>

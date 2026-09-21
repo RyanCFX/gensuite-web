@@ -93,7 +93,7 @@ export function TerminosComercialesFields({ value, onChange, disabled = false }:
         Tiene crédito
       </label>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="form-row">
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-diasCredito">Días de crédito (cliente)</label>
           <input
@@ -122,7 +122,7 @@ export function TerminosComercialesFields({ value, onChange, disabled = false }:
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="form-row">
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-grupoCliente">Grupo de cliente</label>
           <SearchSelect
@@ -149,7 +149,7 @@ export function TerminosComercialesFields({ value, onChange, disabled = false }:
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="form-row">
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-encargadoCxc">Encargado de CxC</label>
           <SearchSelect
@@ -179,7 +179,7 @@ export function TerminosComercialesFields({ value, onChange, disabled = false }:
       <hr style={{ border: 'none', borderTop: '1px solid var(--border-default)', margin: '4px 0' }} />
       <p className="ff-hint" style={{ margin: 0 }}>Lado proveedor (cuando la contraparte también le vende a usted)</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="form-row">
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-grupoProveedor">Grupo de proveedor</label>
           <SearchSelect
@@ -207,7 +207,7 @@ export function TerminosComercialesFields({ value, onChange, disabled = false }:
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="form-row">
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-cuentaCxpAlterna">Cuenta CxP alterna</label>
           <AccountSelect

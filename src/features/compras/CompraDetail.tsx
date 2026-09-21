@@ -279,7 +279,7 @@ export default function CompraDetail() {
         title={`Compra ${compra.id}`}
         description={compra.esProveedorOcasional ? (compra.proveedorOcasionalNombre ?? compra.supplierName) : compra.supplierName}
         action={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {compra.status === 'draft' && (
               <>
                 <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/compras/${id}/editar`)}>

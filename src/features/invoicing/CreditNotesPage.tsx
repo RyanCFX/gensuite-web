@@ -912,10 +912,10 @@ export default function CreditNotesPage() {
                 )}
 
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 8 }}>
                     <label className="ff-label" style={{ margin: 0 }}>Artículos a devolver</label>
                     {selectedInvoice && availableToAdd.length > 0 && (
-                      <div style={{ width: 240 }}>
+                      <div style={{ width: 240, maxWidth: '100%' }}>
                         <SearchSelect
                           value=""
                           onChange={(val) => {

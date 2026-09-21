@@ -272,7 +272,7 @@ export default function SupplierDetail() {
         }
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+      <div className="detail-grid">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <SaldoFavorProveedorIndicator tieneSaldoAFavor={supplier.tieneSaldoAFavor} saldoAFavor={supplier.saldoAFavor} />
 

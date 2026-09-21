@@ -15,7 +15,7 @@ export function PageHeader({ title, description, overline, action }: PageHeaderP
         <h1 className="page-title">{title}</h1>
         {description && <p className="page-sub">{description as ReactNode}</p>}
       </div>
-      {action && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>{action}</div>}
+      {action && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>{action}</div>}
     </div>
   )
 }

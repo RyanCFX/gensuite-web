@@ -303,7 +303,7 @@ export default function DebitNotesPage() {
                   placeholder="Todas las sucursales"
                 />
               </FilterField>
-              <FilterField label="Departamento" style={{ minWidth: 220 }}>
+              <FilterField label="Departamento" style={{ width: 220, maxWidth: '100%' }}>
                 <DepartmentSelect value={filterDepartment} onChange={setFilterDepartment} placeholder="Todos los departamentos" />
               </FilterField>
               <FilterField label="NCF">
@@ -552,8 +552,8 @@ export default function DebitNotesPage() {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', gap: 16 }}>
-                  <div className="ff-wrap" style={{ flex: 1 }}>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  <div className="ff-wrap" style={{ flex: 1, minWidth: 160 }}>
                     <label className="ff-label" htmlFor="branch-debit">Sucursal</label>
                     <SearchSelect
                       id="branch-debit"
@@ -569,7 +569,7 @@ export default function DebitNotesPage() {
                       <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal</p>
                     )}
                   </div>
-                  <div className="ff-wrap" style={{ flex: 1 }}>
+                  <div className="ff-wrap" style={{ flex: 1, minWidth: 160 }}>
                     <label className="ff-label" htmlFor="department-debit">Departamento</label>
                     <DepartmentSelect id="department-debit" value={department} onChange={setDepartment} />
                   </div>
