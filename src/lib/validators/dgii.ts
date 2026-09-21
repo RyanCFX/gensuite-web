@@ -61,7 +61,7 @@ export function validateCedula(value: string): boolean {
 }
 
 export function validateNCFFormat(value: string): boolean {
-  return /^[BE]\d{10}$/.test(value)
+  return /^(B\d{10}|E\d{12})$/.test(value)
 }
 
 export function formatRNC(value: string): string {

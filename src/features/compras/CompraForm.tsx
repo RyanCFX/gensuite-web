@@ -15,9 +15,9 @@ import { useSupplierEmisorElectronico } from '@/shared/hooks/useSupplierEmisorEl
 import { getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateCompraDto, Supplier, DistribucionCuentaDto } from '@/shared/api/types'
-import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { Plus, Trash2, Info, UserPlus } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
+import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { SupplierQuickCreateModal } from '@/features/suppliers/SupplierQuickCreateModal'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -27,10 +27,11 @@ import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
 import type { Item } from '@/shared/api/types'
+import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
-import { SeleccionarOrdenCompraModal } from '@/components/shared/SeleccionarOrdenCompraModal'
 import type { OrdenCompraImportLine } from '@/components/shared/SeleccionarOrdenCompraModal'
+import { listOrdenesCompra, getOrdenCompra } from '@/shared/api/ordenes-compra'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { listItems, getItem } from '@/shared/api/catalog'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
@@ -69,7 +70,7 @@ interface ItemRow {
   /** Si tiene entradas, divide el monto de la línea (qty × rate) entre varias cuentas.
    *  No se puede combinar con seriales/lotes. */
   distribucionCuenta?: DistribucionCuentaDto[]
-  /** Enlace manual (caso excepcional) a una línea de Orden de Compra — ver SeleccionarOrdenCompraModal. */
+  /** Enlace manual (caso excepcional) a una línea de Orden de Compra — ver handleSelectOrden. */
   ordenCompra?: string
   ordenCompraItem?: string
 }
@@ -78,7 +79,7 @@ function emptyItem(defaultWh?: string): ItemRow {
   return { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, warehouse: defaultWh ?? '', uom: 'Nos', trackingType: 'none', serials: [], batches: [], purchaseTaxPct: 0, purchaseTaxTemplate: '' }
 }
 
-const NCF_REGEX = /^[BE]\d{10}$/
+const NCF_REGEX = /^(B\d{10}|E\d{12})$/
 
 function onVariantConfirm(
   selections: VariantSelection[],
@@ -170,7 +171,7 @@ function updateComponentTracking(
 // ─── SerialBatchRow Sub-component ────────────────────────────────────────
 
 function SerialBatchRow({
-  item, idx, items, setItems, warehouses, warehouseOptions, onWarehouseSearch, updateItem, selectCatalogItem, clearCatalogItem, setVariantTemplate, isReturn, allowNewTracking,
+  item, idx, items, setItems, warehouses, warehouseOptions, onWarehouseSearch, updateItem, selectCatalogItem, clearCatalogItem, setVariantTemplate, isReturn, allowNewTracking, onViewItem,
 }: {
   item: ItemRow
   idx: number
@@ -185,6 +186,7 @@ function SerialBatchRow({
   setVariantTemplate: (t: Item | null) => void
   isReturn: boolean
   allowNewTracking: boolean
+  onViewItem: (itemCode: string) => void
 }) {
   const serialInputRef = useRef<HTMLInputElement>(null)
   const [serialInput, setSerialInput] = useState('')
@@ -304,16 +306,22 @@ function SerialBatchRow({
             direction="purchase"
           />
         </td>
-        <td style={{ textAlign: 'center' }}>
-          <button
-            type="button"
-            className="btn btn-ghost btn-size-icon-sm"
-            style={{ color: 'var(--icon-muted)' }}
-            onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
-            disabled={items.length === 1}
-          >
-            <Trash2 size={14} />
-          </button>
+        <td onClick={(e) => e.stopPropagation()} className="actions-cell">
+          <ActionsMenu>
+            <ActionsMenuItem
+              onClick={() => onViewItem(item.itemCode)}
+              disabled={!item.itemCode}
+            >
+              <Eye size={14} /> Ver detalle
+            </ActionsMenuItem>
+            <ActionsMenuItem
+              danger
+              onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
+              disabled={items.length === 1}
+            >
+              <Trash2 size={14} /> Eliminar
+            </ActionsMenuItem>
+          </ActionsMenu>
         </td>
       </tr>
 
@@ -573,7 +581,8 @@ export default function CompraForm() {
   const [formaPago606Touched, setFormaPago606Touched] = useState(false)
   const [tipoPagoTouched, setTipoPagoTouched] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
-  const [showEnlazarOrden, setShowEnlazarOrden] = useState(false)
+  const [ordenSearch, setOrdenSearch] = useState('')
+  const [viewItemCode, setViewItemCode] = useState<string | null>(null)
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
@@ -621,6 +630,56 @@ export default function CompraForm() {
     label: s.supplierName,
     sublabel: s.rnc ?? s.cedula,
   }))
+
+  // ── Enlace manual a Orden de Compra (caso excepcional) ──────────────────────
+  // Trae las líneas pendientes de facturar de una orden existente como filas nuevas — ver
+  // handleImportOrdenLines. El camino normal sigue siendo /compras/ordenes/:id/facturar.
+  const { data: ordenesData, isLoading: ordenesLoading } = useQuery({
+    queryKey: ['ordenes-compra-para-enlazar', ordenSearch],
+    queryFn: () => listOrdenesCompra({ search: ordenSearch || undefined, status: 'submitted', billingStatus: 'pending', limit: 20 }),
+  })
+  const ordenOptions: SearchSelectOption[] = (ordenesData?.items ?? []).map((o) => ({
+    value: o.id,
+    label: o.id,
+    sublabel: o.supplierName,
+  }))
+
+  async function handleSelectOrden(ordenId: string) {
+    if (!ordenId) return
+    const orden = await getOrdenCompra(ordenId)
+    if (esProveedorOcasional) {
+      toast.error('No se puede enlazar una orden de compra a un proveedor ocasional')
+      return
+    }
+    if (supplierId && supplierId !== orden.supplier) {
+      toast.error(`Esta orden es del proveedor ${orden.supplierName}, distinto al proveedor ya seleccionado`)
+      return
+    }
+    if (orden.perReceived > 0) {
+      toast.error(`Esta orden ya tiene mercancía recibida por conduce (${Math.round(orden.perReceived)}% recibido) — facturarla aquí duplicaría ese inventario.`)
+      return
+    }
+    const lines: OrdenCompraImportLine[] = orden.items
+      .map((it) => {
+        const remanente = it.rate > 0 ? Math.max(0, (it.amount - it.billedAmt) / it.rate) : it.qty
+        return {
+          itemCode: it.itemCode,
+          description: it.itemName,
+          qty: Math.round(remanente * 1000) / 1000,
+          rate: it.rate,
+          uom: it.uom,
+          warehouse: it.warehouse,
+          ordenCompra: orden.id,
+          ordenCompraItem: it.id,
+        }
+      })
+      .filter((l) => l.qty > 0)
+    if (lines.length === 0) {
+      toast.error('Esta orden no tiene remanente por facturar')
+      return
+    }
+    handleImportOrdenLines(lines, { id: orden.id, supplier: orden.supplier, supplierName: orden.supplierName })
+  }
 
   function handleSupplierCreated(supplier: Supplier) {
     setShowCreateSupplier(false)
@@ -904,7 +963,7 @@ export default function CompraForm() {
       toast.error('Selecciona un proveedor')
       return
     }
-    if (ncfProveedor && !NCF_REGEX.test(ncfProveedor)) { toast.error('NCF inválido (formato: B/E seguido de 10 dígitos)'); return }
+    if (ncfProveedor && !NCF_REGEX.test(ncfProveedor)) { toast.error('NCF inválido (formato: B + 10 dígitos, o E + 12 dígitos)'); return }
 
     // Clear previous line errors
     setItems((prev) => prev.map((i) => ({ ...i, lineError: undefined })))
@@ -1126,15 +1185,17 @@ export default function CompraForm() {
 
   return (
     <div className="page-container">
-      <button className="page-back-link" onClick={() => navigate(-1)}>
-        ← Volver
-      </button>
-
-      <PageHeader
-        title={isEdit ? 'Editar Compra' : 'Nueva Compra'}
-        description="Registra una compra de inventario"
-        action={<RecargarButton label="Actualizar" />}
-      />
+      <div className="page-header">
+        <div>
+          <a className="page-back-link" onClick={() => navigate(isEdit ? `/compras/${id}` : '/compras')}>
+            <ArrowLeft size={14} /> {isEdit ? 'Compra' : 'Compras'}
+          </a>
+          <h1 className="page-title"><span className="page-title-dot" />{isEdit ? 'Editar Compra' : 'Nueva Compra'}</h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <RecargarButton label="Actualizar" />
+        </div>
+      </div>
 
       {isReturn && (
         <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
@@ -1147,8 +1208,8 @@ export default function CompraForm() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Header fields */}
           <div className="card">
-            <div className="card-header">
-              <span className="card-title">Información General</span>
+            <div className="card-header navy-card-header">
+              <h2 className="card-title">Información General</h2>
             </div>
             <div className="card-body">
               <div className="form-row form-row-3">
@@ -1327,8 +1388,22 @@ export default function CompraForm() {
                   </div>
                 )}
 
+                <div className="ff-wrap">
+                  <label className="ff-label" htmlFor="ordenCompra">Orden de Compra</label>
+                  <SearchSelect
+                    id="ordenCompra"
+                    value=""
+                    onChange={(val) => handleSelectOrden(val)}
+                    options={ordenOptions}
+                    onSearch={setOrdenSearch}
+                    loading={ordenesLoading}
+                    placeholder="Buscar por número o proveedor…"
+                    disabled={isReturn}
+                  />
+                  <p className="ff-hint">Caso excepcional — trae los artículos pendientes de facturar de una orden existente.</p>
                 </div>
-            </div>
+
+                </div>
 
             {/* ── Impuestos y retenciones ── */}
             {supplierDetail?.excepcion0226Aplicable && (
@@ -1374,34 +1449,14 @@ export default function CompraForm() {
                 {pendingRetencionesHint && <p className="ff-hint">{pendingRetencionesHint}</p>}
               </div>
             </div>
+            </div>
           </div>
 
           {/* Items */}
           <div className="card">
-            <div className="card-header">
-              <span className="card-title">Artículos</span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-size-sm"
-                  onClick={() => setShowEnlazarOrden(true)}
-                  title="Traer los artículos pendientes de una Orden de Compra existente"
-                >
-                  Enlazar Orden de Compra
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-size-sm"
-                  onClick={() => setItems((prev) => [...prev, emptyItem(defaultWh)])}
-                >
-                  <Plus size={14} />
-                  Agregar
-                </button>
-              </div>
-            </div>
             <div className="card-body" style={{ padding: 0 }}>
               <div className="items-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
-                <table className="items-table">
+                <table className="items-table navy-table">
                   <thead>
                     <tr>
                       <th style={{ minWidth: 180 }}>Artículo</th>
@@ -1431,11 +1486,21 @@ export default function CompraForm() {
                         setVariantTemplate={setVariantTemplate}
                         isReturn={isReturn}
                         allowNewTracking={!requiereSerialLoteCompra}
+                        onViewItem={setViewItemCode}
                       />
                     ))}
                   </tbody>
                 </table>
-                <div className="items-total-row">
+                <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-size-sm"
+                    onClick={() => setItems((prev) => [...prev, emptyItem(defaultWh)])}
+                  >
+                    <Plus size={14} /> Agregar artículo
+                  </button>
+                </div>
+                <div className="items-total-row navy-totals">
                   <div className="items-total-line">
                     <span>Subtotal</span>
                     <span>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(subtotal)}</span>
@@ -1446,7 +1511,7 @@ export default function CompraForm() {
                       <span>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(taxTotal)}</span>
                     </div>
                   )}
-                  <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
+                  <div className="items-total-line total-row-highlight">
                     <span>Total</span>
                     <strong>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(grandTotal)}</strong>
                   </div>
@@ -1456,7 +1521,7 @@ export default function CompraForm() {
           </div>
 
           {/* 606 Section */}
-          <div className="dgii-section">
+          <div className="dgii-section dgii-section-aqua">
             <div className="dgii-section-title">
               <Info size={14} />
               Información DGII (606)
@@ -1569,10 +1634,19 @@ export default function CompraForm() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? 'Guardando…' : 'Guardar Borrador'}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => navigate(isEdit ? `/compras/${id}` : '/compras')}
+            >
+              Cancelar
+            </button>
+            <button type="submit" className="btn btn-navy" disabled={saveMutation.isPending}>
+              {saveMutation.isPending
+                ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                : <Save size={15} />}
+              {isEdit ? 'Guardar cambios' : 'Guardar Borrador'}
             </button>
           </div>
         </div>
@@ -1596,12 +1670,9 @@ export default function CompraForm() {
         />
       )}
 
-      <SeleccionarOrdenCompraModal
-        open={showEnlazarOrden}
-        onClose={() => setShowEnlazarOrden(false)}
-        mode="compra"
-        onImport={handleImportOrdenLines}
-      />
+      {viewItemCode && (
+        <ItemDetailModal itemCode={viewItemCode} onClose={() => setViewItemCode(null)} />
+      )}
     </div>
   )
 }

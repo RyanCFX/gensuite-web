@@ -4,11 +4,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { getAperturaPreflight } from '@/shared/api/apertura'
 
-/** Letra (B/E) + 2 dígitos de tipo + 8-10 dígitos de secuencial (§4.2). */
-export const NCF_ORIGINAL_REGEX = /^[BE]\d{10,12}$/
+/** NCF: B + 10 dígitos (11 caracteres). e-NCF: E + 12 dígitos (13 caracteres). */
+export const NCF_ORIGINAL_REGEX = /^(B\d{10}|E\d{12})$/
 
-/** Los 11 tipos de comprobante DGII que el backend reconoce (§4.2). */
-export const TIPOS_NCF_DGII = ['B01', 'B02', 'B03', 'B04', 'B11', 'B12', 'B13', 'B14', 'B15', 'B16', 'B17'] as const
+/** Los tipos de comprobante DGII que el backend reconoce (§4.2): físicos (Bxx) y su equivalente electrónico (Exx). */
+export const TIPOS_NCF_DGII = [
+  'B01', 'B02', 'B03', 'B04', 'B11', 'B12', 'B13', 'B14', 'B15', 'B16', 'B17',
+  'E31', 'E32', 'E33', 'E34', 'E41', 'E43', 'E44', 'E45', 'E46', 'E47',
+] as const
 
 export function anioActual(): number {
   return new Date().getFullYear()

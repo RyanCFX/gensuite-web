@@ -86,7 +86,7 @@ function emptyAdHocItem(): ItemRow {
   }
 }
 
-const NCF_REGEX = /^[BE]\d{10}$/
+const NCF_REGEX = /^(B\d{10}|E\d{12})$/
 const B17_MAX = 50
 
 /** Muestra (solo lectura) la cuenta contable que aplicará a una línea de concepto de Cuentas
@@ -600,7 +600,7 @@ export default function GastoForm() {
       toast.error('Selecciona un proveedor')
       return
     }
-    if (ncfProveedor && !NCF_REGEX.test(ncfProveedor)) { toast.error('NCF inválido (formato: B/E seguido de 10 dígitos)'); return }
+    if (ncfProveedor && !NCF_REGEX.test(ncfProveedor)) { toast.error('NCF inválido (formato: B + 10 dígitos, o E + 12 dígitos)'); return }
     // La regla B17 y los campos 606 requeridos se validan al Someter, no al
     // guardar el borrador — un Draft debe poder guardarse siempre.
 

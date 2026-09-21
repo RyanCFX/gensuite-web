@@ -136,9 +136,9 @@ export default function VentaForm() {
     if (!form.customerId) newErrors.customer = 'Selecciona un cliente'
     if (!form.numeroFacturaOriginal.trim()) newErrors.numeroFacturaOriginal = 'Ingresa la referencia de la factura original'
     if (form.ncfOriginal && !ncfValido) {
-      newErrors.ncfOriginal = 'ncfOriginal debe tener el formato de un NCF dominicano válido (ej. B0100000123): letra, 2 dígitos de tipo y 8-10 dígitos de secuencial.'
+      newErrors.ncfOriginal = 'ncfOriginal debe tener el formato de un NCF dominicano válido: B + 10 dígitos (ej. B0100000123), o un e-NCF: E + 12 dígitos (ej. E310000000001).'
     } else if (form.ncfOriginal && !ncfTipoValido) {
-      newErrors.ncfOriginal = `El prefijo de ncfOriginal ("${form.ncfOriginal.slice(0, 3)}") no corresponde a ningún tipo de comprobante DGII válido (B01, B02, B03, B04, B11, B12, B13, B14, B15, B16, B17).`
+      newErrors.ncfOriginal = `El prefijo de ncfOriginal ("${form.ncfOriginal.slice(0, 3)}") no corresponde a ningún tipo de comprobante DGII válido (${TIPOS_NCF_DGII.join(', ')}).`
     } else if (form.reportarEnDgii && !form.ncfOriginal) {
       newErrors.ncfOriginal = 'No se puede reportar a la DGII una factura sin NCF — indique ncfOriginal.'
     }
