@@ -41287,7 +41287,7 @@
             "type": "string",
             "enum": [
               "RNC",
-              "Cedula",
+              "Cédula",
               "Pasaporte",
               "NIT"
             ],
@@ -41301,7 +41301,7 @@
           "cedula": {
             "type": "string",
             "example": "00100100100",
-            "description": "Requerido cuando tipoIdentificacion = Cedula. También acepta el valor si se envía en el campo rnc."
+            "description": "Requerido cuando tipoIdentificacion = Cédula. También acepta el valor si se envía en el campo rnc."
           },
           "esProveedorExterior": {
             "type": "boolean",
@@ -41451,7 +41451,7 @@
             "type": "string",
             "enum": [
               "RNC",
-              "Cedula",
+              "Cédula",
               "Pasaporte",
               "NIT"
             ],
@@ -41465,7 +41465,7 @@
           "cedula": {
             "type": "string",
             "example": "00100100100",
-            "description": "Requerido cuando tipoIdentificacion = Cedula. También acepta el valor si se envía en el campo rnc."
+            "description": "Requerido cuando tipoIdentificacion = Cédula. También acepta el valor si se envía en el campo rnc."
           },
           "esProveedorExterior": {
             "type": "boolean",
