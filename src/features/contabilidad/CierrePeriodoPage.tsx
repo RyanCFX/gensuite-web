@@ -11,6 +11,7 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
@@ -312,14 +313,16 @@ export default function CierrePeriodoPage() {
                   </div>
 
                   <div className="ff-wrap">
-                    <label className="ff-label ff-required">Cuenta de Cierre</label>
+                    <label className="ff-label ff-required">
+                      Cuenta de Cierre
+                      <FieldTooltip>Cuenta de Ganancias Retenidas del sistema</FieldTooltip>
+                    </label>
                     <input
                       className="ff-input"
                       value={formAccountHead}
                       onChange={(e) => setFormAccountHead(e.target.value)}
                       placeholder="Utilidades Retenidas - EMP"
                     />
-                    <p className="ff-hint">Cuenta de Ganancias Retenidas del sistema</p>
                   </div>
 
                   <div className="ff-wrap">

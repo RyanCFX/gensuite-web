@@ -18,6 +18,7 @@ import type { CreateCompraDto, Supplier, DistribucionCuentaDto } from '@/shared/
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { SupplierQuickCreateModal } from '@/features/suppliers/SupplierQuickCreateModal'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -1285,7 +1286,10 @@ export default function CompraForm() {
 
                 {esProveedorOcasional && (
                   <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="proveedorOcasionalRnc">RNC/Cédula (opcional)</label>
+                    <label className="ff-label" htmlFor="proveedorOcasionalRnc">
+                      RNC/Cédula (opcional)
+                      <FieldTooltip>Se recomienda llenarlo — alimenta el reporte fiscal 606.</FieldTooltip>
+                    </label>
                     <input
                       id="proveedorOcasionalRnc"
                       className="ff-input"
@@ -1294,7 +1298,6 @@ export default function CompraForm() {
                       placeholder="RNC/Cédula del vendedor"
                       disabled={isReturn}
                     />
-                    <p className="ff-hint">Se recomienda llenarlo — alimenta el reporte fiscal 606.</p>
                   </div>
                 )}
 
@@ -1318,12 +1321,10 @@ export default function CompraForm() {
                       }}
                     />
                     Proveedor ocasional (sin registrar)
+                    {esProveedorOcasional && (
+                      <FieldTooltip>Compra a un vendedor sin cuenta registrada. No se requiere RNC/Cédula.</FieldTooltip>
+                    )}
                   </label>
-                  {esProveedorOcasional && (
-                    <p className="ff-hint" style={{ marginTop: 4 }}>
-                      Compra a un vendedor sin cuenta registrada. No se requiere RNC/Cédula.
-                    </p>
-                  )}
                 </div>
 
                 <div className="ff-wrap">
@@ -1401,7 +1402,10 @@ export default function CompraForm() {
                 )}
 
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="ordenCompra">Orden de Compra</label>
+                  <label className="ff-label" htmlFor="ordenCompra">
+                    Orden de Compra
+                    <FieldTooltip>Caso excepcional — trae los artículos pendientes de facturar de una orden existente.</FieldTooltip>
+                  </label>
                   <SearchSelect
                     id="ordenCompra"
                     value=""
@@ -1412,7 +1416,6 @@ export default function CompraForm() {
                     placeholder="Buscar por número o proveedor…"
                     disabled={isReturn}
                   />
-                  <p className="ff-hint">Caso excepcional — trae los artículos pendientes de facturar de una orden existente.</p>
                 </div>
 
                 </div>
@@ -1428,7 +1431,10 @@ export default function CompraForm() {
             <div className="form-row form-row-3" style={{ borderTop: '1px solid var(--border-subtle)', marginTop: 16, paddingTop: 16 }}>
               {usaImpuestoDocumento && (
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
+                  <label className="ff-label" htmlFor="taxesTemplate">
+                    Impuesto del Documento
+                    <FieldTooltip>Si no eliges ninguno, se usa el template por defecto del proveedor o de la compañía.</FieldTooltip>
+                  </label>
                   <MultiSearchSelect
                     id="taxesTemplate"
                     value={taxesTemplate}
@@ -1438,13 +1444,18 @@ export default function CompraForm() {
                     emptyLabel="No hay plantillas configuradas."
                     disabled={isReturn}
                   />
-                  <p className="ff-hint">Si no eliges ninguno, se usa el template por defecto del proveedor o de la compañía.</p>
                   {pendingImpuestosHint && <p className="ff-hint">{pendingImpuestosHint}</p>}
                 </div>
               )}
 
               <div className="ff-wrap">
-                <label className="ff-label" htmlFor="retenciones">Retenciones</label>
+                <label className="ff-label" htmlFor="retenciones">
+                  Retenciones
+                  <FieldTooltip>
+                    El BFF calcula el monto de cada una a partir de la tasa configurada; si dejas la lista
+                    vacía se usan las retenciones por defecto del proveedor.
+                  </FieldTooltip>
+                </label>
                 <MultiSearchSelect
                   id="retenciones"
                   value={retenciones}
@@ -1454,10 +1465,6 @@ export default function CompraForm() {
                   emptyLabel="No hay retenciones configuradas."
                   disabled={isReturn}
                 />
-                <p className="ff-hint">
-                  El BFF calcula el monto de cada una a partir de la tasa configurada; si dejas la lista
-                  vacía se usan las retenciones por defecto del proveedor.
-                </p>
                 {pendingRetencionesHint && <p className="ff-hint">{pendingRetencionesHint}</p>}
               </div>
             </div>
@@ -1542,6 +1549,9 @@ export default function CompraForm() {
               <div className="ff-wrap">
                 <label className="ff-label">
                   {esProveedorOcasional ? 'NCF Proveedor (opcional)' : <>NCF Proveedor <span className="ff-required">*</span></>}
+                  {esProveedorOcasional && !ncfProveedor && (
+                    <FieldTooltip>Déjelo en blanco para que el sistema genere el comprobante automáticamente al someter.</FieldTooltip>
+                  )}
                 </label>
                 <input
                   className={`ff-input${!ncfValid ? ' ff-input-error' : ''}`}
@@ -1560,9 +1570,6 @@ export default function CompraForm() {
                 {!ncfValid && (
                   <span className="ff-error">Formato inválido. Debe ser B o E seguido de 10 dígitos.</span>
                 )}
-                {esProveedorOcasional && !ncfProveedor && (
-                  <p className="ff-hint">Déjelo en blanco para que el sistema genere el comprobante automáticamente al someter.</p>
-                )}
               </div>
 
               <div className="ff-wrap">
@@ -1576,7 +1583,16 @@ export default function CompraForm() {
               </div>
 
               <div className="ff-wrap">
-                <label className="ff-label">Tipo de Comprobante</label>
+                <label className="ff-label">
+                  Tipo de Comprobante
+                  <FieldTooltip>
+                    {ncfProveedor
+                      ? 'Se deriva del NCF Proveedor escrito arriba.'
+                      : esProveedorOcasional
+                        ? 'Tipo de comprobante a generar automáticamente al someter (default B11 si no se elige).'
+                        : 'Solo aplica si el proveedor es ocasional — un proveedor registrado debe traer su propio NCF.'}
+                  </FieldTooltip>
+                </label>
                 <SearchSelect
                   value={tipoComprobante}
                   onChange={setTipoComprobante}
@@ -1585,13 +1601,6 @@ export default function CompraForm() {
                   selectedLabel={catalogos?.ncfTypesCompra?.find((t) => t.value === tipoComprobante)?.label ?? ''}
                   placeholder="B11 - Compras/Informal (default)"
                 />
-                <p className="ff-hint">
-                  {ncfProveedor
-                    ? 'Se deriva del NCF Proveedor escrito arriba.'
-                    : esProveedorOcasional
-                      ? 'Tipo de comprobante a generar automáticamente al someter (default B11 si no se elige).'
-                      : 'Solo aplica si el proveedor es ocasional — un proveedor registrado debe traer su propio NCF.'}
-                </p>
               </div>
 
               <div className="ff-wrap">
@@ -1630,18 +1639,20 @@ export default function CompraForm() {
               </div>
 
               <div className="ff-wrap">
-                <label className="ff-label">Cuenta CxP (override)</label>
+                <label className="ff-label">
+                  Cuenta CxP (override)
+                  <FieldTooltip>
+                    Solo si esta compra puntual debe ir a una cuenta CxP distinta a la default del
+                    proveedor. Una devolución de compra solo puede aplicarse/reconciliarse contra
+                    facturas que compartan la misma cuenta CxP.
+                  </FieldTooltip>
+                </label>
                 <AccountSelect
                   value={cuentaCxpOverride}
                   onChange={setCuentaCxpOverride}
                   placeholder="Usar la cuenta CxP default del proveedor"
                   rootType="Liability"
                 />
-                <p className="ff-hint">
-                  Solo si esta compra puntual debe ir a una cuenta CxP distinta a la default del
-                  proveedor. Una devolución de compra solo puede aplicarse/reconciliarse contra
-                  facturas que compartan la misma cuenta CxP.
-                </p>
               </div>
             </div>
           </div>

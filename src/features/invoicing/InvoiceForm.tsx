@@ -29,6 +29,7 @@ import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, Info, UserPlus, Loc
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
 import { useTabs } from '@/contexts/TabsContext'
@@ -1407,12 +1408,10 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
                      <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
                    </span>
                    Venta ocasional (cliente no registrado)
+                   {esClienteOcasional && (
+                     <FieldTooltip>Ingresa el nombre del cliente. Para Crédito Fiscal (B01), también se requiere el RNC.</FieldTooltip>
+                   )}
                  </label>
-                 {esClienteOcasional && (
-                   <p className="ff-hint" style={{ marginTop: 4 }}>
-                     Ingresa el nombre del cliente. Para Crédito Fiscal (B01), también se requiere el RNC.
-                   </p>
-                 )}
                </div>
 
               <div className="ff-wrap">
@@ -1500,16 +1499,21 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
 
               {usaImpuestoDocumento && !mostrarImpuestoDocumento && (
                 <div className="ff-wrap">
-                  <label className="ff-label">Impuesto del Documento</label>
-                  <p className="ff-hint" style={{ marginTop: 6 }}>
-                    No aplica: una factura con cobertura ARS no puede llevar impuestos (Ley 253-12).
-                    Los medicamentos deben estar configurados como exentos de ITBIS en el catálogo.
-                  </p>
+                  <label className="ff-label">
+                    Impuesto del Documento
+                    <FieldTooltip>
+                      No aplica: una factura con cobertura ARS no puede llevar impuestos (Ley 253-12).
+                      Los medicamentos deben estar configurados como exentos de ITBIS en el catálogo.
+                    </FieldTooltip>
+                  </label>
                 </div>
               )}
               {mostrarImpuestoDocumento && (
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
+                  <label className="ff-label" htmlFor="taxesTemplate">
+                    Impuesto del Documento
+                    <FieldTooltip>Impuesto aplicado al total de la factura (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</FieldTooltip>
+                  </label>
                   <SearchSelect
                     id="taxesTemplate"
                     value={taxesTemplate}
@@ -1520,7 +1524,6 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
                     placeholder="Usar el default de la compañía"
                     className="ff-select"
                   />
-                  <p className="ff-hint">Impuesto aplicado al total de la factura (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
                 </div>
               )}
             </div>

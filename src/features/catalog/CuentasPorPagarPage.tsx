@@ -17,6 +17,7 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { ConfirmModal } from '@/shared/ui/Modal'
@@ -301,7 +302,10 @@ export default function CuentasPorPagarPage() {
 
                 <div className="form-row">
                   <div className="ff-wrap">
-                    <label className="ff-label ff-required">Tipo de Documento</label>
+                    <label className="ff-label ff-required">
+                      Tipo de Documento
+                      <FieldTooltip>En qué tipo de documento se usa este concepto de gasto.</FieldTooltip>
+                    </label>
                     <Controller
                       name="tipoDocumento"
                       control={control}
@@ -311,10 +315,12 @@ export default function CuentasPorPagarPage() {
                         </Select>
                       )}
                     />
-                    <p className="ff-hint">En qué tipo de documento se usa este concepto de gasto.</p>
                   </div>
                   <div className="ff-wrap">
-                    <label className="ff-label">Tipo de Bienes/Servicios (606)</label>
+                    <label className="ff-label">
+                      Tipo de Bienes/Servicios (606)
+                      <FieldTooltip>Categoría 606 de la DGII (ej. Arrendamientos, Gastos de personal). El backend normaliza el código corto o el string completo.</FieldTooltip>
+                    </label>
                     <Controller
                       name="claseFiscal"
                       control={control}
@@ -329,12 +335,14 @@ export default function CuentasPorPagarPage() {
                         />
                       )}
                     />
-                    <p className="ff-hint">Categoría 606 de la DGII (ej. Arrendamientos, Gastos de personal). El backend normaliza el código corto o el string completo.</p>
                   </div>
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label">Cuenta Contable</label>
+                  <label className="ff-label">
+                    Cuenta Contable
+                    <FieldTooltip>Si se omite, se usa el default de la compañía.</FieldTooltip>
+                  </label>
                   <Controller
                     name="cuenta"
                     control={control}
@@ -346,7 +354,6 @@ export default function CuentasPorPagarPage() {
                       />
                     )}
                   />
-                  <p className="ff-hint">Si se omite, se usa el default de la compañía.</p>
                 </div>
 
                 <div className="ff-wrap">

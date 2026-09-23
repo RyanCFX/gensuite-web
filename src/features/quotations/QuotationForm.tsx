@@ -12,6 +12,7 @@ import type { CreateQuotationDto, ItemPrices, Bundle, Customer, MonedaCode } fro
 import type { Item } from '@/shared/api/types'
 import { getTasaVigente } from '@/shared/api/monedas'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
 import { formatMoney, displayId, round2 } from '@/lib/formatters'
@@ -970,12 +971,10 @@ if (esClienteOcasional) {
                      <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
                    </span>
                    Venta ocasional (cliente no registrado)
+                   {esClienteOcasional && (
+                     <FieldTooltip>Ingresa el nombre del cliente. No se requiere RUC/Cédula para cotizaciones.</FieldTooltip>
+                   )}
                  </label>
-                 {esClienteOcasional && (
-                   <p className="ff-hint" style={{ marginTop: 4 }}>
-                     Ingresa el nombre del cliente. No se requiere RUC/Cédula para cotizaciones.
-                   </p>
-                 )}
                </div>
 
               <div className="ff-wrap">
@@ -1016,7 +1015,10 @@ if (esClienteOcasional) {
 
               {usaImpuestoDocumento && (
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
+                  <label className="ff-label" htmlFor="taxesTemplate">
+                    Impuesto del Documento
+                    <FieldTooltip>Impuesto aplicado al total del documento (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</FieldTooltip>
+                  </label>
                   <SearchSelect
                     id="taxesTemplate"
                     value={taxesTemplate}
@@ -1026,7 +1028,6 @@ if (esClienteOcasional) {
                     selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
                     placeholder="Usar el default de la compañía"
                   />
-                  <p className="ff-hint">Impuesto aplicado al total del documento (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</p>
                 </div>
               )}
             </div>
@@ -1320,7 +1321,7 @@ if (esClienteOcasional) {
           <button type="button" className="btn btn-ghost" onClick={() => navigate('/cotizaciones')}>
             Cancelar
           </button>
-          <button type="submit" className="btn btn-primary" disabled={isPending}>
+          <button type="submit" className="btn btn-navy" disabled={isPending}>
             {isPending
               ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
               : <Save size={15} />}

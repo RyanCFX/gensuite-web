@@ -14,7 +14,7 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import type { Item, ApiError } from '@/shared/api/types'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { formatStockInsufficientMessage } from '@/lib/stockAlerts'
-import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
@@ -339,10 +339,12 @@ export default function TransferenciaForm() {
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/transferencias')}>Cancelar</button>
-          <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
-            <Save size={15} />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+          <button type="button" className="btn btn-ghost" onClick={() => navigate('/transferencias')}>Cancelar</button>
+          <button type="submit" className="btn btn-navy" disabled={createMutation.isPending}>
+            {createMutation.isPending
+              ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+              : <Save size={15} />}
             {createMutation.isPending ? 'Guardando…' : 'Crear Transferencia'}
           </button>
         </div>

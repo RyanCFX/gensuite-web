@@ -17,8 +17,9 @@ import { getCuenta } from '@/shared/api/cuentas'
 import { CATEGORIA_GASTO } from '@/lib/constants'
 import { listRetenciones } from '@/shared/api/retenciones'
 import { useSupplierEmisorElectronico } from '@/shared/hooks/useSupplierEmisorElectronico'
-import { Plus, Trash2, Pencil, Info, AlertCircle, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, Pencil, Info, AlertCircle, AlertTriangle, Save, Loader2 } from 'lucide-react'
 import { Modal } from '@/shared/ui/Modal'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { MultiSearchSelect } from '@/shared/ui/MultiSearchSelect'
@@ -733,7 +734,10 @@ export default function GastoForm() {
                 </div>
                 {esProveedorOcasional && (
                   <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="proveedorOcasionalRnc">RNC/Cédula (opcional)</label>
+                    <label className="ff-label" htmlFor="proveedorOcasionalRnc">
+                      RNC/Cédula (opcional)
+                      <FieldTooltip>Se recomienda llenarlo — alimenta el reporte fiscal 606.</FieldTooltip>
+                    </label>
                     <input
                       id="proveedorOcasionalRnc"
                       className="ff-input"
@@ -741,7 +745,6 @@ export default function GastoForm() {
                       onChange={(e) => setProveedorOcasionalRnc(e.target.value)}
                       placeholder="RNC/Cédula del vendedor"
                     />
-                    <p className="ff-hint">Se recomienda llenarlo — alimenta el reporte fiscal 606.</p>
                   </div>
                 )}
                 <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
@@ -763,12 +766,10 @@ export default function GastoForm() {
                       }}
                     />
                     Proveedor ocasional (sin registrar)
+                    {esProveedorOcasional && (
+                      <FieldTooltip>Gasto a un vendedor sin cuenta registrada. No se requiere RNC/Cédula.</FieldTooltip>
+                    )}
                   </label>
-                  {esProveedorOcasional && (
-                    <p className="ff-hint" style={{ marginTop: 4 }}>
-                      Gasto a un vendedor sin cuenta registrada. No se requiere RNC/Cédula.
-                    </p>
-                  )}
                 </div>
                 <div className="ff-wrap">
                   <label className="ff-label">Fecha <span className="ff-required">*</span></label>
@@ -819,7 +820,10 @@ export default function GastoForm() {
                 )}
                 {multimonedaHabilitada && selectedCurrency && selectedCurrency !== monedaBase && (
                   <div className="ff-wrap">
-                    <label className="ff-label">Tasa de cambio</label>
+                    <label className="ff-label">
+                      Tasa de cambio
+                      <FieldTooltip>Si la dejas vacía, el backend resuelve la tasa contra las tasas cargadas.</FieldTooltip>
+                    </label>
                     <input
                       type="number"
                       min="0.0001"
@@ -829,7 +833,6 @@ export default function GastoForm() {
                       value={conversionRate}
                       onChange={(e) => setConversionRate(e.target.value === '' ? '' : parseFloat(e.target.value))}
                     />
-                    <p className="ff-hint">Si la dejas vacía, el backend resuelve la tasa contra las tasas cargadas.</p>
                   </div>
                 )}
               </div>
@@ -1004,6 +1007,9 @@ export default function GastoForm() {
               <div className="ff-wrap">
                 <label className="ff-label">
                   {esProveedorOcasional ? 'NCF Proveedor (opcional)' : <>NCF Proveedor <span className="ff-required">*</span></>}
+                  {esProveedorOcasional && !ncfProveedor && (
+                    <FieldTooltip>Déjelo en blanco para que el sistema genere el comprobante automáticamente al someter.</FieldTooltip>
+                  )}
                 </label>
                 <input
                   className={`ff-input${!ncfValid ? ' ff-input-error' : ''}`}
@@ -1020,9 +1026,6 @@ export default function GastoForm() {
                   }}
                 />
                 {!ncfValid && <span className="ff-error">Formato inválido.</span>}
-                {esProveedorOcasional && !ncfProveedor && (
-                  <p className="ff-hint">Déjelo en blanco para que el sistema genere el comprobante automáticamente al someter.</p>
-                )}
               </div>
 
               <div className="ff-wrap">
@@ -1037,7 +1040,10 @@ export default function GastoForm() {
 
               {esProveedorOcasional && !ncfProveedor && (
                 <div className="ff-wrap">
-                  <label className="ff-label">Tipo Comprobante</label>
+                  <label className="ff-label">
+                    Tipo Comprobante
+                    <FieldTooltip>Tipo de comprobante a generar automáticamente al someter.</FieldTooltip>
+                  </label>
                   <SearchSelect
                     value={tipoComprobante}
                     onChange={setTipoComprobante}
@@ -1047,23 +1053,24 @@ export default function GastoForm() {
                     placeholder="Seleccionar"
                     error={isB17 && b17Error}
                   />
-                  <p className="ff-hint">Tipo de comprobante a generar automáticamente al someter.</p>
                 </div>
               )}
 
               <div className="ff-wrap">
-                <label className="ff-label">Cuenta CxP (override)</label>
+                <label className="ff-label">
+                  Cuenta CxP (override)
+                  <FieldTooltip>
+                    Solo si este gasto puntual debe ir a una cuenta CxP distinta a la default del
+                    proveedor. Una devolución de compra solo puede aplicarse/reconciliarse contra
+                    facturas que compartan la misma cuenta CxP.
+                  </FieldTooltip>
+                </label>
                 <AccountSelect
                   value={cuentaCxpOverride}
                   onChange={setCuentaCxpOverride}
                   placeholder="Usar la cuenta CxP default del proveedor"
                   rootType="Liability"
                 />
-                <p className="ff-hint">
-                  Solo si este gasto puntual debe ir a una cuenta CxP distinta a la default del
-                  proveedor. Una devolución de compra solo puede aplicarse/reconciliarse contra
-                  facturas que compartan la misma cuenta CxP.
-                </p>
               </div>
             </div>
 
@@ -1129,7 +1136,10 @@ export default function GastoForm() {
             )}
             <div className="form-row form-row-3" style={{ borderTop: '1px solid var(--border-subtle)', marginTop: 16, paddingTop: 16 }}>
               <div className="ff-wrap">
-                <label className="ff-label" htmlFor="taxesTemplate">Impuesto del Documento</label>
+                <label className="ff-label" htmlFor="taxesTemplate">
+                  Impuesto del Documento
+                  <FieldTooltip>Si no eliges ninguno, se usa el template por defecto del proveedor o de la compañía.</FieldTooltip>
+                </label>
                 <MultiSearchSelect
                   id="taxesTemplate"
                   value={taxesTemplate}
@@ -1138,12 +1148,17 @@ export default function GastoForm() {
                   placeholder="Buscar plantilla…"
                   emptyLabel="No hay plantillas configuradas."
                 />
-                <p className="ff-hint">Si no eliges ninguno, se usa el template por defecto del proveedor o de la compañía.</p>
                 {pendingImpuestosHint && <p className="ff-hint">{pendingImpuestosHint}</p>}
               </div>
 
               <div className="ff-wrap">
-                <label className="ff-label" htmlFor="retenciones">Retenciones</label>
+                <label className="ff-label" htmlFor="retenciones">
+                  Retenciones
+                  <FieldTooltip>
+                    El BFF calcula el monto de cada una a partir de la tasa configurada; si dejas la lista
+                    vacía se usan las retenciones por defecto del proveedor.
+                  </FieldTooltip>
+                </label>
                 <MultiSearchSelect
                   id="retenciones"
                   value={retenciones}
@@ -1152,10 +1167,6 @@ export default function GastoForm() {
                   placeholder="Buscar retención…"
                   emptyLabel="No hay retenciones configuradas."
                 />
-                <p className="ff-hint">
-                  El BFF calcula el monto de cada una a partir de la tasa configurada; si dejas la lista
-                  vacía se usan las retenciones por defecto del proveedor.
-                </p>
                 {pendingRetencionesHint && <p className="ff-hint">{pendingRetencionesHint}</p>}
               </div>
 
@@ -1173,9 +1184,12 @@ export default function GastoForm() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={saveMutation.isPending}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+            <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)}>Cancelar</button>
+            <button type="submit" className="btn btn-navy" disabled={saveMutation.isPending}>
+              {saveMutation.isPending
+                ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                : <Save size={15} />}
               {saveMutation.isPending ? 'Guardando…' : isEdit ? 'Guardar Cambios' : 'Guardar Borrador'}
             </button>
           </div>
@@ -1209,7 +1223,10 @@ export default function GastoForm() {
                 />
               </div>
               <div className="ff-wrap">
-                <label className="ff-label">Tipo de Bienes 606 (línea)</label>
+                <label className="ff-label">
+                  Tipo de Bienes 606 (línea)
+                  <FieldTooltip>Informativo — el reporte 606 solo usa la clasificación de cabecera del documento.</FieldTooltip>
+                </label>
                 <SearchSelect
                   value={adHocModal.draft.tipoBienes606Linea ?? ''}
                   onChange={(val) => updateAdHocDraft('tipoBienes606Linea', val)}
@@ -1218,7 +1235,6 @@ export default function GastoForm() {
                   selectedLabel={catalogos?.tipoBienes606?.find((t) => t.value === adHocModal.draft.tipoBienes606Linea)?.label ?? adHocModal.draft.tipoBienes606Linea}
                   placeholder="Seleccionar tipo"
                 />
-                <p className="ff-hint">Informativo — el reporte 606 solo usa la clasificación de cabecera del documento.</p>
               </div>
               <div className="ff-wrap">
                 <label className="ff-label">Tipo de Gasto Fiscal</label>
@@ -1235,7 +1251,10 @@ export default function GastoForm() {
 
             <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr', borderTop: '1px solid var(--border-subtle)', paddingTop: 16 }}>
               <div className="ff-wrap">
-                <label className="ff-label">Impuestos de esta línea</label>
+                <label className="ff-label">
+                  Impuestos de esta línea
+                  <FieldTooltip>Independiente del impuesto del documento — si lo dejas vacío, esta línea no lleva impuesto.</FieldTooltip>
+                </label>
                 <MultiSearchSelect
                   value={adHocModal.draft.impuestosLinea ?? []}
                   onChange={(val) => updateAdHocDraft('impuestosLinea', val)}
@@ -1243,10 +1262,12 @@ export default function GastoForm() {
                   placeholder="Buscar plantilla…"
                   emptyLabel="No hay plantillas configuradas."
                 />
-                <p className="ff-hint">Independiente del impuesto del documento — si lo dejas vacío, esta línea no lleva impuesto.</p>
               </div>
               <div className="ff-wrap">
-                <label className="ff-label">Retenciones de esta línea</label>
+                <label className="ff-label">
+                  Retenciones de esta línea
+                  <FieldTooltip>Independiente de las retenciones del documento — si la dejas vacía, esta línea no lleva retención.</FieldTooltip>
+                </label>
                 <MultiSearchSelect
                   value={adHocModal.draft.retencionesLinea ?? []}
                   onChange={(val) => updateAdHocDraft('retencionesLinea', val)}
@@ -1254,7 +1275,6 @@ export default function GastoForm() {
                   placeholder="Buscar retención…"
                   emptyLabel="No hay retenciones configuradas."
                 />
-                <p className="ff-hint">Independiente de las retenciones del documento — si la dejas vacía, esta línea no lleva retención.</p>
               </div>
             </div>
           </div>

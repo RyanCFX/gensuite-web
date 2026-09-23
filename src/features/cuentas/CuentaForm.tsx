@@ -7,7 +7,7 @@ import { useTabs } from '@/contexts/TabsContext'
 import { getCuenta, createCuenta, updateCuenta } from '@/shared/api/cuentas'
 import type { CreateCuentaDto, UpdateCuentaDto } from '@/shared/api/types'
 import { AccountSelect } from '@/components/shared/AccountSelect'
-import { ArrowLeft, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, Save, Loader2 } from 'lucide-react'
 import { Select, SelectItem } from '@/components/ui/select'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
@@ -383,14 +383,15 @@ export default function CuentaForm() {
         </div>
 
         {/* Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button type="submit" className="btn btn-primary" disabled={isPending}>
-            {isPending
-              ? <><span className="spinner spinner-white spinner-sm" /> Guardando…</>
-              : isEdit ? 'Guardar Cambios' : 'Crear Cuenta'}
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
           <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)}>
             Cancelar
+          </button>
+          <button type="submit" className="btn btn-navy" disabled={isPending}>
+            {isPending
+              ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+              : <Save size={15} />}
+            {isEdit ? 'Guardar Cambios' : 'Crear Cuenta'}
           </button>
         </div>
       </form>

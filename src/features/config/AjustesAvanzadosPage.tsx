@@ -26,6 +26,7 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { TagInput } from '@/shared/ui/TagInput'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { Select, SelectItem } from '@/components/ui/select'
 import { Save, Settings2, ShieldCheck } from 'lucide-react'
 
@@ -164,12 +165,15 @@ function CuentasTab() {
             <label className="ff-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" className="ff-check" {...register('enableImmutableLedger')} />
               Habilitar Libro Mayor Inmutable
+              <FieldTooltip>Impide modificar asientos contables ya registrados</FieldTooltip>
             </label>
-            <p className="ff-hint">Impide modificar asientos contables ya registrados</p>
           </div>
 
           <div className="ff-wrap">
-            <label className="ff-label" htmlFor="defaultAgeingRange">Rango de Antigüedad por Defecto</label>
+            <label className="ff-label" htmlFor="defaultAgeingRange">
+              Rango de Antigüedad por Defecto
+              <FieldTooltip>Solo números. Separa los rangos con Enter o coma (ej. 60, 90, 120).</FieldTooltip>
+            </label>
             <Controller
               name="defaultAgeingRange"
               control={control}
@@ -182,7 +186,6 @@ function CuentasTab() {
                 />
               )}
             />
-            <p className="ff-hint">Solo números. Separa los rangos con Enter o coma (ej. 60, 90, 120).</p>
           </div>
 
           <div className="ff-wrap">
@@ -317,7 +320,13 @@ function InventarioTab() {
         </div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="ff-wrap">
-            <label className="ff-label" htmlFor="valuationMethod">Método de Valuación</label>
+            <label className="ff-label" htmlFor="valuationMethod">
+              Método de Valuación
+              <FieldTooltip>
+                Este campo puede ser rechazado por el servidor si ya existen movimientos de inventario (Stock Ledger Entry)
+                registrados para artículos afectados. No es posible saberlo de antemano; si ocurre, verás un mensaje de error al guardar.
+              </FieldTooltip>
+            </label>
             <Controller
               name="valuationMethod"
               control={control}
@@ -330,10 +339,6 @@ function InventarioTab() {
                 </Select>
               )}
             />
-            <p className="ff-hint">
-              Este campo puede ser rechazado por el servidor si ya existen movimientos de inventario (Stock Ledger Entry)
-              registrados para artículos afectados. No es posible saberlo de antemano; si ocurre, verás un mensaje de error al guardar.
-            </p>
           </div>
 
           <div className="ff-wrap">
@@ -373,12 +378,12 @@ function InventarioTab() {
             <label className="ff-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" className="ff-check" {...register('enableSerialAndBatchNoForItem')} />
               Activar Serie / Lote para Artículos
+              <FieldTooltip>
+                Interruptor maestro — actívalo para poder vender/comprar artículos con número de serie o lote. Es un
+                requisito para usar el campo de abajo (Usar Campos de Serie/Lote). Si está apagado, cualquier compra o venta
+                de un artículo con serie/lote será rechazada por el servidor.
+              </FieldTooltip>
             </label>
-            <p className="ff-hint">
-              Interruptor maestro — actívalo para poder vender/comprar artículos con número de serie o lote. Es un
-              requisito para usar el campo de abajo (Usar Campos de Serie/Lote). Si está apagado, cualquier compra o venta
-              de un artículo con serie/lote será rechazada por el servidor.
-            </p>
           </div>
 
           <div className="ff-wrap">
@@ -393,16 +398,22 @@ function InventarioTab() {
                 {...register('useSerialBatchFields')}
               />
               Usar campos de Serie/Lote en los documentos
+              <FieldTooltip>
+                Cuando está activo, los documentos (facturas, pedidos, compras, transferencias) muestran los campos de Número de
+                Serie y Lote directamente en la fila del artículo, en lugar del diálogo emergente de captura. Requiere que
+                "Activar Serie / Lote para Artículos" esté encendido — de lo contrario no tiene ningún efecto.
+              </FieldTooltip>
             </label>
-            <p className="ff-hint">
-              Cuando está activo, los documentos (facturas, pedidos, compras, transferencias) muestran los campos de Número de
-              Serie y Lote directamente en la fila del artículo, en lugar del diálogo emergente de captura. Requiere que
-              "Activar Serie / Lote para Artículos" esté encendido — de lo contrario no tiene ningún efecto.
-            </p>
           </div>
 
           <div className="ff-wrap" style={{ borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
-            <label className="ff-label" htmlFor="overDeliveryReceiptAllowance">% de Tolerancia de Sobre-recepción/Sobre-entrega</label>
+            <label className="ff-label" htmlFor="overDeliveryReceiptAllowance">
+              % de Tolerancia de Sobre-recepción/Sobre-entrega
+              <FieldTooltip>
+                Cuánto puede excederse una recepción de compra o un despacho de venta por encima de lo pedido/vendido
+                antes de que el sistema lo rechace. 0 = sin tolerancia (cualquier exceso se rechaza).
+              </FieldTooltip>
+            </label>
             <input
               id="overDeliveryReceiptAllowance"
               className="ff-input"
@@ -412,14 +423,16 @@ function InventarioTab() {
               style={{ maxWidth: 160 }}
               {...register('overDeliveryReceiptAllowance', { valueAsNumber: true })}
             />
-            <p className="ff-hint">
-              Cuánto puede excederse una recepción de compra o un despacho de venta por encima de lo pedido/vendido
-              antes de que el sistema lo rechace. 0 = sin tolerancia (cualquier exceso se rechaza).
-            </p>
           </div>
 
           <div className="ff-wrap">
-            <label className="ff-label">Rol Autorizado para Recibir/Entregar de Más</label>
+            <label className="ff-label">
+              Rol Autorizado para Recibir/Entregar de Más
+              <FieldTooltip>
+                Los usuarios con este rol pueden recibir compras o despachar ventas por encima del porcentaje de
+                tolerancia configurado arriba, sin que el sistema lo bloquee.
+              </FieldTooltip>
+            </label>
             <Controller
               name="roleAllowedToOverDeliverReceive"
               control={control}
@@ -434,10 +447,6 @@ function InventarioTab() {
                 />
               )}
             />
-            <p className="ff-hint">
-              Los usuarios con este rol pueden recibir compras o despachar ventas por encima del porcentaje de
-              tolerancia configurado arriba, sin que el sistema lo bloquee.
-            </p>
           </div>
         </div>
       </div>
@@ -729,14 +738,16 @@ function SeguridadTab() {
         </div>
         <div className="card-body">
           <div className="ff-wrap">
-            <label className="ff-label">Vigencia del link de invitación</label>
+            <label className="ff-label">
+              Vigencia del link de invitación
+              <FieldTooltip>
+                Tiempo que una invitación (usuario nuevo o reenviada) queda utilizable antes de expirar.
+                Se controla por variable de entorno del backend — no hay nada que un tenant pueda
+                configurar acá.
+              </FieldTooltip>
+            </label>
             <p className="detail-value">
               {data?.invitationLinkExpiryHours != null ? `${data.invitationLinkExpiryHours} horas` : '—'}
-            </p>
-            <p className="ff-hint">
-              Tiempo que una invitación (usuario nuevo o reenviada) queda utilizable antes de expirar.
-              Se controla por variable de entorno del backend — no hay nada que un tenant pueda
-              configurar acá.
             </p>
           </div>
         </div>

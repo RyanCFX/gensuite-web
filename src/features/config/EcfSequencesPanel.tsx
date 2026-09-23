@@ -18,6 +18,7 @@ import { ECF_TIPOS, ECF_ENV_LABELS, ecfTipoLabel } from '@/lib/dgii'
 import { formatDate } from '@/lib/formatters'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
@@ -127,9 +128,11 @@ function CreateModal({ company, onClose }: { company: string; onClose: () => voi
               </div>
             </div>
             <div className="ff-wrap">
-              <label className="ff-label">Fecha de vencimiento</label>
+              <label className="ff-label">
+                Fecha de vencimiento
+                <FieldTooltip>Fecha que aparece en la resolución de la DGII. El ambiente se infiere del modo activo.</FieldTooltip>
+              </label>
               <DatePicker className="ff-input" min={today} max={maxExpire} value={expireAt} onChange={setExpireAt} />
-              <p className="ff-hint">Fecha que aparece en la resolución de la DGII. El ambiente se infiere del modo activo.</p>
             </div>
             {error && (
               <div className="inline-alert inline-alert-error">
@@ -200,9 +203,11 @@ function EditModal({ company, seq, onClose }: { company: string; seq: EcfSequenc
         <form onSubmit={handleSubmit}>
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div className="ff-wrap">
-              <label className="ff-label">Tipo de comprobante</label>
+              <label className="ff-label">
+                Tipo de comprobante
+                <FieldTooltip>🔒 No editable — para cambiar de tipo hay que crear un rango nuevo.</FieldTooltip>
+              </label>
               <input className="ff-input" value={ecfTipoLabel(seq.typeId)} disabled />
-              <p className="ff-hint">🔒 No editable — para cambiar de tipo hay que crear un rango nuevo.</p>
             </div>
             <div className="form-row">
               <div className="ff-wrap">
@@ -210,10 +215,12 @@ function EditModal({ company, seq, onClose }: { company: string; seq: EcfSequenc
                 <input className="ff-input" value={seq.startOn} disabled />
               </div>
               <div className="ff-wrap">
-                <label className="ff-label">Número final <span className="ff-required">*</span></label>
+                <label className="ff-label">
+                  Número final <span className="ff-required">*</span>
+                  <FieldTooltip>Solo se puede extender.</FieldTooltip>
+                </label>
                 <input type="number" min={seq.currentNumber} className="ff-input" value={stopOn}
                   onChange={(e) => setStopOn(parseInt(e.target.value) || 0)} />
-                <p className="ff-hint">Solo se puede extender.</p>
               </div>
             </div>
             <div className="ff-wrap">

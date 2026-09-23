@@ -13,7 +13,7 @@ import { listSucursales } from '@/shared/api/sucursales'
 import type { CreatePurchaseReceiptDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Save, Loader2 } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
@@ -924,10 +924,13 @@ export default function RecepcionForm() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? 'Guardando…' : 'Guardar Borrador'}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+            <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)}>Cancelar</button>
+            <button type="submit" className="btn btn-navy" disabled={saveMutation.isPending}>
+              {saveMutation.isPending
+                ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                : <Save size={15} />}
+              Guardar Borrador
             </button>
           </div>
         </div>

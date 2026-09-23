@@ -13,6 +13,7 @@ import {
 import type { TipoDocumentoBancario, TesoreriaNaturaleza, TesoreriaTipoTransaccion } from '@/shared/api/types'
 import { Plus, Pencil, Ban, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -371,7 +372,10 @@ export default function TiposDocumentoPage() {
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={{ display: 'flex', gap: 12 }}>
                   <div className="ff-wrap" style={{ flex: 1 }}>
-                    <label className="ff-label ff-required" htmlFor="tdCode">Código</label>
+                    <label className="ff-label ff-required" htmlFor="tdCode">
+                      Código
+                      <FieldTooltip>Se normaliza a mayúsculas automáticamente.</FieldTooltip>
+                    </label>
                     <input
                       id="tdCode"
                       className={`ff-input${errors.code ? ' ff-input-error' : ''}`}
@@ -380,7 +384,6 @@ export default function TiposDocumentoPage() {
                       {...register('code')}
                     />
                     {errors.code && <p className="ff-error">{errors.code.message}</p>}
-                    <p className="ff-hint">Se normaliza a mayúsculas automáticamente.</p>
                   </div>
                   <div className="ff-wrap" style={{ flex: 2 }}>
                     <label className="ff-label ff-required" htmlFor="tdDescription">Descripción</label>
@@ -432,7 +435,13 @@ export default function TiposDocumentoPage() {
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label">Cuenta Contrapartida por Defecto</label>
+                  <label className="ff-label">
+                    Cuenta Contrapartida por Defecto
+                    <FieldTooltip>
+                      Se usa como contrapartida sugerida al registrar un documento de este tipo sin
+                      beneficiario ni distribución explícita. Opcional.
+                    </FieldTooltip>
+                  </label>
                   <Controller
                     name="defaultOffsetAccount"
                     control={control}
@@ -444,10 +453,6 @@ export default function TiposDocumentoPage() {
                       />
                     )}
                   />
-                  <p className="ff-hint">
-                    Se usa como contrapartida sugerida al registrar un documento de este tipo sin
-                    beneficiario ni distribución explícita. Opcional.
-                  </p>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

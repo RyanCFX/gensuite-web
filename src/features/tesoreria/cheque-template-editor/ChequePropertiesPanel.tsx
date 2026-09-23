@@ -1,5 +1,6 @@
 import type { CreateChequePrintTemplateDto, ChequePrintTemplateSize } from '@/shared/api/types'
 import { Select, SelectItem } from '@/components/ui/select'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { CHEQUE_ELEMENTS, type ChequeElementId } from './constants'
 import { readElement, writeElement } from './mapping'
 
@@ -45,12 +46,12 @@ export function ChequePropertiesPanel({ values, isEdit, selectedId, onChange }: 
         <div className="chq-right-section">
           <h3 className="chq-right-section-title">Cheque</h3>
           <div className="ff-wrap">
-            <label className="ff-label ff-required">Nombre de la plantilla</label>
+            <label className="ff-label ff-required">
+              Nombre de la plantilla
+              {isEdit && <FieldTooltip>No editable — para renombrar, crea una plantilla nueva.</FieldTooltip>}
+            </label>
             {isEdit ? (
-              <>
-                <input className="ff-input" value={values.bankName} disabled />
-                <p className="ff-hint">No editable — para renombrar, crea una plantilla nueva.</p>
-              </>
+              <input className="ff-input" value={values.bankName} disabled />
             ) : (
               <input
                 className="ff-input"

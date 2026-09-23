@@ -16,6 +16,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { EcfTabs } from '@/shared/ui/EcfTabs'
 import { ConfirmModal, Modal } from '@/shared/ui/Modal'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { getEcfConfig } from '@/shared/api/config'
 import { getContingenciaPendientes, activarContingencia, desactivarContingencia, flushContingencia } from '@/shared/api/ecf'
 import type { ApiError, FlushContingenciaResult } from '@/shared/api/types'
@@ -222,7 +223,10 @@ function ContingenciaContent({ company }: { company: string }) {
           <p className="ff-hint">{motivo.trim().length}/500 caracteres</p>
         </div>
         <div className="ff-wrap">
-          <label className="ff-label" htmlFor="contingenciaHasta">Autorizada hasta</label>
+          <label className="ff-label" htmlFor="contingenciaHasta">
+            Autorizada hasta
+            <FieldTooltip>Por defecto la contingencia queda autorizada 72 horas (ventana legal).</FieldTooltip>
+          </label>
           <input
             id="contingenciaHasta"
             type="datetime-local"
@@ -230,7 +234,6 @@ function ContingenciaContent({ company }: { company: string }) {
             value={autorizadoHasta}
             onChange={(e) => setAutorizadoHasta(e.target.value)}
           />
-          <p className="ff-hint">Por defecto la contingencia queda autorizada 72 horas (ventana legal).</p>
         </div>
       </Modal>
 

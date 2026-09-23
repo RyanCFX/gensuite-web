@@ -7,6 +7,7 @@ import { es } from 'date-fns/locale'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ConfirmModal } from '@/shared/ui/Modal'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useTabActiva } from '@/shared/hooks/useTabActiva'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
@@ -378,10 +379,10 @@ function DestinatariosModal({ codigo, onClose }: { codigo: string; onClose: () =
               {/* ── Enviar correo de prueba ───────────────────────────────── */}
               <hr style={{ border: 'none', borderTop: '1px solid var(--border-default)', margin: '8px 0' }} />
 
-              <span className="ff-label" style={{ margin: 0 }}>Enviar correo de prueba</span>
-              <p className="ff-hint" style={{ margin: 0, fontSize: 12, color: 'var(--text-tertiary)' }}>
-                Envía un email de prueba con datos ficticios a cualquier dirección para verificar la plantilla y el canal SMTP.
-              </p>
+              <span className="ff-label" style={{ margin: 0 }}>
+                Enviar correo de prueba
+                <FieldTooltip>Envía un email de prueba con datos ficticios a cualquier dirección para verificar la plantilla y el canal SMTP.</FieldTooltip>
+              </span>
 
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                 <div className="ff-wrap" style={{ flex: 2 }}>

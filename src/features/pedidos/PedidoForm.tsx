@@ -13,6 +13,7 @@ import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { useItemInventory } from '@/shared/hooks/useItemInventory'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
@@ -935,12 +936,10 @@ try {
                      <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
                    </span>
                    Venta ocasional (cliente no registrado)
+                   {esClienteOcasional && (
+                     <FieldTooltip>Ingresa el nombre del cliente. No se requiere RUC/Cédula para pedidos.</FieldTooltip>
+                   )}
                  </label>
-                 {esClienteOcasional && (
-                   <p className="ff-hint" style={{ marginTop: 4 }}>
-                     Ingresa el nombre del cliente. No se requiere RUC/Cédula para pedidos.
-                   </p>
-                 )}
                </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Fecha</label>
@@ -1217,7 +1216,7 @@ try {
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
           <button type="button" className="btn btn-ghost" onClick={() => navigate('/pedidos')}>Cancelar</button>
-          <button type="submit" className="btn btn-primary" disabled={isPending}>
+          <button type="submit" className="btn btn-navy" disabled={isPending}>
             {isPending ? <Loader2 size={15} className="spin" /> : <Save size={15} />}
             Guardar Borrador
           </button>

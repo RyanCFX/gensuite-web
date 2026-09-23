@@ -37,6 +37,7 @@ import { listRoles } from '@/shared/api/usuarios'
 import type { CobrosConfig, MetodoPago, TaxLineCategory, TasaImpuesto, TasaImpuestoComponente, CreateTasaImpuestoDto, GrupoCliente, FacturacionConfig, Denominacion, ApiError, UpdateAlmacenDto, FormatoImpresion, EcfTipoElectronico, PosDeshabilitarBloqueos, HabilitarFarmaciaResult, DesactivarDespachoBloqueos, UpdateDespachoFuturoDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { ConfirmModal, Modal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
@@ -302,12 +303,14 @@ function AlmacenesSection() {
                 />
               </div>
               <div className="ff-wrap">
-                <label className="ff-label">Tipo de Almacén</label>
+                <label className="ff-label">
+                  Tipo de Almacén
+                  <FieldTooltip>"Tránsito" se usa como punto intermedio en transferencias entre almacenes.</FieldTooltip>
+                </label>
                 <Select value={newWarehouseType} onValueChange={setNewWarehouseType} placeholder="Estándar">
                   <SelectItem value="">Estándar</SelectItem>
                   <SelectItem value="Transit">Tránsito</SelectItem>
                 </Select>
-                <p className="ff-hint">"Tránsito" se usa como punto intermedio en transferencias entre almacenes.</p>
               </div>
               <div className="ff-wrap">
                 <label className="ff-label">Cuenta de Inventario</label>
@@ -613,13 +616,15 @@ function MetodosPagoSection() {
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="ff-wrap">
-                <label className="ff-label">Cuenta Bancaria / Caja</label>
+                <label className="ff-label">
+                  Cuenta Bancaria / Caja
+                  <FieldTooltip>Ej: "Efectivo RD" → "Cash - JB"</FieldTooltip>
+                </label>
                 <AccountSelect
                   value={editAccount}
                   onChange={setEditAccount}
                   placeholder="Buscar cuenta bancaria o caja…"
                 />
-                <p className="ff-hint">Ej: "Efectivo RD" → "Cash - JB"</p>
               </div>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
@@ -632,14 +637,14 @@ function MetodosPagoSection() {
                   }}
                 />
                 Es cheque
+                {editEsCheque && (
+                  <FieldTooltip>
+                    Todo pago con este método (en Compras, Gastos y Pagos a proveedores) se tratará
+                    siempre como pago con cheque — se pedirá cuenta bancaria y número de cheque, y
+                    quedará registrado en el historial de cheques.
+                  </FieldTooltip>
+                )}
               </label>
-              {editEsCheque && (
-                <p className="ff-hint">
-                  Todo pago con este método (en Compras, Gastos y Pagos a proveedores) se tratará
-                  siempre como pago con cheque — se pedirá cuenta bancaria y número de cheque, y
-                  quedará registrado en el historial de cheques.
-                </p>
-              )}
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: editEsCheque ? 'default' : 'pointer' }}>
                 <input
@@ -649,14 +654,17 @@ function MetodosPagoSection() {
                   onChange={(e) => setEditRequiresBankAccount(e.target.checked)}
                 />
                 Requiere cuenta bancaria
+                {editEsCheque && (
+                  <FieldTooltip>Requerida automáticamente — todo cheque necesita indicar de qué cuenta sale.</FieldTooltip>
+                )}
               </label>
-              {editEsCheque && (
-                <p className="ff-hint">Requerida automáticamente — todo cheque necesita indicar de qué cuenta sale.</p>
-              )}
 
               {editRequiresBankAccount && (
                 <div className="ff-wrap">
-                  <label className="ff-label">Cuenta bancaria por defecto</label>
+                  <label className="ff-label">
+                    Cuenta bancaria por defecto
+                    <FieldTooltip>Opcional. Si se deja vacío, el usuario deberá elegir la cuenta en cada cobro/pago.</FieldTooltip>
+                  </label>
                   <SearchSelect
                     value={editDefaultBankAccount}
                     onChange={setEditDefaultBankAccount}
@@ -665,7 +673,6 @@ function MetodosPagoSection() {
                     selectedLabel={cuentaBancariaOptions.find((o) => o.value === editDefaultBankAccount)?.label ?? ''}
                     placeholder="— Sin cuenta por defecto —"
                   />
-                  <p className="ff-hint">Opcional. Si se deja vacío, el usuario deberá elegir la cuenta en cada cobro/pago.</p>
                 </div>
               )}
             </div>
@@ -979,17 +986,19 @@ function UomSection() {
               </div>
 
               <div className="ff-wrap">
-                <label className="ff-label">Código DGII</label>
+                <label className="ff-label">
+                  Código DGII
+                  <FieldTooltip>
+                    Unidad de medida que exige la DGII en cada línea de un comprobante electrónico.
+                    Opcional — sin código, esta unidad sigue siendo válida para todo lo demás.
+                  </FieldTooltip>
+                </label>
                 <Select value={newCodigoDgii} onValueChange={setNewCodigoDgii} placeholder="Ninguno">
                   <SelectItem value="">Ninguno</SelectItem>
                   {DGII_UOM_CODES.map((c) => (
                     <SelectItem key={c.codigo} value={c.codigo}>{dgiiUomLabel(c.codigo)}</SelectItem>
                   ))}
                 </Select>
-                <p className="ff-hint">
-                  Unidad de medida que exige la DGII en cada línea de un comprobante electrónico.
-                  Opcional — sin código, esta unidad sigue siendo válida para todo lo demás.
-                </p>
               </div>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
@@ -999,10 +1008,8 @@ function UomSection() {
                   onChange={(e) => setNewMustBeWholeNumber(e.target.checked)}
                 />
                 Solo cantidades enteras (sin decimales)
+                <FieldTooltip>Ej: "Unidad", "Caja". UOMs continuas (Kg, Litro, Metro) deben dejarlo desmarcado.</FieldTooltip>
               </label>
-              <p className="ff-hint" style={{ marginTop: -8 }}>
-                Ej: "Unidad", "Caja". UOMs continuas (Kg, Litro, Metro) deben dejarlo desmarcado.
-              </p>
 
               {/* Conversions table */}
               <div>
@@ -1110,16 +1117,16 @@ function UomSection() {
                   </div>
 
                   <div className="ff-wrap">
-                    <label className="ff-label">Código DGII</label>
+                    <label className="ff-label">
+                      Código DGII
+                      <FieldTooltip>Unidad de medida que exige la DGII en cada línea de un comprobante electrónico.</FieldTooltip>
+                    </label>
                     <Select value={editCodigoDgii} onValueChange={setEditCodigoDgii} placeholder="Ninguno">
                       <SelectItem value="">Ninguno</SelectItem>
                       {DGII_UOM_CODES.map((c) => (
                         <SelectItem key={c.codigo} value={c.codigo}>{dgiiUomLabel(c.codigo)}</SelectItem>
                       ))}
                     </Select>
-                    <p className="ff-hint">
-                      Unidad de medida que exige la DGII en cada línea de un comprobante electrónico.
-                    </p>
                   </div>
 
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
@@ -1129,10 +1136,8 @@ function UomSection() {
                       onChange={(e) => setEditMustBeWholeNumber(e.target.checked)}
                     />
                     Solo cantidades enteras (sin decimales)
+                    <FieldTooltip>Ej: "Unidad", "Caja". UOMs continuas (Kg, Litro, Metro) deben dejarlo desmarcado.</FieldTooltip>
                   </label>
-                  <p className="ff-hint" style={{ marginTop: -8 }}>
-                    Ej: "Unidad", "Caja". UOMs continuas (Kg, Litro, Metro) deben dejarlo desmarcado.
-                  </p>
 
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -1912,14 +1917,16 @@ function TasasImpuestoSection() {
                   />
                 </div>
                 <div className="ff-wrap">
-                  <label className="ff-label">Cuenta Contable (Gastos)</label>
+                  <label className="ff-label">
+                    Cuenta Contable (Gastos)
+                    <FieldTooltip>Si se deja vacía, se usa la misma cuenta de Ventas/Artículos.</FieldTooltip>
+                  </label>
                   <AccountSelect
                     value={formAccountCompras}
                     onChange={setFormAccountCompras}
                     placeholder="Buscar cuenta…"
                     ledgerOnly
                   />
-                  <p className="ff-hint">Si se deja vacía, se usa la misma cuenta de Ventas/Artículos.</p>
                 </div>
               </div>
 
@@ -2023,7 +2030,10 @@ function TasasImpuestoSection() {
 
               {usaImpuestoDocumento && (
                 <div className="ff-wrap">
-                  <label className="ff-label">Aplica a</label>
+                  <label className="ff-label">
+                    Aplica a
+                    <FieldTooltip>El servidor gestiona sola la plantilla correspondiente en cada documento — no es necesario configurarla manualmente.</FieldTooltip>
+                  </label>
                   <div style={{ display: 'flex', gap: 20 }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                       <input
@@ -2044,9 +2054,6 @@ function TasasImpuestoSection() {
                       Compras
                     </label>
                   </div>
-                  <p className="ff-hint">
-                    El servidor gestiona sola la plantilla correspondiente en cada documento — no es necesario configurarla manualmente.
-                  </p>
                 </div>
               )}
             </div>
@@ -2660,11 +2667,13 @@ function FacturacionConfigSection() {
       </div>
       <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div className="ff-wrap">
-          <label className="ff-label">Flujo de cobro al someter</label>
-          <p className="ff-hint" style={{ marginBottom: 8 }}>
-            "Directo": se cobra con un solo método de pago, sin vuelto (comportamiento histórico). "Caja": habilita
-            cobrar con múltiples métodos de pago simultáneos y el registro opcional de vuelto.
-          </p>
+          <label className="ff-label">
+            Flujo de cobro al someter
+            <FieldTooltip>
+              "Directo": se cobra con un solo método de pago, sin vuelto (comportamiento histórico). "Caja": habilita
+              cobrar con múltiples métodos de pago simultáneos y el registro opcional de vuelto.
+            </FieldTooltip>
+          </label>
           <div style={{ maxWidth: 240 }}>
             <Select value={flujoCobro} onValueChange={(val) => setFlujoCobro(val as 'directo' | 'caja')}>
               <SelectItem value="directo">Directo</SelectItem>
@@ -2673,10 +2682,10 @@ function FacturacionConfigSection() {
           </div>
         </div>
         <div className="ff-wrap">
-          <label className="ff-label">Roles autorizados para cancelar facturas sometidas</label>
-          <p className="ff-hint" style={{ marginBottom: 8 }}>
-            Solo usuarios con alguno de estos roles pueden cancelar una factura ya sometida (con NCF asignado).
-          </p>
+          <label className="ff-label">
+            Roles autorizados para cancelar facturas sometidas
+            <FieldTooltip>Solo usuarios con alguno de estos roles pueden cancelar una factura ya sometida (con NCF asignado).</FieldTooltip>
+          </label>
           <div style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
@@ -2714,12 +2723,14 @@ function FacturacionConfigSection() {
               checked={requiereUbicacionVenta}
               onChange={(e) => setRequiereUbicacionVenta(e.target.checked)}
             />
-            <span style={{ fontSize: 13 }}>Requiere Ubicación para Vender</span>
+            <span style={{ fontSize: 13 }}>
+              Requiere Ubicación para Vender
+              <FieldTooltip>
+                Si está activo, no se podrá vender un artículo de inventario si no tiene una Ubicación asignada dentro
+                del almacén desde el cual se factura.
+              </FieldTooltip>
+            </span>
           </label>
-          <p className="ff-hint" style={{ marginTop: 4 }}>
-            Si está activo, no se podrá vender un artículo de inventario si no tiene una Ubicación asignada dentro
-            del almacén desde el cual se factura.
-          </p>
         </div>
 
         <div className="ff-wrap">
@@ -2730,13 +2741,15 @@ function FacturacionConfigSection() {
               checked={requiereSerialLoteCompra}
               onChange={(e) => setRequiereSerialLoteCompra(e.target.checked)}
             />
-            <span style={{ fontSize: 13 }}>Requiere Serial/Lote al Comprar</span>
+            <span style={{ fontSize: 13 }}>
+              Requiere Serial/Lote al Comprar
+              <FieldTooltip>
+                Si está activo, al comprar un artículo con tracking de serial/lote se exige capturar los mismos en la
+                línea de compra, y al vender solo se podrá elegir un serial/lote que ya exista en el sistema. Si está
+                inactivo, la captura es opcional al comprar y se puede crear un serial/lote nuevo automáticamente al vender.
+              </FieldTooltip>
+            </span>
           </label>
-          <p className="ff-hint" style={{ marginTop: 4 }}>
-            Si está activo, al comprar un artículo con tracking de serial/lote se exige capturar los mismos en la
-            línea de compra, y al vender solo se podrá elegir un serial/lote que ya exista en el sistema. Si está
-            inactivo, la captura es opcional al comprar y se puede crear un serial/lote nuevo automáticamente al vender.
-          </p>
         </div>
 
         <div className="ff-wrap">
@@ -2747,15 +2760,17 @@ function FacturacionConfigSection() {
               checked={actualizarCostoEnCompra}
               onChange={(e) => setActualizarCostoEnCompra(e.target.checked)}
             />
-            <span style={{ fontSize: 13 }}>Actualizar costo del artículo al comprar</span>
+            <span style={{ fontSize: 13 }}>
+              Actualizar costo del artículo al comprar
+              <FieldTooltip>
+                Si está activo, cada compra sometida actualiza el "Costo de Valoración" del artículo con el precio de esa
+                compra. Si lo desactivas, el costo se mantiene fijo hasta que lo edites manualmente — útil si preferís
+                controlar el costo de tus artículos a mano en vez de que se mueva con cada compra. No afecta el precio de
+                venta en modo "Sobre Costo": ese sigue recalculándose con cada compra sin importar este ajuste. Un
+                artículo puntual puede tener su propia excepción a esta regla desde su ficha (Catálogo).
+              </FieldTooltip>
+            </span>
           </label>
-          <p className="ff-hint" style={{ marginTop: 4 }}>
-            Si está activo, cada compra sometida actualiza el "Costo de Valoración" del artículo con el precio de esa
-            compra. Si lo desactivas, el costo se mantiene fijo hasta que lo edites manualmente — útil si preferís
-            controlar el costo de tus artículos a mano en vez de que se mueva con cada compra. No afecta el precio de
-            venta en modo "Sobre Costo": ese sigue recalculándose con cada compra sin importar este ajuste. Un
-            artículo puntual puede tener su propia excepción a esta regla desde su ficha (Catálogo).
-          </p>
         </div>
 
         <div className="ff-wrap">
@@ -2766,12 +2781,14 @@ function FacturacionConfigSection() {
               checked={usaDepartamentos}
               onChange={(e) => setUsaDepartamentos(e.target.checked)}
             />
-            <span style={{ fontSize: 13 }}>Usar Departamentos</span>
+            <span style={{ fontSize: 13 }}>
+              Usar Departamentos
+              <FieldTooltip>
+                Si está desactivado, se oculta el selector de Departamento (opcional) en los formularios de Factura,
+                Cotización, Pedido, Cobro, Compra y Gasto. No afecta documentos ya guardados con un departamento asignado.
+              </FieldTooltip>
+            </span>
           </label>
-          <p className="ff-hint" style={{ marginTop: 4 }}>
-            Si está desactivado, se oculta el selector de Departamento (opcional) en los formularios de Factura,
-            Cotización, Pedido, Cobro, Compra y Gasto. No afecta documentos ya guardados con un departamento asignado.
-          </p>
         </div>
 
         <div className="ff-wrap">
@@ -2782,12 +2799,14 @@ function FacturacionConfigSection() {
               checked={usaImpuestoDocumento}
               onChange={(e) => setUsaImpuestoDocumento(e.target.checked)}
             />
-            <span style={{ fontSize: 13 }}>Permitir Impuesto de Documento</span>
+            <span style={{ fontSize: 13 }}>
+              Permitir Impuesto de Documento
+              <FieldTooltip>
+                Si está desactivado, se oculta el selector de plantilla de Impuesto de Documento en Factura, Cotización
+                y Compra. No afecta documentos ya guardados con una plantilla asignada.
+              </FieldTooltip>
+            </span>
           </label>
-          <p className="ff-hint" style={{ marginTop: 4 }}>
-            Si está desactivado, se oculta el selector de plantilla de Impuesto de Documento en Factura, Cotización
-            y Compra. No afecta documentos ya guardados con una plantilla asignada.
-          </p>
         </div>
 
         <div className="ff-wrap">
@@ -2798,39 +2817,45 @@ function FacturacionConfigSection() {
               checked={redondearTotales}
               onChange={(e) => setRedondearTotales(e.target.checked)}
             />
-            <span style={{ fontSize: 13 }}>Redondear totales a la unidad</span>
+            <span style={{ fontSize: 13 }}>
+              Redondear totales a la unidad
+              <FieldTooltip>
+                Si está activo (default), el total con centavos de cada factura/compra se redondea al peso más cercano
+                y ese es el monto que se cobra o queda pendiente (ej. RD$168.57 se cobra como RD$169.00) — pensado para
+                ventas en efectivo, que no manejan centavos físicos. Si se desactiva, se cobra el monto exacto con
+                centavos — más apropiado si el negocio solo cobra con tarjeta, cheque o transferencia. Cambiarlo no
+                afecta facturas o compras ya sometidas, solo las que se sometan después de guardar.
+              </FieldTooltip>
+            </span>
           </label>
-          <p className="ff-hint" style={{ marginTop: 4 }}>
-            Si está activo (default), el total con centavos de cada factura/compra se redondea al peso más cercano
-            y ese es el monto que se cobra o queda pendiente (ej. RD$168.57 se cobra como RD$169.00) — pensado para
-            ventas en efectivo, que no manejan centavos físicos. Si se desactiva, se cobra el monto exacto con
-            centavos — más apropiado si el negocio solo cobra con tarjeta, cheque o transferencia. Cambiarlo no
-            afecta facturas o compras ya sometidas, solo las que se sometan después de guardar.
-          </p>
         </div>
 
         <div className="form-row">
           <div className="ff-wrap">
-            <label className="ff-label">Plantilla de Impuesto — Ventas (default)</label>
+            <label className="ff-label">
+              Plantilla de Impuesto — Ventas (default)
+              <FieldTooltip>
+                Plantilla que aplican Factura, Cotización y Pedido de Venta cuando no se especifica una explícitamente.
+                Se generan y gestionan desde "Tasas de Impuesto".
+              </FieldTooltip>
+            </label>
             <Select value={plantillaImpuestoVentasDefault} onValueChange={setPlantillaImpuestoVentasDefault} placeholder="Seleccionar…">
               <SelectItem value="">Sin plantilla</SelectItem>
               {(plantillasVentas ?? []).map((t) => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}
             </Select>
-            <p className="ff-hint">
-              Plantilla que aplican Factura, Cotización y Pedido de Venta cuando no se especifica una explícitamente.
-              Se generan y gestionan desde "Tasas de Impuesto".
-            </p>
           </div>
           <div className="ff-wrap">
-            <label className="ff-label">Plantilla de Impuesto — Compras (default)</label>
+            <label className="ff-label">
+              Plantilla de Impuesto — Compras (default)
+              <FieldTooltip>
+                Plantilla que aplican Compra y Gasto cuando no se especifica una explícitamente.
+                Se generan y gestionan desde "Tasas de Impuesto".
+              </FieldTooltip>
+            </label>
             <Select value={plantillaImpuestoComprasDefault} onValueChange={setPlantillaImpuestoComprasDefault} placeholder="Seleccionar…">
               <SelectItem value="">Sin plantilla</SelectItem>
               {(plantillasCompras ?? []).map((t) => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}
             </Select>
-            <p className="ff-hint">
-              Plantilla que aplican Compra y Gasto cuando no se especifica una explícitamente.
-              Se generan y gestionan desde "Tasas de Impuesto".
-            </p>
           </div>
         </div>
 
@@ -2924,12 +2949,14 @@ function FacturacionConfigSection() {
                         checked={despachoFuturoHabilitado}
                         onChange={(e) => setDespachoFuturoHabilitado(e.target.checked)}
                       />
-                      <span style={{ fontSize: 13, fontWeight: 600 }}>Permitir despacho a futuro</span>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>
+                        Permitir despacho a futuro
+                        <FieldTooltip>
+                          Si está activo, al facturar se puede elegir despachar ahora o después. Si está apagado, toda
+                          venta nueva se despacha de inmediato (se confirma que exista stock físico antes de facturar).
+                        </FieldTooltip>
+                      </span>
                     </label>
-                    <p className="ff-hint">
-                      Si está activo, al facturar se puede elegir despachar ahora o después. Si está apagado, toda
-                      venta nueva se despacha de inmediato (se confirma que exista stock físico antes de facturar).
-                    </p>
                   </div>
 
                   <div className="ff-wrap" style={{ opacity: despachoFuturoHabilitado ? 1 : 0.5 }}>
@@ -2941,13 +2968,15 @@ function FacturacionConfigSection() {
                         disabled={!despachoFuturoHabilitado}
                         onChange={(e) => setDespachoFuturoBloqueaVenta(e.target.checked)}
                       />
-                      <span style={{ fontSize: 13, fontWeight: 600 }}>El despacho a futuro reserva el stock</span>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>
+                        El despacho a futuro reserva el stock
+                        <FieldTooltip>
+                          Si está activo, mientras una venta a futuro no se despache, esas unidades no se le pueden
+                          vender a otro cliente. Si está apagado, la venta a futuro queda solo como una promesa — el
+                          mismo stock sigue disponible para cualquier otro cliente hasta que alguien lo despache primero.
+                        </FieldTooltip>
+                      </span>
                     </label>
-                    <p className="ff-hint">
-                      Si está activo, mientras una venta a futuro no se despache, esas unidades no se le pueden
-                      vender a otro cliente. Si está apagado, la venta a futuro queda solo como una promesa — el
-                      mismo stock sigue disponible para cualquier otro cliente hasta que alguien lo despache primero.
-                    </p>
                   </div>
 
                   {/* Sin atenuar por despachoFuturoHabilitado: este switch controla las ventas
@@ -2961,14 +2990,16 @@ function FacturacionConfigSection() {
                         checked={despachoConfirmarStockAsignaSeriales}
                         onChange={(e) => setDespachoConfirmarStockAsignaSeriales(e.target.checked)}
                       />
-                      <span style={{ fontSize: 13, fontWeight: 600 }}>Auto-asignar seriales/lotes al confirmar stock</span>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>
+                        Auto-asignar seriales/lotes al confirmar stock
+                        <FieldTooltip>
+                          Solo aplica a ventas inmediatas (no a futuro). Si está activo, al someter la factura el
+                          sistema elige automáticamente los seriales/lotes disponibles. Si está apagado (recomendado si
+                          necesitás elegir manualmente cuál unidad exacta se vende), hay que asignarlos a mano antes de
+                          someter.
+                        </FieldTooltip>
+                      </span>
                     </label>
-                    <p className="ff-hint">
-                      Solo aplica a ventas inmediatas (no a futuro). Si está activo, al someter la factura el
-                      sistema elige automáticamente los seriales/lotes disponibles. Si está apagado (recomendado si
-                      necesitás elegir manualmente cuál unidad exacta se vende), hay que asignarlos a mano antes de
-                      someter.
-                    </p>
                   </div>
 
                   <button
@@ -3006,13 +3037,15 @@ function FacturacionConfigSection() {
                   disabled={!data?.despachoHabilitado}
                   onChange={(e) => setPedidoRequiereConfirmacionDespacho(e.target.checked)}
                 />
-                <span style={{ fontSize: 13, fontWeight: 600 }}>Pedido requiere confirmación de despacho</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>
+                  Pedido requiere confirmación de despacho
+                  <FieldTooltip>
+                    {data?.despachoHabilitado
+                      ? 'Un pedido inmediato (no apartado, no despacho a futuro) no se puede facturar sin que despacho confirme antes la existencia física de los artículos.'
+                      : 'Requiere el módulo de Despacho activado arriba.'}
+                  </FieldTooltip>
+                </span>
               </label>
-              <p className="ff-hint">
-                {data?.despachoHabilitado
-                  ? 'Un pedido inmediato (no apartado, no despacho a futuro) no se puede facturar sin que despacho confirme antes la existencia física de los artículos.'
-                  : 'Requiere el módulo de Despacho activado arriba.'}
-              </p>
             </div>
             <div>
               <label className="ff-check-wrap">
@@ -3022,12 +3055,14 @@ function FacturacionConfigSection() {
                   checked={pedidoConduceIncluyePrecios}
                   onChange={(e) => setPedidoConduceIncluyePrecios(e.target.checked)}
                 />
-                <span style={{ fontSize: 13, fontWeight: 600 }}>Conduce incluye precios</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>
+                  Conduce incluye precios
+                  <FieldTooltip>
+                    Si está apagado, el PDF del Pedido omite columnas de precio/ITBIS/total y la sección de
+                    totales — queda como un conduce sin montos (descripción, cantidad, nota).
+                  </FieldTooltip>
+                </span>
               </label>
-              <p className="ff-hint">
-                Si está apagado, el PDF del Pedido omite columnas de precio/ITBIS/total y la sección de
-                totales — queda como un conduce sin montos (descripción, cantidad, nota).
-              </p>
             </div>
           </div>
         </div>
@@ -3041,23 +3076,27 @@ function FacturacionConfigSection() {
                 checked={arqueoEfectivoRequerido}
                 onChange={(e) => setArqueoEfectivoRequerido(e.target.checked)}
               />
-              <span style={{ fontSize: 13 }}>Arqueo de efectivo obligatorio al cerrar turno</span>
+              <span style={{ fontSize: 13 }}>
+                Arqueo de efectivo obligatorio al cerrar turno
+                <FieldTooltip>
+                  Si está activo, el cajero debe contar y desglosar las denominaciones de efectivo (billetes/monedas) al cerrar su turno;
+                  si falta, el sistema rechaza el cierre.
+                </FieldTooltip>
+              </span>
             </label>
-            <p className="ff-hint" style={{ marginTop: 4 }}>
-              Si está activo, el cajero debe contar y desglosar las denominaciones de efectivo (billetes/monedas) al cerrar su turno;
-              si falta, el sistema rechaza el cierre.
-            </p>
            </div>
          )}
 
          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
            <div className="ff-wrap" style={{ maxWidth: 320 }}>
-               <label className="ff-label">Método de Pago Default (DOP)</label>
-               <p className="ff-hint" style={{ marginTop: 4 }}>
-                 {data?.usaModuloPos
-                   ? 'Se usa para comparar el efectivo físico en caja al cerrar turno, y como método de pago por defecto al cobrar una factura en pesos si no se especifica ninguno.'
-                   : 'Método de pago que se usa por defecto al cobrar una factura en pesos si no se especifica ninguno.'}
-               </p>
+               <label className="ff-label">
+                 Método de Pago Default (DOP)
+                 <FieldTooltip>
+                   {data?.usaModuloPos
+                     ? 'Se usa para comparar el efectivo físico en caja al cerrar turno, y como método de pago por defecto al cobrar una factura en pesos si no se especifica ninguno.'
+                     : 'Método de pago que se usa por defecto al cobrar una factura en pesos si no se especifica ninguno.'}
+                 </FieldTooltip>
+               </label>
                <SearchSelect
                  value={modoPagoCaja ?? ''}
                  onChange={(val) => setModoPagoCaja(val || null)}
@@ -3070,12 +3109,14 @@ function FacturacionConfigSection() {
 
              {data?.monedasHabilitadas?.includes('USD') && (
                <div className="ff-wrap" style={{ maxWidth: 320 }}>
-                 <label className="ff-label">Método de Pago Default (USD)</label>
-                 <p className="ff-hint" style={{ marginTop: 4 }}>
-                   Método de pago que se usa por defecto al cobrar una factura en dólares si no se
-                   especifica ninguno. Opcional — si no se configura, hay que elegir el método de pago
-                   manualmente en cada cobro en USD.
-                 </p>
+                 <label className="ff-label">
+                   Método de Pago Default (USD)
+                   <FieldTooltip>
+                     Método de pago que se usa por defecto al cobrar una factura en dólares si no se
+                     especifica ninguno. Opcional — si no se configura, hay que elegir el método de pago
+                     manualmente en cada cobro en USD.
+                   </FieldTooltip>
+                 </label>
                  <SearchSelect
                    value={modoPagoCajaUsd ?? ''}
                    onChange={(val) => setModoPagoCajaUsd(val || null)}
@@ -3089,12 +3130,14 @@ function FacturacionConfigSection() {
 
              {data?.monedasHabilitadas?.includes('EUR') && (
                <div className="ff-wrap" style={{ maxWidth: 320 }}>
-                 <label className="ff-label">Método de Pago Default (EUR)</label>
-                 <p className="ff-hint" style={{ marginTop: 4 }}>
-                   Método de pago que se usa por defecto al cobrar una factura en euros si no se
-                   especifica ninguno. Opcional — si no se configura, hay que elegir el método de pago
-                   manualmente en cada cobro en EUR.
-                 </p>
+                 <label className="ff-label">
+                   Método de Pago Default (EUR)
+                   <FieldTooltip>
+                     Método de pago que se usa por defecto al cobrar una factura en euros si no se
+                     especifica ninguno. Opcional — si no se configura, hay que elegir el método de pago
+                     manualmente en cada cobro en EUR.
+                   </FieldTooltip>
+                 </label>
                  <SearchSelect
                    value={modoPagoCajaEur ?? ''}
                    onChange={(val) => setModoPagoCajaEur(val || null)}
@@ -3109,11 +3152,13 @@ function FacturacionConfigSection() {
 
           {data?.usaModuloPos && (
             <div className="ff-wrap">
-              <label className="ff-label">Métodos de pago a conciliar</label>
-              <p className="ff-hint" style={{ marginTop: 4 }}>
-                Métodos de pago que requieren que el cajero ingrese el monto contado al cerrar el turno.
-                Si no se selecciona ninguno, el backend usa por defecto los métodos de tipo efectivo.
-              </p>
+              <label className="ff-label">
+                Métodos de pago a conciliar
+                <FieldTooltip>
+                  Métodos de pago que requieren que el cajero ingrese el monto contado al cerrar el turno.
+                  Si no se selecciona ninguno, el backend usa por defecto los métodos de tipo efectivo.
+                </FieldTooltip>
+              </label>
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr',
@@ -3153,11 +3198,13 @@ function FacturacionConfigSection() {
 
  {data?.usaModuloPos && (
            <div className="ff-wrap">
-             <label className="ff-label">Máximo de horas por turno de caja</label>
-             <p className="ff-hint" style={{ marginTop: 4 }}>
-               El turno se bloqueará automáticamente al superar este límite. El cajero deberá cerrar y abrir uno nuevo.
-               Valor 0.1 equivale a 6 minutos. Default: 24 horas.
-             </p>
+             <label className="ff-label">
+               Máximo de horas por turno de caja
+               <FieldTooltip>
+                 El turno se bloqueará automáticamente al superar este límite. El cajero deberá cerrar y abrir uno nuevo.
+                 Valor 0.1 equivale a 6 minutos. Default: 24 horas.
+               </FieldTooltip>
+             </label>
 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input
                   type="number"
@@ -3175,12 +3222,14 @@ function FacturacionConfigSection() {
 
          {data?.usaModuloPos && (
            <div className="ff-wrap">
-             <label className="ff-label">Roles autorizados para cerrar cajas de otros usuarios</label>
-             <p className="ff-hint" style={{ marginBottom: 8 }}>
-               Solo usuarios con alguno de estos roles pueden cerrar el turno de OTRO cajero
-               (mismas validaciones que cerrar el propio turno). Si esta lista queda vacía, nadie puede cerrar
-               turnos ajenos — es el comportamiento por defecto.
-             </p>
+             <label className="ff-label">
+               Roles autorizados para cerrar cajas de otros usuarios
+               <FieldTooltip>
+                 Solo usuarios con alguno de estos roles pueden cerrar el turno de OTRO cajero
+                 (mismas validaciones que cerrar el propio turno). Si esta lista queda vacía, nadie puede cerrar
+                 turnos ajenos — es el comportamiento por defecto.
+               </FieldTooltip>
+             </label>
              <div style={{
                display: 'grid',
                gridTemplateColumns: '1fr 1fr',
@@ -3218,10 +3267,10 @@ function FacturacionConfigSection() {
          )}
 
          <div className="ff-wrap">
-          <label className="ff-label">Formatos de impresión habilitados</label>
-          <p className="ff-hint" style={{ marginBottom: 8 }}>
-            Formatos que estarán disponibles al generar el PDF de una factura, cobro o compra. Mínimo uno.
-          </p>
+          <label className="ff-label">
+            Formatos de impresión habilitados
+            <FieldTooltip>Formatos que estarán disponibles al generar el PDF de una factura, cobro o compra. Mínimo uno.</FieldTooltip>
+          </label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {ALL_FORMATOS_IMPRESION.map((formato) => (
               <label key={formato} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
@@ -3237,10 +3286,10 @@ function FacturacionConfigSection() {
         </div>
 
         <div className="ff-wrap">
-           <label className="ff-label">Formato de impresión default</label>
-          <p className="ff-hint" style={{ marginBottom: 8 }}>
-            Cuál de los formatos habilitados se usa cuando no se pide uno explícito al generar el PDF de una factura, cobro o compra.
-          </p>
+           <label className="ff-label">
+            Formato de impresión default
+            <FieldTooltip>Cuál de los formatos habilitados se usa cuando no se pide uno explícito al generar el PDF de una factura, cobro o compra.</FieldTooltip>
+          </label>
           <div style={{ maxWidth: 240 }}>
             <Select
               value={formatoImpresionDefault}
@@ -3254,11 +3303,13 @@ function FacturacionConfigSection() {
         </div>
 
         <div className="ff-wrap">
-          <label className="ff-label">Mínimo de comprobantes para alertar</label>
-          <p className="ff-hint" style={{ marginBottom: 8 }}>
-            Cuando a una secuencia NCF le queden este número de comprobantes o menos, se marcará como "por agotarse"
-            en la pantalla de Secuencias NCF y, si está activo, se enviará un correo automático. Default: 50.
-          </p>
+          <label className="ff-label">
+            Mínimo de comprobantes para alertar
+            <FieldTooltip>
+              Cuando a una secuencia NCF le queden este número de comprobantes o menos, se marcará como "por agotarse"
+              en la pantalla de Secuencias NCF y, si está activo, se enviará un correo automático. Default: 50.
+            </FieldTooltip>
+          </label>
           <input
             type="number"
             min={0}
@@ -3686,20 +3737,24 @@ function EcfConfigSection() {
               checked={habilitado}
               onChange={(e) => setHabilitado(e.target.checked)}
             />
-            <span style={{ fontSize: 13, fontWeight: 500 }}>Habilitar facturación electrónica</span>
+            <span style={{ fontSize: 13, fontWeight: 500 }}>
+              Habilitar facturación electrónica
+              <FieldTooltip>
+                Si está apagado, tu empresa sigue facturando 100% igual que hoy (NCF físico). El resto de esta
+                pantalla solo tiene efecto cuando esté activo.
+              </FieldTooltip>
+            </span>
           </label>
-          <p className="ff-hint" style={{ marginTop: 4 }}>
-            Si está apagado, tu empresa sigue facturando 100% igual que hoy (NCF físico). El resto de esta
-            pantalla solo tiene efecto cuando esté activo.
-          </p>
         </div>
 
         <div className="ff-wrap" style={{ opacity: habilitado ? 1 : 0.5 }}>
-          <label className="ff-label">Tipos de comprobante electrónico</label>
-          <p className="ff-hint" style={{ marginBottom: 8 }}>
-            Solo los tipos marcados aquí se emiten electrónicamente. Un tipo no marcado sigue emitiéndose
-            físico — la migración puede ser gradual, por tipo, no todo o nada.
-          </p>
+          <label className="ff-label">
+            Tipos de comprobante electrónico
+            <FieldTooltip>
+              Solo los tipos marcados aquí se emiten electrónicamente. Un tipo no marcado sigue emitiéndose
+              físico — la migración puede ser gradual, por tipo, no todo o nada.
+            </FieldTooltip>
+          </label>
           <div style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
@@ -3748,10 +3803,10 @@ function EcfConfigSection() {
 
         <div className="form-row" style={{ opacity: habilitado ? 1 : 0.5 }}>
           <div className="ff-wrap">
-            <label className="ff-label">Días límite para aprobación comercial</label>
-            <p className="ff-hint" style={{ marginBottom: 4 }}>
-              Solo relevante para comprobantes recibidos de terceros (fase futura).
-            </p>
+            <label className="ff-label">
+              Días límite para aprobación comercial
+              <FieldTooltip>Solo relevante para comprobantes recibidos de terceros (fase futura).</FieldTooltip>
+            </label>
             <input
               type="number"
               min={0}
@@ -3764,10 +3819,10 @@ function EcfConfigSection() {
             />
           </div>
           <div className="ff-wrap">
-            <label className="ff-label">Umbral de alerta de secuencia</label>
-            <p className="ff-hint" style={{ marginBottom: 4 }}>
-              Mismo criterio que la alerta de NCF físico, aplicado a los rangos electrónicos.
-            </p>
+            <label className="ff-label">
+              Umbral de alerta de secuencia
+              <FieldTooltip>Mismo criterio que la alerta de NCF físico, aplicado a los rangos electrónicos.</FieldTooltip>
+            </label>
             <input
               type="number"
               min={0}
@@ -3790,12 +3845,14 @@ function EcfConfigSection() {
               disabled={!habilitado}
               onChange={(e) => setAdjuntarPdfa(e.target.checked)}
             />
-            <span style={{ fontSize: 13 }}>Adjuntar PDF de archivo fiscal automáticamente</span>
+            <span style={{ fontSize: 13 }}>
+              Adjuntar PDF de archivo fiscal automáticamente
+              <FieldTooltip>
+                Cuando un comprobante es aceptado por la DGII, adjunta automáticamente su PDF/A (fase futura, pero
+                el campo ya se puede configurar).
+              </FieldTooltip>
+            </span>
           </label>
-          <p className="ff-hint" style={{ marginTop: 4 }}>
-            Cuando un comprobante es aceptado por la DGII, adjunta automáticamente su PDF/A (fase futura, pero
-            el campo ya se puede configurar).
-          </p>
         </div>
 
         {/* Sección avanzada, colapsada por default */}
@@ -3820,12 +3877,14 @@ function EcfConfigSection() {
                     disabled={!habilitado}
                     onChange={(e) => setEmitirAlSometer(e.target.checked)}
                   />
-                  <span style={{ fontSize: 13 }}>Emitir al someter</span>
+                  <span style={{ fontSize: 13 }}>
+                    Emitir al someter
+                    <FieldTooltip>
+                      Si está activo (caso normal), la emisión del e-CF ocurre automáticamente al someter el
+                      documento. Desactivarlo es un modo excepcional/de depuración.
+                    </FieldTooltip>
+                  </span>
                 </label>
-                <p className="ff-hint" style={{ marginTop: 4 }}>
-                  Si está activo (caso normal), la emisión del e-CF ocurre automáticamente al someter el
-                  documento. Desactivarlo es un modo excepcional/de depuración.
-                </p>
               </div>
               <div className="ff-wrap">
                 <label className="ff-check-wrap">
@@ -3836,12 +3895,14 @@ function EcfConfigSection() {
                     disabled={!habilitado}
                     onChange={(e) => setBloquearSubmitSiVegaCaido(e.target.checked)}
                   />
-                  <span style={{ fontSize: 13 }}>Bloquear sometimiento si Vega no responde</span>
+                  <span style={{ fontSize: 13 }}>
+                    Bloquear sometimiento si Vega no responde
+                    <FieldTooltip>
+                      Si Vega/DGII no responde: activo = se bloquea la facturación (default seguro); inactivo =
+                      se activa contingencia automáticamente y se sigue facturando.
+                    </FieldTooltip>
+                  </span>
                 </label>
-                <p className="ff-hint" style={{ marginTop: 4 }}>
-                  Si Vega/DGII no responde: activo = se bloquea la facturación (default seguro); inactivo =
-                  se activa contingencia automáticamente y se sigue facturando.
-                </p>
               </div>
             </div>
           )}

@@ -6,6 +6,7 @@ import { getSiguienteChequeCuenta } from '@/shared/api/tesoreria'
 import { Modal } from '@/shared/ui/Modal'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { formatDOP } from '@/lib/formatters'
 import type { PagoContadoDto } from '@/shared/api/types'
 
@@ -135,7 +136,12 @@ export function PagoContadoModal({ open, onClose, outstandingAmount, postingDate
         </p>
 
         <div className="ff-wrap">
-          <label className="ff-label">Método de Pago <span className="ff-required">*</span></label>
+          <label className="ff-label">
+            Método de Pago <span className="ff-required">*</span>
+            {esCheque && (
+              <FieldTooltip>Este método de pago está configurado como cheque — siempre se tratará como tal.</FieldTooltip>
+            )}
+          </label>
           <Select
             value={modeOfPayment}
             onValueChange={(val) => { setModeOfPayment(val); setBankAccount('') }}
@@ -145,9 +151,6 @@ export function PagoContadoModal({ open, onClose, outstandingAmount, postingDate
               <SelectItem key={m.name} value={m.name}>{m.name}</SelectItem>
             ))}
           </Select>
-          {esCheque && (
-            <p className="ff-hint">Este método de pago está configurado como cheque — siempre se tratará como tal.</p>
-          )}
         </div>
 
         {showBankAccount && (

@@ -23,6 +23,7 @@ import { formatDate, formatMoney } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
@@ -315,17 +316,15 @@ export default function DebitNotesPage() {
                   onChange={(e) => setNcf(e.target.value)}
                 />
               </FilterField>
-            </div>
-          </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
-              <SlidersHorizontal size={13} />
-              Más filtros
-              {activeMoreFiltersCount > 0 && (
-                <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
-              )}
-            </button>
+              <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+                <SlidersHorizontal size={13} />
+                Más filtros
+                {activeMoreFiltersCount > 0 && (
+                  <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -489,7 +488,13 @@ export default function DebitNotesPage() {
             <form onSubmit={handleSubmit}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div className="ff-wrap">
-                  <label className="ff-label ff-required" htmlFor="invoice-debit">Factura afectada (sometida)</label>
+                  <label className="ff-label ff-required" htmlFor="invoice-debit">
+                    Factura afectada (sometida)
+                    <FieldTooltip>
+                      La nota de débito queda vinculada a esta factura. Obligatoria para notas electrónicas
+                      (Vega exige el comprobante afectado).
+                    </FieldTooltip>
+                  </label>
                   <SearchSelect
                     id="invoice-debit"
                     value={selectedInvoiceId}
@@ -508,10 +513,6 @@ export default function DebitNotesPage() {
                     placeholder="Buscar factura por cliente…"
                     error={!selectedInvoiceId}
                   />
-                  <p className="ff-hint">
-                    La nota de débito queda vinculada a esta factura. Obligatoria para notas electrónicas
-                    (Vega exige el comprobante afectado).
-                  </p>
                   {selectedInvoice && (
                     <div style={{ marginTop: 4, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface-sunken)', fontSize: 13 }}>
                       <span style={{ fontWeight: 500 }}>{selectedInvoice.customerName}</span>
@@ -536,7 +537,10 @@ export default function DebitNotesPage() {
 
                 {ndEsEcf && (
                   <div className="ff-wrap">
-                    <label className="ff-label ff-required">Código de modificación (DGII)</label>
+                    <label className="ff-label ff-required">
+                      Código de modificación (DGII)
+                      <FieldTooltip>Requerido para notas de débito electrónicas — declara ante la DGII qué corrige esta nota.</FieldTooltip>
+                    </label>
                     <Select
                       value={modificationCode ? String(modificationCode) : ''}
                       onValueChange={(v) => setModificationCode(v ? (Number(v) as EcfModificationCode) : '')}
@@ -546,9 +550,6 @@ export default function DebitNotesPage() {
                         <SelectItem key={c.code} value={String(c.code)}>{c.label}</SelectItem>
                       ))}
                     </Select>
-                    <p className="ff-hint">
-                      Requerido para notas de débito electrónicas — declara ante la DGII qué corrige esta nota.
-                    </p>
                   </div>
                 )}
 

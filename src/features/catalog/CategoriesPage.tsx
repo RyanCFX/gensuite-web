@@ -9,6 +9,7 @@ import { getPermisosCatalogo } from '@/shared/api/permisos'
 import type { Category, UpdateCategoryDto } from '@/shared/api/types'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightSmall, FolderOpen, Tag, Folder } from 'lucide-react'
@@ -516,7 +517,10 @@ export default function CategoriesPage() {
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="parentCategory">Categoría Padre</label>
+                  <label className="ff-label" htmlFor="parentCategory">
+                    Categoría Padre
+                    <FieldTooltip>Vacío = categoría raíz (se crea como grupo)</FieldTooltip>
+                  </label>
                   <Controller
                     name="parentCategory"
                     control={control}
@@ -540,17 +544,21 @@ export default function CategoriesPage() {
                       )
                     }}
                   />
-                  <p className="ff-hint">Vacío = categoría raíz (se crea como grupo)</p>
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="itemCodePrefix">Prefijo de código</label>
+                  <label className="ff-label" htmlFor="itemCodePrefix">
+                    Prefijo de código
+                    <FieldTooltip>Máx 5 caracteres. Se usará como prefijo en códigos de artículo (ej: VEN-0001)</FieldTooltip>
+                  </label>
                   <input id="itemCodePrefix" className="ff-input" maxLength={5} placeholder="Ej: VEN" {...register('itemCodePrefix')} />
-                  <p className="ff-hint">Máx 5 caracteres. Se usará como prefijo en códigos de artículo (ej: VEN-0001)</p>
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="aplicaA">Aplica a</label>
+                  <label className="ff-label" htmlFor="aplicaA">
+                    Aplica a
+                    <FieldTooltip>Restringe en qué tipo de artículo se puede usar esta categoría/subcategoría.</FieldTooltip>
+                  </label>
                   <Controller
                     name="aplicaA"
                     control={control}
@@ -562,9 +570,6 @@ export default function CategoriesPage() {
                       </Select>
                     )}
                   />
-                  <p className="ff-hint">
-                    Restringe en qué tipo de artículo se puede usar esta categoría/subcategoría.
-                  </p>
                 </div>
 
                 <div className="ff-wrap">
@@ -605,7 +610,10 @@ export default function CategoriesPage() {
 
                 {watchedAplicaA !== 'Servicios' && (
                   <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="defaultCogsAccount">Cuenta de Costo de Mercancía Vendida (COGS)</label>
+                    <label className="ff-label" htmlFor="defaultCogsAccount">
+                      Cuenta de Costo de Mercancía Vendida (COGS)
+                      <FieldTooltip>Cuenta que controla el costo real en ventas — es el campo más importante de los tres.</FieldTooltip>
+                    </label>
                     <Controller
                       name="defaultCogsAccount"
                       control={control}
@@ -620,12 +628,18 @@ export default function CategoriesPage() {
                         />
                       )}
                     />
-                    <p className="ff-hint">Cuenta que controla el costo real en ventas — es el campo más importante de los tres.</p>
                   </div>
                 )}
 
                 <div className="ff-wrap">
-                  <label className="ff-label">Roles autorizados a vender (opcional)</label>
+                  <label className="ff-label">
+                    Roles autorizados a vender (opcional)
+                    <FieldTooltip>
+                      Vacío = cualquiera con permiso de venta puede vender artículos de esta categoría. Con roles
+                      elegidos, solo un usuario con al menos uno de ellos puede vender un artículo de esta categoría
+                      (ej. "Dispensador Controlados" para medicamentos controlados).
+                    </FieldTooltip>
+                  </label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {(permisosCatalogo?.roles ?? []).map((role) => (
                       <label key={role.value} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
@@ -642,11 +656,6 @@ export default function CategoriesPage() {
                       </label>
                     ))}
                   </div>
-                  <p className="ff-hint">
-                    Vacío = cualquiera con permiso de venta puede vender artículos de esta categoría. Con roles
-                    elegidos, solo un usuario con al menos uno de ellos puede vender un artículo de esta categoría
-                    (ej. "Dispensador Controlados" para medicamentos controlados).
-                  </p>
                 </div>
               </div>
               <div className="modal-foot">

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
@@ -210,33 +211,39 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             {/* Rango */}
             <div className="form-row">
               <div className="ff-wrap">
-                <label className="ff-label">Número inicial <span className="ff-required">*</span></label>
+                <label className="ff-label">
+                  Número inicial <span className="ff-required">*</span>
+                  <FieldTooltip>Generalmente comienza en 1</FieldTooltip>
+                </label>
                 <input
                   type="number" min={1} className="ff-input"
                   value={start}
                   onChange={(e) => setStart(parseInt(e.target.value) || 1)}
                 />
-                <p className="ff-hint">Generalmente comienza en 1</p>
               </div>
               <div className="ff-wrap">
-                <label className="ff-label">Número final <span className="ff-required">*</span></label>
+                <label className="ff-label">
+                  Número final <span className="ff-required">*</span>
+                  <FieldTooltip>Máx. estándar: 50,000,000</FieldTooltip>
+                </label>
                 <input
                   type="number" min={start + 1} className="ff-input"
                   value={end}
                   onChange={(e) => setEnd(parseInt(e.target.value) || 50000000)}
                 />
-                <p className="ff-hint">Máx. estándar: 50,000,000</p>
               </div>
             </div>
 
             {/* Vencimiento */}
             <div className="ff-wrap">
-              <label className="ff-label">Fecha de vencimiento <span className="ff-required">*</span></label>
+              <label className="ff-label">
+                Fecha de vencimiento <span className="ff-required">*</span>
+                <FieldTooltip>Fecha que aparece en la resolución de la DGII</FieldTooltip>
+              </label>
               <DatePicker
                 className="ff-input" min={today} max={maxExpiration}
                 value={expiration} onChange={setExpiration}
               />
-              <p className="ff-hint">Fecha que aparece en la resolución de la DGII</p>
             </div>
 
             {/* Preview */}
@@ -406,7 +413,10 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
 
               {/* End number */}
               <div className="ff-wrap">
-                <label className="ff-label">Número final</label>
+                <label className="ff-label">
+                  Número final
+                  <FieldTooltip>Solo puedes extender el rango (aumentar), no reducirlo</FieldTooltip>
+                </label>
                 <input
                   type="number"
                   min={serie.nextNcf > 0 ? serie.nextNcf : serie.start}
@@ -414,7 +424,6 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
                   value={end}
                   onChange={(e) => setEnd(parseInt(e.target.value) || serie.end)}
                 />
-                <p className="ff-hint">Solo puedes extender el rango (aumentar), no reducirlo</p>
               </div>
 
               {/* Expiration date */}

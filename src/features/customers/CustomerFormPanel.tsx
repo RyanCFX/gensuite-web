@@ -14,11 +14,11 @@ import { validateRNCDetailed, validateCedulaDetailed, formatRNC, formatCedula } 
 import { useDebounce } from '@/lib/useDebounce'
 import { SearchSelect, type SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { MultiSelectChecklist } from '@/shared/ui/MultiSelectChecklist'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
-import { CheckCircle2, XCircle, Info, HelpCircle, Plus, Trash2 } from 'lucide-react'
+import { CheckCircle2, XCircle, Info, HelpCircle, Plus, Trash2, Save, Loader2 } from 'lucide-react'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
-import { RecargarButton } from '@/components/shared/RecargarButton'
 
 // NOTE: tipoIdentificacion does NOT exist in CreateCustomerDto/UpdateCustomerDto.
 // It is only used here as a local UI helper to decide which field to show.
@@ -333,7 +333,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
   }, [taxpayerError, dgiiLookupEnabled])
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+    <form onSubmit={handleSubmit(onSubmit)} className="item-form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
       {isSystemManaged && (
         <div className="inline-alert inline-alert-info" style={{ gridColumn: '1 / -1' }}>
           <Info size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
@@ -345,63 +345,92 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* ── Información general ── */}
       <div className="card">
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Información General</h2>
         </div>
-        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="card-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
-          {/* Tipo + Identificación selector */}
-          <div className="form-row">
-            <div className="ff-wrap">
-              <label className="ff-label">Tipo de cliente</label>
-              <Controller
-                name="customerType"
-                control={control}
-                render={({ field }) => (
-                  <SearchSelect
-                    id="customerType"
-                    value={field.value}
-                    onChange={(v) => field.onChange(v)}
-                    options={[
-                      { value: 'Company', label: 'Empresa' },
-                      { value: 'Individual', label: 'Individual' },
-                    ]}
-                    selectedLabel={field.value === 'Company' ? 'Empresa' : field.value === 'Individual' ? 'Individual' : ''}
-                    onSearch={() => {}}
-                    placeholder="Seleccionar…"
-                  />
-                )}
-              />
-            </div>
-
-            <div className="ff-wrap">
-              <label className="ff-label">Tipo de identificación</label>
-              <SearchSelect
-                value={idType}
-                onChange={(v) => {
-                  setIdType(v as IdType)
-                  setValue('rnc', '')
-                  setValue('cedula', '')
-                }}
-                options={[
-                  { value: '', label: 'Sin identificación' },
-                  { value: 'RNC', label: 'RNC (empresa)' },
-                  { value: 'Cedula', label: 'Cédula' },
-                  { value: 'Pasaporte', label: 'Pasaporte' },
-                  { value: 'NIT', label: 'NIT (extranjero)' },
-                ]}
-                selectedLabel={idType ? ID_TYPE_LABELS[idType] : ''}
-                disabled={customerType === 'Company'}
-                onSearch={() => {}}
-                placeholder="Seleccionar…"
-              />
-            </div>
+          {/* Cliente */}
+          <div className="ff-wrap" style={{ gridColumn: '1 / -1' }}>
+            <label className="ff-label" htmlFor="customerName">
+              Cliente <span className="ff-required">*</span>
+            </label>
+            <input
+              id="customerName"
+              className={`ff-input${errors.customerName ? ' ff-input-error' : ''}`}
+              placeholder="Nombre del cliente o empresa"
+              {...register('customerName')}
+            />
+            {errors.customerName && <p className="ff-error">{errors.customerName.message}</p>}
           </div>
 
-          {/* RNC */}
+          <div className="ff-wrap">
+            <label className="ff-label">Tipo de cliente</label>
+            <Controller
+              name="customerType"
+              control={control}
+              render={({ field }) => (
+                <SearchSelect
+                  id="customerType"
+                  value={field.value}
+                  onChange={(v) => field.onChange(v)}
+                  options={[
+                    { value: 'Company', label: 'Empresa' },
+                    { value: 'Individual', label: 'Individual' },
+                  ]}
+                  selectedLabel={field.value === 'Company' ? 'Empresa' : field.value === 'Individual' ? 'Individual' : ''}
+                  onSearch={() => {}}
+                  placeholder="Seleccionar…"
+                />
+              )}
+            />
+          </div>
+
+          <div className="ff-wrap">
+            <label className="ff-label">Tipo de identificación</label>
+            <SearchSelect
+              value={idType}
+              onChange={(v) => {
+                setIdType(v as IdType)
+                setValue('rnc', '')
+                setValue('cedula', '')
+              }}
+              options={[
+                { value: '', label: 'Sin identificación' },
+                { value: 'RNC', label: 'RNC (empresa)' },
+                { value: 'Cedula', label: 'Cédula' },
+                { value: 'Pasaporte', label: 'Pasaporte' },
+                { value: 'NIT', label: 'NIT (extranjero)' },
+              ]}
+              selectedLabel={idType ? ID_TYPE_LABELS[idType] : ''}
+              disabled={customerType === 'Company'}
+              onSearch={() => {}}
+              placeholder="Seleccionar…"
+            />
+          </div>
+
+          <div className="ff-wrap">
+            <label className="ff-label" htmlFor="branch">Sucursal</label>
+            <Controller
+              name="branch"
+              control={control}
+              render={({ field }) => (
+                <SearchSelect
+                  id="branch"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  options={branchOptions}
+                  onSearch={setBranchQuery}
+                  placeholder="Buscar sucursal…"
+                />
+              )}
+            />
+          </div>
+
+          {/* Identificación (RNC o Cédula, según el tipo elegido arriba) */}
           {idType === 'RNC' && (
             <div className="ff-wrap">
-              <label className="ff-label" htmlFor="rnc">RNC</label>
+              <label className="ff-label" htmlFor="rnc">Identificación</label>
               <div className="ff-input-wrap">
                 <input
                   id="rnc"
@@ -434,10 +463,9 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
             </div>
           )}
 
-          {/* Cédula */}
           {idType === 'Cedula' && (
             <div className="ff-wrap">
-              <label className="ff-label" htmlFor="cedula">Cédula</label>
+              <label className="ff-label" htmlFor="cedula">Identificación</label>
               <div className="ff-input-wrap">
                 <input
                   id="cedula"
@@ -470,18 +498,15 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
             </div>
           )}
 
-          {/* Nombre */}
-          <div className="ff-wrap">
-            <label className="ff-label" htmlFor="customerName">
-              Nombre <span className="ff-required">*</span>
-            </label>
+          {/* Dirección */}
+          <div className="ff-wrap" style={{ gridColumn: '1 / -1' }}>
+            <label className="ff-label" htmlFor="address">Dirección de la empresa</label>
             <input
-              id="customerName"
-              className={`ff-input${errors.customerName ? ' ff-input-error' : ''}`}
-              placeholder="Nombre del cliente o empresa"
-              {...register('customerName')}
+              id="address"
+              className="ff-input"
+              placeholder="Calle, número, sector, ciudad…"
+              {...register('address')}
             />
-            {errors.customerName && <p className="ff-error">{errors.customerName.message}</p>}
           </div>
 
           {/* Email para facturas */}
@@ -497,93 +522,76 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
             {errors.emailInvoice && <p className="ff-error">{errors.emailInvoice.message}</p>}
           </div>
 
-          {/* Dirección */}
+          {/* Grupo de clientes */}
           <div className="ff-wrap">
-            <label className="ff-label" htmlFor="address">Dirección</label>
-            <input
-              id="address"
-              className="ff-input"
-              placeholder="Calle, número, sector, ciudad…"
-              {...register('address')}
+            <label className="ff-label" htmlFor="customerGroup">Grupo de clientes</label>
+            <SearchSelect
+              id="customerGroup"
+              value={customerGroup ?? ''}
+              onChange={(_, opt) => {
+                setValue('customerGroup', opt?.value ?? '')
+                setGroupLabel(opt?.label ?? '')
+              }}
+              options={groupOptions}
+              selectedLabel={groupLabel}
+              onSearch={setGroupQuery}
+              placeholder="Buscar grupos"
             />
           </div>
 
-          {/* Grupo de clientes */}
-          <div className="form-row">
+          {selectedGroup && selectedGroup.priceTier && (
             <div className="ff-wrap">
-              <label className="ff-label" htmlFor="customerGroup">Grupo de clientes</label>
-              <SearchSelect
-                id="customerGroup"
-                value={customerGroup ?? ''}
-                onChange={(_, opt) => {
-                  setValue('customerGroup', opt?.value ?? '')
-                  setGroupLabel(opt?.label ?? '')
-                }}
-                options={groupOptions}
-                selectedLabel={groupLabel}
-                onSearch={setGroupQuery}
-                placeholder="Buscar grupo…"
-              />
-            </div>
-            {selectedGroup && selectedGroup.priceTier && (
-              <div className="ff-wrap">
-                <label className="ff-label">Nivel de precio</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36 }}>
-                  <span className="badge" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>
-                    Nivel {selectedGroup.priceTier}
-                  </span>
-                  <HelpCircle size={13} style={{ color: 'var(--text-tertiary)' }} />
-                </div>
+              <label className="ff-label">Nivel de precio</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="badge" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>
+                  Nivel {selectedGroup.priceTier}
+                </span>
+                <HelpCircle size={13} style={{ color: 'var(--text-tertiary)' }} />
               </div>
-            )}
-          </div>
-        </div>
-      </div>
+            </div>
+          )}
 
-      {/* ── Teléfonos ── */}
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Teléfonos</h2>
-        </div>
-        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {telefonoFields.map((field, idx) => (
-            <div key={field.id} className="form-row" style={{ alignItems: 'flex-start' }}>
-              <div className="ff-wrap" style={{ flex: 2 }}>
-                <input
-                  className={`ff-input${errors.telefonos?.[idx]?.telefono ? ' ff-input-error' : ''}`}
-                  placeholder="Ej: 809-555-0100"
-                  {...register(`telefonos.${idx}.telefono` as const)}
-                />
-                {errors.telefonos?.[idx]?.telefono && (
-                  <p className="ff-error">{errors.telefonos[idx]?.telefono?.message}</p>
-                )}
+          {/* Teléfonos */}
+          <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <span className="ff-section-divider">Teléfonos</span>
+            {telefonoFields.map((field, idx) => (
+              <div key={field.id} style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+                <div className="ff-wrap" style={{ flex: 2 }}>
+                  <input
+                    className={`ff-input${errors.telefonos?.[idx]?.telefono ? ' ff-input-error' : ''}`}
+                    placeholder="Ej: 809-555-0100"
+                    {...register(`telefonos.${idx}.telefono` as const)}
+                  />
+                  {errors.telefonos?.[idx]?.telefono && (
+                    <p className="ff-error">{errors.telefonos[idx]?.telefono?.message}</p>
+                  )}
+                </div>
+                <div className="ff-wrap" style={{ flex: 1 }}>
+                  <input
+                    className="ff-input"
+                    placeholder="Etiqueta (ej: Oficina, Celular)"
+                    {...register(`telefonos.${idx}.etiqueta` as const)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-size-sm"
+                  onClick={() => removeTelefono(idx)}
+                  title="Quitar teléfono"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
-              <div className="ff-wrap" style={{ flex: 1 }}>
-                <input
-                  className="ff-input"
-                  placeholder="Etiqueta (ej: Oficina, Celular)"
-                  {...register(`telefonos.${idx}.etiqueta` as const)}
-                />
-              </div>
-              <button
-                type="button"
-                className="btn btn-ghost btn-size-sm"
-                style={{ marginTop: 2 }}
-                onClick={() => removeTelefono(idx)}
-                title="Quitar teléfono"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            className="btn btn-secondary btn-size-sm"
-            style={{ alignSelf: 'flex-start' }}
-            onClick={() => appendTelefono({ telefono: '', etiqueta: '' })}
-          >
-            <Plus size={14} />Agregar teléfono
-          </button>
+            ))}
+            <button
+              type="button"
+              className="btn btn-secondary btn-size-sm"
+              style={{ alignSelf: 'flex-start' }}
+              onClick={() => appendTelefono({ telefono: '', etiqueta: '' })}
+            >
+              <Plus size={14} />Agregar teléfono
+            </button>
+          </div>
         </div>
       </div>
       </div>
@@ -592,7 +600,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* ── Crédito y configuración ── */}
       <div className="card">
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Crédito y Configuración</h2>
         </div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -621,7 +629,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
             render={({ field }) => (
               <label className="ff-check-wrap">
                 <input type="checkbox" className="ff-check" checked={field.value} onChange={field.onChange} />
-                <span style={{ fontSize: 13 }}>Tiene crédito</span>
+                <span style={{ fontSize: 13 }}>Aplicación de crédito</span>
               </label>
             )}
           />
@@ -658,31 +666,16 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
 
       {/* ── Configuración Adicional ── */}
       <div className="card">
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Configuración Adicional</h2>
         </div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="form-row">
             <div className="ff-wrap">
-              <label className="ff-label" htmlFor="branch">Sucursal</label>
-              <Controller
-                name="branch"
-                control={control}
-                render={({ field }) => (
-                  <SearchSelect
-                    id="branch"
-                    value={field.value ?? ''}
-                    onChange={field.onChange}
-                    options={branchOptions}
-                    onSearch={setBranchQuery}
-                    placeholder="Buscar sucursal…"
-                  />
-                )}
-              />
-              <p className="ff-hint">Solo para filtrar/agrupar clientes — no afecta las facturas.</p>
-            </div>
-            <div className="ff-wrap">
-              <label className="ff-label" htmlFor="formaPagoDefault">Forma de Pago por Defecto</label>
+              <label className="ff-label" htmlFor="formaPagoDefault">
+                Forma de Pago por Defecto
+                <FieldTooltip>Prellena el método de pago al facturar a este cliente — editable por documento.</FieldTooltip>
+              </label>
               <Controller
                 name="formaPagoDefault"
                 control={control}
@@ -697,13 +690,15 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
                   />
                 )}
               />
-              <p className="ff-hint">Prellena el método de pago al facturar a este cliente — editable por documento.</p>
             </div>
-          </div>
-
-          <div className="form-row">
             <div className="ff-wrap">
-              <label className="ff-label" htmlFor="defaultCurrency">Moneda por Defecto</label>
+              <label className="ff-label" htmlFor="defaultCurrency">
+                Moneda por Defecto
+                <FieldTooltip>
+                  Prellena la moneda al facturar a este cliente. Al fijarla, autopobla su cuenta CxC en esa moneda
+                  (salvo que elijas una "Cuenta CxC Alterna" explícita abajo).
+                </FieldTooltip>
+              </label>
               <Controller
                 name="defaultCurrency"
                 control={control}
@@ -722,16 +717,15 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
                   </Select>
                 )}
               />
-              <p className="ff-hint">
-                Prellena la moneda al facturar a este cliente. Al fijarla, se autopobla su cuenta CxC en esa moneda
-                (salvo que elijas una "Cuenta CxC Alterna" explícita abajo).
-              </p>
             </div>
           </div>
 
           <div className="form-row">
             <div className="ff-wrap">
-              <label className="ff-label" htmlFor="cuentaCxcDefault">Cuenta CxC Alterna</label>
+              <label className="ff-label" htmlFor="cuentaCxcDefault">
+                Cuenta CxC Alterna
+                <FieldTooltip>Si se omite, se usa el default de la compañía (112-01 - CUENTAS POR COBRAR CLIENTES).</FieldTooltip>
+              </label>
               <Controller
                 name="cuentaCxcDefault"
                 control={control}
@@ -745,9 +739,6 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
                   />
                 )}
               />
-              <p className="ff-hint">
-                Si se omite, se usa el default de la compañía (112-01 - CUENTAS POR COBRAR CLIENTES).
-              </p>
             </div>
             <div className="ff-wrap">
               <label className="ff-label" htmlFor="encargadoCxc">Encargado de Cuentas por Cobrar</label>
@@ -770,7 +761,10 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
           </div>
 
           <div className="ff-wrap">
-            <label className="ff-label">Impuesto(s) de Venta por Defecto</label>
+            <label className="ff-label">
+              Impuesto(s) de Venta por Defecto
+              <FieldTooltip>Prellena el/los template(s) de impuesto al crear una factura/cotización a este cliente — puedes elegir varios.</FieldTooltip>
+            </label>
             <Controller
               name="impuestoVentasDefault"
               control={control}
@@ -786,24 +780,21 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
                 />
               )}
             />
-            <p className="ff-hint">
-              Prellena el/los template(s) de impuesto al crear una factura/cotización a este cliente — puedes elegir varios.
-            </p>
           </div>
         </div>
       </div>
       </div>
 
       {/* ── Botones ── */}
-      <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <RecargarButton label="Actualizar" />
-        <button type="submit" className="btn btn-primary" disabled={isSubmitting || isSystemManaged}>
-          {isSubmitting
-            ? <><span className="spinner spinner-white spinner-sm" /> Guardando…</>
-            : isEdit ? 'Guardar Cambios' : 'Crear Cliente'}
-        </button>
+      <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
         <button type="button" className="btn btn-ghost" onClick={onCancel}>
           Cancelar
+        </button>
+        <button type="submit" className="btn btn-navy" disabled={isSubmitting || isSystemManaged}>
+          {isSubmitting
+            ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+            : <Save size={15} />}
+          {isEdit ? 'Guardar Cambios' : 'Crear Cliente'}
         </button>
       </div>
     </form>

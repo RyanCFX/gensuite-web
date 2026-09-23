@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { AlertTriangle, ArrowLeft } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Save, Loader2 } from 'lucide-react'
 import {
   createEmision,
   getEmisionesPendientes,
@@ -22,6 +22,7 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { listSucursales } from '@/shared/api/sucursales'
 import { validateRNCDetailed, formatRNC } from '@/lib/validators/dgii'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
@@ -384,14 +385,16 @@ export default function EmisionForm() {
                   tipoLabel="tipo de beneficiario"
                 />
                 <div className="ff-wrap">
-                  <label className="ff-label">Nombre a imprimir en el cheque (opcional)</label>
+                  <label className="ff-label">
+                    Nombre a imprimir en el cheque (opcional)
+                    <FieldTooltip>Úsalo cuando el pago se hace a la orden de un tercero distinto.</FieldTooltip>
+                  </label>
                   <input
                     className="ff-input"
                     placeholder={beneficiarioNombreAuto || 'Igual al nombre registrado'}
                     value={beneficiarioNombre}
                     onChange={(e) => setBeneficiarioNombre(e.target.value)}
                   />
-                  <p className="ff-hint">Úsalo cuando el pago se hace a la orden de un tercero distinto.</p>
                 </div>
 
                 <div>
@@ -579,7 +582,10 @@ export default function EmisionForm() {
 
         <div className="doc-actions-bar">
           <button type="button" className="btn btn-ghost" onClick={() => navigate('/tesoreria/emisiones')}>Cancelar</button>
-          <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
+          <button type="submit" className="btn btn-navy" disabled={createMutation.isPending}>
+            {createMutation.isPending
+              ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+              : <Save size={15} />}
             {createMutation.isPending ? 'Guardando…' : 'Crear Emisión'}
           </button>
         </div>

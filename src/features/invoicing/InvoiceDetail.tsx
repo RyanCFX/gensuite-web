@@ -8,6 +8,7 @@ import {
 } from "@/shared/api/relaciones";
 import { useRelacionComercialPorContraparte } from "@/shared/hooks/useRelacionComercialPorContraparte";
 import { Badge } from "@/shared/ui/Badge";
+import { FieldTooltip } from "@/shared/ui/FieldTooltip";
 import { Modal } from "@/shared/ui/Modal";
 import {
   getInvoice,
@@ -2744,6 +2745,11 @@ export default function InvoiceDetail() {
                   htmlFor="cancelMotivo"
                 >
                   Motivo de anulación (DGII)
+                  <FieldTooltip>
+                    {cancelMotivoRequired
+                      ? "Obligatorio: esta factura tiene NCF asignado (Formato 608 DGII)."
+                      : "Opcional: esta factura aún no tiene NCF asignado."}
+                  </FieldTooltip>
                 </label>
                 <Select
                   value={cancelMotivo}
@@ -2756,11 +2762,6 @@ export default function InvoiceDetail() {
                     </SelectItem>
                   ))}
                 </Select>
-                <p className="ff-hint">
-                  {cancelMotivoRequired
-                    ? "Obligatorio: esta factura tiene NCF asignado (Formato 608 DGII)."
-                    : "Opcional: esta factura aún no tiene NCF asignado."}
-                </p>
               </div>
             </div>
             <div className="modal-foot">
@@ -3033,10 +3034,12 @@ export default function InvoiceDetail() {
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="ff-wrap">
-                <label className="ff-label">Monto de efectivo de apertura</label>
-                <p className="ff-hint" style={{ marginTop: 4 }}>
-                  Efectivo físico con el que se abre el turno. Se asociará automáticamente al método de pago de Caja configurado.
-                </p>
+                <label className="ff-label">
+                  Monto de efectivo de apertura
+                  <FieldTooltip>
+                    Efectivo físico con el que se abre el turno. Se asociará automáticamente al método de pago de Caja configurado.
+                  </FieldTooltip>
+                </label>
                 <input
                   type="number"
                   min={0}

@@ -18,6 +18,7 @@ import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 
 const PAGE_SIZE = 20
 
@@ -303,12 +304,14 @@ export default function SucursalesPage() {
 
                 {editTarget && (
                   <div className="ff-wrap">
-                    <label className="ff-label">Almacén de venta</label>
-                    <p className="ff-hint" style={{ marginBottom: 8 }}>
-                      Opcional. Si se configura, toda venta de esta sucursal debe salir de este
-                      almacén — si no hay suficiente stock ahí, hay que transferirlo primero desde
-                      otro almacén de la compañía, aunque pertenezca a la misma sucursal.
-                    </p>
+                    <label className="ff-label">
+                      Almacén de venta
+                      <FieldTooltip>
+                        Opcional. Si se configura, toda venta de esta sucursal debe salir de este
+                        almacén — si no hay suficiente stock ahí, hay que transferirlo primero desde
+                        otro almacén de la compañía, aunque pertenezca a la misma sucursal.
+                      </FieldTooltip>
+                    </label>
                     {almacenVentaOptions.length === 0 ? (
                       <p className="ff-hint">
                         {loadingAlmacenes ? 'Cargando almacenes…' : 'Asigne almacenes a esta sucursal primero (desde Almacenes) para poder elegir uno como almacén de venta.'}

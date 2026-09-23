@@ -173,6 +173,14 @@ export default function CustomersPage() {
                   <SelectItem value="false">Sin crédito</SelectItem>
                 </Select>
               </FilterField>
+
+              <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+                <SlidersHorizontal size={13} />
+                Más filtros
+                {activeMoreFiltersCount > 0 && (
+                  <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+                )}
+              </button>
             </div>
           </div>
 
@@ -188,14 +196,6 @@ export default function CustomersPage() {
               </span>
               Mostrar Clientes desactivados
             </label>
-
-            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
-              <SlidersHorizontal size={13} />
-              Más filtros
-              {activeMoreFiltersCount > 0 && (
-                <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
-              )}
-            </button>
           </div>
         </div>
       </div>
