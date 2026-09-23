@@ -65,6 +65,7 @@ más adelante.
 - Transferencias Internas — `/tesoreria/transferencias`
 - Movimientos Bancarios — `/tesoreria/movimientos`
 - Cheques — `/tesoreria/cheques`
+- Tipos de Documento Bancario — `/config/tesoreria/tipos-documento` (header navy + KPI strip clicable + drawer "Más filtros" + modal con header navy y preview en vivo)
 
 ### Contabilidad
 - Plan de Cuentas — `/cuentas`
@@ -91,7 +92,11 @@ más adelante.
 
 ## Notas
 
-- No se tocó `EjercicioFiscalSection` ni las secciones internas de `ConfigPage.tsx`
+- `Configuración de Cobranza` (`/config/cobros`) y `Empresa` (`/config/empresa`) recibieron
+  rediseño propio bajo la misma línea (header navy con dot + overline, KPI strip estilo
+  dashboard, cards con `navy-card-header`, footbar sticky): no son listados, así que no entran
+  en `pantallas_tablas` pero comparten el lenguaje.
+- No se tocó `EjercicioFiscalSection` ni las secciones internas restantes de `ConfigPage.tsx`
   (Almacenes, Métodos de Pago, UOM, Listas de Precio, etc.): son widgets angostos embebidos
   en un contenedor de 760px, un patrón de configuración deliberadamente distinto al de los
   listados de página completa.
