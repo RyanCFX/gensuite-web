@@ -315,6 +315,7 @@ export const ENDPOINTS = {
   config: {
     farmaciaHabilitar: '/config/farmacia/habilitar',
     empresa: '/config/empresa',
+    empresaLogo: '/config/empresa/logo',
     cobros: '/config/cobros',
     metodosPago: '/config/metodos-pago',
     metodosPagoById: (id: string) => `/config/metodos-pago/${encodeURIComponent(id)}`,

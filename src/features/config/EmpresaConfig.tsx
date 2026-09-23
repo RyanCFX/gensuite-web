@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { getEmpresa, updateEmpresa, getCuentasEmpresa, updateCuentasEmpresa, listAlmacenes } from '@/shared/api/config'
+import { getEmpresa, updateEmpresa, uploadLogoEmpresa, getCuentasEmpresa, updateCuentasEmpresa, listAlmacenes } from '@/shared/api/config'
 import type { Empresa, CuentasEmpresa, ItemProps } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { AccountSelect } from '@/components/shared/AccountSelect'
@@ -11,8 +11,11 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { Select, SelectItem } from '@/components/ui/select'
 import { REGIMENES_FISCALES } from '@/lib/constants'
-import { Building2, Save } from 'lucide-react'
+import { Building2, Image, Loader2, Save } from 'lucide-react'
 import { Link } from 'react-router-dom'
+
+const LOGO_ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp']
+const LOGO_MAX_SIZE_BYTES = 2 * 1024 * 1024
 
 export default function EmpresaConfig() {
   const queryClient = useQueryClient()
@@ -41,6 +44,32 @@ export default function EmpresaConfig() {
 
   const [itemCodeWarning, setItemCodeWarning] = useState(false)
 
+  // ── Logo de la empresa ──────────────────────────────────────────────────────
+  const logoFileInputRef = useRef<HTMLInputElement>(null)
+  const uploadLogoMutation = useMutation({
+    mutationFn: (file: File) => uploadLogoEmpresa(file),
+    onSuccess: (result) => {
+      setForm((prev) => ({ ...prev, logoUrl: result.logoUrl }))
+      toast.success('Logo actualizado')
+    },
+    onError: (err: { response?: { data?: { message?: string } }; message?: string }) => {
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'Error al subir el logo')
+    },
+  })
+
+  function handleLogoFileSelected(file: File | undefined) {
+    if (!file) return
+    if (!LOGO_ACCEPTED_TYPES.includes(file.type)) {
+      toast.error('Formato no soportado — usa PNG, JPG, SVG o WEBP')
+      return
+    }
+    if (file.size > LOGO_MAX_SIZE_BYTES) {
+      toast.error('El logo no puede superar 2MB')
+      return
+    }
+    uploadLogoMutation.mutate(file)
+  }
+
   function set<K extends keyof Empresa>(key: K, value: Empresa[K]) {
     setForm((prev) => {
       if (key === 'itemCodeMode' && (value === 'auto' || value === 'prefix_auto') && prev.itemCodeMode === 'manual') {
@@ -53,7 +82,7 @@ export default function EmpresaConfig() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const payload: Partial<Empresa> = {}
-    for (const key of ['rnc', 'regimenFiscal', 'actividadEconomica', 'representanteLegal', 'cedulaRepresentante', 'logoUrl', 'telefono', 'email', 'website', 'direccion', 'itemCodeMode', 'defaultWarehouse', 'defaultPriceTipo', 'transitWarehouse'] as const) {
+    for (const key of ['rnc', 'regimenFiscal', 'actividadEconomica', 'representanteLegal', 'cedulaRepresentante', 'telefono', 'email', 'website', 'direccion', 'itemCodeMode', 'defaultWarehouse', 'defaultPriceTipo', 'transitWarehouse'] as const) {
       const value = form[key]
       if (value !== undefined) (payload as Record<string, unknown>)[key] = value
     }
@@ -323,6 +352,62 @@ export default function EmpresaConfig() {
                         placeholder="000-0000000-0"
                       />
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Logo de la Empresa */}
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Image size={16} />
+                  Logo de la Empresa
+                </span>
+              </div>
+              <div className="card-body">
+                <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                  <div
+                    className="logo-upload-box"
+                    onClick={() => logoFileInputRef.current?.click()}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') logoFileInputRef.current?.click() }}
+                  >
+                    <input
+                      ref={logoFileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      style={{ display: 'none' }}
+                      onChange={(e) => { handleLogoFileSelected(e.target.files?.[0]); e.target.value = '' }}
+                    />
+                    {uploadLogoMutation.isPending ? (
+                      <Loader2 size={22} className="spin" />
+                    ) : form.logoUrl ? (
+                      <img src={form.logoUrl} alt="Logo de la empresa" />
+                    ) : (
+                      <>
+                        <Image size={26} className="logo-upload-box-icon" />
+                        <span className="logo-upload-box-label">Sin logo configurado</span>
+                      </>
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ alignSelf: 'flex-start' }}
+                      onClick={() => logoFileInputRef.current?.click()}
+                      disabled={uploadLogoMutation.isPending}
+                    >
+                      {uploadLogoMutation.isPending ? 'Subiendo…' : form.logoUrl ? 'Cambiar logo' : 'Subir logo'}
+                    </button>
+                    <p className="ff-hint">
+                      Se usa en las facturas, cotizaciones, pedidos, compras, notas de crédito/débito, órdenes de compra
+                      y solicitudes de compra impresas en PDF. Si no subís uno, esos documentos muestran el nombre de la
+                      empresa en su lugar.
+                    </p>
+                    <p className="ff-hint">Formatos: PNG, JPG, SVG o WEBP — máx. 2MB.</p>
                   </div>
                 </div>
               </div>

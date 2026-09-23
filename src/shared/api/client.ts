@@ -288,6 +288,11 @@ export const ERROR_CODES = {
   // está en la lista permitida del artículo para esa dirección (compra/venta). `details.permitidas`
   // trae las UOMs válidas.
   UOM_NOT_ALLOWED: 'UOM_NOT_ALLOWED',
+  // Almacén de compras (proveedor.almacenCompraDefault / sucursal.almacenCompra) — ninguno de los
+  // dos está configurado y el artículo afecta inventario, así que no hay a qué almacén recibir la
+  // mercancía. Antes esto caía en silencio al primer almacén activo de la compañía; ahora bloquea.
+  // Puede aparecer en POST/PUT /compras, .../ordenes/:id/recibir y POST/PUT .../purchase-receipt.
+  ALMACEN_COMPRA_NO_CONFIGURADO: 'ALMACEN_COMPRA_NO_CONFIGURADO',
 } as const
 
 // El predicado narrowa a `ApiError & { code: C }` (no solo `ApiError`) a propósito: cuando el

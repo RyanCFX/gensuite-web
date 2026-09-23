@@ -932,6 +932,18 @@ export default function CompraForm() {
         toast.error(formatUomNotAllowedMessage(error), { duration: 8000 })
         return
       }
+      if (isApiErrorCode(error, ERROR_CODES.ALMACEN_COMPRA_NO_CONFIGURADO)) {
+        toast.error(
+          apiErr?.message || 'Configura el almacén de compras en la sucursal o en el proveedor antes de continuar',
+          {
+            duration: 10000,
+            action: supplierId
+              ? { label: 'Ver proveedor', onClick: () => navigate(`/proveedores/${supplierId}/editar`) }
+              : { label: 'Ver sucursales', onClick: () => navigate('/config/sucursales') },
+          },
+        )
+        return
+      }
       if (apiErr?.statusCode === 400 && apiErr?.message) {
         // Try to match inline errors to specific items by itemCode mention
         const msg = apiErr.message

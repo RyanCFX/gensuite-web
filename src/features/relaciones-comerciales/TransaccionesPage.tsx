@@ -235,7 +235,7 @@ export default function TransaccionesPage() {
                             <td>{formatDateTime(t.creation)}</td>
                             <td onClick={(e) => e.stopPropagation()}>
                               <div style={{ display: 'flex', gap: 6 }}>
-                                {t.estado === 'Error' && puedeReenviar && (
+                                {(t.estado === 'Error' || t.estado === 'Requiere Configuración') && puedeReenviar && (
                                   <button
                                     type="button"
                                     className="btn btn-ghost btn-size-xs"

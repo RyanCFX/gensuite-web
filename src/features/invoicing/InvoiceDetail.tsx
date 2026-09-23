@@ -35,7 +35,7 @@ import { createDevolucion } from "@/shared/api/devoluciones";
 import { getItem } from "@/shared/api/catalog";
 import { getBundle } from "@/shared/api/bundles";
 import { getTurnoActual, abrirTurno } from "@/shared/api/pos";
-import { crearDespachoDesdeFactura } from "@/shared/api/despachos";
+import { crearDespachoDesdeFactura, listDespachos } from "@/shared/api/despachos";
 import { ECF_SUBMIT_UNAVAILABLE_MSG } from "@/shared/api/ecf";
 import { esClienteEmisorNoEncontrado } from "@/lib/ecfErrors";
 import { formatStockInsufficientMessage } from "@/lib/stockAlerts";
@@ -243,11 +243,20 @@ export default function InvoiceDetail() {
     enabled: !!relacionClienteSocio && invoice?.status === "submitted",
   });
 
+  // Si ya existe una transacción de venta B2B para esta factura y no falló, ya se envió — no
+  // hay que ofrecer "Enviar al cliente" de nuevo solo porque el modo es manual (`autoEnviarVentas
+  // === false`); ese modo describe CÓMO se envía, no si YA se envió. Solo se re-muestra cuando
+  // nunca se envió, o cuando el envío anterior quedó en un estado que necesita reintentarse —
+  // mismo criterio que `mostrarReintentar` en TransaccionDetail.tsx ("Error" o "Requiere
+  // Configuración" son las 2 formas en que un envío queda atascado).
+  const transaccionVentaAtascada =
+    transaccionVentaB2B?.estado === "Error" || transaccionVentaB2B?.estado === "Requiere Configuración";
+  const yaEnviadaAlSocio = !!transaccionVentaB2B && !transaccionVentaAtascada;
   const mostrarEnviarAlCliente =
     !!relacionClienteSocio &&
     invoice?.status === "submitted" &&
-    (relacionClienteSocio.configuracion?.autoEnviarVentas === false ||
-      transaccionVentaB2B?.estado === "Error");
+    !yaEnviadaAlSocio &&
+    (relacionClienteSocio.configuracion?.autoEnviarVentas === false || transaccionVentaAtascada);
 
   const [showEnviarClienteModal, setShowEnviarClienteModal] = useState(false);
   const [showIgualarVentaModal, setShowIgualarVentaModal] = useState(false);
@@ -981,6 +990,22 @@ export default function InvoiceDetail() {
     onError: (err: { message?: string }) => toast.error(err?.message ?? "Error al crear el despacho"),
   });
 
+  // No hay un campo en la factura que diga "ya está despachada" — se resuelve buscando los
+  // despachos ya creados contra esta factura. Si alguno quedó en Borrador, ya se generó y está
+  // pendiente de someter (mostrar un link a ese, no otro botón "Despachar" que confundiría). Si ya
+  // hay uno Sometido y completamente entregado, no queda nada pendiente por despachar.
+  const { data: despachosDeFactura } = useQuery({
+    queryKey: ["despachos-de-factura", invoice?.id],
+    queryFn: () => listDespachos({ salesInvoice: invoice!.id, status: "all", limit: 20 }),
+    enabled: invoice?.status === "submitted" && despachoHabilitado,
+  });
+  const despachoBorradorExistente = despachosDeFactura?.items.find((d) => d.status === "draft");
+  const yaDespachadaPorCompleto = despachosDeFactura?.items.some(
+    (d) => d.status === "submitted" && d.deliveryStatus === "Completed",
+  );
+  const mostrarDespachar =
+    invoice?.status === "submitted" && despachoHabilitado && !despachoBorradorExistente && !yaDespachadaPorCompleto;
+
   const isActionsLoading =
     submitMutation.isPending ||
     cancelMutation.isPending ||
@@ -1354,13 +1379,21 @@ export default function InvoiceDetail() {
             )}
           </div>
         )}
-        {invoice.status === "submitted" && despachoHabilitado && (
+        {mostrarDespachar && (
           <button
             className="btn btn-navy btn-size-sm"
             onClick={() => despacharMutation.mutate()}
             disabled={despacharMutation.isPending}
           >
             <Truck size={14} /> {despacharMutation.isPending ? "Creando despacho…" : "Despachar"}
+          </button>
+        )}
+        {despachoBorradorExistente && (
+          <button
+            className="btn btn-secondary btn-size-sm"
+            onClick={() => navigate(`/despachos/${despachoBorradorExistente.id}`)}
+          >
+            <Truck size={14} /> Ver despacho en borrador
           </button>
         )}
         {mostrarEnviarAlCliente && puedeEnviarVenta && (

@@ -1140,6 +1140,7 @@ function TabBar() {
         overflowX: "auto",
         overflowY: "hidden",
         borderBottom: "1px solid var(--border-default)",
+        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.02)",
         background: "var(--surface-app)",
         position: "sticky",
         top: 0,

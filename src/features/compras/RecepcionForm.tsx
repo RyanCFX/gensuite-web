@@ -597,6 +597,18 @@ export default function RecepcionForm() {
         toast.error(`${apiErr.message} Tus sucursales asignadas se actualizaron, vuelve a intentar.`)
         return
       }
+      if (isApiErrorCode(error, ERROR_CODES.ALMACEN_COMPRA_NO_CONFIGURADO)) {
+        toast.error(
+          apiErr?.message || 'Configura el almacén de compras en la sucursal o en el proveedor antes de continuar',
+          {
+            duration: 10000,
+            action: supplierId
+              ? { label: 'Ver proveedor', onClick: () => navigate(`/proveedores/${supplierId}/editar`) }
+              : { label: 'Ver sucursales', onClick: () => navigate('/config/sucursales') },
+          },
+        )
+        return
+      }
       if (apiErr?.statusCode === 400 && apiErr?.message) {
         const msg = apiErr.message
         let matched = false

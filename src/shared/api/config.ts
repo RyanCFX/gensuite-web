@@ -2,6 +2,7 @@ import { client, unwrap } from './client'
 import { ENDPOINTS } from './endpoints'
 import type {
   Empresa,
+  LogoEmpresaUploadResult,
   CobrosConfig,
   MetodoPago,
   ListaPrecio,
@@ -60,6 +61,21 @@ export async function getEmpresa() {
 
 export async function updateEmpresa(data: Partial<Empresa>) {
   const res = await client.put<{ success: true; data: Empresa }>(ENDPOINTS.config.empresa, data)
+  return unwrap(res)
+}
+
+/** Sube/reemplaza el logo de la empresa (multipart). No hay endpoint de eliminar — para quitarlo
+ *  hay que subir uno nuevo. El archivo previo queda huérfano en el servidor, no es relevante acá. */
+export async function uploadLogoEmpresa(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await client.post<{ success: true; data: LogoEmpresaUploadResult }>(
+    ENDPOINTS.config.empresaLogo,
+    formData,
+    // El cliente fuerza `Content-Type: application/json` por default en toda request — hay que
+    // quitarlo para que el navegador ponga el `multipart/form-data; boundary=...` real.
+    { headers: { 'Content-Type': undefined } },
+  )
   return unwrap(res)
 }
 

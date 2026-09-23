@@ -406,6 +406,10 @@ export default function SupplierDetail() {
                 <span className="detail-value">{supplier.defaultTipoPagoProveedor ?? 'Sin configurar'}</span>
               </div>
               <div className="detail-field">
+                <span className="detail-label">Almacén de Compras por Defecto</span>
+                <span className="detail-value">{supplier.almacenCompraDefault ?? 'Sin configurar'}</span>
+              </div>
+              <div className="detail-field">
                 <span className="detail-label">Cuenta CxP Alterna</span>
                 <span className="detail-value">{supplier.cuentaCxpDefault ?? 'Sin configurar'}</span>
               </div>

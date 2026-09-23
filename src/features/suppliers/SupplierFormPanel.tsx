@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { createSupplier, updateSupplier } from '@/shared/api/suppliers'
 import { listRetenciones } from '@/shared/api/retenciones'
 import type { ApiError, Supplier, CreateProveedorDto, UpdateProveedorDto } from '@/shared/api/types'
-import { listGruposProveedores, getCatalogosFiscales, listPaises, listBancos, listImpuestosCompras, getFacturacionConfig } from '@/shared/api/config'
+import { listGruposProveedores, getCatalogosFiscales, listPaises, listBancos, listImpuestosCompras, getFacturacionConfig, listAlmacenes } from '@/shared/api/config'
 import { validateRNCDetailed, validateCedulaDetailed, formatRNC, formatCedula } from '@/lib/validators/dgii'
 import { TIPO_IDENTIFICACION } from '@/lib/constants'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -42,6 +42,7 @@ const schema = z
     defaultTipoBienes606: z.string().optional(),
     defaultFormaPago606: z.string().optional(),
     defaultTipoPagoProveedor: z.string().optional(),
+    almacenCompraDefault: z.string().optional(),
     cuentaCxpDefault: z.string().optional(),
     defaultCurrency: z.string().optional(),
     retencionesDefault: z.array(z.string()).optional(),
@@ -105,6 +106,16 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
   const defaultFormaPago606Options: SearchSelectOption[] = (catalogos?.formaPago606 ?? [])
     .filter((t) => !defaultFormaPago606Search || t.label.toLowerCase().includes(defaultFormaPago606Search.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
+
+  // Sin contexto de sucursal en esta pantalla (es un default a nivel de proveedor, no de
+  // documento) — ofrece todos los almacenes del tenant, igual que "Almacén destino" en
+  // RelacionDetail (misma naturaleza de campo: override que gana sobre la resolución normal).
+  const { data: almacenesData } = useQuery({
+    queryKey: ['almacenes-todos'],
+    queryFn: () => listAlmacenes(),
+    staleTime: 60_000,
+  })
+  const almacenCompraDefaultOptions: SearchSelectOption[] = (almacenesData ?? []).map((w) => ({ value: w.id, label: w.name }))
 
   const { data: paisesData, isLoading: paisesLoading } = useQuery({
     queryKey: ['paises'],
@@ -188,6 +199,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
       defaultTipoBienes606: '',
       defaultFormaPago606: '',
       defaultTipoPagoProveedor: '',
+      almacenCompraDefault: '',
       cuentaCxpDefault: '',
       defaultCurrency: '',
       retencionesDefault: [],
@@ -221,6 +233,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
         defaultTipoBienes606: supplier.defaultTipoBienes606 ?? '',
         defaultFormaPago606: supplier.defaultFormaPago606 ?? '',
         defaultTipoPagoProveedor: supplier.defaultTipoPagoProveedor ?? '',
+        almacenCompraDefault: supplier.almacenCompraDefault ?? '',
         cuentaCxpDefault: supplier.cuentaCxpDefault ?? '',
         defaultCurrency: supplier.defaultCurrency ?? '',
         retencionesDefault: (supplier.retencionesDefault ?? []).map((d) => d.id),
@@ -253,6 +266,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
         defaultTipoBienes606: data.defaultTipoBienes606 || undefined,
         defaultFormaPago606: data.defaultFormaPago606 || undefined,
         defaultTipoPagoProveedor: (data.defaultTipoPagoProveedor || undefined) as 'Contado' | 'Crédito' | undefined,
+        almacenCompraDefault: data.almacenCompraDefault || undefined,
         cuentaCxpDefault: data.cuentaCxpDefault || undefined,
         defaultCurrency: data.defaultCurrency || undefined,
         retencionesDefault: data.retencionesDefault && data.retencionesDefault.length > 0 ? data.retencionesDefault : undefined,
@@ -655,6 +669,28 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                     moneda (salvo que elijas una "Cuenta CxP Alterna" explícita abajo).
                   </FieldTooltip>
                 </label>
+                <label className="ff-label">Almacén de Compras por Defecto</label>
+                <Controller
+                  name="almacenCompraDefault"
+                  control={control}
+                  render={({ field }) => (
+                    <SearchSelect
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      options={almacenCompraDefaultOptions}
+                      onSearch={() => {}}
+                      selectedLabel={almacenesData?.find((w) => w.id === field.value)?.name ?? ''}
+                      placeholder="Se resuelve por la sucursal de la compra"
+                    />
+                  )}
+                />
+                <p className="ff-hint">
+                  Si se configura, las compras a este proveedor (incluidas compras B2B de este socio) entran SIEMPRE
+                  a este almacén, sin importar la sucursal.
+                </p>
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">Moneda por Defecto</label>
                 <Controller
                   name="defaultCurrency"
                   control={control}
