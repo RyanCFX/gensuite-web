@@ -22,7 +22,7 @@ import { formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, PackageOpen, UserPlus, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, PackageOpen, UserPlus, ChevronDown, RotateCcw } from 'lucide-react'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
@@ -41,6 +41,7 @@ import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
+import { isCostoCompraError } from '@/lib/pinOverride'
 
 interface LineItem {
   itemCode: string
@@ -114,6 +115,9 @@ export default function PedidoForm() {
 const [customerId, setCustomerId] = useState('')
    const [customerName, setCustomerName] = useState('')
    const [customerPriceTier, setCustomerPriceTier] = useState<keyof ItemPrices | undefined>(undefined)
+   /** % de descuento por defecto del cliente elegido — solo sugiere el valor al AGREGAR una línea
+    *  nueva (selectCatalogItem/selectBundle), nunca reescribe una que el usuario ya haya tocado. */
+   const [customerDefaultDiscountPct, setCustomerDefaultDiscountPct] = useState<number | undefined>(undefined)
    const [customerQuery, setCustomerQuery] = useState('')
    const [showCreateCustomer, setShowCreateCustomer] = useState(false)
    const [esClienteOcasional, setEsClienteOcasional] = useState(false)
@@ -147,6 +151,7 @@ const [customerId, setCustomerId] = useState('')
   const [viewItemCode, setViewItemCode] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [pinModalOpen, setPinModalOpen] = useState(false)
+  const [costPinModalOpen, setCostPinModalOpen] = useState(false)
   const [isLayaway, setIsLayaway] = useState(false)
   const [despachoFuturo, setDespachoFuturo] = useState(false)
   const [branch, setBranch] = useState('')
@@ -315,6 +320,7 @@ const [customerId, setCustomerId] = useState('')
       getCustomer(src.customer).then((c) => {
         setCustomerName(c.customerName)
         setCustomerPriceTier(c.priceTier)
+        setCustomerDefaultDiscountPct(c.descuentoDefaultPct ?? undefined)
       }).catch(() => {})
     }).catch(() => toast.error('Error al cargar el pedido a duplicar'))
   }, [duplicateId, loaded, isEdit, quotationId])
@@ -394,6 +400,7 @@ useEffect(() => {
     setCustomerId(customer.id)
     setCustomerName(customer.customerName)
     setCustomerPriceTier(customer.priceTier)
+    setCustomerDefaultDiscountPct(customer.descuentoDefaultPct ?? undefined)
     queryClient.invalidateQueries({ queryKey: ['customerSearch'] })
   }
 
@@ -507,6 +514,10 @@ useEffect(() => {
       setPinModalOpen(true)
       return
     }
+    if (isCostoCompraError(err as { statusCode?: number; message?: string })) {
+      setCostPinModalOpen(true)
+      return
+    }
     if (msg.toLowerCase().includes('no tienes acceso a la sucursal')) {
       refetchMyBranches()
       toast.error(`${msg} Tus sucursales asignadas se actualizaron, vuelve a intentar.`)
@@ -586,6 +597,9 @@ useEffect(() => {
         if (i !== index) return row
         const baseRate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
         const rate = saleRate(baseRate)
+        const defaultPct = catalogItem.allowsDiscount && customerDefaultDiscountPct && customerDefaultDiscountPct > 0
+          ? customerDefaultDiscountPct
+          : 0
         return {
           ...row,
           itemCode: catalogItem.id,
@@ -594,8 +608,8 @@ useEffect(() => {
           description: catalogItem.internalDescription ?? catalogItem.itemName,
           rate,
           baseRate,
-          amount: calcAmount(row.qty, rate, 0, 0),
-          discountPct: 0,
+          amount: calcAmount(row.qty, rate, defaultPct, 0),
+          discountPct: defaultPct,
           discountMode: 'pct' as const,
           discountAmount: 0,
            uom: catalogItem.stockUom ?? row.uom,
@@ -618,6 +632,11 @@ useEffect(() => {
         if (i !== index) return row
         const baseRate = bundle.prices?.[tier] ?? 0
         const rate = saleRate(baseRate)
+        // Solo aplica la sugerencia si la línea todavía no tiene un descuento (recién agregada) —
+        // no pisa uno que el usuario ya haya tocado.
+        const defaultPct = row.discountMode === 'pct' && !row.discountPct && customerDefaultDiscountPct && customerDefaultDiscountPct > 0
+          ? customerDefaultDiscountPct
+          : row.discountPct
         return {
           ...row,
           itemCode: bundle.id,
@@ -626,9 +645,10 @@ useEffect(() => {
           description: bundle.itemName,
           rate,
           baseRate,
+          discountPct: defaultPct,
           amount: row.discountMode === 'amount'
             ? calcAmount(row.qty, rate, 0, row.discountAmount)
-            : calcAmount(row.qty, rate, row.discountPct),
+            : calcAmount(row.qty, rate, defaultPct),
            uom: bundle.itemUom ?? '',
            conversionFactor: 1,
            maxDiscountPct: undefined,
@@ -697,12 +717,26 @@ useEffect(() => {
   }
   function removeRow(index: number) { setItems((prev) => prev.filter((_, i) => i !== index)) }
 
+  const hasAnyDiscount = items.some((i) => i.discountPct > 0 || i.discountAmount > 0)
+  /** Quita el descuento de TODAS las líneas de una sola vez — no toca cantidad, precio ni
+   *  ningún otro campo de la línea. */
+  function undoDiscounts() {
+    setItems((prev) => prev.map((item) => ({
+      ...item,
+      discountPct: 0,
+      discountAmount: 0,
+      amount: calcAmount(item.qty, item.rate, 0, 0),
+    })))
+  }
+
   const subtotal = items.reduce((s, i) => s + i.amount, 0)
   const grossTotal = items.reduce((s, i) => s + i.qty * i.rate, 0)
   const totalDiscount = grossTotal - subtotal
   const total = subtotal
 
-function submitDto() {
+/** Arma el body de creación/edición desde el estado actual del formulario — usado tanto en el
+ *  submit normal como al reintentar con `pinOverride` (override de descuento y de costo). */
+function buildDto(): CreatePedidoDto {
      const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
        itemCode: i.itemCode,
        qty: i.qty,
@@ -714,7 +748,7 @@ function submitDto() {
        warehouse: i.warehouse || undefined,
        uom: i.uom || undefined,
      }))
-     const baseDto = {
+     return {
        ...(esClienteOcasional
          ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalRnc: clienteOcasionalRnc || undefined, clienteOcasionalDireccion: clienteOcasionalDireccion || undefined }
          : { customer: customerId }),
@@ -728,9 +762,30 @@ function submitDto() {
        despachoFuturo: mostrarSelectorDespachoFuturo ? despachoFuturo : undefined,
        currency: currency || undefined,
        conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
-     }
+     } as CreatePedidoDto
+   }
+
+   function submitDto() {
+     const baseDto = buildDto()
      if (isEdit) updateMutation.mutate(baseDto)
      else createMutation.mutate(baseDto)
+   }
+
+   /** Reintenta la MISMA operación (crear o editar) con `pinOverride` embebido, tras el 400 de
+    *  "no puede ser menor al costo de compra" — el backend verifica el PIN dentro de este mismo
+    *  request, no hay un POST /auth/verify-admin-pin aparte. Deja que el 401 (PIN inválido/sin
+    *  permisos) se propague tal cual para que el modal lo muestre y permita reintentar. */
+   async function retryPedidoWithPinOverride(pin: string, identidad: { usuario?: string; codigoTarjeta?: string }) {
+     const dto = { ...buildDto(), pinOverride: { pin, ...identidad } }
+     const formTabId = activeId
+     const result = isEdit ? await updatePedido(id!, dto) : await createPedido(dto)
+     setSubmitError(null)
+     queryClient.invalidateQueries({ queryKey: ['pedidos'] })
+     if (isEdit) queryClient.removeQueries({ queryKey: ['pedido', id] })
+     toast.success(isEdit ? 'Pedido actualizado' : 'Pedido creado')
+     const newId = (result as { id: string }).id
+     navigate(isEdit ? (newId && newId !== id ? `/pedidos/${newId}` : `/pedidos/${id}`) : `/pedidos/${newId}`)
+     if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
    }
 
   const isDirty = useDirtyCheck({
@@ -842,6 +897,7 @@ try {
                        setCustomerName(opt?.label ?? '')
                        const c = cid ? customersData?.items?.find((c) => c.id === cid) : undefined
                        setCustomerPriceTier(c?.priceTier)
+                       setCustomerDefaultDiscountPct(c?.descuentoDefaultPct ?? undefined)
                      }}
                      options={customerOptions}
                      selectedLabel={customerName}
@@ -1025,7 +1081,14 @@ try {
         </div>
 
         <div className="card">
-          <div className="card-header"><h2 className="card-title">Artículos</h2></div>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 className="card-title">Artículos</h2>
+            {hasAnyDiscount && (
+              <button type="button" className="btn btn-ghost btn-size-sm" onClick={undoDiscounts}>
+                <RotateCcw size={13} /> Deshacer descuentos
+              </button>
+            )}
+          </div>
           <div className="items-table-wrap">
             <table className="items-table">
               <thead>
@@ -1253,6 +1316,15 @@ try {
         }}
         title="Autorización requerida"
         description="El descuento supera tu límite. Ingresa el PIN de un administrador."
+      />
+
+      <PinModal
+        open={costPinModalOpen}
+        onClose={() => setCostPinModalOpen(false)}
+        onSubmitInline={retryPedidoWithPinOverride}
+        onAuthorized={() => setCostPinModalOpen(false)}
+        title="Autorización requerida"
+        description="Esta línea se vendería por debajo del costo. Ingresa un PIN de administrador para autorizarlo."
       />
     </div>
   )

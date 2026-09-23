@@ -25,7 +25,7 @@ import type { TrackedComponent } from '@/components/shared/ComponentTrackingModa
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
 import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP, formatMoney, round2 } from '@/lib/formatters'
-import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, Info, UserPlus, Lock, LockOpen, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, Info, UserPlus, Lock, LockOpen, ChevronDown, RotateCcw } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
@@ -55,6 +55,7 @@ import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { useItemInventory } from '@/shared/hooks/useItemInventory'
 import { formatStockInsufficientMessage, formatUomNotAllowedMessage } from '@/lib/stockAlerts'
+import { isCostoCompraError } from '@/lib/pinOverride'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 
 type NcfType = string
@@ -294,6 +295,7 @@ export default function InvoiceForm() {
   const [semaforo, setSemaforo] = useState<SemaforoEntry | null>(null)
   const [loadingSemaforo, setLoadingSemaforo] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
+  const [costPinModalOpen, setCostPinModalOpen] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
   const [viewItemCode, setViewItemCode] = useState<string | null>(null)
   const [trackingModalIndex, setTrackingModalIndex] = useState<number | null>(null)
@@ -682,7 +684,7 @@ export default function InvoiceForm() {
     if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
   }
 
-  function handleInvoiceMutationError(err: { message?: string; code?: string }) {
+  function handleInvoiceMutationError(err: { message?: string; code?: string; statusCode?: number }) {
       const msg = err?.message ?? ''
       const low = msg.toLowerCase()
       // 400 del PATCH: el borrador dejó de serlo (ya sometido) o fue enviado a Caja. El mensaje del
@@ -711,6 +713,7 @@ export default function InvoiceForm() {
         return
       }
       if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) { setPinModalOpen(true); return }
+      if (isCostoCompraError(err)) { setCostPinModalOpen(true); return }
       if (msg.toLowerCase().includes('no tienes acceso a la sucursal')) {
         refetchMyBranches()
         toast.error(`${msg} Tus sucursales asignadas se actualizaron, vuelve a intentar.`)
@@ -745,6 +748,16 @@ export default function InvoiceForm() {
   function persistInvoice(dto: CreateInvoiceDto) {
     if (isEdit) updateMutation.mutate(dto)
     else createMutation.mutate(dto)
+  }
+
+  /** Reintenta la MISMA operación (crear o editar) con `pinOverride` embebido, tras el 400 de
+   *  "no puede ser menor al costo de compra" — el backend verifica el PIN dentro de este mismo
+   *  request, no hay un POST /auth/verify-admin-pin aparte. Deja que el 401 (PIN inválido/sin
+   *  permisos) se propague tal cual para que el modal lo muestre y permita reintentar. */
+  async function retryInvoiceWithPinOverride(pin: string, identidad: { usuario?: string; codigoTarjeta?: string }) {
+    const dto = { ...buildInvoiceDto(), pinOverride: { pin, ...identidad } }
+    const invoice = isEdit ? await updateInvoice(editId!, dto) : await createInvoice(dto)
+    handleInvoiceSaved(invoice, isEdit ? 'Cambios guardados' : 'Factura creada como borrador')
   }
 
   const isSaving = createMutation.isPending || updateMutation.isPending
@@ -935,6 +948,12 @@ export default function InvoiceForm() {
         const tier = selectedCustomer?.priceTier ?? defaultPriceTier ?? 'B'
         const baseRate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
         const rate = saleRate(baseRate)
+        const autoDiscountPct = catalogItem.autoDiscount?.discountType === 'Discount Percentage' ? catalogItem.autoDiscount.discountPercentage : undefined
+        // Sugerencia del % de descuento del cliente al agregar la línea — solo al agregarla, nunca
+        // reescribe una línea que el usuario ya haya tocado. Sigue siendo editable por línea.
+        const defaultManualPct = catalogItem.allowsDiscount && selectedCustomer?.descuentoDefaultPct && selectedCustomer.descuentoDefaultPct > 0
+          ? selectedCustomer.descuentoDefaultPct
+          : 0
         return {
           ...row,
           itemCode: catalogItem.id,
@@ -943,15 +962,15 @@ export default function InvoiceForm() {
           description: catalogItem.internalDescription ?? catalogItem.itemName,
           rate,
           baseRate,
-           amount: calcAmount(row.qty, rate, 0, 0),
+           amount: calcAmount(row.qty, rate, (autoDiscountPct ?? 0) + defaultManualPct, 0),
           uom: catalogItem.stockUom ?? row.uom,
           conversionFactor: 1,
           maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
-          autoDiscountPct: catalogItem.autoDiscount?.discountType === 'Discount Percentage' ? catalogItem.autoDiscount.discountPercentage : undefined,
-          discountPct: 0,
+          autoDiscountPct,
+          discountPct: (autoDiscountPct ?? 0) + defaultManualPct,
           discountMode: 'pct',
           discountAmount: 0,
-          manualDiscountPct: 0,
+          manualDiscountPct: defaultManualPct,
           allowsDiscount: catalogItem.allowsDiscount,
           _prices: catalogItem.prices,
           salesTaxPct: catalogItem.salesTaxPct ?? 0,
@@ -981,6 +1000,11 @@ export default function InvoiceForm() {
         const tier = selectedCustomer?.priceTier ?? defaultPriceTier ?? 'B'
         const baseRate = bundle.prices?.[tier] ?? 0
         const rate = saleRate(baseRate)
+        // Solo aplica la sugerencia si la línea todavía no tiene un descuento manual (recién
+        // agregada) — no pisa uno que el usuario ya haya tocado.
+        const defaultManualPct = row.discountMode === 'pct' && !row.manualDiscountPct && selectedCustomer?.descuentoDefaultPct && selectedCustomer.descuentoDefaultPct > 0
+          ? selectedCustomer.descuentoDefaultPct
+          : row.manualDiscountPct
         return {
           ...row,
           itemCode: bundle.id,
@@ -989,9 +1013,11 @@ export default function InvoiceForm() {
           description: bundle.itemName,
           rate,
           baseRate,
+          manualDiscountPct: defaultManualPct,
+          discountPct: row.discountMode === 'amount' ? row.discountPct : defaultManualPct,
           amount: row.discountMode === 'amount'
             ? calcAmount(row.qty, rate, 0, row.discountAmount)
-            : calcAmount(row.qty, rate, row.discountPct),
+            : calcAmount(row.qty, rate, defaultManualPct),
           uom: bundle.itemUom ?? '',
           conversionFactor: 1,
           maxDiscountPct: undefined,
@@ -1096,6 +1122,19 @@ export default function InvoiceForm() {
 
   function removeRow(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const hasAnyDiscount = items.some((i) => i.discountPct > 0 || i.discountAmount > 0)
+  /** Quita el descuento de TODAS las líneas de una sola vez — no toca cantidad, precio ni
+   *  ningún otro campo de la línea. */
+  function undoDiscounts() {
+    setItems((prev) => prev.map((item) => ({
+      ...item,
+      discountPct: 0,
+      manualDiscountPct: 0,
+      discountAmount: 0,
+      amount: calcAmount(item.qty, item.rate, 0, 0),
+    })))
   }
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0)
@@ -1215,46 +1254,50 @@ if (esClienteOcasional) {
       }
     }
 
-const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
-       itemCode: i.itemCode,
-       description: i.description,
-       qty: i.qty,
-       rate: i.rate,
-       // Mutuamente excluyentes — nunca se envían ambos, aunque el usuario haya escrito algo
-       // en el otro campo antes de cambiar de modo.
-       discountPct: i.discountMode === 'amount' ? undefined : (i.discountPct || undefined),
-       discountAmount: i.discountMode === 'amount' ? (i.discountAmount || undefined) : undefined,
-       uom: i.uom || undefined,
-       warehouse: i.warehouse || undefined,
-       ubicacion: i.ubicacion || undefined,
-       componentTracking: i.componentTracking,
-       ...arsLineaDto(i),
-     }))
-
-     const baseDto = {
-       ...(esClienteOcasional
-         ? {
-             clienteOcasionalNombre: clienteOcasionalNombre || undefined,
-             clienteOcasionalRnc: clienteOcasionalRnc || undefined,
-             clienteOcasionalDireccion: clienteOcasionalDireccion || undefined,
-           }
-         : { customer: customerId }),
-       postingDate,
-       dueDate,
-       branch: branch || undefined,
-       department: usaDepartamentos ? (department || undefined) : undefined,
-       ncfType,
-       items: itemsDto,
-        notes: notes || undefined,
-        taxesTemplate: mostrarImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
-        currency: currency || undefined,
-        conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
-        despachoFuturo: mostrarSelectorDespachoFuturo ? despachoFuturo : undefined,
-        ...arsBloqueDto(),
-      }
-
-     persistInvoice(baseDto as CreateInvoiceDto)
+persistInvoice(buildInvoiceDto())
    }
+
+  /** Arma el body de creación/edición desde el estado actual del formulario — usado tanto en el
+   *  submit normal como al reintentar con `pinOverride` (override de descuento y de costo). */
+  function buildInvoiceDto(): CreateInvoiceDto {
+    const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
+      itemCode: i.itemCode,
+      description: i.description,
+      qty: i.qty,
+      rate: i.rate,
+      // Mutuamente excluyentes — nunca se envían ambos, aunque el usuario haya escrito algo
+      // en el otro campo antes de cambiar de modo.
+      discountPct: i.discountMode === 'amount' ? undefined : (i.discountPct || undefined),
+      discountAmount: i.discountMode === 'amount' ? (i.discountAmount || undefined) : undefined,
+      uom: i.uom || undefined,
+      warehouse: i.warehouse || undefined,
+      ubicacion: i.ubicacion || undefined,
+      componentTracking: i.componentTracking,
+      ...arsLineaDto(i),
+    }))
+
+    return {
+      ...(esClienteOcasional
+        ? {
+            clienteOcasionalNombre: clienteOcasionalNombre || undefined,
+            clienteOcasionalRnc: clienteOcasionalRnc || undefined,
+            clienteOcasionalDireccion: clienteOcasionalDireccion || undefined,
+          }
+        : { customer: customerId }),
+      postingDate,
+      dueDate,
+      branch: branch || undefined,
+      department: usaDepartamentos ? (department || undefined) : undefined,
+      ncfType,
+      items: itemsDto,
+      notes: notes || undefined,
+      taxesTemplate: mostrarImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
+      currency: currency || undefined,
+      conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
+      despachoFuturo: mostrarSelectorDespachoFuturo ? despachoFuturo : undefined,
+      ...arsBloqueDto(),
+    } as CreateInvoiceDto
+  }
 
   const semaforoStatusClass: Record<string, string> = {
     verde: 'semaforo-verde',
@@ -1556,6 +1599,13 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
         )}
 
         <div className="card">
+          {hasAnyDiscount && (
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn btn-ghost btn-size-sm" onClick={undoDiscounts}>
+                <RotateCcw size={13} /> Deshacer descuentos
+              </button>
+            </div>
+          )}
           <div className="items-table-wrap">
             <table className="items-table navy-table">
               <thead>
@@ -2035,39 +2085,22 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
         open={pinModalOpen}
         onClose={() => setPinModalOpen(false)}
         accion="override_descuento"
-onAuthorized={(userId) => {
-           client.defaults.headers.common['X-Admin-Pin'] = userId
-           setPinModalOpen(false)
-           const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
-             itemCode: i.itemCode, description: i.description, qty: i.qty, rate: i.rate,
-             discountPct: i.discountMode === 'amount' ? undefined : (i.discountPct || undefined),
-             discountAmount: i.discountMode === 'amount' ? (i.discountAmount || undefined) : undefined,
-             uom: i.uom || undefined, warehouse: i.warehouse || undefined,
-             ubicacion: i.ubicacion || undefined,
-             componentTracking: i.componentTracking,
-             ...arsLineaDto(i),
-           }))
-           const baseDto = {
-             ...(esClienteOcasional
-               ? {
-                   clienteOcasionalNombre: clienteOcasionalNombre || undefined,
-                   clienteOcasionalRnc: clienteOcasionalRnc || undefined,
-                   clienteOcasionalDireccion: clienteOcasionalDireccion || undefined,
-                 }
-               : { customer: customerId }),
-             postingDate, dueDate, branch: branch || undefined, department: usaDepartamentos ? (department || undefined) : undefined, ncfType,
-             items: itemsDto,
-             notes: notes || undefined,
-             taxesTemplate: mostrarImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
-             currency: currency || undefined,
-             conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
-             despachoFuturo: mostrarSelectorDespachoFuturo ? despachoFuturo : undefined,
-             ...arsBloqueDto(),
-           }
-persistInvoice(baseDto as CreateInvoiceDto)
-         }}
+        onAuthorized={(userId) => {
+          client.defaults.headers.common['X-Admin-Pin'] = userId
+          setPinModalOpen(false)
+          persistInvoice(buildInvoiceDto())
+        }}
         title="Autorización requerida"
         description="El descuento supera tu límite. Ingresa el PIN de un administrador."
+      />
+
+      <PinModal
+        open={costPinModalOpen}
+        onClose={() => setCostPinModalOpen(false)}
+        onSubmitInline={retryInvoiceWithPinOverride}
+        onAuthorized={() => setCostPinModalOpen(false)}
+        title="Autorización requerida"
+        description="Esta línea se vendería por debajo del costo. Ingresa un PIN de administrador para autorizarlo."
       />
 
       {variantTemplate && (

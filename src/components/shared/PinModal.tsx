@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { verifyAdminPin } from '@/shared/api/auth'
+import { listUsuarios } from '@/shared/api/usuarios'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import type { AdminPinAccion } from '@/shared/api/types'
+import { SearchSelect, type SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Loader2, Shield, CheckCircle, ScanLine, X } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -13,15 +15,24 @@ interface PinModalProps {
   onClose: () => void
   onAuthorized: (userId: string) => void
   /** Qué se está autorizando (ver ADMIN_PIN_ACTIONS en el backend) — determina qué rol se le
-   *  exige al dueño del PIN. Un valor no reconocido por el backend responde 400. */
-  accion: AdminPinAccion
+   *  exige al dueño del PIN. Un valor no reconocido por el backend responde 400. Omite esto y
+   *  pasa `onSubmitInline` cuando el backend verifica el PIN dentro del mismo request que se
+   *  reintenta (ej. `pinOverride`), en vez de por separado contra /auth/verify-admin-pin. */
+  accion?: AdminPinAccion
+  /** Alternativa a `accion`/POST-aparte: recibe el pin + identidad y debe reintentar la operación
+   *  original con eso embebido (ej. `pinOverride` en el body de POST/PUT). Resuelve si quedó
+   *  autorizada; lanza/rechaza si el backend la rechazó por PIN inválido o sin permisos — el modal
+   *  muestra el mismo mensaje genérico y deja reintentar sin perder el formulario. */
+  onSubmitInline?: (pin: string, identidad: { usuario?: string; codigoTarjeta?: string }) => Promise<void>
   title?: string
   description?: string
 }
 
-export function PinModal({ open, onClose, onAuthorized, accion, title, description }: PinModalProps) {
+export function PinModal({ open, onClose, onAuthorized, accion, onSubmitInline, title, description }: PinModalProps) {
   const [digits, setDigits] = useState<string[]>(Array(PIN_LENGTH).fill(''))
   const [usuario, setUsuario] = useState('')
+  const [usuarioLabel, setUsuarioLabel] = useState('')
+  const [usuarioQuery, setUsuarioQuery] = useState('')
   const [codigoTarjeta, setCodigoTarjeta] = useState('')
   const [authorizedUser, setAuthorizedUser] = useState<string | null>(null)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
@@ -30,20 +41,32 @@ export function PinModal({ open, onClose, onAuthorized, accion, title, descripti
   // una lectura de carnet/QR resuelve la identificación sin que el usuario escriba su email.
   useBarcodeScanner({
     enabled: open && !authorizedUser,
-    onBarcode: (code) => { setCodigoTarjeta(code); setUsuario('') },
+    onBarcode: (code) => { setCodigoTarjeta(code); setUsuario(''); setUsuarioLabel('') },
   })
 
+  // Solo miembros activos pueden autorizar — no tiene sentido ofrecer uno revocado/suspendido.
+  const { data: usuariosData } = useQuery({
+    queryKey: ['usuarios-pin-modal'],
+    queryFn: () => listUsuarios({ limit: 100, status: 'accepted' }),
+    enabled: open,
+    staleTime: 60_000,
+  })
+  const usuarioOptions: SearchSelectOption[] = (usuariosData?.items ?? [])
+    .filter((u) => !usuarioQuery || u.fullName.toLowerCase().includes(usuarioQuery.toLowerCase()) || u.email.toLowerCase().includes(usuarioQuery.toLowerCase()))
+    .map((u) => ({ value: u.email, label: u.fullName, sublabel: u.email }))
+
   const verifyMutation = useMutation({
-    mutationFn: (pin: string) =>
-      verifyAdminPin({
-        pin,
-        accion,
-        ...(codigoTarjeta ? { codigoTarjeta } : { usuario: usuario.trim() }),
-      }),
+    mutationFn: async ({ pin, identidad }: { pin: string; identidad: { usuario?: string; codigoTarjeta?: string } }) => {
+      if (onSubmitInline) {
+        await onSubmitInline(pin, identidad)
+        return null
+      }
+      return verifyAdminPin({ pin, accion: accion!, ...identidad })
+    },
     onSuccess: (res) => {
       const userId = res?.userId ?? 'Administrador'
       setAuthorizedUser(userId)
-      toast.success(`Autorizado por ${userId}`)
+      toast.success(onSubmitInline ? 'Autorizado' : `Autorizado por ${userId}`)
       setTimeout(() => { onAuthorized(userId); reset() }, 800)
     },
     onError: () => {
@@ -58,25 +81,28 @@ export function PinModal({ open, onClose, onAuthorized, accion, title, descripti
   function reset() {
     setDigits(Array(PIN_LENGTH).fill(''))
     setUsuario('')
+    setUsuarioLabel('')
     setCodigoTarjeta('')
     setAuthorizedUser(null)
   }
 
-  function submitIfReady(pin: string) {
+  /** `identidad` se pasa explícito en vez de leerlo de `usuario`/`codigoTarjeta` — el estado recién
+   *  actualizado (ej. justo tras elegir un autorizador en el select) no está disponible todavía en
+   *  el closure de esta misma vuelta de evento. */
+  function submitIfReady(pin: string, identidad: { usuario?: string; codigoTarjeta?: string }) {
     if (pin.length !== PIN_LENGTH) return
-    if (!codigoTarjeta && !usuario.trim()) {
-      toast.error('Escribe tu email o escanea tu carnet para continuar')
+    if (!identidad.codigoTarjeta && !identidad.usuario?.trim()) {
+      toast.error('Selecciona el autorizador o escanea tu carnet para continuar')
       return
     }
-    verifyMutation.mutate(pin)
+    verifyMutation.mutate({ pin, identidad })
   }
 
   // Cubre el caso de escanear el carnet DESPUÉS de completar el PIN (el 6to dígito solo dispara
-  // la verificación si en ese momento ya hay usuario/codigoTarjeta) — el caso de terminar de
-  // escribir el email después se cubre con onBlur/Enter en el input, no aquí, para no disparar
-  // una verificación por cada tecla.
+  // la verificación si en ese momento ya hay usuario/codigoTarjeta) — el caso de elegir el
+  // autorizador después se cubre en el onChange del select, no aquí.
   useEffect(() => {
-    if (codigoTarjeta) submitIfReady(digits.join(''))
+    if (codigoTarjeta) submitIfReady(digits.join(''), { codigoTarjeta })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codigoTarjeta])
 
@@ -86,7 +112,7 @@ export function PinModal({ open, onClose, onAuthorized, accion, title, descripti
     newDigits[idx] = value
     setDigits(newDigits)
     if (value && idx < PIN_LENGTH - 1) inputRefs.current[idx + 1]?.focus()
-    if (idx === PIN_LENGTH - 1 && value) submitIfReady(newDigits.join(''))
+    if (idx === PIN_LENGTH - 1 && value) submitIfReady(newDigits.join(''), codigoTarjeta ? { codigoTarjeta } : { usuario })
   }
 
   function handleKeyDown(idx: number, e: React.KeyboardEvent) {
@@ -98,7 +124,7 @@ export function PinModal({ open, onClose, onAuthorized, accion, title, descripti
     const text = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, PIN_LENGTH)
     const newDigits = text.split('').concat(Array(PIN_LENGTH).fill('')).slice(0, PIN_LENGTH)
     setDigits(newDigits)
-    if (text.length === PIN_LENGTH) submitIfReady(text)
+    if (text.length === PIN_LENGTH) submitIfReady(text, codigoTarjeta ? { codigoTarjeta } : { usuario })
     else inputRefs.current[text.length]?.focus()
   }
 
@@ -145,15 +171,18 @@ export function PinModal({ open, onClose, onAuthorized, accion, title, descripti
                   </div>
                 ) : (
                   <>
-                    <label className="ff-label" style={{ fontSize: 12 }}>Email del autorizador</label>
-                    <input
-                      className="ff-input"
-                      type="email"
+                    <label className="ff-label" style={{ fontSize: 12 }}>Autorizador</label>
+                    <SearchSelect
                       value={usuario}
-                      onChange={(e) => setUsuario(e.target.value)}
-                      onBlur={() => submitIfReady(digits.join(''))}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitIfReady(digits.join('')) } }}
-                      placeholder="gerente@empresa.com"
+                      onChange={(value, option) => {
+                        setUsuario(value)
+                        setUsuarioLabel(option?.label ?? '')
+                        submitIfReady(digits.join(''), { usuario: value })
+                      }}
+                      options={usuarioOptions}
+                      onSearch={setUsuarioQuery}
+                      selectedLabel={usuarioLabel}
+                      placeholder="Busca por nombre o email…"
                       disabled={verifyMutation.isPending}
                     />
                     <p className="ff-hint" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
