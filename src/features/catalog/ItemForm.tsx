@@ -17,7 +17,8 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { MultiSearchSelect } from '@/shared/ui/MultiSearchSelect'
 import { AttributeSelect } from '@/components/shared/AttributeSelect'
-import { ArrowLeft, Plus, Minus, Trash2, HelpCircle, ImagePlus, Loader2 } from 'lucide-react'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
+import { ArrowLeft, Plus, Minus, Trash2, ImagePlus, Loader2, Save } from 'lucide-react'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 
@@ -732,7 +733,7 @@ export default function ItemForm() {
                   <div className="ff-wrap">
                     <label className="ff-label" htmlFor="shortName">
                       Referencia
-                      <span className="ff-tooltip-icon" title="Nombre corto — se usa internamente para búsquedas rápidas"><HelpCircle size={13} /></span>
+                      <FieldTooltip>Nombre corto — se usa internamente para búsquedas rápidas</FieldTooltip>
                     </label>
                     <input
                       id="shortName"
@@ -747,7 +748,7 @@ export default function ItemForm() {
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="description">
                   Descripción
-                  <span className="ff-tooltip-icon" title="Solo visible en la ficha del artículo, no aparece en facturas ni cotizaciones"><HelpCircle size={13} /></span>
+                  <FieldTooltip>Solo visible en la ficha del artículo, no aparece en facturas ni cotizaciones</FieldTooltip>
                 </label>
                 <textarea id="description" className="ff-textarea" rows={2} placeholder="Descripción interna, solo visible en la ficha del artículo." {...register('description')} />
               </div>
@@ -755,7 +756,7 @@ export default function ItemForm() {
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="notes">
                   Notas
-                  <span className="ff-tooltip-icon" title="Aparece en cotizaciones y facturas"><HelpCircle size={13} /></span>
+                  <FieldTooltip>Aparece en cotizaciones y facturas</FieldTooltip>
                 </label>
                 <textarea id="notes" className="ff-textarea" rows={2} placeholder="Notas que aparecen en documentos." {...register('notes')} />
               </div>
@@ -876,7 +877,10 @@ export default function ItemForm() {
                     />
                   </div>
                   <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="purchaseUoms">UOMs de compra permitidas</label>
+                    <label className="ff-label" htmlFor="purchaseUoms">
+                      UOMs de compra permitidas
+                      <FieldTooltip>Independiente de las UOMs de venta. Dejar vacío = sin restricción.</FieldTooltip>
+                    </label>
                     <Controller
                       name="purchaseUoms"
                       control={control}
@@ -891,10 +895,12 @@ export default function ItemForm() {
                         />
                       )}
                     />
-                    <p className="ff-hint">Independiente de las UOMs de venta. Dejar vacío = sin restricción.</p>
                   </div>
                   <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="saleUoms">UOMs de venta permitidas</label>
+                    <label className="ff-label" htmlFor="saleUoms">
+                      UOMs de venta permitidas
+                      <FieldTooltip>Independiente de las UOMs de compra. Dejar vacío = sin restricción.</FieldTooltip>
+                    </label>
                     <Controller
                       name="saleUoms"
                       control={control}
@@ -909,7 +915,6 @@ export default function ItemForm() {
                         />
                       )}
                     />
-                    <p className="ff-hint">Independiente de las UOMs de compra. Dejar vacío = sin restricción.</p>
                   </div>
                   <div className="ff-wrap">
                     <label className="ff-label" htmlFor="trackingType">Seguimiento</label>
@@ -940,7 +945,10 @@ export default function ItemForm() {
                     </label>
                   </div>
                   <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="shelfLifeInDays">Vida útil (días)</label>
+                    <label className="ff-label" htmlFor="shelfLifeInDays">
+                      Vida útil (días)
+                      <FieldTooltip>Si se omite la fecha de vencimiento al crear un lote, se calcula sumando estos días a la fecha de fabricación.</FieldTooltip>
+                    </label>
                     <input
                       id="shelfLifeInDays"
                       className="ff-input"
@@ -949,9 +957,6 @@ export default function ItemForm() {
                       step="1"
                       {...register('shelfLifeInDays', { valueAsNumber: true })}
                     />
-                    <p className="ff-hint">
-                      Si se omite la fecha de vencimiento al crear un lote, se calcula sumando estos días a la fecha de fabricación.
-                    </p>
                   </div>
                 </div>
               )}
@@ -962,10 +967,8 @@ export default function ItemForm() {
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                       <input type="checkbox" className="ff-check" {...register('asignarSerialEnDespacho')} />
                       Asignar serial/lote al vender o despachar
+                      <FieldTooltip>Si está activo, el serial/lote de este artículo se pide al confirmar despacho (venta), no en la compra.</FieldTooltip>
                     </label>
-                    <p className="ff-hint">
-                      Si está activo, el serial/lote de este artículo se pide al confirmar despacho (venta), no en la compra.
-                    </p>
                   </div>
                 </div>
               )}
@@ -1028,12 +1031,14 @@ export default function ItemForm() {
                     Al guardar, las variantes se generarán en la pantalla de detalle del artículo.
                   </div>
                   <div className="ff-wrap">
-                    <label className="ff-label">Atributos de variantes</label>
+                    <label className="ff-label">
+                      Atributos de variantes
+                      <FieldTooltip>Ej: Color, Talla. Selecciona todos los atributos que diferencian las variantes.</FieldTooltip>
+                    </label>
                     <AttributeSelect
                       selected={selectedAttributes}
                       onChange={setSelectedAttributes}
                     />
-                    <p className="ff-hint">Ej: Color, Talla. Selecciona todos los atributos que diferencian las variantes.</p>
                   </div>
                   <p className="ff-hint" style={{ fontSize: 11 }}>
                     El precio de venta se configura en cada variante individual.
@@ -1122,7 +1127,13 @@ export default function ItemForm() {
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="form-row">
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="valuationRate">Costo de Valoración</label>
+                  <label className="ff-label" htmlFor="valuationRate">
+                    Costo de Valoración
+                    <FieldTooltip>
+                      Costo unitario del artículo (base para calcular márgenes). Opcional — requerido solo si
+                      usas el modo de precio "Sobre costo".
+                    </FieldTooltip>
+                  </label>
                   <input
                     id="valuationRate"
                     type="number" step="0.01" min="0"
@@ -1130,10 +1141,6 @@ export default function ItemForm() {
                     placeholder="0.00"
                     {...register('valuationRate', { valueAsNumber: true })}
                   />
-                  <p className="ff-hint">
-                    Costo unitario del artículo (base para calcular márgenes). Opcional — requerido solo si
-                    usas el modo de precio "Sobre costo".
-                  </p>
                 </div>
                 <div className="ff-wrap">
                   <label className="ff-label" htmlFor="purchaseTaxTemplate">
@@ -1168,8 +1175,8 @@ export default function ItemForm() {
                   <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
                 </span>
                 Sin impuesto de compra
+                <FieldTooltip>Excepción de impuesto para este artículo en compras y gastos (Item Tax Template)</FieldTooltip>
               </label>
-              <p className="ff-hint" style={{ marginTop: -8 }}>Excepción de impuesto para este artículo en compras y gastos (Item Tax Template)</p>
             </div>
           </div>
 
@@ -1203,7 +1210,14 @@ export default function ItemForm() {
               </div>
 
               <div className="ff-wrap">
-                <label className="ff-label" htmlFor="actualizarCostoEnCompraOverride">Actualizar costo al comprar</label>
+                <label className="ff-label" htmlFor="actualizarCostoEnCompraOverride">
+                  Actualizar costo al comprar
+                  <FieldTooltip>
+                    Si está activo (a nivel de empresa o por esta excepción), someter una compra de este artículo
+                    actualiza su "Costo de Valoración" con el precio de esa compra. No afecta el recálculo del precio
+                    de venta en modo "Sobre costo", que sigue igual sin importar este ajuste.
+                  </FieldTooltip>
+                </label>
                 <Controller
                   name="actualizarCostoEnCompraOverride"
                   control={control}
@@ -1218,11 +1232,6 @@ export default function ItemForm() {
                     />
                   )}
                 />
-                <p className="ff-hint">
-                  Si está activo (a nivel de empresa o por esta excepción), someter una compra de este artículo
-                  actualiza su "Costo de Valoración" con el precio de esa compra. No afecta el recálculo del precio
-                  de venta en modo "Sobre costo", que sigue igual sin importar este ajuste.
-                </p>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1237,10 +1246,12 @@ export default function ItemForm() {
                       </>
                     ) : (
                       <>
-                        <label className="ff-label" style={{ color: 'var(--text-secondary)' }}>Precio A — Máximo</label>
+                        <label className="ff-label" style={{ color: 'var(--text-secondary)' }}>
+                          Precio A — Máximo
+                          <FieldTooltip>Clientes VIP / venta especial</FieldTooltip>
+                        </label>
                         <input type="number" step="0.01" min="0" className="ff-input" placeholder="0.00" {...register('priceA', { valueAsNumber: true })} />
                         {priceLabel(watchedPriceA)}
-                        <p className="ff-hint">Clientes VIP / venta especial</p>
                       </>
                     )}
                   </div>
@@ -1300,7 +1311,10 @@ export default function ItemForm() {
                 ) : (
                   <>
                     <div className="ff-wrap">
-                      <label className="ff-label">Precio B — Promedio <span className="ff-required">*</span></label>
+                      <label className="ff-label">
+                        Precio B — Promedio <span className="ff-required">*</span>
+                        <FieldTooltip>Precio estándar (el más usado)</FieldTooltip>
+                      </label>
                       <input
                         type="number" step="0.01" min="0"
                         className={`ff-input${errors.priceB ? ' ff-input-error' : ''}`}
@@ -1309,13 +1323,14 @@ export default function ItemForm() {
                       />
                       {errors.priceB && <span className="ff-error">{errors.priceB.message}</span>}
                       {priceLabel(watchedPriceB)}
-                      <p className="ff-hint">Precio estándar (el más usado)</p>
                     </div>
                     <div className="ff-wrap">
-                      <label className="ff-label" style={{ color: 'var(--text-secondary)' }}>Precio C — Mínimo</label>
+                      <label className="ff-label" style={{ color: 'var(--text-secondary)' }}>
+                        Precio C — Mínimo
+                        <FieldTooltip>Precio al por mayor</FieldTooltip>
+                      </label>
                       <input type="number" step="0.01" min="0" className="ff-input" placeholder="0.00" {...register('priceC', { valueAsNumber: true })} />
                       {priceLabel(watchedPriceC)}
-                      <p className="ff-hint">Precio al por mayor</p>
                     </div>
                   </>
                 )}
@@ -1338,7 +1353,10 @@ export default function ItemForm() {
                   </div>
                   {watch('allowsDiscount') && (
                     <div className="ff-wrap" style={{ minWidth: 180 }}>
-                      <label className="ff-label" htmlFor="maxDiscountPct">Máximo % de descuento</label>
+                      <label className="ff-label" htmlFor="maxDiscountPct">
+                        Máximo % de descuento
+                        <FieldTooltip>Descuento máximo permitido para este artículo en documentos</FieldTooltip>
+                      </label>
                       <div className="ff-input-suffix-wrap">
                         <input
                           id="maxDiscountPct"
@@ -1348,7 +1366,6 @@ export default function ItemForm() {
                         />
                         <span className="ff-input-suffix">%</span>
                       </div>
-                      <p className="ff-hint">Descuento máximo permitido para este artículo en documentos</p>
                     </div>
                   )}
                 </div>
@@ -1359,15 +1376,18 @@ export default function ItemForm() {
         </div>
 
         {/* ════════════════ BOTONES (ancho completo) ════════════════ */}
-        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button type="button" className="btn btn-secondary" onClick={() => navigate(backTo)}>
+        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+          <button type="button" className="btn btn-ghost" onClick={() => navigate(backTo)}>
             Cancelar
           </button>
           <button
             type="submit"
-            className="btn btn-primary"
+            className="btn btn-navy"
             disabled={isSubmitting || createMutation.isPending || updateMutation.isPending}
           >
+            {(isSubmitting || createMutation.isPending || updateMutation.isPending)
+              ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+              : <Save size={15} />}
             {isEdit
               ? (updateMutation.isPending ? 'Guardando…' : 'Guardar Cambios')
               : (createMutation.isPending ? 'Guardando…' : `Crear ${moduleLabel}`)}

@@ -23,6 +23,7 @@ import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii
 import { Select, SelectItem } from '@/components/ui/select'
 import { Plus, Loader2, Wallet, ArrowRightLeft, ChevronDown, ChevronRight, Download, SlidersHorizontal } from 'lucide-react'
 import { ConfirmModal } from '@/shared/ui/Modal'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -597,17 +598,15 @@ export default function CreditNotesPage() {
                   onChange={(e) => setNcf(e.target.value)}
                 />
               </FilterField>
-            </div>
-          </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
-              <SlidersHorizontal size={13} />
-              Más filtros
-              {activeMoreFiltersCount > 0 && (
-                <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
-              )}
-            </button>
+              <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+                <SlidersHorizontal size={13} />
+                Más filtros
+                {activeMoreFiltersCount > 0 && (
+                  <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -895,7 +894,10 @@ export default function CreditNotesPage() {
 
                 {ncEsEcf && (
                   <div className="ff-wrap">
-                    <label className="ff-label ff-required">Código de modificación (DGII)</label>
+                    <label className="ff-label ff-required">
+                      Código de modificación (DGII)
+                      <FieldTooltip>Requerido para notas de crédito electrónicas — declara ante la DGII qué corrige esta nota.</FieldTooltip>
+                    </label>
                     <Select
                       value={modificationCode ? String(modificationCode) : ''}
                       onValueChange={(v) => setModificationCode(v ? (Number(v) as EcfModificationCode) : '')}
@@ -905,9 +907,6 @@ export default function CreditNotesPage() {
                         <SelectItem key={c.code} value={String(c.code)}>{c.label}</SelectItem>
                       ))}
                     </Select>
-                    <p className="ff-hint">
-                      Requerido para notas de crédito electrónicas — declara ante la DGII qué corrige esta nota.
-                    </p>
                   </div>
                 )}
 
@@ -1104,7 +1103,10 @@ export default function CreditNotesPage() {
               </p>
 
               <div className="ff-wrap">
-                <label className="ff-label ff-required">Factura destino</label>
+                <label className="ff-label ff-required">
+                  Factura destino
+                  <FieldTooltip>Se aplicará directamente a la factura seleccionada.</FieldTooltip>
+                </label>
                 <SearchSelect
                   value={applyInvoiceId}
                   selectedLabel={applyInvoiceLabel}
@@ -1118,9 +1120,6 @@ export default function CreditNotesPage() {
                   placeholder="Buscar factura del cliente…"
                   error={!applyInvoiceId}
                 />
-                <p className="ff-hint">
-                  Se aplicará directamente a la factura seleccionada.
-                </p>
                 {!applyInvoiceId && (
                   <p className="ff-hint" style={{ color: 'red' }}>Selecciona una factura destino</p>
                 )}
@@ -1142,7 +1141,12 @@ export default function CreditNotesPage() {
                 </div>
               ) : (
                 <div className="ff-wrap">
-                  <label className="ff-label ff-required" htmlFor="applyAmount">Monto a aplicar</label>
+                  <label className="ff-label ff-required" htmlFor="applyAmount">
+                    Monto a aplicar
+                    <FieldTooltip>
+                      Prellenado con el total de la nota — si excede el saldo restante realmente disponible (ya sea porque hay reembolsos o conversiones previas), el sistema te lo indicará.
+                    </FieldTooltip>
+                  </label>
                   <input
                     id="applyAmount"
                     className={`ff-input${!applyAmountValid ? ' items-input-error' : ''}`}
@@ -1152,9 +1156,6 @@ export default function CreditNotesPage() {
                     value={applyAmount || ''}
                     onChange={(e) => setApplyAmount(parseFloat(e.target.value) || 0)}
                   />
-                  <p className="ff-hint">
-                    Prellenado con el total de la nota — si excede el saldo restante realmente disponible (ya sea porque hay reembolsos o conversiones previas), el sistema te lo indicará.
-                  </p>
                 </div>
               )}
             </div>

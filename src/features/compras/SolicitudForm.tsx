@@ -12,9 +12,10 @@ import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateSolicitudCompraDto, Item } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Save, Loader2 } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
@@ -289,9 +290,11 @@ export default function SolicitudForm() {
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label">Fecha Necesaria</label>
+                  <label className="ff-label">
+                    Fecha Necesaria
+                    <FieldTooltip>Default para las líneas que no traigan la suya propia.</FieldTooltip>
+                  </label>
                   <DatePicker className="ff-input" value={scheduleDate} onChange={setScheduleDate} clearable min={transactionDate} />
-                  <p className="ff-hint">Default para las líneas que no traigan la suya propia.</p>
                 </div>
 
                 <div className="ff-wrap">
@@ -436,10 +439,13 @@ export default function SolicitudForm() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? 'Guardando…' : 'Guardar Borrador'}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+            <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)}>Cancelar</button>
+            <button type="submit" className="btn btn-navy" disabled={saveMutation.isPending}>
+              {saveMutation.isPending
+                ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                : <Save size={15} />}
+              Guardar Borrador
             </button>
           </div>
         </div>

@@ -21,6 +21,7 @@ import { getCachedUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 
 interface ReferenciaRow {
@@ -415,6 +416,9 @@ export default function RegistrarPagoPage() {
                 <div className="ff-wrap">
                   <label className="ff-label">
                     Cuenta Bancaria {requiresBankAccount && <span className="ff-required">*</span>}
+                    {esCheque && (
+                      <FieldTooltip>Este método de pago está configurado como cheque — siempre se tratará como tal.</FieldTooltip>
+                    )}
                   </label>
                   <SearchSelect
                     value={bankAccount}
@@ -429,11 +433,6 @@ export default function RegistrarPagoPage() {
                     placeholder={metodoSeleccionado?.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
                     error={requiresBankAccount && !bankAccount}
                   />
-                  {esCheque && (
-                    <p className="ff-hint">
-                      Este método de pago está configurado como cheque — siempre se tratará como tal.
-                    </p>
-                  )}
                 </div>
               )}
             </div>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Save, Loader2 } from 'lucide-react'
 import { createTransferenciaInterna, listTiposDocumento } from '@/shared/api/tesoreria'
 import { getFacturacionConfig } from '@/shared/api/config'
 import type { CreateTransferenciaInternaDto, CuentaBancaria, TesoreriaLinea } from '@/shared/api/types'
@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { formatMoney } from '@/lib/formatters'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
@@ -195,7 +196,10 @@ export default function TransferenciaInternaForm() {
 
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <div className="ff-wrap" style={{ flex: 1, minWidth: 160 }}>
-                <label className="ff-label ff-required">Monto</label>
+                <label className="ff-label ff-required">
+                  Monto
+                  <FieldTooltip>Monto que sale de la cuenta origen.</FieldTooltip>
+                </label>
                 <input
                   className="ff-input"
                   type="number"
@@ -204,7 +208,6 @@ export default function TransferenciaInternaForm() {
                   value={monto || ''}
                   onChange={(e) => setMonto(parseFloat(e.target.value) || 0)}
                 />
-                <p className="ff-hint">Monto que sale de la cuenta origen.</p>
               </div>
               <div className="ff-wrap" style={{ flex: 2, minWidth: 240 }}>
                 <label className="ff-label">Descripción</label>
@@ -326,7 +329,10 @@ export default function TransferenciaInternaForm() {
 
         <div className="doc-actions-bar">
           <button type="button" className="btn btn-ghost" onClick={() => navigate('/tesoreria/transferencias')}>Cancelar</button>
-          <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
+          <button type="submit" className="btn btn-navy" disabled={createMutation.isPending}>
+            {createMutation.isPending
+              ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+              : <Save size={15} />}
             {createMutation.isPending ? 'Guardando…' : 'Crear Transferencia'}
           </button>
         </div>

@@ -10,7 +10,8 @@ import type { ApiError, Aseguradora } from '@/shared/api/types'
 import { validateRNCDetailed, formatRNC } from '@/lib/validators/dgii'
 import { SearchSelect, type SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
-import { Info, Plus, Trash2 } from 'lucide-react'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
+import { Info, Plus, Trash2, Save, Loader2 } from 'lucide-react'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 const schema = z.object({
@@ -317,7 +318,10 @@ export function AseguradoraFormPanel({ aseguradora, onSuccess, onCancel }: Asegu
             )}
 
             <div className="ff-wrap">
-              <label className="ff-label" htmlFor="cuentaCxcDefault">Cuenta CxC Alterna</label>
+              <label className="ff-label" htmlFor="cuentaCxcDefault">
+                Cuenta CxC Alterna
+                <FieldTooltip>Cuenta contable al facturar el lote consolidado. Si se omite, se usa el default de la compañía.</FieldTooltip>
+              </label>
               <Controller
                 name="cuentaCxcDefault"
                 control={control}
@@ -331,9 +335,6 @@ export function AseguradoraFormPanel({ aseguradora, onSuccess, onCancel }: Asegu
                   />
                 )}
               />
-              <p className="ff-hint">
-                Cuenta contable al facturar el lote consolidado. Si se omite, se usa el default de la compañía.
-              </p>
             </div>
 
             <div className="ff-wrap">
@@ -359,14 +360,15 @@ export function AseguradoraFormPanel({ aseguradora, onSuccess, onCancel }: Asegu
       </div>
 
       {/* ── Botones ── */}
-      <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-          {isSubmitting
-            ? <><span className="spinner spinner-white spinner-sm" /> Guardando…</>
-            : isEdit ? 'Guardar Cambios' : 'Crear Aseguradora'}
-        </button>
+      <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
         <button type="button" className="btn btn-ghost" onClick={onCancel}>
           Cancelar
+        </button>
+        <button type="submit" className="btn btn-navy" disabled={isSubmitting}>
+          {isSubmitting
+            ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+            : <Save size={15} />}
+          {isEdit ? 'Guardar Cambios' : 'Crear Aseguradora'}
         </button>
       </div>
     </form>

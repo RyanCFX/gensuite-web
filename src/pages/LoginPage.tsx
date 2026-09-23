@@ -12,6 +12,7 @@ import type { MfaRequiredResult, AuthResult } from '@/shared/api/types'
 import { useAuthStore } from '@/stores/auth.store'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 
 // docs/tasks/PROMPT_IDENTIDAD_GLOBAL_FRONTEND.md §3.1/§3.5 — el login es global, no hace falta
 // pedir tenant acá: se manda siempre `tenant: null` y, si la persona pertenece a más de una
@@ -371,7 +372,10 @@ function MfaStep({ mfa, tenant, onBack, onSuccess }: {
         )}
 
         <div className="form-field">
-          <Label htmlFor="code">Código</Label>
+          <Label htmlFor="code">
+            Código
+            <FieldTooltip>Código de tu app de autenticación, de correo, o uno de tus códigos de recuperación (XXXXX-XXXXX).</FieldTooltip>
+          </Label>
           <Input
             id="code"
             type="text"
@@ -381,9 +385,6 @@ function MfaStep({ mfa, tenant, onBack, onSuccess }: {
             value={code}
             onChange={(e) => setCode(e.target.value)}
           />
-          <p className="ff-hint" style={{ margin: '4px 0 0' }}>
-            Código de tu app de autenticación, de correo, o uno de tus códigos de recuperación (XXXXX-XXXXX).
-          </p>
         </div>
 
         <button type="submit" className="btn btn-primary auth-submit" disabled={submitting || !code.trim()}>

@@ -10,6 +10,7 @@ import { getEcfTipos } from '@/shared/api/ecf'
 import { createDevolucion } from '@/shared/api/devoluciones'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { formatDOP, formatDate, daysSince } from '@/lib/formatters'
@@ -514,6 +515,11 @@ export default function DevolucionForm() {
                   <div className="ff-wrap">
                     <label className={`ff-label${requiereMotivoArs ? ' ff-required' : ''}`}>
                       Motivo de anulación ARS
+                      <FieldTooltip>
+                        {requiereMotivoArs
+                          ? 'Obligatorio: esta devolución deja la cobertura en cero y la aprobación ARS quedará anulada con este motivo.'
+                          : 'Opcional en devoluciones parciales — queda registrado en la aprobación ARS.'}
+                      </FieldTooltip>
                     </label>
                     <Select
                       value={motivoAnulacionArs || ''}
@@ -524,11 +530,6 @@ export default function DevolucionForm() {
                         <SelectItem key={m} value={m}>{m}</SelectItem>
                       ))}
                     </Select>
-                    <p className="ff-hint">
-                      {requiereMotivoArs
-                        ? 'Obligatorio: esta devolución deja la cobertura en cero y la aprobación ARS quedará anulada con este motivo.'
-                        : 'Opcional en devoluciones parciales — queda registrado en la aprobación ARS.'}
-                    </p>
                   </div>
 
                   {motivoAnulacionArs === 'Otro' && (
@@ -549,7 +550,14 @@ export default function DevolucionForm() {
               )}
 
               <div className="ff-wrap">
-                <label className={`ff-label${notaCreditoEsEcf ? ' ff-required' : ''}`}>Código de modificación (DGII)</label>
+                <label className={`ff-label${notaCreditoEsEcf ? ' ff-required' : ''}`}>
+                  Código de modificación (DGII)
+                  <FieldTooltip>
+                    Preseleccionado según la devolución ({returnFullInvoice ? '"Anula" para factura completa' : '"Corrige montos" para devolución parcial'}) —
+                    cámbialo si no aplica. Solo tiene efecto si esta nota de crédito se emite como comprobante
+                    electrónico (e-CF) ante la DGII; si el negocio no emite e-CF, se ignora.
+                  </FieldTooltip>
+                </label>
                 <Select
                   value={modificationCode ? String(modificationCode) : ''}
                   onValueChange={(v) => {
@@ -563,11 +571,6 @@ export default function DevolucionForm() {
                     <SelectItem key={c.code} value={String(c.code)}>{c.label}</SelectItem>
                   ))}
                 </Select>
-                <p className="ff-hint">
-                  Preseleccionado según la devolución ({returnFullInvoice ? '"Anula" para factura completa' : '"Corrige montos" para devolución parcial'}) —
-                  cámbialo si no aplica. Solo tiene efecto si esta nota de crédito se emite como comprobante
-                  electrónico (e-CF) ante la DGII; si el negocio no emite e-CF, se ignora.
-                </p>
                 {modificationCodeError && (
                   <div className="inline-alert inline-alert-error" style={{ marginTop: 4 }}>
                     <AlertCircle size={14} />

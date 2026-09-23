@@ -215,7 +215,7 @@ button {
 }
 
 /* ─── SCROLLBAR ─── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar { display: none; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--radius-full); }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
@@ -258,7 +258,6 @@ button {
   gap: 12px;
   padding: 0 16px;
   background: var(--surface-page);
-  border-bottom: 1px solid var(--border-default);
   position: sticky;
   top: 0;
   z-index: 200;
@@ -1075,9 +1074,9 @@ button {
 }
 
 .filter-card-navy .ff-label-sm {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  color: #0E3D51;
 }
 
 .navy-table-card { overflow: hidden; }
@@ -1282,19 +1281,27 @@ button {
 .actions-item-danger { color: var(--error-text); }
 .actions-item-danger:hover { background: var(--error-bg); color: var(--error-text); }
 
-/* ─── FORM FIELDS ─── */
-.ff-wrap { display: flex; flex-direction: column; gap: 5px; }
+/* ─── FORM FIELDS ───
+   `.ff-wrap` vive casi siempre dentro de una fila CSS Grid (`.form-row`, `.form-row-3`, o el
+   grid de 2 columnas de una card) — un grid ya estira cada celda a la altura de la fila más
+   alta (default `align-items: stretch`). `justify-content: flex-end` aprovecha ese alto extra
+   empujando el grupo (label + gap de 2px + input) hacia abajo, así el espacio de sobra de un
+   label de 1 línea queda ARRIBA (no entre el label y su input) y los inputs de toda la fila
+   quedan alineados al de abajo — sin min-height fijo en ningún lado, 100% responsive: si nadie
+   en la fila se parte en 2 líneas, no hay hueco de sobra (no hay alto extra que redistribuir). */
+.ff-wrap { display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; }
 
 .ff-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
-  color: var(--text-primary);
+  line-height: 1.4;
+  color: #0E3D51;
 }
 
 .ff-label-sm {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: #0E3D51;
 }
 
 .ff-required { color: var(--error-text); margin-left: 2px; }
@@ -1303,11 +1310,11 @@ button {
 
 .ff-input {
   width: 100%;
-  height: 36px;
-  padding: 0 12px;
-  background: var(--surface-page);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  height: 35px;
+  padding: 8px 16px;
+  background: #FFF;
+  border: 1.457px solid var(--Gris-Forms, #CCDBE2);
+  border-radius: 8.743px;
   font-family: var(--font-body);
   font-size: 13px;
   color: var(--text-primary);
@@ -1317,7 +1324,7 @@ button {
     box-shadow 150ms var(--ease-in-out);
 }
 
-.ff-input::placeholder { color: var(--text-tertiary); }
+.ff-input::placeholder { color: #5A6A85; font-size: 14px; font-weight: 400; }
 
 .ff-input:focus {
   border-color: var(--border-focus);
@@ -1327,7 +1334,14 @@ button {
 .ff-input:disabled { opacity: 0.55; cursor: not-allowed; background: var(--surface-sunken); }
 .ff-input-error { border-color: var(--error-text); }
 .ff-input-error:focus { box-shadow: 0 0 0 3px rgba(196, 30, 19, 0.12); }
-.ff-input-sm { height: 30px; font-size: 12px; }
+.ff-input-sm {
+  height: 35px;
+  font-size: 12px;
+  padding: 8px 16px;
+  border-radius: 8.743px;
+  border: 1.457px solid var(--Gris-Forms, #CCDBE2);
+  background: #FFF;
+}
 
 .tag-input {
   display: flex;
@@ -1449,6 +1463,42 @@ button {
 .ff-error { font-size: 12px; color: var(--error-text); display: flex; align-items: center; gap: 4px; margin-top: 2px; }
 .ff-hint { font-size: 12px; color: var(--text-tertiary); }
 
+/* ─── FIELD TOOLTIP — ícono de ayuda junto al label, hint en cuadro flotante on-hover/focus ─── */
+.ff-tooltip-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+  color: #5A6A85;
+  cursor: help;
+  outline: none;
+  vertical-align: middle;
+}
+
+.ff-tooltip-icon:hover,
+.ff-tooltip-icon:focus-visible {
+  color: var(--text-secondary);
+}
+
+/* Renderizado vía FloatingPortal (fixed, en <body>) — el posicionamiento (top/left/zIndex)
+   lo pone el wrapper del portal inline; acá solo va la apariencia visual del cuadro. */
+.ff-tooltip-box {
+  width: max-content;
+  max-width: 240px;
+  background: var(--ink-deep);
+  color: var(--on-dark-ink);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  text-align: left;
+  white-space: normal;
+  animation: fade-in 120ms var(--ease-out);
+}
+
 /* Checkbox */
 .ff-check-wrap {
   display: flex;
@@ -1461,7 +1511,7 @@ button {
   width: 15px;
   height: 15px;
   border-radius: var(--radius-sm);
-  accent-color: var(--brand-primary);
+  accent-color: #208591;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -1491,7 +1541,7 @@ button {
      alinear por la base hace que inputs y botones sin label queden a la misma altura que el
      campo del input de los que sí lo tienen, en vez de quedar descentrados verticalmente. */
   align-items: flex-end;
-  gap: 8px;
+  gap: 16px;
   flex: 1;
   min-width: 0;
   flex-wrap: wrap;
@@ -1566,11 +1616,11 @@ button {
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  height: 36px;
-  padding: 0 10px;
-  background: var(--surface-page);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  height: 35px;
+  padding: 8px 16px;
+  background: #FFF;
+  border: 1.457px solid var(--Gris-Forms, #CCDBE2);
+  border-radius: 8.743px;
   font-family: var(--font-body);
   font-size: 13px;
   color: var(--text-primary);
@@ -1591,18 +1641,18 @@ button {
   justify-content: center;
   width: 20px;
   height: 20px;
-  background: var(--surface-active);
+  background: none;
   border: none;
-  border-radius: var(--radius-full);
-  color: var(--icon-muted);
+  border-radius: 0;
+  color: #5A6A85;
   cursor: pointer;
   padding: 0;
   line-height: 0;
-  transition: background-color 150ms, color 150ms;
+  transition: color 150ms;
   flex-shrink: 0;
 }
 .select-clear:hover {
-  background: var(--border-strong);
+  background: none;
   color: var(--text-primary);
 }
 .select-clear:focus-visible {
@@ -1845,7 +1895,7 @@ button {
   box-shadow: var(--shadow-xs);
   transition: transform 150ms var(--ease-in-out);
 }
-.ff-toggle input:checked ~ .ff-toggle-track { background: var(--ink-deep); }
+.ff-toggle input:checked ~ .ff-toggle-track { background: #208591; }
 .ff-toggle input:checked ~ .ff-toggle-track .ff-toggle-thumb { transform: translateX(16px); }
 
 /* ─── CONFIRM MODAL ─── */
@@ -2203,7 +2253,7 @@ button {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-tertiary);
+  color: #208591;
 }
 
 .ff-section-divider::after { content: ''; flex: 1; height: 1px; background: var(--border-default); }
@@ -2518,14 +2568,14 @@ button {
   align-items: flex-start;
   gap: 10px;
   padding: 12px 14px;
-  border-radius: var(--radius-md);
+  border-radius: 8.743px;
   font-size: 13px;
-  border: 1px solid;
+  border: 1.457px solid;
 }
 
 .inline-alert-warn { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning-text); }
 .inline-alert-error { background: var(--error-bg); border-color: var(--error-border); color: var(--error-text); }
-.inline-alert-info { background: var(--info-bg); border-color: var(--info-border); color: var(--info-text); }
+.inline-alert-info { border-color: var(--Aqua, #84CDBA); background: rgba(132, 205, 186, 0.33); color: #0E3D51; }
 .inline-alert-success { background: var(--success-bg); border-color: var(--success-border); color: var(--success-text); }
 .inline-alert svg { flex-shrink: 0; margin-top: 1px; }
 
@@ -2732,11 +2782,11 @@ button {
 
 .search-select-input {
   width: 100%;
-  height: 36px;
-  padding: 0 32px 0 12px;
-  background: var(--surface-page);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  height: 35px;
+  padding: 8px 32px 8px 16px;
+  background: #FFF;
+  border: 1.457px solid var(--Gris-Forms, #CCDBE2);
+  border-radius: 8.743px;
   font-family: var(--font-body);
   font-size: 13px;
   color: var(--text-primary);
@@ -2746,7 +2796,9 @@ button {
 }
 
 .search-select-input::placeholder {
-  color: var(--text-tertiary);
+  color: #5A6A85;
+  font-size: 14px;
+  font-weight: 400;
 }
 
 .search-select-input:focus {
@@ -2774,19 +2826,19 @@ button {
   justify-content: center;
   width: 20px;
   height: 20px;
-  background: var(--surface-active);
+  background: none;
   border: none;
-  border-radius: var(--radius-full);
-  color: var(--icon-muted);
+  border-radius: 0;
+  color: #5A6A85;
   cursor: pointer;
   padding: 0;
   line-height: 0;
-  transition: background-color 150ms, color 150ms;
+  transition: color 150ms;
   flex-shrink: 0;
 }
 
 .search-select-clear:hover {
-  background: var(--border-strong);
+  background: none;
   color: var(--text-primary);
 }
 
@@ -2889,11 +2941,11 @@ button {
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
-  min-height: 36px;
-  padding: 4px 8px;
-  background: var(--surface-page);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  min-height: 35px;
+  padding: 8px 16px;
+  background: #FFF;
+  border: 1.457px solid var(--Gris-Forms, #CCDBE2);
+  border-radius: 8.743px;
   cursor: text;
   transition: border-color 150ms var(--ease-in-out), box-shadow 150ms var(--ease-in-out);
 }
@@ -2922,7 +2974,7 @@ button {
   padding: 2px 0;
 }
 
-.multi-search-select-input::placeholder { color: var(--text-tertiary); }
+.multi-search-select-input::placeholder { color: #5A6A85; font-size: 14px; font-weight: 400; }
 
 .multi-search-select-tag {
   display: inline-flex;
@@ -3411,7 +3463,7 @@ tbody .badge {
 
 .date-trigger-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.date-trigger-placeholder { color: var(--text-tertiary); }
+.date-trigger-placeholder { color: #5A6A85; font-size: 14px; font-weight: 400; }
 
 .date-trigger--error { border-color: var(--error-text) !important; }
 

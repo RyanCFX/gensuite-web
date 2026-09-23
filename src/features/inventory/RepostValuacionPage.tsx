@@ -18,6 +18,7 @@ import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { formatDateTime, formatDate } from '@/lib/formatters'
 import { useTabActiva } from '@/shared/hooks/useTabActiva'
 
@@ -142,7 +143,10 @@ export default function RepostValuacionPage() {
                 />
               </div>
               <div className="ff-wrap">
-                <label className="ff-label">Almacén</label>
+                <label className="ff-label">
+                  Almacén
+                  <FieldTooltip>Si no eliges ninguno, se recalcula el artículo en todos los almacenes donde tiene movimientos.</FieldTooltip>
+                </label>
                 <SearchSelect
                   value={warehouse}
                   onChange={setWarehouse}
@@ -151,27 +155,26 @@ export default function RepostValuacionPage() {
                   selectedLabel={warehouses?.find((w) => w.id === warehouse)?.name ?? ''}
                   placeholder="Todos los almacenes del artículo"
                 />
-                <p className="ff-hint">
-                  Si no eliges ninguno, se recalcula el artículo en todos los almacenes donde tiene movimientos.
-                </p>
               </div>
             </div>
 
             <div className="ff-wrap" style={{ maxWidth: 240 }}>
-              <label className="ff-label ff-required">Fecha desde la cual recalcular</label>
+              <label className="ff-label ff-required">
+                Fecha desde la cual recalcular
+                <FieldTooltip>
+                  Debe ser igual o anterior a la fecha del primer movimiento problemático de este
+                  artículo — una fecha posterior deja intacta la corrupción anterior a esa fecha.{' '}
+                  <button
+                    type="button"
+                    className="btn-link"
+                    style={{ fontSize: 12 }}
+                    onClick={() => navigate('/inventario/historial')}
+                  >
+                    Ver historial de movimientos <ExternalLink size={11} style={{ verticalAlign: 'middle' }} />
+                  </button>
+                </FieldTooltip>
+              </label>
               <DatePicker value={postingDate} onChange={setPostingDate} clearable />
-              <p className="ff-hint">
-                Debe ser igual o anterior a la fecha del primer movimiento problemático de este
-                artículo — una fecha posterior deja intacta la corrupción anterior a esa fecha.{' '}
-                <button
-                  type="button"
-                  className="btn-link"
-                  style={{ fontSize: 12 }}
-                  onClick={() => navigate('/inventario/historial')}
-                >
-                  Ver historial de movimientos <ExternalLink size={11} style={{ verticalAlign: 'middle' }} />
-                </button>
-              </p>
             </div>
 
             <div>

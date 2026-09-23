@@ -25,6 +25,7 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useDebounce } from '@/lib/useDebounce'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { FilterField } from '@/shared/ui/FilterField'
@@ -605,7 +606,10 @@ export default function CuentasBancariasPage() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="ff-wrap">
-                    <label className="ff-label ff-required" htmlFor="cbCurrency">Moneda</label>
+                    <label className="ff-label ff-required" htmlFor="cbCurrency">
+                      Moneda
+                      <FieldTooltip>Se toma automáticamente de la moneda real de la cuenta contable elegida arriba.</FieldTooltip>
+                    </label>
                     <Controller
                       name="currency"
                       control={control}
@@ -619,9 +623,7 @@ export default function CuentasBancariasPage() {
                         </Select>
                       )}
                     />
-                    {errors.currency
-                      ? <p className="ff-error">{errors.currency.message}</p>
-                      : <p className="ff-hint">Se toma automáticamente de la moneda real de la cuenta contable elegida arriba.</p>}
+                    {errors.currency && <p className="ff-error">{errors.currency.message}</p>}
                   </div>
 
                   <div className="ff-wrap">
@@ -725,13 +727,13 @@ export default function CuentasBancariasPage() {
                   <input id="cbChequesManuales" type="checkbox" {...register('chequesManuales')} />
                   <label className="ff-label" htmlFor="cbChequesManuales" style={{ margin: 0 }}>
                     Cheques manuales
+                    <FieldTooltip>
+                      {chequesManualesValue
+                        ? 'Manual: usted digita el número en cada pago/emisión — el sistema solo valida que no se repita en esta cuenta.'
+                        : 'Automático: el sistema asigna el número de cheque solo, a partir del último usado en esta cuenta.'}
+                    </FieldTooltip>
                   </label>
                 </div>
-                <p className="ff-hint" style={{ marginTop: -8 }}>
-                  {chequesManualesValue
-                    ? 'Manual: usted digita el número en cada pago/emisión — el sistema solo valida que no se repita en esta cuenta.'
-                    : 'Automático: el sistema asigna el número de cheque solo, a partir del último usado en esta cuenta.'}
-                </p>
 
                 <div className="ff-wrap" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <input id="cbIsDefault" type="checkbox" {...register('isDefault')} />

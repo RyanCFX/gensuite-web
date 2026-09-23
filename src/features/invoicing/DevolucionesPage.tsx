@@ -252,17 +252,15 @@ export default function DevolucionesPage() {
                   <SelectItem value="cancelled">Cancelado</SelectItem>
                 </Select>
               </FilterField>
-            </div>
-          </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
-              <SlidersHorizontal size={13} />
-              Más filtros
-              {activeMoreFiltersCount > 0 && (
-                <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
-              )}
-            </button>
+              <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
+                <SlidersHorizontal size={13} />
+                Más filtros
+                {activeMoreFiltersCount > 0 && (
+                  <span className="badge badge-brand" style={{ marginLeft: 2 }}>{activeMoreFiltersCount}</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>

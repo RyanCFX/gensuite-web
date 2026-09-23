@@ -8,6 +8,7 @@ import { AccountSelect } from '@/components/shared/AccountSelect'
 import { CostCenterSelect } from '@/components/shared/CostCenterSelect'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { Select, SelectItem } from '@/components/ui/select'
 import { REGIMENES_FISCALES } from '@/lib/constants'
 import { Building2, Save } from 'lucide-react'
@@ -263,14 +264,16 @@ export default function EmpresaConfig() {
                   <p className="form-section-title">Información Fiscal</p>
                   <div className="form-row">
                     <div className="ff-wrap">
-                      <label className="ff-label">Nombre de la Empresa</label>
+                      <label className="ff-label">
+                        Nombre de la Empresa
+                        <FieldTooltip>El nombre se toma del registro de tu empresa y no se edita desde esta pantalla.</FieldTooltip>
+                      </label>
                       <input
                         className="ff-input"
                         value={form.companyName ?? ''}
                         disabled
                         placeholder="Mi Empresa SRL"
                       />
-                      <p className="ff-hint">El nombre se toma del registro de tu empresa y no se edita desde esta pantalla.</p>
                     </div>
                     <div className="ff-wrap">
                       <label className="ff-label">RNC</label>
@@ -333,7 +336,10 @@ export default function EmpresaConfig() {
               <div className="card-body">
                 <div className="form-row">
                   <div className="ff-wrap">
-                    <label className="ff-label">Modo de código de artículo</label>
+                    <label className="ff-label">
+                      Modo de código de artículo
+                      <FieldTooltip>Define cómo se asigna el código a nuevos artículos</FieldTooltip>
+                    </label>
                     <Select
                       value={form.itemCodeMode ?? 'manual'}
                       onValueChange={(val) => set('itemCodeMode', val as 'manual' | 'auto' | 'prefix_auto')}
@@ -342,7 +348,6 @@ export default function EmpresaConfig() {
                       <SelectItem value="auto">Automático</SelectItem>
                       <SelectItem value="prefix_auto">Por prefijo de categoría</SelectItem>
                     </Select>
-                    <p className="ff-hint">Define cómo se asigna el código a nuevos artículos</p>
                     {itemCodeWarning && (
                       <div className="inline-alert inline-alert-warn" style={{ marginTop: 8 }}>
                         ⚠️ Este cambio es irreversible. Los artículos existentes mantendrán su código actual, pero los nuevos se generarán automáticamente.
@@ -351,7 +356,10 @@ export default function EmpresaConfig() {
                     )}
                   </div>
                   <div className="ff-wrap">
-                    <label className="ff-label">Almacén por defecto</label>
+                    <label className="ff-label">
+                      Almacén por defecto
+                      <FieldTooltip>Se usará al crear documentos si el usuario no tiene almacén asignado</FieldTooltip>
+                    </label>
                     <SearchSelect
                       value={form.defaultWarehouse ?? ''}
                       onChange={(val) => set('defaultWarehouse', val || undefined)}
@@ -360,7 +368,6 @@ export default function EmpresaConfig() {
                       selectedLabel={(warehouses ?? []).find((w) => w.id === form.defaultWarehouse)?.name ?? ''}
                       placeholder="Sin predeterminado"
                     />
-                    <p className="ff-hint">Se usará al crear documentos si el usuario no tiene almacén asignado</p>
                   </div>
                   <div className="ff-wrap">
                     <label className="ff-label">Almacén de Tránsito</label>
@@ -382,7 +389,10 @@ export default function EmpresaConfig() {
                     )}
                   </div>
                   <div className="ff-wrap">
-                    <label className="ff-label">Nivel de precio por defecto</label>
+                    <label className="ff-label">
+                      Nivel de precio por defecto
+                      <FieldTooltip>Nivel de precio sugerido para nuevos documentos</FieldTooltip>
+                    </label>
                     <Select
                       value={form.defaultPriceTipo ?? ''}
                       onValueChange={(val) => set('defaultPriceTipo', (val || undefined) as 'A' | 'B' | 'C' | undefined)}
@@ -393,7 +403,6 @@ export default function EmpresaConfig() {
                       <SelectItem value="B">B — Medio mayoreo</SelectItem>
                       <SelectItem value="C">C — Mayorista</SelectItem>
                     </Select>
-                    <p className="ff-hint">Nivel de precio sugerido para nuevos documentos</p>
                   </div>
                 </div>
               </div>
@@ -472,7 +481,10 @@ export default function EmpresaConfig() {
               </div>
               <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="defaultReceivableAccount">Cuentas por Cobrar (AR)</label>
+                  <label className="ff-label" htmlFor="defaultReceivableAccount">
+                    Cuentas por Cobrar (AR)
+                    <FieldTooltip>Para facturas emitidas a clientes</FieldTooltip>
+                  </label>
                   <AccountSelect
                     id="defaultReceivableAccount"
                     value={defaultReceivableAccount}
@@ -480,11 +492,13 @@ export default function EmpresaConfig() {
                     placeholder="Buscar cuenta…"
                     ledgerOnly={true}
                   />
-                  <p className="ff-hint">Para facturas emitidas a clientes</p>
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="defaultPayableAccount">Cuentas por Pagar (AP)</label>
+                  <label className="ff-label" htmlFor="defaultPayableAccount">
+                    Cuentas por Pagar (AP)
+                    <FieldTooltip>Para facturas de proveedores</FieldTooltip>
+                  </label>
                   <AccountSelect
                     id="defaultPayableAccount"
                     value={defaultPayableAccount}
@@ -492,11 +506,13 @@ export default function EmpresaConfig() {
                     placeholder="Buscar cuenta…"
                     ledgerOnly={true}
                   />
-                  <p className="ff-hint">Para facturas de proveedores</p>
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="defaultIncomeAccount">Ingresos por Defecto</label>
+                  <label className="ff-label" htmlFor="defaultIncomeAccount">
+                    Ingresos por Defecto
+                    <FieldTooltip>Si el artículo no tiene cuenta de ingreso</FieldTooltip>
+                  </label>
                   <AccountSelect
                     id="defaultIncomeAccount"
                     value={defaultIncomeAccount}
@@ -505,11 +521,13 @@ export default function EmpresaConfig() {
                     rootType="Income"
                     ledgerOnly={true}
                   />
-                  <p className="ff-hint">Si el artículo no tiene cuenta de ingreso</p>
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="defaultExpenseAccount">Gastos por Defecto</label>
+                  <label className="ff-label" htmlFor="defaultExpenseAccount">
+                    Gastos por Defecto
+                    <FieldTooltip>Si el artículo no tiene cuenta de gasto</FieldTooltip>
+                  </label>
                   <AccountSelect
                     id="defaultExpenseAccount"
                     value={defaultExpenseAccount}
@@ -518,11 +536,13 @@ export default function EmpresaConfig() {
                     rootType="Expense"
                     ledgerOnly={true}
                   />
-                  <p className="ff-hint">Si el artículo no tiene cuenta de gasto</p>
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="defaultBankAccount">Banco Principal</label>
+                  <label className="ff-label" htmlFor="defaultBankAccount">
+                    Banco Principal
+                    <FieldTooltip>Para cobros y pagos sin cuenta específica</FieldTooltip>
+                  </label>
                   <AccountSelect
                     id="defaultBankAccount"
                     value={defaultBankAccount}
@@ -530,11 +550,13 @@ export default function EmpresaConfig() {
                     placeholder="Buscar cuenta…"
                     ledgerOnly={true}
                   />
-                  <p className="ff-hint">Para cobros y pagos sin cuenta específica</p>
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="writeOffAccount">Cuenta de Descuentos</label>
+                  <label className="ff-label" htmlFor="writeOffAccount">
+                    Cuenta de Descuentos
+                    <FieldTooltip>Ajustes de diferencias al cerrar facturas</FieldTooltip>
+                  </label>
                   <AccountSelect
                     id="writeOffAccount"
                     value={writeOffAccount}
@@ -542,11 +564,13 @@ export default function EmpresaConfig() {
                     placeholder="Buscar cuenta…"
                     ledgerOnly={true}
                   />
-                  <p className="ff-hint">Ajustes de diferencias al cerrar facturas</p>
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="roundOffAccount">Cuenta de Redondeos</label>
+                  <label className="ff-label" htmlFor="roundOffAccount">
+                    Cuenta de Redondeos
+                    <FieldTooltip>Diferencias de centavos</FieldTooltip>
+                  </label>
                   <AccountSelect
                     id="roundOffAccount"
                     value={roundOffAccount}
@@ -554,7 +578,6 @@ export default function EmpresaConfig() {
                     placeholder="Buscar cuenta…"
                     ledgerOnly={true}
                   />
-                  <p className="ff-hint">Diferencias de centavos</p>
                 </div>
               </div>
             </div>
@@ -617,10 +640,10 @@ export default function EmpresaConfig() {
                         style={{ marginRight: 8 }}
                       />
                       Habilitar Inventario Perpetuo
+                      <FieldTooltip>
+                        Advertencia: una vez que existan movimientos de inventario, no será posible desactivar esta opción.
+                      </FieldTooltip>
                     </label>
-                    <p className="ff-hint">
-                      Advertencia: una vez que existan movimientos de inventario, no será posible desactivar esta opción.
-                    </p>
                   </div>
                 </div>
               </div>

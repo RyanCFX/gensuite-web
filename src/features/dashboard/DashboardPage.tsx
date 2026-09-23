@@ -478,17 +478,17 @@ export default function DashboardPage() {
                     const top3 = data.topProducts.slice(0, 3)
                     return (
                       <>
+                        <div className="top-bar">
+                          {data.topProducts.map((row, i) => (
+                            <span key={row.itemCode} className="top-bar-seg" data-rank={i + 1 <= 3 ? i + 1 : undefined} style={{ width: `${row.percentage}%` }} />
+                          ))}
+                        </div>
                         <div className="top-bar-shares">
                           {top3.map((row) => (
                             <span key={row.itemCode} className="top-bar-share" style={{ width: `${row.percentage}%` }}>
                               <ArrowUp size={10} aria-hidden="true" />
                               {row.percentage.toFixed(1)}%
                             </span>
-                          ))}
-                        </div>
-                        <div className="top-bar">
-                          {top3.map((row, i) => (
-                            <span key={row.itemCode} className="top-bar-seg" data-rank={i + 1} style={{ width: `${row.percentage}%` }} />
                           ))}
                         </div>
                       </>

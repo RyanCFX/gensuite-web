@@ -12,6 +12,7 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { Badge } from '@/shared/ui/Badge'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
@@ -268,7 +269,10 @@ export default function CajasPage() {
                   </div>
                 )}
                 <div className="ff-wrap">
-                  <label className="ff-label ff-required">Almacén</label>
+                  <label className="ff-label ff-required">
+                    Almacén
+                    <FieldTooltip>Almacén del que esta caja descuenta inventario.</FieldTooltip>
+                  </label>
                   <SearchSelect
                     value={form.warehouse}
                     onChange={(val) => setForm((f) => ({ ...f, warehouse: val }))}
@@ -277,10 +281,12 @@ export default function CajasPage() {
                     selectedLabel={warehousesData?.find((w) => w.id === form.warehouse)?.name ?? ''}
                     placeholder="Seleccionar almacén…"
                   />
-                  <p className="ff-hint">Almacén del que esta caja descuenta inventario.</p>
                 </div>
                 <div className="ff-wrap">
-                  <label className="ff-label">Sucursal</label>
+                  <label className="ff-label">
+                    Sucursal
+                    <FieldTooltip>Requerida solo si tu empresa tiene la dimensión "Sucursal" activada.</FieldTooltip>
+                  </label>
                   <SearchSelect
                     value={form.branch}
                     onChange={(val) => setForm((f) => ({ ...f, branch: val }))}
@@ -289,7 +295,6 @@ export default function CajasPage() {
                     selectedLabel={form.branch}
                     placeholder="Sin especificar"
                   />
-                  <p className="ff-hint">Requerida solo si tu empresa tiene la dimensión "Sucursal" activada.</p>
                 </div>
               </div>
               <div className="modal-foot">

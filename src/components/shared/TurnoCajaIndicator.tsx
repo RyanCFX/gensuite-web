@@ -12,6 +12,7 @@ import type { ApiError } from '@/shared/api/types'
 import { formatDateTime } from '@/lib/formatters'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { CerrarTurnoModal } from '@/components/shared/CerrarTurnoModal'
 
 export function TurnoCajaIndicator() {
@@ -151,11 +152,11 @@ export function TurnoCajaIndicator() {
               <div className="ff-wrap">
                 <label className="ff-label">
                   Monto de efectivo de apertura
+                  <FieldTooltip>
+                    Efectivo físico con el que se abre el turno. Se asociará
+                    automáticamente al método de pago de Caja configurado.
+                  </FieldTooltip>
                 </label>
-                <p className="ff-hint" style={{ marginTop: 4 }}>
-                  Efectivo físico con el que se abre el turno. Se asociará
-                  automáticamente al método de pago de Caja configurado.
-                </p>
                 <input
                   type="number"
                   min={0}

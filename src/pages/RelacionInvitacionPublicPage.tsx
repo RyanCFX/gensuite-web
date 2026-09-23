@@ -9,6 +9,7 @@ import {
   rechazarInvitacionRelacionPorToken,
 } from '@/shared/api/relaciones'
 import { formatDateTime } from '@/lib/formatters'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import type { InvitacionPublicaEstado, InvitacionPublicaResumen } from '@/shared/api/types'
 
 // Pantalla pública (sin login) que abre el link de correo de una invitación de Relación
@@ -226,7 +227,10 @@ export default function RelacionInvitacionPublicPage() {
           {accion === 'aceptar' && (
             <div className="auth-form">
               <div className="ff-wrap">
-                <label className="ff-label" htmlFor="email-aceptar">Tu correo (opcional)</label>
+                <label className="ff-label" htmlFor="email-aceptar">
+                  Tu correo (opcional)
+                  <FieldTooltip>Solo para que sepamos quién confirmó — no crea ninguna cuenta ni inicia sesión.</FieldTooltip>
+                </label>
                 <input
                   id="email-aceptar"
                   type="email"
@@ -236,8 +240,6 @@ export default function RelacionInvitacionPublicPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={submitting}
                 />
-                {/* Puramente informativo — nunca se usa como autenticación, ni el backend lo valida como tal. */}
-                <p className="ff-hint">Solo para que sepamos quién confirmó — no crea ninguna cuenta ni inicia sesión.</p>
               </div>
               <button type="button" className="btn btn-primary auth-submit" disabled={submitting} onClick={handleAceptar}>
                 {submitting ? <><span className="spinner" /> Aceptando…</> : 'Confirmar aceptación'}

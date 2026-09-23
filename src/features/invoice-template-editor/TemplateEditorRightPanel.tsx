@@ -4,6 +4,7 @@ import { AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, BringToFro
 import type { TemplateElement, TemplateFieldCategory, TextAlign, TextElement } from './types'
 import { CONDITION_OPERATOR_LABELS } from './constants'
 import { uploadPlantillaLogo } from '@/shared/api/plantillas'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 
 interface Props {
   element: TemplateElement | undefined
@@ -280,12 +281,14 @@ export function TemplateEditorRightPanel({
 
         {element.type === 'logo' && (
           <div className="ff-wrap">
-            <label className="ff-label">Imagen</label>
+            <label className="ff-label">
+              Imagen
+              <FieldTooltip>Se procesará a blanco y negro (1-bit) para impresión térmica.</FieldTooltip>
+            </label>
             <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} disabled={uploadingLogo} />
             <button type="button" className="btn btn-secondary btn-size-sm" disabled={uploadingLogo} onClick={() => fileInputRef.current?.click()}>
               <Upload size={14} /> {uploadingLogo ? 'Subiendo…' : element.src ? 'Reemplazar imagen…' : 'Subir imagen…'}
             </button>
-            <p className="ff-hint">Se procesará a blanco y negro (1-bit) para impresión térmica.</p>
           </div>
         )}
 

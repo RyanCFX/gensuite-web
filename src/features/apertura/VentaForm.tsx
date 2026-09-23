@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, AlertTriangle, Info } from 'lucide-react'
+import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { crearAperturaVenta } from '@/shared/api/apertura'
 import { listCustomers } from '@/shared/api/customers'
 import { listSucursales } from '@/shared/api/sucursales'
@@ -20,6 +20,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { Modal } from '@/shared/ui/Modal'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { formatMoney } from '@/lib/formatters'
 import { NCF_ORIGINAL_REGEX, TIPOS_NCF_DGII, today, usePreflightGate } from './lib'
 
@@ -210,7 +211,10 @@ export default function VentaForm() {
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="form-row form-row-3">
               <div className="ff-wrap">
-                <label className="ff-label ff-required">Cliente</label>
+                <label className="ff-label ff-required">
+                  Cliente
+                  <FieldTooltip>Si el cliente no existe, créalo primero en el módulo de Clientes.</FieldTooltip>
+                </label>
                 <SearchSelect
                   value={form.customerId}
                   selectedLabel={form.customerLabel}
@@ -222,7 +226,6 @@ export default function VentaForm() {
                   error={!!errors.customer}
                 />
                 {errors.customer && <span className="ff-error">{errors.customer}</span>}
-                <p className="ff-hint">Si el cliente no existe, créalo primero en el módulo de Clientes.</p>
               </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">N° de factura original</label>
@@ -257,14 +260,16 @@ export default function VentaForm() {
                 <DatePicker value={form.fechaFactura} onChange={(v) => setForm((f) => ({ ...f, fechaFactura: v }))} max={today()} />
               </div>
               <div className="ff-wrap">
-                <label className="ff-label">Fecha de vencimiento</label>
+                <label className="ff-label">
+                  Fecha de vencimiento
+                  <FieldTooltip>Si se omite, se usa la fecha de la factura.</FieldTooltip>
+                </label>
                 <DatePicker
                   value={form.fechaVencimiento}
                   onChange={(v) => setForm((f) => ({ ...f, fechaVencimiento: v }))}
                   min={form.fechaFactura}
                   clearable
                 />
-                <p className="ff-hint">Si se omite, se usa la fecha de la factura.</p>
               </div>
               {mostrarSucursal && (
                 <div className="ff-wrap">
@@ -284,7 +289,13 @@ export default function VentaForm() {
 
             <div className="form-row form-row-3" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16 }}>
               <div className="ff-wrap">
-                <label className="ff-label ff-required">Saldo pendiente</label>
+                <label className="ff-label ff-required">
+                  Saldo pendiente
+                  <FieldTooltip>
+                    Es el saldo que el cliente TODAVÍA debe — no el total original de la factura. Si ya pagó
+                    parte en el sistema anterior, anota el detalle en Descripción.
+                  </FieldTooltip>
+                </label>
                 <input
                   className="ff-input"
                   type="number"
@@ -294,11 +305,6 @@ export default function VentaForm() {
                   value={form.montoPendiente}
                   onChange={(e) => setForm((f) => ({ ...f, montoPendiente: e.target.value === '' ? '' : parseFloat(e.target.value) }))}
                 />
-                <p className="ff-hint" style={{ display: 'flex', gap: 4, alignItems: 'flex-start' }}>
-                  <Info size={12} style={{ flexShrink: 0, marginTop: 2 }} />
-                  Es el saldo que el cliente TODAVÍA debe — no el total original de la factura. Si ya pagó
-                  parte en el sistema anterior, anota el detalle en Descripción.
-                </p>
               </div>
               {multimonedaHabilitada && (
                 <div className="ff-wrap">
@@ -314,7 +320,10 @@ export default function VentaForm() {
               )}
               {mostrarTasaCambio && (
                 <div className="ff-wrap">
-                  <label className="ff-label ff-required">Tasa de cambio</label>
+                  <label className="ff-label ff-required">
+                    Tasa de cambio
+                    <FieldTooltip>No se asume ninguna tasa actual — usa la tasa que tenías en el sistema anterior.</FieldTooltip>
+                  </label>
                   <input
                     className="ff-input"
                     type="number"
@@ -324,7 +333,6 @@ export default function VentaForm() {
                     value={form.tasaCambio}
                     onChange={(e) => setForm((f) => ({ ...f, tasaCambio: e.target.value === '' ? '' : parseFloat(e.target.value) }))}
                   />
-                  <p className="ff-hint">No se asume ninguna tasa actual — usa la tasa que tenías en el sistema anterior.</p>
                 </div>
               )}
               <div className="ff-wrap" style={{ gridColumn: multimonedaHabilitada ? undefined : 'span 2' }}>
@@ -346,7 +354,10 @@ export default function VentaForm() {
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="form-row form-row-3">
               <div className="ff-wrap">
-                <label className="ff-label">NCF original</label>
+                <label className="ff-label">
+                  NCF original
+                  <FieldTooltip>Dejalo vacío si la factura vieja no tenía NCF o si ya se declaró en el sistema anterior.</FieldTooltip>
+                </label>
                 <input
                   className={`ff-input${errors.ncfOriginal ? ' ff-input-error' : ''}`}
                   placeholder="Ej. B0100000123"
@@ -358,7 +369,6 @@ export default function VentaForm() {
                   }}
                 />
                 {errors.ncfOriginal && <span className="ff-error">{errors.ncfOriginal}</span>}
-                <p className="ff-hint">Dejalo vacío si la factura vieja no tenía NCF o si ya se declaró en el sistema anterior.</p>
               </div>
               <div className="ff-wrap" style={{ justifyContent: 'flex-end' }}>
                 <label className="ff-check-wrap" style={{ opacity: form.ncfOriginal ? 1 : 0.5 }}>
@@ -369,12 +379,14 @@ export default function VentaForm() {
                     disabled={!form.ncfOriginal}
                     onChange={(e) => setForm((f) => ({ ...f, reportarEnDgii: e.target.checked }))}
                   />
-                  <span className="ff-label">Reportar en la DGII (607)</span>
+                  <span className="ff-label">
+                    Reportar en la DGII (607)
+                    <FieldTooltip>
+                      Marca esto solo si esta factura vieja TODAVÍA no se declaró — se incluirá en el 607 del
+                      mes de la fecha de la factura.
+                    </FieldTooltip>
+                  </span>
                 </label>
-                <p className="ff-hint">
-                  Marca esto solo si esta factura vieja TODAVÍA no se declaró — se incluirá en el 607 del
-                  mes de la fecha de la factura.
-                </p>
               </div>
             </div>
           </div>

@@ -13,9 +13,10 @@ import { TIPO_IDENTIFICACION } from '@/lib/constants'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { MultiSelectChecklist } from '@/shared/ui/MultiSelectChecklist'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
-import { CheckCircle2, XCircle } from 'lucide-react'
+import { CheckCircle2, XCircle, Save, Loader2 } from 'lucide-react'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 
 
@@ -445,7 +446,10 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
 
               <div className="form-row">
                 <div className="ff-wrap">
-                  <label className="ff-label">Grupo de Proveedor</label>
+                  <label className="ff-label">
+                    Grupo de Proveedor
+                    <FieldTooltip>Categoría organizativa del proveedor</FieldTooltip>
+                  </label>
                   <Controller
                     name="supplierGroup"
                     control={control}
@@ -460,7 +464,6 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                       />
                     )}
                   />
-                  <p className="ff-hint">Categoría organizativa del proveedor</p>
                 </div>
               </div>
             </div>
@@ -645,7 +648,13 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                 />
               </div>
               <div className="ff-wrap">
-                <label className="ff-label">Moneda por Defecto</label>
+                <label className="ff-label">
+                  Moneda por Defecto
+                  <FieldTooltip>
+                    Prellena la moneda al pagarle a este proveedor. Al fijarla, se autopobla su cuenta CxP en esa
+                    moneda (salvo que elijas una "Cuenta CxP Alterna" explícita abajo).
+                  </FieldTooltip>
+                </label>
                 <Controller
                   name="defaultCurrency"
                   control={control}
@@ -660,13 +669,15 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                     </Select>
                   )}
                 />
-                <p className="ff-hint">
-                  Prellena la moneda al pagarle a este proveedor. Al fijarla, se autopobla su cuenta CxP en esa
-                  moneda (salvo que elijas una "Cuenta CxP Alterna" explícita abajo).
-                </p>
               </div>
               <div className="ff-wrap">
-                <label className="ff-label">Cuenta CxP Alterna</label>
+                <label className="ff-label">
+                  Cuenta CxP Alterna
+                  <FieldTooltip>
+                    Si se configura, las compras a este proveedor afectan esta cuenta en vez de la cuenta CxP
+                    default de la empresa. Dejar vacío para usar el default.
+                  </FieldTooltip>
+                </label>
                 <Controller
                   name="cuentaCxpDefault"
                   control={control}
@@ -679,13 +690,15 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                     />
                   )}
                 />
-                <p className="ff-hint">
-                  Si se configura, las compras a este proveedor afectan esta cuenta en vez de la cuenta CxP
-                  default de la empresa. Dejar vacío para usar el default.
-                </p>
               </div>
               <div className="ff-wrap">
-                <label className="ff-label">Impuestos del Documento</label>
+                <label className="ff-label">
+                  Impuestos del Documento
+                  <FieldTooltip>
+                    Purchase Taxes and Charges Templates aplicados al total de la compra si no se elige ninguno
+                    explícito — si eliges varios, sus líneas de impuesto se combinan en el mismo documento.
+                  </FieldTooltip>
+                </label>
                 <Controller
                   name="impuestoComprasDefault"
                   control={control}
@@ -701,10 +714,6 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                     />
                   )}
                 />
-                <p className="ff-hint">
-                  Purchase Taxes and Charges Templates aplicados al total de la compra si no se elige ninguno
-                  explícito — si eliges varios, sus líneas de impuesto se combinan en el mismo documento.
-                </p>
               </div>
             </div>
           </div>
@@ -722,7 +731,10 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
             </p>
             <div className="form-section">
               <div className="ff-wrap">
-                <label className="ff-label">Impuestos del Documento</label>
+                <label className="ff-label">
+                  Impuestos del Documento
+                  <FieldTooltip>Mismo catálogo de templates que Compras, aplicado a Gastos en su lugar — puedes elegir varios.</FieldTooltip>
+                </label>
                 <Controller
                   name="impuestoGastosDefault"
                   control={control}
@@ -738,10 +750,16 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                     />
                   )}
                 />
-                <p className="ff-hint">Mismo catálogo de templates que Compras, aplicado a Gastos en su lugar — puedes elegir varios.</p>
               </div>
               <div className="ff-wrap">
-                <label className="ff-label">Retenciones por Defecto</label>
+                <label className="ff-label">
+                  Retenciones por Defecto
+                  <FieldTooltip>
+                    Estas retenciones se aplican por defecto al registrar un Gasto a este proveedor (el BFF
+                    calcula el monto correspondiente a partir de la tasa de cada una). La retención no
+                    corresponde a compra de bienes según las reglas fiscales RD, por eso no aplica en Compras.
+                  </FieldTooltip>
+                </label>
                 <Controller
                   name="retencionesDefault"
                   control={control}
@@ -757,11 +775,6 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                     />
                   )}
                 />
-                <p className="ff-hint">
-                  Estas retenciones se aplican por defecto al registrar un Gasto a este proveedor (el BFF
-                  calcula el monto correspondiente a partir de la tasa de cada una). La retención no
-                  corresponde a compra de bienes según las reglas fiscales RD, por eso no aplica en Compras.
-                </p>
               </div>
             </div>
           </div>
@@ -769,12 +782,15 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
       </div>
 
       {/* ════════════════ BOTONES (ancho completo) ════════════════ */}
-      <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+      <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+        <button type="button" className="btn btn-ghost" onClick={onCancel}>
           Cancelar
         </button>
-        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-          {isSubmitting ? 'Guardando…' : isEdit ? 'Guardar Cambios' : 'Crear Proveedor'}
+        <button type="submit" className="btn btn-navy" disabled={isSubmitting}>
+          {isSubmitting
+            ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+            : <Save size={15} />}
+          {isEdit ? 'Guardar Cambios' : 'Crear Proveedor'}
         </button>
       </div>
     </form>

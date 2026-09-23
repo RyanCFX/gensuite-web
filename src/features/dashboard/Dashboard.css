@@ -24,18 +24,18 @@
   --dash-track-bg:       #F1F5F9;
   --dash-skeleton-shine: #E9EDF1;
 
-  --dash-ink-900:    #0F172A;
+  --dash-ink-900:    #0E3D51;
   --dash-ink-800:    #1E293B;
   --dash-ink-700:    #334155;
   --dash-ink-600:    #475569;
   --dash-ink-500:    #64748B;
-  --dash-ink-400:    #94A3B8;
+  --dash-ink-400:    #5A6A85;
   --dash-border:     #E2E8F0; /* slate-200 — más contraste que el slate-100 original */
   --dash-border-2:   #CBD5E1; /* slate-300 */
   --dash-shadow:     0 1px 2px 0 rgb(15 23 42 / 0.02);
   --dash-chip-bg:    color-mix(in oklch, var(--dash-teal) 10%, var(--dash-card-bg));
 
-  font-family: 'Inter', var(--font-body), sans-serif;
+  font-family: 'DM Sans', var(--font-body), sans-serif;
   background: var(--dash-page-bg);
   padding: 24px;
   display: flex;
@@ -81,6 +81,11 @@
   justify-content: space-between;
   gap: 24px;
   flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--dash-page-bg);
+  /*padding-bottom: 16px;*/
 }
 
 .dashboard-greeting { display: flex; flex-direction: column; gap: 2px; }
@@ -115,7 +120,7 @@
   flex-shrink: 0;
 }
 
-.dashboard-subtitle { font-size: 12px; color: var(--dash-ink-400); margin-top: 3px; }
+.dashboard-subtitle { display: none; }
 
 .period-pills {
   display: inline-flex;
@@ -168,7 +173,7 @@
 @starting-style { .kpi-card { opacity: 0; transform: translateY(14px) scale(0.98); } }
 @keyframes card-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: none; } }
 
-.kpi-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.kpi-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 
 .kpi-icon {
   display: inline-flex;
@@ -182,8 +187,7 @@
   line-height: 0;
 }
 
-.kpi-label { font-size: 11px; font-weight: 700; letter-spacing: 0.025em; text-transform: uppercase; color: var(--dash-teal); }
-
+.kpi-label { font-size: 12px; font-weight: 700; letter-spacing: 0.025em; text-transform: uppercase; color: var(--dash-teal); }
 .kpi-value { font-size: 20px; font-weight: 700; letter-spacing: -0.015em; color: var(--dash-ink-900); line-height: 1.2; }
 .kpi-value[data-colored='success'] { color: var(--dash-emerald); }
 .kpi-value[data-colored='error']   { color: var(--dash-rose); }
@@ -235,8 +239,8 @@
 
 .chart-icon-sm { width: 32px; height: 32px; border-radius: 8px; }
 
-.card-title-dash { font-size: 14px; font-weight: 700; color: var(--dash-ink-800); line-height: 1.3; }
-.chart-subtitle { font-size: 11px; color: var(--dash-ink-400); margin-top: 1px; }
+.card-title-dash { font-size: 14px; font-weight: 700; color: var(--dash-ink-800); line-height: 1.3; text-transform: uppercase; }
+.chart-subtitle { font-size: 12px; color: var(--dash-ink-400); }
 
 .chart-legend { display: flex; align-items: center; gap: 16px; }
 .chart-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--dash-ink-500); }
@@ -261,7 +265,7 @@
 .btn-dash-dark:hover { background: #0D2D34; }
 
 .btn-dash-primary { padding: 6px 12px; font-size: 12px; }
-.btn-dash-dark { padding: 4px 10px; font-size: 11px; font-weight: 500; border-radius: 6px; }
+.btn-dash-dark { padding: 6px 12px; font-size: 12px;  border-radius: 6px; }
 
 .chart-plot-wrap { margin-top: 24px; }
 
@@ -272,8 +276,8 @@
 .ig-summary-value { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; color: var(--dash-ink-900); line-height: 1.2; }
 .ig-summary-label { font-size: 11px; color: var(--dash-ink-400); margin-top: 2px; }
 .ig-summary-row { padding-left: 10px; border-left: 2px solid var(--dash-border-2); }
-.ig-summary-row[data-tone='success'] { border-color: var(--dash-emerald); }
-.ig-summary-row[data-tone='dark']    { border-color: var(--dash-ink-700); }
+.ig-summary-row[data-tone='success'] { border-color: #84CDBA; }
+.ig-summary-row[data-tone='dark']    { border-color: #208591; }
 .ig-summary-row-label { font-size: 10px; color: var(--dash-ink-400); }
 .ig-summary-row-value { font-size: 14px; font-weight: 700; color: var(--dash-ink-800); letter-spacing: -0.01em; }
 
@@ -328,19 +332,20 @@
   flex-direction: column;
 }
 
-.list-card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.list-card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
 .list-card-heading { display: flex; align-items: center; gap: 10px; }
-.card-title-sm { font-size: 12px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--dash-ink-800); }
+.card-title-sm { font-size: 14px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--dash-ink-800); }
 
 /* Top Productos — barra proporcional real (top-3), sin deltas inventados */
 .top-bar-shares { display: flex; gap: 2px; margin-bottom: 6px; padding: 0 2px; }
 .top-bar-share { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 700; color: var(--dash-emerald); white-space: nowrap; flex-shrink: 0; }
-.top-bar { display: flex; align-items: center; gap: 2px; width: 100%; height: 20px; border-radius: 8px; background: var(--dash-track-bg); overflow: hidden; padding: 2px; }
-.top-bar-seg { display: block; height: 100%; border-radius: 6px; transition: width 480ms var(--ease-out); background: var(--dash-seg-1); }
+.top-bar { display: flex; align-items: center; gap: 2px; width: 100%; height: 36px; border-radius: 8px; background: var(--dash-track-bg); overflow: hidden; padding: 2px; }
+.top-bar-seg { display: block; height: 100%; border-radius: 6px; transition: width 480ms var(--ease-out); background: var(--dash-border-2); flex-shrink: 0; }
+.top-bar-seg[data-rank='1'] { background: var(--dash-seg-1); }
 .top-bar-seg[data-rank='2'] { background: var(--dash-seg-2); }
 .top-bar-seg[data-rank='3'] { background: var(--dash-seg-3); }
 
-.list-card-rows { display: flex; flex-direction: column; margin-top: 16px; }
+.list-card-rows { display: flex; flex-direction: column; margin-top: 3px; }
 
 .list-row {
   display: flex;
@@ -483,7 +488,7 @@
   .kpi-label { font-size: 14px; }
   .kpi-value { font-size: 30px; }
   .kpi-caption { font-size: 14px; }
-  .dashboard-subtitle { font-size: 15px; }
+ .dashboard-subtitle { display: none; }
   .card-title-dash { font-size: 19px; }
   .card-title-sm { font-size: 15px; }
   .chart-subtitle { font-size: 14px; }

@@ -57,7 +57,13 @@ function Select({ value, onValueChange, placeholder, children, disabled, classNa
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span style={{ color: value ? undefined : 'var(--text-tertiary, hsl(var(--muted-foreground)))', flex: 1, textAlign: 'left' }}>
+        <span
+          style={
+            value
+              ? { flex: 1, textAlign: 'left' }
+              : { color: '#5A6A85', fontSize: 14, fontWeight: 400, flex: 1, textAlign: 'left' }
+          }
+        >
           {selectedLabel}
         </span>
         {!showClear && (

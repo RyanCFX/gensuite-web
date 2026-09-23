@@ -42,8 +42,10 @@ export default function CustomerForm() {
       </button>
 
       <PageHeader
-        title={isEdit ? 'Editar Cliente' : 'Nuevo Cliente'}
-        action={<RecargarButton label="Actualizar" />}
+        title={<><span className="page-title-dot" />{isEdit ? 'Editar Cliente' : 'Nuevo Cliente'}</>}
+        description={isEdit ? 'Modifica los datos del cliente' : 'Registra un nuevo cliente en el catálogo'}
+        overline="Ventas"
+        action={isEdit ? <RecargarButton label="Actualizar" /> : undefined}
       />
 
       <CustomerFormPanel

@@ -13,6 +13,7 @@ import type { ApiError, Usuario, InviteUsuarioDto, UpdateUsuarioDto, MembershipS
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ConfirmModal } from '@/shared/ui/Modal'
+import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
@@ -589,15 +590,18 @@ export default function UsuariosPage() {
 
                 {isSystemManager ? (
                   <div className="ff-wrap">
-                    <label className="ff-label">Sucursales asignadas</label>
-                    <p className="ff-hint" style={{ color: 'var(--color-brand)' }}>
-                      Este usuario tiene acceso a todas las sucursales (rol System Manager). No es necesario asignarle sucursales explícitas.
-                    </p>
+                    <label className="ff-label">
+                      Sucursales asignadas
+                      <FieldTooltip>Este usuario tiene acceso a todas las sucursales (rol System Manager). No es necesario asignarle sucursales explícitas.</FieldTooltip>
+                    </label>
                   </div>
                 ) : (
                   <>
                     <div className="ff-wrap">
-                      <label className="ff-label">Sucursales asignadas</label>
+                      <label className="ff-label">
+                        Sucursales asignadas
+                        <FieldTooltip>El usuario solo podrá crear documentos desde estas sucursales.</FieldTooltip>
+                      </label>
                       <div style={{
                         display: 'grid',
                         gridTemplateColumns: '1fr 1fr',
@@ -632,7 +636,6 @@ export default function UsuariosPage() {
                           ))
                         )}
                       </div>
-                      <p className="ff-hint">El usuario solo podrá crear documentos desde estas sucursales.</p>
                     </div>
 
                     <div className="ff-wrap">
@@ -652,7 +655,10 @@ export default function UsuariosPage() {
                 )}
 
                 <div className="ff-wrap">
-                  <label className="ff-label">Caja por defecto</label>
+                  <label className="ff-label">
+                    Caja por defecto
+                    <FieldTooltip>Se preseleccionará al abrir turno de caja.</FieldTooltip>
+                  </label>
                   <SearchSelect
                     value={defaultPosProfile}
                     onChange={setDefaultPosProfile}
@@ -663,7 +669,6 @@ export default function UsuariosPage() {
                     selectedLabel={cajasHabilitadas.find((c) => c.id === defaultPosProfile)?.label ?? ''}
                     placeholder="Sin caja por defecto"
                   />
-                  <p className="ff-hint">Se preseleccionará al abrir turno de caja.</p>
                 </div>
 
                 {almacenesPermitidos && almacenesPermitidos.warehouses.length > 0 && (
