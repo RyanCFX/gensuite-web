@@ -19,6 +19,7 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { QtyInput } from '@/shared/ui/QtyInput'
 import type { CreateInvoiceFromOrdenDto, ReceiptFromOrdenItemOverrideDto } from '@/shared/api/types'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | 'cerrar' | 'reabrir' | 'enEspera' | null
 
@@ -146,7 +147,21 @@ export default function OrdenDetail() {
       setShowRecibir(false)
       navigate(`/compras/recepciones/${receipt.id}`)
     },
-    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al recibir la mercancía'),
+    onError: (err) => {
+      if (isApiErrorCode(err, ERROR_CODES.ALMACEN_COMPRA_NO_CONFIGURADO)) {
+        toast.error(
+          err.message || 'Configura el almacén de compras en la sucursal o en el proveedor antes de continuar',
+          {
+            duration: 10000,
+            action: orden?.supplier
+              ? { label: 'Ver proveedor', onClick: () => navigate(`/proveedores/${orden.supplier}/editar`) }
+              : { label: 'Ver sucursales', onClick: () => navigate('/config/sucursales') },
+          },
+        )
+        return
+      }
+      toast.error((err as { message?: string })?.message ?? 'Error al recibir la mercancía')
+    },
   })
 
   const facturarMutation = useMutation({

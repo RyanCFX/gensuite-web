@@ -713,10 +713,17 @@ button {
 .nav-float-panel .nav-child.active { color: var(--text-brand); }
 
 /* ─── MAIN CONTENT ─── */
+/* Mismo patrón que .sidebar: alto explícito + sticky, no solo overflow-y:auto — con
+   .app-shell en min-height:100vh (no height fija), sin esto el grid crece con el contenido
+   y termina scrolleando la página completa en vez de solo este panel, arrastrando el TabBar
+   (que vive dentro de .main) por debajo del header sticky. */
 .main {
   grid-area: main;
   overflow-y: auto;
   background: var(--surface-app);
+  position: sticky;
+  top: var(--navbar-height);
+  height: calc(100vh - var(--navbar-height));
 }
 
 .main-inner {
@@ -2154,6 +2161,33 @@ button {
 .item-image-upload img { width: 100%; height: 100%; object-fit: cover; border-radius: calc(var(--radius-lg) - 1px); }
 .item-image-upload .item-image-upload-icon { color: var(--teal-accent); }
 .item-image-upload .item-image-upload-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+
+/* ─── Logo upload box (EmpresaConfig) — igual a .item-image-upload pero más ancho y con
+   object-fit: contain (el logo se imprime en PDF tal cual, no debe recortarse) ─── */
+.logo-upload-box {
+  width: 220px;
+  height: 120px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-page);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  overflow: hidden;
+  padding: 8px;
+  text-align: center;
+  transition: border-color 150ms var(--ease-in-out), background-color 150ms var(--ease-in-out);
+}
+
+.logo-upload-box:hover { border-color: var(--teal-accent); background: var(--surface-sunken); }
+.logo-upload-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.logo-upload-box .logo-upload-box-icon { color: var(--teal-accent); }
+.logo-upload-box .logo-upload-box-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
 
 /* ─── Pill "+" — disparadores de secciones opcionales (Variantes, Garantía, Códigos) ─── */
 .pill-plus-trigger {

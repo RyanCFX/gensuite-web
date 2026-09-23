@@ -3,7 +3,7 @@
 // 3 zonas (lo que envió el socio / mi documento / diferencias) + acciones según estado. El texto
 // del socio (payloadSnapshot) es contenido AJENO de otra empresa: se renderiza siempre vía `{}`
 // (React escapa por defecto) — jamás dangerouslySetInnerHTML en esta pantalla.
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -13,10 +13,12 @@ import {
   getMapeoTransaccion, refrescarMapeoTransaccion, confirmarMapeoTransaccion, crearArticuloDesdeSocio,
   aceptarTransaccionB2B, rechazarTransaccionB2B,
   getDiffTransaccion, igualarBorradorTransaccion, igualarConEnmiendaTransaccion,
-  getCandidatosEnlaceTransaccion, enlazarTransaccionB2B,
+  getCandidatosEnlaceTransaccion, enlazarTransaccionB2B, getRelacionComercial,
 } from '@/shared/api/relaciones'
 import { getCompra } from '@/shared/api/compras-gastos'
 import { getInvoice } from '@/shared/api/invoices'
+import { getSupplier } from '@/shared/api/suppliers'
+import { getCatalogosFiscales } from '@/shared/api/config'
 import type {
   ApiError, Compra, Invoice, DecisionMapeoDto, DocumentoEnlazable, CrearArticuloDesdeSocioDto,
   EnlazarTransaccionResponse,
@@ -25,6 +27,8 @@ import { Badge } from '@/shared/ui/Badge'
 import { Modal, ConfirmModal } from '@/shared/ui/Modal'
 import { FilterField } from '@/shared/ui/FilterField'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { SearchSelect } from '@/shared/ui/SearchSelect'
+import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { MapeoForm } from './components/MapeoForm'
 import { DiffView } from './components/DiffView'
 import { usePuede } from '@/shared/permissions/can'
@@ -77,7 +81,9 @@ export default function TransaccionDetail() {
   const mostrarRechazar = !!transaccion && necesitaAccion && puedeRechazar
   const mostrarEnlazar = !!transaccion && necesitaAccion && esEntrante &&
     ((transaccion.tipo === 'Compra' && puedeEnlazarCompra) || (transaccion.tipo === 'Venta' && puedeEnlazarVenta))
-  const mostrarReintentar = !!transaccion && transaccion.estado === 'Error' && puedeReenviar
+  const mostrarReintentar = !!transaccion &&
+    (transaccion.estado === 'Error' || transaccion.estado === 'Requiere Configuración') &&
+    puedeReenviar
   const mostrarCancelar = !!transaccion && transaccion.estado === 'Pendiente de entrega' && puedeReenviar
   // Informativo puro para el lado Saliente — sin formulario, sin botones de mapeo.
   const mostrarEsperandoContraparte = !!transaccion && necesitaAccion && !esEntrante
@@ -119,6 +125,87 @@ export default function TransaccionDetail() {
     onError: (err: ApiError) => toast.error(err.message ?? 'Error al crear el artículo'),
   })
 
+  // ─── Mi documento local (para saber si sigue en Borrador o ya está Sometido) ───────────────
+  // Verificado contra un caso real: el backend puede devolver este campo como id plano o como
+  // `{ doctype, name }` — normalizar siempre acá, nunca asumir que es un string ni renderizarlo
+  // directo (React tira "Objects are not valid as a React child" si se le pasa el objeto).
+  const documentoLocalId = typeof transaccion?.documentoLocal === 'string'
+    ? transaccion.documentoLocal
+    : (transaccion?.documentoLocal?.name ?? null)
+  // `tipo` describe el TRATO (quién compró/vendió originalmente), no necesariamente el doctype
+  // del documento de ESTE lado — verificado con un caso real: `direccion:"Entrante"` +
+  // `tipo:"Compra"` con `documentoLocal.doctype: "Sales Invoice"` (el emisor recibe la compra del
+  // socio y factura como venta). Cuando el backend manda el doctype, es la fuente de verdad; el
+  // fallback a `tipo` queda solo para el shape viejo (string plano, sin doctype).
+  const documentoLocalDoctype = transaccion?.documentoLocal && typeof transaccion.documentoLocal === 'object'
+    ? transaccion.documentoLocal.doctype
+    : undefined
+  const documentoLocalEsVenta = documentoLocalDoctype
+    ? documentoLocalDoctype === 'Sales Invoice'
+    : transaccion?.tipo === 'Venta'
+
+  // ─── Clasificación 606 (solo cuando el documento local es una Compra) — el backend resuelve un
+  // default (relación → Supplier espejo del socio) al someter, pero acá se precarga y se deja
+  // editable para poder corregirlo antes de aceptar, igual que en CompraForm. Se manda en el body
+  // de aceptar() como override puntual: `respuesta.dto.ts` (backend) documenta
+  // `tipoBienes606`/`formaPago606` opcionales que patchean el borrador antes del submit.
+  //
+  // OJO — `transaccion.tipo` describe el TRATO, no el doctype de ESTE lado (ver comentario arriba
+  // de `documentoLocalEsVenta`): una transacción con `tipo:"Venta"` puede tener como documento
+  // local una Purchase Invoice (verificado contra un caso real, transacción
+  // 2e7609ee-ba39-4904-b529-7a032091e25d). La clasificación 606 es un campo de Compras, así que
+  // el gate correcto es "mi documento local es una Compra", nunca `transaccion.tipo`. ───────────
+  const esCompraEntrante = !!transaccion && esEntrante && !!documentoLocalId && !documentoLocalEsVenta
+
+  const relacionQuery = useQuery({
+    queryKey: ['relacion-comercial', transaccion?.relacionUid],
+    queryFn: () => getRelacionComercial(transaccion!.relacionUid),
+    enabled: esCompraEntrante && necesitaAccion,
+  })
+
+  const proveedorEspejoId = relacionQuery.data?.supplier ?? undefined
+  const proveedorEspejoQuery = useQuery({
+    queryKey: ['supplier', proveedorEspejoId],
+    queryFn: () => getSupplier(proveedorEspejoId!),
+    enabled: !!proveedorEspejoId,
+  })
+
+  const { data: catalogosFiscales } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+    enabled: esCompraEntrante && necesitaAccion,
+  })
+
+  const [tipoBienes606, setTipoBienes606] = useState('')
+  const [formaPago606, setFormaPago606] = useState('')
+  const [tipoBienes606Touched, setTipoBienes606Touched] = useState(false)
+  const [formaPago606Touched, setFormaPago606Touched] = useState(false)
+  const [tipoBienes606Search, setTipoBienes606Search] = useState('')
+  const [formaPago606Search, setFormaPago606Search] = useState('')
+
+  // Prioridad: override de la relación > default del proveedor espejo. Nunca pisa lo que el
+  // usuario ya haya tocado.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!tipoBienes606Touched) {
+      const val = relacionQuery.data?.configuracion?.tipoBienes606 ?? proveedorEspejoQuery.data?.defaultTipoBienes606
+      if (val) setTipoBienes606(val)
+    }
+    if (!formaPago606Touched) {
+      const val = relacionQuery.data?.configuracion?.formaPago606 ?? proveedorEspejoQuery.data?.defaultFormaPago606
+      if (val) setFormaPago606(val)
+    }
+  }, [relacionQuery.data, proveedorEspejoQuery.data, tipoBienes606Touched, formaPago606Touched])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const tipoBienes606Options: SearchSelectOption[] = (catalogosFiscales?.tipoBienes606 ?? [])
+    .filter((t) => !tipoBienes606Search || t.label.toLowerCase().includes(tipoBienes606Search.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
+  const formaPago606Options: SearchSelectOption[] = (catalogosFiscales?.formaPago606 ?? [])
+    .filter((f) => !formaPago606Search || f.label.toLowerCase().includes(formaPago606Search.toLowerCase()))
+    .map((f) => ({ value: f.value, label: f.label }))
+
   // ─── Aceptar ────────────────────────────────────────────────────────────────────────────────
   const [aceptarConfirmOpen, setAceptarConfirmOpen] = useState(false)
   const [aceptarError, setAceptarError] = useState<string | null>(null)
@@ -146,6 +233,10 @@ export default function TransaccionDetail() {
         .filter((l) => l.estado === 'confirmada' && l.local)
         .map((l) => ({ indiceLinea: l.indice, itemCodeLocal: l.local!.itemCode })),
       sincronizarBarcodes: false,
+      ...(esCompraEntrante ? {
+        tipoBienes606: tipoBienes606 || undefined,
+        formaPago606: formaPago606 || undefined,
+      } : {}),
     }),
     onSuccess: () => {
       toast.success('Transacción aceptada y sometida.')
@@ -203,25 +294,6 @@ export default function TransaccionDetail() {
     },
     onError: (err: ApiError) => { toast.error(err.message ?? 'Error al cancelar el envío'); setCancelarOpen(false) },
   })
-
-  // ─── Mi documento local (para saber si sigue en Borrador o ya está Sometido) ───────────────
-  // Verificado contra un caso real: el backend puede devolver este campo como id plano o como
-  // `{ doctype, name }` — normalizar siempre acá, nunca asumir que es un string ni renderizarlo
-  // directo (React tira "Objects are not valid as a React child" si se le pasa el objeto).
-  const documentoLocalId = typeof transaccion?.documentoLocal === 'string'
-    ? transaccion.documentoLocal
-    : (transaccion?.documentoLocal?.name ?? null)
-  // `tipo` describe el TRATO (quién compró/vendió originalmente), no necesariamente el doctype
-  // del documento de ESTE lado — verificado con un caso real: `direccion:"Entrante"` +
-  // `tipo:"Compra"` con `documentoLocal.doctype: "Sales Invoice"` (el emisor recibe la compra del
-  // socio y factura como venta). Cuando el backend manda el doctype, es la fuente de verdad; el
-  // fallback a `tipo` queda solo para el shape viejo (string plano, sin doctype).
-  const documentoLocalDoctype = transaccion?.documentoLocal && typeof transaccion.documentoLocal === 'object'
-    ? transaccion.documentoLocal.doctype
-    : undefined
-  const documentoLocalEsVenta = documentoLocalDoctype
-    ? documentoLocalDoctype === 'Sales Invoice'
-    : transaccion?.tipo === 'Venta'
 
   const documentoLocalQuery = useQuery({
     queryKey: ['documento-local-transaccion', documentoLocalEsVenta, documentoLocalId],
@@ -566,6 +638,35 @@ export default function TransaccionDetail() {
                 puedeSincronizarBarcodes={puedeMapeoSincronizarBarcodes}
               />
             )}
+            {esCompraEntrante && (
+              <div className="form-row form-row-2" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16 }}>
+                <div className="ff-wrap">
+                  <label className="ff-label">Tipo de Bienes 606</label>
+                  <SearchSelect
+                    value={tipoBienes606}
+                    onChange={(v) => { setTipoBienes606(v); setTipoBienes606Touched(true) }}
+                    options={tipoBienes606Options}
+                    onSearch={setTipoBienes606Search}
+                    selectedLabel={catalogosFiscales?.tipoBienes606?.find((t) => t.value === tipoBienes606)?.label ?? tipoBienes606}
+                    placeholder="Seleccionar tipo"
+                  />
+                  <p className="ff-hint">
+                    Precargado del proveedor{relacionQuery.data?.configuracion?.tipoBienes606 ? '/la relación' : ''} si tiene default configurado — editable antes de aceptar.
+                  </p>
+                </div>
+                <div className="ff-wrap">
+                  <label className="ff-label">Forma de Pago 606</label>
+                  <SearchSelect
+                    value={formaPago606}
+                    onChange={(v) => { setFormaPago606(v); setFormaPago606Touched(true) }}
+                    options={formaPago606Options}
+                    onSearch={setFormaPago606Search}
+                    selectedLabel={catalogosFiscales?.formaPago606?.find((f) => f.value === formaPago606)?.label ?? formaPago606}
+                    placeholder="Seleccionar forma"
+                  />
+                </div>
+              </div>
+            )}
             <div>
               <button className="btn btn-primary" disabled={!mapeoQuery.data?.puedeAceptar} onClick={() => setAceptarConfirmOpen(true)}>
                 Aceptar
@@ -899,11 +1000,23 @@ function PayloadSnapshotView({ payload }: { payload: Record<string, unknown> }) 
     )
   }
 
-  const cabecera = Object.entries(documento).filter(([k]) => k !== 'lineas')
+  const cabecera = Object.entries(documento).filter(([k]) => k !== 'lineas' && k !== 'totales')
   const lineasArr = lineas as Record<string, unknown>[]
   const columnasSet = new Set<string>()
   lineasArr.forEach((l) => Object.keys(l).forEach((k) => columnasSet.add(k)))
-  const columnas = Array.from(columnasSet)
+  // "indice" es puramente el orden en el array del socio (no aporta nada, la tabla ya lo respeta
+  // visualmente), "barcodes"/"factorConversion" son datos técnicos de mapeo — ninguno le sirve al
+  // usuario en esta vista de solo lectura. "lote"/"vencimiento" solo tienen sentido para artículos
+  // que trackean lote/vencimiento — si ningún ítem trae valor, la columna solo mostraría rayitas.
+  const columnaTieneValor = (c: string) => lineasArr.some((l) => l[c] !== null && l[c] !== undefined && l[c] !== '')
+  const columnas = Array.from(columnasSet).filter((c) => {
+    if (c === 'indice' || c === 'barcodes' || c === 'factorConversion') return false
+    if (c === 'lote' || c === 'vencimiento') return columnaTieneValor(c)
+    return true
+  })
+  const totales = documento.totales as
+    | { subtotal?: number; descuentos?: number; impuestos?: number; total?: number }
+    | undefined
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -911,7 +1024,7 @@ function PayloadSnapshotView({ payload }: { payload: Record<string, unknown> }) 
         <div className="fields-grid">
           {cabecera.map(([k, v]) => (
             <div className="detail-field" key={k}>
-              <span className="detail-label">{k}</span>
+              <span className="detail-label">{formatSnapshotLabel(k)}</span>
               <span className="detail-value">{formatSnapshotValue(k, v)}</span>
             </div>
           ))}
@@ -921,20 +1034,100 @@ function PayloadSnapshotView({ payload }: { payload: Record<string, unknown> }) 
         <div className="table-scroll">
           <table className="data-table">
             <thead>
-              <tr>{columnas.map((c) => <th key={c}>{c}</th>)}</tr>
+              <tr>{columnas.map((c) => <th key={c}>{formatSnapshotLabel(c)}</th>)}</tr>
             </thead>
             <tbody>
               {lineasArr.map((l, i) => (
                 <tr key={i}>
-                  {columnas.map((c) => <td key={c}>{formatSnapshotValue(c, l[c])}</td>)}
+                  {columnas.map((c) => (
+                    <td key={c}>
+                      {c === 'impuestos' ? formatImpuestosLinea(l.impuestos, l.montoLinea) : formatSnapshotValue(c, l[c])}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+      {totales && (
+        <div className="items-total-row">
+          <div className="items-total-line">
+            <span>Subtotal bruto</span>
+            <span>{formatDOP(totales.subtotal ?? 0)}</span>
+          </div>
+          {!!totales.descuentos && totales.descuentos > 0 && (
+            <div className="items-total-line">
+              <span>Descuento total</span>
+              <span>-{formatDOP(totales.descuentos)}</span>
+            </div>
+          )}
+          <div className="items-total-line">
+            <span>Impuestos</span>
+            <span>{formatDOP(totales.impuestos ?? 0)}</span>
+          </div>
+          <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
+            <span>Total</span>
+            <span>{formatDOP(totales.total ?? 0)}</span>
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+// Etiquetas en español para las claves crudas del payloadSnapshot del socio (documento y líneas) —
+// nunca renderizar el nombre del campo del API directo, siempre a través de este mapa.
+const SNAPSHOT_FIELD_LABELS: Record<string, string> = {
+  doctype: 'Tipo de documento',
+  name: 'Documento',
+  fecha: 'Fecha',
+  fechaVencimiento: 'Vencimiento',
+  moneda: 'Moneda',
+  ncf: 'NCF',
+  tipoNcf: 'Tipo de NCF',
+  numeroFactura: 'Número de factura',
+  condicionPago: 'Condición de pago',
+  ordenCompraCliente: 'Orden de compra del cliente',
+  notas: 'Notas',
+  proveedor: 'Proveedor',
+  cliente: 'Cliente',
+  rnc: 'RNC',
+  // líneas
+  indice: '#',
+  itemCode: 'Código',
+  itemName: 'Artículo',
+  descripcion: 'Descripción',
+  barcodes: 'Códigos de barra',
+  uom: 'Unidad',
+  factorConversion: 'Factor de conversión',
+  cantidad: 'Cantidad',
+  precioUnitario: 'Precio unitario',
+  descuentoPct: 'Descuento %',
+  montoLinea: 'Monto',
+  impuestos: 'Impuestos',
+  lote: 'Lote',
+  vencimiento: 'Vencimiento',
+}
+
+function formatSnapshotLabel(key: string): string {
+  if (SNAPSHOT_FIELD_LABELS[key]) return SNAPSHOT_FIELD_LABELS[key]
+  // Fallback para una clave no mapeada: camelCase → "Palabras separadas", nunca el key crudo.
+  const espaciado = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase()
+  return espaciado.charAt(0).toUpperCase() + espaciado.slice(1)
+}
+
+// El socio manda `impuestos` como el catálogo aplicado a la línea (`[{ nombre, tasa }]`), no el
+// monto ya calculado — acá se calcula el monto real (tasa% de `montoLinea`, sumado si hay más de
+// un impuesto) para mostrar lo que el usuario espera ver, no el catálogo crudo.
+function formatImpuestosLinea(impuestos: unknown, montoLinea: unknown): string {
+  if (!Array.isArray(impuestos) || impuestos.length === 0) return '—'
+  const base = typeof montoLinea === 'number' ? montoLinea : 0
+  const monto = impuestos.reduce((sum: number, imp) => {
+    const tasa = typeof (imp as { tasa?: unknown })?.tasa === 'number' ? (imp as { tasa: number }).tasa : 0
+    return sum + (base * tasa) / 100
+  }, 0)
+  return formatDOP(monto)
 }
 
 function formatSnapshotValue(key: string, v: unknown): string {

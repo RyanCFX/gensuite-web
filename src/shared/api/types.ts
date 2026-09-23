@@ -458,6 +458,10 @@ export interface Supplier {
   defaultTipoBienes606?: string | null;
   defaultFormaPago606?: string | null;
   defaultTipoPagoProveedor?: "Contado" | "Crédito" | null;
+  /** Si se configura, las compras a este proveedor (incluidas las compras B2B recibidas de este
+   *  socio comercial) entran SIEMPRE a este almacén, sin importar la sucursal — gana sobre
+   *  `Sucursal.almacenCompra`. `null`/ausente = se resuelve por la sucursal de la compra. */
+  almacenCompraDefault?: string | null;
   cuentaCxpDefault?: string | null;
   /** Moneda por defecto de este proveedor ('DOP'|'USD'|'EUR') — mismo mecanismo que
    *  `Customer.defaultCurrency` (Fase 2 de docs/tasks/64_multimoneda_completo.md), autopobla
@@ -524,6 +528,7 @@ export interface CreateProveedorDto {
   defaultTipoBienes606?: string | null;
   defaultFormaPago606?: string | null;
   defaultTipoPagoProveedor?: "Contado" | "Crédito" | null;
+  almacenCompraDefault?: string | null;
   cuentaCxpDefault?: string | null;
   defaultCurrency?: string | null;
   retencionesDefault?: string[];
@@ -2149,6 +2154,10 @@ export interface Sucursal {
    *  75_almacen_venta_confirmar_stock_uoms_permitidas.md §1. `null` = sin restricción (cualquier
    *  almacén de la sucursal sirve, como siempre). Siempre presente en las respuestas. */
   almacenVenta: string | null;
+  /** Almacén donde entra la mercancía comprada desde esta sucursal. `null` = sin configurar — si
+   *  tampoco el proveedor tiene `almacenCompraDefault`, las compras que afectan inventario se
+   *  bloquean con ALMACEN_COMPRA_NO_CONFIGURADO. Siempre presente en las respuestas. */
+  almacenCompra: string | null;
 }
 
 export interface CreateSucursalDto {
@@ -2156,6 +2165,9 @@ export interface CreateSucursalDto {
   /** Debe pertenecer a esta misma sucursal — el backend valida y responde 400 si no. En el PUT,
    *  mandar `""` lo quita (vuelve a sin restricción). */
   almacenVenta?: string;
+  /** Debe pertenecer a esta misma sucursal — mismo patrón que `almacenVenta`. En el PUT, mandar
+   *  `""` lo quita. */
+  almacenCompra?: string;
 }
 
 export type UpdateSucursalDto = Partial<CreateSucursalDto>;
@@ -3271,7 +3283,8 @@ export interface Empresa {
   actividadEconomica?: string;
   representanteLegal?: string;
   cedulaRepresentante?: string;
-  logoUrl?: string;
+  /** Solo lectura — se sube/reemplaza con POST /config/empresa/logo, ver uploadLogoEmpresa() en config.ts. null/ausente si el tenant no configuró logo. */
+  logoUrl?: string | null;
   telefono?: string;
   email?: string;
   website?: string;
@@ -3290,7 +3303,6 @@ export interface UpdateEmpresaDto {
   actividadEconomica?: string;
   representanteLegal?: string;
   cedulaRepresentante?: string;
-  logoUrl?: string;
   telefono?: string;
   email?: string;
   website?: string;
@@ -3299,6 +3311,10 @@ export interface UpdateEmpresaDto {
   defaultWarehouse?: string;
   defaultPriceTipo?: "A" | "B" | "C";
   transitWarehouse?: string;
+}
+
+export interface LogoEmpresaUploadResult {
+  logoUrl: string;
 }
 
 export interface CobrosConfig {
@@ -7235,7 +7251,13 @@ export interface RelacionComercialListItem {
 }
 
 export interface RelacionComercialConfiguracion {
+  /** Override OPCIONAL del almacén de compras para las compras B2B materializadas desde este
+   *  socio — si está `null`, el backend resuelve igual que una compra normal (proveedor espejo →
+   *  sucursal) y bloquea con ALMACEN_COMPRA_NO_CONFIGURADO solo si tampoco eso está configurado.
+   *  Ya NO es obligatorio configurarlo para que la relación funcione. */
   almacenDestino: string | null;
+  /** Mismo patrón que `almacenDestino`: override opcional, se resuelve por el Supplier espejo del
+   *  socio si no se configura acá. */
   tipoBienes606: string | null;
   formaPago606: string | null;
   autoEnviarVentas: boolean;
@@ -7475,6 +7497,14 @@ export interface EnviarVentaDto {
 export interface AceptarTransaccionDto {
   mapeo: DecisionMapeoDto[];
   sincronizarBarcodes?: boolean;
+  /** Solo aplica cuando `tipo === 'Compra'` — mismo campo que `CreateCompraDto.tipoBienes606`.
+   *  Si se manda, el backend hace un update sobre el borrador antes de someterlo (patchea
+   *  `custom_tipo_bienes_606`). Si el Supplier espejo del socio (o la relación) ya tiene un
+   *  default configurado, el backend lo resuelve solo — este campo es solo para un override
+   *  puntual o para completar un borrador que quedó sin el default aplicado. */
+  tipoBienes606?: string;
+  /** Igual que `tipoBienes606` pero para `custom_forma_pago_606`. */
+  formaPago606?: string;
 }
 
 export interface RechazarTransaccionDto {

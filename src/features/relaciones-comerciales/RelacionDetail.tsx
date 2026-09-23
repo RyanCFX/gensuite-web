@@ -393,8 +393,13 @@ export default function RelacionDetail() {
             )}
 
             {faltaAlmacen && (
-              <div className="inline-alert inline-alert-warn" style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                <span>Es obligatorio configurar el almacén destino antes de poder aceptar una compra entrante con artículos de stock.</span>
+              <div className="inline-alert inline-alert-info" style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <span>
+                  Este socio no tiene un almacén de compras configurado como excepción para esta relación — las compras
+                  entrantes con artículos de stock usarán el almacén de compras del proveedor o de la sucursal (si ninguno
+                  está configurado ahí tampoco, la compra se bloqueará al recibirla). Configura uno aquí solo si este socio
+                  necesita un almacén distinto al resto de tus compras.
+                </span>
                 <button
                   type="button"
                   className="btn btn-ghost btn-size-xs"
