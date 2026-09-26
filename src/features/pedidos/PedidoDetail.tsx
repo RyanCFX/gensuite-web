@@ -127,10 +127,16 @@ export default function PedidoDetail() {
       remanente: apartadoRemanente || undefined,
       modeOfPayment: apartadoRemanente === 'devolucion' ? apartadoModeOfPayment : undefined,
     }),
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['pedidos'] })
       queryClient.invalidateQueries({ queryKey: ['pedido', id] })
       toast.success('Apartado cancelado')
+      // docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §9.3 — la reversión del movimiento al
+      // almacén de apartados de una línea con dimensiones puede fallar sin bloquear la cancelación;
+      // se muestra el/los texto(s) libres del servidor tal cual, sin asumir un set fijo de mensajes
+      // conocidos, igual que ya se hace con el `warning` de someter un apartado (§9.1).
+      const warnings = (result as unknown as { warnings?: string[] }).warnings ?? []
+      warnings.forEach((w) => toast.info(w, { duration: 8000 }))
       setCancelApartadoOpen(false)
       setApartadoReason('')
       setApartadoRemanente('')

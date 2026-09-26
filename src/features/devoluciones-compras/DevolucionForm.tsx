@@ -36,9 +36,18 @@ const DEVOLUCION_FORM_COLUMNS = [
 
 interface FormItem {
   itemCode: string
+  /** `name` (id de fila) de la línea "Purchase Invoice Item" original — hoy `GET /compras/:id`
+   *  no lo expone (verificado contra el servicio real, ver compras.service.ts::mapToResponse),
+   *  así que esto queda `undefined` en la práctica. Se deja cableado para que, el día que el
+   *  backend lo agregue, `lineaOriginal` viaje solo sin tocar este formulario de nuevo. */
+  name?: string
   stockQty: number
   returnQty: number
   rate: number
+  /** El mismo itemCode aparece más de una vez en la factura original (distintas combinaciones de
+   *  dimensión, precio o lote) — sin `name` disponible, el servidor no puede desambiguar y esta
+   *  línea puede fallar con 400 al guardar si se selecciona junto a su(s) duplicado(s). */
+  ambiguous: boolean
 }
 
 export default function DevolucionForm() {
@@ -126,6 +135,13 @@ export default function DevolucionForm() {
       const devByCode = new Map(
         (isEdit && devolucion ? devolucion.items : []).map((it) => [it.itemCode, it.qty] as const),
       )
+      // Cuántas líneas de la factura original comparten el mismo itemCode — si hay más de una,
+      // el servidor exige `lineaOriginal` para desambiguar (§6.4); acá solo lo detectamos para
+      // avisar en la UI, nunca para bloquear la selección.
+      const countByCode = new Map<string, number>()
+      for (const it of sourceCompra.items) {
+        countByCode.set(it.itemCode, (countByCode.get(it.itemCode) ?? 0) + 1)
+      }
       return sourceCompra.items.map((it, idx) => {
         const typed = qtys[idx]
         const parsed = typed !== undefined ? Number(typed) : 0
@@ -133,9 +149,11 @@ export default function DevolucionForm() {
         const initialQty = isEdit ? Math.abs(devByCode.get(it.itemCode) ?? 0) : 0
         return {
           itemCode: it.itemCode,
+          name: it.id,
           stockQty: it.qty,
           returnQty: typed === undefined ? initialQty : returnQty,
           rate: it.rate,
+          ambiguous: (countByCode.get(it.itemCode) ?? 0) > 1,
         }
     })
   }, [sourceCompra, devolucion, isEdit, qtys])
@@ -187,7 +205,15 @@ export default function DevolucionForm() {
     }
     const payload: CreateDevolucionCompraDto = {
       originalInvoice: isEdit ? devolucion!.originalInvoice : originalInvoiceParam,
-      items: rows.filter((it) => it.returnQty > 0).map((it) => ({ itemCode: it.itemCode, qty: it.returnQty })),
+      items: rows
+        .filter((it) => it.returnQty > 0)
+        .map((it) => ({
+          itemCode: it.itemCode,
+          qty: it.returnQty,
+          // Siempre que tengamos el `name` de la línea original lo mandamos — es inofensivo
+          // incluso cuando el itemCode no es ambiguo, y es obligatorio cuando sí lo es (§6.4).
+          ...(it.name ? { lineaOriginal: it.name } : {}),
+        })),
       postingDate: effectivePostingDate,
       reason: effectiveReason || undefined,
     }
@@ -397,7 +423,16 @@ export default function DevolucionForm() {
             <tbody>
               {rows.map((it, idx) => (
                 <tr key={`${it.itemCode}-${idx}`} style={it.returnQty > 0 ? { background: 'var(--info-bg, var(--surface-sunken))' } : undefined}>
-                  <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{it.itemCode}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      {it.itemCode}
+                      {it.ambiguous && !it.name && (
+                        <span title="Este artículo aparece en más de una línea de esta factura — identifíquelo con cuidado antes de devolverlo.">
+                          <AlertTriangle size={12} style={{ color: 'var(--warning-text)' }} />
+                        </span>
+                      )}
+                    </span>
+                  </td>
                   <td style={{ textAlign: 'right' }}>{it.stockQty}</td>
                   <td style={{ textAlign: 'right' }}>{formatDOP(it.rate, { trimZeros: true })}</td>
                   <td style={{ textAlign: 'right' }}>

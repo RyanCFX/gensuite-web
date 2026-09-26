@@ -26,7 +26,8 @@ import type { MultiSearchSelectOption } from '@/shared/ui/MultiSearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
-import type { Item } from '@/shared/api/types'
+import type { Item, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
+import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
@@ -74,6 +75,14 @@ interface ItemRow {
   /** Enlace manual (caso excepcional) a una línea de Orden de Compra — ver handleSelectOrden. */
   ordenCompra?: string
   ordenCompraItem?: string
+  /** Combinación de dimensión de inventario elegida para esta línea (docs/tasks/
+   *  PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §5) — solo relevante si el artículo la usa. */
+  dimensiones?: DimensionesLinea
+  /** Dimensiones que el artículo de esta línea declara (`item.dimensiones`), guardadas en la fila
+   *  al seleccionar el artículo (o al re-consultarlo en modo edición) para poder renderizar el
+   *  selector de combinación sin tener que re-pedirlo. Vacío/undefined si el artículo no usa
+   *  dimensiones. */
+  itemDimensionesDeclaradas?: ItemDimensionDeclarada[]
 }
 
 function emptyItem(defaultWh?: string): ItemRow {
@@ -81,6 +90,45 @@ function emptyItem(defaultWh?: string): ItemRow {
 }
 
 const NCF_REGEX = /^(B\d{10}|E\d{12})$/
+
+/** `true` si dos combinaciones de dimensión son exactamente iguales (mismas claves, mismos
+ *  valores) — usado por `mergeIdenticalDimensionLines` (§5.1). */
+function dimensionesIguales(a?: DimensionesLinea, b?: DimensionesLinea): boolean {
+  const ea = Object.entries(a ?? {})
+  const eb = Object.entries(b ?? {})
+  if (ea.length !== eb.length) return false
+  return ea.every(([k, v]) => (b ?? {})[k] === v)
+}
+
+/** Fusiona líneas del mismo artículo con la misma combinación de dimensión exacta en una sola,
+ *  sumando la cantidad (§5.1) — se aplica justo antes de someter, sin tocar el estado de la UI.
+ *  No toca líneas sin combinación (comportamiento actual, sin cambios) ni líneas con
+ *  seriales/lotes/combos/enlace a Orden de Compra, donde sumar cantidades perdería información. */
+function mergeIdenticalDimensionLines(rows: ItemRow[]): ItemRow[] {
+  const result: ItemRow[] = []
+  for (const row of rows) {
+    const tieneCombinacion = row.dimensiones && Object.keys(row.dimensiones).length > 0
+    const fusionable = tieneCombinacion
+      && row.trackingType === 'none'
+      && !row._comboComponents?.length
+      && !row.ordenCompra
+    if (fusionable) {
+      const existente = result.find((r) =>
+        r.itemCode === row.itemCode
+        && r.warehouse === row.warehouse
+        && r.uom === row.uom
+        && r.rate === row.rate
+        && dimensionesIguales(r.dimensiones, row.dimensiones),
+      )
+      if (existente) {
+        existente.qty += row.qty
+        continue
+      }
+    }
+    result.push({ ...row })
+  }
+  return result
+}
 
 function onVariantConfirm(
   selections: VariantSelection[],
@@ -172,7 +220,7 @@ function updateComponentTracking(
 // ─── SerialBatchRow Sub-component ────────────────────────────────────────
 
 function SerialBatchRow({
-  item, idx, items, setItems, warehouses, warehouseOptions, onWarehouseSearch, updateItem, selectCatalogItem, clearCatalogItem, setVariantTemplate, isReturn, allowNewTracking, onViewItem,
+  item, idx, items, setItems, warehouses, warehouseOptions, onWarehouseSearch, updateItem, updateDimensiones, selectCatalogItem, clearCatalogItem, setVariantTemplate, isReturn, allowNewTracking, onViewItem,
 }: {
   item: ItemRow
   idx: number
@@ -182,6 +230,7 @@ function SerialBatchRow({
   warehouseOptions: SearchSelectOption[]
   onWarehouseSearch: (q: string) => void
   updateItem: (idx: number, field: keyof ItemRow, value: string | number) => void
+  updateDimensiones: (idx: number, value: DimensionesLinea) => void
   selectCatalogItem: (idx: number, catalogItem: Item) => void
   clearCatalogItem: (idx: number) => void
   setVariantTemplate: (t: Item | null) => void
@@ -307,33 +356,40 @@ function SerialBatchRow({
             direction="purchase"
           />
         </td>
-        <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-          <button
-            type="button"
-            className="btn btn-ghost btn-size-icon-xs"
-            onClick={() => onViewItem(item.itemCode)}
-            disabled={!item.itemCode}
-            title="Ver detalle"
-          >
-            <Eye size={14} />
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost btn-size-icon-xs"
-            onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
-            disabled={items.length === 1}
-            title="Eliminar"
-            style={{ color: 'var(--error-text)' }}
-          >
-            <Trash2 size={14} />
-          </button>
+        <td>
+          {item.itemDimensionesDeclaradas && item.itemDimensionesDeclaradas.length > 0 && (
+            <CombinacionDimensionSelector
+              itemDimensiones={item.itemDimensionesDeclaradas}
+              value={item.dimensiones ?? {}}
+              onChange={(v) => updateDimensiones(idx, v)}
+              disabled={isReturn}
+              compact
+            />
+          )}
+        </td>
+        <td onClick={(e) => e.stopPropagation()} className="actions-cell">
+          <ActionsMenu>
+            <ActionsMenuItem
+              onClick={() => onViewItem(item.itemCode)}
+              disabled={!item.itemCode}
+            >
+              <Eye size={14} /> Ver detalle
+            </ActionsMenuItem>
+            <ActionsMenuItem
+              danger
+              onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
+              disabled={items.length === 1}
+            >
+              <Trash2 size={14} /> Eliminar
+            </ActionsMenuItem>
+          </ActionsMenu>
         </td>
       </tr>
 
       {/* Tracking row */}
       {(item.trackingType === 'serial' || item.trackingType === 'batch' || (item._comboComponents && item._comboComponents.length > 0)) && (
         <tr className="tracking-row">
-          <td colSpan={8} style={{ padding: '4px 8px 8px' }}>
+          <td colSpan={9} style={{ padding: '4px 8px 8px' }}>
             {item.lineError && (
               <div style={{ color: 'red', fontSize: 12, marginBottom: 4 }}>{item.lineError}</div>
             )}
@@ -893,6 +949,25 @@ export default function CompraForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compraData])
 
+  // GET /compras/:id no ecoa la combinación de dimensión elegida por línea (§10.2) — al editar
+  // solo podemos saber si el artículo de cada línea USA dimensiones (re-consultando el catálogo)
+  // para mostrarle el selector y obligarlo a reingresarla antes de guardar (§10.1/§10.2, opción
+  // (b) de las sugeridas por el documento).
+  useEffect(() => {
+    if (!compraData) return
+    let cancelled = false
+    Promise.all(compraData.items.map((ci) => getItem(ci.itemCode).catch(() => null))).then((catalogItems) => {
+      if (cancelled) return
+      setItems((prev) => prev.map((row, idx) => {
+        const catalogItem = catalogItems[idx]
+        return catalogItem?.usaDimensiones
+          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones }
+          : row
+      }))
+    })
+    return () => { cancelled = true }
+  }, [compraData])
+
   const isDirty = useDirtyCheck({
     supplierId,
     esProveedorOcasional,
@@ -977,6 +1052,13 @@ export default function CompraForm() {
     },
   })
 
+  // Al editar, ninguna línea trae de vuelta su combinación previa (§10.2) — si el artículo la usa
+  // y la fila todavía no tiene una elegida, hay que avisarle al usuario que la reingrese antes de
+  // guardar (si no, el PUT la reenviaría vacía y el servidor rechazaría esa línea, §11).
+  const lineasRequierenReingresoDimension = isEdit && items.some(
+    (i) => (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
+  )
+
   const ncfValid = !ncfProveedor || NCF_REGEX.test(ncfProveedor)
   const subtotal = items.reduce((sum, i) => sum + i.qty * i.rate, 0)
   const taxTotal = items.reduce((sum, i) => sum + (i.qty * i.rate * i.purchaseTaxPct / 100), 0)
@@ -1051,7 +1133,7 @@ export default function CompraForm() {
       dueDate: dueDate || undefined,
       branch: branch || undefined,
       department: usaDepartamentos ? (department || undefined) : undefined,
-      items: items.map((i) => ({
+      items: mergeIdenticalDimensionLines(items).map((i) => ({
         itemCode: i.itemCode,
         description: i.description,
         qty: i.qty,
@@ -1065,6 +1147,9 @@ export default function CompraForm() {
           ? { distribucionCuenta: i.distribucionCuenta!.filter((d) => d.cuenta) }
           : {}),
         ...(i.ordenCompra && i.ordenCompraItem ? { ordenCompra: i.ordenCompra, ordenCompraItem: i.ordenCompraItem } : {}),
+        // Siempre se reenvía en cada guardado (create y PUT) — este endpoint no conserva la
+        // combinación de una línea no tocada (§6.1/§10.1).
+        ...(i.dimensiones && Object.keys(i.dimensiones).length > 0 ? { dimensiones: i.dimensiones } : {}),
       })),
       ncfProveedor: ncfProveedor || undefined,
       tipoComprobante: (tipoComprobante as CreateCompraDto['tipoComprobante']) || undefined,
@@ -1085,6 +1170,10 @@ export default function CompraForm() {
 
   const updateItem = useCallback((idx: number, field: keyof ItemRow, value: string | number) => {
     setItems((prev) => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row))
+  }, [])
+
+  const updateDimensiones = useCallback((idx: number, value: DimensionesLinea) => {
+    setItems((prev) => prev.map((row, i) => i === idx ? { ...row, dimensiones: value } : row))
   }, [])
 
   const selectCatalogItem = useCallback((idx: number, catalogItem: Item, opts?: { autoAddRow?: boolean }) => {
@@ -1112,6 +1201,10 @@ export default function CompraForm() {
           purchaseTaxTemplate: catalogItem.purchaseTaxTemplate ?? '',
           // No se puede combinar distribucionCuenta con seriales/lotes.
           distribucionCuenta: trackingType === 'none' ? row.distribucionCuenta : undefined,
+          // Un artículo nuevo en la fila implica una combinación nueva — nunca arrastramos la
+          // combinación del artículo anterior (docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §5).
+          itemDimensionesDeclaradas: catalogItem.usaDimensiones ? catalogItem.dimensiones : undefined,
+          dimensiones: undefined,
         }
         // Detecta componentes del combo con tracking de serial/lote
         if (catalogItem.type === 'combo') {
@@ -1146,7 +1239,7 @@ export default function CompraForm() {
 
   const clearCatalogItem = useCallback((idx: number) => {
     setItems((prev) => prev.map((row, i) =>
-      i === idx ? { ...row, itemCode: '', itemLabel: undefined, description: '', rate: 0, trackingType: 'none', serials: [], batches: [], _comboComponents: undefined, componentTracking: undefined } : row,
+      i === idx ? { ...row, itemCode: '', itemLabel: undefined, description: '', rate: 0, trackingType: 'none', serials: [], batches: [], _comboComponents: undefined, componentTracking: undefined, itemDimensionesDeclaradas: undefined, dimensiones: undefined } : row,
     ))
   }, [])
 
@@ -1196,6 +1289,9 @@ export default function CompraForm() {
         purchaseTaxTemplate: catalogItem?.purchaseTaxTemplate ?? '',
         ordenCompra: line.ordenCompra,
         ordenCompraItem: line.ordenCompraItem,
+        // La orden no ecoa la combinación elegida en su línea (§10.2) — el artículo declara sus
+        // dimensiones igual, así que se muestra el selector para que el usuario la reingrese.
+        itemDimensionesDeclaradas: catalogItem?.usaDimensiones ? catalogItem.dimensiones : undefined,
       }
     }))
     setItems((prev) => [...prev, emptyItem(defaultWh)])
@@ -1229,6 +1325,13 @@ export default function CompraForm() {
         <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
           <Info size={16} />
           <span>Devolución a proveedor — los campos de información general, precio, almacén y UOM no pueden modificarse.</span>
+        </div>
+      )}
+
+      {lineasRequierenReingresoDimension && (
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
+          <Info size={16} />
+          <span>Esta compra tiene línea(s) con un artículo que usa combinación de dimensión de inventario, pero el sistema no puede recuperar la combinación con la que se guardaron originalmente. Vuelve a seleccionarla en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
         </div>
       )}
 
@@ -1539,6 +1642,7 @@ export default function CompraForm() {
                         warehouseOptions={warehouseSelectOptions}
                         onWarehouseSearch={setWarehouseSearch}
                         updateItem={updateItem}
+                        updateDimensiones={updateDimensiones}
                         selectCatalogItem={selectCatalogItem}
                         clearCatalogItem={clearCatalogItem}
                         setVariantTemplate={setVariantTemplate}

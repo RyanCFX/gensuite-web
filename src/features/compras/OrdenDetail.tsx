@@ -18,7 +18,8 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { QtyInput } from '@/shared/ui/QtyInput'
-import type { CreateInvoiceFromOrdenDto, ReceiptFromOrdenItemOverrideDto } from '@/shared/api/types'
+import type { CreateInvoiceFromOrdenDto, ReceiptFromOrdenItemOverrideDto, DimensionesLinea } from '@/shared/api/types'
+import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
@@ -605,6 +606,11 @@ interface RecibirLine {
   qty: number
   serialsText: string
   batches: { batchId: string; qty: number }[]
+  /** Opt-in explícito del usuario para corregir la combinación de dimensión de inventario de esta
+   *  línea al recibir (docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §6.3) — por defecto
+   *  apagado: la combinación de la orden se arrastra sola a la recepción, no hace falta pedirla. */
+  corrigiendoDimensiones: boolean
+  dimensiones: DimensionesLinea
 }
 
 interface RecibirModalProps {
@@ -625,6 +631,8 @@ function RecibirModal({ items, loading, onClose, onConfirm }: RecibirModalProps)
       qty: it.qty - it.receivedQty,
       serialsText: '',
       batches: [],
+      corrigiendoDimensiones: false,
+      dimensiones: {},
     })),
   )
 
@@ -662,22 +670,32 @@ function RecibirModal({ items, loading, onClose, onConfirm }: RecibirModalProps)
     for (const line of activeLines) {
       const idx = lines.indexOf(line)
       const tracking = trackingQueries[idx]?.data?.trackingType ?? 'none'
+      const itemDimensiones = trackingQueries[idx]?.data?.dimensiones ?? []
+
+      // Única excepción a "resend siempre" (§6.3): la combinación se arrastra sola de la orden a
+      // la recepción — solo se manda si el usuario tildó explícitamente que la está corrigiendo.
+      if (line.corrigiendoDimensiones && !combinacionCompleta(itemDimensiones, line.dimensiones)) {
+        toast.error(`${line.itemCode}: complete la combinación de dimensión de inventario antes de confirmar`)
+        return
+      }
+      const dimensionesOverride = line.corrigiendoDimensiones ? line.dimensiones : undefined
+
       if (tracking === 'serial') {
         const serials = line.serialsText.split(/[\n,]/).map((s) => s.trim()).filter(Boolean)
         if (serials.length !== Math.round(line.qty)) {
           toast.error(`${line.itemCode}: debe capturar ${Math.round(line.qty)} serial(es) (ingresó ${serials.length})`)
           return
         }
-        payload.push({ purchaseOrderItem: line.purchaseOrderItem, qty: line.qty, serials })
+        payload.push({ purchaseOrderItem: line.purchaseOrderItem, qty: line.qty, serials, ...(dimensionesOverride ? { dimensiones: dimensionesOverride } : {}) })
       } else if (tracking === 'batch') {
         const sum = line.batches.reduce((s, b) => s + b.qty, 0)
         if (Math.round(sum) !== Math.round(line.qty)) {
           toast.error(`${line.itemCode}: la suma de lotes (${sum}) debe ser igual a la cantidad (${line.qty})`)
           return
         }
-        payload.push({ purchaseOrderItem: line.purchaseOrderItem, qty: line.qty, batches: line.batches })
+        payload.push({ purchaseOrderItem: line.purchaseOrderItem, qty: line.qty, batches: line.batches, ...(dimensionesOverride ? { dimensiones: dimensionesOverride } : {}) })
       } else {
-        payload.push({ purchaseOrderItem: line.purchaseOrderItem, qty: line.qty })
+        payload.push({ purchaseOrderItem: line.purchaseOrderItem, qty: line.qty, ...(dimensionesOverride ? { dimensiones: dimensionesOverride } : {}) })
       }
     }
     onConfirm({ supplierDeliveryNote: supplierDeliveryNote || undefined, items: payload })
@@ -703,6 +721,8 @@ function RecibirModal({ items, loading, onClose, onConfirm }: RecibirModalProps)
 
           {lines.map((line, idx) => {
             const tracking = trackingQueries[idx]?.data?.trackingType ?? 'none'
+            const catalogItem = trackingQueries[idx]?.data
+            const itemDimensiones = catalogItem?.usaDimensiones ? (catalogItem.dimensiones ?? []) : []
             return (
               <div key={line.purchaseOrderItem} className="card" style={{ margin: 0 }}>
                 <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -763,6 +783,30 @@ function RecibirModal({ items, loading, onClose, onConfirm }: RecibirModalProps)
                           <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeBatchRow(idx, bi)}>×</button>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {itemDimensiones.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                        <input
+                          type="checkbox"
+                          checked={line.corrigiendoDimensiones}
+                          onChange={(e) => updateLine(idx, { corrigiendoDimensiones: e.target.checked })}
+                        />
+                        Corregir combinación de esta línea
+                      </label>
+                      {line.corrigiendoDimensiones ? (
+                        <CombinacionDimensionSelector
+                          itemDimensiones={itemDimensiones}
+                          value={line.dimensiones}
+                          onChange={(v) => updateLine(idx, { dimensiones: v })}
+                        />
+                      ) : (
+                        <p style={{ fontSize: 11, color: 'var(--text-tertiary)', margin: 0 }}>
+                          Se recibe con la misma combinación de la orden — no hace falta elegirla de nuevo.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

@@ -21,7 +21,7 @@ import { listDepartamentos } from '@/shared/api/departamentos'
 import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo, EcfModificationCode } from '@/shared/api/types'
 import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
 import { Select, SelectItem } from '@/components/ui/select'
-import { Plus, Loader2, Wallet, ArrowRightLeft, ChevronDown, ChevronRight, Download, SlidersHorizontal } from 'lucide-react'
+import { Plus, Loader2, Wallet, ArrowRightLeft, ChevronDown, ChevronRight, Download, SlidersHorizontal, AlertTriangle } from 'lucide-react'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
@@ -102,6 +102,12 @@ interface NoteLineItem {
   qty: number
   rate: number
   uom?: string
+  /** `name` (id de fila) de la línea "Sales Invoice Item" original — hoy `GET /invoices/:id` no lo
+   *  expone (verificado contra el servicio real, ver invoices.service.ts::mapToResponse — mismo
+   *  gap que Purchase Invoices), así que esto queda `undefined` en la práctica. Se deja cableado
+   *  para que, el día que el backend lo agregue, `lineaOriginal` viaje solo sin tocar este
+   *  formulario de nuevo (§7.5). */
+  name?: string
 }
 
 // El backend devuelve el status en minúscula. Una vez Sometida, `status` deja de ser "submitted"
@@ -287,7 +293,7 @@ export default function CreditNotesPage() {
   useEffect(() => {
     if (selectedInvoiceDetail && selectedInvoiceDetail.id === selectedInvoiceId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- precarga los artículos al llegar el detalle de la factura seleccionada
-      setNoteItems(selectedInvoiceDetail.items.map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate, uom: i.uom })))
+      setNoteItems(selectedInvoiceDetail.items.map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate, uom: i.uom, name: i.id })))
       // La factura preseleccionada por ?originalInvoice= puede no estar en la lista de 20 —
       // completa la tarjeta de resumen desde el detalle.
       setSelectedInvoice((prev) => prev ?? selectedInvoiceDetail)
@@ -338,6 +344,14 @@ export default function CreditNotesPage() {
   const availableToAdd = (selectedInvoiceDetail?.items ?? []).filter(
     (i) => !noteItems.some((n) => n.itemCode === i.itemCode),
   )
+
+  // Cuántas líneas de la factura original comparten el mismo itemCode — si hay más de una, el
+  // servidor exige `lineaOriginal` para desambiguar (§7.5); acá solo lo detectamos para avisar en
+  // la UI, nunca para bloquear la selección (mismo criterio que Devoluciones de Compra).
+  const invoiceItemCountByCode = new Map<string, number>()
+  for (const i of selectedInvoiceDetail?.items ?? []) {
+    invoiceItemCountByCode.set(i.itemCode, (invoiceItemCountByCode.get(i.itemCode) ?? 0) + 1)
+  }
   const [addItemSearch, setAddItemSearch] = useState('')
   const addItemOptions: SearchSelectOption[] = availableToAdd
     .filter((i) => !addItemSearch || i.itemCode.toLowerCase().includes(addItemSearch.toLowerCase()) || i.description?.toLowerCase().includes(addItemSearch.toLowerCase()))
@@ -558,7 +572,14 @@ export default function CreditNotesPage() {
       originalInvoice: selectedInvoice.id,
       postingDate: new Date().toISOString().slice(0, 10),
       reason,
-      items: noteItems.map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate })),
+      items: noteItems.map((i) => ({
+        itemCode: i.itemCode,
+        qty: i.qty,
+        rate: i.rate,
+        // Siempre que tengamos el `name` de la línea original lo mandamos — es inofensivo incluso
+        // cuando el itemCode no es ambiguo, y es obligatorio cuando sí lo es (§7.5).
+        ...(i.name ? { lineaOriginal: i.name } : {}),
+      })),
       modificationCode: modificationCode || undefined,
     }
     createMutation.mutate(dto)
@@ -990,7 +1011,7 @@ export default function CreditNotesPage() {
                           value=""
                           onChange={(val) => {
                             const item = selectedInvoiceDetail?.items.find((i) => i.itemCode === val)
-                            if (item) setNoteItems((prev) => [...prev, { itemCode: item.itemCode, qty: item.qty, rate: item.rate, uom: item.uom }])
+                            if (item) setNoteItems((prev) => [...prev, { itemCode: item.itemCode, qty: item.qty, rate: item.rate, uom: item.uom, name: item.id }])
                           }}
                           options={addItemOptions}
                           onSearch={setAddItemSearch}
@@ -1036,9 +1057,20 @@ export default function CreditNotesPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {noteItems.map((item, index) => (
+                          {noteItems.map((item, index) => {
+                            const ambiguous = (invoiceItemCountByCode.get(item.itemCode) ?? 0) > 1
+                            return (
                             <tr key={index}>
-                              <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode}</td>
+                              <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                  {item.itemCode}
+                                  {ambiguous && !item.name && (
+                                    <span title="Este artículo aparece en más de una línea de la factura original — identifíquelo con cuidado antes de acreditarlo.">
+                                      <AlertTriangle size={12} style={{ color: 'var(--warning-text)' }} />
+                                    </span>
+                                  )}
+                                </span>
+                              </td>
                               <td>
                                 <QtyInput
                                   className="items-input"
@@ -1054,7 +1086,7 @@ export default function CreditNotesPage() {
                                 <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeNoteItem(index)}>✕</button>
                               </td>
                             </tr>
-                          ))}
+                          )})}
                         </tbody>
                       </table>
                       <div className="items-total-row">

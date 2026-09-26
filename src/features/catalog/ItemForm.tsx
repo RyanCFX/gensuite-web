@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffectOnActive } from 'keepalive-for-react'
 import { useForm, Controller } from 'react-hook-form'
@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { createItem, updateItem, getItem, listCategories, listBrands, uploadItemImagen } from '@/shared/api/catalog'
-import type { CreateItemDto } from '@/shared/api/types'
+import type { CreateItemDto, ItemDimensionDeclarada, ReglaCombinacion } from '@/shared/api/types'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listUOMs, getEmpresa, listItemTaxTemplates, getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -21,6 +21,7 @@ import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { ArrowLeft, Plus, Minus, Trash2, ImagePlus, Loader2, Save } from 'lucide-react'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
+import { useDimensionesInventario, useValoresDimension } from '@/shared/hooks/useDimensionesInventario'
 
 const schema = z.object({
   itemName: z.string().min(1, 'El nombre es requerido'),
@@ -106,6 +107,11 @@ export default function ItemForm() {
   const [noPurchaseTax, setNoPurchaseTax] = useState(false)
   const [noSalesTax, setNoSalesTax] = useState(false)
 
+  // ── Dimensiones de inventario (docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §4) ──────
+  const [showDimensiones, setShowDimensiones] = useState(false)
+  const [dimensionesItem, setDimensionesItem] = useState<ItemDimensionDeclarada[]>([])
+  const [reglasCombinacion, setReglasCombinacion] = useState<ReglaCombinacion[]>([])
+
   // ── Foto del artículo ─────────────────────────────────────────────────────
   // En edición se sube de inmediato (el artículo ya existe). En creación no hay id todavía —
   // se guarda el archivo y se sube justo después de que el POST de creación responda con el id.
@@ -175,6 +181,15 @@ export default function ItemForm() {
     queryFn: listItemTaxTemplates,
     staleTime: 5 * 60_000,
   })
+
+  // §3/§4 — catálogo de dimensiones del tenant, cacheado. `activas` decide si el bloque
+  // "Dimensiones de inventario" tiene algo para ofrecer; `porCodigo`/`etiquetaDe` resuelven la
+  // etiqueta legible de cada `codigo` (el response del artículo nunca la trae, §4.2).
+  const {
+    activas: dimensionesActivas,
+    porCodigo: dimensionesPorCodigo,
+    etiquetaDe: etiquetaDimension,
+  } = useDimensionesInventario()
 
   const itemCodeMode = empresa?.itemCodeMode ?? 'manual'
   const isAutoCode = itemCodeMode === 'auto' || itemCodeMode === 'prefix_auto'
@@ -368,6 +383,9 @@ export default function ItemForm() {
     setShowWarranty(!!existingItem.hasWarranty)
     setNoPurchaseTax(!existingItem.purchaseTaxTemplate)
     setNoSalesTax(!existingItem.salesTaxTemplate)
+    setDimensionesItem(existingItem.dimensiones ?? [])
+    setReglasCombinacion(existingItem.reglasCombinacion ?? [])
+    setShowDimensiones((existingItem.dimensiones?.length ?? 0) > 0)
   }, [existingItem, reset, fixedType, navigate])
 
   const watchedPriceMode = watch('priceMode')
@@ -379,6 +397,55 @@ export default function ItemForm() {
   const watchedPriceA = watch('priceA')
   const watchedPriceB = watch('priceB')
   const watchedPriceC = watch('priceC')
+  const watchedTrackingType = watch('trackingType')
+
+  // §4.4 — exclusiones: plantilla de variantes, variante, o artículo con lotes. `hasVariants`
+  // (estado local) cubre la creación; en edición un template ya existente se detecta por
+  // `existingItem.hasVariants` (no hay forma de "convertir" un template acá, ver `isTemplate` más
+  // abajo, misma fuente de verdad).
+  const isVariante = isEdit && !!existingItem?.variantOf
+  const esPlantillaDeVariantes = isEdit ? !!existingItem?.hasVariants : hasVariants
+  const dimensionesExcluidasPorTipo = !isProduct || esPlantillaDeVariantes || isVariante || watchedTrackingType === 'batch'
+  // Bloque realmente usable: además de no estar excluido, el tenant necesita al menos una
+  // dimensión activa creada (§3) — si no hay ninguna, el bloque muestra un mensaje en vez de la
+  // grilla, y nunca se arma/envía el payload de dimensiones.
+  const dimensionesBlockUsable = !dimensionesExcluidasPorTipo && dimensionesActivas.length > 0
+
+  // §4.5 — inmutabilidad. Señal simple y conservadora: solo bloqueamos la edición cuando hay
+  // evidencia POSITIVA de movimientos (`currentStock`/`enPedido`/`reservado`/`entregado` > 0).
+  // "Stock actual en cero" NO prueba "sin movimientos" (un artículo vendido y vuelto a cero sigue
+  // teniendo historia) — así que si toda esa evidencia es 0/undefined, NO bloqueamos acá: dejamos
+  // que el usuario intente guardar y, si el servidor rechaza por inmutabilidad, se muestra su
+  // mensaje tal cual (mismo manejo de errores que el resto del formulario, ver onError de
+  // updateMutation). Esto evita falsos positivos (bloquear sin motivo) a costa de no detectar
+  // 100% de los casos con historia — aceptable según §4.5 del spec.
+  const dimensionesBloqueadas = isEdit && !!existingItem?.usaDimensiones && (
+    (existingItem?.currentStock ?? 0) > 0
+    || (existingItem?.enPedido ?? 0) > 0
+    || (existingItem?.reservado ?? 0) > 0
+    || (existingItem?.entregado ?? 0) > 0
+  )
+
+  const dimCodigosSeleccionados = dimensionesItem.map((d) => d.dimension)
+
+  // Preserva el orden en que MultiSearchSelect va agregando/quitando códigos (agrega al final,
+  // quita filtrando) — ese orden de click es justo lo que §4.1 exige mantener estable.
+  function handleDimCodigosChange(nuevosCodigos: string[]) {
+    setDimensionesItem((prev) => {
+      const porCodigo = new Map(prev.map((d) => [d.dimension, d]))
+      return nuevosCodigos.map((codigo) => porCodigo.get(codigo) ?? { dimension: codigo, valoresPermitidos: [] })
+    })
+  }
+
+  function updateRegla(idx: number, updater: (r: ReglaCombinacion) => ReglaCombinacion) {
+    setReglasCombinacion((prev) => prev.map((r, i) => (i === idx ? updater(r) : r)))
+  }
+
+  // §4.1/§4.3 — solo la(s) dimensión(es) `tipo: "Ordinal"` que el artículo declara habilitan los
+  // inputs desde/hasta en la grilla de reglas.
+  const dimensionOrdinal = dimensionesItem
+    .map((d) => dimensionesPorCodigo.get(d.dimension))
+    .find((meta) => meta?.tipo === 'Ordinal')
 
   const onSubmit = (data: FormValues) => {
     if (subcategoryOptions.length > 0 && !data.subcategory) {
@@ -437,12 +504,26 @@ export default function ItemForm() {
       salesTaxTemplate: noSalesTax ? undefined : data.salesTaxTemplate || undefined,
     }
 
+    // §4.1/§4.6 — `usaDimensiones` NUNCA se manda (el servidor la ignora/rechaza, es de solo
+    // lectura). Si el bloque no aplica o el artículo no declaró ninguna dimensión, se omiten
+    // ambos campos por completo en vez de mandar arrays vacíos.
+    const dimensionesPayload = dimensionesBlockUsable && dimensionesItem.length > 0
+      ? {
+          dimensiones: dimensionesItem.map((d) => ({
+            dimension: d.dimension,
+            valoresPermitidos: d.valoresPermitidos && d.valoresPermitidos.length > 0 ? d.valoresPermitidos : undefined,
+          })),
+          reglasCombinacion: reglasCombinacion.length > 0 ? reglasCombinacion : undefined,
+        }
+      : {}
+
     if (isEdit) {
       // itemCode nunca se manda en el update — el backend lo rechaza (400) si viene en el body.
-      updateMutation.mutate(payload)
+      updateMutation.mutate({ ...payload, ...dimensionesPayload })
     } else {
       createMutation.mutate({
         ...payload,
+        ...dimensionesPayload,
         itemCode: itemCode || undefined,
         hasVariants: hasVariants || undefined,
         attributes:
@@ -1375,6 +1456,185 @@ export default function ItemForm() {
 
         </div>
 
+        {/* ════════════════ DIMENSIONES DE INVENTARIO (ancho completo) ════════════════ */}
+        {/* §4.4 — nunca "Dimensiones" a secas: se confundiría con las dimensiones CONTABLES
+            (Sucursal, Departamento). Solo se renderiza si el artículo es Producto, no es
+            plantilla de variantes ni variante, y no maneja lotes — ver `dimensionesExcluidasPorTipo`. */}
+        {!dimensionesExcluidasPorTipo && (
+          <div className="card" style={{ gridColumn: '1 / -1' }}>
+            <div className="card-header navy-card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h2 className="card-title">Dimensiones de inventario</h2>
+              {dimensionesActivas.length > 0 && (
+                <button
+                  type="button"
+                  className="pill-plus-trigger"
+                  aria-expanded={showDimensiones}
+                  onClick={() => setShowDimensiones((s) => !s)}
+                >
+                  {showDimensiones ? 'Ocultar' : 'Configurar'}
+                  <span key={showDimensiones ? 'open' : 'closed'} className="pill-plus-trigger-icon">
+                    {showDimensiones ? <Minus size={14} /> : <Plus size={14} />}
+                  </span>
+                </button>
+              )}
+            </div>
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {dimensionesActivas.length === 0 ? (
+                <p className="ff-hint">
+                  Todavía no hay dimensiones de inventario creadas para tu empresa.{' '}
+                  <Link to="/catalogo/dimensiones">Creá al menos una dimensión</Link> para poder
+                  declararlas en este artículo.
+                </p>
+              ) : showDimensiones && (
+                <>
+                  {dimensionesBloqueadas && (
+                    <div className="inline-alert inline-alert-info">
+                      Este artículo ya tiene movimientos de inventario — su configuración de dimensiones no se puede modificar. Si necesita manejar otras dimensiones, cree un artículo nuevo.
+                    </div>
+                  )}
+
+                  <div className="ff-wrap">
+                    <label className="ff-label">
+                      Dimensiones que declara este artículo
+                      <FieldTooltip>
+                        El orden en que agregás las dimensiones acá queda fijo luego del primer guardado.
+                        Para cada dimensión, dejar "Valores permitidos" vacío significa que cualquier valor
+                        activo de esa dimensión sirve.
+                      </FieldTooltip>
+                    </label>
+                    <MultiSearchSelect
+                      value={dimCodigosSeleccionados}
+                      onChange={handleDimCodigosChange}
+                      options={dimensionesActivas.map((d) => ({ id: d.codigo, label: d.etiqueta }))}
+                      placeholder="Elegí las dimensiones que usa este artículo"
+                      emptyLabel="No hay dimensiones activas configuradas."
+                      disabled={dimensionesBloqueadas}
+                    />
+                  </div>
+
+                  {dimensionesItem.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {dimensionesItem.map((d, idx) => {
+                        const dimMeta = dimensionesPorCodigo.get(d.dimension)
+                        return (
+                          <div key={d.dimension} className="ff-wrap" style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 10, margin: 0 }}>
+                            <label className="ff-label">
+                              {idx + 1}. {etiquetaDimension(d.dimension)}
+                              {dimMeta?.tipo === 'Ordinal' && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>Ordinal</span>}
+                              <FieldTooltip>Valores permitidos para esta dimensión en este artículo. Vacío = cualquier valor activo sirve.</FieldTooltip>
+                            </label>
+                            <DimensionValoresPermitidosField
+                              codigo={d.dimension}
+                              value={d.valoresPermitidos ?? []}
+                              onChange={(ids) => setDimensionesItem((prev) => prev.map((x, i) => (i === idx ? { ...x, valoresPermitidos: ids } : x)))}
+                              disabled={dimensionesBloqueadas}
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {dimensionesItem.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span className="ff-label" style={{ margin: 0 }}>
+                          Reglas de combinación
+                          <FieldTooltip>
+                            Lista blanca opcional de combinaciones válidas. Sin ninguna regla, cualquier
+                            combinación de los valores permitidos de cada dimensión es válida. Un selector
+                            vacío en una regla es comodín ("Cualquiera").
+                          </FieldTooltip>
+                        </span>
+                        {!dimensionesBloqueadas && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-size-sm"
+                            onClick={() => setReglasCombinacion((prev) => [...prev, { activo: true }])}
+                          >
+                            <Plus size={13} /> Agregar regla
+                          </button>
+                        )}
+                      </div>
+
+                      {reglasCombinacion.length === 0 ? (
+                        <p className="ff-hint">Sin reglas — se permite cualquier combinación de los valores permitidos de cada dimensión.</p>
+                      ) : (
+                        <div className="table-scroll">
+                          <table className="data-table navy-table">
+                            <thead>
+                              <tr>
+                                {dimensionesItem.map((d) => <th key={d.dimension}>{etiquetaDimension(d.dimension)}</th>)}
+                                {dimensionOrdinal && <th>Desde</th>}
+                                {dimensionOrdinal && <th>Hasta</th>}
+                                <th>Activa</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {reglasCombinacion.map((regla, idx) => (
+                                <tr key={idx}>
+                                  {dimensionesItem.map((d) => (
+                                    <td key={d.dimension}>
+                                      <ReglaDimensionSelect
+                                        codigo={d.dimension}
+                                        value={regla.valores?.[d.dimension]}
+                                        onChange={(val) => updateRegla(idx, (r) => {
+                                          const valores = { ...(r.valores ?? {}) }
+                                          if (val) valores[d.dimension] = val
+                                          else delete valores[d.dimension]
+                                          return { ...r, valores: Object.keys(valores).length > 0 ? valores : undefined }
+                                        })}
+                                        disabled={dimensionesBloqueadas}
+                                      />
+                                    </td>
+                                  ))}
+                                  {dimensionOrdinal && (
+                                    <>
+                                      <td>
+                                        <input
+                                          type="number" className="ff-input" style={{ width: 90 }}
+                                          value={regla.desde ?? ''}
+                                          onChange={(e) => updateRegla(idx, (r) => ({ ...r, desde: e.target.value === '' ? undefined : Number(e.target.value) }))}
+                                          disabled={dimensionesBloqueadas}
+                                        />
+                                      </td>
+                                      <td>
+                                        <input
+                                          type="number" className="ff-input" style={{ width: 90 }}
+                                          value={regla.hasta ?? ''}
+                                          onChange={(e) => updateRegla(idx, (r) => ({ ...r, hasta: e.target.value === '' ? undefined : Number(e.target.value) }))}
+                                          disabled={dimensionesBloqueadas}
+                                        />
+                                      </td>
+                                    </>
+                                  )}
+                                  <td>
+                                    <label className="ff-toggle-wrap" style={{ margin: 0 }}>
+                                      <span className="ff-toggle">
+                                        <input
+                                          type="checkbox"
+                                          checked={regla.activo !== false}
+                                          onChange={(e) => updateRegla(idx, (r) => ({ ...r, activo: e.target.checked }))}
+                                          disabled={dimensionesBloqueadas}
+                                        />
+                                        <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+                                      </span>
+                                    </label>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ════════════════ BOTONES (ancho completo) ════════════════ */}
         <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
           <button type="button" className="btn btn-ghost" onClick={() => navigate(backTo)}>
@@ -1395,5 +1655,71 @@ export default function ItemForm() {
         </div>
       </form>
     </div>
+  )
+}
+
+// ─── Dimensiones de inventario — subcomponentes auxiliares ────────────────────────────────────
+// Separados del componente principal porque cada uno necesita su propio `useValoresDimension`
+// (hook) por dimensión — no se puede invocar un hook dentro de un `.map()` del componente padre.
+
+/** Multi-select de `valoresPermitidos` para una dimensión declarada por el artículo (§4.1).
+ *  Vacío = cualquier valor activo de la dimensión sirve — es el estado por defecto. */
+function DimensionValoresPermitidosField({
+  codigo,
+  value,
+  onChange,
+  disabled,
+}: {
+  codigo: string
+  value: string[]
+  onChange: (ids: string[]) => void
+  disabled?: boolean
+}) {
+  const { items, isLoading } = useValoresDimension(codigo)
+  const options = items.map((v) => ({ id: v.id, label: v.valor }))
+  return (
+    <MultiSearchSelect
+      value={value}
+      onChange={onChange}
+      options={options}
+      placeholder="Cualquier valor activo de la dimensión"
+      emptyLabel={isLoading ? 'Cargando valores…' : 'Esta dimensión no tiene valores activos todavía.'}
+      disabled={disabled}
+    />
+  )
+}
+
+/** Selector de un valor exacto para una dimensión dentro de una fila de `reglasCombinacion`
+ *  (§4.1/§4.3). Vacío = comodín ("Cualquiera") — la dimensión queda sin restricción en esa regla. */
+function ReglaDimensionSelect({
+  codigo,
+  value,
+  onChange,
+  disabled,
+}: {
+  codigo: string
+  value?: string
+  onChange: (val: string | undefined) => void
+  disabled?: boolean
+}) {
+  const { items } = useValoresDimension(codigo)
+  const [search, setSearch] = useState('')
+  const options: SearchSelectOption[] = useMemo(() => {
+    const q = search.toLowerCase()
+    return items
+      .filter((v) => !q || v.valor.toLowerCase().includes(q))
+      .map((v) => ({ value: v.id, label: v.valor }))
+  }, [items, search])
+  const selectedLabel = value ? (items.find((v) => v.id === value)?.valor ?? value) : ''
+  return (
+    <SearchSelect
+      value={value ?? ''}
+      onChange={(val) => onChange(val || undefined)}
+      options={options}
+      onSearch={setSearch}
+      selectedLabel={selectedLabel}
+      placeholder="Cualquiera"
+      disabled={disabled}
+    />
   )
 }

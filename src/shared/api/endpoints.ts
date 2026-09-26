@@ -139,6 +139,16 @@ export const ENDPOINTS = {
       list: '/catalog/cuentas-por-pagar',
       byId: (id: string) => `/catalog/cuentas-por-pagar/${id}`,
     },
+    dimensionesInventario: {
+      list: '/catalog/dimensiones-inventario',
+      byId: (codigo: string) => `/catalog/dimensiones-inventario/${codigo}`,
+      toggle: (codigo: string) => `/catalog/dimensiones-inventario/${codigo}/toggle`,
+      valores: (codigo: string) => `/catalog/dimensiones-inventario/${codigo}/valores`,
+      // ⚠️ El handler del servidor solo usa `:id` para buscar el valor (el `:codigo` de la URL no
+      // se valida contra él) — igual armar la URL completa con ambos segmentos tal como está
+      // documentada, no solo con `valores/:id` (docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §3.1).
+      valorById: (codigo: string, id: string) => `/catalog/dimensiones-inventario/${codigo}/valores/${id}`,
+    },
   },
   suppliers: {
     list: '/suppliers',
@@ -182,6 +192,10 @@ export const ENDPOINTS = {
       movimientos: '/inventory/ubicaciones/movimientos',
     },
     repostValuacion: '/inventory/repost-valuacion',
+    ajustesDimension: '/inventory/ajustes-dimension',
+    reclasificaciones: '/inventory/reclasificaciones',
+    stockPorDimension: (itemCode: string) => `/inventory/items/${itemCode}/stock-por-dimension`,
+    verificarStockPorDimension: '/inventory/stock-por-dimension/verificar',
   },
   compras: {
     list: '/compras',

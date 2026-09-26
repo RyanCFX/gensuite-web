@@ -9,7 +9,9 @@ import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getDefaultPriceTier } from '@/shared/api/catalog'
 import { listImpuestosVentas, listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
 import type { CreateQuotationDto, ItemPrices, Bundle, Customer, MonedaCode } from '@/shared/api/types'
-import type { Item } from '@/shared/api/types'
+import type { Item, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
+import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
+import { mergeLineasIguales } from '@/shared/lib/mergeLineasIguales'
 import { getTasaVigente } from '@/shared/api/monedas'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
@@ -33,8 +35,7 @@ import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { isCostoCompraError } from '@/lib/pinOverride'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
-import { listItems } from '@/shared/api/catalog'
-import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { listItems, getItem } from '@/shared/api/catalog'
 import { client } from '@/shared/api/client'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
@@ -76,6 +77,14 @@ interface LineItem {
   /** Stock por almacén del artículo seleccionado, para validar contra el almacén elegido en la línea */
   _stockByWarehouse?: Record<string, number>
   stockError?: string
+  /** Combinación de dimensión de inventario elegida para esta línea (docs/tasks/
+   *  PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §5) — solo relevante si el artículo la usa. */
+  dimensiones?: DimensionesLinea
+  /** Dimensiones que el artículo de esta línea declara (`item.dimensiones`), guardadas en la fila
+   *  al seleccionar el artículo (o al re-consultarlo en modo edición/duplicado) para poder
+   *  renderizar el selector de combinación sin tener que re-pedirlo. Vacío/undefined si el
+   *  artículo no usa dimensiones. */
+  itemDimensionesDeclaradas?: ItemDimensionDeclarada[]
 }
 
 function validateLineStock(row: LineItem): string | undefined {
@@ -283,6 +292,25 @@ useEffect(() => {
      setInitialized(true)
    }, [existingQuotation, initialized])
 
+  // GET /quotations/:id no ecoa la combinación de dimensión elegida por línea (§10.2) — al editar
+  // solo podemos saber si el artículo de cada línea USA dimensiones (re-consultando el catálogo)
+  // para mostrarle el selector y obligarlo a reingresarla antes de guardar (§10.1/§10.2, opción
+  // (b) de las sugeridas por el documento).
+  useEffect(() => {
+    if (!existingQuotation) return
+    let cancelled = false
+    Promise.all(existingQuotation.items.map((i) => getItem(i.itemCode).catch(() => null))).then((catalogItems) => {
+      if (cancelled) return
+      setItems((prev) => prev.map((row, idx) => {
+        const catalogItem = catalogItems[idx]
+        return catalogItem?.usaDimensiones
+          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones }
+          : row
+      }))
+    })
+    return () => { cancelled = true }
+  }, [existingQuotation])
+
   // ── Duplicar: precargar desde una cotización existente (no crea nada) ────
   const { data: duplicateSource } = useQuery({
     queryKey: ['quotation-duplicate-source', duplicateId],
@@ -324,6 +352,24 @@ useEffect(() => {
     setNotes(duplicateSource.notes ?? '')
     setInitialized(true)
   }, [duplicateSource, isEdit, initialized])
+
+  // Igual que al editar: duplicar tampoco trae de vuelta la combinación de dimensión de cada línea
+  // (§10.2) — se re-consulta el catálogo para saber cuáles líneas la necesitan y mostrarles el
+  // selector, obligando a reingresarla antes de guardar la nueva cotización.
+  useEffect(() => {
+    if (isEdit || !duplicateSource) return
+    let cancelled = false
+    Promise.all(duplicateSource.items.map((i) => getItem(i.itemCode).catch(() => null))).then((catalogItems) => {
+      if (cancelled) return
+      setItems((prev) => prev.map((row, idx) => {
+        const catalogItem = catalogItems[idx]
+        return catalogItem?.usaDimensiones
+          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones }
+          : row
+      }))
+    })
+    return () => { cancelled = true }
+  }, [duplicateSource, isEdit])
 
   useEffect(() => {
     if (!duplicateCustomer) return
@@ -520,7 +566,20 @@ function buildDto(): CreateQuotationDto {
        branch: branch || undefined,
        currency: currency || undefined,
        conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
-       items: items.filter((i) => i.itemCode).map((i) => ({
+       // §5.1 — antes de armar el payload, se fusionan líneas del mismo artículo con la MISMA
+       // combinación de dimensión exacta, sumando la cantidad, para no dejarle al servidor un
+       // único error de stock confuso sobre la suma de dos líneas separadas.
+       items: mergeLineasIguales(items.filter((i) => i.itemCode), {
+         getItemCode: (r) => r.itemCode,
+         getDimensiones: (r) => r.dimensiones,
+         sumQty: (base, extra) => {
+           const qty = base.qty + extra.qty
+           const amount = base.discountMode === 'amount'
+             ? calcAmount(qty, base.rate, 0, base.discountAmount)
+             : calcAmount(qty, base.rate, base.discountPct)
+           return { ...base, qty, amount }
+         },
+       }).map((i) => ({
          itemCode: i.itemCode,
          description: i.description,
          qty: i.qty,
@@ -531,6 +590,11 @@ function buildDto(): CreateQuotationDto {
          discountAmount: i.discountMode === 'amount' ? (i.discountAmount || undefined) : undefined,
          uom: i.uom || undefined,
          warehouse: i.warehouse || undefined,
+         // ⚠️ Se reenvía SIEMPRE que la línea la tenga, en cada create/PUT — este formulario
+         // reemplaza el array `items[]` completo en cada guardado (incluso en una edición que solo
+         // tocó el encabezado), y la heurística de conservación de líneas de `PUT /quotations/:id`
+         // no es confiable cuando `items` se reenvía completo (§7.3/§10.1).
+         dimensiones: i.dimensiones && Object.keys(i.dimensiones).length > 0 ? i.dimensiones : undefined,
        })),
        notes: notes || undefined,
        taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
@@ -667,6 +731,8 @@ function buildDto(): CreateQuotationDto {
           _prices: s.item.prices,
           warehouse: defaultWarehouse(),
           _stockByWarehouse: s.item.stockByWarehouse,
+          itemDimensionesDeclaradas: s.item.usaDimensiones ? s.item.dimensiones : undefined,
+          dimensiones: undefined,
         }
       }),
     ])
@@ -713,6 +779,10 @@ function buildDto(): CreateQuotationDto {
           warehouse: defaultWarehouse(),
           _stockByWarehouse: catalogItem.stockByWarehouse,
           stockError: undefined,
+          // Un artículo nuevo en la fila implica una combinación nueva — nunca arrastramos la
+          // combinación del artículo anterior (§5).
+          itemDimensionesDeclaradas: catalogItem.usaDimensiones ? catalogItem.dimensiones : undefined,
+          dimensiones: undefined,
         }
       })
     })
@@ -755,6 +825,10 @@ function buildDto(): CreateQuotationDto {
           warehouse: defaultWarehouse(),
           _stockByWarehouse: undefined,
           stockError: undefined,
+          // Un combo agrupa varios artículos — la combinación de dimensión no aplica a nivel de
+          // línea de combo (§0), así que nunca se muestra el selector para esta fila.
+          itemDimensionesDeclaradas: undefined,
+          dimensiones: undefined,
         }
       })
     })
@@ -762,7 +836,7 @@ function buildDto(): CreateQuotationDto {
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '' })
+    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', itemDimensionesDeclaradas: undefined, dimensiones: undefined })
   }
 
   // ── Reprice on customer change ───────────────────────────────────────────
@@ -805,6 +879,14 @@ function buildDto(): CreateQuotationDto {
       amount: calcAmount(item.qty, item.rate, 0, 0),
     })))
   }
+
+  // Al editar (o duplicar), ninguna línea trae de vuelta su combinación previa (§10.2) — si el
+  // artículo la usa y la fila todavía no tiene una elegida, hay que avisarle al usuario que la
+  // reingrese antes de guardar (si no, el PUT/POST la reenviaría vacía y el servidor rechazaría
+  // esa línea, §11).
+  const lineasRequierenReingresoDimension = (isEdit || !!duplicateId) && items.some(
+    (i) => (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
+  )
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0)
   const grossTotal = items.reduce((s, i) => s + i.qty * i.rate, 0)
@@ -889,6 +971,15 @@ if (esClienteOcasional) {
         toast.error(`Artículo #${num}: ${row.stockError}`)
         return
       }
+      // Artículo con dimensión de inventario: exige la combinación completa antes de someter
+      // (§0.2, §11) — evita un 400 confuso del servidor sobre una línea sin identificar.
+      if (
+        (row.itemDimensionesDeclaradas?.length ?? 0) > 0
+        && !combinacionCompleta(row.itemDimensionesDeclaradas ?? [], row.dimensiones ?? {})
+      ) {
+        toast.error(`Artículo #${num} (${row.itemLabel ?? row.itemCode}): selecciona la combinación de dimensión completa antes de guardar`)
+        return
+      }
     }
 
     submitDto()
@@ -919,6 +1010,13 @@ if (esClienteOcasional) {
           <RecargarButton label="Actualizar" />
         </div>
       </div>
+
+      {lineasRequierenReingresoDimension && (
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
+          <Info size={16} />
+          <span>Esta cotización tiene línea(s) con un artículo que usa combinación de dimensión de inventario, pero el sistema no puede recuperar la combinación con la que se guardaron originalmente. Vuelve a seleccionarla en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         {/* ── Información General ─────────────────────────────────────────── */}
@@ -1144,13 +1242,17 @@ if (esClienteOcasional) {
                     Subtotal
                     <span className="col-resize-handle" onMouseDown={startResize('subtotal')} />
                   </th>
+                   <th style={{ textAlign: 'right' }}>
+                    Combinación
+                    <span className="col-resize-handle" onMouseDown={startResize('combination')} />
+                  </th>
                   <th />
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+                    <td colSpan={10} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
                       No hay artículos. Agrega uno con el botón de abajo.
                     </td>
                   </tr>
@@ -1304,6 +1406,32 @@ if (esClienteOcasional) {
                           className="btn btn-ghost btn-size-icon-xs"
                           onClick={() => setViewItemCode(item.itemCode)}
                           disabled={!item.itemCode}
+                        />
+                      </td>
+
+                      <td>
+                        {item.itemDimensionesDeclaradas && item.itemDimensionesDeclaradas.length > 0 && (
+                          <CombinacionDimensionSelector
+                            itemDimensiones={item.itemDimensionesDeclaradas}
+                            value={item.dimensiones ?? {}}
+                            onChange={(v) => updateItem(index, { dimensiones: v })}
+                            compact
+                          />
+                        )}
+                      </td>
+
+                      <td onClick={(e) => e.stopPropagation()} className="actions-cell">
+                        <ActionsMenu>
+                          <ActionsMenuItem
+                            onClick={() => setViewItemCode(item.itemCode)}
+                            disabled={!item.itemCode}
+                          >
+                            <Eye size={14} /> Ver detalle
+                          </ActionsMenuItem>
+                          <ActionsMenuItem danger onClick={() => removeRow(index)}>
+                            <Trash2 size={14} /> Eliminar
+                          </ActionsMenuItem>
+                        </ActionsMenu>
                           title="Ver detalle"
                         >
                           <Eye size={14} />

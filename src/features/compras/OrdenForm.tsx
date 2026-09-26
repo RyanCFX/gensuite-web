@@ -10,10 +10,12 @@ import { listWarehouses } from '@/shared/api/inventory'
 import { listAlmacenes, getFacturacionConfig, listImpuestosCompras } from '@/shared/api/config'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
-import type { CreateOrdenCompraDto, Item } from '@/shared/api/types'
+import type { CreateOrdenCompraDto, Item, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { Plus, Trash2, Save, Loader2 } from 'lucide-react'
+import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
+import { getItem } from '@/shared/api/catalog'
+import { Plus, Trash2, Save, Loader2, Info } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
@@ -39,10 +41,49 @@ interface ItemRow {
   warehouse: string
   uom: string
   lineError?: string
+  /** Combinación de dimensión de inventario elegida para esta línea (docs/tasks/
+   *  PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §5). */
+  dimensiones?: DimensionesLinea
+  /** Dimensiones que el artículo de esta línea declara — ver misma nota en CompraForm.tsx. */
+  itemDimensionesDeclaradas?: ItemDimensionDeclarada[]
 }
 
 function emptyItem(defaultWh?: string): ItemRow {
   return { itemCode: '', description: '', qty: 1, rate: 0, discountPct: 0, warehouse: defaultWh ?? '', uom: 'Nos' }
+}
+
+/** `true` si dos combinaciones de dimensión son exactamente iguales — ver misma función en
+ *  CompraForm.tsx (§5.1). */
+function dimensionesIguales(a?: DimensionesLinea, b?: DimensionesLinea): boolean {
+  const ea = Object.entries(a ?? {})
+  const eb = Object.entries(b ?? {})
+  if (ea.length !== eb.length) return false
+  return ea.every(([k, v]) => (b ?? {})[k] === v)
+}
+
+/** Fusiona líneas del mismo artículo con la misma combinación de dimensión exacta en una sola,
+ *  sumando la cantidad (§5.1) — justo antes de someter, sin tocar el estado de la UI. */
+function mergeIdenticalDimensionLines(rows: ItemRow[]): ItemRow[] {
+  const result: ItemRow[] = []
+  for (const row of rows) {
+    const tieneCombinacion = row.dimensiones && Object.keys(row.dimensiones).length > 0
+    if (tieneCombinacion) {
+      const existente = result.find((r) =>
+        r.itemCode === row.itemCode
+        && r.warehouse === row.warehouse
+        && r.uom === row.uom
+        && r.rate === row.rate
+        && r.discountPct === row.discountPct
+        && dimensionesIguales(r.dimensiones, row.dimensiones),
+      )
+      if (existente) {
+        existente.qty += row.qty
+        continue
+      }
+    }
+    result.push({ ...row })
+  }
+  return result
 }
 
 export default function OrdenForm() {
@@ -193,6 +234,24 @@ export default function OrdenForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ordenData])
 
+  // GET /compras/ordenes/:id tampoco ecoa la combinación elegida por línea (§10.2) — al editar
+  // solo podemos saber si el artículo de cada línea USA dimensiones (re-consultando el catálogo)
+  // para mostrarle el selector y obligarlo a reingresarla antes de guardar.
+  useEffect(() => {
+    if (!ordenData) return
+    let cancelled = false
+    Promise.all(ordenData.items.map((oi) => getItem(oi.itemCode).catch(() => null))).then((catalogItems) => {
+      if (cancelled) return
+      setItems((prev) => prev.map((row, idx) => {
+        const catalogItem = catalogItems[idx]
+        return catalogItem?.usaDimensiones
+          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones }
+          : row
+      }))
+    })
+    return () => { cancelled = true }
+  }, [ordenData])
+
   const isDirty = useDirtyCheck({
     supplierId,
     transactionDate,
@@ -248,6 +307,11 @@ export default function OrdenForm() {
 
   const grandTotal = items.reduce((sum, i) => sum + i.qty * i.rate * (1 - (i.discountPct || 0) / 100), 0)
 
+  // Ver misma nota en CompraForm.tsx (§10.2, opción (b)).
+  const lineasRequierenReingresoDimension = isEdit && items.some(
+    (i) => (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
+  )
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!supplierId) { toast.error('Selecciona un proveedor'); return }
@@ -274,7 +338,7 @@ export default function OrdenForm() {
       taxesTemplate: taxesTemplate || undefined,
       branch: branch || undefined,
       department: usaDepartamentos ? (department || undefined) : undefined,
-      items: items.filter((i) => i.itemCode).map((i) => ({
+      items: mergeIdenticalDimensionLines(items).filter((i) => i.itemCode).map((i) => ({
         itemCode: i.itemCode,
         description: i.description || undefined,
         qty: i.qty,
@@ -282,6 +346,10 @@ export default function OrdenForm() {
         discountPct: i.discountPct || undefined,
         uom: i.uom || undefined,
         warehouse: i.warehouse || undefined,
+        // Siempre se reenvía en cada guardado — este endpoint tampoco conserva la combinación de
+        // una línea no tocada en el PUT (§6.3/§10.1). Viaja homónima a la recepción/factura
+        // generada desde esta línea salvo que el usuario la corrija explícitamente al recibir.
+        ...(i.dimensiones && Object.keys(i.dimensiones).length > 0 ? { dimensiones: i.dimensiones } : {}),
       })),
     }
     saveMutation.mutate(dto)
@@ -301,12 +369,15 @@ export default function OrdenForm() {
         description: catalogItem.internalDescription ?? catalogItem.itemName,
         rate: catalogItem.valuationRate ?? catalogItem.standardRate ?? 0,
         uom: catalogItem.stockUom ?? row.uom,
+        // Un artículo nuevo en la fila implica una combinación nueva.
+        itemDimensionesDeclaradas: catalogItem.usaDimensiones ? catalogItem.dimensiones : undefined,
+        dimensiones: undefined,
       }
     }))
   }, [])
 
   const clearCatalogItem = useCallback((idx: number) => {
-    updateItem(idx, { itemCode: '', itemLabel: undefined, description: '', rate: 0 })
+    updateItem(idx, { itemCode: '', itemLabel: undefined, description: '', rate: 0, itemDimensionesDeclaradas: undefined, dimensiones: undefined })
   }, [updateItem])
 
   if (isEdit && loadingEdit) {
@@ -329,6 +400,13 @@ export default function OrdenForm() {
         description="El pedido formal a un proveedor específico, con precios"
         action={<RecargarButton label="Actualizar" />}
       />
+
+      {lineasRequierenReingresoDimension && (
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
+          <Info size={16} />
+          <span>Esta orden tiene línea(s) con un artículo que usa combinación de dimensión de inventario, pero el sistema no puede recuperar la combinación con la que se guardaron originalmente. Vuelve a seleccionarla en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -469,6 +547,10 @@ export default function OrdenForm() {
                         UOM
                         <span className="col-resize-handle" onMouseDown={startResize('udm')} />
                       </th>
+                      <th>
+                        Combinación
+                        <span className="col-resize-handle" onMouseDown={startResize('combination')} />
+                      </th>
                       <th />
                     </tr>
                   </thead>
@@ -545,6 +627,16 @@ export default function OrdenForm() {
                             />
                           </td>
                           <td>
+                            {item.itemDimensionesDeclaradas && item.itemDimensionesDeclaradas.length > 0 && (
+                              <CombinacionDimensionSelector
+                                itemDimensiones={item.itemDimensionesDeclaradas}
+                                value={item.dimensiones ?? {}}
+                                onChange={(v) => updateItem(idx, { dimensiones: v })}
+                                compact
+                              />
+                            )}
+                          </td>
+                          <td>
                             <button
                               type="button"
                               className="btn btn-ghost btn-size-icon-sm"
@@ -557,7 +649,7 @@ export default function OrdenForm() {
                         </tr>
                         {item.lineError && (
                           <tr>
-                            <td colSpan={8} style={{ color: 'var(--error-text)', fontSize: 12, paddingTop: 0 }}>
+                            <td colSpan={9} style={{ color: 'var(--error-text)', fontSize: 12, paddingTop: 0 }}>
                               {item.lineError}
                             </td>
                           </tr>

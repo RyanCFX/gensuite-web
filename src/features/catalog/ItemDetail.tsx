@@ -5,13 +5,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getItem, toggleItem, listItemVariants, generateVariants, createVariant, getAttribute, updateItemPrices } from '@/shared/api/catalog'
 import { getFacturacionConfig } from '@/shared/api/config'
-import { listWarehouses } from '@/shared/api/inventory'
+import { listWarehouses, getStockPorDimension } from '@/shared/api/inventory'
 import { listZonas } from '@/shared/api/zonas'
 import { listUbicaciones, getItemUbicaciones, assignItemUbicacion, unassignItemUbicacion, moverStockUbicacion } from '@/shared/api/ubicaciones'
+import { useValoresDimension } from '@/shared/hooks/useDimensionesInventario'
 import { formatDOP } from '@/lib/formatters'
 import { PrintLabelsModal } from '@/components/shared/PrintLabelsModal'
-import { ToggleLeft, ToggleRight, Package, ArrowLeft, X, MapPin, Trash2, Info, DollarSign, ArrowRightLeft, Pencil, Printer, Truck } from 'lucide-react'
-import type { Item, GenerateVariantsResult, ItemAttribute, ApiError, UpdateItemPricesDto, ItemPricesResult } from '@/shared/api/types'
+import { ToggleLeft, ToggleRight, Package, ArrowLeft, X, MapPin, Trash2, Info, DollarSign, ArrowRightLeft, Pencil, Printer, Truck, ChevronDown, ChevronUp, AlertTriangle, Layers } from 'lucide-react'
+import type { Item, GenerateVariantsResult, ItemAttribute, ApiError, UpdateItemPricesDto, ItemPricesResult, DimensionesLinea } from '@/shared/api/types'
+import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -772,9 +774,19 @@ function MoverUbicacionModal({
   const [ubicacionDestino, setUbicacionDestino] = useState('')
   const [cantidad, setCantidad] = useState(1)
   const [notas, setNotas] = useState('')
+  const [dimensiones, setDimensiones] = useState<DimensionesLinea>({})
 
-  const isDirty = useDirtyCheck({ zonaId, ubicacionDestino, cantidad, notas }, true)
+  const isDirty = useDirtyCheck({ zonaId, ubicacionDestino, cantidad, notas, dimensiones }, true)
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
+
+  // Mismo queryKey ['item', itemCode] que PendienteCombinacionCell en ZonasPage.tsx — se benefician
+  // del mismo cache de react-query si ambas pantallas se visitan en la misma sesión.
+  const { data: catalogItem } = useQuery({
+    queryKey: ['item', itemCode],
+    queryFn: () => getItem(itemCode),
+  })
+  const usaDimensiones = !!catalogItem?.usaDimensiones && (catalogItem?.dimensiones?.length ?? 0) > 0
+  const combinacionOk = !usaDimensiones || combinacionCompleta(catalogItem!.dimensiones!, dimensiones)
 
   const { data: zonasData } = useQuery({
     queryKey: ['zonas', warehouse],
@@ -800,7 +812,14 @@ function MoverUbicacionModal({
     .map((u) => ({ value: u.id, label: u.ubicacionName }))
 
   const moverMutation = useMutation({
-    mutationFn: () => moverStockUbicacion({ itemCode, cantidad, ubicacionOrigen: origen.id, ubicacionDestino, notas: notas || undefined }),
+    mutationFn: () => moverStockUbicacion({
+      itemCode,
+      cantidad,
+      ubicacionOrigen: origen.id,
+      ubicacionDestino,
+      notas: notas || undefined,
+      dimensiones: usaDimensiones ? dimensiones : undefined,
+    }),
     onSuccess: () => {
       toast.success('Stock movido correctamente')
       onSuccess()
@@ -854,6 +873,16 @@ function MoverUbicacionModal({
               onChange={(e) => setCantidad(parseFloat(e.target.value) || 0)}
             />
           </div>
+          {usaDimensiones && (
+            <div className="ff-wrap">
+              <label className="ff-label ff-required">Combinación</label>
+              <CombinacionDimensionSelector
+                itemDimensiones={catalogItem!.dimensiones!}
+                value={dimensiones}
+                onChange={setDimensiones}
+              />
+            </div>
+          )}
           <div className="ff-wrap">
             <label className="ff-label">Notas</label>
             <textarea className="ff-textarea" rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Opcional" />
@@ -864,7 +893,7 @@ function MoverUbicacionModal({
           <button
             className="btn btn-primary"
             onClick={() => moverMutation.mutate()}
-            disabled={!ubicacionDestino || cantidad <= 0 || moverMutation.isPending}
+            disabled={!ubicacionDestino || cantidad <= 0 || !combinacionOk || moverMutation.isPending}
           >
             {moverMutation.isPending ? 'Moviendo…' : 'Mover'}
           </button>
@@ -879,6 +908,134 @@ function MoverUbicacionModal({
         confirmLabel="Descartar cambios"
         variant="danger"
       />
+    </div>
+  )
+}
+
+// ─── Panel de Stock por Combinación ───────────────────────────────────────────
+// docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §8.3 — reemplazo, para un artículo con
+// dimensiones, de la columna simple de "Stock actual": el stock total no dice si existe la
+// combinación puntual que pide el cliente. Acordeón cerrado por defecto — la llamada solo se
+// dispara al abrir la sección (§8.3 recomienda no pedirlo en un listado general), no al cargar
+// la página.
+
+/** Resuelve `id` → etiqueta legible para UNA columna de dimensión de la grilla. El backend hoy
+ *  manda `valores[codigo].etiqueta` literalmente igual al `id` (§8.3) — nunca se usa ese campo acá,
+ *  se resuelve siempre contra el catálogo de valores de la dimensión. */
+function StockPorDimensionCell({ codigo, id }: { codigo: string; id: string | undefined }) {
+  const { etiquetaDe, isLoading } = useValoresDimension(codigo)
+  if (!id) return <>—</>
+  if (isLoading) return <span className="skeleton-box" style={{ width: 60, height: 14, display: 'inline-block' }} />
+  return <>{etiquetaDe(id)}</>
+}
+
+function StockPorDimensionPanel({ itemCode }: { itemCode: string }) {
+  const [open, setOpen] = useState(false)
+  const [warehouse, setWarehouse] = useState('')
+  const [warehouseSearch, setWarehouseSearch] = useState('')
+
+  const { data: warehouses } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: listWarehouses,
+    enabled: open,
+  })
+  const warehouseOptions: SearchSelectOption[] = (warehouses ?? [])
+    .filter((w) => !warehouseSearch || w.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
+    .map((w) => ({ value: w.id, label: w.name }))
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['stock-por-dimension', itemCode, warehouse],
+    // Solo se dispara al abrir el acordeón — no en la carga inicial del detalle ni en un listado.
+    queryFn: () => getStockPorDimension(itemCode, warehouse ? { warehouse } : undefined),
+    enabled: open,
+  })
+
+  const response = data?.data
+  const dimensiones = response?.dimensiones ?? []
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div
+        className="card-header"
+        style={{ cursor: 'pointer' }}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Layers size={15} style={{ color: 'var(--text-secondary)' }} /> Stock por combinación
+        </span>
+        {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </div>
+
+      {open && (
+        <div className="card-body">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ width: 220 }}>
+              <SearchSelect
+                value={warehouse}
+                onChange={setWarehouse}
+                options={warehouseOptions}
+                onSearch={setWarehouseSearch}
+                selectedLabel={warehouseOptions.find((w) => w.value === warehouse)?.label ?? ''}
+                placeholder="Todos los almacenes"
+              />
+            </div>
+          </div>
+
+          {isLoading ? (
+            <span className="skeleton-box" style={{ height: 100, display: 'block' }} />
+          ) : !response || response.items.length === 0 ? (
+            <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: 0 }}>Sin combinaciones registradas.</p>
+          ) : (
+            <>
+              <div className="stats-row" style={{ marginBottom: 16 }}>
+                <div className="stat-card">
+                  <div className="stat-card-top"><span className="stat-label">Total</span></div>
+                  <div className="stat-value" style={{ fontSize: 28 }}>{response.total}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-card-top"><span className="stat-label">Sin especificar</span></div>
+                  <div className="stat-value" style={{ fontSize: 28, color: response.sinEspecificar !== 0 ? 'var(--color-error)' : undefined }}>
+                    {response.sinEspecificar}
+                  </div>
+                  {/* §8.3 — para un artículo dimensionado desde el día uno esto debería ser
+                      siempre 0; un valor distinto de cero señala un problema de datos, no un
+                      estado normal. */}
+                  {response.sinEspecificar !== 0 && (
+                    <div className="stat-footer">
+                      <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <AlertTriangle size={12} /> Revisar — señal de un problema de datos
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <table className="data-table" style={{ width: '100%' }}>
+                <thead>
+                  <tr>
+                    <th>Almacén</th>
+                    {dimensiones.map((d) => <th key={d.codigo}>{d.etiqueta}</th>)}
+                    <th style={{ textAlign: 'right' }}>Disponible</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {response.items.map((row, i) => (
+                    <tr key={i}>
+                      <td>{row.warehouse}</td>
+                      {dimensiones.map((d) => (
+                        <td key={d.codigo}>
+                          <StockPorDimensionCell codigo={d.codigo} id={row.valores[d.codigo]?.id} />
+                        </td>
+                      ))}
+                      <td style={{ textAlign: 'right' }}>{row.disponible}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -1422,6 +1579,10 @@ export default function ItemDetail() {
             )}
           </div>
         </div>
+      )}
+
+      {item.type === 'product' && !item.hasVariants && item.usaDimensiones === true && (
+        <StockPorDimensionPanel itemCode={item.id} />
       )}
 
       {item.type === 'product' && !item.hasVariants && (
