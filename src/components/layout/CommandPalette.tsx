@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getFacturacionConfig } from '@/shared/api/config'
 import { usePermissionsStore } from '@/stores/permissions.store'
+import { useFeaturesStore } from '@/stores/features.store'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { resolverRuta } from '@/shared/permissions/rutas'
+import { resolverFeature, REPORTE_KEY_POR_TIPO } from '@/shared/features/catalog'
 import {
   LayoutDashboard, Users, Package, PackagePlus, FileText, Receipt, Warehouse,
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
@@ -199,11 +201,25 @@ interface PermCtx {
   acciones: Record<string, boolean>
   esFarmacia: boolean
   isSystemManager: boolean
+  features: Record<string, boolean> | null
+  featuresReady: boolean
+  reportesHabilitados: readonly string[]
 }
 
 // Oculta del buscador global las entradas que el usuario no podría abrir
-// (docs/PROMPT_PERMISOS_FRONTEND.md §6) — misma fuente de verdad que el guard de router.
+// (docs/PROMPT_PERMISOS_FRONTEND.md §6 + docs/tasks/80_features_tenant_discriminacion_ui.md §5)
+// — misma fuente de verdad que el guard de router y que el menú lateral.
 function itemPermitido(item: SearchItem, perm: PermCtx): boolean {
+  // Features del tenant (§5): un ítem se muestra solo si el feature está encendido Y hay permiso.
+  if (perm.featuresReady) {
+    const featureKey = resolverFeature(item.path)?.feature ?? null
+    if (featureKey !== null && perm.features?.[featureKey] !== true) return false
+    if (item.path.startsWith('/reportes/')) {
+      const tipo = item.path.split('/')[2] ?? ''
+      const reporteKey = REPORTE_KEY_POR_TIPO[tipo]
+      if (reporteKey && !perm.reportesHabilitados.includes(reporteKey)) return false
+    }
+  }
   const ruta = resolverRuta(item.path)
   if (!ruta) return true
   if (ruta.soloFarmacia && !perm.esFarmacia) return false
@@ -247,10 +263,13 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const acciones = usePermissionsStore((s) => s.acciones)
   const esFarmacia = usePermissionsStore((s) => s.vertical) === 'farmacia'
   const isSystemManager = useIsSystemManager()
+  const features = useFeaturesStore((s) => s.features)
+  const featuresReady = useFeaturesStore((s) => s.status === 'ready')
+  const reportesHabilitados = useFeaturesStore((s) => s.reportesHabilitados)
 
   const results = useMemo(
-    () => filterItems(query, usaModuloPos, { acciones, esFarmacia, isSystemManager }),
-    [query, usaModuloPos, acciones, esFarmacia, isSystemManager],
+    () => filterItems(query, usaModuloPos, { acciones, esFarmacia, isSystemManager, features, featuresReady, reportesHabilitados }),
+    [query, usaModuloPos, acciones, esFarmacia, isSystemManager, features, featuresReady, reportesHabilitados],
   )
 
   // Reset on open

@@ -23,6 +23,9 @@ import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { useAuthStore } from '@/stores/auth.store'
+import { useLimites } from '@/shared/features/can'
+import { limiteUsuariosAlcanzado, textoContadorUsuarios } from '@/shared/features/catalog'
+import { isApiErrorCode } from '@/shared/api/client'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -55,6 +58,12 @@ type ConfirmType = { type: 'revocar' | 'suspender' | 'reactivar' | 'reinvitar'; 
 export default function UsuariosPage() {
   const queryClient = useQueryClient()
   const authUser = useAuthStore((s) => s.user)
+  // Límites del plan (§8): contador "X de Y" junto al botón de alta + botón deshabilitado al
+  // llegar al límite. Es ayuda de UX, no la validación real (el submit igual puede intentar y el
+  // backend responde LIMITE_USUARIOS_ALCANZADO — ver inviteMutation abajo).
+  const limites = useLimites()
+  const limiteAlcanzado = limiteUsuariosAlcanzado(limites)
+  const contador = textoContadorUsuarios(limites)
 
   const [statusFilter, setStatusFilter] = useState<MembershipStatus | 'all'>('all')
 
@@ -171,7 +180,21 @@ export default function UsuariosPage() {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] })
       resetForm()
     },
-    onError: (err) => toast.error(apiMessage(err, 'Error al invitar al usuario')),
+    // §9 LIMITE_USUARIOS_ALCANZADO (400): mensaje con el límite exacto (details.limite) — mismo
+    // texto que el tooltip del botón deshabilitado. El contador pudo quedar desactualizado
+    // (alguien creó un usuario en otra pestaña un segundo antes).
+    onError: (err) => {
+      if (isApiErrorCode(err, 'LIMITE_USUARIOS_ALCANZADO')) {
+        const limite = (err.details as { limite?: number } | undefined)?.limite
+        toast.error(limite !== undefined
+          ? `Se alcanzó el límite del plan (${limite} usuarios).`
+          : apiMessage(err, 'Se alcanzó el límite de usuarios del plan.'))
+        return
+      }
+      // §9 PERFIL_NO_CONTRATADO (400): no debería pasar si el selector usa GET /roles/perfiles
+      // en vivo (ver PerfilesChecklist abajo — consume el endpoint sin filtro adicional, §7).
+      toast.error(apiMessage(err, 'Error al invitar al usuario'))
+    },
   })
 
   const updateMutation = useMutation({
@@ -181,6 +204,8 @@ export default function UsuariosPage() {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] })
       resetForm()
     },
+    // §9 PERFIL_NO_CONTRATADO (400): no debería pasar si el selector usa GET /roles/perfiles
+    // en vivo — mensaje genérico.
     onError: (err) => toast.error(apiMessage(err, 'Error al actualizar el usuario')),
   })
 
@@ -293,7 +318,17 @@ export default function UsuariosPage() {
         action={
           <>
             <RecargarButton />
-            <button className="btn btn-primary" onClick={openInvite}>
+            {contador && (
+              <span style={{ fontSize: 12, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }} title={`${contador} — límite del plan`}>
+                {contador}
+              </span>
+            )}
+            <button
+              className="btn btn-primary"
+              onClick={openInvite}
+              disabled={limiteAlcanzado}
+              title={limiteAlcanzado ? `Se alcanzó el límite del plan (${contador}).` : undefined}
+            >
               <Plus size={16} />
               Invitar Usuario
             </button>
@@ -753,6 +788,9 @@ function PerfilesChecklist({ perfiles, isError, selected, onToggle, onSelectAll,
   onSelectAll: (names: string[]) => void
   hint?: string
 }) {
+  // §7 — GET /roles/perfiles YA viene filtrado por el backend según los features del tenant: se
+  // consume tal cual, sin ningún filtro adicional del lado del frontend (el backend puede tener
+  // reglas más finas). No filtrar esta lista por `features` nunca.
   const allSelected = perfiles.length > 0 && selected.length === perfiles.length
 
   return (

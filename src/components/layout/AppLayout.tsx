@@ -48,14 +48,17 @@ import {
   Wrench,
   ScrollText,
   Pill,
+  FlaskConical,
   History,
   Handshake,
   ArrowLeftRight,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { usePermissionsStore } from "@/stores/permissions.store";
+import { useFeaturesStore } from "@/stores/features.store";
 import { useIsSystemManager } from "@/shared/hooks/useIsSystemManager";
 import { resolverRuta } from "@/shared/permissions/rutas";
+import { resolverFeature, REPORTE_KEY_POR_TIPO } from "@/shared/features/catalog";
 import { switchTenant, isApiError } from "@/shared/api/auth";
 import { CommandPalette } from "./CommandPalette";
 import { Toaster, toast } from "sonner";
@@ -324,6 +327,7 @@ const NAV_FARMACIA: NavGroup = {
   children: [
     { label: "Aseguradoras", icon: <Shield size={14} />, path: "/farmacia/aseguradoras" },
     { label: "Lotes de Facturación", icon: <Receipt size={14} />, path: "/farmacia/lotes" },
+    { label: "Principios Activos", icon: <FlaskConical size={14} />, path: "/farmacia/principios-activos" },
     // Vive en la pantalla de Reportes (/reportes/:tipo), no bajo /farmacia — el permiso igual se
     // resuelve por ruta (`farmacia.reportes.lotes.listar`) como cualquier otra entrada del menú.
     { label: "Reportes", icon: <FileText size={14} />, path: "/reportes/farmacia-lotes" },
@@ -739,20 +743,43 @@ function stripAdminOnlyEntry(entry: NavEntry): NavEntry | null {
   return stripPathsFromEntry(entry, ADMIN_ONLY_PATHS);
 }
 
-// Filtra el menú por los permisos del usuario actual (docs/PROMPT_PERMISOS_FRONTEND.md §6).
-// Fuente de verdad: el mismo mapa ruta→acción que usa el guard de router (`RUTAS_PERMISOS`).
+// Filtra el menú por los permisos del usuario actual (docs/PROMPT_PERMISOS_FRONTEND.md §6) Y por
+// los features contratados por el tenant (docs/tasks/80_features_tenant_discriminacion_ui.md §5).
+// Fuente de verdad: el mismo mapa ruta→acción que usa el guard de router (`RUTAS_PERMISOS`) más
+// el mapa ruta→feature (`RUTAS_FEATURES`, ver `resolverFeature`).
 // - Ítem sin entrada en el mapa → se deja pasar (fail-open); la seguridad real la aplica el backend.
 // - `soloFarmacia` / `soloSystemManager` se evalúan antes que `acciones` (§6 / §15).
+// - Feature apagado → el ítem se oculta aunque el permiso exista (§2 features: hacen falta las DOS).
+//   Mientras los features no están `ready`, fail-open (ProtectedRoute bloquea de todos modos).
+// - Reportes (`/reportes/:tipo`) se filtran por `reportesHabilitados`, no por feature de módulo (§6).
 // - Un grupo cuyos hijos quedan todos ocultos no se renderiza (no dejar carpetas vacías).
 function filtrarNavPorPermisos(
   entry: NavEntry,
-  ctx: { acciones: Record<string, boolean>; esFarmacia: boolean; isSystemManager: boolean },
+  ctx: {
+    acciones: Record<string, boolean>
+    esFarmacia: boolean
+    isSystemManager: boolean
+    features: Record<string, boolean> | null
+    featuresReady: boolean
+    reportesHabilitados: readonly string[]
+  },
 ): NavEntry | null {
   if (isGroup(entry)) {
     const children = entry.children
       .map((c) => filtrarNavPorPermisos(c, ctx))
       .filter((c): c is NavEntry => c !== null);
     return children.length ? { ...entry, children } : null;
+  }
+  // Features del tenant (§5) — se evalúan junto con los permisos, en el mismo filtro.
+  if (ctx.featuresReady) {
+    const featureKey = resolverFeature(entry.path)?.feature ?? null;
+    if (featureKey !== null && ctx.features?.[featureKey] !== true) return null;
+    // Reportes individuales por `reportesHabilitados` (§6) — la pantalla contenedora es núcleo.
+    if (entry.path.startsWith('/reportes/')) {
+      const tipo = entry.path.split('/')[2] ?? '';
+      const reporteKey = REPORTE_KEY_POR_TIPO[tipo];
+      if (reporteKey && !ctx.reportesHabilitados.includes(reporteKey)) return null;
+    }
   }
   const ruta = resolverRuta(entry.path);
   if (!ruta) return entry;
@@ -764,7 +791,14 @@ function filtrarNavPorPermisos(
 
 function filtrarNavList(
   entries: NavEntry[],
-  ctx: { acciones: Record<string, boolean>; esFarmacia: boolean; isSystemManager: boolean },
+  ctx: {
+    acciones: Record<string, boolean>
+    esFarmacia: boolean
+    isSystemManager: boolean
+    features: Record<string, boolean> | null
+    featuresReady: boolean
+    reportesHabilitados: readonly string[]
+  },
 ): NavEntry[] {
   return entries
     .map((e) => filtrarNavPorPermisos(e, ctx))
@@ -1254,7 +1288,10 @@ function AppLayoutInner() {
   const vertical = usePermissionsStore((s) => s.vertical);
   const esFarmacia = vertical === "farmacia";
   const acciones = usePermissionsStore((s) => s.acciones);
-  const permCtx = { acciones, esFarmacia, isSystemManager };
+  const features = useFeaturesStore((s) => s.features);
+  const featuresReady = useFeaturesStore((s) => s.status === 'ready');
+  const reportesHabilitados = useFeaturesStore((s) => s.reportesHabilitados);
+  const permCtx = { acciones, esFarmacia, isSystemManager, features, featuresReady, reportesHabilitados };
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ["facturacion-config"],
