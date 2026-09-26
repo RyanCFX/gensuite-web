@@ -6,11 +6,22 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Search, Wallet } from 'lucide-react'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const COLUMNS = [
+  { key: 'factura', width: 140 },
+  { key: 'proveedor', width: 220 },
+  { key: 'vencimiento', width: 160 },
+  { key: 'total', width: 120 },
+  { key: 'pendiente', width: 120 },
+  { key: 'actions', width: 40 },
+]
 
 export default function PendientesPagoPage() {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [overdueOnly, setOverdueOnly] = useState(false)
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data, isLoading } = useQuery({
     queryKey: ['pagos-pendientes', search, overdueOnly],
@@ -59,15 +70,33 @@ export default function PendientesPagoPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Factura</th>
-                <th>Proveedor</th>
-                <th>Vencimiento</th>
-                <th style={{ textAlign: 'right' }}>Total</th>
-                <th style={{ textAlign: 'right' }}>Pendiente</th>
-                <th style={{ width: 40 }} />
+                <th>
+                  Factura
+                  <span className="col-resize-handle" onMouseDown={startResize('factura')} />
+                </th>
+                <th>
+                  Proveedor
+                  <span className="col-resize-handle" onMouseDown={startResize('proveedor')} />
+                </th>
+                <th>
+                  Vencimiento
+                  <span className="col-resize-handle" onMouseDown={startResize('vencimiento')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Total
+                  <span className="col-resize-handle" onMouseDown={startResize('total')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Pendiente
+                  <span className="col-resize-handle" onMouseDown={startResize('pendiente')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -92,7 +121,7 @@ export default function PendientesPagoPage() {
                 : facturas.map((f) => (
                     <tr key={f.id}>
                       <td>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500 }}>{f.id}</span>
+                        <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500 }}>{f.id}</span>
                       </td>
                       <td>{f.supplierName}</td>
                       <td>

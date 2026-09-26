@@ -17,6 +17,7 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { usePuede } from '@/shared/permissions/can'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { formatDate, formatDateTime, formatDOP } from '@/lib/formatters'
 import { ESTADO_TRANSACCION_BADGE, ESTADOS_TRANSACCION_B2B } from './estadoTransaccion'
 
@@ -79,6 +80,17 @@ export default function TransaccionesPage() {
   function resetPage<T>(setter: (v: T) => void) {
     return (v: T) => { setter(v); setPage(1) }
   }
+
+  const TRANSACCIONES_COLUMNS = [
+    { key: 'direccion', width: 100 },
+    { key: 'tipo', width: 90 },
+    { key: 'contraparte', width: 200 },
+    { key: 'documentoOrigen', width: 220 },
+    { key: 'estado', width: 160 },
+    { key: 'creada', width: 110 },
+    { key: 'acciones', width: 150 },
+  ]
+  const { widths: transaccionesColWidths, startResize: startTransaccionesResize } = useResizableColumns(TRANSACCIONES_COLUMNS)
 
   if (!puedeListar) {
     return (
@@ -158,16 +170,19 @@ export default function TransaccionesPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {TRANSACCIONES_COLUMNS.map((c) => <col key={c.key} style={{ width: transaccionesColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Dirección</th>
-                <th>Tipo</th>
-                <th>Contraparte</th>
-                <th>Documento origen</th>
-                <th>Estado</th>
-                <th>Creada</th>
-                <th>Acciones</th>
+                <th>Dirección<span className="col-resize-handle" onMouseDown={startTransaccionesResize('direccion')} /></th>
+                <th>Tipo<span className="col-resize-handle" onMouseDown={startTransaccionesResize('tipo')} /></th>
+                <th>Contraparte<span className="col-resize-handle" onMouseDown={startTransaccionesResize('contraparte')} /></th>
+                <th>Documento origen<span className="col-resize-handle" onMouseDown={startTransaccionesResize('documentoOrigen')} /></th>
+                <th>Estado<span className="col-resize-handle" onMouseDown={startTransaccionesResize('estado')} /></th>
+                <th>Creada<span className="col-resize-handle" onMouseDown={startTransaccionesResize('creada')} /></th>
+                <th>Acciones<span className="col-resize-handle" onMouseDown={startTransaccionesResize('acciones')} /></th>
               </tr>
             </thead>
             <tbody>

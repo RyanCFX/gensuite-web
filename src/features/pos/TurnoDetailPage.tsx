@@ -10,6 +10,22 @@ import { CorteCajaView } from '@/components/shared/CorteCajaView'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import type { TurnoClosing } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const CONCILIACION_COLUMNS = [
+  { key: 'metodo', width: 140 },
+  { key: 'apertura', width: 110 },
+  { key: 'esperado', width: 110 },
+  { key: 'contado', width: 110 },
+  { key: 'diferencia', width: 110 },
+  { key: 'conciliacion', width: 110 },
+]
+
+const DENOMINACIONES_COLUMNS = [
+  { key: 'denominacion', width: 140 },
+  { key: 'cantidad', width: 100 },
+  { key: 'subtotal', width: 120 },
+]
 
 export default function TurnoDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -119,7 +135,7 @@ export default function TurnoDetailPage() {
               <span style={{ color: 'var(--text-secondary)' }}>Método de pago</span>
               <span style={{ fontWeight: 500 }}>{turno.modeOfPayment}</span>
               <span style={{ color: 'var(--text-secondary)' }}>Fondo inicial</span>
-              <span style={{ fontWeight: 500, fontFamily: 'var(--font-mono)' }}>{formatDOP(turno.openingAmount)}</span>
+              <span style={{ fontWeight: 500, fontFamily: 'var(--font-body)' }}>{formatDOP(turno.openingAmount)}</span>
             </>
           )}
         </div>
@@ -152,6 +168,8 @@ function ClosingSection({ closing, turnoCajero, closedBy }: { closing: TurnoClos
   })
 
   const denomMap = new Map((denominaciones ?? []).map((d) => [d.denominacion, d.valor]))
+  const { widths: conciliacionColWidths, startResize: startConciliacionResize } = useResizableColumns(CONCILIACION_COLUMNS)
+  const { widths: denominacionesColWidths, startResize: startDenominacionesResize } = useResizableColumns(DENOMINACIONES_COLUMNS)
 
   return (
     <>
@@ -163,7 +181,7 @@ function ClosingSection({ closing, turnoCajero, closedBy }: { closing: TurnoClos
         </div>
         <div className="card-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 24px', fontSize: 13 }}>
           <span style={{ color: 'var(--text-secondary)' }}>ID de cierre</span>
-          <span style={{ fontWeight: 500, fontFamily: 'var(--font-mono)' }}>{closing.id}</span>
+          <span style={{ fontWeight: 500, fontFamily: 'var(--font-body)' }}>{closing.id}</span>
           <span style={{ color: 'var(--text-secondary)' }}>Estado</span>
           <span><span className="badge badge-submitted">{closing.status}</span></span>
           <span style={{ color: 'var(--text-secondary)' }}>Fecha de apertura</span>
@@ -207,15 +225,36 @@ function ClosingSection({ closing, turnoCajero, closedBy }: { closing: TurnoClos
           <span className="card-title">Conciliación de pagos</span>
         </div>
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table items-table-resizable">
+            <colgroup>
+              {CONCILIACION_COLUMNS.map((c) => <col key={c.key} style={{ width: conciliacionColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
                 <tr>
-                  <th>Método</th>
-                  <th style={{ textAlign: 'right' }}>Apertura</th>
-                  <th style={{ textAlign: 'right' }}>Esperado</th>
-                  <th style={{ textAlign: 'right' }}>Contado</th>
-                  <th style={{ textAlign: 'right' }}>Diferencia</th>
-                  <th>Conciliación</th>
+                  <th>
+                    Método
+                    <span className="col-resize-handle" onMouseDown={startConciliacionResize('metodo')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Apertura
+                    <span className="col-resize-handle" onMouseDown={startConciliacionResize('apertura')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Esperado
+                    <span className="col-resize-handle" onMouseDown={startConciliacionResize('esperado')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Contado
+                    <span className="col-resize-handle" onMouseDown={startConciliacionResize('contado')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Diferencia
+                    <span className="col-resize-handle" onMouseDown={startConciliacionResize('diferencia')} />
+                  </th>
+                  <th>
+                    Conciliación
+                    <span className="col-resize-handle" onMouseDown={startConciliacionResize('conciliacion')} />
+                  </th>
                 </tr>
             </thead>
             <tbody>
@@ -229,13 +268,13 @@ function ClosingSection({ closing, turnoCajero, closedBy }: { closing: TurnoClos
                 closing.paymentReconciliation.map((p) => (
                   <tr key={p.modeOfPayment}>
                     <td>{p.modeOfPayment}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatDOP(p.openingAmount)}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatDOP(p.expectedAmount)}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatDOP(p.closingAmount)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatDOP(p.openingAmount)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatDOP(p.expectedAmount)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatDOP(p.closingAmount)}</td>
                     <td
                       style={{
                         textAlign: 'right',
-                        fontFamily: 'var(--font-mono)',
+                        fontFamily: 'var(--font-body)',
                         fontWeight: 600,
                         color:
                           p.difference < 0
@@ -287,12 +326,24 @@ function ClosingSection({ closing, turnoCajero, closedBy }: { closing: TurnoClos
             </p>
           ) : (
             <div className="table-scroll">
-              <table className="data-table">
+              <table className="data-table items-table-resizable">
+                <colgroup>
+                  {DENOMINACIONES_COLUMNS.map((c) => <col key={c.key} style={{ width: denominacionesColWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>Denominación</th>
-                    <th style={{ textAlign: 'right' }}>Cantidad</th>
-                    <th style={{ textAlign: 'right' }}>Subtotal</th>
+                    <th>
+                      Denominación
+                      <span className="col-resize-handle" onMouseDown={startDenominacionesResize('denominacion')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Cantidad
+                      <span className="col-resize-handle" onMouseDown={startDenominacionesResize('cantidad')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Subtotal
+                      <span className="col-resize-handle" onMouseDown={startDenominacionesResize('subtotal')} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -301,8 +352,8 @@ function ClosingSection({ closing, turnoCajero, closedBy }: { closing: TurnoClos
                     return (
                       <tr key={d.denominacion}>
                         <td>{d.denominacion}</td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{d.cantidad}</td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{d.cantidad}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontWeight: 500 }}>
                           {formatDOP(valor * d.cantidad)}
                         </td>
                       </tr>

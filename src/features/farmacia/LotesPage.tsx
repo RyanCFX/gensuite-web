@@ -14,6 +14,7 @@ import { Permitido } from '@/components/shared/Permitido'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { LoteCreateModal } from './LoteCreateModal'
 import type { LoteFarmaciaEstado } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 type EstadoFilter = LoteFarmaciaEstado | 'all'
 
@@ -23,6 +24,17 @@ const ESTADO_BADGE: Record<LoteFarmaciaEstado, string> = {
   Facturado: 'badge-info',
 }
 
+const COLUMNS = [
+  { key: 'id', width: 100 },
+  { key: 'ars', width: 180 },
+  { key: 'periodo', width: 180 },
+  { key: 'facturas', width: 90 },
+  { key: 'total', width: 120 },
+  { key: 'ncf', width: 130 },
+  { key: 'estado', width: 110 },
+  { key: 'actions', width: 48 },
+]
+
 export default function LotesPage() {
   const navigate = useNavigate()
   const [aseguradoraId, setAseguradoraId] = useState('')
@@ -30,6 +42,7 @@ export default function LotesPage() {
   const [aseguradoraQuery, setAseguradoraQuery] = useState('')
   const [estado, setEstado] = useState<EstadoFilter>('all')
   const [showCreate, setShowCreate] = useState(false)
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data: aseguradorasData, isLoading: aseguradorasLoading } = useQuery({
     queryKey: ['aseguradoraSearch', aseguradoraQuery],
@@ -99,17 +112,41 @@ export default function LotesPage() {
 
       <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>#</th>
-              <th>ARS</th>
-              <th>Período</th>
-              <th style={{ textAlign: 'right' }}>Facturas</th>
-              <th style={{ textAlign: 'right' }}>Total</th>
-              <th>NCF consolidada</th>
-              <th>Estado</th>
-              <th style={{ width: 48 }} />
+              <th>
+                #
+                <span className="col-resize-handle" onMouseDown={startResize('id')} />
+              </th>
+              <th>
+                ARS
+                <span className="col-resize-handle" onMouseDown={startResize('ars')} />
+              </th>
+              <th>
+                Período
+                <span className="col-resize-handle" onMouseDown={startResize('periodo')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Facturas
+                <span className="col-resize-handle" onMouseDown={startResize('facturas')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Total
+                <span className="col-resize-handle" onMouseDown={startResize('total')} />
+              </th>
+              <th>
+                NCF consolidada
+                <span className="col-resize-handle" onMouseDown={startResize('ncf')} />
+              </th>
+              <th>
+                Estado
+                <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+              </th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -133,12 +170,12 @@ export default function LotesPage() {
             ) : (
               lotes.map((l) => (
                 <tr key={l.id} className="table-row-clickable" onClick={() => navigate(`/farmacia/lotes/${l.id}`)}>
-                  <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{l.id}</td>
+                  <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{l.id}</td>
                   <td style={{ fontWeight: 500 }}>{l.aseguradoraName ?? l.aseguradora}</td>
                   <td>{formatDate(l.periodoInicio)} – {formatDate(l.periodoFin)}</td>
                   <td style={{ textAlign: 'right' }}>{l.cantidadFacturas}</td>
                   <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(l.montoTotalLote)}</td>
-                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{l.ncfAsignado ?? <span className="td-dim">—</span>}</td>
+                  <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{l.ncfAsignado ?? <span className="td-dim">—</span>}</td>
                   <td><span className={`badge ${ESTADO_BADGE[l.estado] ?? 'badge-neutral'}`}>{l.estado}</span></td>
                   <td onClick={(e) => e.stopPropagation()} className="actions-cell">
                     <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/farmacia/lotes/${l.id}`)}>

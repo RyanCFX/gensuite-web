@@ -12,6 +12,21 @@ import type {
 } from '@/shared/api/types'
 import { formatDOP } from '@/lib/formatters'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const PREVIEW_COLUMNS = [
+  { key: 'metodo', width: 200 },
+  { key: 'esperado', width: 120 },
+  { key: 'contado', width: 150 },
+  { key: 'flag', width: 90 },
+]
+
+const RESULT_COLUMNS = [
+  { key: 'metodo', width: 200 },
+  { key: 'esperado', width: 120 },
+  { key: 'contado', width: 120 },
+  { key: 'diferencia', width: 120 },
+]
 
 interface CerrarTurnoModalProps {
   open: boolean
@@ -33,6 +48,8 @@ export function CerrarTurnoModal({
   const [cierreResult, setCierreResult] = useState<CierreTurnoResult | null>(null)
   const [seededKey, setSeededKey] = useState<string | null>(null)
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
+  const { widths: previewColWidths, startResize: startPreviewResize } = useResizableColumns(PREVIEW_COLUMNS)
+  const { widths: resultColWidths, startResize: startResultResize } = useResizableColumns(RESULT_COLUMNS)
 
   // Reinicia el flujo cuando se abre el modal o cambia el turno objetivo.
   // Patrón "adjust state during render" (comparando el valor previo) — evita
@@ -270,13 +287,16 @@ export function CerrarTurnoModal({
                   )}
                 </p>
                 <div className="table-scroll">
-                  <table className="data-table">
+                  <table className="data-table items-table-resizable">
+                    <colgroup>
+                      {PREVIEW_COLUMNS.map((c) => <col key={c.key} style={{ width: previewColWidths[c.key] }} />)}
+                    </colgroup>
                     <thead>
                       <tr>
-                        <th>Método</th>
-                        <th style={{ textAlign: 'right' }}>Esperado</th>
-                        <th style={{ textAlign: 'right' }}>Contado</th>
-                        <th style={{ width: 40 }} />
+                        <th>Método<span className="col-resize-handle" onMouseDown={startPreviewResize('metodo')} /></th>
+                        <th style={{ textAlign: 'right' }}>Esperado<span className="col-resize-handle" onMouseDown={startPreviewResize('esperado')} /></th>
+                        <th style={{ textAlign: 'right' }}>Contado<span className="col-resize-handle" onMouseDown={startPreviewResize('contado')} /></th>
+                        <th />
                       </tr>
                     </thead>
                     <tbody>
@@ -295,7 +315,7 @@ export function CerrarTurnoModal({
                             <td
                               style={{
                                 textAlign: 'right',
-                                fontFamily: 'monospace',
+                                fontFamily: 'var(--font-body)',
                               }}
                             >
                               {formatDOP(p.expectedAmount)}
@@ -501,7 +521,7 @@ export function CerrarTurnoModal({
                             style={{
                               fontSize: 14,
                               fontWeight: 700,
-                              fontFamily: 'var(--font-mono)',
+                              fontFamily: 'var(--font-body)',
                             }}
                           >
                             {formatDOP(totalArqueo)}
@@ -531,13 +551,16 @@ export function CerrarTurnoModal({
                     </p>
                   )}
                 <div className="table-scroll">
-                  <table className="data-table">
+                  <table className="data-table items-table-resizable">
+                    <colgroup>
+                      {RESULT_COLUMNS.map((c) => <col key={c.key} style={{ width: resultColWidths[c.key] }} />)}
+                    </colgroup>
                     <thead>
                       <tr>
-                        <th>Método</th>
-                        <th style={{ textAlign: 'right' }}>Esperado</th>
-                        <th style={{ textAlign: 'right' }}>Contado</th>
-                        <th style={{ textAlign: 'right' }}>Diferencia</th>
+                        <th>Método<span className="col-resize-handle" onMouseDown={startResultResize('metodo')} /></th>
+                        <th style={{ textAlign: 'right' }}>Esperado<span className="col-resize-handle" onMouseDown={startResultResize('esperado')} /></th>
+                        <th style={{ textAlign: 'right' }}>Contado<span className="col-resize-handle" onMouseDown={startResultResize('contado')} /></th>
+                        <th style={{ textAlign: 'right' }}>Diferencia<span className="col-resize-handle" onMouseDown={startResultResize('diferencia')} /></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -547,7 +570,7 @@ export function CerrarTurnoModal({
                           <td
                             style={{
                               textAlign: 'right',
-                              fontFamily: 'monospace',
+                              fontFamily: 'var(--font-body)',
                             }}
                           >
                             {formatDOP(p.expectedAmount)}
@@ -555,7 +578,7 @@ export function CerrarTurnoModal({
                           <td
                             style={{
                               textAlign: 'right',
-                              fontFamily: 'monospace',
+                              fontFamily: 'var(--font-body)',
                             }}
                           >
                             {formatDOP(p.closingAmount)}
@@ -563,7 +586,7 @@ export function CerrarTurnoModal({
                           <td
                             style={{
                               textAlign: 'right',
-                              fontFamily: 'monospace',
+                              fontFamily: 'var(--font-body)',
                               fontWeight: 600,
                               color:
                                 p.difference < 0

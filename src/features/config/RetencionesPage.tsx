@@ -26,8 +26,15 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const RETENCIONES_COLUMNS = [
+  { key: 'nombre', width: 220 },
+  { key: 'base', width: 180 },
+  { key: 'actions', width: 48 },
+]
 
 const TAX_DEDUCTION_BASIS_OPTIONS = ['Gross Total', 'Net Total'] as const
 
@@ -99,6 +106,7 @@ export default function RetencionesPage() {
   const [toDelete, setToDelete] = useState<RetencionListItem | null>(null)
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(RETENCIONES_COLUMNS)
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
@@ -281,12 +289,24 @@ export default function RetencionesPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {RETENCIONES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <SortableTh label="Nombre" sortKey="categoryName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                <th>Base de deducción</th>
-                <th style={{ width: 48 }} />
+                <SortableTh
+                  label="Nombre"
+                  sortKey="categoryName"
+                  orderBy={orderBy}
+                  onSort={(k) => { sort(k); setPage(1) }}
+                  resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('nombre')} />}
+                />
+                <th>
+                  Base de deducción
+                  <span className="col-resize-handle" onMouseDown={startResize('base')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>

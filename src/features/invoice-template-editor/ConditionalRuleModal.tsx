@@ -61,7 +61,7 @@ export function ConditionalRuleModal({ element, fields, onSave, onClose }: Props
             <input className="ff-input" value={value} onChange={(e) => setValue(e.target.value)} placeholder='ej. "Consumo"' />
           </div>
 
-          <div className="inline-alert inline-alert-info" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+          <div className="inline-alert inline-alert-info" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
             mostrar si {field || '…'} {CONDITION_OPERATOR_LABELS[operator]} "{value || '…'}"
           </div>
         </div>

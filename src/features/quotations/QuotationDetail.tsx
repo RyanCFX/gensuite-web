@@ -11,6 +11,19 @@ import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
 import { RelatedDocsCard } from '@/components/shared/RelatedDocsCard'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ITEMS_COLUMNS = [
+  { key: 'codigo', width: 100 },
+  { key: 'descripcion', width: 220 },
+  { key: 'notas', width: 160 },
+  { key: 'cantidad', width: 90 },
+  { key: 'precio', width: 110 },
+  { key: 'descuento', width: 72 },
+  { key: 'importe', width: 110 },
+  { key: 'impuesto', width: 100 },
+  { key: 'udm', width: 90 },
+]
 
 const STATUS_BADGE: Record<string, string> = {
   Draft: 'badge-draft',
@@ -33,6 +46,7 @@ export default function QuotationDetail() {
   const queryClient = useQueryClient()
   const [convertDialogOpen, setConvertDialogOpen] = useState(false)
   const [selectedNcfType, setSelectedNcfType] = useState<string>('B02')
+  const { widths: itemsColWidths, startResize: startItemsResize } = useResizableColumns(ITEMS_COLUMNS)
 
   const { data: quotation, isLoading } = useQuery({
     queryKey: ['quotation', id],
@@ -294,7 +308,7 @@ export default function QuotationDetail() {
             {quotation.esClienteOcasional && quotation.clienteOcasionalRnc && (
               <div className="detail-field">
                 <span className="detail-label">RNC / Cédula</span>
-                <span className="detail-value" style={{ fontFamily: 'monospace' }}>{quotation.clienteOcasionalRnc}</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{quotation.clienteOcasionalRnc}</span>
               </div>
             )}
             {quotation.esClienteOcasional && quotation.clienteOcasionalDireccion && (
@@ -331,24 +345,54 @@ export default function QuotationDetail() {
 
       <div className="card">
         <div className="items-table-wrap">
-          <table className="items-table">
+          <table className="items-table items-table-resizable">
+            <colgroup>
+              {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Código</th>
-                <th>Descripción</th>
-                <th>Notas</th>
-                <th style={{ textAlign: 'right' }}>Cant.</th>
-                <th style={{ textAlign: 'right' }}>Precio Unit.</th>
-                <th style={{ textAlign: 'right', width: 72 }}>Dto. %</th>
-                <th style={{ textAlign: 'right' }}>Importe</th>
-                <th style={{ textAlign: 'right' }}>Impuesto</th>
-                <th>UDM</th>
+                <th>
+                  Código
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('codigo')} />
+                </th>
+                <th>
+                  Descripción
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('descripcion')} />
+                </th>
+                <th>
+                  Notas
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('notas')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Cant.
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('cantidad')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Precio Unit.
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('precio')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Dto. %
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('descuento')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Importe
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('importe')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Impuesto
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('impuesto')} />
+                </th>
+                <th>
+                  UDM
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('udm')} />
+                </th>
               </tr>
             </thead>
             <tbody>
               {quotation.items.map((item, i) => (
                 <tr key={i}>
-                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.itemCode || '—'}</td>
+                  <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode || '—'}</td>
                   <td>{item.description || '—'}</td>
                   <td style={{ fontSize: 12, color: 'var(--text-tertiary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.notes ?? ''}>{item.notes ?? '—'}</td>
                   <td style={{ textAlign: 'right' }}>{item.qty}</td>

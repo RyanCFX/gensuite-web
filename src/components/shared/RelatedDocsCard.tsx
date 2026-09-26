@@ -10,7 +10,7 @@ export interface RelatedDocRow {
 }
 
 const linkStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-mono, monospace)',
+  fontFamily: 'var(--font-body)',
   color: 'var(--color-brand)',
   textDecoration: 'underline',
   width: 'fit-content',

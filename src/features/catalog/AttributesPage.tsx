@@ -15,6 +15,25 @@ import type { ItemAttribute, AttributeValue, CreateAttributeDto, UpdateAttribute
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const DETAIL_VALUES_COLUMNS = [
+  { key: 'valor', width: 200 },
+  { key: 'abrev', width: 140 },
+]
+
+const FORM_VALUES_COLUMNS = [
+  { key: 'valor', width: 200 },
+  { key: 'abrev', width: 140 },
+  { key: 'actions', width: 36 },
+]
+
+const ATTRIBUTES_LIST_COLUMNS = [
+  { key: 'nombre', width: 220 },
+  { key: 'tipo', width: 110 },
+  { key: 'numValores', width: 110 },
+  { key: 'acciones', width: 120 },
+]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -75,6 +94,7 @@ function DetailPanel({
     queryFn: () => getAttribute(attrId),
     staleTime: 30_000,
   })
+  const { widths: detailColWidths, startResize: startResizeDetail } = useResizableColumns(DETAIL_VALUES_COLUMNS)
 
   return (
     <div className="card" style={{ marginTop: 16 }}>
@@ -122,11 +142,20 @@ function DetailPanel({
                   <div className="empty-state">Sin valores definidos.</div>
                 ) : (
                   <div className="table-scroll">
-                    <table className="data-table" style={{ width: '100%' }}>
+                    <table className="data-table items-table-resizable" style={{ width: '100%' }}>
+                      <colgroup>
+                        {DETAIL_VALUES_COLUMNS.map((c) => <col key={c.key} style={{ width: detailColWidths[c.key] }} />)}
+                      </colgroup>
                       <thead>
                         <tr>
-                          <th>Valor</th>
-                          <th>Abreviación</th>
+                          <th>
+                            Valor
+                            <span className="col-resize-handle" onMouseDown={startResizeDetail('valor')} />
+                          </th>
+                          <th>
+                            Abreviación
+                            <span className="col-resize-handle" onMouseDown={startResizeDetail('abrev')} />
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -171,6 +200,7 @@ function AttributeModal({
 
   const isDirty = useDirtyCheck(form, true)
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
+  const { widths: formColWidths, startResize: startResizeForm } = useResizableColumns(FORM_VALUES_COLUMNS)
 
   function setField<K extends keyof FormState>(key: K, val: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: val }))
@@ -340,12 +370,21 @@ function AttributeModal({
                 </span>
               )}
               <div className="table-scroll">
-                <table className="items-table" style={{ width: '100%' }}>
+                <table className="items-table items-table-resizable" style={{ width: '100%' }}>
+                  <colgroup>
+                    {FORM_VALUES_COLUMNS.map((c) => <col key={c.key} style={{ width: formColWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Valor</th>
-                      <th>Abreviación</th>
-                      <th style={{ width: 36 }} />
+                      <th>
+                        Valor
+                        <span className="col-resize-handle" onMouseDown={startResizeForm('valor')} />
+                      </th>
+                      <th>
+                        Abreviación
+                        <span className="col-resize-handle" onMouseDown={startResizeForm('abrev')} />
+                      </th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
@@ -437,6 +476,7 @@ export default function AttributesPage() {
   })
 
   const attributes = data?.items ?? []
+  const { widths: listColWidths, startResize: startResizeList } = useResizableColumns(ATTRIBUTES_LIST_COLUMNS)
 
   function openCreate() {
     setEditTarget(null)
@@ -515,13 +555,31 @@ export default function AttributesPage() {
 
           {!isLoading && attributes.length > 0 && (
             <div className="table-scroll">
-              <table className="data-table navy-table" style={{ width: '100%' }}>
+              <table className="data-table navy-table items-table-resizable" style={{ width: '100%' }}>
+                <colgroup>
+                  {ATTRIBUTES_LIST_COLUMNS.map((c) => <col key={c.key} style={{ width: listColWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
                   <tr>
-                    <SortableTh label="Nombre" sortKey="name" orderBy={orderBy} onSort={sort} />
-                    <th>Tipo</th>
-                    <th># Valores</th>
-                    <th style={{ width: 120 }}>Acciones</th>
+                    <SortableTh
+                      label="Nombre"
+                      sortKey="name"
+                      orderBy={orderBy}
+                      onSort={sort}
+                      resizeHandle={<span className="col-resize-handle" onMouseDown={startResizeList('nombre')} />}
+                    />
+                    <th>
+                      Tipo
+                      <span className="col-resize-handle" onMouseDown={startResizeList('tipo')} />
+                    </th>
+                    <th>
+                      # Valores
+                      <span className="col-resize-handle" onMouseDown={startResizeList('numValores')} />
+                    </th>
+                    <th>
+                      Acciones
+                      <span className="col-resize-handle" onMouseDown={startResizeList('acciones')} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

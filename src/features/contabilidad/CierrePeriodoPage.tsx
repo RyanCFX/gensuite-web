@@ -15,6 +15,16 @@ import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const CIERRES_COLUMNS = [
+  { key: 'id', width: 120 },
+  { key: 'ejercicio', width: 140 },
+  { key: 'finPeriodo', width: 130 },
+  { key: 'fechaRegistro', width: 130 },
+  { key: 'estado', width: 110 },
+  { key: 'actions', width: 140 },
+]
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-warning',
@@ -30,6 +40,7 @@ export default function CierrePeriodoPage() {
 
   // ── Filters ───────────────────────────────────────────────────────────────
   const [fyFilter, setFyFilter] = useState('')
+  const { widths: colWidths, startResize } = useResizableColumns(CIERRES_COLUMNS)
 
   const { data, isLoading } = useQuery({
     queryKey: ['cierres-periodo', fyFilter],
@@ -192,15 +203,33 @@ export default function CierrePeriodoPage() {
       {/* Table */}
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {CIERRES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Ejercicio Fiscal</th>
-                <th>Fin de Período</th>
-                <th>Fecha Registro</th>
-                <th>Estado</th>
-                <th style={{ width: 140 }} />
+                <th>
+                  ID
+                  <span className="col-resize-handle" onMouseDown={startResize('id')} />
+                </th>
+                <th>
+                  Ejercicio Fiscal
+                  <span className="col-resize-handle" onMouseDown={startResize('ejercicio')} />
+                </th>
+                <th>
+                  Fin de Período
+                  <span className="col-resize-handle" onMouseDown={startResize('finPeriodo')} />
+                </th>
+                <th>
+                  Fecha Registro
+                  <span className="col-resize-handle" onMouseDown={startResize('fechaRegistro')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -225,7 +254,7 @@ export default function CierrePeriodoPage() {
                     )
                   : items.map((c) => (
                       <tr key={c.id}>
-                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{c.id}</td>
+                        <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{c.id}</td>
                         <td style={{ fontWeight: 500 }}>{c.closingFiscalYear}</td>
                         <td className="td-muted">{formatDate(c.periodEndDate)}</td>
                         <td className="td-muted">{formatDate(c.postingDate)}</td>

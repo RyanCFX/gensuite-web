@@ -20,8 +20,28 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { Modal } from '@/shared/ui/Modal'
 import { today } from '@/features/despachos/lib'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const PENDIENTES_COLUMNS = [
+  { key: 'checked', width: 36 },
+  { key: 'pedido', width: 110 },
+  { key: 'fecha', width: 100 },
+  { key: 'cliente', width: 200 },
+  { key: 'articulo', width: 220 },
+  { key: 'almacen', width: 130 },
+  { key: 'precio', width: 110 },
+  { key: 'pendiente', width: 100 },
+]
+
+const MARGEN_COLUMNS = [
+  { key: 'articulo', width: 140 },
+  { key: 'pedido', width: 110 },
+  { key: 'precioVenta', width: 110 },
+  { key: 'costoCompra', width: 110 },
+  { key: 'margen', width: 110 },
+]
 
 function rowKey(l: PendienteAbastecimientoLinea): string {
   return `${l.salesOrder}::${l.itemCode}`
@@ -31,6 +51,8 @@ export default function AbastecimientoPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const puedeCrear = usePuede('compras.orden.crear')
+  const { widths: pendientesColWidths, startResize: startResizePendientes } = useResizableColumns(PENDIENTES_COLUMNS)
+  const { widths: margenColWidths, startResize: startResizeMargen } = useResizableColumns(MARGEN_COLUMNS)
 
   const [itemCode, setItemCode] = useState('')
   const [customer, setCustomer] = useState('')
@@ -144,17 +166,41 @@ export default function AbastecimientoPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {PENDIENTES_COLUMNS.map((c) => <col key={c.key} style={{ width: pendientesColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
                 <th style={{ width: 36 }} />
-                <th>Pedido</th>
-                <th>Fecha</th>
-                <th>Cliente</th>
-                <th>Artículo</th>
-                <th>Almacén</th>
-                <th style={{ textAlign: 'right' }}>Precio venta</th>
-                <th style={{ textAlign: 'right' }}>Pendiente</th>
+                <th>
+                  Pedido
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('pedido')} />
+                </th>
+                <th>
+                  Fecha
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('fecha')} />
+                </th>
+                <th>
+                  Cliente
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('cliente')} />
+                </th>
+                <th>
+                  Artículo
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('articulo')} />
+                </th>
+                <th>
+                  Almacén
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('almacen')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Precio venta
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('precio')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Pendiente
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('pendiente')} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -280,14 +326,32 @@ export default function AbastecimientoPage() {
               <span>El costo de compra es igual o mayor al precio al que se le vendió esta mercancía al cliente.</span>
             </div>
             <div className="table-scroll">
-              <table className="data-table">
+              <table className="data-table items-table-resizable">
+                <colgroup>
+                  {MARGEN_COLUMNS.map((c) => <col key={c.key} style={{ width: margenColWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>Artículo</th>
-                    <th>Pedido</th>
-                    <th style={{ textAlign: 'right' }}>Precio venta</th>
-                    <th style={{ textAlign: 'right' }}>Costo compra</th>
-                    <th style={{ textAlign: 'right' }}>Margen</th>
+                    <th>
+                      Artículo
+                      <span className="col-resize-handle" onMouseDown={startResizeMargen('articulo')} />
+                    </th>
+                    <th>
+                      Pedido
+                      <span className="col-resize-handle" onMouseDown={startResizeMargen('pedido')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Precio venta
+                      <span className="col-resize-handle" onMouseDown={startResizeMargen('precioVenta')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Costo compra
+                      <span className="col-resize-handle" onMouseDown={startResizeMargen('costoCompra')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Margen
+                      <span className="col-resize-handle" onMouseDown={startResizeMargen('margen')} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

@@ -16,6 +16,15 @@ import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const CAJAS_COLUMNS = [
+  { key: 'etiqueta', width: 200 },
+  { key: 'almacen', width: 180 },
+  { key: 'sucursal', width: 160 },
+  { key: 'estado', width: 200 },
+  { key: 'actions', width: 48 },
+]
 
 interface CajaFormValues {
   label: string
@@ -64,6 +73,7 @@ export default function CajasPage() {
 
   const isDirty = useDirtyCheck(form, dialogOpen)
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, closeDialog)
+  const { widths: colWidths, startResize } = useResizableColumns(CAJAS_COLUMNS)
 
   const createMutation = useMutation({
     mutationFn: () => createCaja({ label: form.label, warehouse: form.warehouse, branch: form.branch || undefined }),
@@ -172,14 +182,29 @@ export default function CajasPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {CAJAS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Etiqueta</th>
-                <th>Almacén</th>
-                <th>Sucursal</th>
-                <th>Estado</th>
-                <th style={{ width: 48 }} />
+                <th>
+                  Etiqueta
+                  <span className="col-resize-handle" onMouseDown={startResize('etiqueta')} />
+                </th>
+                <th>
+                  Almacén
+                  <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                </th>
+                <th>
+                  Sucursal
+                  <span className="col-resize-handle" onMouseDown={startResize('sucursal')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>

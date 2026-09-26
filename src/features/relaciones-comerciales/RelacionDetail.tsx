@@ -13,6 +13,7 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDate, formatDateTime } from '@/lib/formatters'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { isApiErrorCode } from '@/shared/api/client'
 import { listAlmacenes, getCatalogosFiscales } from '@/shared/api/config'
 import {
@@ -228,6 +229,18 @@ export default function RelacionDetail() {
     onError: (err) => toast.error((err as { message?: string })?.message ?? 'Error al guardar el mapeo'),
   })
 
+  const MAPEO_COLUMNS = [
+    { key: 'codigoOrigen', width: 110 },
+    { key: 'nombreOrigen', width: 200 },
+    { key: 'barcodeOrigen', width: 110 },
+    { key: 'codigoLocal', width: 160 },
+    { key: 'uomOrigen', width: 90 },
+    { key: 'uomLocal', width: 110 },
+    { key: 'factor', width: 90 },
+    { key: 'acciones', width: 48 },
+  ]
+  const { widths: mapeoColWidths, startResize: startMapeoResize } = useResizableColumns(MAPEO_COLUMNS)
+
   if (!puedeVer) {
     return (
       <div className="page-container">
@@ -327,7 +340,7 @@ export default function RelacionDetail() {
             </div>
             <div className="detail-field">
               <span className="detail-label">RNC</span>
-              <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{relacion.contraparte.rnc ?? '—'}</span>
+              <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{relacion.contraparte.rnc ?? '—'}</span>
             </div>
             <div className="detail-field">
               <span className="detail-label">Estado</span>
@@ -459,7 +472,7 @@ export default function RelacionDetail() {
                         <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
                           <div className="detail-field">
                             <span className="detail-label">Operación</span>
-                            <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{ultimo.op}</span>
+                            <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{ultimo.op}</span>
                           </div>
                           <div className="detail-field">
                             <span className="detail-label">Estado</span>
@@ -482,7 +495,7 @@ export default function RelacionDetail() {
                         {ultimo.lastError && (
                           <div className="inline-alert inline-alert-error" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
                             <strong>Último error</strong>
-                            <p style={{ margin: '4px 0 0', fontFamily: 'var(--font-mono)', fontSize: 12, whiteSpace: 'pre-wrap' }}>
+                            <p style={{ margin: '4px 0 0', fontFamily: 'var(--font-body)', fontSize: 12, whiteSpace: 'pre-wrap' }}>
                               {ultimo.lastError}
                             </p>
                           </div>
@@ -675,16 +688,19 @@ export default function RelacionDetail() {
                   Al guardar se reemplaza la lista COMPLETA de mapeos de esta relación — no es un ajuste incremental.
                 </p>
                 <div className="table-scroll" style={{ marginBottom: 12 }}>
-                  <table className="data-table navy-table">
+                  <table className="data-table navy-table items-table-resizable">
+                    <colgroup>
+                      {MAPEO_COLUMNS.map((c) => <col key={c.key} style={{ width: mapeoColWidths[c.key] }} />)}
+                    </colgroup>
                     <thead>
                       <tr>
-                        <th>Código origen</th>
-                        <th>Nombre origen</th>
-                        <th>Barcode origen</th>
-                        <th>Código local</th>
-                        <th>UOM origen</th>
-                        <th>UOM local</th>
-                        <th>Factor</th>
+                        <th>Código origen<span className="col-resize-handle" onMouseDown={startMapeoResize('codigoOrigen')} /></th>
+                        <th>Nombre origen<span className="col-resize-handle" onMouseDown={startMapeoResize('nombreOrigen')} /></th>
+                        <th>Barcode origen<span className="col-resize-handle" onMouseDown={startMapeoResize('barcodeOrigen')} /></th>
+                        <th>Código local<span className="col-resize-handle" onMouseDown={startMapeoResize('codigoLocal')} /></th>
+                        <th>UOM origen<span className="col-resize-handle" onMouseDown={startMapeoResize('uomOrigen')} /></th>
+                        <th>UOM local<span className="col-resize-handle" onMouseDown={startMapeoResize('uomLocal')} /></th>
+                        <th>Factor<span className="col-resize-handle" onMouseDown={startMapeoResize('factor')} /></th>
                         <th style={{ width: 40 }} />
                       </tr>
                     </thead>
@@ -845,19 +861,31 @@ function CandidatosModal({
     },
   })
 
+  const CANDIDATOS_COLUMNS = [
+    { key: 'nombre', width: 200 },
+    { key: 'deshabilitado', width: 100 },
+    { key: 'documentos', width: 100 },
+    { key: 'saldo', width: 110 },
+    { key: 'acciones', width: 100 },
+  ]
+  const { widths: candidatosColWidths, startResize: startCandidatosResize } = useResizableColumns(CANDIDATOS_COLUMNS)
+
   function renderCandidatos(candidatos: MaestroCandidatoRelacion[], tipo: 'customer' | 'supplier') {
     if (candidatos.length === 0) {
       return <p className="ff-hint">Sin ambigüedad de este lado (0 o 1 candidato) — no hace falta elegir.</p>
     }
     return (
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {CANDIDATOS_COLUMNS.map((c) => <col key={c.key} style={{ width: candidatosColWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>Nombre</th>
-              <th>Deshabilitado</th>
-              <th>Documentos</th>
-              <th>Saldo</th>
+              <th>Nombre<span className="col-resize-handle" onMouseDown={startCandidatosResize('nombre')} /></th>
+              <th>Deshabilitado<span className="col-resize-handle" onMouseDown={startCandidatosResize('deshabilitado')} /></th>
+              <th>Documentos<span className="col-resize-handle" onMouseDown={startCandidatosResize('documentos')} /></th>
+              <th>Saldo<span className="col-resize-handle" onMouseDown={startCandidatosResize('saldo')} /></th>
               <th style={{ width: 100 }} />
             </tr>
           </thead>

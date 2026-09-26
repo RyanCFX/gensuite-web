@@ -19,8 +19,20 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useDebounce } from '@/lib/useDebounce'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const COLUMNS = [
+  { key: 'fecha', width: 100 },
+  { key: 'referencia', width: 140 },
+  { key: 'cliente', width: 200 },
+  { key: 'montoPendiente', width: 130 },
+  { key: 'saldoActual', width: 130 },
+  { key: 'ncf', width: 120 },
+  { key: 'estado', width: 100 },
+  { key: 'actions', width: 60 },
+]
 const ESTADO_BADGE: Record<string, string> = { submitted: 'badge-submitted', cancelled: 'badge-cancelled' }
 const ESTADO_LABEL: Record<string, string> = { submitted: 'Confirmada', cancelled: 'Anulada' }
 
@@ -38,6 +50,7 @@ export default function VentasListPage() {
   const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
   const [toCancel, setToCancel] = useState<FacturaAperturaVenta | null>(null)
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
@@ -127,16 +140,19 @@ export default function VentasListPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Fecha</th>
-                <th>Referencia</th>
-                <th>Cliente</th>
-                <th style={{ textAlign: 'right' }}>Monto pendiente</th>
-                <th style={{ textAlign: 'right' }}>Saldo actual</th>
-                <th>NCF</th>
-                <th>Estado</th>
+                <th>Fecha<span className="col-resize-handle" onMouseDown={startResize('fecha')} /></th>
+                <th>Referencia<span className="col-resize-handle" onMouseDown={startResize('referencia')} /></th>
+                <th>Cliente<span className="col-resize-handle" onMouseDown={startResize('cliente')} /></th>
+                <th style={{ textAlign: 'right' }}>Monto pendiente<span className="col-resize-handle" onMouseDown={startResize('montoPendiente')} /></th>
+                <th style={{ textAlign: 'right' }}>Saldo actual<span className="col-resize-handle" onMouseDown={startResize('saldoActual')} /></th>
+                <th>NCF<span className="col-resize-handle" onMouseDown={startResize('ncf')} /></th>
+                <th>Estado<span className="col-resize-handle" onMouseDown={startResize('estado')} /></th>
                 <th />
               </tr>
             </thead>

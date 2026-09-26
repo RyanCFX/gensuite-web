@@ -25,8 +25,19 @@ import { Drawer } from '@/shared/ui/Drawer'
 import { Select, SelectItem } from '@/components/ui/select'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { CargarXmlModal } from './CargarXmlModal'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const COLUMNS = [
+  { key: 'ncf', width: 100 },
+  { key: 'proveedor', width: 180 },
+  { key: 'total', width: 120 },
+  { key: 'estadoDgii', width: 130 },
+  { key: 'conciliacion', width: 160 },
+  { key: 'acecf', width: 160 },
+  { key: 'fecha', width: 100 },
+]
 
 const ESTADOS_DGII: EcfStatusDgii[] = [
   'PENDING', 'SIGNED', 'IN_PROCESS', 'ACCEPTED', 'CONDITIONAL', 'REJECTED',
@@ -46,6 +57,7 @@ export default function EcfRecibidosPage() {
   const [to, setTo] = useState('')
   const [showCargarXml, setShowCargarXml] = useState(false)
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const debouncedSearch = useDebounce(search, 300)
   const debouncedRnc = useDebounce(rnc, 300)
@@ -158,16 +170,39 @@ export default function EcfRecibidosPage() {
 
       <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>NCF</th>
-              <th>Proveedor</th>
-              <th style={{ textAlign: 'right' }}>Total</th>
-              <th>Estado DGII</th>
-              <th>Conciliación</th>
-              <th>Aprobación comercial</th>
-              <th />
+              <th>
+                NCF
+                <span className="col-resize-handle" onMouseDown={startResize('ncf')} />
+              </th>
+              <th>
+                Proveedor
+                <span className="col-resize-handle" onMouseDown={startResize('proveedor')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Total
+                <span className="col-resize-handle" onMouseDown={startResize('total')} />
+              </th>
+              <th>
+                Estado DGII
+                <span className="col-resize-handle" onMouseDown={startResize('estadoDgii')} />
+              </th>
+              <th>
+                Conciliación
+                <span className="col-resize-handle" onMouseDown={startResize('conciliacion')} />
+              </th>
+              <th>
+                Aprobación comercial
+                <span className="col-resize-handle" onMouseDown={startResize('acecf')} />
+              </th>
+              <th>
+                <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -203,7 +238,7 @@ export default function EcfRecibidosPage() {
                   className="table-row-clickable"
                   onClick={() => navigate(`/ecf-recibidos/${encodeURIComponent(it.voucherId)}`)}
                 >
-                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{it.ncf}</td>
+                  <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{it.ncf}</td>
                   <td>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span>{it.counterpartName || '—'}</span>

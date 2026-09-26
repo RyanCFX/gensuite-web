@@ -23,8 +23,16 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const DEPARTAMENTOS_COLUMNS = [
+  { key: 'nombre', width: 220 },
+  { key: 'padre', width: 200 },
+  { key: 'estado', width: 110 },
+  { key: 'actions', width: 48 },
+]
 
 const departamentoSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -90,6 +98,7 @@ export default function DepartamentosPage() {
   })
 
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, closeDialog)
+  const { widths: colWidths, startResize } = useResizableColumns(DEPARTAMENTOS_COLUMNS)
 
   const createMutation = useMutation({
     mutationFn: createDepartamento,
@@ -226,13 +235,28 @@ export default function DepartamentosPage() {
       {viewMode === 'list' ? (
         <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {DEPARTAMENTOS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <SortableTh label="Nombre" sortKey="name" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <th>Departamento Padre</th>
-                  <th>Estado</th>
-                  <th style={{ width: 48 }} />
+                  <SortableTh
+                    label="Nombre"
+                    sortKey="name"
+                    orderBy={orderBy}
+                    onSort={(k) => { sort(k); setPage(1) }}
+                    resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('nombre')} />}
+                  />
+                  <th>
+                    Departamento Padre
+                    <span className="col-resize-handle" onMouseDown={startResize('padre')} />
+                  </th>
+                  <th>
+                    Estado
+                    <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                  </th>
+                  <th />
                 </tr>
               </thead>
               <tbody>

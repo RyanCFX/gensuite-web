@@ -18,6 +18,7 @@ import { formatStockInsufficientMessage } from '@/lib/stockAlerts'
 import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { usePuede } from '@/shared/permissions/can'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
 
@@ -115,10 +116,18 @@ export default function ConfirmacionDespachoDetail() {
     confirmarMutation.mutate(payload)
   }
 
+  const yaResuelta = solicitud?.status !== 'Pendiente'
+
+  const columns = [
+    { key: 'articulo', width: 260 },
+    { key: 'cantidad', width: 100 },
+    { key: 'almacenDestino', width: 160 },
+    ...(!yaResuelta ? [{ key: 'traerDesde', width: 260 }] : []),
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(columns)
+
   if (isLoading) return <div className="page-container"><div className="skeleton-box" style={{ width: 280, height: 28 }} /><div className="skeleton-box" style={{ width: '100%', height: 128, marginTop: 12 }} /></div>
   if (!solicitud) return <div className="page-container"><div className="empty-state"><p className="empty-title">Solicitud no encontrada</p></div></div>
-
-  const yaResuelta = solicitud.status !== 'Pendiente'
 
   return (
     <div className="page-container">
@@ -148,13 +157,30 @@ export default function ConfirmacionDespachoDetail() {
 
       <div className="card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table items-table-resizable">
+            <colgroup>
+              {columns.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Artículo</th>
-                <th style={{ textAlign: 'right' }}>Cantidad</th>
-                <th>Almacén destino</th>
-                {!yaResuelta && <th style={{ width: 260 }}>Traer faltante desde (opcional)</th>}
+                <th>
+                  Artículo
+                  <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Cantidad
+                  <span className="col-resize-handle" onMouseDown={startResize('cantidad')} />
+                </th>
+                <th>
+                  Almacén destino
+                  <span className="col-resize-handle" onMouseDown={startResize('almacenDestino')} />
+                </th>
+                {!yaResuelta && (
+                  <th>
+                    Traer faltante desde (opcional)
+                    <span className="col-resize-handle" onMouseDown={startResize('traerDesde')} />
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>

@@ -23,6 +23,15 @@ import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const REFERENCIAS_COLUMNS = [
+  { key: 'check', width: 36 },
+  { key: 'factura', width: 200 },
+  { key: 'total', width: 120 },
+  { key: 'pendiente', width: 120 },
+  { key: 'monto', width: 140 },
+]
 
 interface ReferenciaRow {
   invoiceId: string
@@ -58,6 +67,7 @@ export default function RegistrarPagoPage() {
   const [branchSearch, setBranchSearch] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
+  const { widths: referenciasColWidths, startResize: startReferenciasResize } = useResizableColumns(REFERENCIAS_COLUMNS)
 
   // ── Multimoneda (docs/tasks/64_multimoneda_completo.md Fase 4) ─────────────
   const [showMonedaOptions, setShowMonedaOptions] = useState(false)
@@ -648,14 +658,29 @@ export default function RegistrarPagoPage() {
           ) : (
             <>
               <div style={{ overflowX: 'auto' }}>
-                <table className="items-table">
+                <table className="items-table items-table-resizable">
+                  <colgroup>
+                    {REFERENCIAS_COLUMNS.map((c) => <col key={c.key} style={{ width: referenciasColWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ width: 36 }} />
-                      <th>Factura</th>
-                      <th style={{ textAlign: 'right' }}>Total</th>
-                      <th style={{ textAlign: 'right' }}>Pendiente</th>
-                      <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
+                      <th />
+                      <th>
+                        Factura
+                        <span className="col-resize-handle" onMouseDown={startReferenciasResize('factura')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Total
+                        <span className="col-resize-handle" onMouseDown={startReferenciasResize('total')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Pendiente
+                        <span className="col-resize-handle" onMouseDown={startReferenciasResize('pendiente')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Monto a aplicar
+                        <span className="col-resize-handle" onMouseDown={startReferenciasResize('monto')} />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -670,7 +695,7 @@ export default function RegistrarPagoPage() {
                           />
                         </td>
                         <td>
-                          <span style={{ fontWeight: 500, fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                          <span style={{ fontWeight: 500, fontFamily: 'var(--font-body)', fontSize: 13 }}>
                             {ref.invoiceId}
                           </span>
                           <br />

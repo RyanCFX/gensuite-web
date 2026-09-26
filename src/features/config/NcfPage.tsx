@@ -23,7 +23,18 @@ import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { EcfSequencesPanel } from './EcfSequencesPanel'
+
+const NCF_COLUMNS = [
+  { key: 'tipo', width: 100 },
+  { key: 'rango', width: 180 },
+  { key: 'siguiente', width: 130 },
+  { key: 'disponibles', width: 160 },
+  { key: 'vence', width: 120 },
+  { key: 'estado', width: 110 },
+  { key: 'acciones', width: 120 },
+]
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -256,7 +267,7 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
               <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                 Primer NCF que se generará
               </p>
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.06em' }}>
+              <p style={{ fontFamily: 'var(--font-body)', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.06em' }}>
                 {preview}
               </p>
               <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
@@ -689,6 +700,8 @@ export default function NcfPage() {
   const [modal, setModal] = useState<ModalState>({ type: 'none' })
   const [tabOverride, setTabOverride] = useState<'fisico' | 'ecf' | null>(null)
 
+  const { widths: colWidths, startResize } = useResizableColumns(NCF_COLUMNS)
+
   const { data: series, isLoading, isError } = useQuery({
     queryKey: ['ncf-series'],
     queryFn: getNcfSeries,
@@ -830,16 +843,37 @@ export default function NcfPage() {
         {/* Main table */}
         <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {NCF_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Tipo</th>
-                  <th>Rango</th>
-                  <th>Siguiente NCF</th>
-                  <th style={{ minWidth: 160 }}>Disponibles</th>
-                  <th>Vence</th>
-                  <th>Estado</th>
-                  <th style={{ width: 120 }}>Acciones</th>
+                  <th>
+                    Tipo
+                    <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                  </th>
+                  <th>
+                    Rango
+                    <span className="col-resize-handle" onMouseDown={startResize('rango')} />
+                  </th>
+                  <th>
+                    Siguiente NCF
+                    <span className="col-resize-handle" onMouseDown={startResize('siguiente')} />
+                  </th>
+                  <th style={{ minWidth: 160 }}>
+                    Disponibles
+                    <span className="col-resize-handle" onMouseDown={startResize('disponibles')} />
+                  </th>
+                  <th>
+                    Vence
+                    <span className="col-resize-handle" onMouseDown={startResize('vence')} />
+                  </th>
+                  <th>
+                    Estado
+                    <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                  </th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -884,10 +918,10 @@ export default function NcfPage() {
                           return (
                             <tr key={s.id} className="table-row-clickable" onClick={() => setModal({ type: 'detail', serieId: s.id })}>
                               <td><NcfTypeBadge type={s.ncfType} /></td>
-                              <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                              <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                                 {s.start.toLocaleString('es-DO')} — {s.end.toLocaleString('es-DO')}
                               </td>
-                              <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                              <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                                 {s.nextNcf === -1 ? <span style={{ color: 'var(--text-tertiary)' }}>Agotada</span> : s.nextNcf.toLocaleString('es-DO')}
                               </td>
                               <td>

@@ -9,8 +9,19 @@ import { Plus, Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as C
 import { CuentaMovimientosModal } from '@/features/contabilidad/CuentaMovimientosModal'
 import { Select, SelectItem } from '@/components/ui/select'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 25
+
+const CUENTAS_COLUMNS = [
+  { key: 'codigo', width: 110 },
+  { key: 'nombre', width: 220 },
+  { key: 'tipo', width: 130 },
+  { key: 'raiz', width: 110 },
+  { key: 'moneda', width: 90 },
+  { key: 'estado', width: 110 },
+  { key: 'actions', width: 48 },
+]
 
 type RootTypeFilter = '' | 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense'
 
@@ -104,7 +115,7 @@ function TreeNode({ cuenta, depth, onNavigate, onMovimientos }: { cuenta: Cuenta
           {cuenta.accountName}
         </span>
         {cuenta.accountNumber && (
-          <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}>
             {cuenta.accountNumber}
           </span>
         )}
@@ -155,6 +166,8 @@ export default function CuentasPage() {
   const [rootTypeFilter, setRootTypeFilter] = useState<RootTypeFilter>('')
   const [includeDisabled, setIncludeDisabled] = useState(false)
   const [page, setPage] = useState(1)
+
+  const { widths: colWidths, startResize } = useResizableColumns(CUENTAS_COLUMNS)
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
@@ -273,15 +286,36 @@ export default function CuentasPage() {
 
           <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {CUENTAS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Código</th>
-                  <th>Nombre</th>
-                  <th>Tipo</th>
-                  <th>Raíz</th>
-                  <th>Moneda</th>
-                  <th>Estado</th>
+                  <th>
+                    Código
+                    <span className="col-resize-handle" onMouseDown={startResize('codigo')} />
+                  </th>
+                  <th>
+                    Nombre
+                    <span className="col-resize-handle" onMouseDown={startResize('nombre')} />
+                  </th>
+                  <th>
+                    Tipo
+                    <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                  </th>
+                  <th>
+                    Raíz
+                    <span className="col-resize-handle" onMouseDown={startResize('raiz')} />
+                  </th>
+                  <th>
+                    Moneda
+                    <span className="col-resize-handle" onMouseDown={startResize('moneda')} />
+                  </th>
+                  <th>
+                    Estado
+                    <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                  </th>
                   <th />
                 </tr>
               </thead>
@@ -320,7 +354,7 @@ export default function CuentasPage() {
                             className="table-row-clickable"
                             onClick={() => navigate(`/cuentas/${encodeURIComponent(cuenta.id)}`)}
                           >
-                            <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                            <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                               {cuenta.accountNumber ?? '—'}
                             </td>
                             <td style={{ fontWeight: 500 }}>{cuenta.accountName}</td>

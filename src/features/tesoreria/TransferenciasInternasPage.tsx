@@ -14,6 +14,15 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const COLUMNS = [
+  { key: 'fecha', width: 100 },
+  { key: 'cuentaOrigen', width: 180 },
+  { key: 'cuentaDestino', width: 180 },
+  { key: 'monto', width: 120 },
+  { key: 'estado', width: 100 },
+]
 
 const STATUS_BADGE: Record<TesoreriaEstado, string> = {
   draft: 'badge-draft',
@@ -35,6 +44,7 @@ export default function TransferenciasInternasPage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const params: ListTransferenciasInternasParams = {
     cuentaBancaria: cuentaBancaria || undefined,
@@ -96,14 +106,35 @@ export default function TransferenciasInternasPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <SortableTh label="Fecha" sortKey="fecha" orderBy={orderBy} onSort={sort} />
-                <th>Cuenta Origen</th>
-                <th>Cuenta Destino</th>
-                <th style={{ textAlign: 'right' }}>Monto</th>
-                <th>Estado</th>
+                <SortableTh
+                  label="Fecha"
+                  sortKey="fecha"
+                  orderBy={orderBy}
+                  onSort={sort}
+                  resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />}
+                />
+                <th>
+                  Cuenta Origen
+                  <span className="col-resize-handle" onMouseDown={startResize('cuentaOrigen')} />
+                </th>
+                <th>
+                  Cuenta Destino
+                  <span className="col-resize-handle" onMouseDown={startResize('cuentaDestino')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Monto
+                  <span className="col-resize-handle" onMouseDown={startResize('monto')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
               </tr>
             </thead>
             <tbody>

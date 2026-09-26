@@ -54,7 +54,7 @@ export function CargarXmlModal({ onClose }: { onClose: () => void }) {
           value={signedXml}
           onChange={(e) => setSignedXml(e.target.value)}
           placeholder="<ECF>…</ECF>  (o el contenido en base64)"
-          style={{ fontFamily: 'monospace', fontSize: 12 }}
+          style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}
           autoFocus
         />
       </div>

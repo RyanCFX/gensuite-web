@@ -10,8 +10,19 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 30
+
+const COLUMNS = [
+  { key: 'fecha', width: 100 },
+  { key: 'tipo', width: 110 },
+  { key: 'documento', width: 120 },
+  { key: 'referencia', width: 180 },
+  { key: 'debito', width: 110 },
+  { key: 'credito', width: 110 },
+  { key: 'saldo', width: 120 },
+]
 
 // Mismo criterio que el kardex de cuentas contables (CuentaMovimientosModal): reutilizar las
 // pantallas de detalle ya existentes de cada módulo en vez de intentar adivinar si un Payment
@@ -46,6 +57,7 @@ export default function MovimientosBancoPage() {
   const [appliedRange, setAppliedRange] = useState({ fromDate: firstOfMonth(), toDate: today() })
   const [page, setPage] = useState(1)
   const offset = (page - 1) * PAGE_SIZE
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data, isLoading } = useQuery({
     queryKey: ['tesoreria-movimientos', cuentaBancaria, appliedRange, offset],
@@ -141,16 +153,40 @@ export default function MovimientosBancoPage() {
 
           <div className="card navy-table-card">
             <div className="table-scroll">
-              <table className="data-table navy-table">
+              <table className="data-table navy-table items-table-resizable">
+                <colgroup>
+                  {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>Fecha</th>
-                    <th>Tipo</th>
-                    <th>Documento</th>
-                    <th>Referencia</th>
-                    <th style={{ textAlign: 'right' }}>Débito</th>
-                    <th style={{ textAlign: 'right' }}>Crédito</th>
-                    <th style={{ textAlign: 'right' }}>Saldo corrido</th>
+                    <th>
+                      Fecha
+                      <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+                    </th>
+                    <th>
+                      Tipo
+                      <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                    </th>
+                    <th>
+                      Documento
+                      <span className="col-resize-handle" onMouseDown={startResize('documento')} />
+                    </th>
+                    <th>
+                      Referencia
+                      <span className="col-resize-handle" onMouseDown={startResize('referencia')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Débito
+                      <span className="col-resize-handle" onMouseDown={startResize('debito')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Crédito
+                      <span className="col-resize-handle" onMouseDown={startResize('credito')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Saldo corrido
+                      <span className="col-resize-handle" onMouseDown={startResize('saldo')} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -169,7 +205,7 @@ export default function MovimientosBancoPage() {
                           <td colSpan={6} style={{ fontStyle: 'italic', color: 'var(--text-secondary)', fontSize: 12 }}>
                             Saldo inicial al {formatDate(appliedRange.fromDate)}
                           </td>
-                          <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, fontSize: 12 }}>
+                          <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontWeight: 600, fontSize: 12 }}>
                             {formatMoney(meta.saldoInicialDelRango, cuentaBancariaObj?.currency)}
                           </td>
                         </tr>
@@ -210,19 +246,19 @@ export default function MovimientosBancoPage() {
                                 {row.party ?? row.remarks ?? '—'}
                                 {row.esDiferenciaCambiaria && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>Ajuste cambiario</span>}
                               </td>
-                              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
+                              <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 12 }}>
                                 {row.debito ? formatMoney(row.debito, row.moneda) : '—'}
                                 {row.moneda && row.montoBase != null && row.debito > 0 && (
                                   <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>≈ {formatDOP(row.montoBase)}</div>
                                 )}
                               </td>
-                              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
+                              <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 12 }}>
                                 {row.credito ? formatMoney(row.credito, row.moneda) : '—'}
                                 {row.moneda && row.montoBase != null && row.credito > 0 && (
                                   <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>≈ {formatDOP(row.montoBase)}</div>
                                 )}
                               </td>
-                              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12, color: balanceColor }}>
+                              <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 12, color: balanceColor }}>
                                 {formatMoney(row.saldoCorrido, row.moneda)}
                               </td>
                             </tr>

@@ -32,6 +32,7 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { MapeoForm } from './components/MapeoForm'
 import { DiffView } from './components/DiffView'
 import { usePuede } from '@/shared/permissions/can'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { formatDate, formatDateTime, formatDOP, formatNumber } from '@/lib/formatters'
 import { ESTADO_TRANSACCION_BADGE, estadoNecesitaAccion } from './estadoTransaccion'
 
@@ -991,17 +992,10 @@ export default function TransaccionDetail() {
 function PayloadSnapshotView({ payload }: { payload: Record<string, unknown> }) {
   const documento = payload?.documento as Record<string, unknown> | undefined
   const lineas = documento?.lineas
-
-  if (!documento || !Array.isArray(lineas)) {
-    return (
-      <pre style={{ margin: 0, padding: 12, background: 'var(--surface-muted, #f7f7f8)', borderRadius: 8, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 400, overflow: 'auto' }}>
-        {JSON.stringify(payload, null, 2)}
-      </pre>
-    )
-  }
-
-  const cabecera = Object.entries(documento).filter(([k]) => k !== 'lineas' && k !== 'totales')
-  const lineasArr = lineas as Record<string, unknown>[]
+  // `lineasArr`/`columnas` se calculan antes del early-return de abajo (con fallback vacío cuando
+  // no hay `documento`/`lineas`) para que `useResizableColumns` se llame siempre, sin importar la
+  // rama — las reglas de hooks no permiten llamarlo condicionalmente tras un `return` temprano.
+  const lineasArr = Array.isArray(lineas) ? (lineas as Record<string, unknown>[]) : []
   const columnasSet = new Set<string>()
   lineasArr.forEach((l) => Object.keys(l).forEach((k) => columnasSet.add(k)))
   // "indice" es puramente el orden en el array del socio (no aporta nada, la tabla ya lo respeta
@@ -1014,6 +1008,18 @@ function PayloadSnapshotView({ payload }: { payload: Record<string, unknown> }) 
     if (c === 'lote' || c === 'vencimiento') return columnaTieneValor(c)
     return true
   })
+  const SNAPSHOT_COLUMNS = columnas.map((c) => ({ key: c, width: 110 }))
+  const { widths: snapshotColWidths, startResize: startSnapshotResize } = useResizableColumns(SNAPSHOT_COLUMNS)
+
+  if (!documento || !Array.isArray(lineas)) {
+    return (
+      <pre style={{ margin: 0, padding: 12, background: 'var(--surface-muted, #f7f7f8)', borderRadius: 8, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 400, overflow: 'auto' }}>
+        {JSON.stringify(payload, null, 2)}
+      </pre>
+    )
+  }
+
+  const cabecera = Object.entries(documento).filter(([k]) => k !== 'lineas' && k !== 'totales')
   const totales = documento.totales as
     | { subtotal?: number; descuentos?: number; impuestos?: number; total?: number }
     | undefined
@@ -1032,9 +1038,14 @@ function PayloadSnapshotView({ payload }: { payload: Record<string, unknown> }) 
       )}
       {lineasArr.length > 0 && (
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table items-table-resizable">
+            <colgroup>
+              {SNAPSHOT_COLUMNS.map((c) => <col key={c.key} style={{ width: snapshotColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
-              <tr>{columnas.map((c) => <th key={c}>{formatSnapshotLabel(c)}</th>)}</tr>
+              <tr>{columnas.map((c) => (
+                <th key={c}>{formatSnapshotLabel(c)}<span className="col-resize-handle" onMouseDown={startSnapshotResize(c)} /></th>
+              ))}</tr>
             </thead>
             <tbody>
               {lineasArr.map((l, i) => (

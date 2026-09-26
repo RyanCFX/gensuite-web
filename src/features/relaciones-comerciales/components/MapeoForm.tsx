@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query'
 import { listCategories } from '@/shared/api/catalog'
 import type { DecisionMapeoDto, EstadoLineaMapeo, Item, LineaMapeo, ResultadoMapeo, CrearArticuloDesdeSocioDto } from '@/shared/api/types'
 import { formatDOP, formatNumber } from '@/lib/formatters'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const ESTADO_BADGE: Record<EstadoLineaMapeo, { label: string; variant: 'success' | 'warning' | 'neutral' | 'error' }> = {
   confirmada: { label: 'Confirmada', variant: 'success' },
@@ -92,6 +93,15 @@ export function MapeoForm({
 
   const haySugeridasPendientes = resultado.lineas.some((l) => l.estado === 'sugerida')
 
+  const MAPEO_COLUMNS = [
+    { key: 'articuloSocio', width: 220 },
+    { key: 'miArticulo', width: 240 },
+    { key: 'estado', width: 110 },
+    { key: 'advertencias', width: 220 },
+    ...(puedeGuardar ? [{ key: 'acciones', width: 160 }] : []),
+  ]
+  const { widths: mapeoColWidths, startResize: startMapeoResize } = useResizableColumns(MAPEO_COLUMNS)
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -111,14 +121,17 @@ export function MapeoForm({
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {MAPEO_COLUMNS.map((c) => <col key={c.key} style={{ width: mapeoColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Artículo del socio</th>
-                <th>Mi artículo</th>
-                <th>Estado</th>
-                <th>Advertencias</th>
-                {puedeGuardar && <th>Acciones</th>}
+                <th>Artículo del socio<span className="col-resize-handle" onMouseDown={startMapeoResize('articuloSocio')} /></th>
+                <th>Mi artículo<span className="col-resize-handle" onMouseDown={startMapeoResize('miArticulo')} /></th>
+                <th>Estado<span className="col-resize-handle" onMouseDown={startMapeoResize('estado')} /></th>
+                <th>Advertencias<span className="col-resize-handle" onMouseDown={startMapeoResize('advertencias')} /></th>
+                {puedeGuardar && <th>Acciones<span className="col-resize-handle" onMouseDown={startMapeoResize('acciones')} /></th>}
               </tr>
             </thead>
             <tbody>

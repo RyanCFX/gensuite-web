@@ -12,6 +12,7 @@ import { formatDate, formatDOP } from '@/lib/formatters'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const DEFAULT_LABELS = ['Corriente', '0–30 días', '31–60 días', '61–90 días', '+90 días']
 
@@ -46,6 +47,17 @@ export default function AgingPage() {
   const rows = data?.rows ?? []
   const isInvoiceView = groupBy === 'invoice'
   const colCount = labels.length + (isInvoiceView ? 4 : 2) - (showCurrent ? 0 : 1)
+  const shownLabels = showCurrent ? labels : labels.slice(1)
+
+  const AGING_COLUMNS = [
+    { key: 'cliente', width: 200 },
+    ...(isInvoiceView ? [{ key: 'factura', width: 110 }] : []),
+    ...(isInvoiceView ? [{ key: 'vencimiento', width: 110 }] : []),
+    ...(isInvoiceView ? [{ key: 'saldo', width: 120 }] : []),
+    ...shownLabels.map((_, i) => ({ key: `range-${i}`, width: 90 })),
+    ...(!isInvoiceView ? [{ key: 'total', width: 110 }] : []),
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(AGING_COLUMNS)
 
   function agingStyle(amount: number): React.CSSProperties {
     return amount > AGING_THRESHOLD
@@ -119,17 +131,46 @@ export default function AgingPage() {
       <div>
         <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {AGING_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Cliente</th>
-                  {isInvoiceView && <th>Factura</th>}
-                  {isInvoiceView && <th>Vencimiento</th>}
-                  {isInvoiceView && <th style={{ textAlign: 'right' }}>Saldo</th>}
-                  {(showCurrent ? labels : labels.slice(1)).map((label, i) => (
-                    <th key={i} style={{ textAlign: 'right' }}>{label}</th>
+                  <th>
+                    Cliente
+                    <span className="col-resize-handle" onMouseDown={startResize('cliente')} />
+                  </th>
+                  {isInvoiceView && (
+                    <th>
+                      Factura
+                      <span className="col-resize-handle" onMouseDown={startResize('factura')} />
+                    </th>
+                  )}
+                  {isInvoiceView && (
+                    <th>
+                      Vencimiento
+                      <span className="col-resize-handle" onMouseDown={startResize('vencimiento')} />
+                    </th>
+                  )}
+                  {isInvoiceView && (
+                    <th style={{ textAlign: 'right' }}>
+                      Saldo
+                      <span className="col-resize-handle" onMouseDown={startResize('saldo')} />
+                    </th>
+                  )}
+                  {shownLabels.map((label, i) => (
+                    <th key={i} style={{ textAlign: 'right' }}>
+                      {label}
+                      <span className="col-resize-handle" onMouseDown={startResize(`range-${i}`)} />
+                    </th>
                   ))}
-                  {!isInvoiceView && <th style={{ textAlign: 'right', fontWeight: 700 }}>Total</th>}
+                  {!isInvoiceView && (
+                    <th style={{ textAlign: 'right', fontWeight: 700 }}>
+                      Total
+                      <span className="col-resize-handle" onMouseDown={startResize('total')} />
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>

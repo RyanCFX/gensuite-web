@@ -1095,7 +1095,7 @@ try {
                 <div className="ff-wrap">
                   <span className="ff-label">Fecha</span>
                   <span className="ff-input" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }}>
-                    {formatDate(transactionDate)}
+                    {existing?.transactionDate ? formatDate(existing.transactionDate) : ''}
                   </span>
                 </div>
               )}

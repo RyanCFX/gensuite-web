@@ -9,6 +9,13 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { getRoleDetail, updateRole, deleteRole } from '@/shared/api/roles'
 import type { ApiError } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ROLE_USERS_COLUMNS = [
+  { key: 'usuario', width: 220 },
+  { key: 'correo', width: 240 },
+  { key: 'estado', width: 110 },
+]
 
 function apiMessage(err: unknown, fallback: string): string {
   return (err as ApiError)?.message ?? fallback
@@ -21,6 +28,7 @@ export default function RoleDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const { widths: colWidths, startResize } = useResizableColumns(ROLE_USERS_COLUMNS)
 
   // Refrescar permisos de sesión al salir (docs/PROMPT_PERMISOS_FRONTEND.md §5.2 / §12.2).
   useEffect(() => {
@@ -204,12 +212,24 @@ export default function RoleDetailPage() {
               </div>
             ) : (
               <div className="table-scroll">
-                <table className="data-table">
+                <table className="data-table items-table-resizable">
+                  <colgroup>
+                    {ROLE_USERS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Usuario</th>
-                      <th>Correo</th>
-                      <th>Estado</th>
+                      <th>
+                        Usuario
+                        <span className="col-resize-handle" onMouseDown={startResize('usuario')} />
+                      </th>
+                      <th>
+                        Correo
+                        <span className="col-resize-handle" onMouseDown={startResize('correo')} />
+                      </th>
+                      <th>
+                        Estado
+                        <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>

@@ -21,6 +21,16 @@ import {
   setMiSeleccion,
 } from '@/shared/api/impresoras'
 import type { Impresora } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const IMPRESORAS_COLUMNS = [
+  { key: 'seleccion', width: 40 },
+  { key: 'nombre', width: 200 },
+  { key: 'marca', width: 140 },
+  { key: 'modelo', width: 140 },
+  { key: 'impresora', width: 220 },
+  { key: 'actions', width: 48 },
+]
 
 const printerSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -38,6 +48,8 @@ export default function ImpresorasPage() {
   const [editTarget, setEditTarget] = useState<Impresora | null>(null)
   const [toDelete, setToDelete] = useState<Impresora | null>(null)
   const [certModalOpen, setCertModalOpen] = useState(false)
+
+  const { widths: colWidths, startResize } = useResizableColumns(IMPRESORAS_COLUMNS)
 
   const { data: configs = [], isLoading: configsLoading } = useQuery({
     queryKey: ['impresoras'],
@@ -165,15 +177,30 @@ export default function ImpresorasPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {IMPRESORAS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th style={{ width: 40 }} />
-                <th>Nombre</th>
-                <th>Marca</th>
-                <th>Modelo</th>
-                <th>Impresora (QZ Tray)</th>
-                <th style={{ width: 48 }} />
+                <th />
+                <th>
+                  Nombre
+                  <span className="col-resize-handle" onMouseDown={startResize('nombre')} />
+                </th>
+                <th>
+                  Marca
+                  <span className="col-resize-handle" onMouseDown={startResize('marca')} />
+                </th>
+                <th>
+                  Modelo
+                  <span className="col-resize-handle" onMouseDown={startResize('modelo')} />
+                </th>
+                <th>
+                  Impresora (QZ Tray)
+                  <span className="col-resize-handle" onMouseDown={startResize('impresora')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -215,7 +242,7 @@ export default function ImpresorasPage() {
                     <td style={{ fontWeight: 500 }}>{c.name}</td>
                     <td className="td-muted">{c.brand}</td>
                     <td className="td-muted">{c.model}</td>
-                    <td className="td-muted" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                    <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                       {c.qzPrinterName}
                     </td>
                     <td onClick={(e) => e.stopPropagation()} className="actions-cell">

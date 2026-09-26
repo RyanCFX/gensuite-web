@@ -125,8 +125,8 @@ export function ApplyToCxpModal({ devolucionId, supplier, supplierName, availabl
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{c.id}</span>
-                        <span className="td-muted" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{c.ncfProveedor ?? '—'}</span>
+                        <span style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{c.id}</span>
+                        <span className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 11 }}>{c.ncfProveedor ?? '—'}</span>
                         <StatusBadge status={c.status} dot />
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>

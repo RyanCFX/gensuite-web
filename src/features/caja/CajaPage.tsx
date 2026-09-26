@@ -38,8 +38,19 @@ import {
   type PaymentLinesValue,
 } from '@/lib/paymentLines'
 import type { Invoice, CobrarFacturaDto } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const PENDIENTES_COLUMNS = [
+  { key: 'factura', width: 120 },
+  { key: 'cliente', width: 200 },
+  { key: 'ncf', width: 120 },
+  { key: 'fecha', width: 100 },
+  { key: 'total', width: 120 },
+  { key: 'saldo', width: 140 },
+  { key: 'actions', width: 80 },
+]
 
 export default function CajaPage() {
   const navigate = useNavigate()
@@ -330,6 +341,8 @@ function validateAndSubmit() {
     setPage(1)
   }, [])
 
+  const { widths: pendientesColWidths, startResize: startResizePendientes } = useResizableColumns(PENDIENTES_COLUMNS)
+
   return (
     <div className="page-container">
        {/* ── Header ───────────────────────────────────────────────────── */}
@@ -377,16 +390,37 @@ function validateAndSubmit() {
       {/* ── Tabla de pendientes ──────────────────────────────────────── */}
       <div className="card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table items-table-resizable">
+            <colgroup>
+              {PENDIENTES_COLUMNS.map((c) => <col key={c.key} style={{ width: pendientesColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Factura</th>
-                <th>Cliente</th>
-                <th>NCF</th>
-                <th>Fecha</th>
-                <th style={{ textAlign: 'right' }}>Total</th>
-                <th style={{ textAlign: 'right' }}>Saldo Pendiente</th>
-                <th style={{ width: 80 }} />
+                <th>
+                  Factura
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('factura')} />
+                </th>
+                <th>
+                  Cliente
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('cliente')} />
+                </th>
+                <th>
+                  NCF
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('ncf')} />
+                </th>
+                <th>
+                  Fecha
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('fecha')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Total
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('total')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Saldo Pendiente
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('saldo')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -411,14 +445,14 @@ function validateAndSubmit() {
                     )
                   : pendientes.map((inv) => (
                       <tr key={inv.id}>
-                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500 }}>{inv.id}</td>
+                        <td style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500 }}>{inv.id}</td>
                         <td>{inv.customerName}</td>
                         <td className="td-muted">{inv.ncf || '—'}</td>
                         <td className="td-muted">{formatDate(inv.postingDate)}</td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>
                           {formatMoney(inv.grandTotal, inv.currency ?? monedaBase)}
                         </td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--color-error)' }}>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--color-error)' }}>
                           {formatMoney(inv.outstandingAmount, inv.currency ?? monedaBase)}
                         </td>
                         <td>

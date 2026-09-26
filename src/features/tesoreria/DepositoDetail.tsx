@@ -10,6 +10,14 @@ import { formatDate, formatDOP, formatMoney } from '@/lib/formatters'
 import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
 import { CuentaContableOverrideSection } from './components/CuentaContableOverrideSection'
 import { EditableAccountCell, findBancoYPartyRows } from './components/EditableAccountCell'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const LINEAS_COLUMNS = [
+  { key: 'cuenta', width: 220 },
+  { key: 'debito', width: 130 },
+  { key: 'credito', width: 130 },
+  { key: 'descripcion', width: 220 },
+]
 
 const STATUS_BADGE: Record<TesoreriaEstado, string> = {
   draft: 'badge-draft',
@@ -35,6 +43,7 @@ export default function DepositoDetail() {
   const [pendingBancoOverride, setPendingBancoOverride] = useState('')
   const [pendingPartyOverride, setPendingPartyOverride] = useState('')
   const refetchPreviewRef = useRef<() => void>(() => {})
+  const { widths: lineasColWidths, startResize: startLineasResize } = useResizableColumns(LINEAS_COLUMNS)
 
   const { data: deposito, isLoading, isError } = useQuery({
     queryKey: ['tesoreria-deposito', id],
@@ -162,7 +171,7 @@ export default function DepositoDetail() {
             {deposito.referencias?.numeroReferencia && (
               <div className="detail-field">
                 <span className="detail-label">Referencia</span>
-                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{deposito.referencias.numeroReferencia}</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{deposito.referencias.numeroReferencia}</span>
               </div>
             )}
             {deposito.documentoOrigen?.doctype && (
@@ -218,13 +227,16 @@ export default function DepositoDetail() {
         <div className="card">
           <div className="card-header"><h2 className="card-title">Asiento Contable</h2></div>
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {LINEAS_COLUMNS.map((c) => <col key={c.key} style={{ width: lineasColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Cuenta</th>
-                  <th style={{ textAlign: 'right' }}>Débito</th>
-                  <th style={{ textAlign: 'right' }}>Crédito</th>
-                  <th>Descripción</th>
+                  <th>Cuenta<span className="col-resize-handle" onMouseDown={startLineasResize('cuenta')} /></th>
+                  <th style={{ textAlign: 'right' }}>Débito<span className="col-resize-handle" onMouseDown={startLineasResize('debito')} /></th>
+                  <th style={{ textAlign: 'right' }}>Crédito<span className="col-resize-handle" onMouseDown={startLineasResize('credito')} /></th>
+                  <th>Descripción<span className="col-resize-handle" onMouseDown={startLineasResize('descripcion')} /></th>
                 </tr>
               </thead>
               <tbody>

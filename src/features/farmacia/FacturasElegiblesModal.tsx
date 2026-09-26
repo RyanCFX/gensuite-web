@@ -5,9 +5,21 @@ import { Loader2, X } from 'lucide-react'
 import { listFacturasElegibles, vincularFacturasALote } from '@/shared/api/farmacia'
 import { formatDOP, formatDate } from '@/lib/formatters'
 import type { LoteFacturacionArs, VincularFacturasResult } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 /** El backend acepta entre 1 y 100 facturas por llamada (§6.3). */
 const MAX_POR_LOTE = 100
+
+const COLUMNS = [
+  { key: 'checkbox', width: 36 },
+  { key: 'factura', width: 110 },
+  { key: 'paciente', width: 180 },
+  { key: 'fecha', width: 100 },
+  { key: 'ncf', width: 110 },
+  { key: 'autorizacion', width: 140 },
+  { key: 'total', width: 110 },
+  { key: 'cobertura', width: 130 },
+]
 
 /**
  * Diálogo "Facturas elegibles" del lote: trae los candidatos que el servidor considera
@@ -25,6 +37,7 @@ export function FacturasElegiblesModal({
 }) {
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set())
   const [rechazadas, setRechazadas] = useState<VincularFacturasResult['rechazadas']>([])
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['farmacia-facturas-elegibles', lote.aseguradora, lote.periodoInicio, lote.periodoFin],
@@ -102,7 +115,7 @@ export function FacturasElegiblesModal({
               <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 12 }}>
                 {rechazadas.map((r) => (
                   <li key={r.factura}>
-                    <span style={{ fontFamily: 'monospace' }}>{r.factura}</span> — {r.motivo}
+                    <span style={{ fontFamily: 'var(--font-body)' }}>{r.factura}</span> — {r.motivo}
                   </li>
                 ))}
               </ul>
@@ -121,10 +134,13 @@ export function FacturasElegiblesModal({
           )}
 
           <div className="table-scroll" style={{ maxHeight: 380 }}>
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th style={{ width: 36 }}>
+                  <th>
                     <input
                       type="checkbox"
                       checked={todasSeleccionadas}
@@ -133,14 +149,36 @@ export function FacturasElegiblesModal({
                       title="Seleccionar todas"
                       style={{ cursor: 'pointer' }}
                     />
+                    <span className="col-resize-handle" onMouseDown={startResize('checkbox')} />
                   </th>
-                  <th>Factura</th>
-                  <th>Paciente</th>
-                  <th>Fecha</th>
-                  <th>NCF</th>
-                  <th>N.º autorización</th>
-                  <th style={{ textAlign: 'right' }}>Total</th>
-                  <th style={{ textAlign: 'right' }}>Cobertura neta</th>
+                  <th>
+                    Factura
+                    <span className="col-resize-handle" onMouseDown={startResize('factura')} />
+                  </th>
+                  <th>
+                    Paciente
+                    <span className="col-resize-handle" onMouseDown={startResize('paciente')} />
+                  </th>
+                  <th>
+                    Fecha
+                    <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+                  </th>
+                  <th>
+                    NCF
+                    <span className="col-resize-handle" onMouseDown={startResize('ncf')} />
+                  </th>
+                  <th>
+                    N.º autorización
+                    <span className="col-resize-handle" onMouseDown={startResize('autorizacion')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Total
+                    <span className="col-resize-handle" onMouseDown={startResize('total')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Cobertura neta
+                    <span className="col-resize-handle" onMouseDown={startResize('cobertura')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -180,10 +218,10 @@ export function FacturasElegiblesModal({
                           style={{ cursor: 'pointer' }}
                         />
                       </td>
-                      <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{f.id}</td>
+                      <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{f.id}</td>
                       <td>{f.customerName || f.customer}</td>
                       <td className="td-muted">{formatDate(f.postingDate)}</td>
-                      <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{f.ncf ?? '—'}</td>
+                      <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{f.ncf ?? '—'}</td>
                       <td>{f.numeroAutorizacion}</td>
                       <td style={{ textAlign: 'right' }}>{formatDOP(f.grandTotal)}</td>
                       <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatDOP(f.montoCoberturaNeta)}</td>

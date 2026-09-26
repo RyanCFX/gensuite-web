@@ -15,6 +15,14 @@ import { formatDate, formatDOP, formatMoney } from '@/lib/formatters'
 import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
 import { CuentaContableOverrideSection } from './components/CuentaContableOverrideSection'
 import { EditableAccountCell, findOrigenYDestinoRows } from './components/EditableAccountCell'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ASIENTO_COLUMNS = [
+  { key: 'cuenta', width: 200 },
+  { key: 'debito', width: 120 },
+  { key: 'credito', width: 120 },
+  { key: 'descripcion', width: 220 },
+]
 
 const STATUS_BADGE: Record<TesoreriaEstado, string> = {
   draft: 'badge-draft',
@@ -40,6 +48,7 @@ export default function TransferenciaInternaDetail() {
   const [pendingOrigenOverride, setPendingOrigenOverride] = useState('')
   const [pendingDestinoOverride, setPendingDestinoOverride] = useState('')
   const refetchPreviewRef = useRef<() => void>(() => {})
+  const { widths: asientoColWidths, startResize: startAsientoResize } = useResizableColumns(ASIENTO_COLUMNS)
 
   const { data: transferencia, isLoading, isError } = useQuery({
     queryKey: ['tesoreria-transferencia-interna', id],
@@ -169,7 +178,7 @@ export default function TransferenciaInternaDetail() {
             {transferencia.referencias?.numeroReferencia && (
               <div className="detail-field">
                 <span className="detail-label">Referencia</span>
-                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{transferencia.referencias.numeroReferencia}</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{transferencia.referencias.numeroReferencia}</span>
               </div>
             )}
             {transferencia.cuentaBancoOrigenOverride && (
@@ -219,13 +228,28 @@ export default function TransferenciaInternaDetail() {
         <div className="card">
           <div className="card-header"><h2 className="card-title">Asiento Contable</h2></div>
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {ASIENTO_COLUMNS.map((c) => <col key={c.key} style={{ width: asientoColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Cuenta</th>
-                  <th style={{ textAlign: 'right' }}>Débito</th>
-                  <th style={{ textAlign: 'right' }}>Crédito</th>
-                  <th>Descripción</th>
+                  <th>
+                    Cuenta
+                    <span className="col-resize-handle" onMouseDown={startAsientoResize('cuenta')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Débito
+                    <span className="col-resize-handle" onMouseDown={startAsientoResize('debito')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Crédito
+                    <span className="col-resize-handle" onMouseDown={startAsientoResize('credito')} />
+                  </th>
+                  <th>
+                    Descripción
+                    <span className="col-resize-handle" onMouseDown={startAsientoResize('descripcion')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>

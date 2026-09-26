@@ -20,6 +20,7 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePermissionsStore } from '@/stores/permissions.store'
 import { ComposicionPanel } from './ComposicionPanel'
 import { EquivalentesPanel } from './EquivalentesPanel'
@@ -484,6 +485,14 @@ function VariantsPanel({ itemId, item }: { itemId: string; item: Item }) {
   }
 
   const attrCols = item.attributes ?? []
+  const VARIANTS_COLUMNS = [
+    { key: 'codigo', width: 120 },
+    { key: 'nombre', width: 200 },
+    ...attrCols.map((a) => ({ key: `attr-${a.attribute}`, width: 110 })),
+    { key: 'precio', width: 110 },
+    { key: 'stock', width: 90 },
+  ]
+  const { widths: variantsColWidths, startResize: startResizeVariants } = useResizableColumns(VARIANTS_COLUMNS)
 
   return (
     <div className="card" id="variants">
@@ -527,14 +536,34 @@ function VariantsPanel({ itemId, item }: { itemId: string; item: Item }) {
       )}
 
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table items-table-resizable">
+          <colgroup>
+            {VARIANTS_COLUMNS.map((c) => <col key={c.key} style={{ width: variantsColWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>Código</th>
-              <th>Nombre</th>
-              {attrCols.map((a) => <th key={a.attribute}>{a.attribute}</th>)}
-              <th style={{ textAlign: 'right' }}>Precio</th>
-              <th style={{ textAlign: 'right' }}>Stock</th>
+              <th>
+                Código
+                <span className="col-resize-handle" onMouseDown={startResizeVariants('codigo')} />
+              </th>
+              <th>
+                Nombre
+                <span className="col-resize-handle" onMouseDown={startResizeVariants('nombre')} />
+              </th>
+              {attrCols.map((a) => (
+                <th key={a.attribute}>
+                  {a.attribute}
+                  <span className="col-resize-handle" onMouseDown={startResizeVariants(`attr-${a.attribute}`)} />
+                </th>
+              ))}
+              <th style={{ textAlign: 'right' }}>
+                Precio
+                <span className="col-resize-handle" onMouseDown={startResizeVariants('precio')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Stock
+                <span className="col-resize-handle" onMouseDown={startResizeVariants('stock')} />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -565,7 +594,7 @@ function VariantsPanel({ itemId, item }: { itemId: string; item: Item }) {
                       className="table-row-clickable"
                       onClick={() => navigate(`/inventario/productos/${v.id}`)}
                     >
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{v.id}</td>
+                      <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{v.id}</td>
                       <td style={{ fontWeight: 500 }}>{v.itemName}</td>
                       {attrCols.map((a) => {
                         const av = (v.attributes ?? []).find((va) => va.attribute === a.attribute)
@@ -1182,6 +1211,12 @@ export default function ItemDetail() {
   const [showPricesModal, setShowPricesModal] = useState(false)
   const [showPrintLabels, setShowPrintLabels] = useState(false)
 
+  const STOCK_WAREHOUSE_COLUMNS = [
+    { key: 'almacen', width: 200 },
+    { key: 'cantidad', width: 110 },
+  ]
+  const { widths: stockWhColWidths, startResize: startResizeStockWh } = useResizableColumns(STOCK_WAREHOUSE_COLUMNS)
+
   const toggleMutation = useMutation({
     mutationFn: () => toggleItem(id!),
     onSuccess: (updated) => {
@@ -1254,7 +1289,7 @@ export default function ItemDetail() {
             {item.hasVariants && <span className="badge badge-info">Template</span>}
             {item.variantOf && <span className="badge badge-neutral">Variante</span>}
           </h1>
-          <p className="page-sub" style={{ fontFamily: 'monospace' }}>{item.id}</p>
+          <p className="page-sub" style={{ fontFamily: 'var(--font-body)' }}>{item.id}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-secondary" onClick={() => navigate(`${basePath}/${item.id}/editar`)}>
@@ -1562,11 +1597,20 @@ export default function ItemDetail() {
                 return <p style={{ color: 'var(--text-tertiary)', fontSize: 13, margin: 0 }}>Sin existencias</p>
               }
               return (
-                <table className="data-table" style={{ width: '100%' }}>
+                <table className="data-table items-table-resizable" style={{ width: '100%' }}>
+                  <colgroup>
+                    {STOCK_WAREHOUSE_COLUMNS.map((c) => <col key={c.key} style={{ width: stockWhColWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Almacén</th>
-                      <th style={{ textAlign: 'right' }}>Cantidad</th>
+                      <th>
+                        Almacén
+                        <span className="col-resize-handle" onMouseDown={startResizeStockWh('almacen')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Cantidad
+                        <span className="col-resize-handle" onMouseDown={startResizeStockWh('cantidad')} />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1644,7 +1688,7 @@ export default function ItemDetail() {
           <div className="fields-grid fields-grid-3">
             <div className="detail-field">
               <span className="detail-label">Código</span>
-              <span className="detail-value" style={{ fontFamily: 'monospace' }}>{item.id}</span>
+              <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{item.id}</span>
             </div>
             <div className="detail-field">
               <span className="detail-label">Nombre</span>

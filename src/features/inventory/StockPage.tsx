@@ -13,6 +13,23 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FilterField } from '@/shared/ui/FilterField'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const COLUMNS = [
+  { key: 'codigo', width: 110 },
+  { key: 'nombre', width: 220 },
+  { key: 'almacen', width: 120 },
+  { key: 'categoria', width: 130 },
+  { key: 'stock', width: 90 },
+  { key: 'disponible', width: 110 },
+  { key: 'ubicacion', width: 140 },
+  { key: 'costoUnit', width: 110 },
+  { key: 'precioVenta', width: 110 },
+  { key: 'inversion', width: 120 },
+  { key: 'valorVenta', width: 120 },
+  { key: 'ganancia', width: 110 },
+  { key: 'estado', width: 100 },
+]
 
 export default function StockPage() {
   const authUser = useAuthStore((s) => s.user)
@@ -22,6 +39,7 @@ export default function StockPage() {
   const [brand, setBrand] = useState('')
   const [stockFilter, setStockFilter] = useState<string>('all')
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data: warehouses } = useQuery({
     queryKey: ['warehouses'],
@@ -190,22 +208,74 @@ export default function StockPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <SortableTh label="Código" sortKey="itemCode" orderBy={orderBy} onSort={sort} />
-                <SortableTh label="Nombre" sortKey="itemName" orderBy={orderBy} onSort={sort} />
-                <th>Almacén</th>
-                <th>Categoría</th>
-                <SortableTh label="Stock" sortKey="currentStock" orderBy={orderBy} onSort={sort} align="right" />
-                <th style={{ textAlign: 'right' }} title="Stock físico menos lo reservado nativamente para pedidos concretos — lo que realmente se le puede prometer a un cliente nuevo ahora mismo">Disponible</th>
-                <th>Ubicación</th>
-                <th style={{ textAlign: 'right' }}>Costo Unit.</th>
-                <th style={{ textAlign: 'right' }}>Precio Venta</th>
-                <th style={{ textAlign: 'right' }}>Inversión</th>
-                <th style={{ textAlign: 'right' }}>Valor Venta</th>
-                <th style={{ textAlign: 'right' }}>Ganancia</th>
-                <th>Estado</th>
+                <SortableTh
+                  label="Código"
+                  sortKey="itemCode"
+                  orderBy={orderBy}
+                  onSort={sort}
+                  resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('codigo')} />}
+                />
+                <SortableTh
+                  label="Nombre"
+                  sortKey="itemName"
+                  orderBy={orderBy}
+                  onSort={sort}
+                  resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('nombre')} />}
+                />
+                <th>
+                  Almacén
+                  <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                </th>
+                <th>
+                  Categoría
+                  <span className="col-resize-handle" onMouseDown={startResize('categoria')} />
+                </th>
+                <SortableTh
+                  label="Stock"
+                  sortKey="currentStock"
+                  orderBy={orderBy}
+                  onSort={sort}
+                  align="right"
+                  resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('stock')} />}
+                />
+                <th style={{ textAlign: 'right' }} title="Stock físico menos lo reservado nativamente para pedidos concretos — lo que realmente se le puede prometer a un cliente nuevo ahora mismo">
+                  Disponible
+                  <span className="col-resize-handle" onMouseDown={startResize('disponible')} />
+                </th>
+                <th>
+                  Ubicación
+                  <span className="col-resize-handle" onMouseDown={startResize('ubicacion')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Costo Unit.
+                  <span className="col-resize-handle" onMouseDown={startResize('costoUnit')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Precio Venta
+                  <span className="col-resize-handle" onMouseDown={startResize('precioVenta')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Inversión
+                  <span className="col-resize-handle" onMouseDown={startResize('inversion')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Valor Venta
+                  <span className="col-resize-handle" onMouseDown={startResize('valorVenta')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Ganancia
+                  <span className="col-resize-handle" onMouseDown={startResize('ganancia')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -240,7 +310,7 @@ export default function StockPage() {
                         const status = getStockStatus(item.actualQty)
                         return (
                           <tr key={`${item.itemCode}-${item.warehouse}`}>
-                            <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.itemCode}</td>
+                            <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode}</td>
                             <td style={{ fontWeight: 500 }}>{item.itemName}</td>
                             <td className="td-muted">{item.warehouse}</td>
                             <td className="td-muted">{item.category ?? '—'}</td>

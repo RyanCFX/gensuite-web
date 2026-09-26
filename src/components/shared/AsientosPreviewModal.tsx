@@ -5,6 +5,7 @@ import { RefreshCw, BookOpen, X, Split } from 'lucide-react'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { DistribucionCuentaEditor } from '@/components/shared/DistribucionCuentaEditor'
 import type { AsientoPreviewRow, ApiError, DistribucionCuentaDto, ImpuestoDistribucionDto } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 interface AsientosPreviewModalProps {
   open: boolean
@@ -31,6 +32,16 @@ interface AsientosPreviewModalProps {
  *  no cuadra, y ese mensaje se muestra tal cual, sin reformular; o renderizar `extraContent` (p.ej.
  *  el formulario de override de cuentas de Tesorería) para editar sin cerrar el modal. */
 export function AsientosPreviewModal({ open, onClose, queryKey, queryFn, onRedistribuir, extraContent, renderAccountCell }: AsientosPreviewModalProps) {
+  const COLUMNS = [
+    { key: 'fecha', width: 100 },
+    { key: 'cuenta', width: 220 },
+    { key: 'debito', width: 110 },
+    { key: 'credito', width: 110 },
+    { key: 'contraCuenta', width: 160 },
+    { key: 'centroCosto', width: 140 },
+    ...(onRedistribuir ? [{ key: 'actions', width: 100 }] : []),
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey,
     queryFn,
@@ -104,16 +115,19 @@ export function AsientosPreviewModal({ open, onClose, queryKey, queryFn, onRedis
           )}
           {!isLoading && !isError && rows.length > 0 && (
             <div className="table-scroll">
-              <table className="data-table">
+              <table className="data-table items-table-resizable">
+                <colgroup>
+                  {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>Fecha</th>
-                    <th>Cuenta</th>
-                    <th style={{ textAlign: 'right' }}>Débito</th>
-                    <th style={{ textAlign: 'right' }}>Crédito</th>
-                    <th>Contra cuenta</th>
-                    <th>Centro de costo</th>
-                    {onRedistribuir && <th style={{ width: 100 }} />}
+                    <th>Fecha<span className="col-resize-handle" onMouseDown={startResize('fecha')} /></th>
+                    <th>Cuenta<span className="col-resize-handle" onMouseDown={startResize('cuenta')} /></th>
+                    <th style={{ textAlign: 'right' }}>Débito<span className="col-resize-handle" onMouseDown={startResize('debito')} /></th>
+                    <th style={{ textAlign: 'right' }}>Crédito<span className="col-resize-handle" onMouseDown={startResize('credito')} /></th>
+                    <th>Contra cuenta<span className="col-resize-handle" onMouseDown={startResize('contraCuenta')} /></th>
+                    <th>Centro de costo<span className="col-resize-handle" onMouseDown={startResize('centroCosto')} /></th>
+                    {onRedistribuir && <th />}
                   </tr>
                 </thead>
                 <tbody>

@@ -11,6 +11,15 @@ import { getAperturaInventario, cancelarAperturaInventario } from '@/shared/api/
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate, formatMoney, formatNumber } from '@/lib/formatters'
 import { ConfirmModal } from '@/shared/ui/Modal'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ITEMS_COLUMNS = [
+  { key: 'articulo', width: 220 },
+  { key: 'almacen', width: 160 },
+  { key: 'cantidad', width: 100 },
+  { key: 'costoUnitario', width: 120 },
+  { key: 'importe', width: 130 },
+]
 
 const ESTADO_BADGE: Record<string, string> = { submitted: 'badge-submitted', cancelled: 'badge-cancelled' }
 const ESTADO_LABEL: Record<string, string> = { submitted: 'Confirmada', cancelled: 'Anulada' }
@@ -21,6 +30,7 @@ export default function InventarioDetail() {
   const queryClient = useQueryClient()
   const puedeAnular = usePuede('apertura.inventario.anular')
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
 
   const { data: doc, isLoading, isError } = useQuery({
     queryKey: ['apertura-inventario', id],
@@ -112,14 +122,17 @@ export default function InventarioDetail() {
       <div className="card">
         <div className="card-header"><h2 className="card-title">Artículos ({doc.items.length})</h2></div>
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table items-table-resizable">
+            <colgroup>
+              {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Artículo</th>
-                <th>Almacén</th>
-                <th style={{ textAlign: 'right' }}>Cantidad</th>
-                <th style={{ textAlign: 'right' }}>Costo unitario</th>
-                <th style={{ textAlign: 'right' }}>Importe</th>
+                <th>Artículo<span className="col-resize-handle" onMouseDown={startResize('articulo')} /></th>
+                <th>Almacén<span className="col-resize-handle" onMouseDown={startResize('almacen')} /></th>
+                <th style={{ textAlign: 'right' }}>Cantidad<span className="col-resize-handle" onMouseDown={startResize('cantidad')} /></th>
+                <th style={{ textAlign: 'right' }}>Costo unitario<span className="col-resize-handle" onMouseDown={startResize('costoUnitario')} /></th>
+                <th style={{ textAlign: 'right' }}>Importe<span className="col-resize-handle" onMouseDown={startResize('importe')} /></th>
               </tr>
             </thead>
             <tbody>

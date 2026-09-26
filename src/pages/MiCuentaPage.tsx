@@ -20,6 +20,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { formatDate } from '@/lib/formatters'
 import type { MfaFactor, ApiError } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 function apiMessage(err: unknown, fallback: string): string {
   return isApiError(err) ? err.message : fallback
@@ -180,6 +181,14 @@ function MfaCard() {
   const [enrollOpen, setEnrollOpen] = useState(false)
   const [toDelete, setToDelete] = useState<MfaFactor | null>(null)
 
+  const MFA_COLUMNS = [
+    { key: 'tipo', width: 110 },
+    { key: 'etiqueta', width: 200 },
+    { key: 'estado', width: 160 },
+    { key: 'actions', width: 48 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(MFA_COLUMNS)
+
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['my-mfa-factors'] })
 
   const emailMutation = useMutation({
@@ -212,13 +221,25 @@ function MfaCard() {
         ) : (factors ?? []).length === 0 ? (
           <p className="ff-hint" style={{ margin: 0 }}>No tienes ningún factor de 2FA configurado — tu cuenta solo pide contraseña al iniciar sesión.</p>
         ) : (
-          <table className="data-table">
+          <table className="data-table items-table-resizable">
+            <colgroup>
+              {MFA_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Tipo</th>
-                <th>Etiqueta</th>
-                <th>Estado</th>
-                <th style={{ width: 48 }} />
+                <th>
+                  Tipo
+                  <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                </th>
+                <th>
+                  Etiqueta
+                  <span className="col-resize-handle" onMouseDown={startResize('etiqueta')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -321,7 +342,7 @@ function TotpEnrollModal({ onClose }: { onClose: () => void }) {
             </div>
             <div style={{
               display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
-              fontFamily: 'var(--font-mono)', fontSize: 13, background: 'var(--surface-sunken)',
+              fontFamily: 'var(--font-body)', fontSize: 13, background: 'var(--surface-sunken)',
               border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', padding: 16,
             }}>
               {recoveryCodes.map((c) => <span key={c}>{c}</span>)}
@@ -374,7 +395,7 @@ function TotpEnrollModal({ onClose }: { onClose: () => void }) {
               <div className="ff-wrap">
                 <label className="ff-label">O ingresa este código manualmente</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input className="ff-input" value={enrolled.secret} disabled style={{ fontFamily: 'var(--font-mono)' }} />
+                  <input className="ff-input" value={enrolled.secret} disabled style={{ fontFamily: 'var(--font-body)' }} />
                   <button
                     type="button"
                     className="btn btn-secondary btn-size-sm"
