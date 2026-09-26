@@ -10,6 +10,7 @@ import type { Supplier } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { useFeature } from '@/shared/features/can'
 import { Pencil, Ban, Building2, Globe, Wallet, RefreshCw } from 'lucide-react'
 
 const PAGO_STATUS_BADGE: Record<string, string> = {
@@ -156,6 +157,11 @@ export default function SupplierDetail() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [showDisableDialog, setShowDisableDialog] = useState(false)
+  // Secciones embebidas de un módulo gateado dentro de una pantalla núcleo (§6): el "Historial
+  // de pagos"/"Cuentas por pagar" pertenece a `cuentasPorPagar` aunque Proveedor sea visible por
+  // su propio feature; "Compras Recientes" a `compras`.
+  const tieneCxP = useFeature('cuentasPorPagar')
+  const tieneCompras = useFeature('compras')
 
   const { data: supplier, isLoading, isError } = useQuery({
     queryKey: ['supplier', id],
@@ -351,6 +357,7 @@ export default function SupplierDetail() {
             </div>
           </div>
 
+          {tieneCompras && (
           <div className="card">
             <div className="card-header">
               <span className="card-title">Compras Recientes</span>
@@ -359,6 +366,7 @@ export default function SupplierDetail() {
               {id && <RecentPurchases supplierId={id} />}
             </div>
           </div>
+          )}
 
           {(supplier.banco || supplier.numeroCuenta) && (
             <div className="card">
@@ -452,6 +460,7 @@ export default function SupplierDetail() {
             </div>
           </div>
 
+          {tieneCxP && (
           <div className="card">
             <div className="card-header">
               <span className="card-title">Historial de Pagos</span>
@@ -465,6 +474,7 @@ export default function SupplierDetail() {
               {id && <HistorialPagos supplierId={id} />}
             </div>
           </div>
+          )}
         </div>
       </div>
 

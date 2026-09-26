@@ -11,6 +11,8 @@ import type {
   PaginationParams,
   VincularFacturasDto,
   VincularFacturasResult,
+  BuscarAsistidaParams,
+  BusquedaAsistidaResponse,
 } from './types'
 
 // ─── Lotes de Facturación ARS (docs/PROMPT_FARMACIA_V2_FRONTEND.md §6) ──────
@@ -110,4 +112,17 @@ export async function downloadLoteFarmaciaPdf(id: string, filename?: string): Pr
   a.download = filename ?? `lote-${id}.pdf`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+// ─── Búsqueda asistida de mostrador/POS (motor de recomendación) — docs/tasks/
+// PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §9 ────────────────────────────────
+
+/** `coincidencias` se pinta igual que un resultado normal de catálogo; `equivalentes` va SIEMPRE
+ *  en una sección visualmente separada, nunca intercalada (§2 regla 4, §9.2). */
+export async function buscarAsistida(params: BuscarAsistidaParams) {
+  const res = await client.get<{ success: true; data: BusquedaAsistidaResponse }>(
+    ENDPOINTS.farmacia.busquedaAsistida,
+    { params },
+  )
+  return unwrap(res)
 }

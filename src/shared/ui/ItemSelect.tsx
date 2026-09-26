@@ -39,6 +39,11 @@ export interface ItemSelectProps {
   excludeItems?: boolean
   /** Filtra artículos con stock en almacenes de esta sucursal — el item devuelto trae stockByWarehouse */
   branch?: string
+  /** Opt-in, no cambia el comportamiento por defecto de nadie más: se llama con el texto tecleado
+   *  cada vez que cambia, para que un panel externo (ej. equivalentes por composición — vertical
+   *  Farmacia, docs/tasks/PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §9) pueda reaccionar a la
+   *  misma búsqueda sin que ItemSelect sepa nada de ese caso de uso. */
+  onQueryChange?: (query: string) => void
 }
 
 export function ItemSelect({
@@ -57,6 +62,7 @@ export function ItemSelect({
   onSelectCuentaPorPagar,
   excludeItems,
   branch,
+  onQueryChange,
 }: ItemSelectProps) {
   const [query, setQuery] = useState('')
 
@@ -166,7 +172,7 @@ export function ItemSelect({
         if (foundCuentaPorPagar && onSelectCuentaPorPagar) onSelectCuentaPorPagar(foundCuentaPorPagar)
       }}
       options={options}
-      onSearch={setQuery}
+      onSearch={(q) => { setQuery(q); onQueryChange?.(q) }}
       onOpen={() => {
         refetch()
         if (includeBundles) refetchBundles()

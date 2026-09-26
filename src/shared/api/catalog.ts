@@ -23,6 +23,10 @@ import type {
   CuentaPorPagar,
   CreateCuentaPorPagarDto,
   UpdateCuentaPorPagarDto,
+  ComposicionDto,
+  ComposicionResponse,
+  EquivalentesResponse,
+  ListEquivalentesParams,
 } from './types'
 
 // ---- Items ----
@@ -49,6 +53,13 @@ export interface ListItemsParams extends PaginationParams {
   maxDiscountPctMin?: number
   maxDiscountPctMax?: number
   trackingType?: 'none' | 'serial' | 'batch'
+  // ─── Composición de medicamentos (vertical Farmacia) — docs/tasks/
+  // PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §7. Combinables entre sí y con el resto. ───────
+  /** id de un Active Ingredient — solo artículos que lo declaran en su composición. */
+  principioActivo?: string
+  esMedicamento?: boolean
+  /** id de un Dosage Form. */
+  formaFarmaceutica?: string
 }
 
 export async function listItems(params?: ListItemsParams) {
@@ -109,6 +120,32 @@ export async function getItemStock(id: string) {
 export async function toggleItem(id: string) {
   const res = await client.post<{ success: true; data: Item }>(ENDPOINTS.catalog.items.toggle(id))
   return unwrap(res)
+}
+
+// ─── Composición de medicamentos (vertical Farmacia) — docs/tasks/
+// PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §6 ────────────────────────────────
+
+/** Solo llamar al entrar a la pestaña "Composición" — no hace falta pedirlo si el usuario nunca
+ *  abre esa pestaña (§6.3). */
+export async function getComposicion(itemId: string) {
+  const res = await client.get<{ success: true; data: ComposicionResponse }>(ENDPOINTS.catalog.items.composicion(itemId))
+  return unwrap(res)
+}
+
+/** REEMPLAZO TOTAL — el body es la lista completa de principios que debe quedar, nunca un parche
+ *  (§6.4). Con `esMedicamento: false` alcanza mandar solo eso, el backend limpia el resto. */
+export async function updateComposicion(itemId: string, data: ComposicionDto) {
+  const res = await client.put<{ success: true; data: ComposicionResponse }>(ENDPOINTS.catalog.items.composicion(itemId), data)
+  return unwrap(res)
+}
+
+/** Motor de recomendación sobre un artículo puntual (§8). No llamar si `esMedicamento` es
+ *  `false` en la ficha — evita una llamada innecesaria que el backend igual respondería con
+ *  `motivo: "NO_ES_MEDICAMENTO"`. */
+export async function getEquivalentes(itemId: string, params?: ListEquivalentesParams) {
+  const res = await client.get<{ success: true } & EquivalentesResponse>(ENDPOINTS.catalog.items.equivalentes(itemId), { params })
+  const { data, ancla, aviso, motivo } = res.data
+  return { data, ancla, aviso, motivo }
 }
 
 // ---- Categories ----

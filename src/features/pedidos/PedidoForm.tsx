@@ -17,7 +17,7 @@ import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
-import { formatMoney, round2 } from '@/lib/formatters'
+import { formatMoney, round2, formatDate } from '@/lib/formatters'
 import { formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -503,6 +503,14 @@ useEffect(() => {
   function handleError(err: unknown) {
     const msg = (err as any)?.message ?? ''
     setSubmitError(msg)
+    // docs/PROMPT_ERRORES_COMERCIALES_FRONTEND.md §4/§5.3 — el pedido dejó de ser editable
+    // (sometido/cancelado mientras se editaba). No hay una acción de enmienda local propia para
+    // Pedidos hoy — se devuelve al detalle con el mensaje comercial del backend tal cual.
+    if (id && isApiErrorCode(err, ERROR_CODES.DOC_SUBMITTED_IMMUTABLE)) {
+      toast.error(msg || 'Este pedido ya no se puede editar')
+      navigate(`/pedidos/${id}`)
+      return
+    }
     if (isApiErrorCode(err, ERROR_CODES.BRANCH_REQUIRED)) {
       setBranchError(true)
       toast.error(msg || 'Selecciona una sucursal')
@@ -993,6 +1001,16 @@ try {
                    )}
                  </label>
                </div>
+              {/* La fecha del pedido ya no la fija el cliente — el servidor siempre la asigna con
+                  el momento real del request. En edición se muestra de solo lectura, informativa. */}
+              {id && (
+                <div className="ff-wrap">
+                  <span className="ff-label">Fecha</span>
+                  <span className="ff-input" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }}>
+                    {formatDate(transactionDate)}
+                  </span>
+                </div>
+              )}
               <div className="ff-wrap">
                 <label className="ff-label">Entrega estimada</label>
                 <DatePicker value={deliveryDate} onChange={setDeliveryDate} className="ff-input" clearable />

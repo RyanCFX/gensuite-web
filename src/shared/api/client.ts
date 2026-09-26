@@ -113,6 +113,14 @@ function forceLogout() {
   }
 }
 
+// Códigos que el interceptor ya maneja arriba pero que NO viven en `ERROR_CODES` (definido más
+// abajo en este archivo — son estructurales/de sesión, no de negocio, así que no tiene sentido
+// mezclarlos con el catálogo de códigos comerciales). Se usa solo para no reportar estos como
+// "código desconocido" — ver el bloque de logging centralizado más abajo.
+const CODIGOS_ESTRUCTURALES_CONOCIDOS = new Set([
+  'NETWORK_ERROR', 'UNKNOWN_ERROR', 'FORBIDDEN', 'ERPNEXT_AUTH_ERROR', 'PERMISO_INSUFICIENTE',
+])
+
 client.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -122,11 +130,13 @@ client.interceptors.response.use(
     if (!axios.isAxiosError(error) || !error.response) {
       // Sin respuesta del servidor (backend caído, CORS, timeout, sin conexión) — a diferencia de
       // un 4xx (error de validación esperado), esto siempre es una falla real que vale reportar.
+      // §3 fila 7 — mismo texto fijo que un 5xx genérico (agrupados: ninguno de los dos tiene un
+      // `message` de negocio del que valga la pena depender). Sin reintento automático agresivo.
       Sentry.captureException(error, { extra: { url: requestUrl, method: requestMethod } })
       Sentry.logger.error('Request sin respuesta del servidor', { url: requestUrl, method: requestMethod })
       return Promise.reject({
         code: 'NETWORK_ERROR',
-        message: 'Error de conexión con el servidor',
+        message: 'Ocurrió un error inesperado. Inténtelo de nuevo; si el problema persiste, contacte a soporte.',
         statusCode: 0,
       })
     }
@@ -170,14 +180,50 @@ client.interceptors.response.use(
       data.error.message = ocultarErp(data.error.message)
     }
 
-    // ERPNEXT_AUTH_ERROR: el BFF no pudo autenticarse contra ERPNext con las
-    // credenciales de la integración (no es la sesión del usuario) — tratamos esto
-    // como sesión inválida: cerramos sesión y redirigimos a login con un aviso.
-    if (!isAuthEndpoint && data?.error?.code === 'ERPNEXT_AUTH_ERROR') {
+    // ERPNEXT_AUTH_ERROR (502) — §3 fila 2. El JWT del BFF (la sesión del usuario) sigue siendo
+    // válido; lo que falló es la credencial de ERPNext QUE LLEVA ADENTRO (api key/secret de la
+    // integración, revocada o el usuario deshabilitado en el site Frappe). Un 401 significa "la
+    // sesión murió"; esto significa "la integración falló" — son cosas distintas a propósito
+    // (por eso el backend usa un status distinto). Cerrar sesión acá sería destruir una sesión
+    // válida sin arreglar nada: el re-login fallaría igual, porque el problema no es la sesión.
+    // Se reescribe el mensaje al texto fijo de la fila (nunca el técnico del backend) para que
+    // cualquier pantalla que ya haga `toast.error(err.message)` muestre el texto correcto sin
+    // tener que tocar cada `onError` uno por uno.
+    if (!isAuthEndpoint && status === 502 && data?.error?.code === 'ERPNEXT_AUTH_ERROR') {
       Sentry.captureException(new Error('ERPNEXT_AUTH_ERROR'), { extra: { url: requestUrl, method: requestMethod } })
-      Sentry.logger.error('ERPNEXT_AUTH_ERROR — el BFF no pudo autenticarse contra ERPNext', { url: requestUrl })
-      clearSession()
-      window.location.href = '/login?sessionExpired=1'
+      Sentry.logger.error('ERPNEXT_AUTH_ERROR — el BFF no pudo autenticarse contra ERPNext (integración, no sesión)', { url: requestUrl })
+      data.error.message = 'Hay un problema de conexión con el servidor. Reintentá en unos minutos. Si persiste, contactá a soporte.'
+      return Promise.reject(data.error)
+    }
+
+    // Código de negocio de este error — se reusa para todos los chequeos de acá en adelante
+    // (tenant, permisos, features, catálogo desconocido).
+    const errorCode = data?.error?.code
+
+    // Estados de tenant bloqueantes (§3/§5.5) — nunca un toast: se setea un estado global que
+    // `ProtectedRoute` usa para tapar toda la app con una pantalla completa. Import dinámico para
+    // evitar el mismo ciclo que permissions.store/features.store más abajo.
+    if (
+      errorCode === 'TENANT_SUSPENDED' ||
+      errorCode === 'TENANT_PROVISIONING' ||
+      errorCode === 'TENANT_CANCELLED' ||
+      errorCode === 'TENANT_NOT_FOUND'
+    ) {
+      import('@/stores/tenantStatus.store').then((m) =>
+        m.useTenantStatusStore.getState().setBlocked(errorCode, data.error.message),
+      )
+      return Promise.reject(data.error)
+    }
+
+    // TENANT_MISMATCH (403) — §3 fila 3: el `X-Tenant` de la sesión ya no es válido para este
+    // usuario (ej. se le quitó el acceso a ese tenant desde otra sesión). A diferencia de un 401,
+    // el logout acá NO es automático — se explica la situación y el usuario cierra sesión por su
+    // cuenta. Mismo mecanismo de pantalla completa que los demás estados de tenant.
+    if (!isAuthEndpoint && errorCode === 'TENANT_MISMATCH') {
+      Sentry.logger.warn('TENANT_MISMATCH — el tenant de la sesión ya no es válido para este usuario', { url: requestUrl })
+      import('@/stores/tenantStatus.store').then((m) =>
+        m.useTenantStatusStore.getState().setBlocked('TENANT_MISMATCH', data.error.message),
+      )
       return Promise.reject(data.error)
     }
 
@@ -188,22 +234,62 @@ client.interceptors.response.use(
     // viene de ERPNext más abajo y puede ser un permiso más fino: solo se informa.
     // Import dinámico a propósito: un import estático de vuelta crearía un ciclo real
     // (client.ts → permissions.store.ts → me.ts → client.ts).
-    const permCode = data?.error?.code
-    if (!isAuthEndpoint && (permCode === 'PERMISO_INSUFICIENTE' || permCode === 'FORBIDDEN')) {
+    if (!isAuthEndpoint && (errorCode === 'PERMISO_INSUFICIENTE' || errorCode === 'FORBIDDEN')) {
       // Toast throttleado: un mismo mensaje puede llegar en ráfaga (react-query reintenta,
       // varias queries fallan a la vez) — no spamear al usuario con el mismo aviso.
       const msg = data?.error?.message
       if (msg && shouldToastPermiso(msg)) toast.error(msg)
-      if (permCode === 'PERMISO_INSUFICIENTE') {
+      if (errorCode === 'PERMISO_INSUFICIENTE') {
         // Refresco SILENCIOSO: no toca `status`, así ProtectedRoute no re-monta la app (evita el
         // loop de re-render → re-request → 403 → refresh → ...). Deduplicado en el store.
         import('@/stores/permissions.store').then((m) => m.usePermissionsStore.getState().refreshSilencioso())
       }
     }
 
-    // 5xx: falla real del backend (no un error de validación del usuario) — se reporta como
-    // Issue y como log estructurado, con el tenant ya etiquetado en el scope global.
+    // Errores de features por tenant (docs/tasks/80_features_tenant_discriminacion_ui.md §9).
+    // `FEATURE_NO_CONTRATADO` (403) no debería pasar si el menú está bien gateado — si aparece,
+    // falta ocultar algo (§5/§6): se avisa con mensaje genérico (no técnico) y se refrescan los
+    // features en segundo plano para que la UI se corrija sola. `LIMITE_*` (400) y
+    // `PERFIL_NO_CONTRATADO` (400) los maneja cada pantalla con su propio mensaje (ver §9) — acá
+    // solo se dejan pasar tal cual (el `message` del backend ya viene en español).
+    // Mismo import dinámico que arriba (evita el ciclo client.ts → features.store.ts → me.ts).
+    if (!isAuthEndpoint && errorCode === 'FEATURE_NO_CONTRATADO') {
+      const msg = 'Este módulo no está disponible en tu plan'
+      if (shouldToastPermiso(msg)) toast.error(msg)
+      import('@/stores/features.store').then((m) => m.useFeaturesStore.getState().refreshSilencioso())
+    }
+
+    // 429 — §3 fila 6. Puede venir de una capa que no arma un `message` comercial (proxy/
+    // rate-limiter delante del BFF) — se fija el texto siempre, sin depender del backend. Nunca
+    // reintentar en loop: el usuario espera y reintenta a mano.
+    if (status === 429) {
+      const msg = 'Demasiadas solicitudes. Espere un momento e inténtelo de nuevo.'
+      if (data?.error) data.error.message = msg
+      return Promise.reject(data?.error ?? { code: 'RATE_LIMITED', message: msg, statusCode: 429 })
+    }
+
+    // Código no catalogado (§2/§5.4): el `message` sigue siendo comercial/en español y cada
+    // pantalla ya lo muestra tal cual con su propio `onError` — acá solo se deja constancia
+    // centralizada (una sola vez, para TODO el árbol de requests) de que el backend mandó un
+    // `code` que el frontend no conoce todavía, para que el equipo de backend se entere sin
+    // depender de que alguien lo reporte a mano.
+    if (errorCode && !(errorCode in ERROR_CODES) && !CODIGOS_ESTRUCTURALES_CONOCIDOS.has(errorCode)) {
+      console.error(`[api] code desconocido: "${errorCode}" — avisar al equipo de backend`, data.error)
+      Sentry.captureMessage(`Código de error de API desconocido: ${errorCode}`, {
+        level: 'warning',
+        extra: { url: requestUrl, method: requestMethod, status, message: data?.error?.message },
+      })
+    }
+
+    // 5xx genéricos: falla real del backend (no un error de validación del usuario) — §3 fila 7.
+    // `ERPNEXT_AUTH_ERROR` (502) ya se manejó y retornó arriba, así que lo que llega acá son fallas
+    // internas reales sin un `message` de negocio del que valga la pena depender: se fija el texto,
+    // sin reintento automático agresivo. Se reporta como Issue y como log estructurado, con el
+    // tenant ya etiquetado en el scope global.
     if (status >= 500) {
+      if (data?.error) {
+        data.error.message = 'Ocurrió un error inesperado. Inténtelo de nuevo; si el problema persiste, contacte a soporte.'
+      }
       Sentry.captureException(error, {
         extra: { url: requestUrl, method: requestMethod, status, code: data?.error?.code },
       })
@@ -293,6 +379,57 @@ export const ERROR_CODES = {
   // mercancía. Antes esto caía en silencio al primer almacén activo de la compañía; ahora bloquea.
   // Puede aparecer en POST/PUT /compras, .../ordenes/:id/recibir y POST/PUT .../purchase-receipt.
   ALMACEN_COMPRA_NO_CONFIGURADO: 'ALMACEN_COMPRA_NO_CONFIGURADO',
+  // Features por tenant (docs/tasks/80_features_tenant_discriminacion_ui.md §9) — códigos que
+  // requieren un comportamiento de UI específico (no basta con mostrar el `message` genérico).
+  FEATURE_NO_CONTRATADO: 'FEATURE_NO_CONTRATADO',
+  LIMITE_USUARIOS_ALCANZADO: 'LIMITE_USUARIOS_ALCANZADO',
+  LIMITE_SUCURSALES_ALCANZADO: 'LIMITE_SUCURSALES_ALCANZADO',
+  PERFIL_NO_CONTRATADO: 'PERFIL_NO_CONTRATADO',
+
+  // ─── Códigos comerciales unificados (docs/PROMPT_ERRORES_COMERCIALES_FRONTEND.md §4) ──────────
+  // Todo error del BFF trae ahora un `message` comercial en español listo para mostrar tal cual
+  // (§2: bifurcar por `code`, nunca por texto de `message`) y, salvo pocas excepciones (ver abajo
+  // y `mostrarErrorApi` en `@/lib/apiErrors`), no hace falta un manejo especial de UI — un
+  // `toast.error(err.message)` ya cumple. Los únicos 3 que SÍ exigen una acción de UI puntual
+  // (§5.3) son `POS_TURNO_DESACTUALIZADO` (ofrecer cerrar turno), `DOC_SUBMITTED_IMMUTABLE`
+  // (ofrecer enmienda donde exista) y `PARTY_CURRENCY_LOCKED` (nunca ofrecer reintentar).
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  DOC_FIELD_FROZEN: 'DOC_FIELD_FROZEN',
+  DUPLICATE_ENTRY: 'DUPLICATE_ENTRY',
+  MANDATORY_MISSING: 'MANDATORY_MISSING',
+  DOC_SUBMITTED_IMMUTABLE: 'DOC_SUBMITTED_IMMUTABLE',
+  LINKED_DOC_BLOCKS: 'LINKED_DOC_BLOCKS',
+  LINK_NOT_FOUND: 'LINK_NOT_FOUND',
+  CONCURRENT_MODIFICATION: 'CONCURRENT_MODIFICATION',
+  CREDIT_LIMIT_EXCEEDED: 'CREDIT_LIMIT_EXCEEDED',
+  INVALID_POSTING_DATE: 'INVALID_POSTING_DATE',
+  INVALID_DUE_DATE: 'INVALID_DUE_DATE',
+  SERIAL_BATCH_DUPLICATE: 'SERIAL_BATCH_DUPLICATE',
+  BATCH_EXPIRED: 'BATCH_EXPIRED',
+  ITEM_CONFIG_MISSING: 'ITEM_CONFIG_MISSING',
+  OVER_ALLOWANCE_EXCEEDED: 'OVER_ALLOWANCE_EXCEEDED',
+  PAYMENT_MISMATCH: 'PAYMENT_MISMATCH',
+  PAYMENT_CONFIG_MISSING: 'PAYMENT_CONFIG_MISSING',
+  TAX_ACCOUNT_MISSING: 'TAX_ACCOUNT_MISSING',
+  NCF_SEQUENCE_EXHAUSTED: 'NCF_SEQUENCE_EXHAUSTED',
+  EXCHANGE_RATE_MISSING: 'EXCHANGE_RATE_MISSING',
+  CURRENCY_MISMATCH: 'CURRENCY_MISMATCH',
+  // A diferencia de todos los demás: reintentar el MISMO payload nunca va a funcionar (el
+  // cliente/proveedor quedó atado para siempre a otra moneda) — nunca ofrecer un botón de
+  // reintentar para este código, ver `mostrarErrorApi`.
+  PARTY_CURRENCY_LOCKED: 'PARTY_CURRENCY_LOCKED',
+  INVENTORY_VALUATION_ERROR: 'INVENTORY_VALUATION_ERROR',
+  INVALID_BARCODE: 'INVALID_BARCODE',
+  // Turno de caja de un día anterior — ofrecer "Cerrar turno" (reutiliza CerrarTurnoModal).
+  POS_TURNO_DESACTUALIZADO: 'POS_TURNO_DESACTUALIZADO',
+
+  // ─── Estados de tenant y sesión (§3) — nunca un toast, son pantallas/redirecciones completas.
+  // Manejados centralmente en el interceptor de abajo, no en cada `onError` de pantalla. ─────────
+  TENANT_MISMATCH: 'TENANT_MISMATCH',
+  TENANT_SUSPENDED: 'TENANT_SUSPENDED',
+  TENANT_PROVISIONING: 'TENANT_PROVISIONING',
+  TENANT_CANCELLED: 'TENANT_CANCELLED',
+  TENANT_NOT_FOUND: 'TENANT_NOT_FOUND',
 } as const
 
 // El predicado narrowa a `ApiError & { code: C }` (no solo `ApiError`) a propósito: cuando el

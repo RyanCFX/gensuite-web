@@ -16,6 +16,9 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useLimites } from '@/shared/features/can'
+import { limiteSucursalesAlcanzado, textoContadorSucursales } from '@/shared/features/catalog'
+import { isApiErrorCode } from '@/shared/api/client'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
@@ -38,6 +41,10 @@ export default function SucursalesPage() {
   const [toDelete, setToDelete] = useState<Sucursal | null>(null)
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
+  // Límites del plan (§8): mismo criterio que Usuarios — contador "X de Y" + botón deshabilitado.
+  const limites = useLimites()
+  const limiteAlcanzado = limiteSucursalesAlcanzado(limites)
+  const contador = textoContadorSucursales(limites)
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
@@ -90,7 +97,18 @@ export default function SucursalesPage() {
       queryClient.invalidateQueries({ queryKey: ['sucursales'] })
       closeDialog()
     },
-    onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al crear la sucursal'),
+    // §9 LIMITE_SUCURSALES_ALCANZADO (400): mensaje con el límite exacto — mismo texto que el
+    // tooltip del botón deshabilitado.
+    onError: (err: { message?: string; code?: string; details?: Record<string, unknown> }) => {
+      if (isApiErrorCode(err, 'LIMITE_SUCURSALES_ALCANZADO')) {
+        const limite = err.details?.['limite']
+        toast.error(typeof limite === 'number'
+          ? `Se alcanzó el límite del plan (${limite} sucursales).`
+          : (err?.message ?? 'Se alcanzó el límite de sucursales del plan.'))
+        return
+      }
+      toast.error(err?.message ?? 'Error al crear la sucursal')
+    },
   })
 
   const updateMutation = useMutation({
@@ -163,7 +181,17 @@ export default function SucursalesPage() {
         action={
           <>
             <RecargarButton />
-            <button className="btn btn-navy" onClick={openCreate}>
+            {contador && (
+              <span style={{ fontSize: 12, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }} title={`${contador} — límite del plan`}>
+                {contador}
+              </span>
+            )}
+            <button
+              className="btn btn-navy"
+              onClick={openCreate}
+              disabled={limiteAlcanzado}
+              title={limiteAlcanzado ? `Se alcanzó el límite del plan (${contador}).` : undefined}
+            >
               <Plus size={16} />
               Nueva Sucursal
             </button>

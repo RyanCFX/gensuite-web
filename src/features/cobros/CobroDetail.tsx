@@ -47,10 +47,13 @@ export default function CobroDetail() {
   const formatoImpresionDefault = facturacionConfig?.formatoImpresionDefault ?? 'a4'
   const formatosPermitidos = facturacionConfig?.formatosPermitidos
 
+  // Solo enriquece el nombre para mostrar (`?? cobro.bankAccount` abajo como fallback): sin
+  // reintentos, es un dato decorativo y no debe pagar doble request por un fallo transitorio.
   const { data: cuentaBancaria } = useQuery({
     queryKey: ['cuenta-bancaria', cobro?.bankAccount],
     queryFn: () => getCuentaBancaria(cobro!.bankAccount!),
     enabled: !!cobro?.bankAccount,
+    retry: false,
   })
 
   const downloadMutation = useMutation({

@@ -18,6 +18,8 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
+import { listPrincipiosActivos } from '@/shared/api/principios-activos'
+import { usePermissionsStore } from '@/stores/permissions.store'
 
 const PAGE_SIZE = 20
 
@@ -88,6 +90,13 @@ export default function ItemsPage() {
   const [trackingTypeFilter, setTrackingTypeFilter] = useState<'all' | 'none' | 'serial' | 'batch'>('all')
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
 
+  // ─── Composición de medicamentos (vertical Farmacia) — docs/tasks/
+  // PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §7. Filtros completamente ausentes (ni ocultos ni
+  // deshabilitados) para un tenant que no sea Farmacia. ─────────────────────────────────────────
+  const esFarmacia = usePermissionsStore((s) => s.vertical) === 'farmacia'
+  const [principioActivoFilter, setPrincipioActivoFilter] = useState('')
+  const [esMedicamentoFilter, setEsMedicamentoFilter] = useState(false)
+
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
 
@@ -98,6 +107,7 @@ export default function ItemsPage() {
         search: debouncedSearch, fixedType, templateFilter, categoryFilter, brandFilter, statusFilter, offset, orderBy,
         stockUomFilter, hasWarrantyFilter, warrantyPeriodMin, warrantyPeriodMax,
         pricesMin, pricesMax, priceModeFilter, maxDiscountPctMin, maxDiscountPctMax, trackingTypeFilter,
+        principioActivoFilter, esMedicamentoFilter,
       },
     ],
     queryFn: () =>
@@ -121,8 +131,20 @@ export default function ItemsPage() {
         maxDiscountPctMin: maxDiscountPctMin ? Number(maxDiscountPctMin) : undefined,
         maxDiscountPctMax: maxDiscountPctMax ? Number(maxDiscountPctMax) : undefined,
         trackingType: isProduct ? (trackingTypeFilter === 'all' ? undefined : trackingTypeFilter) : undefined,
+        principioActivo: esFarmacia ? (principioActivoFilter || undefined) : undefined,
+        esMedicamento: esFarmacia && esMedicamentoFilter ? true : undefined,
       }),
   })
+
+  const { data: principiosActivosData } = useQuery({
+    queryKey: ['principios-activos-filtro', {}],
+    queryFn: () => listPrincipiosActivos({ soloActivos: true, limit: 100 }),
+    enabled: esFarmacia,
+  })
+  const [principioActivoSearch, setPrincipioActivoSearch] = useState('')
+  const principioActivoOptions: SearchSelectOption[] = (principiosActivosData?.items ?? [])
+    .filter((p) => !principioActivoSearch || p.nombre.toLowerCase().includes(principioActivoSearch.toLowerCase()))
+    .map((p) => ({ value: p.id, label: p.nombre }))
 
   const { data: categoriesData } = useQuery({
     queryKey: ['categories', {}],
@@ -180,6 +202,8 @@ export default function ItemsPage() {
     + (hasWarrantyFilter !== 'all' ? 1 : 0)
     + (priceModeFilter !== 'all' ? 1 : 0)
     + (trackingTypeFilter !== 'all' ? 1 : 0)
+    + (esFarmacia && principioActivoFilter ? 1 : 0)
+    + (esFarmacia && esMedicamentoFilter ? 1 : 0)
 
   function clearMoreFilters() {
     setStockUomFilter('')
@@ -192,6 +216,8 @@ export default function ItemsPage() {
     setMaxDiscountPctMin('')
     setMaxDiscountPctMax('')
     setTrackingTypeFilter('all')
+    setPrincipioActivoFilter('')
+    setEsMedicamentoFilter(false)
     setPage(1)
   }
 
@@ -540,6 +566,30 @@ export default function ItemsPage() {
               <SelectItem value="batch">Lote</SelectItem>
             </Select>
           </div>
+        )}
+
+        {esFarmacia && (
+          <>
+            <div className="ff-wrap">
+              <label className="ff-label">Principio activo</label>
+              <SearchSelect
+                value={principioActivoFilter}
+                onChange={(val) => { setPrincipioActivoFilter(val); setPage(1) }}
+                options={principioActivoOptions}
+                onSearch={setPrincipioActivoSearch}
+                selectedLabel={principiosActivosData?.items.find((p) => p.id === principioActivoFilter)?.nombre ?? ''}
+                placeholder="Todos los principios activos"
+              />
+            </div>
+            <label className="ff-check-wrap">
+              <input
+                type="checkbox"
+                checked={esMedicamentoFilter}
+                onChange={(e) => { setEsMedicamentoFilter(e.target.checked); setPage(1) }}
+              />
+              Solo medicamentos
+            </label>
+          </>
         )}
       </Drawer>
     </div>

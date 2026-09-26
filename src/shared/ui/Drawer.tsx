@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 interface DrawerProps {
   open: boolean
@@ -18,7 +19,10 @@ interface DrawerProps {
 // que no caben en la barra de filtros principal sin saturarla.
 export function Drawer({ open, onClose, title, subtitle, children, footer, size = 'md', width }: DrawerProps) {
   if (!open) return null
-  return (
+  // Portal a document.body (mismo patrón que Modal): si se renderiza inline, cualquier ancestro
+  // con stacking context propio (o que atrape `position: fixed`) deja el overlay/drawer por
+  // debajo del topbar — el fondo oscuro no cubre el header y el panel queda recortado.
+  return createPortal(
     <div className="drawer-overlay" onClick={onClose}>
       <div
         className={`drawer-panel${size === 'lg' ? ' drawer-panel-lg' : ''}`}
@@ -37,6 +41,7 @@ export function Drawer({ open, onClose, title, subtitle, children, footer, size 
         </div>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

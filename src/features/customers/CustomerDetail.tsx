@@ -8,6 +8,7 @@ import { getCreditNoteSaldoFavor, removerCreditNoteAplicada } from '@/shared/api
 import { client } from '@/shared/api/client'
 import type { Invoice, EstadoCuentaResponse } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
+import { useFeature } from '@/shared/features/can'
 import { Pencil, Ban, Building2, User, ArrowLeft, Wallet, Receipt, X, FileText, Download, Eye, EyeOff } from 'lucide-react'
 
 function SemaforoIndicator({ customerId }: { customerId: string }) {
@@ -418,6 +419,11 @@ export default function CustomerDetail() {
   const queryClient = useQueryClient()
   const [showDisableDialog, setShowDisableDialog] = useState(false)
   const [showEstadoCuenta, setShowEstadoCuenta] = useState(false)
+  // Secciones embebidas de un módulo gateado dentro de una pantalla núcleo (§6): el "Estado de
+  // cuenta"/"Cuentas por cobrar" pertenece a `cuentasPorCobrar` aunque Cliente sea núcleo; las
+  // Notas de Crédito a `notasCredito`.
+  const tieneCxC = useFeature('cuentasPorCobrar')
+  const tieneNotasCredito = useFeature('notasCredito')
 
   const { data: estadoCuenta, isLoading: isEstadoCuentaLoading } = useQuery({
     queryKey: ['estado-cuenta', id],
@@ -488,7 +494,7 @@ export default function CustomerDetail() {
               Editar
             </button>
           )}
-          {id && (
+          {id && tieneCxC && (
             <button className="btn btn-secondary" onClick={() => setShowEstadoCuenta(!showEstadoCuenta)}>
               <FileText size={14} />
               Estado de Cuenta
@@ -503,11 +509,11 @@ export default function CustomerDetail() {
         </div>
       </div>
 
-      {customer.hasCredit && id && <SemaforoIndicator customerId={id} />}
-      {id && <SaldoFavorIndicator customerId={id} />}
-      {id && <CreditNotesIndicator customerId={id} />}
+      {customer.hasCredit && id && tieneCxC && <SemaforoIndicator customerId={id} />}
+      {id && tieneCxC && <SaldoFavorIndicator customerId={id} />}
+      {id && tieneNotasCredito && <CreditNotesIndicator customerId={id} />}
 
-      {id && showEstadoCuenta && (
+      {id && tieneCxC && showEstadoCuenta && (
         <EstadoCuentaPreview
           customerId={id}
           customerName={customer.customerName}

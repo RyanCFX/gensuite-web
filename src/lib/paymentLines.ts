@@ -20,8 +20,9 @@ export interface VueltoLineDraft {
 
 export interface PaymentLinesValue {
   payments: PaymentLineDraft[]
-  vueltoEnabled: boolean
-  tenderedCash: string
+  /** Desglose del vuelto en denominaciones — solo tiene contenido cuando hay un sobrepago
+   *  válido (suma > total a cobrar con al menos una línea en efectivo); se calcula
+   *  automáticamente y el cajero puede ajustarlo. Vacío en cualquier otro caso. */
   vuelto: VueltoLineDraft[]
 }
 
@@ -40,8 +41,6 @@ export function emptyPaymentLine(): PaymentLineDraft {
 
 export const EMPTY_PAYMENT_LINES_VALUE: PaymentLinesValue = {
   payments: [emptyPaymentLine()],
-  vueltoEnabled: false,
-  tenderedCash: '',
   vuelto: [],
 }
 
@@ -49,11 +48,35 @@ export function sumPayments(payments: PaymentLineDraft[]): number {
   return payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
 }
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
 export function cashAmount(payments: PaymentLineDraft[], metodos: MetodoPago[]): number {
   return payments.reduce((sum, p) => {
     const metodo = metodos.find((m) => m.name === p.modeOfPayment)
     return metodo?.type === 'Cash' ? sum + (Number(p.amount) || 0) : sum
   }, 0)
+}
+
+/** Excedente por encima del total a cobrar (0 si la suma no lo supera fuera de tolerancia). */
+export function overpayAmount(payments: PaymentLineDraft[], amountDue: number): number {
+  const over = sumPayments(payments) - amountDue
+  return over > PAYMENT_LINES_TOLERANCE ? round2(over) : 0
+}
+
+/** Faltante por debajo del total a cobrar (0 si está cubierto o dentro de tolerancia). */
+export function missingAmount(payments: PaymentLineDraft[], amountDue: number): number {
+  const missing = amountDue - sumPayments(payments)
+  return missing > PAYMENT_LINES_TOLERANCE ? round2(missing) : 0
+}
+
+/** true si hay 1 o más líneas de pago en efectivo (type Cash) con monto > 0. */
+export function hasCashPayment(payments: PaymentLineDraft[], metodos: MetodoPago[]): boolean {
+  return payments.some((p) => {
+    if (!(Number(p.amount) > 0)) return false
+    return metodos.find((m) => m.name === p.modeOfPayment)?.type === 'Cash'
+  })
 }
 
 /** Moneda real de un método de pago — nunca se asume del nombre. Se deriva de la Cuenta Bancaria
@@ -79,6 +102,11 @@ export function sumVuelto(vuelto: VueltoLineDraft[], denominaciones: { denominac
   }, 0)
 }
 
+/** Líneas del desglose de vuelto completas (con denominación y cantidad > 0). */
+export function declaredVuelto(value: PaymentLinesValue): VueltoLineDraft[] {
+  return value.vuelto.filter((v) => v.denominacion && Number(v.cantidad) > 0)
+}
+
 export function isPaymentLinesValid(
   value: PaymentLinesValue,
   amountDue: number,
@@ -92,18 +120,22 @@ export function isPaymentLinesValid(
     const metodo = metodos.find((m) => m.name === p.modeOfPayment)
     if (metodo?.requiresBankAccount && !metodo.defaultBankAccount && !p.bankAccount) return false
   }
-  const sum = sumPayments(value.payments)
-  if (Math.abs(amountDue - sum) > PAYMENT_LINES_TOLERANCE) return false
+  // El pago parcial (suma < total) se permite — el backend responde fullyPaid=false y cada
+  // pantalla lo maneja con su propio flujo. Acá solo se valida el sobrepago.
 
-  if (value.vueltoEnabled) {
-    const tenderedCash = Number(value.tenderedCash) || 0
-    if (tenderedCash <= 0) return false
-    const declaredVuelto = value.vuelto.filter((v) => v.denominacion && Number(v.cantidad) > 0)
-    if (declaredVuelto.length === 0) return false
+  // Sobrepago: solo válido con al menos una línea en efectivo, sin superar el efectivo
+  // recibido (no se puede devolver más de lo que entró en cash) y con el desglose del vuelto
+  // coincidiendo con el excedente.
+  // NOTA: el pago parcial (suma < total) NO se valida acá — PorCobrar/Caja/Facturación lo
+  // permiten (el backend responde fullyPaid=false) y cada pantalla lo maneja con su propio flujo.
+  const over = overpayAmount(value.payments, amountDue)
+  if (over > 0) {
+    if (!hasCashPayment(value.payments, metodos)) return false
     const cash = cashAmount(value.payments, metodos)
-    const vueltoEsperado = Math.max(0, tenderedCash - cash)
+    if (over > cash + PAYMENT_LINES_TOLERANCE) return false
+    if (declaredVuelto(value).length === 0) return false
     const vueltoDeclarado = sumVuelto(value.vuelto, denominaciones)
-    if (Math.abs(vueltoEsperado - vueltoDeclarado) > PAYMENT_LINES_TOLERANCE) return false
+    if (Math.abs(over - vueltoDeclarado) > PAYMENT_LINES_TOLERANCE) return false
   }
   return true
 }
@@ -135,24 +167,49 @@ export function friendlyPaymentError(message: string | undefined, fallback = 'Er
 
 export function buildSubmitPayload(
   value: PaymentLinesValue,
+  amountDue: number,
+  metodos: MetodoPago[],
 ): { payments: PaymentLine[]; vuelto?: VueltoLine[]; tenderedCash?: number } {
-  const payments: PaymentLine[] = value.payments
-    .filter((p) => p.modeOfPayment && Number(p.amount) > 0)
-    .map((p) => ({
-      modeOfPayment: p.modeOfPayment,
-      amount: Number(p.amount),
-      ...(p.cardNumber ? { cardNumber: p.cardNumber } : {}),
-      ...(p.authorizationCode ? { authorizationCode: p.authorizationCode } : {}),
-      ...(p.bank ? { bank: p.bank } : {}),
-      ...(p.checkNumber ? { checkNumber: p.checkNumber } : {}),
-      ...(p.bankAccount ? { bankAccount: p.bankAccount } : {}),
-    }))
+  const over = overpayAmount(value.payments, amountDue)
+  const cash = cashAmount(value.payments, metodos)
+  const canVuelto =
+    over > 0 && hasCashPayment(value.payments, metodos) && over <= cash + PAYMENT_LINES_TOLERANCE
 
-  if (!value.vueltoEnabled) return { payments }
+  // Solo las líneas válidas, marcando cuáles son en efectivo para el ajuste de abajo.
+  const valid = value.payments
+    .map((p) => ({
+      p,
+      isCash: metodos.find((m) => m.name === p.modeOfPayment)?.type === 'Cash',
+    }))
+    .filter(({ p }) => p.modeOfPayment && Number(p.amount) > 0)
+
+  const payments: PaymentLine[] = valid.map(({ p }) => ({
+    modeOfPayment: p.modeOfPayment,
+    amount: Number(p.amount),
+    ...(p.cardNumber ? { cardNumber: p.cardNumber } : {}),
+    ...(p.authorizationCode ? { authorizationCode: p.authorizationCode } : {}),
+    ...(p.bank ? { bank: p.bank } : {}),
+    ...(p.checkNumber ? { checkNumber: p.checkNumber } : {}),
+    ...(p.bankAccount ? { bankAccount: p.bankAccount } : {}),
+  }))
+
+  if (!canVuelto) return { payments }
+
+  // Con sobrepago, las líneas se normalizan para que sumen exactamente el total a cobrar:
+  // el excedente se absorbe de las líneas en efectivo (de la última a la primera) y viaja como
+  // vuelto. `tenderedCash` es el efectivo total recibido (mismo contrato que antes).
+  let remaining = over
+  for (let i = payments.length - 1; i >= 0 && remaining > PAYMENT_LINES_TOLERANCE; i--) {
+    if (!valid[i].isCash) continue
+    const take = Math.min(payments[i].amount, remaining)
+    payments[i] = { ...payments[i], amount: round2(payments[i].amount - take) }
+    remaining = round2(remaining - take)
+  }
+  const adjusted = payments.filter((l) => l.amount > PAYMENT_LINES_TOLERANCE)
 
   const vuelto: VueltoLine[] = value.vuelto
     .filter((v) => v.denominacion && Number(v.cantidad) > 0)
     .map((v) => ({ denominacion: v.denominacion, cantidad: Number(v.cantidad) }))
 
-  return { payments, vuelto, tenderedCash: Number(value.tenderedCash) || 0 }
+  return { payments: adjusted, vuelto, tenderedCash: round2(cash) }
 }

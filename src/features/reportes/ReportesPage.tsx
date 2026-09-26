@@ -30,6 +30,8 @@ import {
   getDespachoMargen, getDespachoReservas, getDespachoFaltantes, getDespachoPendientesCompra,
 } from '@/shared/api/reportes'
 import { usePermissionsStore } from '@/stores/permissions.store'
+import { useFeaturesStore } from '@/stores/features.store'
+import { REPORTE_KEY_POR_TIPO } from '@/shared/features/catalog'
 import type { LibroDiarioByDimension, CuadreTurnoRow, CorteCajaDiaTurno, AgingGroupBy } from '@/shared/api/types'
 import { CorteCajaView } from '@/components/shared/CorteCajaView'
 import { listSucursales } from '@/shared/api/sucursales'
@@ -2864,15 +2866,27 @@ export default function ReportesPage() {
   const despachoHabilitado = facturacionConfig?.despachoHabilitado ?? false
   const esFarmacia = usePermissionsStore((s) => s.vertical) === 'farmacia'
   const acciones = usePermissionsStore((s) => s.acciones)
+  const reportesHabilitados = useFeaturesStore((s) => s.reportesHabilitados)
+  const featuresReady = useFeaturesStore((s) => s.status === 'ready')
   const puedeVerReporte = (key: string) => {
     const accion = REPORT_VER_ACCIONES[key]
     return !accion || acciones[accion] === true
+  }
+  // Features por tenant (§6): cada tarjeta/reporte individual se filtra por
+  // `reportesHabilitados` — la pantalla contenedora es núcleo. Fail-open mientras no están
+  // `ready` y para los tipos sin clave en §4.2 (ver REPORTE_KEY_POR_TIPO).
+  const reporteHabilitado = (key: string) => {
+    if (!featuresReady) return true
+    const reporteKey = REPORTE_KEY_POR_TIPO[key]
+    if (!reporteKey) return true
+    return reportesHabilitados.includes(reporteKey)
   }
 
   const reportNav = (usaModuloPos ? REPORT_NAV : REPORT_NAV.filter((n) => !POS_ONLY_REPORT_KEYS.has(n.key)))
     .filter((n) => despachoHabilitado || !DESPACHO_ONLY_REPORT_KEYS.has(n.key))
     .filter((n) => esFarmacia || !FARMACIA_ONLY_REPORT_KEYS.has(n.key))
     .filter((n) => puedeVerReporte(n.key))
+    .filter((n) => reporteHabilitado(n.key))
   const groups = [...new Set(reportNav.map((n) => n.group))]
 
   function renderReport() {
@@ -2884,6 +2898,11 @@ export default function ReportesPage() {
     }
     if (REPORT_VER_ACCIONES[active] && !puedeVerReporte(active)) {
       return <ServiceUnavailable message="No tenés permiso para ver este reporte." />
+    }
+    // URL directa a un reporte apagado para el tenant (§9 FEATURE_NO_CONTRATADO) — no debería
+    // pasar si el listado de arriba está bien filtrado; mensaje genérico, no técnico.
+    if (!reporteHabilitado(active)) {
+      return <ServiceUnavailable message="Este reporte no está disponible en tu plan." />
     }
     if (!esFarmacia && FARMACIA_ONLY_REPORT_KEYS.has(active)) {
       return <ServiceUnavailable message="Este reporte requiere el vertical Farmacia ARS." />

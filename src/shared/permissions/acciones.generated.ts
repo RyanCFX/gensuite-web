@@ -1,5 +1,5 @@
 // GENERADO automáticamente por scripts/gen-acciones.mjs — NO editar a mano.
-// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (453 acciones). Regenerar: node scripts/gen-acciones.mjs
+// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (461 acciones). Regenerar: node scripts/gen-acciones.mjs
 
 export type AccionId =
   | 'apertura.compras.anular'
@@ -45,10 +45,12 @@ export type AccionId =
   | 'catalogo.items.consultar-stock'
   | 'catalogo.items.crear'
   | 'catalogo.items.editar'
+  | 'catalogo.items.editar-composicion'
   | 'catalogo.items.eliminar'
   | 'catalogo.items.generar-variantes'
   | 'catalogo.items.imprimir-etiqueta'
   | 'catalogo.items.listar'
+  | 'catalogo.items.ver-composicion'
   | 'catalogo.marcas.crear'
   | 'catalogo.marcas.editar'
   | 'catalogo.marcas.eliminar'
@@ -228,6 +230,7 @@ export type AccionId =
   | 'ecf.recibidos.aceptar-rechazar'
   | 'ecf.recibidos.cargar-xml'
   | 'ecf.recibidos.listar'
+  | 'farmacia.equivalentes.consultar'
   | 'farmacia.lotes.crear'
   | 'farmacia.lotes.facturar'
   | 'farmacia.lotes.facturas-elegibles'
@@ -236,6 +239,11 @@ export type AccionId =
   | 'farmacia.lotes.marcar-en-revision'
   | 'farmacia.lotes.recalcular'
   | 'farmacia.lotes.vincular-facturas'
+  | 'farmacia.principios-activos.crear'
+  | 'farmacia.principios-activos.editar'
+  | 'farmacia.principios-activos.eliminar'
+  | 'farmacia.principios-activos.fusionar'
+  | 'farmacia.principios-activos.listar'
   | 'farmacia.reportes.facturas-ars.listar'
   | 'farmacia.reportes.lotes.listar'
   | 'gastos.anular'
@@ -500,10 +508,12 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'catalogo.items.consultar-stock',
   'catalogo.items.crear',
   'catalogo.items.editar',
+  'catalogo.items.editar-composicion',
   'catalogo.items.eliminar',
   'catalogo.items.generar-variantes',
   'catalogo.items.imprimir-etiqueta',
   'catalogo.items.listar',
+  'catalogo.items.ver-composicion',
   'catalogo.marcas.crear',
   'catalogo.marcas.editar',
   'catalogo.marcas.eliminar',
@@ -683,6 +693,7 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'ecf.recibidos.aceptar-rechazar',
   'ecf.recibidos.cargar-xml',
   'ecf.recibidos.listar',
+  'farmacia.equivalentes.consultar',
   'farmacia.lotes.crear',
   'farmacia.lotes.facturar',
   'farmacia.lotes.facturas-elegibles',
@@ -691,6 +702,11 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'farmacia.lotes.marcar-en-revision',
   'farmacia.lotes.recalcular',
   'farmacia.lotes.vincular-facturas',
+  'farmacia.principios-activos.crear',
+  'farmacia.principios-activos.editar',
+  'farmacia.principios-activos.eliminar',
+  'farmacia.principios-activos.fusionar',
+  'farmacia.principios-activos.listar',
   'farmacia.reportes.facturas-ars.listar',
   'farmacia.reportes.lotes.listar',
   'gastos.anular',

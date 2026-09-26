@@ -14,6 +14,13 @@ import type {
   PaginationParams,
 } from './types'
 
+// ─── Gates por feature (auditoría backend punto 1 + fixes) ───────────────────────
+// `GET /cuentas-bancarias` (listado) y `GET :id` (findOne) NO tienen gate de feature: son dato
+// de referencia igual que los métodos de pago (siguen exigiendo permiso RBAC) — los consumen
+// Pagos, Cobros, Facturación (PaymentLinesEditor/PagoContadoModal), reembolsos de NC y config
+// de Métodos de Pago, varios de ellos núcleo o de otro módulo. Todo lo demás del controller
+// (mutaciones, tipos, inconsistencias-moneda, `:id/balance`) sigue exigiendo `tesoreria`.
+
 // ─── Bancos (catálogo propio, CRUD) ─────────────────────────────────────────
 
 export async function listBancosCatalogo() {

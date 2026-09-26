@@ -8,6 +8,9 @@ import {
   sumPayments,
   cashAmount,
   sumVuelto,
+  overpayAmount,
+  missingAmount,
+  hasCashPayment,
   PAYMENT_LINES_TOLERANCE,
   type PaymentLineDraft,
   type VueltoLineDraft,
@@ -58,7 +61,7 @@ export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP
   const [bancoSearch, setBancoSearch] = useState<Record<number, string>>({})
   const [bankAccountSearch, setBankAccountSearch] = useState<Record<number, string>>({})
   const [vueltoDenomSearch, setVueltoDenomSearch] = useState<Record<number, string>>({})
-  const prevTenderedCashRef = useRef<string>('')
+  const prevOverpayRef = useRef<string>('')
 
   const todosMetodosActivos = (metodos ?? []).filter((m) => !m.disabled)
   const metodoCurrencies = useMetodoPagoCurrencies(todosMetodosActivos, 'DOP')
@@ -67,22 +70,34 @@ export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP
   const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo)
 
   const total = sumPayments(value.payments)
-  const totalOk = Math.abs(amountDue - total) <= PAYMENT_LINES_TOLERANCE
+  const missing = missingAmount(value.payments, amountDue)
+  // Sobrepago con vuelto automático: la suma supera el total a cobrar y hay 1 o más líneas en
+  // efectivo (type Cash) — el excedente se devuelve como vuelto sin pedir nada más al cajero.
+  const over = overpayAmount(value.payments, amountDue)
+  const cash = cashAmount(value.payments, metodos ?? [])
+  const hasCash = hasCashPayment(value.payments, metodos ?? [])
+  const showVuelto = over > 0 && hasCash
+  const overExceedsCash = over > 0 && hasCash && over > cash + PAYMENT_LINES_TOLERANCE
+  const totalsOk = missing === 0 && !overExceedsCash && !(over > 0 && !hasCash)
 
+  // Desglose automático del vuelto con el mismo cálculo de siempre (denominaciones de mayor a
+  // menor). Se recalcula solo cuando cambia el excedente — los ajustes manuales del cajero se
+  // respetan hasta que el excedente vuelva a cambiar. Sin sobrepago válido se limpia.
+  const overKey = showVuelto ? over.toFixed(2) : ''
   useEffect(() => {
-    if (!value.vueltoEnabled) return
-    const tendered = Number(value.tenderedCash) || 0
-    if (tendered <= 0) return
-    const cash = cashAmount(value.payments, metodos ?? [])
-    const vueltoEsperado = tendered - cash
-    if (vueltoEsperado <= 0) return
-    if (prevTenderedCashRef.current === value.tenderedCash) return
-    prevTenderedCashRef.current = value.tenderedCash
-    const autoVuelto = calcularVuelto(vueltoEsperado, denominacionesActivas)
+    if (!showVuelto) {
+      if (value.vuelto.length > 0) onChange({ ...value, vuelto: [] })
+      prevOverpayRef.current = ''
+      return
+    }
+    if (prevOverpayRef.current === overKey) return
+    prevOverpayRef.current = overKey
+    const autoVuelto = calcularVuelto(over, denominacionesActivas)
     if (autoVuelto.length > 0) {
       onChange({ ...value, vuelto: autoVuelto })
     }
-  }, [value, denominacionesActivas, metodos, onChange])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overKey, showVuelto, denominacionesActivas, metodos])
 
   function updateLine(idx: number, patch: Partial<PaymentLineDraft>) {
     const payments = value.payments.map((p, i) => (i === idx ? { ...p, ...patch } : p))
@@ -98,11 +113,8 @@ export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP
     onChange({ ...value, payments: value.payments.filter((_, i) => i !== idx) })
   }
 
-  const cash = cashAmount(value.payments, metodos ?? [])
-  const tenderedCash = Number(value.tenderedCash) || 0
-  const vueltoEsperado = tenderedCash - cash
   const vueltoDeclarado = sumVuelto(value.vuelto, denominacionesActivas)
-  const vueltoOk = Math.abs(vueltoEsperado - vueltoDeclarado) <= PAYMENT_LINES_TOLERANCE
+  const vueltoOk = Math.abs(over - vueltoDeclarado) <= PAYMENT_LINES_TOLERANCE
 
   function updateVueltoLine(idx: number, patch: Partial<VueltoLineDraft>) {
     const vuelto = value.vuelto.map((v, i) => (i === idx ? { ...v, ...patch } : v))
@@ -275,28 +287,30 @@ export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP
             alignItems: 'center',
             padding: '10px 14px',
             borderRadius: 'var(--radius-md)',
-            background: totalOk ? 'var(--success-bg, rgba(34,197,94,0.08))' : 'var(--error-bg, rgba(239,68,68,0.08))',
+            background: totalsOk ? 'var(--success-bg, rgba(34,197,94,0.08))' : 'var(--error-bg, rgba(239,68,68,0.08))',
             fontSize: 13,
           }}
         >
-          <span>Total ingresado: <strong>{formatMoney(total, currency)}</strong></span>
-          <span style={{ color: totalOk ? 'var(--color-success)' : 'var(--error-text)', fontWeight: 600 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span>Total ingresado: <strong>{formatMoney(total, currency)}</strong></span>
+            {missing > 0 && (
+              <span style={{ color: 'var(--error-text)', fontWeight: 600 }}>
+                Total faltante: <strong>{formatMoney(missing, currency)}</strong>
+              </span>
+            )}
+          </div>
+          <span style={{ color: totalsOk ? 'var(--color-success)' : 'var(--error-text)', fontWeight: 600 }}>
             Total a cobrar: {formatMoney(amountDue, currency)}
           </span>
         </div>
+        {over > 0 && !hasCash && (
+          <p style={{ fontSize: 12, margin: 0, color: 'var(--error-text)' }}>
+            La suma excede el total a cobrar — agrega una línea de pago en efectivo para registrar el excedente como vuelto.
+          </p>
+        )}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 4, borderTop: '1px solid var(--border-subtle)' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', paddingTop: 10 }}>
-          <input
-            type="checkbox"
-            checked={value.vueltoEnabled}
-            onChange={(e) => onChange({ ...value, vueltoEnabled: e.target.checked })}
-          />
-          Registrar vuelto entregado
-        </label>
-
-        {value.vueltoEnabled && (
+      {showVuelto && (
           <div
             style={{
               border: '1px solid var(--border-default)',
@@ -308,29 +322,19 @@ export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP
               gap: 14,
             }}
           >
-            <div className="ff-wrap">
-              <label className="ff-label">Efectivo entregado por el cliente</label>
-              <input
-                className="ff-input"
-                type="number"
-                min="0"
-                step="0.01"
-                value={value.tenderedCash}
-                onChange={(e) => onChange({ ...value, tenderedCash: e.target.value })}
-                style={{ width: 200 }}
-              />
-            </div>
-
-            {tenderedCash > 0 && (
-              <>
-                <p style={{ fontSize: 13, margin: 0, color: vueltoEsperado < 0 ? 'var(--color-error)' : undefined }}>
-                  Vuelto a entregar: {formatMoney(vueltoEsperado, currency)}
-                  {vueltoEsperado < 0 && (
-                    <span style={{ display: 'block', fontSize: 12, color: 'var(--color-error)', marginTop: 2 }}>
-                      El efectivo entregado es menor al total de pagos en efectivo
-                    </span>
-                  )}
-                </p>
+            <p style={{ fontSize: 13, margin: 0 }}>
+              Vuelto a entregar: <strong>{formatMoney(over, currency)}</strong>
+            </p>
+            {overExceedsCash && (
+              <p style={{ fontSize: 12, margin: 0, color: 'var(--color-error)' }}>
+                El vuelto ({formatMoney(over, currency)}) supera el efectivo recibido ({formatMoney(cash, currency)}) — no se puede devolver más de lo que entró en efectivo.
+              </p>
+            )}
+            {denominacionesActivas.length === 0 && (
+              <p style={{ fontSize: 12, margin: 0, color: 'var(--color-error)' }}>
+                No hay denominaciones configuradas — configura las denominaciones para poder desglosar el vuelto.
+              </p>
+            )}
 
                 {value.vuelto.length > 0 && (
                   <p style={{ fontSize: 11, color: 'var(--text-tertiary)', margin: 0 }}>
@@ -388,19 +392,16 @@ export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP
                   <Plus size={13} /> Agregar denominación
                 </button>
 
-                <p style={{ fontSize: 13, margin: 0, color: vueltoEsperado >= 0 && vueltoOk ? 'var(--color-success)' : 'var(--error-text)' }}>
-                  Total desglosado: {formatMoney(vueltoDeclarado, currency)} / Vuelto esperado: {formatMoney(vueltoEsperado, currency)}
-                  {vueltoEsperado >= 0 && !vueltoOk && (
+                <p style={{ fontSize: 13, margin: 0, color: overExceedsCash || !vueltoOk ? 'var(--error-text)' : 'var(--color-success)' }}>
+                  Total desglosado: {formatMoney(vueltoDeclarado, currency)} / Vuelto esperado: {formatMoney(over, currency)}
+                  {!vueltoOk && (
                     <span style={{ display: 'block', fontSize: 12, color: 'var(--color-error)', marginTop: 2 }}>
                       El desglose no coincide con el vuelto esperado
                     </span>
                   )}
                 </p>
-              </>
-            )}
           </div>
         )}
-      </div>
     </div>
   )
 }

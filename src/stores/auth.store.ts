@@ -7,6 +7,7 @@ import { refresh as apiRefresh, logout as apiLogout } from '@/shared/api/auth'
 import { getMeProfile } from '@/shared/api/me'
 import type { AuthUser, AuthTenant, AuthMembership, AuthResult, RefreshTokenResult, SwitchTenantResult } from '@/shared/api/types'
 import { usePermissionsStore } from '@/stores/permissions.store'
+import { useFeaturesStore } from '@/stores/features.store'
 import { connectRealtimeSocket, disconnectRealtimeSocket } from '@/shared/socket/realtimeSocket'
 
 /** `AuthUser` + un par de campos de conveniencia que el resto de la app ya lee en decenas de
@@ -128,6 +129,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       ...deriveFlags({ refreshToken: result.refresh_token, accessToken: result.access_token }),
     })
     usePermissionsStore.getState().clear()
+    useFeaturesStore.getState().clear()
     if (result.access_token) connectRealtimeSocket(result.access_token)
   },
 
@@ -145,8 +147,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       ...deriveFlags({ refreshToken: result.refresh_token, accessToken: result.access_token }),
     })
     // Un refresh puede resolver el tenant activo a uno distinto del que tenía esta pestaña (o
-    // pasar de null a resuelto) — refresca el catálogo de permisos para ese tenant.
-    if (tenantChanged) usePermissionsStore.getState().clear()
+    // pasar de null a resuelto) — refresca el catálogo de permisos y features para ese tenant.
+    if (tenantChanged) {
+      usePermissionsStore.getState().clear()
+      useFeaturesStore.getState().clear()
+    }
     if (result.access_token) connectRealtimeSocket(result.access_token)
     // `GET /me/profile` no viene en la respuesta de refresh — si nunca tuvimos `user` en memoria
     // (ej. abrí la pestaña directo en un F5 sin caché previa útil) y ya hay tenant activo, lo
@@ -173,6 +178,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       ...deriveFlags({ refreshToken: state.refreshToken, accessToken: result.access_token }),
     })
     usePermissionsStore.getState().clear()
+    useFeaturesStore.getState().clear()
     // El tenant queda fijo en el JWT desde el momento de la conexión — hay que reconectar con
     // el token nuevo para que el socket empiece a recibir los eventos del tenant nuevo.
     connectRealtimeSocket(result.access_token)
@@ -180,6 +186,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearLocal: () => {
     usePermissionsStore.getState().clear()
+    useFeaturesStore.getState().clear()
     disconnectRealtimeSocket()
     set({
       refreshToken: null, accessToken: null, tenant: null, user: null, memberships: [],
