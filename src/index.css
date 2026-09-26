@@ -2001,6 +2001,7 @@ button {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  overflow-x: auto;
 }
 
 .items-table {
@@ -2010,7 +2011,7 @@ button {
 
 .items-table th {
   padding: 0 12px;
-  height: 34px;
+  height: 38px;
   font-size: 11px;
   font-weight: 500;
   text-transform: uppercase;
@@ -2079,6 +2080,7 @@ button {
   background: var(--surface-sunken);
   border-right: 1px solid var(--border-default);
   flex-shrink: 0;
+  width: 58px;
 }
 
 .disc-combo-select {
@@ -2087,6 +2089,7 @@ button {
   background: transparent;
   border: none;
   height: 32px;
+  width: 100%;
   padding: 0 20px 0 10px;
   font-family: var(--font-body);
   font-size: 13px;
@@ -2343,6 +2346,30 @@ button {
   opacity: 0.25;
 }
 
+/* ─── Columnas redimensionables (ver useResizableColumns) ───
+   `table-layout: fixed` + <colgroup> hace que el ancho declarado en cada <col> mande siempre —
+   la tabla ya no se encoge/expande sola según el contenido (vacía vs. con filas), y arrastrar el
+   divisor cambia el ancho real de la columna de forma predecible. */
+.items-table-resizable { table-layout: fixed; }
+.items-table-resizable th { position: relative; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.items-table-resizable td { overflow: hidden; }
+
+.col-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Adentro del borde del `<th>`, nunca sobresaliendo — un `<th>` de esta tabla tiene
+     `overflow: hidden` (para el ellipsis del texto), y una manija que sobresaliera (ej.
+     `right: -4px`) quedaría recortada ahí y jamás recibiría el mousedown. */
+  right: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 3;
+  touch-action: none;
+}
+.col-resize-handle:hover,
+.col-resize-handle:active { background: var(--brand-primary); opacity: 0.35; }
+
 .items-total-row.navy-totals {
   background: var(--color-navy);
   border-top: none;
@@ -2353,7 +2380,7 @@ button {
 
 .items-total-row.navy-totals .total-row-highlight,
 .items-total-row.navy-totals .total-row-highlight > span:last-child {
-  color: var(--sidebar-label);
+  color: #FCB124;
   font-size: 18px;
   font-weight: 700;
 }
@@ -2399,8 +2426,8 @@ button {
   border: none;
   font-family: var(--font-body);
   font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-weight: 400;
+  color: #0E3D51;
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
@@ -2410,7 +2437,7 @@ button {
 }
 
 .tab-btn:hover { color: var(--text-primary); }
-.tab-btn.on { color: var(--brand-primary); border-bottom-color: var(--brand-primary); }
+.tab-btn.on { color: var(--brand-primary); border-bottom-color: var(--brand-primary); font-weight: 500; }
 
 /* ─── TOAST ─── */
 .toast-stack {

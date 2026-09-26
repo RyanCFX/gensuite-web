@@ -48,6 +48,12 @@ export default function TransferenciaForm() {
   const [toUbicacion, setToUbicacion] = useState('')
   const [toUbicacionLabel, setToUbicacionLabel] = useState('')
   const [items, setItems] = useState<LineItem[]>([{ itemCode: '', qty: 1 }])
+  const ITEMS_COLUMNS = [
+    { key: 'articulo', width: 240 },
+    { key: 'cantidad', width: 120 },
+    { key: 'actions', width: 40 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
   const [notes, setNotes] = useState('')
   const [notesOpen, setNotesOpen] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -283,13 +289,25 @@ export default function TransferenciaForm() {
 
         <div className="card">
           <div className="items-table-wrap">
-            <table className="items-table">
+            <table className="items-table items-table-resizable">
+              <colgroup>
+                {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th style={{ minWidth: 240 }}>Artículo</th>
-                  <th style={{ textAlign: 'right', width: 120 }}>Cantidad</th>
-                  <th style={{ minWidth: 200 }}>Combinación</th>
-                  <th style={{ width: 40 }} />
+                  <th>
+                    Artículo
+                    <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Cantidad
+                    <span className="col-resize-handle" onMouseDown={startResize('cantidad')} />
+                  </th>
+          <th style={{ textAlign: 'right' }}>
+                    Combinación
+                    <span className="col-resize-handle" onMouseDown={startResize('combination')} />
+                  </th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -340,9 +358,9 @@ export default function TransferenciaForm() {
                 ))}
               </tbody>
             </table>
-            <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
-              <button type="button" className="btn btn-ghost btn-size-sm" onClick={addRow}><Plus size={14} /> Agregar artículo</button>
-            </div>
+          </div>
+          <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
+            <button type="button" className="btn btn-ghost btn-size-sm" onClick={addRow}><Plus size={14} /> Agregar artículo</button>
           </div>
         </div>
 
