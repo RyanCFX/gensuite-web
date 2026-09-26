@@ -549,6 +549,10 @@ export type UpdateProveedorDto = Partial<CreateProveedorDto>;
 // ─── Invoice ──────────────────────────────────────────────────────────────────
 
 export interface InvoiceItem {
+  /** id de la fila "Sales Invoice Item" — usar como `lineaOriginal` (`sales_invoice_item`) al
+   *  crear una Nota de Crédito de esta línea (§7.5). Confirmado contra el backend real
+   *  (2026-09-26): el campo se llama `id` (no `name`). */
+  id?: string;
   itemCode: string;
   description?: string;
   qty: number;
@@ -725,6 +729,12 @@ export interface CreateInvoiceDto {
     montoAprobadoArs?: number;
     /** Ajuste manual protegido: el recálculo no toca esta línea. */
     lineaBloqueadaArs?: boolean;
+    /** Combinación de dimensión de inventario de esta línea (§5/§7.1) — obligatoria si el
+     *  artículo declara dimensiones y la factura afecta stock. ⚠️ Este endpoint SÍ intenta
+     *  conservarla en el `PUT` si la línea no cambió (mismo itemCode/qty/rate/discountPct/
+     *  discountAmount) — pero esa heurística no es 100% confiable: mandarla siempre en cada línea
+     *  con combinación, en cada `PUT`, sin excepción (§10.1). */
+    dimensiones?: DimensionesLinea;
   }[];
   notes?: string;
   /** ID de un Sales Taxes and Charges Template (/config/impuestos-ventas). Si se omite, se usa el default de la compañía si existe. */
@@ -850,6 +860,11 @@ export interface CreateQuotationDto {
     discountAmount?: number;
     /** Almacén de entrega. Si se omite, se usa el almacén por defecto del usuario. */
     warehouse?: string;
+    /** Ver `CreateInvoiceDto.items[].dimensiones` (§7.3). ⚠️ Acá la conservación automática en el
+     *  `PUT` es TODAVÍA menos confiable: solo funciona si el `PUT` no toca `items` en absoluto. Si
+     *  el formulario reemplaza el array completo en cualquier edición (incluso de solo cabecera),
+     *  mandar `dimensiones` en cada línea siempre, sin excepción (§10.1). */
+    dimensiones?: DimensionesLinea;
   }[];
   notes?: string;
   /** ID de un Sales Taxes and Charges Template (/config/impuestos-ventas). Si se omite, se usa el default de la compañía si existe. */
@@ -925,7 +940,13 @@ export interface CreateCreditNoteDto {
   originalInvoice: string; // field name corrected from invoiceId
   postingDate: string; // required
   items: {
+    /** Ver `DevolucionCompraItemDto.itemCode` — mismo criterio de ambigüedad (§7.5). */
     itemCode: string;
+    /** `sales_invoice_item` de la línea de la factura original que se devuelve — identifica la
+     *  LÍNEA, no el artículo. Obligatorio si `itemCode` aparece en más de una línea de la factura
+     *  original. La combinación de dimensión de esa línea se conserva sola; nunca se pide de
+     *  nuevo (§7.5). No hay `PUT` para Notas de Crédito — esta regla aplica solo a la creación. */
+    lineaOriginal?: string;
     qty: number;
     rate: number;
     uom?: string;
@@ -987,7 +1008,17 @@ export interface DevolucionDto {
   invoiceId: string;
   /** Si se omite, se devuelve la factura completa (todas las líneas, cantidad total) */
   items?: {
+    /** Se acepta como identificador solo si es único en la factura original — si el mismo
+     *  artículo aparece en más de una línea (ej. dos combinaciones distintas de dimensión de
+     *  inventario, o simplemente dos precios distintos), usar `lineaOriginal` o la devolución
+     *  responde 400 por ambigüedad. */
     itemCode: string;
+    /** `items[].id` de la línea de la factura original (`GET /invoices/:id`) que se devuelve —
+     *  identifica la LÍNEA, no el artículo. Obligatorio si `itemCode` aparece en más de una línea.
+     *  Este endpoint delega en `POST /credit-notes` internamente, así que sigue exactamente la
+     *  misma regla de desambiguación que esa nota de crédito. La combinación de dimensión de esa
+     *  línea se conserva sola; nunca se pide de nuevo. */
+    lineaOriginal?: string;
     qty: number;
   }[];
   resolution: "refund" | "credit_note_only";
@@ -1134,7 +1165,15 @@ export interface DevolucionDetail {
 export type DevolucionCompraStatus = 'draft' | 'submitted' | 'cancelled'
 
 export interface DevolucionCompraItemDto {
+  /** Se acepta como identificador solo si es único en la factura original — si el mismo artículo
+   *  aparece en más de una línea (ej. dos combinaciones distintas de dimensión de inventario), usar
+   *  `lineaOriginal` o la devolución responde 400 por ambigüedad (§6.4). */
   itemCode: string
+  /** `name` (id) de la fila "Purchase Invoice Item" de la factura original que se devuelve —
+   *  identifica la LÍNEA, no el artículo. Obligatorio si `itemCode` aparece en más de una línea de
+   *  la factura original. La combinación de dimensión se copia SIEMPRE de esta línea; nunca se
+   *  pide de nuevo en el formulario de devolución. */
+  lineaOriginal?: string
   /** Siempre positiva en el request; el backend la convierte a negativa. */
   qty: number
 }
@@ -1439,6 +1478,16 @@ export interface Item {
   esMedicamento?: boolean;
   formaFarmaceutica?: string | null;
   viaAdministracion?: ViaAdministracion | null;
+  // ─── Dimensiones de Inventario — docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §4.2 ─────
+  /** Calculado por el servidor: `true` si `dimensiones` tiene al menos una fila. Nunca se manda en
+   *  el request (`POST`/`PUT` lo ignoran) — es el interruptor que decide si esta pantalla debe
+   *  pedir la combinación para este artículo (§5). */
+  usaDimensiones?: boolean;
+  /** El orden es significativo y permanente desde el primer guardado (§4.1) pero la API nunca
+   *  expone posiciones — siempre se referencia por `dimension` (el `codigo`, §3). No trae la
+   *  etiqueta legible (§10.4) — resolver contra el catálogo de GET /catalog/dimensiones-inventario. */
+  dimensiones?: ItemDimensionDeclarada[];
+  reglasCombinacion?: ReglaCombinacion[];
 }
 
 /** Lista CERRADA — únicos valores válidos (§6.2). */
@@ -1733,9 +1782,220 @@ export interface CreateItemDto {
    *  mismo shape exacto que PUT .../composicion (§6.5). Nunca obligatorio: si el alta no distingue
    *  "es medicamento", se puede seguir usando exclusivamente la pestaña dedicada de la ficha. */
   composicion?: ComposicionDto;
+  /** Ver `Item.dimensiones` — el ORDEN de este array importa y queda fijo desde el primer
+   *  guardado (§4.1). Un artículo con al menos un movimiento de inventario no puede cambiar esta
+   *  configuración (§0.3, §4.5) — el servidor rechaza el intento con un mensaje dedicado. */
+  dimensiones?: { dimension: string; valoresPermitidos?: string[] }[];
+  reglasCombinacion?: ReglaCombinacion[];
 }
 
 export type UpdateItemDto = Partial<CreateItemDto>;
+
+// ─── Dimensiones de Inventario — docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md ───────────
+// Eje configurable por empresa (Marca, Modelo, Año…) que identifica un lote lógico de existencias
+// de un artículo sin crear un artículo nuevo por combinación (§0). Catálogo único por tenant
+// (§3); cada artículo elige cuáles usa y con qué valores permitidos (§4).
+
+/** Objeto plano `{ <codigo de dimensión>: <id de valor> }` — el contrato universal de una
+ *  combinación en cualquier línea de documento (§5). Ej: `{ marca: "MARCA-HONDA", anio: "ANIO-2000" }`. */
+export type DimensionesLinea = Record<string, string>;
+
+export interface DimensionInventario {
+  /** Identificador estable, INMUTABLE — clave usada en `DimensionesLinea` en todo el sistema. */
+  codigo: string;
+  etiqueta: string;
+  tipo: "Categorica" | "Ordinal";
+  /** Código de otra dimensión de la que esta depende jerárquicamente (cascada, §3.6). */
+  dimensionPadre?: string;
+  /** Puramente informativo — número de columna física provisionada. No usar en lógica de negocio. */
+  espacio: number;
+  activo: boolean;
+  orden: number;
+}
+
+export interface ListDimensionesResponse {
+  data: DimensionInventario[];
+  meta: { espaciosLibres: number; total: number };
+}
+
+export interface CreateDimensionInventarioDto {
+  /** Obligatorio, INMUTABLE. Regex: `^[a-z][a-z0-9_]{1,29}$` (minúsculas sin acentos, números y
+   *  guión bajo, empezando por letra). */
+  codigo: string;
+  etiqueta: string;
+  tipo?: "Categorica" | "Ordinal";
+  dimensionPadre?: string;
+}
+
+/** PUT .../:codigo solo acepta estos dos campos — cualquier otro se ignora. */
+export interface UpdateDimensionInventarioDto {
+  etiqueta?: string;
+  orden?: number;
+}
+
+export interface CreateDimensionInventarioResult {
+  codigo: string;
+  espacio: number;
+  /** Nombre físico interno en ERPNext (`custom_dim_N`) — nunca mostrar en la UI ni usarlo en
+   *  ninguna llamada, es un detalle de implementación. */
+  campo: string;
+}
+
+export interface DimensionInventarioValor {
+  id: string;
+  valor: string;
+  /** El `id` de un valor de la dimensión PADRE (no el código de la dimensión). */
+  padre?: string;
+  /** Solo relevante si la dimensión es `tipo: "Ordinal"` (ej. año, para reglas de rango). */
+  ordenNumerico?: number;
+  activo: boolean;
+}
+
+export interface CreateDimensionValorDto {
+  valor: string;
+  /** Opcional — si se omite, el servidor genera uno a partir de la dimensión y el valor. */
+  id?: string;
+  padre?: string;
+  ordenNumerico?: number;
+}
+
+export interface UpdateDimensionValorDto {
+  valor?: string;
+  padre?: string;
+  ordenNumerico?: number;
+  activo?: boolean;
+}
+
+/** Fila de `Item.dimensiones` / `CreateItemDto.dimensiones` (§4.1-4.2). */
+export interface ItemDimensionDeclarada {
+  /** El `codigo` de una dimensión activa de la empresa. */
+  dimension: string;
+  /** Ids de valores permitidos para ESTE artículo en esa dimensión. Vacío/omitido en el request =
+   *  cualquier valor activo sirve; en la respuesta siempre viene como array (nunca `undefined`). */
+  valoresPermitidos?: string[];
+}
+
+/** Lista blanca opcional de combinaciones válidas para un artículo (§4.1). Sin ninguna regla,
+ *  cualquier combinación de los `valoresPermitidos` de cada dimensión es válida (cartesiano). Con
+ *  al menos una regla activa, la combinación elegida debe cumplir al menos una. */
+export interface ReglaCombinacion {
+  /** `{codigo: idDeValor}` — fija un valor exacto para esa dimensión en esta regla. Una dimensión
+   *  ausente de este objeto es comodín ("cualquier valor") en esta regla particular. */
+  valores?: Record<string, string>;
+  /** Solo tiene efecto en la dimensión `tipo: "Ordinal"` del artículo (ej. año). */
+  desde?: number;
+  hasta?: number;
+  /** Default `true` en la respuesta. `false` desactiva la regla sin borrarla. */
+  activo?: boolean;
+}
+
+// ─── Inventario → Stock por combinación, verificación previa, ajuste y reclasificación ────────
+
+export interface StockPorDimensionItem {
+  warehouse: string;
+  /** `etiqueta` hoy es literalmente igual al `id` (el servidor todavía no resuelve el texto
+   *  legible acá) — resolver contra GET .../valores del catálogo de dimensiones (§8.3, §10.4). */
+  valores: Record<string, { id: string; etiqueta: string }>;
+  disponible: number;
+}
+
+export interface StockPorDimensionResponse {
+  itemCode: string;
+  /** Catálogo de dimensiones activas de la empresa — este bloque SÍ trae `etiqueta` legible. */
+  dimensiones: { codigo: string; etiqueta: string }[];
+  /** Stock total del artículo en el/los almacén(es) consultado(s). */
+  total: number;
+  /** Cantidad sin una combinación completa asociada — debería ser siempre 0 para un artículo
+   *  dimensionado desde el día uno; un valor ≠ 0 señala un problema de datos. */
+  sinEspecificar: number;
+  items: StockPorDimensionItem[];
+}
+
+export interface GetStockPorDimensionParams {
+  warehouse?: string;
+  incluirSinEspecificar?: boolean;
+  limit?: number;
+  offset?: number;
+  /** Filtros dinámicos por dimensión — la CLAVE es el `codigo` de una dimensión activa (varía por
+   *  tenant), por eso no aparecen como propiedades fijas: armarlos aparte y mezclarlos en la query
+   *  string (§8.3). */
+  [codigoDimension: string]: string | number | boolean | undefined;
+}
+
+export interface VerificarStockPorDimensionLineaDto {
+  itemCode: string;
+  warehouse: string;
+  dimensiones: DimensionesLinea;
+  qty: number;
+}
+
+export interface VerificarStockPorDimensionDto {
+  lineas: VerificarStockPorDimensionLineaDto[];
+}
+
+export interface VerificarStockPorDimensionFaltante {
+  itemCode: string;
+  warehouse: string;
+  solicitado: number;
+  disponible: number;
+  /** ⚠️ Claves son nombres de campo internos del servidor (`custom_dim_1`), NO códigos de
+   *  dimensión de negocio — no las decodifiques, matcheá por `itemCode`+`warehouse` contra tus
+   *  propias líneas (§8.4). */
+  valores: Record<string, string>;
+}
+
+export interface AjusteDimensionDto {
+  itemCode: string;
+  warehouse: string;
+  /** La combinación EXACTA y COMPLETA a ajustar — todas las dimensiones que declara el artículo.
+   *  No puede venir vacía. */
+  dimensiones: DimensionesLinea;
+  /** La cantidad FINAL deseada de esa combinación — NO la diferencia. El servidor calcula la
+   *  diferencia internamente (§8.5). */
+  cantidadFinal: number;
+  postingDate?: string;
+  remarks?: string;
+  branch?: string;
+}
+
+export interface AjusteDimensionResult {
+  id: string;
+  /** "Material Receipt" si `cantidadFinal` > saldo actual (se agregó stock), "Material Issue" si
+   *  es menor. */
+  tipo: "Material Receipt" | "Material Issue";
+  itemCode: string;
+  warehouse: string;
+  /** Siempre positiva — la magnitud de la diferencia aplicada, no la cantidad final. */
+  qty: number;
+  postingDate: string;
+  branch?: string;
+  remarks?: string;
+}
+
+export interface ReclasificacionDimensionDto {
+  itemCode: string;
+  /** El MISMO almacén para origen y destino — no hay traslado entre almacenes acá. */
+  warehouse: string;
+  /** La combinación actual (completa). */
+  desde: DimensionesLinea;
+  /** La combinación nueva (completa) — debe diferir de `desde` en al menos una dimensión. */
+  hacia: DimensionesLinea;
+  qty: number;
+  postingDate?: string;
+  remarks?: string;
+  branch?: string;
+}
+
+// Verificado contra el backend real (2026-09-26): a diferencia de AjusteDimensionResult, esta
+// respuesta NO ecoa `desde`/`hacia`/`remarks` — solo id/itemCode/warehouse/qty/postingDate/branch.
+export interface ReclasificacionDimensionResult {
+  id: string;
+  itemCode: string;
+  warehouse: string;
+  qty: number;
+  postingDate: string;
+  branch?: string;
+}
 
 // ─── Cuentas por Pagar (catálogo de conceptos recurrentes de gasto) ───────────
 // Catálogo separado de Productos/Servicios — nunca se venden, solo sirven para
@@ -1960,6 +2220,10 @@ export interface CreatePedidoDto {
     /** Descuento fijo en RD$. Mutuamente excluyente con discountPct — use uno u otro, nunca ambos. */
     discountAmount?: number;
     warehouse?: string;
+    /** Ver `CreateInvoiceDto.items[].dimensiones` — mismo criterio de resend siempre en `PUT`
+     *  (§7.2, §10.1). Al someter (`POST /pedidos/:id/submit`) o al facturar/facturar-apartado se
+     *  arrastra sola, no hace falta volver a pedirla. */
+    dimensiones?: DimensionesLinea;
   }[];
   quotation?: string;
   /** Marca el pedido como apartado (layaway) — reserva stock al someter, no genera factura de inmediato */
@@ -2332,6 +2596,10 @@ export interface DistribuirUbicacionItemDto {
   ubicacion: string;
   cantidad: number;
   esPrincipal?: boolean;
+  /** Combinación de dimensión de inventario que se está reubicando — docs/tasks/
+   *  PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §8.2. Opcional a nivel de tipo, obligatoria en la
+   *  práctica si el artículo declara dimensiones (el servidor la exige igual). */
+  dimensiones?: DimensionesLinea;
 }
 
 export interface DistribuirUbicacionDto {
@@ -2352,6 +2620,9 @@ export interface MoverUbicacionDto {
   ubicacionOrigen: string;
   ubicacionDestino: string;
   notas?: string;
+  /** Ver nota de `DistribuirUbicacionItemDto.dimensiones` — mismo criterio, un solo objeto porque
+   *  este endpoint mueve una sola línea por llamada (no un array). */
+  dimensiones?: DimensionesLinea;
 }
 
 export interface MoverUbicacionResult {
@@ -2484,7 +2755,11 @@ export interface Transferencia {
 export interface CreateTransferenciaDto {
   fromWarehouse: string;
   toWarehouse: string;
-  items: { itemCode: string; qty: number }[];
+  /** `dimensiones` (§8.1) obligatoria en la práctica si el artículo declara dimensiones — se
+   *  escribe igual en ambos lados de la transferencia (nunca cambia una combinación al mover; para
+   *  eso está `POST /inventory/reclasificaciones`, §8.6). `POST /transferencias/:id/confirmar` no
+   *  necesita ni acepta que se vuelva a mandar — se conserva sola entre ambos tramos. */
+  items: { itemCode: string; qty: number; dimensiones?: DimensionesLinea }[];
   notes?: string;
 }
 
@@ -2617,6 +2892,10 @@ export interface CreateCountDto {
 // CompraItemDto has NO description field.
 
 export interface CompraItem {
+  /** id de la fila "Purchase Invoice Item" — usar como `lineaOriginal` al devolver esta línea
+   *  desde Devoluciones de Compra (§6.4). Confirmado contra el backend real (2026-09-26): el
+   *  campo se llama `id` (no `name`). */
+  id?: string;
   itemCode: string;
   qty: number;
   rate: number;
@@ -2763,6 +3042,10 @@ export interface CreateCompraDto {
     ordenCompra?: string;
     ordenCompraItem?: string;
     // NO description
+    /** Combinación de dimensión de inventario de esta línea (§5/§6.1) — obligatoria en la
+     *  práctica si el artículo declara dimensiones. Este endpoint NO conserva la combinación de
+     *  una línea no tocada en un `PUT`: mandarla siempre que el artículo la use, en cada línea. */
+    dimensiones?: DimensionesLinea;
   }[];
   /** NCF del comprobante del proveedor. Obligatorio si el proveedor está registrado (no
    *  ocasional). Para un proveedor ocasional puede omitirse: el sistema genera el comprobante
@@ -2851,6 +3134,9 @@ export interface CreatePurchaseReceiptDto {
      *  acá no hay guard — recibir contra una orden es el caso normal. No usar en un Combo. */
     ordenCompra?: string;
     ordenCompraItem?: string;
+    /** Ver nota en `CreateCompraDto.items[].dimensiones` — mismo criterio, sin conservación
+     *  automática en `PUT` (§6.2). */
+    dimensiones?: DimensionesLinea;
   }[];
 }
 
@@ -3032,6 +3318,10 @@ export interface CreateOrdenCompraDto {
      *  se genera solo vía POST /compras/solicitudes/:id/generar-orden. */
     materialRequestItem?: string;
     materialRequest?: string;
+    /** Ver nota en `CreateCompraDto.items[].dimensiones` — sin conservación automática en `PUT`
+     *  (§6.3). Viaja homónima a la recepción/factura generada desde esta orden, no hace falta
+     *  repetirla ahí salvo para corregirla explícitamente (ver `ReceiptFromOrdenItemOverrideDto`). */
+    dimensiones?: DimensionesLinea;
   }[];
 }
 
@@ -3047,6 +3337,10 @@ export interface ReceiptFromOrdenItemOverrideDto {
   serials?: string[];
   /** Requerido si el artículo tiene tracking de lote activo. */
   batches?: { batchId: string; expiryDate?: string; qty: number }[];
+  /** ÚNICA excepción a "resend siempre" (§6.3): opcional a propósito porque el arrastre acá es un
+   *  copy homónimo real de ERPNext, no una heurística frágil. Mandar solo si el usuario corrige
+   *  explícitamente una combinación mal elegida al ordenar — en el caso normal, omitir. */
+  dimensiones?: DimensionesLinea;
 }
 
 export interface CreateReceiptFromOrdenDto {
@@ -7152,6 +7446,12 @@ export interface DespachoItemDto {
   warehouse?: string;
   /** Costo/valor de referencia, informativo — el Despacho no es un documento fiscal. Default 0. */
   rate?: number;
+  /** Ver `CreateInvoiceDto.items[].dimensiones` (§7.4). `PUT /despachos/:id` intenta conservarla
+   *  mirando el `itemCode` de la línea existente — poco confiable si hay dos líneas del mismo
+   *  artículo con combinaciones distintas. Mandarla siempre en cada línea con combinación. La
+   *  creación desde un Pedido/Factura (`POST /despachos/desde-pedido/:soId`,
+   *  `/desde-factura/:siId`) arrastra la combinación sola, no pedirla ahí. */
+  dimensiones?: DimensionesLinea;
 }
 
 /** POST /despachos — creación directa (venta mostrador, sin Sales Order previo). Único de los 3

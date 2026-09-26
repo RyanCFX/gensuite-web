@@ -37,6 +37,7 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/catalogo/servicios/*', accion: 'catalogo.items.listar' },
   { pattern: '/catalogo/servicios', accion: 'catalogo.items.listar' },
   { pattern: '/catalogo/atributos', accion: 'catalogo.atributos.listar' },
+  { pattern: '/catalogo/dimensiones', accion: 'catalogo.dimensiones.listar' },
 
   // Farmacia ARS (vertical)
   { pattern: '/farmacia/aseguradoras/*', accion: 'aseguradoras.listar', soloFarmacia: true },
@@ -77,6 +78,8 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/inventario/historial', accion: 'inventario.historial.consultar' },
   { pattern: '/inventario/conteos', accion: 'inventario.conteos.listar' },
   { pattern: '/inventario/zonas', accion: 'inventario.zonas.listar' },
+  { pattern: '/inventario/ajustes-dimension', accion: 'inventario.ajustar' },
+  { pattern: '/inventario/reclasificaciones', accion: 'inventario.reclasificar' },
   // Carga Inicial de Inventario — docs/tasks/PROMPT_CARGA_INICIAL_INVENTARIO_FRONTEND.md §2.
   // NO confundir con /apertura/inventario (Migración de Saldos): cuenta contable, semántica de
   // qty y permisos son independientes entre ambas pantallas.

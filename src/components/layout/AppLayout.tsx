@@ -178,7 +178,7 @@ const NAV_OPS: NavEntry[] = [
     label: "Inventario",
     icon: <Warehouse size={16} aria-hidden="true" />,
     prefix:
-      "/inventario|/transferencias|/catalogo/categorias|/catalogo/marcas|/catalogo/atributos|/catalogo/descuentos|/catalogo/combos",
+      "/inventario|/transferencias|/catalogo/categorias|/catalogo/marcas|/catalogo/atributos|/catalogo/dimensiones|/catalogo/descuentos|/catalogo/combos",
     children: [
       {
         label: "Productos",
@@ -195,6 +195,11 @@ const NAV_OPS: NavEntry[] = [
         label: "Atributos",
         icon: <Tag size={14} />,
         path: "/catalogo/atributos",
+      },
+      {
+        label: "Dimensiones de Inventario",
+        icon: <Tag size={14} />,
+        path: "/catalogo/dimensiones",
       },
       {
         label: "Descuentos",
@@ -234,6 +239,20 @@ const NAV_OPS: NavEntry[] = [
         label: "Carga Inicial",
         icon: <PackagePlus size={14} />,
         path: "/inventario/carga-inicial",
+      },
+      {
+        // Ajuste de Combinación (Dimensiones de Inventario) — docs/tasks/
+        // PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §8.5. Reemplaza al Conteo estándar para
+        // artículos con dimensiones (el Conteo/Stock Reconciliation no funciona con ellos).
+        label: "Ajuste de Combinación",
+        icon: <FileText size={14} />,
+        path: "/inventario/ajustes-dimension",
+      },
+      {
+        // Reclasificación de Combinación — docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §8.6.
+        label: "Reclasificación de Combinación",
+        icon: <ArrowRightLeft size={14} />,
+        path: "/inventario/reclasificaciones",
       },
       {
         label: "Valoración de Stock",

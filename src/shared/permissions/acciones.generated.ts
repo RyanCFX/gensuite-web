@@ -1,5 +1,5 @@
 // GENERADO automáticamente por scripts/gen-acciones.mjs — NO editar a mano.
-// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (461 acciones). Regenerar: node scripts/gen-acciones.mjs
+// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (466 acciones). Regenerar: node scripts/gen-acciones.mjs
 
 export type AccionId =
   | 'apertura.compras.anular'
@@ -39,6 +39,9 @@ export type AccionId =
   | 'catalogo.descuentos.crear'
   | 'catalogo.descuentos.editar'
   | 'catalogo.descuentos.listar'
+  | 'catalogo.dimensiones.crear'
+  | 'catalogo.dimensiones.editar'
+  | 'catalogo.dimensiones.listar'
   | 'catalogo.items.activar'
   | 'catalogo.items.actualizar-precios'
   | 'catalogo.items.asignar-ubicacion'
@@ -256,6 +259,7 @@ export type AccionId =
   | 'gastos.ver-asientos'
   | 'impresoras.administrar'
   | 'impresoras.listar'
+  | 'inventario.ajustar'
   | 'inventario.almacenes.crear'
   | 'inventario.almacenes.editar'
   | 'inventario.almacenes.eliminar'
@@ -268,6 +272,7 @@ export type AccionId =
   | 'inventario.conteos.someter'
   | 'inventario.historial.consultar'
   | 'inventario.lotes.consultar'
+  | 'inventario.reclasificar'
   | 'inventario.seriales.consultar'
   | 'inventario.stock.consultar'
   | 'inventario.transferencias.anular'
@@ -502,6 +507,9 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'catalogo.descuentos.crear',
   'catalogo.descuentos.editar',
   'catalogo.descuentos.listar',
+  'catalogo.dimensiones.crear',
+  'catalogo.dimensiones.editar',
+  'catalogo.dimensiones.listar',
   'catalogo.items.activar',
   'catalogo.items.actualizar-precios',
   'catalogo.items.asignar-ubicacion',
@@ -719,6 +727,7 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'gastos.ver-asientos',
   'impresoras.administrar',
   'impresoras.listar',
+  'inventario.ajustar',
   'inventario.almacenes.crear',
   'inventario.almacenes.editar',
   'inventario.almacenes.eliminar',
@@ -731,6 +740,7 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'inventario.conteos.someter',
   'inventario.historial.consultar',
   'inventario.lotes.consultar',
+  'inventario.reclasificar',
   'inventario.seriales.consultar',
   'inventario.stock.consultar',
   'inventario.transferencias.anular',

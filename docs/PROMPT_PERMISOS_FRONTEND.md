@@ -734,6 +734,17 @@ Reportes y catálogos horizontales agregadas en esta revisión) no lo necesita.
 | `contabilidad.centros-costo.editar` | Editar | `Cost Center.write` | — |
 | `contabilidad.centros-costo.eliminar` | Eliminar | `Cost Center.delete` | — |
 
+#### Dimensiones de Inventario
+
+Docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §2. No hay `eliminar` — solo `toggle` (activar/
+desactivar, gateado por el mismo `catalogo.dimensiones.editar` que edita etiqueta/orden y valores).
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `catalogo.dimensiones.listar` | Ver pantalla de Dimensiones/Valores | `Dimension de Inventario.read` | — |
+| `catalogo.dimensiones.crear` | Nueva dimensión | `Dimension de Inventario.create` | — |
+| `catalogo.dimensiones.editar` | Editar/activar/desactivar dimensión, agregar/editar valor | `Dimension de Inventario.write` | — |
+
 #### Cheques
 
 | Acción | Botón / control | Permiso ERPNext | Marcador |
@@ -1214,6 +1225,8 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 | `inventario.historial.consultar` | Ver historial de movimientos | `Stock Ledger Entry.read` | — |
 | `inventario.lotes.consultar` | Ver lotes | `Batch.read` | — |
 | `inventario.seriales.consultar` | Ver seriales | `Serial No.read` | — |
+| `inventario.ajustar` | Ajustar combinación (docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §8.5) | `Stock Entry.create` | — |
+| `inventario.reclasificar` | Reclasificar combinación (docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §8.6) | `Stock Entry.create` | — |
 
 #### Libro Diario / Libro Mayor
 
