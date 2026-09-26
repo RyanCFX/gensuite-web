@@ -28,6 +28,7 @@ import {
   sumPayments,
   cashAmount,
   overpayAmount,
+  missingAmount,
   hasCashPayment,
   isPaymentLinesValid,
   emptyPaymentLine,
@@ -269,6 +270,12 @@ function validateAndSubmit() {
       // caja flow
       const validLines = paymentsValue.payments.filter((p) => p.modeOfPayment && Number(p.amount) > 0)
       if (validLines.length === 0) { toast.error('Agrega al menos una línea de pago válida'); return }
+      // El botón ya se deshabilita con faltante, pero se valida igual por seguridad: no se puede
+      // cobrar por menos del saldo pendiente.
+      if (missingAmount(paymentsValue.payments, outstanding) > 0) {
+        toast.error(`El total ingresado (${formatMoney(sumPayments(paymentsValue.payments), selectedInvoiceCurrency)}) es menor al saldo pendiente (${formatMoney(outstanding, selectedInvoiceCurrency)})`)
+        return
+      }
       // Sobrepago con vuelto automático: permitido solo con al menos una línea en efectivo y sin
       // superar el efectivo recibido. El pago parcial (suma < saldo) sigue permitido.
       const total = sumPayments(paymentsValue.payments)
@@ -300,6 +307,7 @@ function validateAndSubmit() {
   const canSubmitCaja =
     flujoCobro !== 'caja' ||
     (selectedInvoice != null &&
+      missingAmount(paymentsValue.payments, selectedInvoice.outstandingAmount) === 0 &&
       isPaymentLinesValid(paymentsValue, selectedInvoice.outstandingAmount, metodosActivos, denominacionesActivas))
 
   // Con sobrepago válido, lo que realmente se cobra es el saldo (el excedente vuelve como vuelto).
