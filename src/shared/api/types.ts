@@ -686,7 +686,10 @@ export interface CreateInvoiceDto {
   clienteOcasionalNombre?: string;
   clienteOcasionalRnc?: string;
   clienteOcasionalDireccion?: string;
-  postingDate: string;
+  /** Ya NO se manda — la fecha de la factura la asigna siempre el servidor (fecha real del
+   *  momento del request). Si el body llega a incluir `postingDate`, el backend responde 400
+   *  ("property postingDate should not exist"). El campo sigue viniendo en las respuestas.
+   *  `UpdateInvoiceDto = CreateInvoiceDto` (reemplazo completo) — tampoco va en el PUT. */
   dueDate?: string;
   branch?: string;
   department?: string;
@@ -826,7 +829,9 @@ export interface CreateQuotationDto {
   /** RNC (9 dígitos) o cédula (11) del comprador ocasional. Se conserva al convertir el documento en factura y se envía a Vega como identificación del comprador en el e-CF. */
   clienteOcasionalRnc?: string;
   clienteOcasionalDireccion?: string;
-  date: string; // required per API
+  /** Ya NO se manda — la fecha de la cotización la asigna siempre el servidor (fecha real del
+   *  momento del request). Si el body llega a incluir `date`, el backend responde 400
+   *  ("property date should not exist"). El campo sigue viniendo en las respuestas. */
   validTill?: string;
   branch?: string;
   /** Ver `CreateInvoiceDto.currency` — misma regla de resolución. Al editar (PUT), omitirlo
@@ -1426,6 +1431,246 @@ export interface Item {
   autoDiscount?: AutoDiscount;
   /** Componentes del combo (cuando type === 'combo') */
   components?: { itemCode: string; qty: number }[];
+  // ─── Composición de medicamentos (vertical Farmacia) ──────────────────────
+  // docs/tasks/PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §6.1. Siempre presentes (false/vacíos
+  // en un tenant no-Farmacia) — la lista de `principiosActivos` NO viene acá, hace falta pedir
+  // GET /catalog/items/:id/composicion (§6.3) para evitar esa consulta extra en cada fila de un
+  // listado donde nadie la necesita.
+  esMedicamento?: boolean;
+  formaFarmaceutica?: string | null;
+  viaAdministracion?: ViaAdministracion | null;
+}
+
+/** Lista CERRADA — únicos valores válidos (§6.2). */
+export type ViaAdministracion =
+  | "Oral"
+  | "Tópica"
+  | "Oftálmica"
+  | "Ótica"
+  | "Nasal"
+  | "Rectal"
+  | "Vaginal"
+  | "Inhalatoria"
+  | "Intravenosa"
+  | "Intramuscular"
+  | "Subcutánea";
+
+/** Lista cerrada de unidades de concentración (§6.2.1). */
+export type StrengthUom = "mg" | "g" | "mcg" | "UI" | "mL" | "%" | "mEq";
+
+/** Lista cerrada del denominador ("por") de la concentración (§6.2.1). */
+export type PerUom = "Unidad" | "mL" | "g" | "Aplicación" | "Dosis";
+
+/** Una fila de la grilla de principios activos de un artículo — mismo shape en el body de
+ *  PUT .../composicion y en la respuesta de GET .../composicion (esta última agrega
+ *  `activeIngredientNombre`, ver ActiveIngredientRowResponse). */
+export interface ActiveIngredientRowDto {
+  /** id (nombre) del Active Ingredient — GET /farmacia/principios-activos. NUNCA texto libre: el
+   *  usuario siempre selecciona de ese catálogo (si no, el motor de recomendación no matchea). */
+  activeIngredient: string;
+  strengthValue?: number;
+  strengthUom?: StrengthUom;
+  /** Default 1 si se omite. */
+  perValue?: number;
+  /** Default 'Unidad' si se omite. */
+  perUom?: PerUom;
+  /** A lo sumo una fila puede tener esto en `true` (validado por el servidor). */
+  isPrimary?: boolean;
+  notes?: string;
+}
+
+/** Fila tal como viene en GET .../composicion — agrega el nombre legible del principio (puede
+ *  diferir de `activeIngredient` si el principio fue renombrado, ver §5.6). */
+export interface ActiveIngredientRowResponse extends ActiveIngredientRowDto {
+  activeIngredientNombre: string;
+}
+
+/** Body de PUT /catalog/items/:id/composicion — REEMPLAZO TOTAL, nunca un parche (§6.4). Si
+ *  `esMedicamento` es `false`, el resto del bloque se ignora/limpia — alcanza con mandar
+ *  `{ esMedicamento: false }`. */
+export interface ComposicionDto {
+  esMedicamento: boolean;
+  formaFarmaceutica?: string;
+  viaAdministracion?: ViaAdministracion;
+  principiosActivos?: ActiveIngredientRowDto[];
+}
+
+/** Respuesta de GET /catalog/items/:id/composicion. El campo `firmas` es EXCLUSIVAMENTE de
+ *  depuración interna del motor — nunca mostrarlo en la UI ni usarlo para lógica de negocio del
+ *  frontend (§6.3). */
+export interface ComposicionResponse {
+  esMedicamento: boolean;
+  formaFarmaceutica: string | null;
+  viaAdministracion: ViaAdministracion | null;
+  principiosActivos: ActiveIngredientRowResponse[];
+  firmas?: { principios: string; composicion: string };
+}
+
+// ─── Principios Activos (catálogo maestro, vertical Farmacia) ─────────────────
+// docs/tasks/PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §5.
+
+export interface PrincipioActivo {
+  /** El `nombre` es también el identificador — cambia si se renombra (§5.6). */
+  id: string;
+  nombre: string;
+  sinonimos?: string[];
+  codigoAtc?: string | null;
+  esControlado: boolean;
+  deshabilitado: boolean;
+  descripcion?: string | null;
+  /** Solo viene si se pidió `incluirConteo=true` en el listado (§5.3). */
+  cantidadArticulos?: number;
+}
+
+/** GET /farmacia/principios-activos/:id — agrega hasta 100 artículos que lo usan (§5.4). */
+export interface PrincipioActivoDetalle extends PrincipioActivo {
+  items: { id: string; nombre: string }[];
+}
+
+export interface CreatePrincipioActivoDto {
+  nombre: string;
+  sinonimos?: string[];
+  codigoAtc?: string;
+  esControlado?: boolean;
+  descripcion?: string;
+}
+
+export type UpdatePrincipioActivoDto = Partial<CreatePrincipioActivoDto>;
+
+export interface ListPrincipiosActivosParams extends PaginationParams {
+  search?: string;
+  soloActivos?: boolean;
+  esControlado?: boolean;
+  /** Cuesta una consulta extra en el backend — no pedirlo en cada tecla del buscador (§5.3). */
+  incluirConteo?: boolean;
+}
+
+/** 409 al crear/renombrar un duplicado (nombre normalizado ya existente) — manejo especial
+ *  obligatorio, ver §5.2/§11. */
+export interface PrincipioActivoDuplicadoError {
+  message: string;
+  candidato: PrincipioActivo;
+}
+
+export interface DeshabilitarPrincipioActivoResult {
+  message: string;
+  /** `undefined` si no hay artículos asociados — no mostrar el campo en ese caso (§5.7). */
+  advertencia?: string;
+}
+
+export interface FusionarPrincipioActivoDto {
+  /** id del principio que ABSORBE al `:id` de la URL. */
+  destino: string;
+}
+
+export interface FusionarPrincipioActivoResult {
+  articulosAfectados: number;
+  procesados: number;
+  actualizados: number;
+}
+
+// ─── Motor de recomendación por composición (equivalentes) ────────────────────
+// docs/tasks/PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §8/§9/§10.
+
+/** "Cuánto se parece" (0-100, 1 decimal) — el dato PRINCIPAL a mostrar (§1.5, §2 regla 5). */
+export type BandaEquivalente = "intercambiable" | "equivalente" | "similar" | "relacionado";
+
+/** Motivo por el que el puntaje de un candidato quedó topado — informativo para power-users
+ *  (§10.3), nunca inventar otro texto. */
+export type TopeAplicadoEquivalente = "DATOS_INCOMPLETOS" | "PRINCIPIOS_ADICIONALES";
+
+export interface DetalleCoincidenciaEquivalente {
+  /** 0-100 o `null` = "no se pudo comparar", NUNCA equivale a 0%. */
+  principios: number | null;
+  dosis: number | null;
+  forma: number | null;
+  compartidos: string[];
+  soloEnAncla: string[];
+  soloEnCandidato: string[];
+  tienePrincipiosAdicionales: boolean;
+  topeAplicado: TopeAplicadoEquivalente | null;
+}
+
+/** Resumen liviano del artículo candidato dentro de un resultado del motor (§8.2/§10.1). */
+export interface EquivalenteItemResumen {
+  id: string;
+  itemName: string;
+  brand?: string;
+  category?: string;
+  image?: string;
+  standardRate?: number;
+  disabled: boolean;
+}
+
+export interface EquivalenteResponseDto {
+  item: EquivalenteItemResumen;
+  /** El número principal a mostrar, ej. "94.2%" — con 1 decimal tal cual viene, nunca redondear. */
+  coincidencia: number;
+  banda: BandaEquivalente;
+  /** Diagnóstico interno de CÓMO se encontró — nunca mostrar como dato principal (§1.5). */
+  nivel: 1 | 2 | 3;
+  detalleCoincidencia: DetalleCoincidenciaEquivalente;
+  /** Texto legible ya armado por el backend — mostrar tal cual, nunca reconstruirlo (§8.2). */
+  motivo: string;
+  /** Puramente interno para el ordenamiento (desempate) — NUNCA mostrar este número (§8.2). */
+  bonoNegocio: number;
+  /** `null` = no se pudo calcular (nunca "0" en ese caso); `0` = agotado de verdad. */
+  stock: number | null;
+  /** `undefined` si no hay precio configurado — ocultar el campo, nunca "$0"/"$undefined". */
+  precio?: number;
+  /** Negativo = más barato, positivo = más caro; `null` si falta algún precio para comparar. */
+  diferenciaPrecioPct: number | null;
+}
+
+export type OrdenEquivalentes = "relevancia" | "coincidencia";
+
+export interface ListEquivalentesParams {
+  /** Default 2 — §8.1. */
+  nivelMinimo?: 1 | 2 | 3;
+  /** Default 60. */
+  coincidenciaMinima?: number;
+  /** Default 'relevancia' — el array YA viene ordenado, nunca reordenar en el cliente (§8.3). */
+  orden?: OrdenEquivalentes;
+  /** Default 10, máx 50. Sin `offset` — es una lista corta de sugerencias, no un listado completo. */
+  limit?: number;
+  branch?: string;
+  soloConStock?: boolean;
+}
+
+/** Motivo a nivel raíz cuando `data` viene vacío por una razón conocida (§12) — `undefined` si
+ *  simplemente no hay coincidencias (caso normal, no es un estado especial). */
+export type MotivoSinEquivalentes = "NO_ES_MEDICAMENTO" | "SIN_COMPOSICION_DECLARADA";
+
+export interface EquivalentesResponse {
+  data: EquivalenteResponseDto[];
+  /** id del artículo consultado. */
+  ancla: string;
+  /** Texto fijo del backend — mostrar SIEMPRE tal cual viene, nunca hardcodear (§2 regla 2). */
+  aviso: string;
+  motivo?: MotivoSinEquivalentes;
+}
+
+// ─── Búsqueda asistida (mostrador / POS) ───────────────────────────────────────
+// docs/tasks/PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §9.
+
+export interface BuscarAsistidaParams {
+  q: string;
+  /** Default 10, máx 50 — aplica tanto a `coincidencias` como a `equivalentes`. */
+  limit?: number;
+  branch?: string;
+  /** Aplica solo a `equivalentes`. */
+  soloConStock?: boolean;
+}
+
+export interface BusquedaAsistidaResponse {
+  coincidencias: PaginatedResponse<Item>;
+  /** Mismo shape que EquivalenteResponseDto[] de §8.2 — nunca en la misma lista que
+   *  `coincidencias` (§2 regla 4, §9.2). */
+  equivalentes: EquivalenteResponseDto[];
+  /** `null` = la búsqueda textual no encontró nada — en ese caso `equivalentes` también viene
+   *  vacío y no hay que mostrar el panel de equivalentes en absoluto (§9.3). */
+  ancla: string | null;
+  aviso: string;
 }
 
 export interface ItemImagenUploadResult {
@@ -1484,6 +1729,10 @@ export interface CreateItemDto {
   asignarSerialEnDespacho?: boolean;
   purchaseTaxTemplate?: string;
   salesTaxTemplate?: string;
+  /** Opcional — carga la composición farmacéutica en el mismo paso de crear/editar el artículo,
+   *  mismo shape exacto que PUT .../composicion (§6.5). Nunca obligatorio: si el alta no distingue
+   *  "es medicamento", se puede seguir usando exclusivamente la pestaña dedicada de la ficha. */
+  composicion?: ComposicionDto;
 }
 
 export type UpdateItemDto = Partial<CreateItemDto>;
@@ -1691,7 +1940,9 @@ export interface CreatePedidoDto {
   /** RNC (9 dígitos) o cédula (11) del comprador ocasional. Se conserva al convertir el documento en factura y se envía a Vega como identificación del comprador en el e-CF. */
   clienteOcasionalRnc?: string;
   clienteOcasionalDireccion?: string;
-  transactionDate?: string;
+  /** Ya NO se manda — la fecha del pedido la asigna siempre el servidor (fecha real del momento
+   *  del request). Si el body llega a incluir `transactionDate`, el backend responde 400
+   *  ("property transactionDate should not exist"). El campo sigue viniendo en las respuestas. */
   deliveryDate?: string;
   branch?: string;
   department?: string;
@@ -6177,6 +6428,44 @@ export interface DocumentPermissions {
   doctype: string;
   name: string;
   permisos: Partial<Record<PermisoPtype, PermisoPtypeFlag>>;
+}
+
+// ─── Features por tenant — docs/tasks/80_features_tenant_discriminacion_ui.md §3 ───
+// `GET /me/features` se pide una sola vez al iniciar sesión (o al cambiar de tenant) y se guarda
+// junto con `permissions`/`vertical` (ver src/stores/features.store.ts). Este frontend solo LEE:
+// nunca enciende ni apaga features (eso lo hace GenSuite Control directo en Postgres).
+
+export type TenantFeatureKey =
+  | 'compras' | 'comprasOrdenes' | 'comprasSolicitudes' | 'devolucionesCompras'
+  | 'gastos' | 'proveedores' | 'caja' | 'contabilidad' | 'cuentasPorCobrar'
+  | 'cuentasPorPagar' | 'tesoreria' | 'inventario' | 'servicios'
+  | 'relacionesComerciales' | 'cotizaciones' | 'despacho' | 'devoluciones'
+  | 'notasCredito' | 'notasDebito' | 'pedidos';
+
+export type TenantReporteKey =
+  | 'ventas_por_periodo' | 'top_productos' | 'top_clientes' | 'ventas_por_vendedor'
+  | 'compras_por_periodo' | 'gastos_por_periodo' | 'cuentas_por_cobrar'
+  | 'cuentas_por_pagar' | 'stock_valorizado' | 'movimientos_inventario'
+  | 'flujo_caja' | 'balance_general' | 'estado_resultados'
+  | 'reporte_606' | 'reporte_607';
+
+export interface TenantLimites {
+  /** `null` = sin límite (plan ilimitado o tenant legado). */
+  maxUsuarios: number | null;
+  /** `null` = sin límite. */
+  maxSucursales: number | null;
+  /** Ya calculados por el backend — no recontar listas locales (paginación, filtros). */
+  usuariosActuales: number;
+  sucursalesActuales: number;
+}
+
+export interface MeFeatures {
+  /** Siempre trae las 20 claves de `public.features` (`MeFeaturesResponseDto`/`FeaturesMapDto`
+   *  en openapi.json — 19 implementadas + `servicios` reservada) como booleano. */
+  features: Record<TenantFeatureKey, boolean>;
+  /** Claves de reporte ENCENDIDAS — un reporte ausente está apagado, no hay booleano por reporte. */
+  reportesHabilitados: TenantReporteKey[];
+  limites: TenantLimites;
 }
 
 // ─── Farmacia ARS v2 — cobertura dentro de la factura ───────────────────────

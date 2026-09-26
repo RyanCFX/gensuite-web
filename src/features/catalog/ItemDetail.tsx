@@ -18,6 +18,9 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { usePermissionsStore } from '@/stores/permissions.store'
+import { ComposicionPanel } from './ComposicionPanel'
+import { EquivalentesPanel } from './EquivalentesPanel'
 
 // ─── Update Prices Modal ──────────────────────────────────────────────────────
 
@@ -1004,6 +1007,7 @@ export default function ItemDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const esFarmacia = usePermissionsStore((s) => s.vertical) === 'farmacia'
 
   const { data: item, isLoading, isError } = useQuery({
     queryKey: ['item', id],
@@ -1541,6 +1545,16 @@ export default function ItemDetail() {
         <div style={{ marginTop: 20 }}>
           <VariantsPanel itemId={id!} item={item} />
         </div>
+      )}
+
+      {/* Composición y Equivalentes (vertical Farmacia) — docs/tasks/
+          PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §3/§6/§8. Ausente por completo (nunca solo
+          deshabilitado) para un tenant que no sea Farmacia. */}
+      {esFarmacia && item.type === 'product' && !item.hasVariants && (
+        <>
+          <ComposicionPanel itemId={item.id} />
+          {item.esMedicamento && <EquivalentesPanel itemId={item.id} basePath={basePath} />}
+        </>
       )}
 
       {showPricesModal && (

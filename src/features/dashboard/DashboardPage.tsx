@@ -15,6 +15,7 @@ import {
 } from '@/shared/api/dashboard'
 import { listInvoices } from '@/shared/api/invoices'
 import { listInventory } from '@/shared/api/inventory'
+import { useFeature } from '@/shared/features/can'
 
 const PERIOD_OPTIONS: { label: string; value: DashboardPeriod }[] = [
   { label: 'Hoy',      value: 'today' },
@@ -185,6 +186,12 @@ interface PendingAction {
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState<DashboardPeriod>('month')
+  // Widgets por módulo (§6): el Dashboard es núcleo, pero cada tarjeta se oculta según su
+  // feature — igual que una ruta de nivel superior.
+  const tieneGastos = useFeature('gastos')
+  const tieneCxC = useFeature('cuentasPorCobrar')
+  const tieneInventario = useFeature('inventario')
+  const tieneCompras = useFeature('compras')
 
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard', period],
@@ -207,6 +214,8 @@ export default function DashboardPage() {
     queryKey: ['dashboard-low-stock'],
     queryFn: () => listInventory({ stockStatus: 'low_stock', limit: 2 }),
     retry: false,
+    // Sin `inventario` contratado no se pide (evita un 403 esperado) — el widget se oculta abajo.
+    enabled: tieneInventario,
   })
 
   const pendingActions = useMemo<PendingAction[]>(() => {
@@ -233,15 +242,17 @@ export default function DashboardPage() {
       sublabel: 'Factura pendiente de aprobación',
       href: `/facturas/${inv.id}`,
     }))
-    const lowStock: PendingAction[] = (lowStockRes?.items ?? []).map((item) => ({
-      id: `stock-${item.itemCode}-${item.warehouse}`,
-      tone: 'danger',
-      label: item.itemCode,
-      sublabel: `Stock crítico · ${formatNumber(item.actualQty)} unid. de ${item.itemName}`,
-      href: '/inventario/productos',
-    }))
+    const lowStock: PendingAction[] = tieneInventario
+      ? (lowStockRes?.items ?? []).map((item) => ({
+        id: `stock-${item.itemCode}-${item.warehouse}`,
+        tone: 'danger',
+        label: item.itemCode,
+        sublabel: `Stock crítico · ${formatNumber(item.actualQty)} unid. de ${item.itemName}`,
+        href: '/inventario/productos',
+      }))
+      : []
     return [...dueSoon, ...drafts, ...lowStock]
-  }, [dueSoonRes, draftRes, lowStockRes])
+  }, [dueSoonRes, draftRes, lowStockRes, tieneInventario])
 
   const pendingLoading = loadingDueSoon || loadingDrafts || loadingLowStock
 
@@ -271,6 +282,13 @@ export default function DashboardPage() {
   // docs/tasks/64_multimoneda_completo.md §6.2. Los KPIs y los gráficos agregados (ventas,
   // ingresos/gastos, top productos) están en esta moneda; `recentActivity` es la excepción, cada
   // fila trae su propia moneda porque es la ficha de un documento puntual, no un agregado.
+  // Actividad reciente: filtra las filas de módulos no contratados (§6 — cualquier fragmento
+  // de UI que muestre datos de un módulo gateado se oculta igual que la ruta de ese módulo).
+  const actividadVisible = (data?.recentActivity ?? []).filter((item) => {
+    if (item.type === 'purchase_registered' && !tieneCompras) return false
+    if (item.type === 'expense_registered' && !tieneGastos) return false
+    return true
+  })
   const currency   = kpis?.currency
   const ventas     = kpis?.totalVentas ?? 0
   const cobrado    = kpis?.totalCobrado ?? 0
@@ -357,6 +375,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {tieneGastos && (
             <div className="kpi-card gap-50 w-200" style={{ '--i': 2 } as React.CSSProperties}>
               <div className="kpi-top">
                 <span className="kpi-icon" style={{ fontSize: 12, fontWeight: 700, lineHeight: 1, padding: '5px 6px' }}>$</span>
@@ -368,7 +387,9 @@ export default function DashboardPage() {
                 <span>de ventas</span>
               </div>
             </div>
+            )}
 
+            {tieneCxC && (
             <div className="kpi-card gap-50 w-200" style={{ '--i': 3 } as React.CSSProperties}>
               <div className="kpi-top">
                 <span className="kpi-icon" style={{ fontSize: 12, fontWeight: 700, lineHeight: 1, padding: '5px 6px' }}>$</span>
@@ -380,6 +401,7 @@ export default function DashboardPage() {
                 <span>de ventas pendiente</span>
               </div>
             </div>
+            )}
 
             <div className="kpi-card gap-50 w-200" style={{ '--i': 4 } as React.CSSProperties}>
               <div className="kpi-top">
@@ -560,7 +582,7 @@ export default function DashboardPage() {
                 </div>
                 <Link to="/facturas" className="btn-dash-dark">Ver Facturación</Link>
               </div>
-              {!data?.recentActivity?.length ? (
+              {!actividadVisible?.length ? (
                 <div className="dash-empty">
                   <div className="dash-empty-title">Sin actividad reciente</div>
                   <p className="dash-empty-sub">Las transacciones recientes aparecerán aquí.</p>
@@ -577,7 +599,7 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.recentActivity.map((item, idx) => {
+                      {actividadVisible.map((item, idx) => {
                         const isOutflow = OUTFLOW_TYPES.has(item.type)
                         const [datePart, timePart] = formatDateTime(item.timestamp).split(' ')
                         return (

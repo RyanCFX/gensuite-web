@@ -3,6 +3,7 @@ export const ENDPOINTS = {
     permissions: '/me/permissions',
     permissionsByDoc: (doctype: string, name: string) =>
       `/me/permissions/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,
+    features: '/me/features',
     profile: '/me/profile',
     password: '/me/password',
     mfaFactors: '/me/mfa/factors',
@@ -122,6 +123,8 @@ export const ENDPOINTS = {
       generateVariants: (id: string) => `/catalog/items/${id}/variants/generate`,
       precios: (id: string) => `/catalog/items/${id}/precios`,
       imagen: (id: string) => `/catalog/items/${id}/imagen`,
+      composicion: (id: string) => `/catalog/items/${id}/composicion`,
+      equivalentes: (id: string) => `/catalog/items/${id}/equivalentes`,
     },
     bundles: {
       list: '/catalog/bundles',
@@ -632,6 +635,12 @@ export const ENDPOINTS = {
       lotes: '/farmacia/reportes/lotes',
       facturasArs: '/farmacia/reportes/facturas-ars',
     },
+    principiosActivos: {
+      list: '/farmacia/principios-activos',
+      byId: (id: string) => `/farmacia/principios-activos/${encodeURIComponent(id)}`,
+      fusionar: (id: string) => `/farmacia/principios-activos/${encodeURIComponent(id)}/fusionar`,
+    },
+    busquedaAsistida: '/farmacia/busqueda-asistida',
   },
   despachos: {
     list: '/despachos',

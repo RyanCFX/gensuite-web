@@ -992,6 +992,19 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 | `catalogo.items.imprimir-etiqueta` | Imprimir etiqueta | `Item.print` | — |
 | `catalogo.items.generar-variantes` | Agregar/Generar variantes | `Item.create` | — |
 | `catalogo.items.asignar-ubicacion` | Asignar/Mover/Quitar ubicación | `Warehouse.write` | — |
+| `catalogo.items.ver-composicion` | Ver pestaña "Composición" | `Item.read` | Farmacia |
+| `catalogo.items.editar-composicion` | Editar composición | `Item.write` | Farmacia |
+
+#### Composición de Medicamentos (vertical Farmacia)
+
+| Acción | Botón / control | Permiso ERPNext | Marcador |
+|---|---|---|---|
+| `farmacia.principios-activos.listar` | Ver catálogo de Principios Activos | `Active Ingredient.read` | Farmacia |
+| `farmacia.principios-activos.crear` | Nuevo principio activo | `Active Ingredient.create` | Farmacia |
+| `farmacia.principios-activos.editar` | Editar / renombrar | `Active Ingredient.write` | Farmacia |
+| `farmacia.principios-activos.eliminar` | Deshabilitar | `Active Ingredient.delete` | Farmacia |
+| `farmacia.principios-activos.fusionar` | Fusionar duplicados | `Active Ingredient.write` | Farmacia |
+| `farmacia.equivalentes.consultar` | Ver equivalentes sugeridos (ficha y búsqueda asistida) | `Item.read` | Farmacia |
 
 #### Detalle de Cobro/Pago
 

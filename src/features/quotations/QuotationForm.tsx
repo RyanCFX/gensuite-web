@@ -15,7 +15,7 @@ import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
-import { formatMoney, displayId, round2 } from '@/lib/formatters'
+import { formatMoney, displayId, round2, formatDate } from '@/lib/formatters'
 import { formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -522,7 +522,6 @@ function buildDto(): CreateQuotationDto {
        ...(esClienteOcasional
          ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalRnc: clienteOcasionalRnc || undefined, clienteOcasionalDireccion: clienteOcasionalDireccion || undefined }
          : { customer: customerId }),
-       date,
        validTill,
        branch: branch || undefined,
        currency: currency || undefined,
@@ -579,6 +578,14 @@ function buildDto(): CreateQuotationDto {
 
   function handleError(err: { message?: string; statusCode?: number }) {
     const msg = err?.message ?? ''
+    // docs/PROMPT_ERRORES_COMERCIALES_FRONTEND.md §4/§5.3 — la cotización dejó de ser editable
+    // mientras se editaba. No hay una acción de enmienda local propia para Cotizaciones hoy — se
+    // devuelve al detalle con el mensaje comercial del backend tal cual.
+    if (id && isApiErrorCode(err, ERROR_CODES.DOC_SUBMITTED_IMMUTABLE)) {
+      toast.error(msg || 'Esta cotización ya no se puede editar')
+      navigate(`/cotizaciones/${id}`)
+      return
+    }
     if (isApiErrorCode(err, ERROR_CODES.SALE_WAREHOUSE_MISMATCH)) {
       toast.error(msg, { duration: 8000 })
       return
@@ -817,7 +824,6 @@ function buildDto(): CreateQuotationDto {
     clienteOcasionalNombre,
     clienteOcasionalRnc,
     clienteOcasionalDireccion,
-    date,
     validTill,
     items,
     notes,
@@ -1043,15 +1049,18 @@ if (esClienteOcasional) {
                  </label>
                </div>
 
-              <div className="ff-wrap">
-                <label className="ff-label ff-required" htmlFor="date">Fecha</label>
-                <DatePicker
-                  id="date"
-                  className="ff-input"
-                  value={date}
-                  onChange={setDate}
-                />
-              </div>
+              {/* La fecha de la cotización ya no la fija el cliente — el servidor siempre la
+                  asigna con el momento real del request (evita el desfase cronológico con
+                  inventario que rompía el submit). En edición se muestra de solo lectura,
+                  informativa; en alta no hay nada que mostrar todavía. */}
+              {id && (
+                <div className="ff-wrap">
+                  <span className="ff-label">Fecha</span>
+                  <span className="ff-input" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }}>
+                    {formatDate(date)}
+                  </span>
+                </div>
+              )}
 
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="validTill">Válida hasta</label>

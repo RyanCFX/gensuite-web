@@ -53,6 +53,10 @@ export function TurnoCajaIndicator() {
     .filter((c) => !posProfileSearch || c.label.toLowerCase().includes(posProfileSearch.toLowerCase()))
     .map((c) => ({ value: c.id, label: c.label }))
 
+  // Caja por defecto del usuario: si tiene una configurada (y habilitada), se preselecciona y el
+  // select queda bloqueado — no se puede abrir turno en otra caja.
+  const lockedCaja = cajasHabilitadas.find((c) => c.isUserDefault) ?? null
+
   // Preselecciona la caja por defecto del usuario en cuanto se cargan las opciones.
   useEffect(() => {
     if (!modalOpen || posProfile || !cajas) return
@@ -62,7 +66,7 @@ export function TurnoCajaIndicator() {
   }, [modalOpen, cajas])
 
   const abrirMutation = useMutation({
-    mutationFn: () => abrirTurno({ openingAmount, posProfile: posProfile || undefined }),
+    mutationFn: () => abrirTurno({ openingAmount, posProfile: (lockedCaja?.id ?? posProfile) || undefined }),
     onSuccess: () => {
       toast.success('Turno de caja abierto')
       queryClient.invalidateQueries({ queryKey: ['turno-actual'] })
@@ -113,9 +117,10 @@ export function TurnoCajaIndicator() {
         </button>
       )}
 
-      {/* Modal: abrir turno */}
+      {/* Modal: abrir turno — no se cierra con click afuera (sin alerta): la única forma de
+        salir sin abrir turno es el botón Cancelar. */}
       {modalOpen && (
-        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
+        <div className="modal-overlay">
           <div
             className="modal-box modal-box-sm"
             onClick={(e) => e.stopPropagation()}
@@ -127,12 +132,6 @@ export function TurnoCajaIndicator() {
               >
                 <Clock size={16} /> Abrir turno de caja
               </h2>
-              <button
-                className="modal-close"
-                onClick={() => setModalOpen(false)}
-              >
-                ×
-              </button>
             </div>
             <div
               className="modal-body"
@@ -141,13 +140,19 @@ export function TurnoCajaIndicator() {
               <div className="ff-wrap">
                 <label className="ff-label">Caja</label>
                 <SearchSelect
-                  value={posProfile}
+                  value={lockedCaja ? lockedCaja.id : posProfile}
                   onChange={setPosProfile}
                   options={posProfileOptions}
                   onSearch={setPosProfileSearch}
-                  selectedLabel={cajasHabilitadas.find((c) => c.id === posProfile)?.label ?? ''}
+                  selectedLabel={(lockedCaja ?? cajasHabilitadas.find((c) => c.id === posProfile))?.label ?? ''}
                   placeholder="Usar la caja default de la empresa"
+                  disabled={!!lockedCaja}
                 />
+                {lockedCaja && (
+                  <p className="ff-hint" style={{ marginTop: 4 }}>
+                    Caja por defecto de tu usuario — el select está bloqueado.
+                  </p>
+                )}
               </div>
               <div className="ff-wrap">
                 <label className="ff-label">

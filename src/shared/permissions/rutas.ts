@@ -43,6 +43,7 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/farmacia/aseguradoras', accion: 'aseguradoras.listar', soloFarmacia: true },
   { pattern: '/farmacia/lotes/*', accion: 'farmacia.lotes.listar', soloFarmacia: true },
   { pattern: '/farmacia/lotes', accion: 'farmacia.lotes.listar', soloFarmacia: true },
+  { pattern: '/farmacia/principios-activos', accion: 'farmacia.principios-activos.listar', soloFarmacia: true },
 
   // Cotizaciones
   { pattern: '/cotizaciones/*', accion: 'cotizaciones.listar' },

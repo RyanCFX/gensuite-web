@@ -17338,7 +17338,7 @@
     },
     "/api/v1/compras/{id}/submit": {
       "post": {
-        "description": "Si la compra es de tipoPago \"Contado\", debe enviarse el body con la información de pago (modeOfPayment y, si aplica, esCheque/referenceNo/referenceDate/remarks/bankAccount) — se crea y somete el Payment Entry por el saldo pendiente en el mismo request, para que la compra no quede como un pago pendiente.",
+        "description": "Si la compra es de tipoPago \"Contado\", debe enviarse el body con la información de pago (modeOfPayment y, si aplica, esCheque/referenceNo/referenceDate/remarks/bankAccount) — se crea y somete el Payment Entry por el saldo pendiente en el mismo request, para que la compra no quede como un pago pendiente. El body es opcional — omitirlo (o mandarlo vacío) es válido y esperado para una compra \"Crédito\".",
         "operationId": "ComprasController_submit",
         "parameters": [
           {
@@ -17359,7 +17359,7 @@
           }
         ],
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {
               "schema": {
@@ -17858,6 +17858,35 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "principioActivo",
+            "required": false,
+            "in": "query",
+            "description": "name (id) de un Active Ingredient — filtra artículos que lo declaran en su composición. Filtra por child table (Item Active Ingredient): el servicio deduplica antes de contar.",
+            "schema": {
+              "example": "Acetaminofén",
+              "type": "string"
+            }
+          },
+          {
+            "name": "esMedicamento",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por Item.custom_is_medicine",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "formaFarmaceutica",
+            "required": false,
+            "in": "query",
+            "description": "name (id) de un Dosage Form — filtra por Item.custom_dosage_form",
+            "schema": {
+              "example": "Tableta",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -18186,6 +18215,191 @@
           }
         ],
         "summary": "Toggle item active/inactive",
+        "tags": [
+          "Catalog - Items"
+        ]
+      }
+    },
+    "/api/v1/catalog/items/{id}/composicion": {
+      "get": {
+        "description": "Principios activos, forma farmacéutica y vía de administración. Ver docs/plans/PLAN_COMPOSICION_MEDICAMENTOS_RECOMENDACION.md §11.2.",
+        "operationId": "ItemsController_getComposicion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ver la composición farmacéutica del artículo",
+        "tags": [
+          "Catalog - Items"
+        ]
+      },
+      "put": {
+        "description": "Reemplazo TOTAL (semántica PUT): la lista de principios activos que se manda es la que queda. Ver §11.2 del plan.",
+        "operationId": "ItemsController_updateComposicion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComposicionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reemplazar la composición farmacéutica del artículo",
+        "tags": [
+          "Catalog - Items"
+        ]
+      }
+    },
+    "/api/v1/catalog/items/{id}/equivalentes": {
+      "get": {
+        "description": "Recomienda otros artículos con la misma composición declarada (mismo principio activo, o incluso misma dosis y forma farmacéutica) — NO es sustitución automática. Ver docs/plans/PLAN_COMPOSICION_MEDICAMENTOS_RECOMENDACION.md §10.",
+        "operationId": "ItemsController_getEquivalentes",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nivelMinimo",
+            "required": false,
+            "in": "query",
+            "description": "Nivel más laxo que se acepta (§9): 1 = solo intercambiables, 2 (default) = 1+2, 3 = también principio_compartido (clínicamente más delicado, off por defecto).",
+            "schema": {
+              "default": 2,
+              "type": "number",
+              "enum": [1, 2, 3]
+            }
+          },
+          {
+            "name": "coincidenciaMinima",
+            "required": false,
+            "in": "query",
+            "description": "Puntaje 0–100 mínimo para aparecer (§10.2.5) — la banda \"relacionado\" queda oculta salvo que se pida explícitamente con un valor menor.",
+            "schema": {
+              "default": 60,
+              "type": "number"
+            }
+          },
+          {
+            "name": "orden",
+            "required": false,
+            "in": "query",
+            "description": "\"relevancia\" (default, §10.3): banda desc -\u003E stock/precio -\u003E coincidencia -\u003E nombre. \"coincidencia\": orden estricto por puntaje, ignorando stock y precio.",
+            "schema": {
+              "default": "relevancia",
+              "type": "string",
+              "enum": [
+                "relevancia",
+                "coincidencia"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 50,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Restringe el stock consultado a los almacenes de esta sucursal",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "soloConStock",
+            "required": false,
+            "in": "query",
+            "description": "Excluye candidatos sin existencia en el ámbito consultado",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Artículos equivalentes por composición (motor de recomendación)",
         "tags": [
           "Catalog - Items"
         ]
@@ -21045,7 +21259,7 @@
     },
     "/api/v1/gastos/{id}/submit": {
       "post": {
-        "description": "Si el gasto es de tipoPago \"Contado\", debe enviarse el body con la información de pago (modeOfPayment y, si aplica, esCheque/referenceNo/referenceDate/remarks/bankAccount) — se crea y somete el Payment Entry por el saldo pendiente en el mismo request, para que el gasto no quede como un pago pendiente.",
+        "description": "Si el gasto es de tipoPago \"Contado\", debe enviarse el body con la información de pago (modeOfPayment y, si aplica, esCheque/referenceNo/referenceDate/remarks/bankAccount) — se crea y somete el Payment Entry por el saldo pendiente en el mismo request, para que el gasto no quede como un pago pendiente. El body es opcional — omitirlo (o mandarlo vacío) es válido y esperado para un gasto \"Crédito\".",
         "operationId": "GastosController_submit",
         "parameters": [
           {
@@ -21066,7 +21280,7 @@
           }
         ],
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {
               "schema": {
@@ -30014,7 +30228,7 @@
     },
     "/api/v1/me/features": {
       "get": {
-        "description": "docs/plans/PLAN_FEATURES_TENANT.md §10. El frontend arma el menú intersectando esto con GET /me/permissions: un ítem aparece solo si el feature está encendido (acá) Y el usuario tiene permiso sobre al menos una acción de ese módulo (endpoint existente, sin cambios). `usuariosActuales`/`sucursalesActuales` se calculan con el mismo método que usa el límite al crear, para poder mostrar \"X de Y\" sin un segundo roundtrip.",
+        "description": "docs/plans/PLAN_FEATURES_TENANT.md §10. El frontend arma el menú intersectando esto con GET /me/permissions: un ítem aparece solo si el feature está encendido (acá) Y el usuario tiene permiso sobre al menos una acción de ese módulo (endpoint existente, sin cambios). `usuariosActuales`/`sucursalesActuales` se calculan con el mismo método que usa el límite al crear, para poder mostrar \"X de Y\" sin un segundo roundtrip.\n\n`features` siempre trae las 20 claves de `public.features` con `type='modulo'` (nunca falta una) — el shape exacto es `MeFeaturesResponseDto`, ver el schema de esta respuesta.",
         "operationId": "MeController_getFeatures",
         "parameters": [
           {
@@ -30028,7 +30242,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeFeaturesResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -30439,6 +30660,7 @@
     },
     "/api/v1/cuentas-bancarias": {
       "get": {
+        "description": "Dato de referencia, igual que los métodos de pago — sin gate de `tesoreria` a propósito: lo consumen selectores de banco de pantallas núcleo (Pagos, Cobros, líneas de pago de facturación/Caja, cobro al contado de Compras/Gastos, reembolsos de Notas de Crédito), no solo la administración de Tesorería.",
         "operationId": "CuentasBancariasController_findAll",
         "parameters": [
           {
@@ -30566,7 +30788,7 @@
     },
     "/api/v1/cuentas-bancarias/tipos": {
       "get": {
-        "description": "Opciones reales del Select custom_tipo_cuenta leídas del meta de ERPNext (Cuenta de Ahorro, Cuenta Corriente, Cuenta de Nómina).",
+        "description": "Opciones reales del Select custom_tipo_cuenta leídas del meta de ERPNext (Cuenta de Ahorro, Cuenta Corriente, Cuenta de Nómina). Solo lo usa el formulario de alta/edición de cuenta bancaria (administración de Tesorería) — sí exige `tesoreria`.",
         "operationId": "CuentasBancariasController_getTipos",
         "parameters": [
           {
@@ -30626,6 +30848,7 @@
     },
     "/api/v1/cuentas-bancarias/{id}": {
       "get": {
+        "description": "Mismo criterio que el listado (`GET /cuentas-bancarias`, ver ahí) — sin gate de `tesoreria` a propósito: `CobroDetail` (CxC) y otras pantallas núcleo resuelven acá el detalle de la cuenta bancaria de un cobro/pago puntual, no solo la administración de Tesorería.",
         "operationId": "CuentasBancariasController_findOne",
         "parameters": [
           {
@@ -34783,6 +35006,368 @@
         ]
       }
     },
+    "/api/v1/farmacia/principios-activos": {
+      "get": {
+        "operationId": "PrincipiosActivosController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "soloActivos",
+            "required": false,
+            "in": "query",
+            "description": "Si es true, excluye los deshabilitados (default: los incluye)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "esControlado",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por sustancia controlada",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "incluirConteo",
+            "required": false,
+            "in": "query",
+            "description": "Incluye `cantidadArticulos` por principio — cuesta una consulta agregada extra sobre la child table, por eso no es el default (ver §11.1 del plan).",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar principios activos del catálogo maestro",
+        "tags": [
+          "Farmacia — Principios Activos"
+        ]
+      },
+      "post": {
+        "operationId": "PrincipiosActivosController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePrincipioActivoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear un principio activo",
+        "tags": [
+          "Farmacia — Principios Activos"
+        ]
+      }
+    },
+    "/api/v1/farmacia/principios-activos/{id}": {
+      "get": {
+        "description": "Incluye `items[]` — los artículos que lo declaran en su composición (máx 100).",
+        "operationId": "PrincipiosActivosController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un principio activo",
+        "tags": [
+          "Farmacia — Principios Activos"
+        ]
+      },
+      "put": {
+        "operationId": "PrincipiosActivosController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePrincipioActivoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar un principio activo (incluye renombrar)",
+        "tags": [
+          "Farmacia — Principios Activos"
+        ]
+      },
+      "delete": {
+        "description": "Nunca se borra — se marca disabled=1. No bloquea si tiene artículos asociados.",
+        "operationId": "PrincipiosActivosController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deshabilitar un principio activo",
+        "tags": [
+          "Farmacia — Principios Activos"
+        ]
+      }
+    },
+    "/api/v1/farmacia/principios-activos/{id}/fusionar": {
+      "post": {
+        "description": "Reapunta todas las filas de composición que usan `:id` hacia `destino`, deshabilita `:id` y recalcula las firmas de los artículos afectados.",
+        "operationId": "PrincipiosActivosController_fusionar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FusionarPrincipioActivoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fusionar un principio activo duplicado en otro",
+        "tags": [
+          "Farmacia — Principios Activos"
+        ]
+      }
+    },
+    "/api/v1/farmacia/busqueda-asistida": {
+      "get": {
+        "description": "`coincidencias` es la búsqueda textual de SIEMPRE (mismo shape y orden que GET /catalog/items?search=). `equivalentes` es un bloque APARTE — nunca se mezcla con lo de arriba ni lo reordena.",
+        "operationId": "BusquedaAsistidaController_buscar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "Texto de búsqueda — el mismo criterio que GET /catalog/items?search=",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 50,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Restringe el stock consultado a los almacenes de esta sucursal",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "soloConStock",
+            "required": false,
+            "in": "query",
+            "description": "Excluye equivalentes sin existencia en el ámbito consultado",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Búsqueda de catálogo + equivalentes por composición",
+        "tags": [
+          "Farmacia — Búsqueda Asistida"
+        ]
+      }
+    },
     "/api/v1/apertura/preflight": {
       "get": {
         "description": "Verifica si el tenant está listo para cargar facturas de apertura (Ejercicios Fiscales de los años a migrar, cuenta contable de apertura, series de numeración). No escribe nada.",
@@ -36671,11 +37256,9 @@
             "example": 60.5,
             "description": "Tasa de cambio explícita (moneda de la factura → moneda de la compañía). Solo aplica si `currency` es distinta a la de la compañía. Si se omite, ERPNext la resuelve contra las tasas cargadas en /monedas/tasas — si no hay ninguna, la factura falla al crearse."
           },
-          "postingDate": {
-            "type": "string"
-          },
           "dueDate": {
-            "type": "string"
+            "type": "string",
+            "description": "Fecha de vencimiento del pago. Default: la fecha de creación de la factura (hoy)."
           },
           "ncfType": {
             "type": "string",
@@ -36756,7 +37339,6 @@
           }
         },
         "required": [
-          "postingDate",
           "ncfType",
           "items"
         ]
@@ -36799,11 +37381,9 @@
             "example": 60.5,
             "description": "Tasa de cambio explícita (moneda de la factura → moneda de la compañía). Solo aplica si `currency` es distinta a la de la compañía. Si se omite, ERPNext la resuelve contra las tasas cargadas en /monedas/tasas — si no hay ninguna, la factura falla al crearse."
           },
-          "postingDate": {
-            "type": "string"
-          },
           "dueDate": {
-            "type": "string"
+            "type": "string",
+            "description": "Fecha de vencimiento del pago. Default: la fecha de creación de la factura (hoy)."
           },
           "ncfType": {
             "type": "string",
@@ -36884,7 +37464,6 @@
           }
         },
         "required": [
-          "postingDate",
           "ncfType",
           "items"
         ]
@@ -40273,6 +40852,100 @@
           "relacionId"
         ]
       },
+      "ActiveIngredientRowDto": {
+        "type": "object",
+        "properties": {
+          "activeIngredient": {
+            "type": "string",
+            "description": "name (id) del Active Ingredient — ver GET /farmacia/principios-activos",
+            "example": "Acetaminofén"
+          },
+          "strengthValue": {
+            "type": "number",
+            "description": "Cantidad de este principio (opcional — se puede declarar solo QUÉ contiene sin decir cuánto). Ambas, cantidad y porcentaje, se representan igual: un valor + una unidad.",
+            "example": 500
+          },
+          "strengthUom": {
+            "type": "string",
+            "enum": [
+              "mg",
+              "g",
+              "mcg",
+              "UI",
+              "mL",
+              "%",
+              "mEq"
+            ],
+            "example": "mg"
+          },
+          "perValue": {
+            "type": "number",
+            "description": "El denominador: \"500 mg POR 1 tableta\". Default 1.",
+            "default": 1
+          },
+          "perUom": {
+            "type": "string",
+            "enum": [
+              "Unidad",
+              "mL",
+              "g",
+              "Aplicación",
+              "Dosis"
+            ],
+            "default": "Unidad"
+          },
+          "isPrimary": {
+            "type": "boolean",
+            "description": "En productos combinados, marca cuál principio define el producto. A lo sumo uno por artículo (validado por el servidor).",
+            "default": false
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "activeIngredient"
+        ]
+      },
+      "ComposicionDto": {
+        "type": "object",
+        "properties": {
+          "esMedicamento": {
+            "type": "boolean",
+            "description": "Interruptor maestro. Con false (default en ERPNext), el resto del bloque se ignora y el motor de recomendación ignora el artículo."
+          },
+          "formaFarmaceutica": {
+            "type": "string",
+            "description": "name (id) de un Dosage Form — ver docs del catálogo de formas farmacéuticas.",
+            "example": "Tableta"
+          },
+          "viaAdministracion": {
+            "type": "string",
+            "enum": [
+              "Oral",
+              "Tópica",
+              "Oftálmica",
+              "Ótica",
+              "Nasal",
+              "Rectal",
+              "Vaginal",
+              "Inhalatoria",
+              "Intravenosa",
+              "Intramuscular",
+              "Subcutánea"
+            ]
+          },
+          "principiosActivos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActiveIngredientRowDto"
+            }
+          }
+        },
+        "required": [
+          "esMedicamento"
+        ]
+      },
       "CreateItemDto": {
         "type": "object",
         "properties": {
@@ -40483,6 +41156,14 @@
             "type": "boolean",
             "default": false,
             "description": "Solo aplica con `trackingType` distinto de \"none\". Si está activo, el serial/lote de este artículo se asigna al vender/despachar (en POST /despachos/confirmaciones/:id/confirmar, cuando Facturacion Config.pedido_requiere_confirmacion_despacho está activo) en vez de dejarse para la asignación manual/automática ya existente al facturar. No reemplaza `requiereSerialLoteCompra` (Facturacion Config) — ese sigue controlando la compra; este campo es sobre CUÁNDO, del lado de la venta, se pide el serial/lote."
+          },
+          "composicion": {
+            "description": "Composición farmacéutica (principios activos) — vertical Farmacia. OPCIONAL de verdad: omitirlo deja el artículo exactamente igual que hoy. Ver docs/plans/PLAN_COMPOSICION_MEDICAMENTOS_RECOMENDACION.md §11.2. Solo tiene efecto en tenants con el vertical Farmacia habilitado (custom fields inertes en cualquier otro caso).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ComposicionDto"
+              }
+            ]
           }
         },
         "required": [
@@ -40696,6 +41377,14 @@
             "type": "boolean",
             "default": false,
             "description": "Solo aplica con `trackingType` distinto de \"none\". Si está activo, el serial/lote de este artículo se asigna al vender/despachar (en POST /despachos/confirmaciones/:id/confirmar, cuando Facturacion Config.pedido_requiere_confirmacion_despacho está activo) en vez de dejarse para la asignación manual/automática ya existente al facturar. No reemplaza `requiereSerialLoteCompra` (Facturacion Config) — ese sigue controlando la compra; este campo es sobre CUÁNDO, del lado de la venta, se pide el serial/lote."
+          },
+          "composicion": {
+            "description": "Composición farmacéutica (principios activos) — vertical Farmacia. OPCIONAL de verdad: omitirlo deja el artículo exactamente igual que hoy. Ver docs/plans/PLAN_COMPOSICION_MEDICAMENTOS_RECOMENDACION.md §11.2. Solo tiene efecto en tenants con el vertical Farmacia habilitado (custom fields inertes en cualquier otro caso).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ComposicionDto"
+              }
+            ]
           }
         }
       },
@@ -42511,10 +43200,6 @@
             "example": "Av. Independencia 45, Santo Domingo",
             "description": "Dirección de la persona cuando la cotización es para alguien sin registrar como cliente. Solo tiene efecto junto con `clienteOcasionalNombre`."
           },
-          "date": {
-            "type": "string",
-            "example": "2025-01-15"
-          },
           "currency": {
             "type": "string",
             "enum": [
@@ -42533,7 +43218,7 @@
           "validTill": {
             "type": "string",
             "example": "2025-01-31",
-            "description": "Válida hasta. Default: date + 15 días"
+            "description": "Válida hasta. Default: fecha de creación (hoy) + 15 días."
           },
           "items": {
             "type": "array",
@@ -42564,7 +43249,6 @@
           }
         },
         "required": [
-          "date",
           "items"
         ]
       },
@@ -43048,10 +43732,6 @@
             "type": "string",
             "example": "Av. Independencia 45, Santo Domingo",
             "description": "Dirección de la persona cuando el pedido es para alguien sin registrar como cliente. Solo tiene efecto junto con `clienteOcasionalNombre`."
-          },
-          "transactionDate": {
-            "type": "string",
-            "example": "2025-01-15"
           },
           "deliveryDate": {
             "type": "string",
@@ -44554,6 +45234,149 @@
         "required": [
           "doctype",
           "role"
+        ]
+      },
+      "FeaturesMapDto": {
+        "type": "object",
+        "properties": {
+          "compras": {
+            "type": "boolean"
+          },
+          "comprasOrdenes": {
+            "type": "boolean"
+          },
+          "comprasSolicitudes": {
+            "type": "boolean"
+          },
+          "devolucionesCompras": {
+            "type": "boolean"
+          },
+          "gastos": {
+            "type": "boolean"
+          },
+          "proveedores": {
+            "type": "boolean"
+          },
+          "caja": {
+            "type": "boolean"
+          },
+          "contabilidad": {
+            "type": "boolean"
+          },
+          "cuentasPorCobrar": {
+            "type": "boolean"
+          },
+          "cuentasPorPagar": {
+            "type": "boolean"
+          },
+          "tesoreria": {
+            "type": "boolean"
+          },
+          "inventario": {
+            "type": "boolean"
+          },
+          "servicios": {
+            "type": "boolean",
+            "description": "Reservada — el módulo no existe todavía, siempre false."
+          },
+          "relacionesComerciales": {
+            "type": "boolean"
+          },
+          "cotizaciones": {
+            "type": "boolean"
+          },
+          "despacho": {
+            "type": "boolean"
+          },
+          "devoluciones": {
+            "type": "boolean"
+          },
+          "notasCredito": {
+            "type": "boolean"
+          },
+          "notasDebito": {
+            "type": "boolean"
+          },
+          "pedidos": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "compras",
+          "comprasOrdenes",
+          "comprasSolicitudes",
+          "devolucionesCompras",
+          "gastos",
+          "proveedores",
+          "caja",
+          "contabilidad",
+          "cuentasPorCobrar",
+          "cuentasPorPagar",
+          "tesoreria",
+          "inventario",
+          "servicios",
+          "relacionesComerciales",
+          "cotizaciones",
+          "despacho",
+          "devoluciones",
+          "notasCredito",
+          "notasDebito",
+          "pedidos"
+        ]
+      },
+      "LimitesFeaturesDto": {
+        "type": "object",
+        "properties": {
+          "maxUsuarios": {
+            "type": "number",
+            "nullable": true,
+            "description": "null = sin límite (plan ilimitado o tenant legado)."
+          },
+          "maxSucursales": {
+            "type": "number",
+            "nullable": true,
+            "description": "null = sin límite."
+          },
+          "usuariosActuales": {
+            "type": "number"
+          },
+          "sucursalesActuales": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "maxUsuarios",
+          "maxSucursales",
+          "usuariosActuales",
+          "sucursalesActuales"
+        ]
+      },
+      "MeFeaturesResponseDto": {
+        "type": "object",
+        "properties": {
+          "features": {
+            "$ref": "#/components/schemas/FeaturesMapDto"
+          },
+          "reportesHabilitados": {
+            "description": "Claves de `public.features` con `type='reporte'` que están encendidas para este tenant — un reporte ausente acá está apagado, no hay booleano por reporte.",
+            "example": [
+              "ventas_por_periodo",
+              "top_productos",
+              "stock_valorizado"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "limites": {
+            "$ref": "#/components/schemas/LimitesFeaturesDto"
+          }
+        },
+        "required": [
+          "features",
+          "reportesHabilitados",
+          "limites"
         ]
       },
       "UpdateMyProfileDto": {
@@ -46103,6 +46926,80 @@
             }
           }
         }
+      },
+      "CreatePrincipioActivoDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "example": "Acetaminofén"
+          },
+          "sinonimos": {
+            "example": [
+              "Paracetamol"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "codigoAtc": {
+            "type": "string",
+            "example": "N02BE01"
+          },
+          "esControlado": {
+            "type": "boolean",
+            "default": false
+          },
+          "descripcion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre"
+        ]
+      },
+      "UpdatePrincipioActivoDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "example": "Acetaminofén"
+          },
+          "sinonimos": {
+            "example": [
+              "Paracetamol"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "codigoAtc": {
+            "type": "string",
+            "example": "N02BE01"
+          },
+          "esControlado": {
+            "type": "boolean",
+            "default": false
+          },
+          "descripcion": {
+            "type": "string"
+          }
+        }
+      },
+      "FusionarPrincipioActivoDto": {
+        "type": "object",
+        "properties": {
+          "destino": {
+            "type": "string",
+            "description": "name (id) del Active Ingredient que absorbe al que se está fusionando",
+            "example": "Acetaminofén"
+          }
+        },
+        "required": [
+          "destino"
+        ]
       },
       "PrepararAperturaDto": {
         "type": "object",

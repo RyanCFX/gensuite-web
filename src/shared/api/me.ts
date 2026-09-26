@@ -1,7 +1,7 @@
 import { client, unwrap } from './client'
 import { ENDPOINTS } from './endpoints'
 import type {
-  DocumentPermissions, MePermissions, MeProfile, PatchMeProfileDto, ChangeMyPasswordDto,
+  DocumentPermissions, MeFeatures, MePermissions, MeProfile, PatchMeProfileDto, ChangeMyPasswordDto,
   MfaFactor, TotpEnrollResult, TotpConfirmDto, TotpConfirmResult, LinkedIdentity,
 } from './types'
 
@@ -36,6 +36,53 @@ export async function getMePermissionsForDoc(doctype: string, name: string): Pro
     name: typeof d.name === 'string' ? d.name : name,
     permisos: d.permisos && typeof d.permisos === 'object' ? (d.permisos as DocumentPermissions['permisos']) : {},
   }
+}
+
+// ─── Features por tenant — docs/tasks/80_features_tenant_discriminacion_ui.md §3 ─────────
+// `GET /me/features` tampoco tiene JSON Schema en openapi.json (solo prosa en la descripción
+// del endpoint) — se normaliza defensivamente igual que los permisos. Garantías que SÍ se
+// asumen (las da el backend): `features` trae booleanos por clave, `reportesHabilitados` es un
+// array de claves encendidas, `limites` trae contadores ya calculados.
+
+const FEATURE_KEYS = [
+  'compras', 'comprasOrdenes', 'comprasSolicitudes', 'devolucionesCompras', 'gastos',
+  'proveedores', 'caja', 'contabilidad', 'cuentasPorCobrar', 'cuentasPorPagar', 'tesoreria',
+  'inventario', 'servicios', 'relacionesComerciales', 'cotizaciones', 'despacho',
+  'devoluciones', 'notasCredito', 'notasDebito', 'pedidos',
+] as const
+
+function normalizeMeFeatures(raw: unknown): MeFeatures {
+  const d = (raw ?? {}) as Record<string, unknown>
+  const rawFeatures = (d.features ?? {}) as Record<string, unknown>
+  const features = {} as MeFeatures['features']
+  for (const key of FEATURE_KEYS) {
+    // El backend garantiza booleano siempre — cualquier otra cosa se trata como apagado
+    // (fail-closed en esta capa; ProtectedRoute hace fail-open mientras carga).
+    features[key] = rawFeatures[key] === true
+  }
+  const reportes = Array.isArray(d.reportesHabilitados)
+    ? (d.reportesHabilitados as unknown[]).filter((r): r is MeFeatures['reportesHabilitados'][number] => typeof r === 'string')
+    : []
+  const rawLimites = (d.limites ?? {}) as Record<string, unknown>
+  const numOrNull = (v: unknown): number | null =>
+    typeof v === 'number' && Number.isFinite(v) ? v : null
+  const numOrZero = (v: unknown): number =>
+    typeof v === 'number' && Number.isFinite(v) ? v : 0
+  return {
+    features,
+    reportesHabilitados: reportes,
+    limites: {
+      maxUsuarios: numOrNull(rawLimites.maxUsuarios),
+      maxSucursales: numOrNull(rawLimites.maxSucursales),
+      usuariosActuales: numOrZero(rawLimites.usuariosActuales),
+      sucursalesActuales: numOrZero(rawLimites.sucursalesActuales),
+    },
+  }
+}
+
+export async function getMeFeatures(): Promise<MeFeatures> {
+  const res = await client.get<{ success: true; data: unknown }>(ENDPOINTS.me.features)
+  return normalizeMeFeatures(res.data.data)
 }
 
 // ─── Perfil propio — docs/tasks/PROMPT_IDENTIDAD_GLOBAL_FRONTEND.md §7.1 ────────────────────
