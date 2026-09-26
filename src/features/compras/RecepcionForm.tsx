@@ -13,13 +13,14 @@ import { listSucursales } from '@/shared/api/sucursales'
 import type { CreatePurchaseReceiptDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { Plus, Trash2, Save, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Save, Loader2, Info } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
-import type { Item } from '@/shared/api/types'
+import type { Item, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
+import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
@@ -52,10 +53,51 @@ interface ItemRow {
   /** Enlace manual (caso excepcional) a una línea de Orden de Compra — ver SeleccionarOrdenCompraModal. */
   ordenCompra?: string
   ordenCompraItem?: string
+  /** Combinación de dimensión de inventario elegida para esta línea (docs/tasks/
+   *  PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §5). */
+  dimensiones?: DimensionesLinea
+  /** Dimensiones que el artículo de esta línea declara — ver misma nota en CompraForm.tsx. */
+  itemDimensionesDeclaradas?: ItemDimensionDeclarada[]
 }
 
 function emptyItem(defaultWh?: string): ItemRow {
   return { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, warehouse: defaultWh ?? '', uom: 'Nos', trackingType: 'none', serials: [], batches: [] }
+}
+
+/** `true` si dos combinaciones de dimensión son exactamente iguales — ver misma función en
+ *  CompraForm.tsx (§5.1). */
+function dimensionesIguales(a?: DimensionesLinea, b?: DimensionesLinea): boolean {
+  const ea = Object.entries(a ?? {})
+  const eb = Object.entries(b ?? {})
+  if (ea.length !== eb.length) return false
+  return ea.every(([k, v]) => (b ?? {})[k] === v)
+}
+
+/** Fusiona líneas del mismo artículo con la misma combinación de dimensión exacta en una sola,
+ *  sumando la cantidad (§5.1) — justo antes de someter, sin tocar el estado de la UI. */
+function mergeIdenticalDimensionLines(rows: ItemRow[]): ItemRow[] {
+  const result: ItemRow[] = []
+  for (const row of rows) {
+    const tieneCombinacion = row.dimensiones && Object.keys(row.dimensiones).length > 0
+    const fusionable = tieneCombinacion
+      && row.trackingType === 'none'
+      && !row.ordenCompra
+    if (fusionable) {
+      const existente = result.find((r) =>
+        r.itemCode === row.itemCode
+        && r.warehouse === row.warehouse
+        && r.uom === row.uom
+        && r.rate === row.rate
+        && dimensionesIguales(r.dimensiones, row.dimensiones),
+      )
+      if (existente) {
+        existente.qty += row.qty
+        continue
+      }
+    }
+    result.push({ ...row })
+  }
+  return result
 }
 
 function onVariantConfirm(
@@ -122,7 +164,7 @@ function removeBatch(idx: number, batchIdx: number, setItems: React.Dispatch<Rea
 // ─── SerialBatchRow Sub-component ────────────────────────────────────────
 
 function SerialBatchRow({
-  item, idx, items, setItems, warehouses, warehouseOptions, onWarehouseSearch, updateItem, selectCatalogItem, clearCatalogItem, setVariantTemplate,
+  item, idx, items, setItems, warehouses, warehouseOptions, onWarehouseSearch, updateItem, updateDimensiones, selectCatalogItem, clearCatalogItem, setVariantTemplate,
 }: {
   item: ItemRow
   idx: number
@@ -132,6 +174,7 @@ function SerialBatchRow({
   warehouseOptions: SearchSelectOption[]
   onWarehouseSearch: (q: string) => void
   updateItem: (idx: number, field: keyof ItemRow, value: string | number) => void
+  updateDimensiones: (idx: number, value: DimensionesLinea) => void
   selectCatalogItem: (idx: number, catalogItem: Item) => void
   clearCatalogItem: (idx: number) => void
   setVariantTemplate: (t: Item | null) => void
@@ -241,6 +284,16 @@ function SerialBatchRow({
             itemCode={item.itemCode || undefined}
           />
         </td>
+        <td>
+          {item.itemDimensionesDeclaradas && item.itemDimensionesDeclaradas.length > 0 && (
+            <CombinacionDimensionSelector
+              itemDimensiones={item.itemDimensionesDeclaradas}
+              value={item.dimensiones ?? {}}
+              onChange={(v) => updateDimensiones(idx, v)}
+              compact
+            />
+          )}
+        </td>
         <td style={{ textAlign: 'center' }}>
           <button
             type="button"
@@ -257,7 +310,7 @@ function SerialBatchRow({
       {/* Tracking row */}
       {(item.trackingType === 'serial' || item.trackingType === 'batch') && (
         <tr className="tracking-row">
-          <td colSpan={7} style={{ padding: '4px 8px 8px' }}>
+          <td colSpan={8} style={{ padding: '4px 8px 8px' }}>
             {item.lineError && (
               <div style={{ color: 'red', fontSize: 12, marginBottom: 4 }}>{item.lineError}</div>
             )}
@@ -573,6 +626,23 @@ export default function RecepcionForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receiptData])
 
+  // GET /compras/purchase-receipt/:id tampoco ecoa la combinación elegida por línea (§10.2) —
+  // ver misma nota en CompraForm.tsx.
+  useEffect(() => {
+    if (!receiptData) return
+    let cancelled = false
+    Promise.all(receiptData.items.map((ri) => getItem(ri.itemCode).catch(() => null))).then((catalogItems) => {
+      if (cancelled) return
+      setItems((prev) => prev.map((row, idx) => {
+        const catalogItem = catalogItems[idx]
+        return catalogItem?.usaDimensiones
+          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones }
+          : row
+      }))
+    })
+    return () => { cancelled = true }
+  }, [receiptData])
+
   const isDirty = useDirtyCheck({
     supplierId,
     postingDate,
@@ -639,6 +709,11 @@ export default function RecepcionForm() {
 
   const grandTotal = items.reduce((sum, i) => sum + i.qty * i.rate, 0)
 
+  // Ver misma nota en CompraForm.tsx (§10.2, opción (b)).
+  const lineasRequierenReingresoDimension = isEdit && items.some(
+    (i) => (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
+  )
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!supplierId) { toast.error('Selecciona un proveedor'); return }
@@ -687,7 +762,7 @@ export default function RecepcionForm() {
       supplierDeliveryNote: supplierDeliveryNote || undefined,
       branch: branch || undefined,
       department: usaDepartamentos ? (department || undefined) : undefined,
-      items: items.map((i) => ({
+      items: mergeIdenticalDimensionLines(items).map((i) => ({
         itemCode: i.itemCode,
         description: i.description,
         qty: i.qty,
@@ -697,6 +772,9 @@ export default function RecepcionForm() {
         ...(i.serials.length > 0 ? { serials: i.serials } : {}),
         ...(i.batches.length > 0 ? { batches: i.batches } : {}),
         ...(i.ordenCompra && i.ordenCompraItem ? { ordenCompra: i.ordenCompra, ordenCompraItem: i.ordenCompraItem } : {}),
+        // Siempre se reenvía en cada guardado — este endpoint tampoco conserva la combinación de
+        // una línea no tocada en el PUT (§6.2/§10.1).
+        ...(i.dimensiones && Object.keys(i.dimensiones).length > 0 ? { dimensiones: i.dimensiones } : {}),
       })),
     }
     saveMutation.mutate(dto)
@@ -704,6 +782,10 @@ export default function RecepcionForm() {
 
   const updateItem = useCallback((idx: number, field: keyof ItemRow, value: string | number) => {
     setItems((prev) => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row))
+  }, [])
+
+  const updateDimensiones = useCallback((idx: number, value: DimensionesLinea) => {
+    setItems((prev) => prev.map((row, i) => i === idx ? { ...row, dimensiones: value } : row))
   }, [])
 
   const selectCatalogItem = useCallback((idx: number, catalogItem: Item) => {
@@ -722,13 +804,16 @@ export default function RecepcionForm() {
         trackingType,
         serials: [],
         batches: [],
+        // Un artículo nuevo en la fila implica una combinación nueva.
+        itemDimensionesDeclaradas: catalogItem.usaDimensiones ? catalogItem.dimensiones : undefined,
+        dimensiones: undefined,
       }
     }))
   }, [])
 
   const clearCatalogItem = useCallback((idx: number) => {
     setItems((prev) => prev.map((row, i) =>
-      i === idx ? { ...row, itemCode: '', itemLabel: undefined, description: '', rate: 0, trackingType: 'none', serials: [], batches: [] } : row,
+      i === idx ? { ...row, itemCode: '', itemLabel: undefined, description: '', rate: 0, trackingType: 'none', serials: [], batches: [], itemDimensionesDeclaradas: undefined, dimensiones: undefined } : row,
     ))
   }, [])
 
@@ -772,6 +857,7 @@ export default function RecepcionForm() {
         trackingType,
         ordenCompra: line.ordenCompra,
         ordenCompraItem: line.ordenCompraItem,
+        itemDimensionesDeclaradas: catalogItem?.usaDimensiones ? catalogItem.dimensiones : undefined,
       }
     }))
     setItems((prev) => [...prev, emptyItem(defaultWh)])
@@ -798,6 +884,13 @@ export default function RecepcionForm() {
         description="Registra la mercancía recibida — sin datos fiscales, esos se capturan al facturar"
         action={<RecargarButton label="Actualizar" />}
       />
+
+      {lineasRequierenReingresoDimension && (
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
+          <Info size={16} />
+          <span>Esta recepción tiene línea(s) con un artículo que usa combinación de dimensión de inventario, pero el sistema no puede recuperar la combinación con la que se guardaron originalmente. Vuelve a seleccionarla en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -939,6 +1032,7 @@ export default function RecepcionForm() {
                         warehouseOptions={warehouseSelectOptions}
                         onWarehouseSearch={setWarehouseSearch}
                         updateItem={updateItem}
+                        updateDimensiones={updateDimensiones}
                         selectCatalogItem={selectCatalogItem}
                         clearCatalogItem={clearCatalogItem}
                         setVariantTemplate={setVariantTemplate}

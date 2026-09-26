@@ -39,6 +39,11 @@ export interface ItemSelectProps {
   excludeItems?: boolean
   /** Filtra artículos con stock en almacenes de esta sucursal — el item devuelto trae stockByWarehouse */
   branch?: string
+  /** Excluye del listado los artículos que usan dimensiones de inventario (`usaDimensiones: true`) —
+   *  para pickers donde ese tipo de artículo no está soportado (Conteos, Apertura de Inventario,
+   *  Carga Inicial de Inventario, componentes de Combo). Filtro client-side sobre el resultado de
+   *  `listItems`; no cambia el comportamiento por defecto de nadie más. */
+  excludeDimensioned?: boolean
   /** Opt-in, no cambia el comportamiento por defecto de nadie más: se llama con el texto tecleado
    *  cada vez que cambia, para que un panel externo (ej. equivalentes por composición — vertical
    *  Farmacia, docs/tasks/PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §9) pueda reaccionar a la
@@ -62,6 +67,7 @@ export function ItemSelect({
   onSelectCuentaPorPagar,
   excludeItems,
   branch,
+  excludeDimensioned,
   onQueryChange,
 }: ItemSelectProps) {
   const [query, setQuery] = useState('')
@@ -102,6 +108,10 @@ export function ItemSelect({
   })
   const activeCuentasPorPagar = (cuentasPorPagarData?.items ?? []).filter((c) => !c.disabled)
 
+  // Artículos elegibles para este picker: si `excludeDimensioned` está activo, se filtran del
+  // lado del cliente los que declaran dimensiones de inventario (no soportados en esta pantalla).
+  const visibleItems = (data?.items ?? []).filter((item) => !excludeDimensioned || !item.usaDimensiones)
+
   // Lector de código de barras: al escribir un número y presionar Enter antes de que
   // el debounce traiga resultados, se busca directamente por código de barras.
   const handleEnterWithoutMatch = async (typed: string) => {
@@ -120,13 +130,13 @@ export function ItemSelect({
     }
     const res = await listItems(params)
     const item = res.items?.[0]
-    if (!item) { toast.error(`Código de barras no encontrado: ${typed}`); return }
+    if (!item || (excludeDimensioned && item.usaDimensiones)) { toast.error(`Código de barras no encontrado: ${typed}`); return }
     if (item.hasVariants && onVariantSelect) { onVariantSelect(item); return }
     onSelect(item)
   }
 
   const options: SearchSelectOption[] = [
-    ...(excludeItems ? [] : (data?.items ?? [])).map((item) => {
+    ...(excludeItems ? [] : visibleItems).map((item) => {
       const parts: string[] = []
       if (item.id !== item.itemName) parts.push(item.id)
       if (item.autoDiscount) {
@@ -160,7 +170,7 @@ export function ItemSelect({
       selectedLabel={selectedLabel}
       onChange={(val) => {
         if (!val) { onClear(); return }
-        const found = excludeItems ? undefined : data?.items.find((i) => i.id === val)
+        const found = excludeItems ? undefined : visibleItems.find((i) => i.id === val)
         if (found) {
           if (found.hasVariants && onVariantSelect) { onVariantSelect(found); return }
           onSelect(found)

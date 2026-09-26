@@ -11639,6 +11639,119 @@
         ]
       }
     },
+    "/api/v1/inventory/items/{itemCode}/stock-por-dimension": {
+      "get": {
+        "operationId": "InventoryController_stockPorDimension",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse",
+            "required": false,
+            "in": "query",
+            "description": "Filtra a un almacén específico.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incluirSinEspecificar",
+            "required": false,
+            "in": "query",
+            "description": "Incluir la fila \"sin especificar\" (SLE de esta combinación sin todos los valores) en el desglose. Con false, esas unidades solo se ven reflejadas en la diferencia total−filas.",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Existencias de un artículo desglosadas por combinación de dimensión de inventario (docs/plans/PLAN_INVENTORY_DIMENSIONS.md §6.3). Los filtros por dimensión se pasan como query params dinámicos (ej. ?marca=MARCA-HONDA) — no aparecen en el schema porque el código de cada dimensión es propio de cada tenant.",
+        "tags": [
+          "Inventario"
+        ]
+      }
+    },
+    "/api/v1/inventory/stock-por-dimension/verificar": {
+      "post": {
+        "operationId": "InventoryController_verificarDisponibilidad",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificarDisponibilidadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Avisa qué combinaciones no alcanzan ANTES de someter un documento — agrega por combinación (POS/facturación). ERPNext sigue siendo la autoridad final al someter.",
+        "tags": [
+          "Inventario"
+        ]
+      }
+    },
     "/api/v1/inventory/counts": {
       "get": {
         "operationId": "CountsController_findAll",
@@ -12942,6 +13055,368 @@
         "summary": "Cancelar una carga inicial ya sometida",
         "tags": [
           "Inventario — Carga Inicial"
+        ]
+      }
+    },
+    "/api/v1/inventory/ajustes-dimension": {
+      "post": {
+        "operationId": "AjustesDimensionController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAjusteDimensionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajusta el saldo de UNA combinación de dimensión de inventario (docs/plans/PLAN_INVENTORY_DIMENSIONS.md §7.4) — Stock Reconciliation no sirve con dimensiones. Somete un Stock Entry Material Receipt/Issue calculando la diferencia contra el saldo actual de esa combinación puntual.",
+        "tags": [
+          "Inventario"
+        ]
+      }
+    },
+    "/api/v1/inventory/reclasificaciones": {
+      "post": {
+        "operationId": "ReclasificacionesController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReclasificacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reclasifica una combinación de dimensión de inventario a otra, dentro del mismo almacén, sin tocar valuación (docs/plans/PLAN_INVENTORY_DIMENSIONS.md §7.3).",
+        "tags": [
+          "Inventario"
+        ]
+      }
+    },
+    "/api/v1/catalog/dimensiones-inventario": {
+      "get": {
+        "description": "Incluye cuántos espacios quedan libres: el número de dimensiones tiene un tope por empresa que se fija al darla de alta, porque cada una agrega una columna indexada al libro de inventario.",
+        "operationId": "DimensionesInventarioController_listar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar las dimensiones de inventario de la empresa (Marca, Modelo, Año…)",
+        "tags": [
+          "Catálogo — Dimensiones de Inventario"
+        ]
+      },
+      "post": {
+        "description": "Toma uno de los espacios libres de la empresa. Responde 400 si no quedan: ampliarlos es una tarea de mantenimiento programada, no autoservicio.",
+        "operationId": "DimensionesInventarioController_crear",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDimensionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear una dimensión de inventario",
+        "tags": [
+          "Catálogo — Dimensiones de Inventario"
+        ]
+      }
+    },
+    "/api/v1/catalog/dimensiones-inventario/{codigo}": {
+      "put": {
+        "description": "El código y el espacio no se pueden cambiar: son la identidad física de la columna del libro de inventario.",
+        "operationId": "DimensionesInventarioController_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDimensionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambiar la etiqueta o el orden de una dimensión",
+        "tags": [
+          "Catálogo — Dimensiones de Inventario"
+        ]
+      }
+    },
+    "/api/v1/catalog/dimensiones-inventario/{codigo}/toggle": {
+      "post": {
+        "operationId": "DimensionesInventarioController_toggle",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activar o desactivar una dimensión (no hay borrado)",
+        "tags": [
+          "Catálogo — Dimensiones de Inventario"
+        ]
+      }
+    },
+    "/api/v1/catalog/dimensiones-inventario/{codigo}/valores": {
+      "get": {
+        "description": "Con `padre` se obtienen solo los valores que dependen de ese otro valor — es lo que permite los selectores en cascada (elegir Honda y que solo aparezcan modelos Honda).",
+        "operationId": "DimensionesInventarioController_listarValores",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Valores de una dimensión",
+        "tags": [
+          "Catálogo — Dimensiones de Inventario"
+        ]
+      },
+      "post": {
+        "operationId": "DimensionesInventarioController_crearValor",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateValorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Agregar un valor a una dimensión",
+        "tags": [
+          "Catálogo — Dimensiones de Inventario"
+        ]
+      }
+    },
+    "/api/v1/catalog/dimensiones-inventario/{codigo}/valores/{id}": {
+      "put": {
+        "description": "El id del valor no se puede cambiar: queda escrito en cada movimiento del libro de inventario. Para \"renombrar\", cree uno nuevo y dé de baja el viejo.",
+        "operationId": "DimensionesInventarioController_actualizarValor",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateValorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar un valor",
+        "tags": [
+          "Catálogo — Dimensiones de Inventario"
         ]
       }
     },
@@ -37121,6 +37596,17 @@
             "type": "boolean",
             "example": true,
             "description": "Ajuste manual protegido: el recálculo no toca esta línea."
+          },
+          "dimensiones": {
+            "type": "object",
+            "description": "Combinación de dimensión de inventario de esta línea: { \"\u003Ccódigo\u003E\": \"\u003Cid del valor\u003E\" } — ver docs/plans/PLAN_INVENTORY_DIMENSIONS.md. Obligatoria si el artículo declara dimensiones y la factura afecta stock (update_stock=1). Al editar sin mandarla, se conserva la de la línea guardada.",
+            "example": {
+              "marca": "MARCA-HONDA",
+              "anio": "ANIO-2000"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -39003,6 +39489,52 @@
           "postingDate"
         ]
       },
+      "VerificarDisponibilidadLineaDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "example": "PUERTA-VEHICULO"
+          },
+          "warehouse": {
+            "type": "string",
+            "example": "ALM-01"
+          },
+          "dimensiones": {
+            "type": "object",
+            "example": {
+              "marca": "MARCA-HONDA",
+              "anio": "ANIO-2000"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "qty": {
+            "type": "number",
+            "example": 5
+          }
+        },
+        "required": [
+          "itemCode",
+          "warehouse",
+          "qty"
+        ]
+      },
+      "VerificarDisponibilidadDto": {
+        "type": "object",
+        "properties": {
+          "lineas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerificarDisponibilidadLineaDto"
+            }
+          }
+        },
+        "required": [
+          "lineas"
+        ]
+      },
       "CountItemDto": {
         "type": "object",
         "properties": {
@@ -39163,6 +39695,17 @@
             "type": "boolean",
             "default": false,
             "description": "Marca esta como la ubicación principal del artículo en este almacén"
+          },
+          "dimensiones": {
+            "type": "object",
+            "description": "Combinación de dimensión de inventario de este artículo: { \"\u003Ccódigo\u003E\": \"\u003Cid del valor\u003E\" } — obligatoria si el artículo declara dimensiones.",
+            "example": {
+              "marca": "MARCA-HONDA",
+              "anio": "ANIO-2000"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -39207,6 +39750,17 @@
           },
           "notas": {
             "type": "string"
+          },
+          "dimensiones": {
+            "type": "object",
+            "description": "Combinación de dimensión de inventario de este artículo: { \"\u003Ccódigo\u003E\": \"\u003Cid del valor\u003E\" } — obligatoria si el artículo declara dimensiones.",
+            "example": {
+              "marca": "MARCA-HONDA",
+              "anio": "ANIO-2000"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -39317,6 +39871,196 @@
           "postingDate",
           "items"
         ]
+      },
+      "CreateAjusteDimensionDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "example": "PUERTA-VEHICULO"
+          },
+          "warehouse": {
+            "type": "string",
+            "example": "ALM-01"
+          },
+          "dimensiones": {
+            "type": "object",
+            "example": {
+              "marca": "MARCA-HONDA",
+              "anio": "ANIO-2000"
+            },
+            "description": "Combinación exacta a ajustar — TODAS las dimensiones que declara el artículo.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "cantidadFinal": {
+            "type": "number",
+            "example": 7,
+            "description": "Cantidad final deseada de esta combinación (no la diferencia — el BFF la calcula)."
+          },
+          "postingDate": {
+            "type": "string",
+            "description": "Fecha contable. Default: hoy."
+          },
+          "remarks": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string",
+            "description": "Sucursal del documento. Si se omite, se resuelve en cascada (usuario → dimensión por defecto → única sucursal existente), igual que el resto de los módulos de inventario."
+          }
+        },
+        "required": [
+          "itemCode",
+          "warehouse",
+          "dimensiones",
+          "cantidadFinal"
+        ]
+      },
+      "CreateReclasificacionDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "example": "PUERTA-VEHICULO"
+          },
+          "warehouse": {
+            "type": "string",
+            "example": "ALM-01"
+          },
+          "desde": {
+            "type": "object",
+            "example": {
+              "marca": "MARCA-HONDA",
+              "anio": "ANIO-2000"
+            },
+            "description": "Combinación actual (de donde sale) — completa, todas las dimensiones del artículo.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "hacia": {
+            "type": "object",
+            "example": {
+              "marca": "MARCA-HONDA",
+              "anio": "ANIO-2001"
+            },
+            "description": "Combinación nueva (a donde entra) — completa. Debe diferir de \"desde\" en al menos una dimensión.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "qty": {
+            "type": "number",
+            "example": 2
+          },
+          "postingDate": {
+            "type": "string",
+            "description": "Fecha contable. Default: hoy."
+          },
+          "remarks": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemCode",
+          "warehouse",
+          "desde",
+          "hacia",
+          "qty"
+        ]
+      },
+      "CreateDimensionDto": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "example": "marca",
+            "description": "Identificador estable de la dimensión. Se usa como clave en toda la API y NO se puede cambiar después: solo minúsculas sin acentos, números y guión bajo."
+          },
+          "etiqueta": {
+            "type": "string",
+            "example": "Marca",
+            "description": "Lo que ve el usuario. Sí se puede cambiar después."
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "Categorica",
+              "Ordinal"
+            ],
+            "default": "Categorica",
+            "description": "Ordinal habilita rangos desde/hasta en las combinaciones permitidas de un artículo (ej. años)."
+          },
+          "dimensionPadre": {
+            "type": "string",
+            "example": "marca",
+            "description": "Código de la dimensión de la que depende esta. Con esto, \"Civic\" solo puede elegirse junto a \"Honda\", declarado una vez en el catálogo y no artículo por artículo."
+          }
+        },
+        "required": [
+          "codigo",
+          "etiqueta"
+        ]
+      },
+      "UpdateDimensionDto": {
+        "type": "object",
+        "properties": {
+          "etiqueta": {
+            "type": "string",
+            "description": "Solo la etiqueta y el orden se pueden cambiar."
+          },
+          "orden": {
+            "type": "number"
+          }
+        }
+      },
+      "CreateValorDto": {
+        "type": "object",
+        "properties": {
+          "valor": {
+            "type": "string",
+            "example": "Honda"
+          },
+          "id": {
+            "type": "string",
+            "example": "MARCA-HONDA",
+            "description": "Id del valor. Si se omite, se genera desde la dimensión y el valor."
+          },
+          "padre": {
+            "type": "string",
+            "example": "MARCA-HONDA",
+            "description": "Id del valor padre, cuando la dimensión depende de otra (Civic → Honda)."
+          },
+          "ordenNumerico": {
+            "type": "number",
+            "description": "Para dimensiones ordinales: el número con el que se compara en los rangos."
+          }
+        },
+        "required": [
+          "valor"
+        ]
+      },
+      "UpdateValorDto": {
+        "type": "object",
+        "properties": {
+          "valor": {
+            "type": "string"
+          },
+          "padre": {
+            "type": "string"
+          },
+          "ordenNumerico": {
+            "type": "number"
+          },
+          "activo": {
+            "type": "boolean"
+          }
+        }
       },
       "CobrarFacturaDto": {
         "type": "object",
@@ -40491,6 +41235,17 @@
           "ordenCompraItem": {
             "type": "string",
             "description": "name (id) de la fila \"Purchase Order Item\" que esta línea liquida — acompaña a \"ordenCompra\"."
+          },
+          "dimensiones": {
+            "type": "object",
+            "description": "Combinación de dimensión de inventario de esta línea: { \"\u003Ccódigo\u003E\": \"\u003Cid del valor\u003E\" } — ver docs/plans/PLAN_INVENTORY_DIMENSIONS.md. Obligatoria si el artículo declara dimensiones; el hook de ERPNext la exige al someter (afecta stock).",
+            "example": {
+              "marca": "MARCA-HONDA",
+              "anio": "ANIO-2000"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -40946,6 +41701,59 @@
           "esMedicamento"
         ]
       },
+      "DimensionItemDto": {
+        "type": "object",
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "example": "marca",
+            "description": "Código de una dimensión activa de la empresa (GET /catalog/dimensiones-inventario)."
+          },
+          "valoresPermitidos": {
+            "example": [
+              "MARCA-HONDA",
+              "MARCA-TOYOTA"
+            ],
+            "description": "ids de \"Valor Dimension Inventario\" permitidos para este artículo en esta dimensión. Vacío/omitido = cualquier valor activo de la dimensión sirve.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "dimension"
+        ]
+      },
+      "ReglaCombinacionDto": {
+        "type": "object",
+        "properties": {
+          "valores": {
+            "type": "object",
+            "example": {
+              "marca": "MARCA-TOYOTA",
+              "modelo": "MODELO-COROLLA"
+            },
+            "description": "Código de dimensión → id del valor fijo para esta regla. Omitir una dimensión declarada la deja como comodín en esta regla.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "desde": {
+            "type": "number",
+            "example": 1996,
+            "description": "Solo para la dimensión ordinal del artículo."
+          },
+          "hasta": {
+            "type": "number",
+            "example": 2000
+          },
+          "activo": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
       "CreateItemDto": {
         "type": "object",
         "properties": {
@@ -41164,6 +41972,20 @@
                 "$ref": "#/components/schemas/ComposicionDto"
               }
             ]
+          },
+          "dimensiones": {
+            "description": "Dimensiones de inventario que este artículo declara (docs/plans/PLAN_INVENTORY_DIMENSIONS.md §4.2). Solo se puede fijar en la creación o en una edición mientras el artículo no tenga movimientos de inventario — la autoridad final es el hook de `localizacion_rd` (decisión (d): inmutable desde el primer movimiento). Excluyente con hasVariants/variantOf y con trackingType \"batch\". Omitir deja el artículo sin dimensiones (comportamiento de hoy).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DimensionItemDto"
+            }
+          },
+          "reglasCombinacion": {
+            "description": "Reglas de combinación válida para las dimensiones declaradas arriba (§5.3 del plan). Sin efecto si \"dimensiones\" viene vacío.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReglaCombinacionDto"
+            }
           }
         },
         "required": [
@@ -41385,6 +42207,20 @@
                 "$ref": "#/components/schemas/ComposicionDto"
               }
             ]
+          },
+          "dimensiones": {
+            "description": "Dimensiones de inventario que este artículo declara (docs/plans/PLAN_INVENTORY_DIMENSIONS.md §4.2). Solo se puede fijar en la creación o en una edición mientras el artículo no tenga movimientos de inventario — la autoridad final es el hook de `localizacion_rd` (decisión (d): inmutable desde el primer movimiento). Excluyente con hasVariants/variantOf y con trackingType \"batch\". Omitir deja el artículo sin dimensiones (comportamiento de hoy).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DimensionItemDto"
+            }
+          },
+          "reglasCombinacion": {
+            "description": "Reglas de combinación válida para las dimensiones declaradas arriba (§5.3 del plan). Sin efecto si \"dimensiones\" viene vacío.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReglaCombinacionDto"
+            }
           }
         }
       },
@@ -42410,7 +43246,12 @@
         "properties": {
           "itemCode": {
             "type": "string",
-            "example": "ITEM-001"
+            "example": "ITEM-001",
+            "description": "Se acepta como identificador solo si es único en la factura original — si el mismo artículo aparece en más de una línea (ej. dos combinaciones distintas de dimensión), use \"lineaOriginal\" en su lugar o la devolución responde 400 por ambigüedad."
+          },
+          "lineaOriginal": {
+            "type": "string",
+            "description": "name (id) de la fila \"Purchase Invoice Item\" de la factura original que se devuelve — identifica la LÍNEA, no el artículo. Obligatorio si itemCode aparece en más de una línea de la factura original (ej. el mismo artículo con dos combinaciones de dimensión de inventario distintas). La combinación de dimensión se copia SIEMPRE de esta línea; no se pide de nuevo."
           },
           "qty": {
             "type": "number",
@@ -43169,6 +44010,17 @@
           "warehouse": {
             "type": "string",
             "description": "Almacén de entrega. Si se omite, se usa el almacén por defecto del usuario."
+          },
+          "dimensiones": {
+            "type": "object",
+            "description": "Combinación de dimensión de inventario de esta línea: { \"\u003Ccódigo\u003E\": \"\u003Cid del valor\u003E\" } — ver docs/plans/PLAN_INVENTORY_DIMENSIONS.md. Viaja homónima al pedido/factura que se genere desde esta cotización.",
+            "example": {
+              "marca": "MARCA-HONDA",
+              "anio": "ANIO-2000"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -43257,7 +44109,12 @@
         "properties": {
           "itemCode": {
             "type": "string",
-            "example": "PROD-001"
+            "example": "PROD-001",
+            "description": "Se acepta como identificador solo si es único en la factura original — si el mismo artículo aparece en más de una línea (ej. dos combinaciones distintas de dimensión de inventario), use \"lineaOriginal\" o la nota de crédito responde 400 por ambigüedad."
+          },
+          "lineaOriginal": {
+            "type": "string",
+            "description": "\"sales_invoice_item\" de la línea de la factura original que se devuelve — identifica la LÍNEA, no el artículo. Obligatorio si itemCode aparece en más de una línea (ej. el mismo artículo con dos combinaciones de dimensión de inventario distintas). La combinación de dimensión de esa línea se conserva automáticamente; no se pide de nuevo."
           },
           "qty": {
             "type": "number",
@@ -43702,6 +44559,17 @@
             "type": "string",
             "example": "Caja x12",
             "description": "UOM de venta para esta línea (debe estar configurada como conversión del artículo, ver `uoms` en GET catalog/items/:id). Si se omite, se usa la UOM de stock del artículo. ERPNext resuelve automáticamente el conversion_factor y el stock_qty (descuento real de inventario)."
+          },
+          "dimensiones": {
+            "type": "object",
+            "description": "Combinación de dimensión de inventario de esta línea: { \"\u003Ccódigo\u003E\": \"\u003Cid del valor\u003E\" } — ver docs/plans/PLAN_INVENTORY_DIMENSIONS.md. Viaja homónima al pedido y de ahí a la factura/despacho que se genere.",
+            "example": {
+              "marca": "MARCA-HONDA",
+              "anio": "ANIO-2000"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -43828,7 +44696,12 @@
         "properties": {
           "itemCode": {
             "type": "string",
-            "example": "PROD-001"
+            "example": "PROD-001",
+            "description": "Se acepta como identificador solo si es único en la factura original — si el mismo artículo aparece en más de una línea (ej. dos combinaciones distintas de dimensión de inventario, o simplemente dos precios distintos), use \"lineaOriginal\" o la devolución responde 400 por ambigüedad."
+          },
+          "lineaOriginal": {
+            "type": "string",
+            "description": "\"sales_invoice_item\" de la línea de la factura original que se devuelve — identifica la LÍNEA, no el artículo (viene como `items[].id` en GET /invoices/:id de la factura original). Obligatorio si itemCode aparece en más de una línea (ej. el mismo artículo con dos combinaciones de dimensión de inventario distintas). La combinación de dimensión de esa línea se conserva automáticamente; no se pide de nuevo. Este endpoint delega en POST /credit-notes internamente, así que sigue exactamente la misma regla de desambiguación que esa nota de crédito."
           },
           "qty": {
             "type": "number",
@@ -43977,6 +44850,17 @@
           "qty": {
             "type": "number",
             "example": 5
+          },
+          "dimensiones": {
+            "type": "object",
+            "description": "Combinación de dimensión de inventario de esta línea: { \"\u003Ccódigo\u003E\": \"\u003Cid del valor\u003E\" } — ver docs/plans/PLAN_INVENTORY_DIMENSIONS.md. Obligatoria si el artículo declara dimensiones. Se escribe igual en ambos lados de la transferencia (nunca cambia una combinación al mover — para eso está POST /inventory/reclasificaciones).",
+            "example": {
+              "marca": "MARCA-HONDA",
+              "anio": "ANIO-2000"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -44300,6 +45184,17 @@
           "ordenCompraItem": {
             "type": "string",
             "description": "name (id) de la fila \"Purchase Order Item\" que esta línea liquida — acompaña a \"ordenCompra\"."
+          },
+          "dimensiones": {
+            "type": "object",
+            "description": "Combinación de dimensión de inventario de esta línea: { \"\u003Ccódigo\u003E\": \"\u003Cid del valor\u003E\" } — ver docs/plans/PLAN_INVENTORY_DIMENSIONS.md.",
+            "example": {
+              "marca": "MARCA-HONDA",
+              "anio": "ANIO-2000"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -44500,6 +45395,17 @@
           "materialRequest": {
             "type": "string",
             "description": "id de la Solicitud de Compra origen de esta línea (acompaña a materialRequestItem)."
+          },
+          "dimensiones": {
+            "type": "object",
+            "description": "Combinación de dimensión de inventario de esta línea: { \"\u003Ccódigo\u003E\": \"\u003Cid del valor\u003E\" } — ver docs/plans/PLAN_INVENTORY_DIMENSIONS.md. Viaja homónima a la recepción/factura que se genere desde esta orden (§7.1 del plan): no hace falta repetirla ahí.",
+            "example": {
+              "marca": "MARCA-HONDA",
+              "anio": "ANIO-2000"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -44627,6 +45533,17 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BatchLineDto"
+            }
+          },
+          "dimensiones": {
+            "type": "object",
+            "description": "Corrige la combinación de dimensión de esta línea al recibirla — sin esto, se hereda la de la orden (ERPNext copia los campos homónimos automáticamente). Solo tiene sentido si la combinación elegida al ordenar estaba equivocada.",
+            "example": {
+              "marca": "MARCA-HONDA",
+              "anio": "ANIO-2000"
+            },
+            "additionalProperties": {
+              "type": "string"
             }
           }
         },
@@ -44959,6 +45876,17 @@
           "rate": {
             "type": "number",
             "description": "Costo/valor de referencia de la línea, informativo — el Delivery Note no es un documento fiscal (eso vive en la Sales Invoice). Default 0 si se omite."
+          },
+          "dimensiones": {
+            "type": "object",
+            "description": "Combinación de dimensión de inventario de esta línea: { \"\u003Ccódigo\u003E\": \"\u003Cid del valor\u003E\" } — ver docs/plans/PLAN_INVENTORY_DIMENSIONS.md. Al editar sin mandarla, se conserva la de la línea guardada.",
+            "example": {
+              "marca": "MARCA-HONDA",
+              "anio": "ANIO-2000"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
         "required": [

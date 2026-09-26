@@ -18,7 +18,9 @@ import { client } from '@/shared/api/client'
 import { listItems, getDefaultPriceTier, getItem } from '@/shared/api/catalog'
 import { listImpuestosVentas, listAlmacenes, getCatalogosFiscales, getStockSettings, getFacturacionConfig } from '@/shared/api/config'
 import { getItemUbicaciones } from '@/shared/api/ubicaciones'
-import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking, ItemStock, MonedaCode } from '@/shared/api/types'
+import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking, ItemStock, MonedaCode, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
+import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
+import { mergeLineasIguales } from '@/shared/lib/mergeLineasIguales'
 import { getTasaVigente } from '@/shared/api/monedas'
 import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingModal'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
@@ -109,6 +111,19 @@ interface LineItem {
   montoPacienteArs?: number
   /** Solo respuesta del servidor. */
   porcientoRealArs?: number
+  // ── Combinación de dimensión de inventario (docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md
+  //    §0/§5/§7.1/§10). Solo aplica cuando el artículo elegido `usaDimensiones` (opt-in, la
+  //    inmensa mayoría del catálogo no lo usa).
+  /** `true` si el artículo de esta línea usa dimensiones — cacheado igual que `_prices`/etc. */
+  _usaDimensiones?: boolean
+  /** Ejes declarados por el artículo (`item.dimensiones`), para armar el selector sin otra llamada. */
+  _itemDimensiones?: ItemDimensionDeclarada[]
+  /** Combinación elegida para esta línea — clave = código de dimensión, valor = id del valor elegido. */
+  dimensiones?: DimensionesLinea
+  /** §10.2: `GET /invoices/:id` no devuelve la combinación de una línea ya guardada. Al hidratar una
+   *  línea existente de un artículo con dimensiones, esto queda en `true` hasta que el usuario
+   *  vuelva a elegir la combinación — bloquea el submit igual que si nunca se hubiera elegido. */
+  _dimensionesPendientesReseleccion?: boolean
 }
 
 // Factura directa (sin despacho) no valida disponibilidad del lado del servidor antes de someter
@@ -866,6 +881,12 @@ export default function InvoiceForm() {
             _prices: cat?.prices,
             _stockByWarehouse: cat?.stockByWarehouse,
             ubicacion: it.ubicacion || undefined,
+            _usaDimensiones: cat?.usaDimensiones,
+            _itemDimensiones: cat?.dimensiones,
+            // §10.2: GET /invoices/:id no trae la combinación de la línea — se deja vacía y se
+            // marca pendiente de reselección en vez de asumir cualquier valor.
+            dimensiones: undefined,
+            _dimensionesPendientesReseleccion: cat?.usaDimensiones ? true : undefined,
             porcientoTeoricoArs: it.porcientoTeoricoArs,
             montoAprobadoArs: it.montoAprobadoArs,
             lineaBloqueadaArs: it.lineaBloqueadaArs,
@@ -988,6 +1009,10 @@ export default function InvoiceForm() {
           componentTracking: undefined,
           ubicacion: undefined,
           ubicacionError: undefined,
+          _usaDimensiones: catalogItem.usaDimensiones,
+          _itemDimensiones: catalogItem.dimensiones,
+          dimensiones: undefined,
+          _dimensionesPendientesReseleccion: undefined,
         }
       })
     })
@@ -995,7 +1020,7 @@ export default function InvoiceForm() {
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', _comboComponents: undefined, componentTracking: undefined, ubicacion: undefined, ubicacionError: undefined })
+    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', _comboComponents: undefined, componentTracking: undefined, ubicacion: undefined, ubicacionError: undefined, _usaDimensiones: undefined, _itemDimensiones: undefined, dimensiones: undefined, _dimensionesPendientesReseleccion: undefined })
   }
 
   function selectBundle(index: number, bundle: Bundle) {
@@ -1037,6 +1062,11 @@ export default function InvoiceForm() {
           componentTracking: undefined,
           ubicacion: undefined,
           ubicacionError: undefined,
+          // Un combo/bundle nunca usa dimensiones (§0: es una cosa o la otra, nunca ambas).
+          _usaDimensiones: undefined,
+          _itemDimensiones: undefined,
+          dimensiones: undefined,
+          _dimensionesPendientesReseleccion: undefined,
         }
       })
     })
@@ -1171,7 +1201,7 @@ export default function InvoiceForm() {
   // ── Cobertura ARS: armado del payload (§3.2/§3.3) ─────────────────────────
   const arsActiva = esFarmacia && arsEnabled
   /** 11 columnas base + las 5 de cobertura ARS — para los `colSpan` de las filas especiales. */
-  const columnCount = (arsActiva ? 16 : 11) - (almacenVentaSucursal ? 1 : 0)
+  const columnCount = (arsActiva ? 17 : 12) - (almacenVentaSucursal ? 1 : 0)
 
   const itemsColumnDefs: { key: string; width: number }[] = [
     { key: 'codigo', width: 100 },
@@ -1285,6 +1315,13 @@ if (esClienteOcasional) {
         toast.error(`Línea ${i + 1}: la cobertura ARS (${formatDOP(item.montoAprobadoArs)}) supera el importe de la línea (${formatDOP(item.amount)})`)
         return
       }
+      // Combinación de dimensión de inventario (§5/§7.1): obligatoria para TODA línea de un
+      // artículo con `usaDimensiones`, incluso una línea hidratada de una edición que todavía no
+      // se volvió a seleccionar (§10.2) — en ese caso `dimensiones` está vacío y esto la atrapa igual.
+      if (item._usaDimensiones && item._itemDimensiones && !combinacionCompleta(item._itemDimensiones, item.dimensiones ?? {})) {
+        toast.error(`Línea ${i + 1}: selecciona la combinación de dimensión completa para ${item.itemLabel ?? item.itemCode} antes de continuar`)
+        return
+      }
     }
 
     if (arsActiva) {
@@ -1307,7 +1344,23 @@ persistInvoice(buildInvoiceDto())
   /** Arma el body de creación/edición desde el estado actual del formulario — usado tanto en el
    *  submit normal como al reintentar con `pinOverride` (override de descuento y de costo). */
   function buildInvoiceDto(): CreateInvoiceDto {
-    const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
+    // §5.1: fusiona líneas del mismo artículo con la MISMA combinación exacta antes de armar el
+    // payload, sumando la cantidad — evita que el servidor devuelva un único error de "stock
+    // insuficiente" sobre la suma sin que el usuario entienda por qué (líneas sin dimensiones o de
+    // artículos que no las usan nunca se fusionan por esta vía, mergeLineasIguales es idempotente
+    // para ellas).
+    const merged = mergeLineasIguales(items.filter((i) => i.itemCode), {
+      getItemCode: (r) => r.itemCode,
+      getDimensiones: (r) => r.dimensiones,
+      sumQty: (base, extra) => {
+        const qty = base.qty + extra.qty
+        const amount = base.discountMode === 'amount'
+          ? calcAmount(qty, base.rate, 0, base.discountAmount)
+          : calcAmount(qty, base.rate, base.discountPct)
+        return { ...base, qty, amount }
+      },
+    })
+    const itemsDto = merged.map((i) => ({
       itemCode: i.itemCode,
       description: i.description,
       qty: i.qty,
@@ -1320,6 +1373,9 @@ persistInvoice(buildInvoiceDto())
       warehouse: i.warehouse || undefined,
       ubicacion: i.ubicacion || undefined,
       componentTracking: i.componentTracking,
+      // ⚠️ §0.4/§7.1/§10.1: se reenvía SIEMPRE que la línea la tenga, en cada creación y en cada
+      // PUT de edición — nunca depender de la conservación heurística (frágil) del backend.
+      ...(i.dimensiones && Object.keys(i.dimensiones).length > 0 ? { dimensiones: i.dimensiones } : {}),
       ...arsLineaDto(i),
     }))
 
@@ -1705,6 +1761,10 @@ persistInvoice(buildInvoiceDto())
                     Ubicación
                     <span className="col-resize-handle" onMouseDown={startResize('ubicacion')} />
                   </th>
+                  <th>
+                    Combinación
+                    <span className="col-resize-handle" onMouseDown={startResize('combination')} />
+                  </th>
                   {arsActiva && (
                     <>
                       <th style={{ textAlign: 'right' }} title="Peso de esta línea en el reparto automático de la cobertura. Vacío en todas = partes iguales.">
@@ -1932,6 +1992,25 @@ persistInvoice(buildInvoiceDto())
                             error={item.ubicacionError}
                             onChange={(val) => updateItem(index, { ubicacion: val || undefined, ubicacionError: undefined })}
                           />
+                        ) : (
+                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                        )}
+                      </td>
+                      <td>
+                        {item.itemCode && item._usaDimensiones && item._itemDimensiones ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <CombinacionDimensionSelector
+                              itemDimensiones={item._itemDimensiones}
+                              value={item.dimensiones ?? {}}
+                              onChange={(next) => updateItem(index, { dimensiones: next, _dimensionesPendientesReseleccion: undefined })}
+                              compact
+                            />
+                            {item._dimensionesPendientesReseleccion && (
+                              <span style={{ fontSize: 11, color: 'var(--color-warning)', display: 'block', whiteSpace: 'normal', maxWidth: 160 }}>
+                                Esta línea usa combinación de dimensión — vuelva a seleccionarla antes de guardar
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                         )}

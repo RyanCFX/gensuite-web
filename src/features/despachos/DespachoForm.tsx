@@ -11,7 +11,7 @@ import { listCustomers } from '@/shared/api/customers'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listWarehouses } from '@/shared/api/inventory'
 import { getFacturacionConfig } from '@/shared/api/config'
-import type { Item, DespachoItemDto, ApiError } from '@/shared/api/types'
+import type { Item, DespachoItemDto, ApiError, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { formatStockInsufficientMessage } from '@/lib/stockAlerts'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -20,6 +20,8 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
+import { mergeLineasIguales } from '@/shared/lib/mergeLineasIguales'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 interface ItemRow {
@@ -27,10 +29,15 @@ interface ItemRow {
   itemLabel: string
   qty: number
   warehouse: string
+  // Declaración de dimensiones del artículo elegido (§4.2) — determina si mostramos el selector
+  // de combinación y si es obligatoria antes de someter (docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §0.2).
+  usaDimensiones: boolean
+  itemDimensiones: ItemDimensionDeclarada[]
+  dimensiones: DimensionesLinea
 }
 
 function emptyRow(): ItemRow {
-  return { itemCode: '', itemLabel: '', qty: 1, warehouse: '' }
+  return { itemCode: '', itemLabel: '', qty: 1, warehouse: '', usaDimensiones: false, itemDimensiones: [], dimensiones: {} }
 }
 
 export default function DespachoForm() {
@@ -104,7 +111,16 @@ export default function DespachoForm() {
     let wasLastRow = false
     setItems((prev) => {
       wasLastRow = idx === prev.length - 1
-      return prev.map((r, i) => (i === idx ? { ...r, itemCode: item.id, itemLabel: item.itemName } : r))
+      return prev.map((r, i) => (i === idx
+        ? {
+            ...r,
+            itemCode: item.id,
+            itemLabel: item.itemName,
+            usaDimensiones: !!item.usaDimensiones,
+            itemDimensiones: item.dimensiones ?? [],
+            dimensiones: {},
+          }
+        : r))
     })
     if (wasLastRow) setItems((prev) => [...prev, emptyRow()])
   }
@@ -117,14 +133,31 @@ export default function DespachoForm() {
     const invalid = validRows.find((r) => !r.qty || r.qty <= 0)
     if (invalid) { toast.error('Todas las líneas necesitan una cantidad mayor a cero'); return }
 
+    // §0.2/§11: un artículo con dimensiones exige la combinación completa en toda línea que mueva
+    // stock — bloqueamos el submit acá para no dejarle al usuario un 400 confuso del servidor.
+    const incompleta = validRows.find((r) => r.usaDimensiones && !combinacionCompleta(r.itemDimensiones, r.dimensiones))
+    if (incompleta) {
+      toast.error(`Completa la combinación de dimensión del artículo "${incompleta.itemLabel || incompleta.itemCode}" antes de continuar`)
+      return
+    }
+
+    // §5.1: fusionamos líneas del mismo artículo con la misma combinación exacta antes de someter.
+    const mergedRows = mergeLineasIguales(validRows, {
+      getItemCode: (r) => r.itemCode,
+      getDimensiones: (r) => r.dimensiones,
+      sumQty: (base, extra) => ({ ...base, qty: base.qty + extra.qty }),
+    })
+
     const dto = {
       customer: customerId,
       branch: branch || undefined,
       department: usaDepartamentos ? (department || undefined) : undefined,
-      items: validRows.map((r): DespachoItemDto => ({
+      items: mergedRows.map((r): DespachoItemDto => ({
         itemCode: r.itemCode,
         qty: r.qty,
         warehouse: r.warehouse || undefined,
+        // §5/§10.1: siempre mandar dimensiones cuando el artículo las usa.
+        dimensiones: r.usaDimensiones ? r.dimensiones : undefined,
       })),
       notes: notes || undefined,
     }
@@ -208,6 +241,10 @@ export default function DespachoForm() {
                       Almacén
                       <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
                     </th>
+                     <th>
+                      Combinación
+                      <span className="col-resize-handle" onMouseDown={startResize('combination')} />
+                    </th>
                     <th />
                   </tr>
                 </thead>
@@ -245,6 +282,16 @@ export default function DespachoForm() {
                           placeholder="Default del usuario"
                           className="items-input"
                         />
+                      </td>
+                      <td>
+                        {row.usaDimensiones && (
+                          <CombinacionDimensionSelector
+                            itemDimensiones={row.itemDimensiones}
+                            value={row.dimensiones}
+                            onChange={(next) => updateRow(idx, { dimensiones: next })}
+                            compact
+                          />
+                        )}
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         <button

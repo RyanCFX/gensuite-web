@@ -14,6 +14,14 @@ import type {
   CreateRepostValuacionDto,
   CreateRepostValuacionResult,
   RepostValuacionItem,
+  StockPorDimensionResponse,
+  GetStockPorDimensionParams,
+  VerificarStockPorDimensionDto,
+  VerificarStockPorDimensionFaltante,
+  AjusteDimensionDto,
+  AjusteDimensionResult,
+  ReclasificacionDimensionDto,
+  ReclasificacionDimensionResult,
 } from './types'
 
 export interface InventoryFilterParams extends PaginationParams {
@@ -109,4 +117,46 @@ export async function getLoteSugerido(params: { itemCode: string; warehouse: str
 export async function listSeriales(params?: PaginationParams & { itemCode?: string; status?: string }) {
   const res = await client.get<PaginatedResponse<InventorySerial>>(ENDPOINTS.inventory.seriales, { params })
   return unwrapPaginated(res)
+}
+
+// ─── Dimensiones de Inventario — docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §8.3-§8.6 ──
+
+/** Los filtros por dimensión son query params DINÁMICOS (la clave es el `codigo` de la dimensión,
+ *  varía por tenant) — no aparecen tipados en `GetStockPorDimensionParams` más que por índice, por
+ *  eso se arman aparte acá en vez de mandar el objeto de filtros tal cual (§8.3). */
+export async function getStockPorDimension(itemCode: string, params?: GetStockPorDimensionParams) {
+  const res = await client.get<{ success: true; data: StockPorDimensionResponse; meta: { limit: number; offset: number; totalRegistros: number } }>(
+    ENDPOINTS.inventory.stockPorDimension(itemCode),
+    { params },
+  )
+  return { data: res.data.data, meta: res.data.meta }
+}
+
+/** Solo un aviso — nunca bloquea nada por sí solo, la autoridad final sigue siendo el servidor al
+ *  someter el documento real (§8.4). Array vacío = todo alcanza. */
+export async function verificarStockPorDimension(data: VerificarStockPorDimensionDto) {
+  const res = await client.post<{ success: true; data: VerificarStockPorDimensionFaltante[] }>(
+    ENDPOINTS.inventory.verificarStockPorDimension,
+    data,
+  )
+  return unwrap(res)
+}
+
+/** Único mecanismo para corregir el saldo de UNA combinación puntual — el Conteo/Stock
+ *  Reconciliation estándar no funciona con artículos dimensionados (§8.5). */
+export async function ajustarDimension(data: AjusteDimensionDto) {
+  const res = await client.post<{ success: true; data: AjusteDimensionResult }>(
+    ENDPOINTS.inventory.ajustesDimension,
+    data,
+  )
+  return unwrap(res)
+}
+
+/** Corrige una combinación mal elegida en el mismo almacén, sin mover valuación (§8.6). */
+export async function reclasificarDimension(data: ReclasificacionDimensionDto) {
+  const res = await client.post<{ success: true; data: ReclasificacionDimensionResult }>(
+    ENDPOINTS.inventory.reclasificaciones,
+    data,
+  )
+  return unwrap(res)
 }
