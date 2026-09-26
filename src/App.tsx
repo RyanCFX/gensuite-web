@@ -31,6 +31,7 @@ const AseguradoraDetail = lazy(() => import('@/features/aseguradoras/Aseguradora
 const AseguradoraForm = lazy(() => import('@/features/aseguradoras/AseguradoraForm'))
 const LotesPage = lazy(() => import('@/features/farmacia/LotesPage'))
 const LoteDetail = lazy(() => import('@/features/farmacia/LoteDetail'))
+const PrincipiosActivosPage = lazy(() => import('@/features/farmacia/PrincipiosActivosPage'))
 const QuotationsPage  = lazy(() => import('@/features/quotations/QuotationsPage'))
 const QuotationDetail = lazy(() => import('@/features/quotations/QuotationDetail'))
 const QuotationForm   = lazy(() => import('@/features/quotations/QuotationForm'))
@@ -230,6 +231,7 @@ export default function App() {
             <Route path="/farmacia/aseguradoras/:id/editar" element={<Suspense fallback={<PageLoader />}><AseguradoraForm /></Suspense>} />
             <Route path="/farmacia/lotes" element={<Suspense fallback={<PageLoader />}><LotesPage /></Suspense>} />
             <Route path="/farmacia/lotes/:id" element={<Suspense fallback={<PageLoader />}><LoteDetail /></Suspense>} />
+            <Route path="/farmacia/principios-activos" element={<Suspense fallback={<PageLoader />}><PrincipiosActivosPage /></Suspense>} />
             <Route path="/cotizaciones" element={<Suspense fallback={<PageLoader />}><QuotationsPage /></Suspense>} />
             <Route path="/cotizaciones/nueva" element={<Suspense fallback={<PageLoader />}><QuotationForm /></Suspense>} />
             <Route path="/cotizaciones/:id/editar" element={<Suspense fallback={<PageLoader />}><QuotationForm /></Suspense>} />

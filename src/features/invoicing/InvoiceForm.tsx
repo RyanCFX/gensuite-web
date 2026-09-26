@@ -24,7 +24,7 @@ import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingMod
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
 import { ENDPOINTS } from '@/shared/api/endpoints'
-import { formatDOP, formatMoney, round2 } from '@/lib/formatters'
+import { formatDOP, formatMoney, round2, formatDate } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, Info, UserPlus, Lock, LockOpen, ChevronDown, RotateCcw } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
@@ -37,6 +37,7 @@ import { useTabs } from '@/contexts/TabsContext'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
+import { BusquedaAsistidaPanel } from './BusquedaAsistidaPanel'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
 import { DatePicker } from '@/shared/ui/DatePicker'
@@ -342,6 +343,13 @@ export default function InvoiceForm() {
   const monedasHabilitadas = facturacionConfig?.monedasHabilitadas ?? ['DOP']
   /** Una factura con cobertura ARS no puede llevar impuestos (§3.7): se oculta el selector. */
   const mostrarImpuestoDocumento = usaImpuestoDocumento && !(esFarmacia && arsEnabled)
+
+  // Búsqueda asistida de mostrador (vertical Farmacia) — docs/tasks/
+  // PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §9. Sigue el texto tecleado en CUALQUIER fila del
+  // buscador de artículos (ItemSelect es opt-in vía onQueryChange, no cambia para el resto de las
+  // pantallas que lo usan) y muestra las sugerencias de equivalentes en un panel aparte, nunca
+  // mezcladas con los resultados normales del buscador (§2 regla 4).
+  const [busquedaAsistidaQuery, setBusquedaAsistidaQuery] = useState('')
   // Si está inactivo, se permite capturar un serial/lote nuevo al vender en vez de exigir que ya exista.
   const requiereSerialLoteCompra = facturacionConfig?.requiereSerialLoteCompra ?? false
 
@@ -686,11 +694,13 @@ export default function InvoiceForm() {
 
   function handleInvoiceMutationError(err: { message?: string; code?: string; statusCode?: number }) {
       const msg = err?.message ?? ''
-      const low = msg.toLowerCase()
-      // 400 del PATCH: el borrador dejó de serlo (ya sometido) o fue enviado a Caja. El mensaje del
-      // backend es accionable ("usar cancelar + enmendar" / "se edita al cobrar"): se muestra tal
-      // cual y se devuelve al detalle, donde sí están las acciones correctas.
-      if (isEdit && (low.includes('no está en borrador') || low.includes('no esta en borrador') || low.includes('enmendar') || low.includes('caja'))) {
+      // 400 del PATCH: el borrador dejó de serlo (ya sometido) o fue enviado a Caja —
+      // docs/PROMPT_ERRORES_COMERCIALES_FRONTEND.md §4/§5.3 (`DOC_SUBMITTED_IMMUTABLE`). El
+      // mensaje del backend ya es comercial y accionable: se muestra tal cual y se devuelve al
+      // detalle, que es donde vive la acción de enmienda (Igualar con enmienda, B2B) cuando
+      // corresponde — nunca se bifurca por texto (§2, antes hacía match contra "no está en
+      // borrador"/"enmendar"/"caja", frágil ante cualquier cambio de redacción).
+      if (isEdit && isApiErrorCode(err, ERROR_CODES.DOC_SUBMITTED_IMMUTABLE)) {
         toast.error(msg || 'Esta factura ya no se puede editar')
         navigate(`/facturas/${editId}`)
         return
@@ -768,7 +778,6 @@ export default function InvoiceForm() {
     clienteOcasionalNombre,
     clienteOcasionalRnc,
     clienteOcasionalDireccion,
-    postingDate,
     dueDate,
     ncfType,
     items,
@@ -1124,6 +1133,24 @@ export default function InvoiceForm() {
     setItems((prev) => prev.filter((_, i) => i !== index))
   }
 
+  // "Usar este" en el panel de equivalentes por composición — siempre agrega una línea NUEVA,
+  // nunca reemplaza la que el usuario estaba escribiendo (§2 regla 1: elección explícita, nunca
+  // una sustitución automática de lo que ya había en la factura).
+  async function agregarEquivalenteComoLinea(equivalenteId: string) {
+    if (!branch) {
+      toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
+      return
+    }
+    const index = items.length
+    try {
+      const fullItem = await getItem(equivalenteId)
+      addRow()
+      await selectCatalogItem(index, fullItem, { autoAddRow: false })
+    } catch {
+      toast.error('No se pudo agregar el artículo equivalente')
+    }
+  }
+
   const hasAnyDiscount = items.some((i) => i.discountPct > 0 || i.discountAmount > 0)
   /** Quita el descuento de TODAS las líneas de una sola vez — no toca cantidad, precio ni
    *  ningún otro campo de la línea. */
@@ -1284,7 +1311,6 @@ persistInvoice(buildInvoiceDto())
             clienteOcasionalDireccion: clienteOcasionalDireccion || undefined,
           }
         : { customer: customerId }),
-      postingDate,
       dueDate,
       branch: branch || undefined,
       department: usaDepartamentos ? (department || undefined) : undefined,
@@ -1457,15 +1483,18 @@ persistInvoice(buildInvoiceDto())
                  </label>
                </div>
 
-              <div className="ff-wrap">
-                <label className="ff-label ff-required" htmlFor="postingDate">Fecha</label>
-                <DatePicker
-                  id="postingDate"
-                  className="ff-input"
-                  value={postingDate}
-                  onChange={setPostingDate}
-                />
-              </div>
+              {/* La fecha de la factura ya no la fija el cliente — el servidor siempre la asigna
+                  con el momento real del request (evita el desfase cronológico con inventario que
+                  rompía el submit con "insufficient stock"). En edición se muestra de solo
+                  lectura, informativa. */}
+              {isEdit && (
+                <div className="ff-wrap">
+                  <span className="ff-label">Fecha</span>
+                  <span className="ff-input" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }}>
+                    {formatDate(postingDate)}
+                  </span>
+                </div>
+              )}
 
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="dueDate">Fecha vencimiento</label>
@@ -1662,6 +1691,7 @@ persistInvoice(buildInvoiceDto())
                           onVariantSelect={(t) => setVariantTemplate(t)}
                           validateStock
                           branch={branch || undefined}
+                          onQueryChange={esFarmacia ? setBusquedaAsistidaQuery : undefined}
                         />
                       </td>
                       <td>
@@ -1955,6 +1985,14 @@ persistInvoice(buildInvoiceDto())
                 <Plus size={14} /> Agregar artículo
               </button>
             </div>
+
+            {esFarmacia && (
+              <BusquedaAsistidaPanel
+                query={busquedaAsistidaQuery}
+                onAgregar={(eq) => agregarEquivalenteComoLinea(eq.item.id)}
+              />
+            )}
+
             <div className="items-total-row navy-totals">
               {/* <div className="items-total-line">
                 <span>Subtotal bruto</span>
