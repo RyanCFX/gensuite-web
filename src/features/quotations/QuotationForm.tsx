@@ -19,7 +19,7 @@ import { formatMoney, displayId, round2 } from '@/lib/formatters'
 import { formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { Select, SelectItem } from '@/components/ui/select'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, Info, UserPlus, ChevronDown } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { toast } from 'sonner'
@@ -30,9 +30,9 @@ import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
-import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { listItems } from '@/shared/api/catalog'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { client } from '@/shared/api/client'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
@@ -133,6 +133,23 @@ export default function QuotationForm() {
   const [date, setDate] = useState(todayIso())
   const [validTill, setValidTill] = useState(defaultValidTill())
   const [items, setItems] = useState<LineItem[]>([])
+  // Anchos de columna de la tabla de artículos — el usuario puede arrastrar los divisores del
+  // thead para ajustarlos (ver useResizableColumns). Reservan desde el inicio el ancho real que
+  // necesita cada control (ej. Descuento es un combo select+input de ~140px), no el mínimo que
+  // ocuparía solo el texto del header — así no cambian de tamaño al pasar de "sin artículos" a
+  // "con artículos".
+  const ITEMS_COLUMNS = [
+    { key: 'codigo', width: 100 },
+    { key: 'articulo', width: 220 },
+    { key: 'cant', width: 80 },
+    { key: 'udm', width: 100 },
+    { key: 'precio', width: 120 },
+    { key: 'descuento', width: 140 },
+    { key: 'itbis', width: 80 },
+    { key: 'subtotal', width: 120 },
+    { key: 'actions', width: 70 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
   const [highlightedRow, setHighlightedRow] = useState<number | null>(null)
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
   const flashRow = useCallback((index: number) => {
@@ -143,6 +160,7 @@ export default function QuotationForm() {
     }, 400)
   }, [])
   const [notes, setNotes] = useState('')
+  const [notesOpen, setNotesOpen] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
@@ -152,7 +170,6 @@ export default function QuotationForm() {
   const [branchSearch, setBranchSearch] = useState('')
   const [taxesTemplate, setTaxesTemplate] = useState('')
   const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
-  const [warehouseSearch, setWarehouseSearch] = useState('')
   // '' = automático (Cliente.defaultCurrency → moneda base). Al editar, se hidrata con la
   // moneda/tasa existente — reenviarla es equivalente a omitirla (docs/tasks/64_multimoneda_completo.md §3.2).
   const [currency, setCurrency] = useState('')
@@ -403,13 +420,6 @@ useEffect(() => {
     setItems((prev) => prev.map((row) => (row.warehouse ? { ...row, warehouse: '', stockError: undefined } : row)))
   }, [branch])
 
-  const warehouseSelectOptions: SearchSelectOption[] = useMemo(() => {
-    const q = warehouseSearch.toLowerCase()
-    return (branchWarehouses ?? [])
-      .filter((w) => !q || w.name.toLowerCase().includes(q))
-      .map((w) => ({ value: w.id, label: w.name }))
-  }, [branchWarehouses, warehouseSearch])
-
   function defaultWarehouse(): string {
     return branchWarehouses?.length === 1 ? branchWarehouses[0].id : ''
   }
@@ -576,22 +586,6 @@ function submitDto() {
         if ('qty' in patch || 'warehouse' in patch) {
           updated.stockError = validateLineStock(updated)
         }
-        return updated
-      }),
-    )
-  }
-
-  function updateWarehouse(index: number, warehouse: string) {
-    setItems((prev) =>
-      prev.map((item, i) => {
-        if (i !== index) return item
-        const available = item._stockByWarehouse?.[warehouse]
-        const qty = available != null ? Math.min(item.qty, available) : item.qty
-        const amount = item.discountMode === 'amount'
-          ? calcAmount(qty, item.rate, 0, item.discountAmount)
-          : calcAmount(qty, item.rate, item.discountPct)
-        const updated = { ...item, warehouse, qty, amount }
-        updated.stockError = validateLineStock(updated)
         return updated
       }),
     )
@@ -848,7 +842,7 @@ if (esClienteOcasional) {
           <a className="page-back-link" onClick={() => navigate('/cotizaciones')}>
             <ArrowLeft size={14} /> Cotizaciones
           </a>
-          <h1 className="page-title">{id ? 'Editar Cotización' : 'Nueva Cotización'}</h1>
+          <h1 className="page-title"><span className="page-title-dot" />{id ? 'Editar Cotización' : 'Nueva Cotización'}</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <RecargarButton label="Actualizar" />
@@ -858,12 +852,12 @@ if (esClienteOcasional) {
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         {/* ── Información General ─────────────────────────────────────────── */}
         <div className="card">
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <h2 className="card-title">Información General</h2>
           </div>
           <div className="card-body">
-            <div className="form-row form-row-3">
-<div className="ff-wrap">
+            <div className="form-row">
+<div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
                  <label className="ff-label ff-required" htmlFor="customer">Cliente</label>
                  {esClienteOcasional ? (
                    <input
@@ -1036,26 +1030,47 @@ if (esClienteOcasional) {
 
         {/* ── Artículos ───────────────────────────────────────────────────── */}
         <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Artículos</h2>
-          </div>
           <div className="items-table-wrap">
-            <table className="items-table">
+            <table className="items-table navy-table items-table-resizable">
+              <colgroup>
+                {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th style={{ minWidth: 200 }}>Artículo</th>
-                  <th>Descripción</th>
-                  <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
-                  <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
-                  <th style={{ textAlign: 'right', width: 80 }}>
-                  Descuento
-                  <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} />
-                </th>
-                  <th style={{ textAlign: 'right', width: 80 }}>Impuesto</th>
-                  <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
-                  <th style={{ width: 72 }}>UDM</th>
-                  <th style={{ width: 140 }}>Almacén</th>
-                  <th style={{ width: 40 }} />
+                  <th>
+                    Código
+                    <span className="col-resize-handle" onMouseDown={startResize('codigo')} />
+                  </th>
+                  <th>
+                    Artículo
+                    <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Cant.
+                    <span className="col-resize-handle" onMouseDown={startResize('cant')} />
+                  </th>
+                  <th>
+                    UDM
+                    <span className="col-resize-handle" onMouseDown={startResize('udm')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Precio Unit.
+                    <span className="col-resize-handle" onMouseDown={startResize('precio')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Descuento
+                    <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} />
+                    <span className="col-resize-handle" onMouseDown={startResize('descuento')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    ITBIS
+                    <span className="col-resize-handle" onMouseDown={startResize('itbis')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Subtotal
+                    <span className="col-resize-handle" onMouseDown={startResize('subtotal')} />
+                  </th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -1072,7 +1087,14 @@ if (esClienteOcasional) {
                       ref={(el) => { rowRefs.current[index] = el }}
                       className={highlightedRow === index ? 'row-flash' : undefined}
                     >
-                      {/* Artículo — SearchSelect por catálogo */}
+                      {/* Código — solo lectura, informativo */}
+                      <td>
+                        <span className="td-muted" style={{ fontSize: 12 }}>{item.itemCode || '—'}</span>
+                      </td>
+
+                      {/* Artículo — SearchSelect por catálogo (la descripción de la línea se
+                          autopobla al seleccionar, ver selectCatalogItem/selectBundle — ya no
+                          hace falta un campo de descripción editable aparte, era redundante). */}
                       <td style={{ minWidth: 200 }}>
                         <ItemSelect
                           value={item.itemCode}
@@ -1087,16 +1109,6 @@ if (esClienteOcasional) {
                         />
                       </td>
 
-                      {/* Descripción — editable, pre-llenada al seleccionar ítem */}
-                      <td>
-                        <input
-                          className="items-input"
-                          value={item.description}
-                          onChange={(e) => updateItem(index, { description: e.target.value })}
-                          placeholder="Descripción del servicio o artículo"
-                        />
-                      </td>
-
                       <td>
                         <QtyInput
                           className={`items-input${(submitted && (!item.qty || item.qty <= 0)) || item.stockError ? ' items-input-error' : ''}`}
@@ -1106,9 +1118,23 @@ if (esClienteOcasional) {
                           style={{ textAlign: 'right' }}
                         />
                         {item.stockError && (
-                          <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
                             {item.stockError}
                           </span>
+                        )}
+                      </td>
+
+                      <td>
+                        {item.itemType === 'service' || item.itemType === 'combo' ? (
+                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                        ) : (
+                          <UomSelect
+                            value={item.uom}
+                            onChange={(v, factor) => updateItem(index, { uom: v, rate: saleRate(item.baseRate, factor), conversionFactor: factor })}
+                            itemCode={item.itemCode || undefined}
+                            error={submitted && !item.uom}
+                            direction="sale"
+                          />
                         )}
                       </td>
 
@@ -1182,28 +1208,23 @@ if (esClienteOcasional) {
                                 )}
                               </div>
                               {isAmountMode ? (
-                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
                                   Descuento: {formatMoney(item.discountAmount, currency || monedaBase)}
                                 </span>
                               ) : (
                                 <>
                                   {item.discountPct > 0 && (
-                                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
                                       Total: {item.discountPct.toFixed(1)}%
                                     </span>
                                   )}
-                                  {effectiveLimit < 100 && (
-                                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                      máx {effectiveLimit.toFixed(2)}%
-                                    </span>
-                                  )}
                                   {item.discountPct > effectiveLimit && (
-                                    <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                    <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
                                       Supera el límite de {effectiveLimit.toFixed(2)}%
                                     </span>
                                   )}
-                                  <span style={{ fontSize: 10, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, cursor: 'help' }} title="El descuento puede incluir una parte automática (Pricing Rule) y una parte manual del vendedor. Ambas se suman contra el tope máximo.">
-                                    ⓘ automático + manual
+                                  <span style={{ fontSize: 10, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
+                                    {effectiveLimit < 100 ? `máx ${effectiveLimit.toFixed(2)}% · ` : ''}ⓘ automático + manual
                                   </span>
                                 </>
                               )}
@@ -1223,109 +1244,110 @@ if (esClienteOcasional) {
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount, currency || monedaBase, { trimZeros: true })}</td>
 
-                      <td>
-                        {item.itemType === 'service' || item.itemType === 'combo' ? (
-                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
-                        ) : (
-                          <UomSelect
-                            value={item.uom}
-                            onChange={(v, factor) => updateItem(index, { uom: v, rate: saleRate(item.baseRate, factor), conversionFactor: factor })}
-                            itemCode={item.itemCode || undefined}
-                            error={submitted && !item.uom}
-                            direction="sale"
-                          />
-                        )}
-                      </td>
-
-                      <td>
-                        <SearchSelect
-                          value={item.warehouse}
-                          onChange={(val) => updateWarehouse(index, val)}
-                          options={warehouseSelectOptions}
-                          onSearch={setWarehouseSearch}
-                          selectedLabel={branchWarehouses?.find((w) => w.id === item.warehouse)?.name ?? ''}
-                          placeholder="Almacén por defecto"
+                      <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ position: 'relative', verticalAlign: 'middle' }}>
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-size-icon-xs"
+                          onClick={() => setViewItemCode(item.itemCode)}
                           disabled={!item.itemCode}
-                        />
-                      </td>
-
-                      <td onClick={(e) => e.stopPropagation()} className="actions-cell">
-                        <ActionsMenu>
-                          <ActionsMenuItem
-                            onClick={() => setViewItemCode(item.itemCode)}
-                            disabled={!item.itemCode}
-                          >
-                            <Eye size={14} /> Ver detalle
-                          </ActionsMenuItem>
-                          <ActionsMenuItem danger onClick={() => removeRow(index)}>
-                            <Trash2 size={14} /> Eliminar
-                          </ActionsMenuItem>
-                        </ActionsMenu>
+                          title="Ver detalle"
+                        >
+                          <Eye size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-size-icon-xs"
+                          onClick={() => removeRow(index)}
+                          title="Eliminar"
+                          style={{ color: 'var(--error-text)' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                        </div>
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
-
-            <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
-              <button type="button" className="btn btn-ghost btn-size-sm" onClick={addRow}>
-                <Plus size={14} /> Agregar artículo
-              </button>
-            </div>
-
-            <div className="items-total-row">
-            <div className="items-total-line">
-                <span>Subtotal bruto</span>
-                <span>{formatMoney(grossTotal, currency || monedaBase)}</span>
-              </div>
-
-              {totalDiscount > 0 && (
-                <div className="items-total-line" style={{ color: 'var(--text-danger)' }}>
-                  <span>Descuento total</span>
-                  <span>-{formatMoney(totalDiscount, currency || monedaBase)}</span>
-                </div>
-              )}
-
-              {taxTotal > 0 && (
-                <div className="items-total-line" style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
-                  <span>Impuesto</span>
-                  <span>{formatMoney(taxTotal, currency || monedaBase)}</span>
-                </div>
-              )}
-              <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
-                <span>Total</span>
-                <span>{formatMoney(total, currency || monedaBase)}</span>
-              </div>
-            </div>
           </div>
+
+          <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
+            <button type="button" className="btn btn-ghost btn-size-sm" onClick={addRow}>
+              <Plus size={14} /> Agregar artículo
+            </button>
+          </div>
+
+          <div className="items-total-row navy-totals">
+            <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ textAlign: 'right' }}>Subtotal bruto</span>
+                <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(grossTotal, currency || monedaBase)}</span>
+              </div>
+
+              <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ textAlign: 'right' }}>Descuento</span>
+                <span style={{ textAlign: 'left', minWidth: 170 }}>-{formatMoney(totalDiscount, currency || monedaBase)}</span>
+              </div>
+
+              <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ textAlign: 'right' }}>Impuesto</span>
+                <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(taxTotal, currency || monedaBase)}</span>
+              </div>
+              <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ fontSize: 20, color: '#FCB124', textAlign: 'right' }}>Total</span>
+                <span style={{ fontSize: 24, color: '#FCB124', textAlign: 'left', minWidth: 170 }}>{formatMoney(total, currency || monedaBase)}</span>
+              </div>
+            </div>
         </div>
 
         {/* ── Notas ───────────────────────────────────────────────────────── */}
         <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Notas</h2>
+          <div
+            className="card-header navy-card-header"
+            style={{ cursor: 'pointer' }}
+            onClick={() => setNotesOpen((o) => !o)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 className="card-title">Notas</h2>
+              <button
+                type="button"
+                className="navy-header-toggle-btn icon-swap"
+                aria-expanded={notesOpen}
+                aria-label={notesOpen ? 'Ocultar notas' : 'Mostrar notas'}
+                onClick={(e) => { e.stopPropagation(); setNotesOpen((o) => !o) }}
+              >
+                {notesOpen ? <Minus size={13} /> : <Plus size={13} />}
+              </button>
+            </div>
+            {!notesOpen && (
+              <span className="navy-header-hint">
+                Agrega comentarios para aclarar datos de la cotización, serán visibles PDF.
+              </span>
+            )}
           </div>
-          <div className="card-body">
-            <textarea
-              className="ff-textarea"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Condiciones comerciales, términos de entrega, observaciones..."
-              rows={3}
-            />
-          </div>
+          {notesOpen && (
+            <div className="card-body">
+              <textarea
+                className="ff-textarea"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Condiciones comerciales, términos de entrega, observaciones..."
+                rows={3}
+              />
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-          <button type="button" className="btn btn-ghost" onClick={() => navigate('/cotizaciones')}>
+          <button type="button" className="btn btn-ghost" onClick={() => navigate(isEdit ? `/cotizaciones/${id}` : '/cotizaciones')}>
             Cancelar
           </button>
           <button type="submit" className="btn btn-navy" disabled={isPending}>
             {isPending
               ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
               : <Save size={15} />}
-            Guardar Borrador
+            {isEdit ? 'Guardar cambios' : 'Guardar Borrador'}
           </button>
         </div>
       </form>

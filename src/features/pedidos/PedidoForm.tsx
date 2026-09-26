@@ -22,10 +22,9 @@ import { formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, PackageOpen, UserPlus, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, PackageOpen, UserPlus, ChevronDown, Info } from 'lucide-react'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
-import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
 import { PinModal } from '@/components/shared/PinModal'
@@ -38,6 +37,7 @@ import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales, getSucursal } from '@/shared/api/sucursales'
 import { getCachedUser } from '@/shared/api/storage'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
@@ -141,6 +141,7 @@ const [customerId, setCustomerId] = useState('')
     }, 400)
   }, [])
   const [notes, setNotes] = useState('')
+  const [notesOpen, setNotesOpen] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
@@ -448,6 +449,19 @@ useEffect(() => {
     staleTime: 60_000,
   })
   const almacenVentaSucursal = sucursalActual?.almacenVenta || null
+
+  const ITEMS_COLUMNS = [
+    { key: 'articulo', width: 220 },
+    { key: 'descripcion', width: 220 },
+    { key: 'cant', width: 80 },
+    { key: 'precio', width: 120 },
+    { key: 'descuento', width: 140 },
+    { key: 'importe', width: 120 },
+    { key: 'udm', width: 120 },
+    ...(!almacenVentaSucursal ? [{ key: 'almacen', width: 160 }] : []),
+    { key: 'actions', width: 70 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
 
   // Al cambiar de sucursal, el almacén elegido en cada línea deja de ser válido
   useEffect(() => {
@@ -806,7 +820,7 @@ try {
       <div className="page-header">
         <div>
           <a className="page-back-link" onClick={() => navigate('/pedidos')}><ArrowLeft size={14} /> Pedidos</a>
-          <h1 className="page-title">{isEdit ? 'Editar Pedido' : 'Nuevo Pedido'}</h1>
+          <h1 className="page-title"><span className="page-title-dot" />{isEdit ? 'Editar Pedido' : 'Nuevo Pedido'}</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <RecargarButton label="Actualizar" />
@@ -820,9 +834,9 @@ try {
           </div>
         )}
         <div className="card">
-          <div className="card-header"><h2 className="card-title">Información General</h2></div>
+          <div className="card-header navy-card-header"><h2 className="card-title">Información General</h2></div>
           <div className="card-body">
-            <div className="form-row form-row-3">
+            <div className="form-row">
 <div className="ff-wrap">
                  <label className="ff-label ff-required">Cliente</label>
                  {esClienteOcasional ? (
@@ -1025,25 +1039,54 @@ try {
         </div>
 
         <div className="card">
-          <div className="card-header"><h2 className="card-title">Artículos</h2></div>
           <div className="items-table-wrap">
-            <table className="items-table">
+            <table className="items-table navy-table items-table-resizable">
+              <colgroup>
+                {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th style={{ minWidth: 200 }}>Artículo</th>
-                  <th>Descripción</th>
-                  <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
-                  <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
-                  <th style={{ textAlign: 'right', width: 72 }}>Descuento</th>
-                  <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
-                  <th style={{ width: 72 }}>UDM</th>
-                  {!almacenVentaSucursal && <th style={{ width: 140 }}>Almacén</th>}
-                  <th style={{ width: 40 }} />
+                  <th>
+                    Artículo
+                    <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                  </th>
+                  <th>
+                    Descripción
+                    <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Cant.
+                    <span className="col-resize-handle" onMouseDown={startResize('cant')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Precio Unit.
+                    <span className="col-resize-handle" onMouseDown={startResize('precio')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Descuento
+                    <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} />
+                    <span className="col-resize-handle" onMouseDown={startResize('descuento')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Importe
+                    <span className="col-resize-handle" onMouseDown={startResize('importe')} />
+                  </th>
+                  <th>
+                    UDM
+                    <span className="col-resize-handle" onMouseDown={startResize('udm')} />
+                  </th>
+                  {!almacenVentaSucursal && (
+                    <th>
+                      Almacén
+                      <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                    </th>
+                  )}
+                  <th />
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
-                  <tr><td colSpan={almacenVentaSucursal ? 8 : 9} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>No hay artículos.</td></tr>
+                  <tr><td colSpan={almacenVentaSucursal ? 8 : 9} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>No hay artículos. Agrega uno con el botón de abajo.</td></tr>
                 ) : (
                   items.map((item, index) => (
                     <tr
@@ -1067,16 +1110,16 @@ try {
                             <>
                               <QtyInput className={`items-input${(submitted && (!item.qty || item.qty <= 0)) || stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
                               {stockError ? (
-                                <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
                                   {stockError}
                                 </span>
                               ) : info && info.reservedStock > 0 ? (
-                                <span style={{ fontSize: 11, color: 'var(--warning-text)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                <span style={{ fontSize: 11, color: 'var(--warning-text)', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
                                   Disponible: {info.disponible} ({info.reservedStock} reservadas para otro cliente)
                                   {enPedido > 0 ? ` · En pedido: ${enPedido} (informativo)` : ''}
                                 </span>
                               ) : enPedido > 0 ? (
-                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
                                   En pedido: {enPedido} (informativo)
                                 </span>
                               ) : null}
@@ -1130,18 +1173,23 @@ try {
                                 )}
                               </div>
                               {isAmountMode ? (
-                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
                                   Descuento: {formatMoney(item.discountAmount, currency || monedaBase)}
                                 </span>
                               ) : (
                                 <>
+                                  {item.discountPct > 0 && (
+                                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
+                                      Total: {item.discountPct.toFixed(1)}%
+                                    </span>
+                                  )}
                                   {effectiveLimit < 100 && (
-                                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                    <span style={{ fontSize: 10, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
                                       máx {effectiveLimit.toFixed(2)}%
                                     </span>
                                   )}
                                   {item.discountPct > effectiveLimit && (
-                                    <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                    <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
                                       Supera el límite de {effectiveLimit.toFixed(2)}%
                                     </span>
                                   )}
@@ -1177,41 +1225,83 @@ try {
                           />
                         </td>
                       )}
-                      <td onClick={(e) => e.stopPropagation()} className="actions-cell">
-                        <ActionsMenu>
-                          <ActionsMenuItem
-                            onClick={() => setViewItemCode(item.itemCode)}
-                            disabled={!item.itemCode}
-                          >
-                            <Eye size={14} /> Ver detalle
-                          </ActionsMenuItem>
-                          <ActionsMenuItem danger onClick={() => removeRow(index)}>
-                            <Trash2 size={14} /> Eliminar
-                          </ActionsMenuItem>
-                        </ActionsMenu>
+                      <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ position: 'relative', verticalAlign: 'middle' }}>
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-size-icon-xs"
+                          onClick={() => setViewItemCode(item.itemCode)}
+                          disabled={!item.itemCode}
+                          title="Ver detalle"
+                        >
+                          <Eye size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-size-icon-xs"
+                          onClick={() => removeRow(index)}
+                          title="Eliminar"
+                          style={{ color: 'var(--error-text)' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                        </div>
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
-            <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
-              <button type="button" className="btn btn-ghost btn-size-sm" onClick={addRow}><Plus size={14} /> Agregar artículo</button>
+          </div>
+          <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
+            <button type="button" className="btn btn-ghost btn-size-sm" onClick={addRow}><Plus size={14} /> Agregar artículo</button>
+          </div>
+          <div className="items-total-row navy-totals">
+            <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ textAlign: 'right' }}>Subtotal bruto</span>
+              <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(grossTotal, currency || monedaBase)}</span>
             </div>
-            <div className="items-total-row">
-              <div className="items-total-line"><span>Subtotal bruto</span><span>{formatMoney(grossTotal, currency || monedaBase)}</span></div>
-              {totalDiscount > 0 && <div className="items-total-line" style={{ color: 'var(--text-danger)' }}><span>Descuento total</span><span>-{formatMoney(totalDiscount, currency || monedaBase)}</span></div>}
-              {/*<div className="items-total-line"><span>Subtotal neto</span><span>{formatDOP(subtotal)}</span></div>*/}
-              <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}><span>Total</span><span>{formatMoney(total, currency || monedaBase)}</span></div>
+            <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ textAlign: 'right' }}>Descuento</span>
+              <span style={{ textAlign: 'left', minWidth: 170 }}>-{formatMoney(totalDiscount, currency || monedaBase)}</span>
+            </div>
+            {/*<div className="items-total-line"><span>Subtotal neto</span><span>{formatDOP(subtotal)}</span></div>*/}
+            <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ fontSize: 20, color: '#FCB124', textAlign: 'right' }}>Total</span>
+              <span style={{ fontSize: 24, color: '#FCB124', textAlign: 'left', minWidth: 170 }}>{formatMoney(total, currency || monedaBase)}</span>
             </div>
           </div>
         </div>
 
         <div className="card">
-          <div className="card-header"><h2 className="card-title">Notas</h2></div>
-          <div className="card-body">
-            <textarea className="ff-textarea" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observaciones, condiciones de entrega…" rows={3} />
+          <div
+            className="card-header navy-card-header"
+            style={{ cursor: 'pointer' }}
+            onClick={() => setNotesOpen((o) => !o)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 className="card-title">Notas</h2>
+              <button
+                type="button"
+                className="navy-header-toggle-btn icon-swap"
+                aria-expanded={notesOpen}
+                aria-label={notesOpen ? 'Ocultar notas' : 'Mostrar notas'}
+                onClick={(e) => { e.stopPropagation(); setNotesOpen((o) => !o) }}
+              >
+                {notesOpen ? <Minus size={13} /> : <Plus size={13} />}
+              </button>
+            </div>
+            {!notesOpen && (
+              <span className="navy-header-hint">
+                Agrega comentarios para aclarar datos del pedido, serán visibles PDF.
+              </span>
+            )}
           </div>
+          {notesOpen && (
+            <div className="card-body">
+              <textarea className="ff-textarea" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observaciones, condiciones de entrega…" rows={3} />
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>

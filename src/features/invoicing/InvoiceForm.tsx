@@ -28,7 +28,6 @@ import { formatDOP, formatMoney, round2 } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, Info, UserPlus, Lock, LockOpen, ChevronDown } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
-import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
@@ -54,6 +53,7 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { useItemInventory } from '@/shared/hooks/useItemInventory'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { formatStockInsufficientMessage, formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 
@@ -1109,6 +1109,28 @@ export default function InvoiceForm() {
   /** 11 columnas base + las 5 de cobertura ARS — para los `colSpan` de las filas especiales. */
   const columnCount = (arsActiva ? 16 : 11) - (almacenVentaSucursal ? 1 : 0)
 
+  const itemsColumnDefs: { key: string; width: number }[] = [
+    { key: 'articulo', width: 220 },
+    { key: 'descripcion', width: 220 },
+    { key: 'cant', width: 80 },
+    { key: 'precio', width: 120 },
+    { key: 'descuento', width: 140 },
+    { key: 'impuesto', width: 80 },
+    { key: 'importe', width: 120 },
+    { key: 'udm', width: 100 },
+    ...(!almacenVentaSucursal ? [{ key: 'almacen', width: 160 }] : []),
+    { key: 'ubicacion', width: 140 },
+    ...(arsActiva ? [
+      { key: 'pctTeorico', width: 100 },
+      { key: 'coberturaArs', width: 130 },
+      { key: 'lock', width: 50 },
+      { key: 'paciente', width: 120 },
+      { key: 'pctReal', width: 90 },
+    ] : []),
+    { key: 'actions', width: 70 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(itemsColumnDefs)
+
   /**
    * Campos ARS de una línea. Solo se envían si el usuario realmente los tocó: si NINGUNA línea
    * trae `montoAprobadoArs`/`lineaBloqueadaArs`, el servidor reparte la cobertura solo al
@@ -1557,34 +1579,80 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
 
         <div className="card">
           <div className="items-table-wrap">
-            <table className="items-table navy-table">
+            <table className="items-table navy-table items-table-resizable">
+              <colgroup>
+                {itemsColumnDefs.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th style={{ minWidth: 200 }}>Artículo</th>
-                  <th>Descripción</th>
-                  <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
-                  <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
-                  <th style={{ textAlign: 'right', width: 72 }}>
+                  <th>
+                    Artículo
+                    <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                  </th>
+                  <th>
+                    Descripción
+                    <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Cant.
+                    <span className="col-resize-handle" onMouseDown={startResize('cant')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Precio Unit.
+                    <span className="col-resize-handle" onMouseDown={startResize('precio')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
                   Descuento
                   <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} />
+                  <span className="col-resize-handle" onMouseDown={startResize('descuento')} />
                 </th>
-                  <th style={{ textAlign: 'right', width: 80 }}>Impuesto</th>
-                  <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
-                  <th style={{ width: 56 }}>UDM</th>
-                  {!almacenVentaSucursal && <th style={{ width: 140 }}>Almacén</th>}
-                  <th style={{ width: 140 }}>Ubicación</th>
+                  <th style={{ textAlign: 'right' }}>
+                    Impuesto
+                    <span className="col-resize-handle" onMouseDown={startResize('impuesto')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Importe
+                    <span className="col-resize-handle" onMouseDown={startResize('importe')} />
+                  </th>
+                  <th>
+                    UDM
+                    <span className="col-resize-handle" onMouseDown={startResize('udm')} />
+                  </th>
+                  {!almacenVentaSucursal && (
+                    <th>
+                      Almacén
+                      <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                    </th>
+                  )}
+                  <th>
+                    Ubicación
+                    <span className="col-resize-handle" onMouseDown={startResize('ubicacion')} />
+                  </th>
                   {arsActiva && (
                     <>
-                      <th style={{ textAlign: 'right', width: 80 }} title="Peso de esta línea en el reparto automático de la cobertura. Vacío en todas = partes iguales.">
+                      <th style={{ textAlign: 'right' }} title="Peso de esta línea en el reparto automático de la cobertura. Vacío en todas = partes iguales.">
                         % teórico ARS
+                        <span className="col-resize-handle" onMouseDown={startResize('pctTeorico')} />
                       </th>
-                      <th style={{ textAlign: 'right', width: 120 }}>Cobertura ARS</th>
-                      <th style={{ width: 44, textAlign: 'center' }} title="Ajuste manual protegido: Recalcular no toca la línea.">🔒</th>
-                      <th style={{ textAlign: 'right', width: 110 }}>Paciente</th>
-                      <th style={{ textAlign: 'right', width: 72 }}>% real</th>
+                      <th style={{ textAlign: 'right' }}>
+                        Cobertura ARS
+                        <span className="col-resize-handle" onMouseDown={startResize('coberturaArs')} />
+                      </th>
+                      <th style={{ textAlign: 'center' }} title="Ajuste manual protegido: Recalcular no toca la línea.">
+                        🔒
+                        <span className="col-resize-handle" onMouseDown={startResize('lock')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Paciente
+                        <span className="col-resize-handle" onMouseDown={startResize('paciente')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        % real
+                        <span className="col-resize-handle" onMouseDown={startResize('pctReal')} />
+                      </th>
                     </>
                   )}
-                  <th style={{ width: 40 }} />
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -1843,18 +1911,25 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
                           </td>
                         </>
                       )}
-                      <td onClick={(e) => e.stopPropagation()} className="actions-cell">
-                        <ActionsMenu>
-                          <ActionsMenuItem
-                            onClick={() => setViewItemCode(item.itemCode)}
-                            disabled={!item.itemCode}
-                          >
-                            <Eye size={14} /> Ver detalle
-                          </ActionsMenuItem>
-                          <ActionsMenuItem danger onClick={() => removeRow(index)}>
-                            <Trash2 size={14} /> Eliminar
-                          </ActionsMenuItem>
-                        </ActionsMenu>
+                      <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-size-icon-xs"
+                          onClick={() => setViewItemCode(item.itemCode)}
+                          disabled={!item.itemCode}
+                          title="Ver detalle"
+                        >
+                          <Eye size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-size-icon-xs"
+                          onClick={() => removeRow(index)}
+                          title="Eliminar"
+                          style={{ color: 'var(--error-text)' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </td>
                     </tr>
                     {item.itemType === 'combo' && item._comboComponents && item._comboComponents.length > 0 && (
@@ -1900,12 +1975,13 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
                 )}
               </tbody>
             </table>
-            <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
-              <button type="button" className="btn btn-ghost btn-size-sm" onClick={addRow}>
-                <Plus size={14} /> Agregar artículo
-              </button>
-            </div>
-            <div className="items-total-row navy-totals">
+          </div>
+          <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
+            <button type="button" className="btn btn-ghost btn-size-sm" onClick={addRow}>
+              <Plus size={14} /> Agregar artículo
+            </button>
+          </div>
+          <div className="items-total-row navy-totals">
               {/* <div className="items-total-line">
                 <span>Subtotal bruto</span>
                 <span>{formatDOP(grossTotal)}</span>
@@ -1943,7 +2019,6 @@ const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
                 </>
               )}
             </div>
-          </div>
         </div>
 
         {mostrarSelectorDespachoFuturo && (
