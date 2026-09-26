@@ -1,10 +1,21 @@
 import { FileText } from 'lucide-react'
 import { type GlColumn, classifyGlRow, glCellValue } from '@/shared/lib/glLedger'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 /** Tabla genérica de Libro Diario/Mayor: resalta las filas de Apertura/Total/Cierre y filtra
  * las separadoras. */
 export function GlLedgerTable({ data, columns }: { data: Record<string, unknown>[]; columns?: GlColumn[] }) {
   const rows = data.filter((r) => classifyGlRow(r) !== 'separator')
+
+  // Columnas dinámicas (según los datos o la prop `columns`) — calculadas ANTES del early return
+  // de abajo para que el hook de anchos se llame siempre, sin importar si hay filas o no.
+  const colDefs: GlColumn[] = columns && columns.length > 0
+    ? columns
+    : rows.length > 0
+      ? Object.keys(rows[0]).map((k) => ({ fieldname: k, label: k.replace(/_/g, ' ') }))
+      : []
+  const COLUMNS = colDefs.map((c) => ({ key: c.fieldname, width: 140 }))
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   if (rows.length === 0) {
     return (
@@ -16,16 +27,20 @@ export function GlLedgerTable({ data, columns }: { data: Record<string, unknown>
     )
   }
 
-  const colDefs: GlColumn[] = columns && columns.length > 0
-    ? columns
-    : Object.keys(rows[0]).map((k) => ({ fieldname: k, label: k.replace(/_/g, ' ') }))
-
   return (
     <div className="table-scroll">
-      <table className="data-table navy-table">
+      <table className="data-table navy-table items-table-resizable">
+        <colgroup>
+          {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+        </colgroup>
         <thead>
           <tr>
-            {colDefs.map((c) => <th key={c.fieldname}>{c.label}</th>)}
+            {colDefs.map((c) => (
+              <th key={c.fieldname}>
+                {c.label}
+                <span className="col-resize-handle" onMouseDown={startResize(c.fieldname)} />
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>

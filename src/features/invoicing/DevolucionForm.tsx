@@ -508,7 +508,7 @@ export default function DevolucionForm() {
                           <td>
                             <span style={{ fontWeight: 500 }}>{row.description}</span>
                             <br />
-                            <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--text-tertiary)' }}>{row.itemCode}</span>
+                            <span style={{ fontSize: 11, fontFamily: 'var(--font-body)', color: 'var(--text-tertiary)' }}>{row.itemCode}</span>
                           </td>
                           <td style={{ textAlign: 'right' }}>{row.qtyPurchased}</td>
                           <td>

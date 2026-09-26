@@ -1051,7 +1051,7 @@ if (esClienteOcasional) {
                 <div className="ff-wrap">
                   <span className="ff-label">Fecha</span>
                   <span className="ff-input" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }}>
-                    {formatDate(date)}
+                    {existingQuotation?.date ? formatDate(existingQuotation.date) : ''}
                   </span>
                 </div>
               )}

@@ -18,6 +18,17 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const COLUMNS = [
+  { key: 'id', width: 100 },
+  { key: 'cliente', width: 220 },
+  { key: 'fecha', width: 110 },
+  { key: 'validaHasta', width: 120 },
+  { key: 'total', width: 120 },
+  { key: 'estado', width: 130 },
+  { key: 'actions', width: 48 },
+]
 
 type StatusFilter = 'draft' | 'submitted' | 'ordered' | 'lost' | 'cancelled' | 'all'
 
@@ -48,6 +59,7 @@ export default function QuotationsPage() {
   const [branch, setBranch] = useState('')
   const [toCancel, setToCancel] = useState<Quotation | null>(null)
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data: sucursalesData } = useQuery({
     queryKey: ['sucursales-all'],
@@ -169,16 +181,25 @@ export default function QuotationsPage() {
 
       <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} />
-              <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} />
-              <SortableTh label="Fecha" sortKey="date" orderBy={orderBy} onSort={sort} />
-              <th>Válida hasta</th>
-              <th style={{ textAlign: 'right' }}>Total</th>
-              <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
-              <th style={{ width: 48 }} />
+              <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('id')} />} />
+              <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('cliente')} />} />
+              <SortableTh label="Fecha" sortKey="date" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />} />
+              <th>
+                Válida hasta
+                <span className="col-resize-handle" onMouseDown={startResize('validaHasta')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Total
+                <span className="col-resize-handle" onMouseDown={startResize('total')} />
+              </th>
+              <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('estado')} />} />
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -211,7 +232,7 @@ export default function QuotationsPage() {
                     className="table-row-clickable"
                     onClick={() => navigate(`/cotizaciones/${q.id}`)}
                   >
-                    <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                       {q.amendedFrom && <GitBranch size={11} style={{ marginRight: 4, color: 'var(--text-tertiary)', verticalAlign: 'middle' }} />}
                       {displayId(q.id, q.sequence)}
                     </td>

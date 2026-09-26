@@ -6,8 +6,18 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { listAdminPinLog } from '@/shared/api/auth'
 import { formatDateTime } from '@/lib/formatters'
 import { usePermissionsStore } from '@/stores/permissions.store'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 30
+
+const ADMIN_PIN_LOG_COLUMNS = [
+  { key: 'fecha', width: 130 },
+  { key: 'accion', width: 200 },
+  { key: 'solicitadoPor', width: 140 },
+  { key: 'autorizadoPor', width: 140 },
+  { key: 'resultado', width: 110 },
+  { key: 'motivo', width: 220 },
+]
 
 const ACCION_LABELS: Record<string, string> = {
   override_descuento: 'Override de descuento',
@@ -19,6 +29,7 @@ export default function AdminPinLogPage() {
   const canView = roles.includes('System Manager') || roles.includes('Auditor')
   const [page, setPage] = useState(1)
   const offset = (page - 1) * PAGE_SIZE
+  const { widths: colWidths, startResize } = useResizableColumns(ADMIN_PIN_LOG_COLUMNS)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['admin-pin-log', offset],
@@ -53,15 +64,36 @@ export default function AdminPinLogPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {ADMIN_PIN_LOG_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Fecha</th>
-                <th>Acción</th>
-                <th>Solicitado por</th>
-                <th>Autorizado por</th>
-                <th>Resultado</th>
-                <th>Motivo</th>
+                <th>
+                  Fecha
+                  <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+                </th>
+                <th>
+                  Acción
+                  <span className="col-resize-handle" onMouseDown={startResize('accion')} />
+                </th>
+                <th>
+                  Solicitado por
+                  <span className="col-resize-handle" onMouseDown={startResize('solicitadoPor')} />
+                </th>
+                <th>
+                  Autorizado por
+                  <span className="col-resize-handle" onMouseDown={startResize('autorizadoPor')} />
+                </th>
+                <th>
+                  Resultado
+                  <span className="col-resize-handle" onMouseDown={startResize('resultado')} />
+                </th>
+                <th>
+                  Motivo
+                  <span className="col-resize-handle" onMouseDown={startResize('motivo')} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -93,8 +125,8 @@ export default function AdminPinLogPage() {
                   <tr key={row.id}>
                     <td className="td-muted" style={{ fontSize: 12 }}>{formatDateTime(row.fecha)}</td>
                     <td style={{ fontSize: 12 }}>{ACCION_LABELS[row.accion] ?? row.accion}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{row.solicitadoPor ?? '—'}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{row.autorizadoPor ?? '—'}</td>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{row.solicitadoPor ?? '—'}</td>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{row.autorizadoPor ?? '—'}</td>
                     <td>
                       {row.exito
                         ? <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={12} /> Autorizado</span>

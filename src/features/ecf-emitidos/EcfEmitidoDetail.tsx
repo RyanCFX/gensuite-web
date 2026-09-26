@@ -17,6 +17,17 @@ import {
   ecfStatusLabel, ecfFlujoStatusLabel, ecfStatusBadge, ecfTipoLabel, ecfEnvChip, ecfPuedeRefrescar, ECF_ENV_LABELS,
 } from '@/lib/dgii'
 import { EcfFlujoStepper } from './EcfFlujoStepper'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ECF_LINEAS_COLUMNS = [
+  { key: 'descripcion', width: 240 },
+  { key: 'cantidad', width: 90 },
+  { key: 'precioUnit', width: 110 },
+  { key: 'descuento', width: 110 },
+  { key: 'pctItbis', width: 90 },
+  { key: 'itbis', width: 100 },
+  { key: 'importe', width: 110 },
+]
 
 function num(s?: string | null): string {
   if (s == null || s === '') return '—'
@@ -74,6 +85,8 @@ export default function EcfEmitidoDetail() {
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo regenerar el e-NCF'),
   })
 
+  const { widths: colWidths, startResize } = useResizableColumns(ECF_LINEAS_COLUMNS)
+
   if (isLoading) {
     return (
       <div className="page-container">
@@ -113,7 +126,7 @@ export default function EcfEmitidoDetail() {
             <ArrowLeft size={14} /> e-CF Emitidos
           </a>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontFamily: 'monospace' }}>{v.ncf}</span>
+            <span style={{ fontFamily: 'var(--font-body)' }}>{v.ncf}</span>
             <span className={`badge ${ecfStatusBadge(v.status)}`}>{ecfFlujoStatusLabel(v.flujo, v.status)}</span>
             {chip && <span className={`badge ${chip.className}`}>{chip.label}</span>}
             {v.deferredSend && <span className="badge badge-info">Contingencia</span>}
@@ -187,15 +200,15 @@ export default function EcfEmitidoDetail() {
         </div>
         <div className="card-body">
           <div className="fields-grid">
-            <div className="detail-field"><span className="detail-label">e-NCF</span><span className="detail-value" style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v.ncf}</span></div>
+            <div className="detail-field"><span className="detail-label">e-NCF</span><span className="detail-value" style={{ fontFamily: 'var(--font-body)', fontWeight: 600 }}>{v.ncf}</span></div>
             <div className="detail-field"><span className="detail-label">Tipo</span><span className="detail-value">{ecfTipoLabel(v.typeId)}</span></div>
             <div className="detail-field"><span className="detail-label">Ambiente</span><span className="detail-value">{ECF_ENV_LABELS[v.env] ?? v.env}</span></div>
             <div className="detail-field"><span className="detail-label">Comprador</span><span className="detail-value">{v.counterpartName || 'Consumidor final'}{v.counterpartRnc ? ` (${v.counterpartRnc})` : ''}</span></div>
             <div className="detail-field"><span className="detail-label">Fecha de emisión</span><span className="detail-value">{formatDate(v.issuedAt)}</span></div>
             <div className="detail-field"><span className="detail-label">Creado</span><span className="detail-value">{formatDateTime(v.createdAt)}</span></div>
             <div className="detail-field"><span className="detail-label">Moneda</span><span className="detail-value">{v.currency}{v.exchangeRate && v.exchangeRate !== 1 ? ` · TC ${v.exchangeRate}` : ''}</span></div>
-            <div className="detail-field"><span className="detail-label">Track ID (DGII)</span><span className="detail-value" style={{ fontFamily: 'monospace' }}>{v.trackId || '—'}</span></div>
-            <div className="detail-field"><span className="detail-label">Código de seguridad</span><span className="detail-value" style={{ fontFamily: 'monospace' }}>{v.securityCode || '—'}</span></div>
+            <div className="detail-field"><span className="detail-label">Track ID (DGII)</span><span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{v.trackId || '—'}</span></div>
+            <div className="detail-field"><span className="detail-label">Código de seguridad</span><span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{v.securityCode || '—'}</span></div>
             {v.archived && <div className="detail-field"><span className="detail-label">Archivado</span><span className="detail-value">Sí</span></div>}
           </div>
 
@@ -209,7 +222,7 @@ export default function EcfEmitidoDetail() {
           {docPath && (
             <p style={{ fontSize: 13, marginTop: 12 }}>
               {esSales ? 'Factura de venta' : 'Factura de compra'}:{' '}
-              <Link to={docPath} style={{ fontFamily: 'monospace', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Link to={docPath} style={{ fontFamily: 'var(--font-body)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                 {v.erpnext!.docname} <ExternalLink size={12} />
               </Link>
               {v.erpnext?.outboxState && (
@@ -244,16 +257,40 @@ export default function EcfEmitidoDetail() {
           <h2 className="card-title">Líneas</h2>
         </div>
         <div className="items-table-wrap">
-          <table className="items-table">
+          <table className="items-table items-table-resizable">
+            <colgroup>
+              {ECF_LINEAS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Descripción</th>
-                <th style={{ textAlign: 'right' }}>Cant.</th>
-                <th style={{ textAlign: 'right' }}>Precio Unit.</th>
-                <th style={{ textAlign: 'right' }}>Descuento</th>
-                <th style={{ textAlign: 'right' }}>% ITBIS</th>
-                <th style={{ textAlign: 'right' }}>ITBIS</th>
-                <th style={{ textAlign: 'right' }}>Importe</th>
+                <th>
+                  Descripción
+                  <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Cant.
+                  <span className="col-resize-handle" onMouseDown={startResize('cantidad')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Precio Unit.
+                  <span className="col-resize-handle" onMouseDown={startResize('precioUnit')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Descuento
+                  <span className="col-resize-handle" onMouseDown={startResize('descuento')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  % ITBIS
+                  <span className="col-resize-handle" onMouseDown={startResize('pctItbis')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  ITBIS
+                  <span className="col-resize-handle" onMouseDown={startResize('itbis')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Importe
+                  <span className="col-resize-handle" onMouseDown={startResize('importe')} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -291,7 +328,7 @@ export default function EcfEmitidoDetail() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {v.securityCode && (
                   <span style={{ fontSize: 13 }}>
-                    Código de seguridad: <strong style={{ fontFamily: 'monospace' }}>{v.securityCode}</strong>
+                    Código de seguridad: <strong style={{ fontFamily: 'var(--font-body)' }}>{v.securityCode}</strong>
                   </span>
                 )}
                 <a href={v.qrUrl} target="_blank" rel="noreferrer" className="btn btn-secondary btn-size-sm" style={{ width: 'fit-content' }}>

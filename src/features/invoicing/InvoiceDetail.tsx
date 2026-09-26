@@ -107,6 +107,54 @@ import { Select, SelectItem } from "@/components/ui/select";
 import type { SearchSelectOption } from "@/shared/ui/SearchSelect";
 import { ComponentTrackingModal } from "@/components/shared/ComponentTrackingModal";
 import type { TrackedComponent } from "@/components/shared/ComponentTrackingModal";
+import { useResizableColumns } from "@/shared/hooks/useResizableColumns";
+
+const PAGOS_COLUMNS = [
+  { key: "metodo", width: 110 },
+  { key: "monto", width: 110 },
+  { key: "detalle", width: 220 },
+];
+
+const VUELTO_COLUMNS = [
+  { key: "denominacion", width: 140 },
+  { key: "cantidad", width: 100 },
+];
+
+const SALDO_FAVOR_COLUMNS = [
+  { key: "origen", width: 120 },
+  { key: "fecha", width: 100 },
+  { key: "metodo", width: 110 },
+  { key: "disponible", width: 110 },
+  { key: "comprometido", width: 110 },
+  { key: "disponibleNeto", width: 120 },
+  { key: "montoAplicar", width: 140 },
+  { key: "actions", width: 140 },
+];
+
+const CREDIT_NOTE_COLUMNS = [
+  { key: "ncf", width: 120 },
+  { key: "fecha", width: 100 },
+  { key: "total", width: 110 },
+  { key: "reembolsado", width: 110 },
+  { key: "aplicado", width: 110 },
+  { key: "disponible", width: 110 },
+  { key: "montoAplicar", width: 140 },
+  { key: "actions", width: 140 },
+];
+
+const PENDING_TRACKING_COLUMNS = [
+  { key: "articulo", width: 180 },
+  { key: "almacen", width: 120 },
+  { key: "cantidad", width: 90 },
+  { key: "tipo", width: 90 },
+];
+
+const RETURN_COLUMNS = [
+  { key: "checkbox", width: 36 },
+  { key: "articulo", width: 200 },
+  { key: "comprado", width: 100 },
+  { key: "cantidadDevolver", width: 120 },
+];
 
 const RETURN_RESOLUTION_OPTIONS: SearchSelectOption[] = [
   { value: "credit_note_only", label: "Saldo a favor" },
@@ -134,6 +182,13 @@ export default function InvoiceDetail() {
   // al someter — ver escenarios en handleSubmitClick. La forma del bloque depende de
   // flujoCobro: "directo" = un solo método + monto, sin vuelto; "caja" = PaymentLinesEditor
   // completo (varias líneas + vuelto), igual que en CajaPage.tsx/PorCobrarPage.tsx.
+  const { widths: pagosColWidths, startResize: pagosStartResize } = useResizableColumns(PAGOS_COLUMNS);
+  const { widths: vueltoColWidths, startResize: vueltoStartResize } = useResizableColumns(VUELTO_COLUMNS);
+  const { widths: saldoFavorColWidths, startResize: saldoFavorStartResize } = useResizableColumns(SALDO_FAVOR_COLUMNS);
+  const { widths: creditNoteColWidths, startResize: creditNoteStartResize } = useResizableColumns(CREDIT_NOTE_COLUMNS);
+  const { widths: pendingTrackingColWidths, startResize: pendingTrackingStartResize } = useResizableColumns(PENDING_TRACKING_COLUMNS);
+  const { widths: returnColWidths, startResize: returnStartResize } = useResizableColumns(RETURN_COLUMNS);
+
   const [payments, setPayments] = useState(EMPTY_PAYMENT_LINES_VALUE);
   const [directoMop, setDirectoMop] = useState("");
   const [directoMopSearch, setDirectoMopSearch] = useState("");
@@ -525,6 +580,25 @@ export default function InvoiceDetail() {
    *  la factura responde 409/400. La única salida es una devolución (§3.8). */
   const arsFacturado = estadoArs === "Facturado";
   const puedeRecalcularCobertura = usePuede("ventas.factura.recalcular-cobertura");
+
+  const ITEMS_COLUMNS = [
+    { key: "codigo", width: 110 },
+    { key: "descripcion", width: 200 },
+    { key: "notas", width: 160 },
+    { key: "cantidad", width: 90 },
+    { key: "precioUnit", width: 110 },
+    { key: "descuentoPct", width: 72 },
+    { key: "importe", width: 110 },
+    { key: "udm", width: 80 },
+    ...(arsCobertura
+      ? [
+          { key: "cubreArs", width: 100 },
+          { key: "paciente", width: 100 },
+          { key: "porcientoReal", width: 90 },
+        ]
+      : []),
+  ];
+  const { widths: itemsColWidths, startResize: itemsStartResize } = useResizableColumns(ITEMS_COLUMNS);
 
   const recalcularCoberturaMutation = useMutation({
     mutationFn: () => recalcularCoberturaFactura(id!),
@@ -1619,7 +1693,7 @@ export default function InvoiceDetail() {
             {invoice.esClienteOcasional && invoice.clienteOcasionalRnc && (
               <div className="detail-field">
                 <span className="detail-label">RNC</span>
-                <span className="detail-value" style={{ fontFamily: 'monospace' }}>{invoice.clienteOcasionalRnc}</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{invoice.clienteOcasionalRnc}</span>
               </div>
             )}
             {invoice.esClienteOcasional && invoice.clienteOcasionalDireccion && (
@@ -1644,7 +1718,7 @@ export default function InvoiceDetail() {
               <span className="detail-label">NCF</span>
               <span
                 className="detail-value"
-                style={{ fontFamily: "monospace", fontWeight: 600 }}
+                style={{ fontFamily: "var(--font-body)", fontWeight: 600 }}
               >
                 {invoice.ncf ?? (
                   <em
@@ -1675,7 +1749,7 @@ export default function InvoiceDetail() {
                 <button
                   style={{
                     fontSize: 12,
-                    fontFamily: "monospace",
+                    fontFamily: "var(--font-body)",
                     color: "var(--color-brand)",
                     textDecoration: "underline",
                     background: "none",
@@ -1763,12 +1837,24 @@ export default function InvoiceDetail() {
                 Pagos
               </p>
               <div className="table-scroll">
-                <table className="data-table">
+                <table className="data-table items-table-resizable">
+                  <colgroup>
+                    {PAGOS_COLUMNS.map((c) => <col key={c.key} style={{ width: pagosColWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Método</th>
-                      <th style={{ textAlign: "right" }}>Monto</th>
-                      <th>Detalle</th>
+                      <th>
+                        Método
+                        <span className="col-resize-handle" onMouseDown={pagosStartResize("metodo")} />
+                      </th>
+                      <th style={{ textAlign: "right" }}>
+                        Monto
+                        <span className="col-resize-handle" onMouseDown={pagosStartResize("monto")} />
+                      </th>
+                      <th>
+                        Detalle
+                        <span className="col-resize-handle" onMouseDown={pagosStartResize("detalle")} />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1806,11 +1892,20 @@ export default function InvoiceDetail() {
                 Vuelto entregado
               </p>
               <div className="table-scroll">
-                <table className="data-table">
+                <table className="data-table items-table-resizable">
+                  <colgroup>
+                    {VUELTO_COLUMNS.map((c) => <col key={c.key} style={{ width: vueltoColWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Denominación</th>
-                      <th style={{ textAlign: "right" }}>Cantidad</th>
+                      <th>
+                        Denominación
+                        <span className="col-resize-handle" onMouseDown={vueltoStartResize("denominacion")} />
+                      </th>
+                      <th style={{ textAlign: "right" }}>
+                        Cantidad
+                        <span className="col-resize-handle" onMouseDown={vueltoStartResize("cantidad")} />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1876,19 +1971,41 @@ export default function InvoiceDetail() {
             </div>
           ) : (
             <div className="table-scroll">
-              <table className="data-table">
+              <table className="data-table items-table-resizable">
+                <colgroup>
+                  {SALDO_FAVOR_COLUMNS.map((c) => <col key={c.key} style={{ width: saldoFavorColWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>Origen</th>
-                    <th>Fecha</th>
-                    <th>Método</th>
-                    <th style={{ textAlign: "right" }}>Disponible</th>
-                    <th style={{ textAlign: "right" }}>Comprometido</th>
-                    <th style={{ textAlign: "right" }}>Disponible neto</th>
-                    <th style={{ textAlign: "right", width: 140 }}>
-                      Monto a aplicar
+                    <th>
+                      Origen
+                      <span className="col-resize-handle" onMouseDown={saldoFavorStartResize("origen")} />
                     </th>
-                    <th style={{ width: 140 }} />
+                    <th>
+                      Fecha
+                      <span className="col-resize-handle" onMouseDown={saldoFavorStartResize("fecha")} />
+                    </th>
+                    <th>
+                      Método
+                      <span className="col-resize-handle" onMouseDown={saldoFavorStartResize("metodo")} />
+                    </th>
+                    <th style={{ textAlign: "right" }}>
+                      Disponible
+                      <span className="col-resize-handle" onMouseDown={saldoFavorStartResize("disponible")} />
+                    </th>
+                    <th style={{ textAlign: "right" }}>
+                      Comprometido
+                      <span className="col-resize-handle" onMouseDown={saldoFavorStartResize("comprometido")} />
+                    </th>
+                    <th style={{ textAlign: "right" }}>
+                      Disponible neto
+                      <span className="col-resize-handle" onMouseDown={saldoFavorStartResize("disponibleNeto")} />
+                    </th>
+                    <th style={{ textAlign: "right" }}>
+                      Monto a aplicar
+                      <span className="col-resize-handle" onMouseDown={saldoFavorStartResize("montoAplicar")} />
+                    </th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
@@ -1903,7 +2020,7 @@ export default function InvoiceDetail() {
                     );
                     return (
                       <tr key={entry.paymentEntryId}>
-                        <td style={{ fontFamily: "monospace", fontSize: 12 }}>
+                        <td style={{ fontFamily: "var(--font-body)", fontSize: 12 }}>
                           {entry.paymentEntryId}
                         </td>
                         <td>{formatDate(entry.postingDate)}</td>
@@ -2043,19 +2160,41 @@ export default function InvoiceDetail() {
             </div>
           ) : (
             <div className="table-scroll">
-              <table className="data-table">
+              <table className="data-table items-table-resizable">
+                <colgroup>
+                  {CREDIT_NOTE_COLUMNS.map((c) => <col key={c.key} style={{ width: creditNoteColWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>NCF</th>
-                    <th>Fecha</th>
-                    <th style={{ textAlign: "right" }}>Total</th>
-                    <th style={{ textAlign: "right" }}>Reembolsado</th>
-                    <th style={{ textAlign: "right" }}>Aplicado</th>
-                    <th style={{ textAlign: "right" }}>Disponible</th>
-                    <th style={{ textAlign: "right", width: 140 }}>
-                      Monto a aplicar
+                    <th>
+                      NCF
+                      <span className="col-resize-handle" onMouseDown={creditNoteStartResize("ncf")} />
                     </th>
-                    <th style={{ width: 140 }} />
+                    <th>
+                      Fecha
+                      <span className="col-resize-handle" onMouseDown={creditNoteStartResize("fecha")} />
+                    </th>
+                    <th style={{ textAlign: "right" }}>
+                      Total
+                      <span className="col-resize-handle" onMouseDown={creditNoteStartResize("total")} />
+                    </th>
+                    <th style={{ textAlign: "right" }}>
+                      Reembolsado
+                      <span className="col-resize-handle" onMouseDown={creditNoteStartResize("reembolsado")} />
+                    </th>
+                    <th style={{ textAlign: "right" }}>
+                      Aplicado
+                      <span className="col-resize-handle" onMouseDown={creditNoteStartResize("aplicado")} />
+                    </th>
+                    <th style={{ textAlign: "right" }}>
+                      Disponible
+                      <span className="col-resize-handle" onMouseDown={creditNoteStartResize("disponible")} />
+                    </th>
+                    <th style={{ textAlign: "right" }}>
+                      Monto a aplicar
+                      <span className="col-resize-handle" onMouseDown={creditNoteStartResize("montoAplicar")} />
+                    </th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
@@ -2070,7 +2209,7 @@ export default function InvoiceDetail() {
                     );
                     return (
                       <tr key={entry.creditNoteId}>
-                        <td style={{ fontFamily: "monospace", fontSize: 12 }}>
+                        <td style={{ fontFamily: "var(--font-body)", fontSize: 12 }}>
                           {entry.ncf ?? entry.creditNoteId}
                         </td>
                         <td>{formatDate(entry.postingDate)}</td>
@@ -2297,13 +2436,28 @@ export default function InvoiceDetail() {
                 usa este selector solo si quieres elegir uno específico, o si
                 el submit falla por falta de stock.
               </p>
-              <table className="data-table">
+              <table className="data-table items-table-resizable">
+                <colgroup>
+                  {PENDING_TRACKING_COLUMNS.map((c) => <col key={c.key} style={{ width: pendingTrackingColWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>Artículo</th>
-                    <th>Almacén</th>
-                    <th style={{ textAlign: "right" }}>Cant.</th>
-                    <th>Tipo</th>
+                    <th>
+                      Artículo
+                      <span className="col-resize-handle" onMouseDown={pendingTrackingStartResize("articulo")} />
+                    </th>
+                    <th>
+                      Almacén
+                      <span className="col-resize-handle" onMouseDown={pendingTrackingStartResize("almacen")} />
+                    </th>
+                    <th style={{ textAlign: "right" }}>
+                      Cant.
+                      <span className="col-resize-handle" onMouseDown={pendingTrackingStartResize("cantidad")} />
+                    </th>
+                    <th>
+                      Tipo
+                      <span className="col-resize-handle" onMouseDown={pendingTrackingStartResize("tipo")} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2379,7 +2533,7 @@ export default function InvoiceDetail() {
                   <span className="detail-label">Lote de facturación</span>
                   <span className="detail-value">
                     <button
-                      style={{ fontFamily: "monospace", color: "var(--color-brand)", background: "none", border: "none", padding: 0, cursor: "pointer", textDecoration: "underline" }}
+                      style={{ fontFamily: "var(--font-body)", color: "var(--color-brand)", background: "none", border: "none", padding: 0, cursor: "pointer", textDecoration: "underline" }}
                       onClick={() => navigate(`/farmacia/lotes/${arsCobertura.lote}`)}
                     >
                       {arsCobertura.lote}
@@ -2405,22 +2559,58 @@ export default function InvoiceDetail() {
 
       <div className="card">
         <div className="items-table-wrap">
-          <table className="items-table navy-table">
+          <table className="items-table navy-table items-table-resizable">
+            <colgroup>
+              {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Código</th>
-                <th>Descripción</th>
-                <th>Notas</th>
-                <th style={{ textAlign: "right" }}>Cant.</th>
-                <th style={{ textAlign: "right" }}>Precio Unit.</th>
-                <th style={{ textAlign: "right", width: 72 }}>Dto. %</th>
-                <th style={{ textAlign: "right" }}>Importe</th>
-                <th>UDM</th>
+                <th>
+                  Código
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize("codigo")} />
+                </th>
+                <th>
+                  Descripción
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize("descripcion")} />
+                </th>
+                <th>
+                  Notas
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize("notas")} />
+                </th>
+                <th style={{ textAlign: "right" }}>
+                  Cant.
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize("cantidad")} />
+                </th>
+                <th style={{ textAlign: "right" }}>
+                  Precio Unit.
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize("precioUnit")} />
+                </th>
+                <th style={{ textAlign: "right" }}>
+                  Dto. %
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize("descuentoPct")} />
+                </th>
+                <th style={{ textAlign: "right" }}>
+                  Importe
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize("importe")} />
+                </th>
+                <th>
+                  UDM
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize("udm")} />
+                </th>
                 {arsCobertura && (
                   <>
-                    <th style={{ textAlign: "right" }}>Cubre ARS</th>
-                    <th style={{ textAlign: "right" }}>Paciente</th>
-                    <th style={{ textAlign: "right" }}>% real</th>
+                    <th style={{ textAlign: "right" }}>
+                      Cubre ARS
+                      <span className="col-resize-handle" onMouseDown={itemsStartResize("cubreArs")} />
+                    </th>
+                    <th style={{ textAlign: "right" }}>
+                      Paciente
+                      <span className="col-resize-handle" onMouseDown={itemsStartResize("paciente")} />
+                    </th>
+                    <th style={{ textAlign: "right" }}>
+                      % real
+                      <span className="col-resize-handle" onMouseDown={itemsStartResize("porcientoReal")} />
+                    </th>
                   </>
                 )}
               </tr>
@@ -2428,7 +2618,7 @@ export default function InvoiceDetail() {
             <tbody>
               {invoice.items.map((item, i) => (
                 <tr key={i}>
-                  <td style={{ fontFamily: "monospace", fontSize: 12 }}>
+                  <td style={{ fontFamily: "var(--font-body)", fontSize: 12 }}>
                     {item.itemCode || "—"}
                   </td>
                   <td>{item.description || "—"}</td>
@@ -2871,16 +3061,24 @@ export default function InvoiceDetail() {
 
               {!returnFullInvoice && (
                 <div className="items-table-wrap">
-                  <table className="items-table">
+                  <table className="items-table items-table-resizable">
+                    <colgroup>
+                      {RETURN_COLUMNS.map((c) => <col key={c.key} style={{ width: returnColWidths[c.key] }} />)}
+                    </colgroup>
                     <thead>
                       <tr>
-                        <th style={{ width: 36 }} />
-                        <th>Artículo</th>
-                        <th style={{ textAlign: "right", width: 100 }}>
-                          Comprado
+                        <th />
+                        <th>
+                          Artículo
+                          <span className="col-resize-handle" onMouseDown={returnStartResize("articulo")} />
                         </th>
-                        <th style={{ textAlign: "right", width: 120 }}>
+                        <th style={{ textAlign: "right" }}>
+                          Comprado
+                          <span className="col-resize-handle" onMouseDown={returnStartResize("comprado")} />
+                        </th>
+                        <th style={{ textAlign: "right" }}>
                           Cant. a devolver
+                          <span className="col-resize-handle" onMouseDown={returnStartResize("cantidadDevolver")} />
                         </th>
                       </tr>
                     </thead>
@@ -2909,7 +3107,7 @@ export default function InvoiceDetail() {
                             <span
                               style={{
                                 fontSize: 11,
-                                fontFamily: "monospace",
+                                fontFamily: "var(--font-body)",
                                 color: "var(--text-tertiary)",
                               }}
                             >
@@ -3178,7 +3376,7 @@ function DetalleArs({ label, valor, mono = false }: { label: string; valor?: str
   return (
     <div className="detail-field">
       <span className="detail-label">{label}</span>
-      <span className="detail-value" style={mono ? { fontFamily: "monospace" } : undefined}>{valor}</span>
+      <span className="detail-value" style={mono ? { fontFamily: "var(--font-body)" } : undefined}>{valor}</span>
     </div>
   );
 }

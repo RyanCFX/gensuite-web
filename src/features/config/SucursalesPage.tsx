@@ -22,8 +22,17 @@ import { isApiErrorCode } from '@/shared/api/client'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const SUCURSALES_COLUMNS = [
+  { key: 'nombre', width: 200 },
+  { key: 'almacenes', width: 140 },
+  { key: 'almacenVenta', width: 180 },
+  { key: 'almacenCompra', width: 180 },
+  { key: 'actions', width: 48 },
+]
 
 const sucursalSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -41,6 +50,7 @@ export default function SucursalesPage() {
   const [toDelete, setToDelete] = useState<Sucursal | null>(null)
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(SUCURSALES_COLUMNS)
   // Límites del plan (§8): mismo criterio que Usuarios — contador "X de Y" + botón deshabilitado.
   const limites = useLimites()
   const limiteAlcanzado = limiteSucursalesAlcanzado(limites)
@@ -219,14 +229,32 @@ export default function SucursalesPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {SUCURSALES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <SortableTh label="Nombre" sortKey="name" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                <th>Almacenes</th>
-                <th>Almacén de venta</th>
-                <th>Almacén de compras</th>
-                <th style={{ width: 48 }} />
+                <SortableTh
+                  label="Nombre"
+                  sortKey="name"
+                  orderBy={orderBy}
+                  onSort={(k) => { sort(k); setPage(1) }}
+                  resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('nombre')} />}
+                />
+                <th>
+                  Almacenes
+                  <span className="col-resize-handle" onMouseDown={startResize('almacenes')} />
+                </th>
+                <th>
+                  Almacén de venta
+                  <span className="col-resize-handle" onMouseDown={startResize('almacenVenta')} />
+                </th>
+                <th>
+                  Almacén de compras
+                  <span className="col-resize-handle" onMouseDown={startResize('almacenCompra')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>

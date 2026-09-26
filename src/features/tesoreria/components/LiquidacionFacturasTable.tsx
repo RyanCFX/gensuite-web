@@ -2,6 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { formatDOP, formatDate } from '@/lib/formatters'
 import type { TesoreriaLiquidacion, TesoreriaPendienteFactura } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const COLUMNS = [
+  { key: 'check', width: 36 },
+  { key: 'factura', width: 160 },
+  { key: 'total', width: 110 },
+  { key: 'pendiente', width: 110 },
+  { key: 'montoAplicar', width: 140 },
+]
 
 interface LiquidacionFacturasTableProps {
   pendientes: TesoreriaPendienteFactura[]
@@ -36,6 +45,7 @@ export function LiquidacionFacturasTable({
 }: LiquidacionFacturasTableProps) {
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
   const [manualOverrides, setManualOverrides] = useState<Record<string, number>>({})
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   // Si cambia la lista de pendientes (ej. cambió el party), descartar selección anterior.
   useEffect(() => {
@@ -117,14 +127,29 @@ export function LiquidacionFacturasTable({
   return (
     <>
       <div style={{ overflowX: 'auto' }}>
-        <table className="items-table">
+        <table className="items-table items-table-resizable">
+          <colgroup>
+            {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th style={{ width: 36 }} />
-              <th>Factura</th>
-              <th style={{ textAlign: 'right' }}>Total</th>
-              <th style={{ textAlign: 'right' }}>Pendiente</th>
-              <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
+              <th />
+              <th>
+                Factura
+                <span className="col-resize-handle" onMouseDown={startResize('factura')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Total
+                <span className="col-resize-handle" onMouseDown={startResize('total')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Pendiente
+                <span className="col-resize-handle" onMouseDown={startResize('pendiente')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Monto a aplicar
+                <span className="col-resize-handle" onMouseDown={startResize('montoAplicar')} />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -141,7 +166,7 @@ export function LiquidacionFacturasTable({
                     />
                   </td>
                   <td>
-                    <span style={{ fontWeight: 500, fontFamily: 'var(--font-mono)', fontSize: 13 }}>{p.facturaId}</span>
+                    <span style={{ fontWeight: 500, fontFamily: 'var(--font-body)', fontSize: 13 }}>{p.facturaId}</span>
                     <br />
                     <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Vence {formatDate(p.dueDate)}</span>
                   </td>

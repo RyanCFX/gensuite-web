@@ -33,8 +33,27 @@ import { formatMoney } from '@/lib/formatters'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { usePuede } from '@/shared/permissions/can'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const CUENTAS_BANCARIAS_COLUMNS = [
+  { key: 'nombre', width: 200 },
+  { key: 'banco', width: 160 },
+  { key: 'numeroCuenta', width: 150 },
+  { key: 'moneda', width: 90 },
+  { key: 'tipoCuenta', width: 140 },
+  { key: 'estado', width: 100 },
+  { key: 'porDefecto', width: 100 },
+  { key: 'actions', width: 48 },
+]
+
+const INCONSISTENCIAS_MONEDA_COLUMNS = [
+  { key: 'cuentaBancaria', width: 200 },
+  { key: 'cuentaContable', width: 200 },
+  { key: 'monedaRegistrada', width: 160 },
+  { key: 'monedaReal', width: 160 },
+]
 
 const ESTADOS: CuentaBancariaEstado[] = ['Activa', 'Inactiva', 'Cerrada']
 const CHEQUE_FORMATS: ChequeFormat[] = ['Estándar', 'Voucher', 'Media Carta', 'Cartera']
@@ -91,6 +110,8 @@ export default function CuentasBancariasPage() {
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
+  const { widths: colWidths, startResize } = useResizableColumns(CUENTAS_BANCARIAS_COLUMNS)
+  const { widths: inconsistenciasColWidths, startResize: startInconsistenciasResize } = useResizableColumns(INCONSISTENCIAS_MONEDA_COLUMNS)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['cuentas-bancarias', { search: debouncedSearch, offset, estadoFilter, tipoCuentaFilter }],
@@ -371,17 +392,41 @@ export default function CuentasBancariasPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {CUENTAS_BANCARIAS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>Banco</th>
-                <th>Número de cuenta</th>
-                <th>Moneda</th>
-                <th>Tipo de Cuenta</th>
-                <th>Estado</th>
-                <th>Por defecto</th>
-                <th style={{ width: 48 }} />
+                <th>
+                  Nombre
+                  <span className="col-resize-handle" onMouseDown={startResize('nombre')} />
+                </th>
+                <th>
+                  Banco
+                  <span className="col-resize-handle" onMouseDown={startResize('banco')} />
+                </th>
+                <th>
+                  Número de cuenta
+                  <span className="col-resize-handle" onMouseDown={startResize('numeroCuenta')} />
+                </th>
+                <th>
+                  Moneda
+                  <span className="col-resize-handle" onMouseDown={startResize('moneda')} />
+                </th>
+                <th>
+                  Tipo de Cuenta
+                  <span className="col-resize-handle" onMouseDown={startResize('tipoCuenta')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
+                <th>
+                  Por defecto
+                  <span className="col-resize-handle" onMouseDown={startResize('porDefecto')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -488,13 +533,28 @@ export default function CuentasBancariasPage() {
                 </p>
               </div>
               <div className="table-scroll">
-                <table className="data-table navy-table">
+                <table className="data-table navy-table items-table-resizable">
+                  <colgroup>
+                    {INCONSISTENCIAS_MONEDA_COLUMNS.map((c) => <col key={c.key} style={{ width: inconsistenciasColWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Cuenta Bancaria</th>
-                      <th>Cuenta Contable</th>
-                      <th>Moneda registrada</th>
-                      <th>Moneda real (GL)</th>
+                      <th>
+                        Cuenta Bancaria
+                        <span className="col-resize-handle" onMouseDown={startInconsistenciasResize('cuentaBancaria')} />
+                      </th>
+                      <th>
+                        Cuenta Contable
+                        <span className="col-resize-handle" onMouseDown={startInconsistenciasResize('cuentaContable')} />
+                      </th>
+                      <th>
+                        Moneda registrada
+                        <span className="col-resize-handle" onMouseDown={startInconsistenciasResize('monedaRegistrada')} />
+                      </th>
+                      <th>
+                        Moneda real (GL)
+                        <span className="col-resize-handle" onMouseDown={startInconsistenciasResize('monedaReal')} />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -520,7 +580,7 @@ export default function CuentasBancariasPage() {
                         : inconsistencias!.map((i) => (
                             <tr key={i.id}>
                               <td style={{ fontWeight: 500 }}>{i.accountName}</td>
-                              <td className="td-muted" style={{ fontFamily: 'var(--font-mono)' }}>{i.account}</td>
+                              <td className="td-muted" style={{ fontFamily: 'var(--font-body)' }}>{i.account}</td>
                               <td style={{ color: 'var(--error-text)' }}>{i.customMoneda}</td>
                               <td style={{ fontWeight: 600 }}>{i.accountCurrency}</td>
                             </tr>

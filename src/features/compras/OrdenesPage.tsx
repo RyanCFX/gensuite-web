@@ -17,8 +17,20 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const COLUMNS = [
+  { key: 'id', width: 100 },
+  { key: 'proveedor', width: 200 },
+  { key: 'fecha', width: 100 },
+  { key: 'total', width: 120 },
+  { key: 'estado', width: 110 },
+  { key: 'recepcion', width: 130 },
+  { key: 'facturacion', width: 130 },
+  { key: 'acciones', width: 70 },
+]
 
 function PerBadge({ pct, doneLabel, pendingLabel, progressLabel }: { pct: number; doneLabel: string; pendingLabel: string; progressLabel: (n: number) => string }) {
   if (pct >= 100) return <Badge variant="success">{doneLabel}</Badge>
@@ -38,6 +50,7 @@ export default function OrdenesPage() {
   const [page, setPage] = useState(1)
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const offset = (page - 1) * PAGE_SIZE
 
@@ -146,16 +159,28 @@ export default function OrdenesPage() {
 
         <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <SortableTh label="Proveedor" sortKey="supplierName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <SortableTh label="Fecha" sortKey="transactionDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <th style={{ textAlign: 'right' }}>Total</th>
-                  <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <th>Recepción</th>
-                  <th>Facturación</th>
+                  <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('id')} />} />
+                  <SortableTh label="Proveedor" sortKey="supplierName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('proveedor')} />} />
+                  <SortableTh label="Fecha" sortKey="transactionDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />} />
+                  <th style={{ textAlign: 'right' }}>
+                    Total
+                    <span className="col-resize-handle" onMouseDown={startResize('total')} />
+                  </th>
+                  <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('estado')} />} />
+                  <th>
+                    Recepción
+                    <span className="col-resize-handle" onMouseDown={startResize('recepcion')} />
+                  </th>
+                  <th>
+                    Facturación
+                    <span className="col-resize-handle" onMouseDown={startResize('facturacion')} />
+                  </th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -195,7 +220,7 @@ export default function OrdenesPage() {
                         )
                       : data?.items.map((o) => (
                           <tr key={o.id} className="table-row-clickable" onClick={() => navigate(`/compras/ordenes/${o.id}`)}>
-                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{o.id}</td>
+                            <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{o.id}</td>
                             <td style={{ fontWeight: 500 }}>{o.supplierName}</td>
                             <td>{formatDate(o.transactionDate)}</td>
                             <td style={{ textAlign: 'right' }}>{formatDOP(o.grandTotal)}</td>

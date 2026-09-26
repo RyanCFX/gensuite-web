@@ -23,8 +23,17 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const CENTROS_COSTO_COLUMNS = [
+  { key: 'nombre', width: 220 },
+  { key: 'numero', width: 110 },
+  { key: 'tipo', width: 100 },
+  { key: 'estado', width: 100 },
+  { key: 'actions', width: 48 },
+]
 
 const centroCostoSchema = z.object({
   costCenterName: z.string().min(1, 'El nombre es requerido'),
@@ -100,6 +109,7 @@ export default function CentrosCostoPage() {
   })
 
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, closeDialog)
+  const { widths: colWidths, startResize } = useResizableColumns(CENTROS_COSTO_COLUMNS)
 
   const createMutation = useMutation({
     mutationFn: createCentroCosto,
@@ -235,14 +245,32 @@ export default function CentrosCostoPage() {
       {view === 'list' ? (
         <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {CENTROS_COSTO_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <SortableTh label="Nombre" sortKey="name" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <th>Número</th>
-                  <th>Tipo</th>
-                  <th>Estado</th>
-                  <th style={{ width: 48 }} />
+                  <SortableTh
+                    label="Nombre"
+                    sortKey="name"
+                    orderBy={orderBy}
+                    onSort={(k) => { sort(k); setPage(1) }}
+                    resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('nombre')} />}
+                  />
+                  <th>
+                    Número
+                    <span className="col-resize-handle" onMouseDown={startResize('numero')} />
+                  </th>
+                  <th>
+                    Tipo
+                    <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                  </th>
+                  <th>
+                    Estado
+                    <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                  </th>
+                  <th />
                 </tr>
               </thead>
               <tbody>

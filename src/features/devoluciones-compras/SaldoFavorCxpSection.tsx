@@ -4,6 +4,17 @@ import { toast } from 'sonner'
 import { Wallet } from 'lucide-react'
 import { getDevolucionesSaldoFavor, applyDevolucionToCxp, unapplyDevolucionFromCxp } from '@/shared/api/devoluciones-compras'
 import { formatDOP, formatDate } from '@/lib/formatters'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const SALDO_FAVOR_COLUMNS = [
+  { key: 'devolucion', width: 120 },
+  { key: 'ncf', width: 130 },
+  { key: 'fecha', width: 100 },
+  { key: 'total', width: 110 },
+  { key: 'disponible', width: 110 },
+  { key: 'montoAplicar', width: 140 },
+  { key: 'acciones', width: 140 },
+]
 
 export interface SaldoFavorCxpSectionProps {
   /** Proveedor registrado — si es un proveedor ocasional (sin id) no hay saldo a favor que consultar. */
@@ -34,6 +45,7 @@ export function SaldoFavorCxpSection({
 }: SaldoFavorCxpSectionProps) {
   const queryClient = useQueryClient()
   const [amounts, setAmounts] = useState<Record<string, number>>({})
+  const { widths: colWidths, startResize } = useResizableColumns(SALDO_FAVOR_COLUMNS)
 
   const { data: saldoFavor, isLoading } = useQuery({
     queryKey: ['devoluciones-saldo-favor', supplierId],
@@ -131,16 +143,37 @@ export function SaldoFavorCxpSection({
           </p>
         )}
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table items-table-resizable">
+            <colgroup>
+              {SALDO_FAVOR_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Devolución</th>
-                <th>NCF</th>
-                <th>Fecha</th>
-                <th style={{ textAlign: 'right' }}>Total</th>
-                <th style={{ textAlign: 'right' }}>Disponible</th>
-                <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
-                <th style={{ width: 140 }} />
+                <th>
+                  Devolución
+                  <span className="col-resize-handle" onMouseDown={startResize('devolucion')} />
+                </th>
+                <th>
+                  NCF
+                  <span className="col-resize-handle" onMouseDown={startResize('ncf')} />
+                </th>
+                <th>
+                  Fecha
+                  <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Total
+                  <span className="col-resize-handle" onMouseDown={startResize('total')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Disponible
+                  <span className="col-resize-handle" onMouseDown={startResize('disponible')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Monto a aplicar
+                  <span className="col-resize-handle" onMouseDown={startResize('montoAplicar')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -150,8 +183,8 @@ export function SaldoFavorCxpSection({
                 const defaultAmount = Math.min(entry.availableAmount, remaining || entry.availableAmount)
                 return (
                   <tr key={entry.devolucionId}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{entry.devolucionId}</td>
-                    <td className="td-muted" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{entry.ncf ?? '—'}</td>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{entry.devolucionId}</td>
+                    <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 11 }}>{entry.ncf ?? '—'}</td>
                     <td>{formatDate(entry.postingDate)}</td>
                     <td style={{ textAlign: 'right' }}>{formatDOP(entry.grandTotal)}</td>
                     <td style={{ textAlign: 'right' }}>{formatDOP(entry.availableAmount)}</td>

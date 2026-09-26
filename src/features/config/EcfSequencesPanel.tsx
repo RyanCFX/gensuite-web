@@ -23,6 +23,18 @@ import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const SEQUENCES_COLUMNS = [
+  { key: 'tipo', width: 130 },
+  { key: 'ambiente', width: 100 },
+  { key: 'rango', width: 150 },
+  { key: 'siguiente', width: 100 },
+  { key: 'disponibles', width: 160 },
+  { key: 'vence', width: 110 },
+  { key: 'estado', width: 110 },
+  { key: 'acciones', width: 90 },
+]
 
 const ECF_TYPE_IDS = ECF_TIPOS.map((t) => t.typeId) as EcfTipoElectronico[]
 
@@ -404,6 +416,7 @@ function VoidRangeModal({ company, seq, onClose }: { company: string; seq: EcfSe
 
 export function EcfSequencesPanel() {
   const [modal, setModal] = useState<PanelModal>({ type: 'none' })
+  const { widths: colWidths, startResize } = useResizableColumns(SEQUENCES_COLUMNS)
 
   const { data: ecfConfig, isLoading: configLoading } = useQuery({
     queryKey: ['ecf-config'],
@@ -468,17 +481,41 @@ export function EcfSequencesPanel() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {SEQUENCES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Tipo</th>
-                <th>Ambiente</th>
-                <th>Rango</th>
-                <th>Siguiente</th>
-                <th style={{ minWidth: 160 }}>Disponibles</th>
-                <th>Vence</th>
-                <th>Estado</th>
-                <th style={{ width: 90 }}>Acciones</th>
+                <th>
+                  Tipo
+                  <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                </th>
+                <th>
+                  Ambiente
+                  <span className="col-resize-handle" onMouseDown={startResize('ambiente')} />
+                </th>
+                <th>
+                  Rango
+                  <span className="col-resize-handle" onMouseDown={startResize('rango')} />
+                </th>
+                <th>
+                  Siguiente
+                  <span className="col-resize-handle" onMouseDown={startResize('siguiente')} />
+                </th>
+                <th>
+                  Disponibles
+                  <span className="col-resize-handle" onMouseDown={startResize('disponibles')} />
+                </th>
+                <th>
+                  Vence
+                  <span className="col-resize-handle" onMouseDown={startResize('vence')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -520,10 +557,10 @@ export function EcfSequencesPanel() {
                             <span style={{ marginLeft: 6, fontSize: 12, color: 'var(--text-tertiary)' }}>{s.ncfType}</span>
                           </td>
                           <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ECF_ENV_LABELS[s.env] ?? s.env}</td>
-                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                          <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                             {s.startOn.toLocaleString('es-DO')} — {s.stopOn.toLocaleString('es-DO')}
                           </td>
-                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                          <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                             {s.exhausted ? <span style={{ color: 'var(--text-tertiary)' }}>Agotado</span> : s.currentNumber.toLocaleString('es-DO')}
                           </td>
                           <td>

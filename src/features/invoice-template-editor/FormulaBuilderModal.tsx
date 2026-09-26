@@ -45,7 +45,7 @@ export function FormulaBuilderModal({ element, fields, onSave, onClose }: Props)
 
           <div className="ff-wrap">
             <label className="ff-label">Fórmula</label>
-            <input ref={inputRef} className="ff-input" style={{ fontFamily: 'var(--font-mono)' }} value={formula} onChange={(e) => setFormula(e.target.value)} placeholder="items.cantidad * items.precio" />
+            <input ref={inputRef} className="ff-input" style={{ fontFamily: 'var(--font-body)' }} value={formula} onChange={(e) => setFormula(e.target.value)} placeholder="items.cantidad * items.precio" />
           </div>
 
           <div className="ff-wrap">
@@ -63,7 +63,7 @@ export function FormulaBuilderModal({ element, fields, onSave, onClose }: Props)
             <label className="ff-label">Operadores</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {OPERATORS.map((op) => (
-                <button key={op} type="button" className="btn btn-secondary btn-size-xs" style={{ fontFamily: 'var(--font-mono)', minWidth: 32 }} onClick={() => insertAtCursor(` ${op} `)}>
+                <button key={op} type="button" className="btn btn-secondary btn-size-xs" style={{ fontFamily: 'var(--font-body)', minWidth: 32 }} onClick={() => insertAtCursor(` ${op} `)}>
                   {op}
                 </button>
               ))}

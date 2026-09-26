@@ -27,6 +27,23 @@ import {
   probarNotificacionTipo,
 } from '@/shared/api/notificaciones'
 import type { NotificacionCategoria, NotificacionDestinatario, NotificacionLogEntry, ListNotificacionLogsParams, ProbarNotificacionDto } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const CATALOGO_COLUMNS = [
+  { key: 'notificacion', width: 240 },
+  { key: 'activo', width: 110 },
+  { key: 'canalEmail', width: 130 },
+  { key: 'destinatarios', width: 140 },
+]
+
+const HISTORIAL_COLUMNS = [
+  { key: 'fecha', width: 130 },
+  { key: 'tipo', width: 180 },
+  { key: 'estado', width: 110 },
+  { key: 'referencia', width: 130 },
+  { key: 'destinatarios', width: 220 },
+  { key: 'error', width: 80 },
+]
 
 const CATEGORIAS: NotificacionCategoria[] = [
   'Contabilidad',
@@ -89,6 +106,8 @@ function CatalogoTab() {
   const [categoriaTab, setCategoriaTab] = useState<NotificacionCategoria>('Contabilidad')
   const [destinatariosCodigo, setDestinatariosCodigo] = useState<string | null>(null)
 
+  const { widths: colWidths, startResize } = useResizableColumns(CATALOGO_COLUMNS)
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ['notificaciones', 'tipos'],
     queryFn: listNotificacionTipos,
@@ -130,13 +149,28 @@ function CatalogoTab() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {CATALOGO_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Notificación</th>
-                <th style={{ width: 110 }}>Activo</th>
-                <th style={{ width: 130 }}>Canal Email</th>
-                <th style={{ width: 140 }}>Destinatarios</th>
+                <th>
+                  Notificación
+                  <span className="col-resize-handle" onMouseDown={startResize('notificacion')} />
+                </th>
+                <th>
+                  Activo
+                  <span className="col-resize-handle" onMouseDown={startResize('activo')} />
+                </th>
+                <th>
+                  Canal Email
+                  <span className="col-resize-handle" onMouseDown={startResize('canalEmail')} />
+                </th>
+                <th>
+                  Destinatarios
+                  <span className="col-resize-handle" onMouseDown={startResize('destinatarios')} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -688,6 +722,8 @@ function HistorialTab() {
   const [offset, setOffset] = useState(0)
   const limit = 20
 
+  const { widths: colWidths, startResize } = useResizableColumns(HISTORIAL_COLUMNS)
+
   // Fetch tipos for dropdown
   const { data: tiposData } = useQuery({
     queryKey: ['notificaciones', 'tipos'],
@@ -780,15 +816,33 @@ function HistorialTab() {
       {/* ── Tabla ───────────────────────────────────────────────────────── */}
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {HISTORIAL_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Fecha</th>
-                <th>Tipo</th>
-                <th>Estado</th>
-                <th>Referencia</th>
-                <th>Destinatarios</th>
-                <th style={{ width: 80 }}>Error</th>
+                <th>
+                  Fecha
+                  <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+                </th>
+                <th>
+                  Tipo
+                  <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
+                <th>
+                  Referencia
+                  <span className="col-resize-handle" onMouseDown={startResize('referencia')} />
+                </th>
+                <th>
+                  Destinatarios
+                  <span className="col-resize-handle" onMouseDown={startResize('destinatarios')} />
+                </th>
+                <th>Error</th>
               </tr>
             </thead>
             <tbody>
@@ -865,7 +919,7 @@ function LogRow({ entry, tipos }: { entry: NotificacionLogEntry; tipos: { codigo
           </span>
         </td>
         <td>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+          <span style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
             {entry.referencia ?? '—'}
           </span>
         </td>
@@ -910,7 +964,7 @@ function ErrorModal({ entry, tipoNombre, onClose }: { entry: NotificacionLogEntr
           </div>
           <div className="detail-field">
             <span className="detail-label">Referencia</span>
-            <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{entry.referencia ?? '—'}</span>
+            <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{entry.referencia ?? '—'}</span>
           </div>
           <div className="detail-field">
             <span className="detail-label">Destinatarios</span>
@@ -929,7 +983,7 @@ function ErrorModal({ entry, tipoNombre, onClose }: { entry: NotificacionLogEntr
               border: '1px solid var(--color-danger-border, #fecaca)',
               borderRadius: 6,
               fontSize: 12,
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-body)',
               color: 'var(--color-danger-text, #b91c1c)',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',

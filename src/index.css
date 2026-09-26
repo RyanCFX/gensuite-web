@@ -2,7 +2,7 @@
  * Login reverted to its original asymmetric photo-split at user request (2026-08-04) — see .hallmark/log.json.
  * theme: existing-brand, extended · accent: brand-red oklch(66.3% 0.224 28.7) · secondary: brand-blue oklch(50.9% 0.128 249.1)
  * new: ink-deep navy oklch(16% 0.030 228) (from logo navy, dashboard hero tile only) · teal-accent oklch(60% 0.090 203)
- * fonts: DM Sans (display 800 / body 400-500, now actually loaded — see index.html) + JetBrains Mono (numeric-data outlier)
+ * fonts: DM Sans (display 800 / body 400-500, now actually loaded — see index.html)
  * scope: Dashboard screen only · Login is back to its pre-existing design · rest of app design system untouched
  */
 /* ─── FLUX DESIGN SYSTEM — ERP RD ─── */
@@ -52,7 +52,7 @@
   --info-text: #1a69ab;
 
   --font-body: 'DM Sans', 'Geist', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Geist Mono', monospace;
+  --font-mono: 'DM Sans', Arial, sans-serif;
 
   --radius-xs: 2px;
   --radius-sm: 4px;
@@ -1112,7 +1112,7 @@ button {
   opacity: 0.25;
 }
 
-/* Hallmark · component: turno-strip · genre: modern-minimal · branding: preserved (brand-red, JetBrains Mono)
+/* Hallmark · component: turno-strip · genre: modern-minimal · branding: preserved (brand-red)
  * states: default · hover · focus · active · disabled · loading · error · success
  * contrast: pass
  * Deliberately NOT a right-aligned button cluster (that pattern belongs to .topbar-right) —
@@ -1164,7 +1164,7 @@ button {
 }
 
 .turno-strip-time {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 12px;
   color: var(--text-tertiary);
   white-space: nowrap;
@@ -2598,7 +2598,7 @@ button {
 
 /* ─── 606 DGII SECTION ─── */
 .dgii-section {
-  background: var(--info-bg);
+  /*background: var(--info-bg);*/
   border: 1px solid var(--info-border);
   border-radius: var(--radius-lg);
   padding: 16px 18px;
@@ -3066,8 +3066,11 @@ button {
   width: 100%;
   height: 32px;
   padding: 0 60px 0 32px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-default);
+  /*background: var(--surface-sunken);*/
+  background-color: #f3faf8;
+  border: 1px solid var(--info-border);
+  border-color: #BDD0D2;
+  /*border: 1px solid var(--border-default);*/
   border-radius: var(--radius-md);
   font-family: var(--font-body);
   font-size: 13px;
@@ -3093,7 +3096,7 @@ button {
   left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--icon-muted);
+  color: #BDD0D2;
   pointer-events: none;
   display: flex;
   align-items: center;
@@ -3116,7 +3119,7 @@ button {
   justify-content: center;
   height: 18px;
   padding: 0 5px;
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 10px;
   color: var(--text-tertiary);
   background: var(--surface-page);
@@ -3936,7 +3939,7 @@ tbody .badge {
 .tpl-field-item:hover { background: var(--surface-hover); border-color: var(--border-subtle); }
 .tpl-field-item:active { cursor: grabbing; opacity: 0.7; }
 .tpl-field-label { font-size: 12px; font-weight: 500; color: var(--text-primary); }
-.tpl-field-sample { font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono); }
+.tpl-field-sample { font-size: 11px; color: var(--text-tertiary); font-family: var(--font-body); }
 
 .tpl-palette-grid {
   display: grid;
@@ -4098,7 +4101,7 @@ tbody .badge {
   top: 2px;
   font-size: 9px;
   color: #9ca3af;
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
 }
 
 .tpl-el { box-sizing: border-box; cursor: move; }
@@ -4418,7 +4421,7 @@ tbody .badge {
   position: absolute;
   color: var(--text-secondary);
   font-size: 9px;
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   pointer-events: none;
 }
 .chq-ruler-h { top: 0; left: 20px; height: 18px; border-bottom: 1px solid var(--border-strong); }
@@ -4471,7 +4474,7 @@ tbody .badge {
   color: #111827;
   white-space: nowrap;
   overflow: hidden;
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
 }
 .chq-el-text-multiline { flex-direction: column; align-items: flex-start; justify-content: center; white-space: normal; }
 

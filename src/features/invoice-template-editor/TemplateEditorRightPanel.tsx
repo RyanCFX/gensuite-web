@@ -342,7 +342,7 @@ export function TemplateEditorRightPanel({
             <input className="ff-input" value={element.text} onChange={(e) => onUpdate({ text: e.target.value })} />
             <label className="ff-label" style={{ marginTop: 10 }}>Regla</label>
             {element.rule ? (
-              <p style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>
+              <p style={{ fontSize: 12, fontFamily: 'var(--font-body)' }}>
                 {element.rule.field} {CONDITION_OPERATOR_LABELS[element.rule.operator]} "{element.rule.value}"
               </p>
             ) : (

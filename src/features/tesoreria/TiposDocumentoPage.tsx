@@ -23,9 +23,20 @@ import { Drawer } from '@/shared/ui/Drawer'
 import { useDebounce } from '@/lib/useDebounce'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import './TiposDocumento.css'
 
 const PAGE_SIZE = 20
+
+const COLUMNS = [
+  { key: 'codigo', width: 100 },
+  { key: 'descripcion', width: 220 },
+  { key: 'naturaleza', width: 140 },
+  { key: 'transaccion', width: 110 },
+  { key: 'requisitos', width: 200 },
+  { key: 'estado', width: 110 },
+  { key: 'actions', width: 48 },
+]
 
 const NATURALEZAS: TesoreriaNaturaleza[] = [
   'Cheque',
@@ -100,6 +111,7 @@ export default function TiposDocumentoPage() {
   const [editTarget, setEditTarget] = useState<TipoDocumentoBancario | null>(null)
   const [toDisable, setToDisable] = useState<TipoDocumentoBancario | null>(null)
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   // El usuario puede tocar transactionType manualmente — si lo hace, dejamos de autocompletarlo
   // al cambiar nature. Se resetea cada vez que se abre el diálogo (ver openCreate/openEdit).
@@ -409,16 +421,40 @@ export default function TiposDocumentoPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <SortableTh label="Código" sortKey="code" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                <th>Descripción</th>
-                <th>Naturaleza</th>
-                <th>Transacción</th>
-                <th>Requisitos</th>
-                <th>Estado</th>
-                <th style={{ width: 48 }} />
+                <SortableTh
+                  label="Código"
+                  sortKey="code"
+                  orderBy={orderBy}
+                  onSort={(k) => { sort(k); setPage(1) }}
+                  resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('codigo')} />}
+                />
+                <th>
+                  Descripción
+                  <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+                </th>
+                <th>
+                  Naturaleza
+                  <span className="col-resize-handle" onMouseDown={startResize('naturaleza')} />
+                </th>
+                <th>
+                  Transacción
+                  <span className="col-resize-handle" onMouseDown={startResize('transaccion')} />
+                </th>
+                <th>
+                  Requisitos
+                  <span className="col-resize-handle" onMouseDown={startResize('requisitos')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -570,7 +606,7 @@ export default function TiposDocumentoPage() {
                         id="tdCode"
                         className={`ff-input${errors.code ? ' ff-input-error' : ''}`}
                         placeholder="Ej: AZL"
-                        style={{ textTransform: 'uppercase', fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                        style={{ textTransform: 'uppercase', fontFamily: 'var(--font-body)', fontWeight: 700 }}
                         {...register('code')}
                       />
                       {errors.code && <p className="ff-error">{errors.code.message}</p>}

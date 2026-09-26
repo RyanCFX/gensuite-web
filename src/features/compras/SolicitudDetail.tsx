@@ -15,6 +15,24 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
 import type { OrdenFromSolicitudItemOverrideDto } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ITEMS_COLUMNS = [
+  { key: 'codigo', width: 100 },
+  { key: 'descripcion', width: 220 },
+  { key: 'qty', width: 100 },
+  { key: 'precio', width: 130 },
+  { key: 'ordenado', width: 100 },
+  { key: 'remanente', width: 110 },
+  { key: 'almacen', width: 130 },
+]
+
+const ORDEN_LINES_COLUMNS = [
+  { key: 'articulo', width: 220 },
+  { key: 'remanente', width: 130 },
+  { key: 'cantidad', width: 150 },
+  { key: 'precio', width: 150 },
+]
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | 'detener' | 'reanudar' | null
 
@@ -22,6 +40,7 @@ export default function SolicitudDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { widths: itemsColWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [showGenerarOrden, setShowGenerarOrden] = useState(false)
@@ -192,22 +211,46 @@ export default function SolicitudDetail() {
 
         <div className="card">
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Código</th>
-                  <th>Descripción</th>
-                  <th style={{ textAlign: 'right' }}>Qty</th>
-                  <th style={{ textAlign: 'right' }}>Precio Estimado</th>
-                  <th style={{ textAlign: 'right' }}>Ordenado</th>
-                  <th style={{ textAlign: 'right' }}>Remanente</th>
-                  <th>Almacén</th>
+                  <th>
+                    Código
+                    <span className="col-resize-handle" onMouseDown={startResize('codigo')} />
+                  </th>
+                  <th>
+                    Descripción
+                    <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Qty
+                    <span className="col-resize-handle" onMouseDown={startResize('qty')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Precio Estimado
+                    <span className="col-resize-handle" onMouseDown={startResize('precio')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Ordenado
+                    <span className="col-resize-handle" onMouseDown={startResize('ordenado')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Remanente
+                    <span className="col-resize-handle" onMouseDown={startResize('remanente')} />
+                  </th>
+                  <th>
+                    Almacén
+                    <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {solicitud.items.map((item) => (
                   <tr key={item.id}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{item.itemCode}</td>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode}</td>
                     <td>{item.itemName}</td>
                     <td style={{ textAlign: 'right' }}>{item.qty} {item.uom}</td>
                     <td style={{ textAlign: 'right' }}>{item.rate > 0 ? formatDOP(item.rate) : '—'}</td>
@@ -271,6 +314,7 @@ interface GenerarOrdenModalProps {
 }
 
 function GenerarOrdenModal({ solicitudId, remanentes, onClose, onSuccess }: GenerarOrdenModalProps) {
+  const { widths: ordenLinesColWidths, startResize: startResizeOrdenLines } = useResizableColumns(ORDEN_LINES_COLUMNS)
   const [supplierId, setSupplierId] = useState('')
   const [supplierName, setSupplierName] = useState('')
   const [supplierQuery, setSupplierQuery] = useState('')
@@ -347,13 +391,28 @@ function GenerarOrdenModal({ solicitudId, remanentes, onClose, onSuccess }: Gene
           </div>
 
           <div className="table-scroll">
-          <table className="items-table">
+          <table className="items-table items-table-resizable">
+            <colgroup>
+              {ORDEN_LINES_COLUMNS.map((c) => <col key={c.key} style={{ width: ordenLinesColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Artículo</th>
-                <th style={{ width: '18%', textAlign: 'right' }}>Remanente</th>
-                <th style={{ width: '20%', textAlign: 'right' }}>Cantidad a Ordenar</th>
-                <th style={{ width: '22%', textAlign: 'right' }}>Precio</th>
+                <th>
+                  Artículo
+                  <span className="col-resize-handle" onMouseDown={startResizeOrdenLines('articulo')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Remanente
+                  <span className="col-resize-handle" onMouseDown={startResizeOrdenLines('remanente')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Cantidad a Ordenar
+                  <span className="col-resize-handle" onMouseDown={startResizeOrdenLines('cantidad')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Precio
+                  <span className="col-resize-handle" onMouseDown={startResizeOrdenLines('precio')} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -361,7 +420,7 @@ function GenerarOrdenModal({ solicitudId, remanentes, onClose, onSuccess }: Gene
                 <tr key={line.materialRequestItem}>
                   <td>
                     <div style={{ fontWeight: 500 }}>{line.itemName}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{line.itemCode}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-body)' }}>{line.itemCode}</div>
                   </td>
                   <td style={{ textAlign: 'right' }}>{line.remanente} {line.uom}</td>
                   <td>

@@ -14,6 +14,22 @@ import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Plus, ClipboardList, Send, AlertTriangle } from 'lucide-react'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const COUNTS_COLUMNS = [
+  { key: 'id', width: 100 },
+  { key: 'almacen', width: 160 },
+  { key: 'estado', width: 110 },
+  { key: 'articulos', width: 110 },
+  { key: 'fecha', width: 110 },
+  { key: 'actions', width: 96 },
+]
+
+const TEMPLATE_COLUMNS = [
+  { key: 'articulo', width: 220 },
+  { key: 'stockActual', width: 120 },
+  { key: 'cantidadContada', width: 144 },
+]
 
 const STATUS_BADGE: Record<string, string> = {
   Draft: 'badge-draft',
@@ -42,6 +58,8 @@ export default function CountsPage() {
   const [branch, setBranch] = useState<string>('')
   const [department, setDepartment] = useState<string>('')
   const [mixedBranchError, setMixedBranchError] = useState<string | null>(null)
+  const { widths: countsColWidths, startResize: countsStartResize } = useResizableColumns(COUNTS_COLUMNS)
+  const { widths: templateColWidths, startResize: templateStartResize } = useResizableColumns(TEMPLATE_COLUMNS)
 
   const { data: warehouses } = useQuery({
     queryKey: ['warehouses'],
@@ -192,15 +210,33 @@ export default function CountsPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COUNTS_COLUMNS.map((c) => <col key={c.key} style={{ width: countsColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Almacén</th>
-                <th>Estado</th>
-                <th>Artículos</th>
-                <th>Fecha</th>
-                <th style={{ width: 96 }} />
+                <th>
+                  ID
+                  <span className="col-resize-handle" onMouseDown={countsStartResize('id')} />
+                </th>
+                <th>
+                  Almacén
+                  <span className="col-resize-handle" onMouseDown={countsStartResize('almacen')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={countsStartResize('estado')} />
+                </th>
+                <th>
+                  Artículos
+                  <span className="col-resize-handle" onMouseDown={countsStartResize('articulos')} />
+                </th>
+                <th>
+                  Fecha
+                  <span className="col-resize-handle" onMouseDown={countsStartResize('fecha')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -236,7 +272,7 @@ export default function CountsPage() {
                       )
                     : data?.items.map((count) => (
                         <tr key={count.id}>
-                          <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{count.id}</td>
+                          <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{count.id}</td>
                           <td>{count.postingDate ?? "—"}</td>
                           <td>
                             <span className={`badge ${STATUS_BADGE[count.status] ?? 'badge-neutral'}`}>
@@ -335,12 +371,24 @@ export default function CountsPage() {
 
               {!templateLoading && countRows.length > 0 && (
                 <div className="table-scroll" style={{ marginBottom: 16 }}>
-                  <table className="data-table">
+                  <table className="data-table items-table-resizable">
+                    <colgroup>
+                      {TEMPLATE_COLUMNS.map((c) => <col key={c.key} style={{ width: templateColWidths[c.key] }} />)}
+                    </colgroup>
                     <thead>
                       <tr>
-                        <th>Artículo</th>
-                        <th style={{ textAlign: 'right' }}>Stock Actual</th>
-                        <th style={{ textAlign: 'right', width: 144 }}>Cantidad Contada</th>
+                        <th>
+                          Artículo
+                          <span className="col-resize-handle" onMouseDown={templateStartResize('articulo')} />
+                        </th>
+                        <th style={{ textAlign: 'right' }}>
+                          Stock Actual
+                          <span className="col-resize-handle" onMouseDown={templateStartResize('stockActual')} />
+                        </th>
+                        <th style={{ textAlign: 'right' }}>
+                          Cantidad Contada
+                          <span className="col-resize-handle" onMouseDown={templateStartResize('cantidadContada')} />
+                        </th>
                       </tr>
                     </thead>
                     <tbody>

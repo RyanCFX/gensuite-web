@@ -10,6 +10,12 @@ import { ArrowLeft, Send, Eye } from 'lucide-react'
 import { PdfFormatButton } from '@/components/shared/PdfFormatButton'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import type { FormatoImpresion } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const REFERENCIAS_COLUMNS = [
+  { key: 'factura', width: 200 },
+  { key: 'montoAplicado', width: 160 },
+]
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
@@ -32,6 +38,7 @@ export default function CobroDetail() {
   const queryClient = useQueryClient()
 
   const [confirmSubmit, setConfirmSubmit] = useState(false)
+  const { widths: referenciasColWidths, startResize: startResizeReferencias } = useResizableColumns(REFERENCIAS_COLUMNS)
 
   const { data: cobro, isLoading, isError } = useQuery({
     queryKey: ['cobro', id],
@@ -209,7 +216,7 @@ export default function CobroDetail() {
             {cobro.referenceNo && (
               <div className="detail-field">
                 <span className="detail-label">No. de Referencia</span>
-                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{cobro.referenceNo}</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{cobro.referenceNo}</span>
               </div>
             )}
 
@@ -242,21 +249,21 @@ export default function CobroDetail() {
             {cobro.checkNumber && (
               <div className="detail-field">
                 <span className="detail-label">No. de Cheque</span>
-                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{cobro.checkNumber}</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{cobro.checkNumber}</span>
               </div>
             )}
 
             {cobro.cardNumber && (
               <div className="detail-field">
                 <span className="detail-label">No. de Tarjeta</span>
-                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{cobro.cardNumber}</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{cobro.cardNumber}</span>
               </div>
             )}
 
             {cobro.authorizationCode && (
               <div className="detail-field">
                 <span className="detail-label">Código de Autorización</span>
-                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{cobro.authorizationCode}</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{cobro.authorizationCode}</span>
               </div>
             )}
 
@@ -299,11 +306,20 @@ export default function CobroDetail() {
             <h2 className="card-title">Facturas Aplicadas</h2>
           </div>
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {REFERENCIAS_COLUMNS.map((c) => <col key={c.key} style={{ width: referenciasColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Factura</th>
-                  <th style={{ textAlign: 'right' }}>Monto Aplicado</th>
+                  <th>
+                    Factura
+                    <span className="col-resize-handle" onMouseDown={startResizeReferencias('factura')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Monto Aplicado
+                    <span className="col-resize-handle" onMouseDown={startResizeReferencias('montoAplicado')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -314,7 +330,7 @@ export default function CobroDetail() {
                     onClick={() => navigate(`/facturas/${ref.invoiceId}`)}
                   >
                     <td>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }}>
+                      <span style={{ fontFamily: 'var(--font-body)', fontWeight: 500 }}>
                         {ref.invoiceName ?? ref.invoiceId}
                       </span>
                     </td>

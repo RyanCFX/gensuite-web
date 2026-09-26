@@ -18,10 +18,20 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
 const ESTADO_BADGE: Record<string, string> = { submitted: 'badge-submitted', cancelled: 'badge-cancelled' }
 const ESTADO_LABEL: Record<string, string> = { submitted: 'Confirmada', cancelled: 'Anulada' }
+
+const COLUMNS = [
+  { key: 'fecha', width: 100 },
+  { key: 'sucursal', width: 160 },
+  { key: 'departamento', width: 160 },
+  { key: 'notas', width: 220 },
+  { key: 'estado', width: 110 },
+  { key: 'actions', width: 60 },
+]
 
 export default function CargaInicialListPage() {
   const navigate = useNavigate()
@@ -34,6 +44,7 @@ export default function CargaInicialListPage() {
   const [status, setStatus] = useState<CargaInicialStatus | ''>('')
   const [page, setPage] = useState(1)
   const [toCancel, setToCancel] = useState<CargaInicialListItem | null>(null)
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const offset = (page - 1) * PAGE_SIZE
 
@@ -116,14 +127,32 @@ export default function CargaInicialListPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Fecha</th>
-                <th>Sucursal</th>
-                <th>Departamento</th>
-                <th>Notas</th>
-                <th>Estado</th>
+                <th>
+                  Fecha
+                  <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+                </th>
+                <th>
+                  Sucursal
+                  <span className="col-resize-handle" onMouseDown={startResize('sucursal')} />
+                </th>
+                <th>
+                  Departamento
+                  <span className="col-resize-handle" onMouseDown={startResize('departamento')} />
+                </th>
+                <th>
+                  Notas
+                  <span className="col-resize-handle" onMouseDown={startResize('notas')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
                 <th />
               </tr>
             </thead>

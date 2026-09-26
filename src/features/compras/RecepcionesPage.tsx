@@ -17,8 +17,19 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const COLUMNS = [
+  { key: 'id', width: 100 },
+  { key: 'proveedor', width: 200 },
+  { key: 'fecha', width: 100 },
+  { key: 'remision', width: 140 },
+  { key: 'estado', width: 110 },
+  { key: 'facturacion', width: 140 },
+  { key: 'acciones', width: 70 },
+]
 
 function PerBilledBadge({ perBilled }: { perBilled: number }) {
   if (perBilled >= 100) return <Badge variant="success">100% facturado</Badge>
@@ -37,6 +48,7 @@ export default function RecepcionesPage() {
   const [page, setPage] = useState(1)
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const offset = (page - 1) * PAGE_SIZE
 
@@ -144,15 +156,24 @@ export default function RecepcionesPage() {
 
         <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <SortableTh label="Proveedor" sortKey="supplierName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <th>Remisión</th>
-                  <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <th>Facturación</th>
+                  <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('id')} />} />
+                  <SortableTh label="Proveedor" sortKey="supplierName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('proveedor')} />} />
+                  <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />} />
+                  <th>
+                    Remisión
+                    <span className="col-resize-handle" onMouseDown={startResize('remision')} />
+                  </th>
+                  <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('estado')} />} />
+                  <th>
+                    Facturación
+                    <span className="col-resize-handle" onMouseDown={startResize('facturacion')} />
+                  </th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -192,7 +213,7 @@ export default function RecepcionesPage() {
                         )
                       : data?.items.map((r) => (
                           <tr key={r.id} className="table-row-clickable" onClick={() => navigate(`/compras/recepciones/${r.id}`)}>
-                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{r.id}</td>
+                            <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{r.id}</td>
                             <td style={{ fontWeight: 500 }}>{r.supplierName}</td>
                             <td>{formatDate(r.postingDate)}</td>
                             <td className="td-muted">{r.supplierDeliveryNote ?? '—'}</td>

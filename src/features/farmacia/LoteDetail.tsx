@@ -17,12 +17,22 @@ import { usePuede } from '@/shared/permissions/can'
 import { FacturasElegiblesModal } from './FacturasElegiblesModal'
 import { EstadoArsBadge } from '@/features/invoicing/EstadoArsBadge'
 import type { LoteFarmaciaEstado } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const ESTADO_BADGE: Record<LoteFarmaciaEstado, string> = {
   Abierto: 'badge-draft',
   'En Revisión': 'badge-warning',
   Facturado: 'badge-info',
 }
+
+const FACTURAS_SNAPSHOT_COLUMNS = [
+  { key: 'factura', width: 110 },
+  { key: 'ncf', width: 110 },
+  { key: 'paciente', width: 180 },
+  { key: 'autorizacion', width: 140 },
+  { key: 'carnet', width: 120 },
+  { key: 'cobertura', width: 140 },
+]
 
 export default function LoteDetail() {
   const { id } = useParams<{ id: string }>()
@@ -85,6 +95,21 @@ export default function LoteDetail() {
 
   const puedeVincular = usePuede('farmacia.lotes.vincular-facturas')
   const puedeVerElegibles = usePuede('farmacia.lotes.facturas-elegibles')
+  // Se calcula con optional chaining porque `lote` puede no estar cargado todavía — el hook de
+  // columnas debe llamarse siempre, nunca después del `return` temprano de abajo.
+  const mostrarAccionesFacturaCols = (!lote || lote.estado !== 'Facturado') && puedeVincular
+  const FACTURAS_COLUMNS = [
+    { key: 'factura', width: 110 },
+    { key: 'paciente', width: 180 },
+    { key: 'ncf', width: 110 },
+    { key: 'autorizacion', width: 140 },
+    { key: 'total', width: 110 },
+    { key: 'cobertura', width: 130 },
+    { key: 'estadoArs', width: 130 },
+    ...(mostrarAccionesFacturaCols ? [{ key: 'actions', width: 48 }] : []),
+  ]
+  const { widths: facturasColWidths, startResize: facturasStartResize } = useResizableColumns(FACTURAS_COLUMNS)
+  const { widths: snapshotColWidths, startResize: snapshotStartResize } = useResizableColumns(FACTURAS_SNAPSHOT_COLUMNS)
 
   async function handleDescargarPdf() {
     if (!id) return
@@ -178,13 +203,13 @@ export default function LoteDetail() {
             {lote.responsable && <div className="ff-wrap"><label className="ff-label">Responsable</label><p>{lote.responsable}</p></div>}
             <div className="ff-wrap"><label className="ff-label">Cantidad de facturas</label><p style={{ fontWeight: 600 }}>{lote.cantidadFacturas}</p></div>
             <div className="ff-wrap"><label className="ff-label">Monto total del lote</label><p style={{ fontWeight: 600 }}>{formatDOP(lote.montoTotalLote)}</p></div>
-            {lote.ncfAsignado && <div className="ff-wrap"><label className="ff-label">NCF de la consolidada</label><p style={{ fontFamily: 'monospace' }}>{lote.ncfAsignado}</p></div>}
+            {lote.ncfAsignado && <div className="ff-wrap"><label className="ff-label">NCF de la consolidada</label><p style={{ fontFamily: 'var(--font-body)' }}>{lote.ncfAsignado}</p></div>}
             {lote.facturaConsolidada && (
               <div className="ff-wrap">
                 <label className="ff-label">Factura consolidada</label>
                 <p>
                   <button
-                    style={{ fontFamily: 'monospace', color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+                    style={{ fontFamily: 'var(--font-body)', color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
                     onClick={() => navigate(`/facturas/${lote.facturaConsolidada}`)}
                   >
                     {lote.facturaConsolidada}
@@ -207,17 +232,41 @@ export default function LoteDetail() {
         </div>
 
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table items-table-resizable">
+            <colgroup>
+              {FACTURAS_COLUMNS.map((c) => <col key={c.key} style={{ width: facturasColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Factura</th>
-                <th>Paciente</th>
-                <th>NCF</th>
-                <th>N.º autorización</th>
-                <th style={{ textAlign: 'right' }}>Total</th>
-                <th style={{ textAlign: 'right' }}>Cobertura neta</th>
-                <th>Estado ARS</th>
-                {mostrarAccionesFactura && <th style={{ width: 48 }} />}
+                <th>
+                  Factura
+                  <span className="col-resize-handle" onMouseDown={facturasStartResize('factura')} />
+                </th>
+                <th>
+                  Paciente
+                  <span className="col-resize-handle" onMouseDown={facturasStartResize('paciente')} />
+                </th>
+                <th>
+                  NCF
+                  <span className="col-resize-handle" onMouseDown={facturasStartResize('ncf')} />
+                </th>
+                <th>
+                  N.º autorización
+                  <span className="col-resize-handle" onMouseDown={facturasStartResize('autorizacion')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Total
+                  <span className="col-resize-handle" onMouseDown={facturasStartResize('total')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Cobertura neta
+                  <span className="col-resize-handle" onMouseDown={facturasStartResize('cobertura')} />
+                </th>
+                <th>
+                  Estado ARS
+                  <span className="col-resize-handle" onMouseDown={facturasStartResize('estadoArs')} />
+                </th>
+                {mostrarAccionesFactura && <th />}
               </tr>
             </thead>
             <tbody>
@@ -237,9 +286,9 @@ export default function LoteDetail() {
               ) : (
                 facturas.map((f) => (
                   <tr key={f.id} className="table-row-clickable" onClick={() => navigate(`/facturas/${f.id}`)}>
-                    <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{f.id}</td>
+                    <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{f.id}</td>
                     <td>{f.customerName || f.customer}</td>
-                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{f.ncf ?? '—'}</td>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{f.ncf ?? '—'}</td>
                     <td>{f.numeroAutorizacion}</td>
                     <td style={{ textAlign: 'right' }}>{formatDOP(f.grandTotal)}</td>
                     <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatDOP(f.montoCoberturaNeta)}</td>
@@ -275,22 +324,43 @@ export default function LoteDetail() {
             </p>
           </div>
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {FACTURAS_SNAPSHOT_COLUMNS.map((c) => <col key={c.key} style={{ width: snapshotColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Factura</th>
-                  <th>NCF</th>
-                  <th>Paciente</th>
-                  <th>N.º autorización</th>
-                  <th>Carnet</th>
-                  <th style={{ textAlign: 'right' }}>Cobertura facturada</th>
+                  <th>
+                    Factura
+                    <span className="col-resize-handle" onMouseDown={snapshotStartResize('factura')} />
+                  </th>
+                  <th>
+                    NCF
+                    <span className="col-resize-handle" onMouseDown={snapshotStartResize('ncf')} />
+                  </th>
+                  <th>
+                    Paciente
+                    <span className="col-resize-handle" onMouseDown={snapshotStartResize('paciente')} />
+                  </th>
+                  <th>
+                    N.º autorización
+                    <span className="col-resize-handle" onMouseDown={snapshotStartResize('autorizacion')} />
+                  </th>
+                  <th>
+                    Carnet
+                    <span className="col-resize-handle" onMouseDown={snapshotStartResize('carnet')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Cobertura facturada
+                    <span className="col-resize-handle" onMouseDown={snapshotStartResize('cobertura')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {snapshot.map((f) => (
                   <tr key={f.factura}>
-                    <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{f.factura}</td>
-                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{f.ncf ?? '—'}</td>
+                    <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{f.factura}</td>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{f.ncf ?? '—'}</td>
                     <td>{f.paciente ?? '—'}</td>
                     <td>{f.numeroAutorizacion ?? '—'}</td>
                     <td>{f.carnetAfiliado ?? '—'}</td>

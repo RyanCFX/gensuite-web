@@ -23,8 +23,20 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { Drawer } from '@/shared/ui/Drawer'
 import { Select, SelectItem } from '@/components/ui/select'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const ECF_EMITIDOS_COLUMNS = [
+  { key: 'encf', width: 160 },
+  { key: 'tipo', width: 140 },
+  { key: 'fecha', width: 100 },
+  { key: 'comprador', width: 200 },
+  { key: 'total', width: 120 },
+  { key: 'estadoDgii', width: 150 },
+  { key: 'documento', width: 130 },
+  { key: 'actions', width: 110 },
+]
 
 const ESTADOS_DGII: EcfStatusDgii[] = [
   'PENDING', 'SIGNED', 'IN_PROCESS', 'ACCEPTED', 'CONDITIONAL', 'REJECTED',
@@ -58,6 +70,7 @@ export default function EcfEmitidosPage() {
   const [to, setTo] = useState('')
   const [archived, setArchived] = useState(false)
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
+  const { widths: colWidths, startResize } = useResizableColumns(ECF_EMITIDOS_COLUMNS)
 
   const debouncedSearch = useDebounce(search, 300)
   const debouncedRnc = useDebounce(rnc, 300)
@@ -181,16 +194,40 @@ export default function EcfEmitidosPage() {
 
       <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {ECF_EMITIDOS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>e-NCF</th>
-              <th>Tipo</th>
-              <th>Fecha</th>
-              <th>Comprador</th>
-              <th style={{ textAlign: 'right' }}>Total</th>
-              <th>Estado DGII</th>
-              <th>Documento</th>
+              <th>
+                e-NCF
+                <span className="col-resize-handle" onMouseDown={startResize('encf')} />
+              </th>
+              <th>
+                Tipo
+                <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+              </th>
+              <th>
+                Fecha
+                <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+              </th>
+              <th>
+                Comprador
+                <span className="col-resize-handle" onMouseDown={startResize('comprador')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Total
+                <span className="col-resize-handle" onMouseDown={startResize('total')} />
+              </th>
+              <th>
+                Estado DGII
+                <span className="col-resize-handle" onMouseDown={startResize('estadoDgii')} />
+              </th>
+              <th>
+                Documento
+                <span className="col-resize-handle" onMouseDown={startResize('documento')} />
+              </th>
               <th />
             </tr>
           </thead>
@@ -231,7 +268,7 @@ export default function EcfEmitidosPage() {
                     className="table-row-clickable"
                     onClick={() => navigate(`/ecf-emitidos/${encodeURIComponent(it.voucherId)}`)}
                   >
-                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         {it.ncf}
                         {chip && <span className={`badge ${chip.className}`}>{chip.label}</span>}
@@ -257,7 +294,7 @@ export default function EcfEmitidosPage() {
                         <a
                           href={docPath}
                           onClick={(e) => { e.preventDefault(); navigate(docPath) }}
-                          style={{ fontFamily: 'monospace', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                          style={{ fontFamily: 'var(--font-body)', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                         >
                           {it.erpnext!.docname} <ExternalLink size={11} />
                         </a>

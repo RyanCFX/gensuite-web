@@ -13,8 +13,19 @@ import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const SOLICITUDES_COLUMNS = [
+  { key: 'id', width: 90 },
+  { key: 'fecha', width: 110 },
+  { key: 'fechaNecesaria', width: 110 },
+  { key: 'articulos', width: 90 },
+  { key: 'estado', width: 110 },
+  { key: 'ordenamiento', width: 160 },
+  { key: 'actions', width: 90 },
+]
 
 function PerOrderedBadge({ perOrdered }: { perOrdered: number }) {
   if (perOrdered >= 100) return <Badge variant="success">100% ordenado</Badge>
@@ -30,6 +41,7 @@ export default function SolicitudesPage() {
   const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(SOLICITUDES_COLUMNS)
 
   const offset = (page - 1) * PAGE_SIZE
 
@@ -99,16 +111,46 @@ export default function SolicitudesPage() {
 
         <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {SOLICITUDES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <SortableTh label="Fecha" sortKey="transactionDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <th>Fecha Necesaria</th>
-                  <th>Artículos</th>
-                  <th>Estado</th>
-                  <th>Ordenamiento</th>
-                  <th>Acciones</th>
+                  <SortableTh
+                    label="#"
+                    sortKey="id"
+                    orderBy={orderBy}
+                    onSort={(k) => { sort(k); setPage(1) }}
+                    resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('id')} />}
+                  />
+                  <SortableTh
+                    label="Fecha"
+                    sortKey="transactionDate"
+                    orderBy={orderBy}
+                    onSort={(k) => { sort(k); setPage(1) }}
+                    resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />}
+                  />
+                  <th>
+                    Fecha Necesaria
+                    <span className="col-resize-handle" onMouseDown={startResize('fechaNecesaria')} />
+                  </th>
+                  <th>
+                    Artículos
+                    <span className="col-resize-handle" onMouseDown={startResize('articulos')} />
+                  </th>
+                  <th>
+                    Estado
+                    <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                  </th>
+                  <th>
+                    Ordenamiento
+                    <span className="col-resize-handle" onMouseDown={startResize('ordenamiento')} />
+                  </th>
+                  <th>
+                    Acciones
+                    <span className="col-resize-handle" onMouseDown={startResize('actions')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -147,7 +189,7 @@ export default function SolicitudesPage() {
                         )
                       : data?.items.map((s) => (
                           <tr key={s.id} className="table-row-clickable" onClick={() => navigate(`/compras/solicitudes/${s.id}`)}>
-                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{s.id}</td>
+                            <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{s.id}</td>
                             <td>{formatDate(s.transactionDate)}</td>
                             <td className="td-muted">{formatDate(s.scheduleDate)}</td>
                             <td className="td-muted">{s.items.length}</td>

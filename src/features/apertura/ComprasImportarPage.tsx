@@ -15,8 +15,19 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { formatMoney } from '@/lib/formatters'
 import { today, usePreflightGate } from './lib'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const MAX_FILAS = 200
+
+const COLUMNS = [
+  { key: 'proveedor', width: 200 },
+  { key: 'factura', width: 160 },
+  { key: 'fecha', width: 140 },
+  { key: 'monto', width: 140 },
+  { key: 'ncf', width: 160 },
+  { key: 'dgii', width: 90 },
+  { key: 'actions', width: 60 },
+]
 
 interface Row {
   key: number
@@ -39,6 +50,7 @@ export default function ComprasImportarPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { listo } = usePreflightGate()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
   const [rows, setRows] = useState<Row[]>([emptyRow(), emptyRow(), emptyRow()])
   const [supplierQuery, setSupplierQuery] = useState('')
   const [summary, setSummary] = useState<{ total: number; creadas: number; fallidas: number; montoTotalMigrado: number } | null>(null)
@@ -125,16 +137,19 @@ export default function ComprasImportarPage() {
 
       <div className="card navy-table-card" style={{ marginBottom: 16 }}>
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th style={{ minWidth: 200 }}>Proveedor</th>
-                <th style={{ minWidth: 160 }}>N° Factura</th>
-                <th style={{ minWidth: 140 }}>Fecha</th>
-                <th style={{ minWidth: 140 }}>Monto pendiente</th>
-                <th style={{ minWidth: 160 }}>NCF proveedor</th>
-                <th style={{ width: 90 }}>Reportar DGII</th>
-                <th style={{ width: 60 }} />
+                <th>Proveedor<span className="col-resize-handle" onMouseDown={startResize('proveedor')} /></th>
+                <th>N° Factura<span className="col-resize-handle" onMouseDown={startResize('factura')} /></th>
+                <th>Fecha<span className="col-resize-handle" onMouseDown={startResize('fecha')} /></th>
+                <th>Monto pendiente<span className="col-resize-handle" onMouseDown={startResize('monto')} /></th>
+                <th>NCF proveedor<span className="col-resize-handle" onMouseDown={startResize('ncf')} /></th>
+                <th>Reportar DGII<span className="col-resize-handle" onMouseDown={startResize('dgii')} /></th>
+                <th />
               </tr>
             </thead>
             <tbody>

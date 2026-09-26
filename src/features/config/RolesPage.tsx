@@ -12,6 +12,12 @@ import type { ApiError, CreateRoleDto } from '@/shared/api/types'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ROLES_COLUMNS = [
+  { key: 'rol', width: 260 },
+  { key: 'actions', width: 48 },
+]
 
 function apiMessage(err: unknown, fallback: string): string {
   return (err as ApiError)?.message ?? fallback
@@ -22,6 +28,7 @@ export default function RolesPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
+  const { widths: colWidths, startResize } = useResizableColumns(ROLES_COLUMNS)
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['roles-admin'],
@@ -74,11 +81,17 @@ export default function RolesPage() {
 
       <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {ROLES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>Rol</th>
-              <th style={{ width: 48 }} />
+              <th>
+                Rol
+                <span className="col-resize-handle" onMouseDown={startResize('rol')} />
+              </th>
+              <th />
             </tr>
           </thead>
           <tbody>

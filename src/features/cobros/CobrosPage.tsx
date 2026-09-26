@@ -17,6 +17,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Drawer } from '@/shared/ui/Drawer'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +53,17 @@ export default function CobrosPage() {
   const [paidAmountMax, setPaidAmountMax] = useState('')
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
+
+  const COLUMNS = [
+    { key: 'id', width: 110 },
+    { key: 'cliente', width: 220 },
+    { key: 'fecha', width: 100 },
+    { key: 'metodo', width: 150 },
+    { key: 'tipo', width: 140 },
+    { key: 'monto', width: 120 },
+    { key: 'estado', width: 110 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data: customersData, isLoading: customersLoading } = useQuery({
     queryKey: ['customerSearch', customerQuery],
@@ -175,16 +187,25 @@ export default function CobrosPage() {
       {/* ── Tabla ───────────────────────────────────────────────────────── */}
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <SortableTh label="ID" sortKey="id" orderBy={orderBy} onSort={sort} />
-                <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} />
-                <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} />
-                <th>Método de Pago</th>
-                <th>Tipo</th>
-                <SortableTh label="Monto" sortKey="paidAmount" orderBy={orderBy} onSort={sort} align="right" />
-                <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
+                <SortableTh label="ID" sortKey="id" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('id')} />} />
+                <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('cliente')} />} />
+                <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />} />
+                <th>
+                  Método de Pago
+                  <span className="col-resize-handle" onMouseDown={startResize('metodo')} />
+                </th>
+                <th>
+                  Tipo
+                  <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                </th>
+                <SortableTh label="Monto" sortKey="paidAmount" orderBy={orderBy} onSort={sort} align="right" resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('monto')} />} />
+                <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('estado')} />} />
               </tr>
             </thead>
             <tbody>
@@ -213,7 +234,7 @@ export default function CobrosPage() {
                       onClick={() => navigate(cobro.isPosSale ? `/facturas/${cobro.id}` : `/cobros/${cobro.id}`)}
                     >
                       <td>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500 }}>
+                        <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500 }}>
                           {cobro.id}
                         </span>
                       </td>

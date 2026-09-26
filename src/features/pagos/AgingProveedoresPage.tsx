@@ -12,6 +12,7 @@ import { Info, Download, Loader2 } from 'lucide-react'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const DEFAULT_LABELS = ['Corriente', '0–30 días', '31–60 días', '61–90 días', '+90 días']
 
@@ -46,6 +47,17 @@ export default function AgingProveedoresPage() {
   const rows = data?.rows ?? []
   const isInvoiceView = groupBy === 'invoice'
   const colCount = labels.length + (isInvoiceView ? 4 : 2) - (showCurrent ? 0 : 1)
+
+  const visibleLabels = showCurrent ? labels : labels.slice(1)
+  const COLUMNS = [
+    { key: 'proveedor', width: 200 },
+    ...(isInvoiceView ? [{ key: 'factura', width: 120 }] : []),
+    ...(isInvoiceView ? [{ key: 'vencimiento', width: 110 }] : []),
+    ...(isInvoiceView ? [{ key: 'saldo', width: 110 }] : []),
+    ...visibleLabels.map((label) => ({ key: `rango-${label}`, width: 100 })),
+    ...(!isInvoiceView ? [{ key: 'total', width: 110 }] : []),
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   function agingStyle(amount: number): React.CSSProperties {
     return amount > AGING_THRESHOLD ? { color: 'var(--error-text)', fontWeight: 600 } : {}
@@ -117,17 +129,46 @@ export default function AgingProveedoresPage() {
       <div>
         <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Proveedor</th>
-                  {isInvoiceView && <th>Factura</th>}
-                  {isInvoiceView && <th>Vencimiento</th>}
-                  {isInvoiceView && <th style={{ textAlign: 'right' }}>Saldo</th>}
-                  {(showCurrent ? labels : labels.slice(1)).map((label, i) => (
-                    <th key={i} style={{ textAlign: 'right' }}>{label}</th>
+                  <th>
+                    Proveedor
+                    <span className="col-resize-handle" onMouseDown={startResize('proveedor')} />
+                  </th>
+                  {isInvoiceView && (
+                    <th>
+                      Factura
+                      <span className="col-resize-handle" onMouseDown={startResize('factura')} />
+                    </th>
+                  )}
+                  {isInvoiceView && (
+                    <th>
+                      Vencimiento
+                      <span className="col-resize-handle" onMouseDown={startResize('vencimiento')} />
+                    </th>
+                  )}
+                  {isInvoiceView && (
+                    <th style={{ textAlign: 'right' }}>
+                      Saldo
+                      <span className="col-resize-handle" onMouseDown={startResize('saldo')} />
+                    </th>
+                  )}
+                  {visibleLabels.map((label) => (
+                    <th key={label} style={{ textAlign: 'right' }}>
+                      {label}
+                      <span className="col-resize-handle" onMouseDown={startResize(`rango-${label}`)} />
+                    </th>
                   ))}
-                  {!isInvoiceView && <th style={{ textAlign: 'right', fontWeight: 700 }}>Total</th>}
+                  {!isInvoiceView && (
+                    <th style={{ textAlign: 'right', fontWeight: 700 }}>
+                      Total
+                      <span className="col-resize-handle" onMouseDown={startResize('total')} />
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>

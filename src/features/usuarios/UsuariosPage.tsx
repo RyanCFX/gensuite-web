@@ -29,6 +29,7 @@ import { isApiErrorCode } from '@/shared/api/client'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -88,6 +89,16 @@ export default function UsuariosPage() {
   const [defaultPosProfile, setDefaultPosProfile] = useState('')
   const [defaultPosProfileSearch, setDefaultPosProfileSearch] = useState('')
   const { orderBy, sort } = useSortState()
+
+  const USUARIOS_COLUMNS = [
+    { key: 'email', width: 220 },
+    { key: 'fullName', width: 200 },
+    { key: 'roles', width: 240 },
+    { key: 'lastActive', width: 110 },
+    { key: 'estado', width: 100 },
+    { key: 'actions', width: 48 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(USUARIOS_COLUMNS)
 
   const showForm = inviteOpen || !!editingUser
 
@@ -354,15 +365,39 @@ export default function UsuariosPage() {
       <div>
         <div className="card">
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {USUARIOS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <SortableTh label="Email" sortKey="email" orderBy={orderBy} onSort={sort} />
-                  <SortableTh label="Nombre" sortKey="fullName" orderBy={orderBy} onSort={sort} />
-                  <th>Roles</th>
-                  <th>Último acceso</th>
-                  <th>Estado</th>
-                  <th style={{ width: 48 }} />
+                  <SortableTh
+                    label="Email"
+                    sortKey="email"
+                    orderBy={orderBy}
+                    onSort={sort}
+                    resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('email')} />}
+                  />
+                  <SortableTh
+                    label="Nombre"
+                    sortKey="fullName"
+                    orderBy={orderBy}
+                    onSort={sort}
+                    resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fullName')} />}
+                  />
+                  <th>
+                    Roles
+                    <span className="col-resize-handle" onMouseDown={startResize('roles')} />
+                  </th>
+                  <th>
+                    Último acceso
+                    <span className="col-resize-handle" onMouseDown={startResize('lastActive')} />
+                  </th>
+                  <th>
+                    Estado
+                    <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                  </th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -399,7 +434,7 @@ export default function UsuariosPage() {
                         )
                       : data?.items.map((u) => (
                           <tr key={u.email}>
-                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{u.email}</td>
+                            <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{u.email}</td>
                             <td style={{ fontWeight: 500 }}>
                               {u.fullName}
                               {u.isDefault && <span className="badge badge-info" style={{ marginLeft: 6, fontSize: 10 }}>Por defecto</span>}

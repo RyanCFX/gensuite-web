@@ -47,6 +47,7 @@ import { AccountSelect } from '@/components/shared/AccountSelect'
 import { formatDate } from '@/lib/formatters'
 import { Plus, Trash2, Save, FileWarning, X, Pencil, ChevronLeft, ChevronRight, Info, ChevronDown, Check, Search, TrafficCone, TriangleAlert, BellRing, BarChart3 } from 'lucide-react'
 import EjercicioFiscalSection from './EjercicioFiscalSection'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import './CobrosConfig.css'
 import { DGII_UOM_CODES, dgiiUomLabel, ECF_TIPOS, TIPO_PAGO_DEFAULT_OPTIONS, TIPO_INGRESOS_DEFAULT_OPTIONS } from '@/lib/dgii'
 
@@ -298,8 +299,18 @@ function CobrosConfigSection() {
 }
 
 // ---- Almacenes Section ----
+const ALMACENES_COLUMNS = [
+  { key: 'nombre', width: 200 },
+  { key: 'sucursal', width: 160 },
+  { key: 'tipo', width: 120 },
+  { key: 'cuenta', width: 180 },
+  { key: 'estado', width: 100 },
+  { key: 'actions', width: 80 },
+]
+
 function AlmacenesSection() {
   const queryClient = useQueryClient()
+  const { widths: colWidths, startResize } = useResizableColumns(ALMACENES_COLUMNS)
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
   const [newBranch, setNewBranch] = useState('')
@@ -390,15 +401,33 @@ function AlmacenesSection() {
           {isLoading
             ? <span className="skeleton-box" style={{ height: 128, display: 'block', margin: 16 }} />
             : (
-                <table className="data-table">
+                <table className="data-table items-table-resizable">
+                  <colgroup>
+                    {ALMACENES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Nombre</th>
-                      <th>Sucursal</th>
-                      <th>Tipo</th>
-                      <th>Cuenta</th>
-                      <th>Estado</th>
-                      <th style={{ width: 80 }} />
+                      <th>
+                        Nombre
+                        <span className="col-resize-handle" onMouseDown={startResize('nombre')} />
+                      </th>
+                      <th>
+                        Sucursal
+                        <span className="col-resize-handle" onMouseDown={startResize('sucursal')} />
+                      </th>
+                      <th>
+                        Tipo
+                        <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                      </th>
+                      <th>
+                        Cuenta
+                        <span className="col-resize-handle" onMouseDown={startResize('cuenta')} />
+                      </th>
+                      <th>
+                        Estado
+                        <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                      </th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
@@ -587,8 +616,16 @@ function AlmacenesSection() {
 }
 
 // ---- Metodos de Pago Section ----
+const METODOS_PAGO_COLUMNS = [
+  { key: 'nombre', width: 220 },
+  { key: 'tipo', width: 120 },
+  { key: 'estado', width: 100 },
+  { key: 'actions', width: 48 },
+]
+
 function MetodosPagoSection() {
   const queryClient = useQueryClient()
+  const { widths: colWidths, startResize } = useResizableColumns(METODOS_PAGO_COLUMNS)
   const [search, setSearch] = useState('')
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
@@ -672,13 +709,25 @@ function MetodosPagoSection() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {METODOS_PAGO_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>Tipo</th>
-                <th>Estado</th>
-                <th style={{ width: 48 }} />
+                <th>
+                  Nombre
+                  <span className="col-resize-handle" onMouseDown={startResize('nombre')} />
+                </th>
+                <th>
+                  Tipo
+                  <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -879,8 +928,33 @@ interface UomConversionRow {
   searchQuery: string // para filtrar el SearchSelect de cada fila
 }
 
+const UOM_LIST_COLUMNS = [
+  { key: 'nombre', width: 200 },
+  { key: 'codigoDgii', width: 160 },
+  { key: 'soloEnteros', width: 120 },
+  { key: 'actions', width: 100 },
+]
+const UOM_CREATE_CONV_COLUMNS = [
+  { key: 'factor', width: 120 },
+  { key: 'uom', width: 200 },
+  { key: 'actions', width: 36 },
+]
+const UOM_EDIT_CONV_COLUMNS = [
+  { key: 'factor', width: 120 },
+  { key: 'uom', width: 200 },
+  { key: 'actions', width: 36 },
+]
+const UOM_DETAIL_CONV_COLUMNS = [
+  { key: 'factor', width: 150 },
+  { key: 'uomDestino', width: 150 },
+]
+
 function UomSection() {
   const queryClient = useQueryClient()
+  const { widths: uomListColWidths, startResize: startUomListResize } = useResizableColumns(UOM_LIST_COLUMNS)
+  const { widths: uomCreateConvColWidths, startResize: startUomCreateConvResize } = useResizableColumns(UOM_CREATE_CONV_COLUMNS)
+  const { widths: uomEditConvColWidths, startResize: startUomEditConvResize } = useResizableColumns(UOM_EDIT_CONV_COLUMNS)
+  const { widths: uomDetailConvColWidths, startResize: startUomDetailConvResize } = useResizableColumns(UOM_DETAIL_CONV_COLUMNS)
   const [showCreate, setShowCreate] = useState(false)
   const [newUomName, setNewUomName] = useState('')
   const [newCodigoDgii, setNewCodigoDgii] = useState('')
@@ -1052,13 +1126,25 @@ function UomSection() {
             ? <span className="skeleton-box" style={{ height: 128, display: 'block', margin: 16 }} />
             : (
                 <>
-                  <table className="data-table">
+                  <table className="data-table items-table-resizable">
+                    <colgroup>
+                      {UOM_LIST_COLUMNS.map((c) => <col key={c.key} style={{ width: uomListColWidths[c.key] }} />)}
+                    </colgroup>
                     <thead>
                       <tr>
-                        <th>Nombre</th>
-                        <th>Código DGII</th>
-                        <th>Solo enteros</th>
-                        <th style={{ width: 100 }} />
+                        <th>
+                          Nombre
+                          <span className="col-resize-handle" onMouseDown={startUomListResize('nombre')} />
+                        </th>
+                        <th>
+                          Código DGII
+                          <span className="col-resize-handle" onMouseDown={startUomListResize('codigoDgii')} />
+                        </th>
+                        <th>
+                          Solo enteros
+                          <span className="col-resize-handle" onMouseDown={startUomListResize('soloEnteros')} />
+                        </th>
+                        <th />
                       </tr>
                     </thead>
                     <tbody>
@@ -1179,14 +1265,21 @@ function UomSection() {
                   </button>
                 </div>
                 {conversions.length > 0 && (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <table className="items-table-resizable" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <colgroup>
+                      {UOM_CREATE_CONV_COLUMNS.map((c) => <col key={c.key} style={{ width: uomCreateConvColWidths[c.key] }} />)}
+                    </colgroup>
                     <thead>
                       <tr style={{ borderBottom: '1px solid var(--border-default)' }}>
                         <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)', fontWeight: 500 }}>
                           1 {newUomName || '[esta UOM]'} =
+                          <span className="col-resize-handle" onMouseDown={startUomCreateConvResize('factor')} />
                         </th>
-                        <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)', fontWeight: 500 }}>Otra UOM</th>
-                        <th style={{ width: 36 }} />
+                        <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                          Otra UOM
+                          <span className="col-resize-handle" onMouseDown={startUomCreateConvResize('uom')} />
+                        </th>
+                        <th />
                       </tr>
                     </thead>
                     <tbody>
@@ -1315,14 +1408,21 @@ function UomSection() {
 
                     {editConversions.length > 0 ? (
                       <>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                        <table className="items-table-resizable" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                          <colgroup>
+                            {UOM_EDIT_CONV_COLUMNS.map((c) => <col key={c.key} style={{ width: uomEditConvColWidths[c.key] }} />)}
+                          </colgroup>
                           <thead>
                             <tr style={{ borderBottom: '1px solid var(--border-default)' }}>
                               <th style={{ textAlign: 'left', padding: '4px 8px 4px 0', color: 'var(--text-secondary)', fontWeight: 500 }}>
                                 1 {editName || detailId} =
+                                <span className="col-resize-handle" onMouseDown={startUomEditConvResize('factor')} />
                               </th>
-                              <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)', fontWeight: 500 }}>Otra UOM</th>
-                              <th style={{ width: 36 }} />
+                              <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                                Otra UOM
+                                <span className="col-resize-handle" onMouseDown={startUomEditConvResize('uom')} />
+                              </th>
+                              <th />
                             </tr>
                           </thead>
                           <tbody>
@@ -1409,11 +1509,20 @@ function UomSection() {
                     ? <span className="skeleton-box" style={{ height: 80, display: 'block' }} />
                     : detailData?.conversions.length
                       ? (
-                          <table className="data-table">
+                          <table className="data-table items-table-resizable">
+                            <colgroup>
+                              {UOM_DETAIL_CONV_COLUMNS.map((c) => <col key={c.key} style={{ width: uomDetailConvColWidths[c.key] }} />)}
+                            </colgroup>
                             <thead>
                               <tr>
-                                <th>1 {detailId} equivale a</th>
-                                <th>UOM destino</th>
+                                <th>
+                                  1 {detailId} equivale a
+                                  <span className="col-resize-handle" onMouseDown={startUomDetailConvResize('factor')} />
+                                </th>
+                                <th>
+                                  UOM destino
+                                  <span className="col-resize-handle" onMouseDown={startUomDetailConvResize('uomDestino')} />
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1454,9 +1563,18 @@ function UomSection() {
 }
 
 // ---- Listas de Precio Section ----
+const LISTAS_PRECIO_COLUMNS = [
+  { key: 'nombre', width: 200 },
+  { key: 'moneda', width: 100 },
+  { key: 'compra', width: 90 },
+  { key: 'venta', width: 90 },
+  { key: 'estado', width: 100 },
+]
+
 function ListasPrecioSection() {
   const [search, setSearch] = useState('')
   const { data, isLoading } = useQuery({ queryKey: ['listas-precio'], queryFn: listListasPrecio })
+  const { widths: colWidths, startResize } = useResizableColumns(LISTAS_PRECIO_COLUMNS)
 
   const listas = (data ?? []).filter((l) => !search || l.name.toLowerCase().includes(search.toLowerCase()))
 
@@ -1489,14 +1607,32 @@ function ListasPrecioSection() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {LISTAS_PRECIO_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>Moneda</th>
-                <th>Compra</th>
-                <th>Venta</th>
-                <th>Estado</th>
+                <th>
+                  Nombre
+                  <span className="col-resize-handle" onMouseDown={startResize('nombre')} />
+                </th>
+                <th>
+                  Moneda
+                  <span className="col-resize-handle" onMouseDown={startResize('moneda')} />
+                </th>
+                <th>
+                  Compra
+                  <span className="col-resize-handle" onMouseDown={startResize('compra')} />
+                </th>
+                <th>
+                  Venta
+                  <span className="col-resize-handle" onMouseDown={startResize('venta')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1541,12 +1677,21 @@ function ListasPrecioSection() {
 }
 
 // ---- NCF Series Section ----
+const NCF_SECTION_COLUMNS = [
+  { key: 'tipoNcf', width: 140 },
+  { key: 'prefijo', width: 100 },
+  { key: 'numeroActual', width: 130 },
+  { key: 'validoDesde', width: 120 },
+  { key: 'validoHasta', width: 120 },
+]
+
 function NcfSection() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['ncf-series'],
     queryFn: getNcfSeries,
     retry: false,
   })
+  const { widths: colWidths, startResize } = useResizableColumns(NCF_SECTION_COLUMNS)
 
   if (is503(error)) {
     return <ServiceUnavailableBanner message="Las secuencias NCF requieren configuración adicional (dgii-compliance). Contacta al administrador." />
@@ -1559,14 +1704,32 @@ function NcfSection() {
         <span className="card-title">Secuencias NCF</span>
       </div>
       <div>
-        <table className="data-table">
+        <table className="data-table items-table-resizable">
+          <colgroup>
+            {NCF_SECTION_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>Tipo NCF</th>
-              <th>Prefijo</th>
-              <th style={{ textAlign: 'right' }}>Número Actual</th>
-              <th>Válido Desde</th>
-              <th>Válido Hasta</th>
+              <th>
+                Tipo NCF
+                <span className="col-resize-handle" onMouseDown={startResize('tipoNcf')} />
+              </th>
+              <th>
+                Prefijo
+                <span className="col-resize-handle" onMouseDown={startResize('prefijo')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Número Actual
+                <span className="col-resize-handle" onMouseDown={startResize('numeroActual')} />
+              </th>
+              <th>
+                Válido Desde
+                <span className="col-resize-handle" onMouseDown={startResize('validoDesde')} />
+              </th>
+              <th>
+                Válido Hasta
+                <span className="col-resize-handle" onMouseDown={startResize('validoHasta')} />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -1580,8 +1743,8 @@ function NcfSection() {
                 )
               : data.map((s) => (
                   <tr key={s.ncfType}>
-                    <td style={{ fontFamily: 'var(--font-mono)' }}>{s.ncfType}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)' }}>{String(s.id)}</td>
+                    <td style={{ fontFamily: 'var(--font-body)' }}>{s.ncfType}</td>
+                    <td style={{ fontFamily: 'var(--font-body)' }}>{String(s.id)}</td>
                     <td style={{ textAlign: 'right' }}>{s.nextNcf === -1 ? "Agotada" : s.nextNcf}</td>
                     <td>{formatDate(String(s.start))}</td>
                     <td>{formatDate(s.expirationDate)}</td>
@@ -1700,11 +1863,18 @@ interface TaxTemplatesSectionProps {
   kind: 'ventas' | 'compras'
 }
 
+const TAX_TEMPLATES_COLUMNS = [
+  { key: 'titulo', width: 200 },
+  { key: 'lineas', width: 300 },
+  { key: 'porDefecto', width: 110 },
+]
+
 function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
   const queryKey = kind === 'ventas' ? 'impuestos-ventas' : 'impuestos-compras'
   const listFn = kind === 'ventas' ? listImpuestosVentas : listImpuestosCompras
 
   const { data, isLoading } = useQuery({ queryKey: [queryKey], queryFn: listFn })
+  const { widths: colWidths, startResize } = useResizableColumns(TAX_TEMPLATES_COLUMNS)
 
   const label = kind === 'ventas' ? 'Ventas' : 'Compras'
   const sectionDescription = kind === 'ventas'
@@ -1731,12 +1901,24 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
                 </div>
               )
             : (
-                <table className="data-table">
+                <table className="data-table items-table-resizable">
+                  <colgroup>
+                    {TAX_TEMPLATES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Título</th>
-                      <th>Líneas</th>
-                      <th>Por defecto</th>
+                      <th>
+                        Título
+                        <span className="col-resize-handle" onMouseDown={startResize('titulo')} />
+                      </th>
+                      <th>
+                        Líneas
+                        <span className="col-resize-handle" onMouseDown={startResize('lineas')} />
+                      </th>
+                      <th>
+                        Por defecto
+                        <span className="col-resize-handle" onMouseDown={startResize('porDefecto')} />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1772,8 +1954,14 @@ function TaxTemplatesSection({ kind }: TaxTemplatesSectionProps) {
 }
 
 // ---- Item Tax Templates Section (impuesto por artículo — solo lectura) ----
+const ITEM_TAX_TEMPLATES_COLUMNS = [
+  { key: 'titulo', width: 220 },
+  { key: 'tasas', width: 320 },
+]
+
 function ItemTaxTemplatesSection() {
   const { data, isLoading } = useQuery({ queryKey: ['item-tax-templates'], queryFn: listItemTaxTemplates })
+  const { widths: colWidths, startResize } = useResizableColumns(ITEM_TAX_TEMPLATES_COLUMNS)
 
   return (
     <div className="card">
@@ -1799,11 +1987,20 @@ function ItemTaxTemplatesSection() {
                 </div>
               )
             : (
-                <table className="data-table">
+                <table className="data-table items-table-resizable">
+                  <colgroup>
+                    {ITEM_TAX_TEMPLATES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Título</th>
-                      <th>Tasas</th>
+                      <th>
+                        Título
+                        <span className="col-resize-handle" onMouseDown={startResize('titulo')} />
+                      </th>
+                      <th>
+                        Tasas
+                        <span className="col-resize-handle" onMouseDown={startResize('tasas')} />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1832,10 +2029,26 @@ function emptyComponente(): TasaImpuestoComponente {
   return { impuestoBaseId: '', factor: 100 }
 }
 
+const TASAS_IMPUESTO_COLUMNS = [
+  { key: 'nombre', width: 200 },
+  { key: 'cuenta', width: 220 },
+  { key: 'tipo', width: 110 },
+  { key: 'tasa', width: 90 },
+  { key: 'descripcion', width: 220 },
+  { key: 'actions', width: 80 },
+]
+const TASA_COMPONENTES_COLUMNS = [
+  { key: 'impuestoBase', width: 220 },
+  { key: 'factor', width: 100 },
+  { key: 'actions', width: 36 },
+]
+
 function TasasImpuestoSection() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const { data, isLoading } = useQuery({ queryKey: ['tasas-impuesto'], queryFn: listTasasImpuesto })
+  const { widths: colWidths, startResize } = useResizableColumns(TASAS_IMPUESTO_COLUMNS)
+  const { widths: componentesColWidths, startResize: startComponentesResize } = useResizableColumns(TASA_COMPONENTES_COLUMNS)
   const { data: facturacionConfig } = useQuery({ queryKey: ['facturacion-config'], queryFn: getFacturacionConfig })
   const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
 
@@ -1979,15 +2192,33 @@ function TasasImpuestoSection() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {TASAS_IMPUESTO_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>Cuenta</th>
-                <th>Tipo</th>
-                <th>Tasa</th>
-                <th>Descripción</th>
-                <th style={{ width: 80 }} />
+                <th>
+                  Nombre
+                  <span className="col-resize-handle" onMouseDown={startResize('nombre')} />
+                </th>
+                <th>
+                  Cuenta
+                  <span className="col-resize-handle" onMouseDown={startResize('cuenta')} />
+                </th>
+                <th>
+                  Tipo
+                  <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                </th>
+                <th>
+                  Tasa
+                  <span className="col-resize-handle" onMouseDown={startResize('tasa')} />
+                </th>
+                <th>
+                  Descripción
+                  <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -2126,12 +2357,21 @@ function TasasImpuestoSection() {
                     </button>
                   </div>
                   <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <table className="items-table-resizable" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <colgroup>
+                        {TASA_COMPONENTES_COLUMNS.map((c) => <col key={c.key} style={{ width: componentesColWidths[c.key] }} />)}
+                      </colgroup>
                       <thead>
                         <tr style={{ background: 'var(--surface-sunken)' }}>
-                          <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>Impuesto base</th>
-                          <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11, width: 100 }}>Factor %</th>
-                          <th style={{ width: 36 }} />
+                          <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>
+                            Impuesto base
+                            <span className="col-resize-handle" onMouseDown={startComponentesResize('impuestoBase')} />
+                          </th>
+                          <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11 }}>
+                            Factor %
+                            <span className="col-resize-handle" onMouseDown={startComponentesResize('factor')} />
+                          </th>
+                          <th />
                         </tr>
                       </thead>
                       <tbody>
@@ -2289,7 +2529,7 @@ function ResultadoFarmacia({ label, valor }: { label: string; valor?: string }) 
   return (
     <div className="detail-field">
       <span className="detail-label">{label}</span>
-      <span className="detail-value" style={{ fontFamily: 'monospace', fontSize: 12 }}>{valor}</span>
+      <span className="detail-value" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{valor}</span>
     </div>
   )
 }
@@ -2400,9 +2640,16 @@ function FarmaciaArsConfigSection() {
   )
 }
 
+const GRUPOS_CLIENTES_COLUMNS = [
+  { key: 'nombre', width: 220 },
+  { key: 'nivelPrecio', width: 150 },
+  { key: 'actions', width: 70 },
+]
+
 function GruposClientesSection() {
   const queryClient = useQueryClient()
   const { data: grupos, isLoading } = useQuery({ queryKey: ['customer-groups'], queryFn: listCustomerGroups })
+  const { widths: colWidths, startResize } = useResizableColumns(GRUPOS_CLIENTES_COLUMNS)
   const [showForm, setShowForm] = useState(false)
   const [formName, setFormName] = useState('')
   const [formPriceTier, setFormPriceTier] = useState<string>('')
@@ -2455,12 +2702,21 @@ function GruposClientesSection() {
           {isLoading
             ? <span className="skeleton-box" style={{ height: 128, display: 'block', margin: 16 }} />
             : (
-                <table className="data-table">
+                <table className="data-table items-table-resizable">
+                  <colgroup>
+                    {GRUPOS_CLIENTES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Nombre</th>
-                      <th>Nivel de precio</th>
-                      <th style={{ width: 80 }} />
+                      <th>
+                        Nombre
+                        <span className="col-resize-handle" onMouseDown={startResize('nombre')} />
+                      </th>
+                      <th>
+                        Nivel de precio
+                        <span className="col-resize-handle" onMouseDown={startResize('nivelPrecio')} />
+                      </th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
@@ -3800,9 +4056,18 @@ function PosBloqueosModal({ bloqueos, onClose }: { bloqueos: PosDeshabilitarBloq
 // F0-F1 ya aterrizaron en el backend (cimientos + config). Todavía no existe ninguna fase de
 // emisión real (F3-F6) — esta pantalla es solo scaffolding de configuración para adelantar
 // trabajo. No hay endpoints de emisión/consulta/anulación de e-CF que probar todavía.
+const ECF_CLIENTES_COLUMNS = [
+  { key: 'compania', width: 180 },
+  { key: 'rnc', width: 120 },
+  { key: 'certificadoVence', width: 140 },
+  { key: 'etapaCertificacion', width: 180 },
+  { key: 'contingencia', width: 110 },
+]
+
 function EcfConfigSection() {
   const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({ queryKey: ['ecf-config'], queryFn: getEcfConfig })
+  const { widths: colWidths, startResize } = useResizableColumns(ECF_CLIENTES_COLUMNS)
 
   const [habilitado, setHabilitado] = useState(false)
   const [tiposElectronicos, setTiposElectronicos] = useState<EcfTipoElectronico[]>([])
@@ -4099,14 +4364,32 @@ function EcfConfigSection() {
               {provisioning.clientes.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Sin RNC emisores conectados todavía.</p>
               ) : (
-                <table className="data-table">
+                <table className="data-table items-table-resizable">
+                  <colgroup>
+                    {ECF_CLIENTES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Compañía</th>
-                      <th>RNC</th>
-                      <th>Certificado vence</th>
-                      <th>Etapa de certificación</th>
-                      <th>Contingencia</th>
+                      <th>
+                        Compañía
+                        <span className="col-resize-handle" onMouseDown={startResize('compania')} />
+                      </th>
+                      <th>
+                        RNC
+                        <span className="col-resize-handle" onMouseDown={startResize('rnc')} />
+                      </th>
+                      <th>
+                        Certificado vence
+                        <span className="col-resize-handle" onMouseDown={startResize('certificadoVence')} />
+                      </th>
+                      <th>
+                        Etapa de certificación
+                        <span className="col-resize-handle" onMouseDown={startResize('etapaCertificacion')} />
+                      </th>
+                      <th>
+                        Contingencia
+                        <span className="col-resize-handle" onMouseDown={startResize('contingencia')} />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -4131,8 +4414,16 @@ function EcfConfigSection() {
 }
 
 // ---- Denominaciones Section ----
+const DENOMINACIONES_COLUMNS = [
+  { key: 'denominacion', width: 180 },
+  { key: 'valor', width: 110 },
+  { key: 'estado', width: 100 },
+  { key: 'actions', width: 48 },
+]
+
 function DenominacionesSection() {
   const queryClient = useQueryClient()
+  const { widths: colWidths, startResize } = useResizableColumns(DENOMINACIONES_COLUMNS)
   const [showNew, setShowNew] = useState(false)
   const [newDenominacion, setNewDenominacion] = useState('')
   const [newValor, setNewValor] = useState(0)
@@ -4191,13 +4482,25 @@ function DenominacionesSection() {
           {isLoading
             ? <span className="skeleton-box" style={{ height: 128, display: 'block', margin: 16 }} />
             : (
-                <table className="data-table">
+                <table className="data-table items-table-resizable">
+                  <colgroup>
+                    {DENOMINACIONES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Denominación</th>
-                      <th>Valor</th>
-                      <th>Estado</th>
-                      <th style={{ width: 48 }} />
+                      <th>
+                        Denominación
+                        <span className="col-resize-handle" onMouseDown={startResize('denominacion')} />
+                      </th>
+                      <th>
+                        Valor
+                        <span className="col-resize-handle" onMouseDown={startResize('valor')} />
+                      </th>
+                      <th>
+                        Estado
+                        <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                      </th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>

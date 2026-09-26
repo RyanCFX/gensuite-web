@@ -1,4 +1,5 @@
 import './Dashboard.css'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -184,8 +185,16 @@ interface PendingAction {
   href: string
 }
 
+const ACTIVITY_COLUMNS = [
+  { key: 'fecha', width: 90 },
+  { key: 'transaccion', width: 130 },
+  { key: 'detalle', width: 200 },
+  { key: 'monto', width: 110 },
+]
+
 export default function DashboardPage() {
   const [period, setPeriod] = useState<DashboardPeriod>('month')
+  const { widths: activityColWidths, startResize: startActivityResize } = useResizableColumns(ACTIVITY_COLUMNS)
   // Widgets por módulo (§6): el Dashboard es núcleo, pero cada tarjeta se oculta según su
   // feature — igual que una ruta de nivel superior.
   const tieneGastos = useFeature('gastos')
@@ -589,12 +598,24 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="dash-table-wrap">
-                  <table className="dash-activity-table">
+                  <table className="dash-activity-table items-table-resizable">
+                    <colgroup>
+                      {ACTIVITY_COLUMNS.map((c) => <col key={c.key} style={{ width: activityColWidths[c.key] }} />)}
+                    </colgroup>
                     <thead>
                       <tr>
-                        <th>Fecha</th>
-                        <th>Transacción</th>
-                        <th>Detalle</th>
+                        <th>
+                          Fecha
+                          <span className="col-resize-handle" onMouseDown={startActivityResize('fecha')} />
+                        </th>
+                        <th>
+                          Transacción
+                          <span className="col-resize-handle" onMouseDown={startActivityResize('transaccion')} />
+                        </th>
+                        <th>
+                          Detalle
+                          <span className="col-resize-handle" onMouseDown={startActivityResize('detalle')} />
+                        </th>
                         <th style={{ textAlign: 'right' }}>Monto</th>
                       </tr>
                     </thead>

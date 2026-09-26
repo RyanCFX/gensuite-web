@@ -14,8 +14,19 @@ import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FilterField } from '@/shared/ui/FilterField'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 25
+
+const COLUMNS = [
+  { key: 'id', width: 120 },
+  { key: 'fecha', width: 100 },
+  { key: 'tipo', width: 110 },
+  { key: 'descripcion', width: 220 },
+  { key: 'totalDebitos', width: 120 },
+  { key: 'totalCreditos', width: 120 },
+  { key: 'estado', width: 100 },
+]
 
 export default function JournalPage() {
   const navigate = useNavigate()
@@ -24,6 +35,7 @@ export default function JournalPage() {
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
@@ -123,16 +135,46 @@ export default function JournalPage() {
 
       <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <SortableTh label="ID" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-              <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-              <th>Tipo</th>
-              <th>Descripción</th>
-              <th style={{ textAlign: 'right' }}>Total Débitos</th>
-              <th style={{ textAlign: 'right' }}>Total Créditos</th>
-              <th>Estado</th>
+              <SortableTh
+                label="ID"
+                sortKey="id"
+                orderBy={orderBy}
+                onSort={(k) => { sort(k); setPage(1) }}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('id')} />}
+              />
+              <SortableTh
+                label="Fecha"
+                sortKey="postingDate"
+                orderBy={orderBy}
+                onSort={(k) => { sort(k); setPage(1) }}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />}
+              />
+              <th>
+                Tipo
+                <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+              </th>
+              <th>
+                Descripción
+                <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Total Débitos
+                <span className="col-resize-handle" onMouseDown={startResize('totalDebitos')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Total Créditos
+                <span className="col-resize-handle" onMouseDown={startResize('totalCreditos')} />
+              </th>
+              <th>
+                Estado
+                <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -170,7 +212,7 @@ export default function JournalPage() {
                         className="table-row-clickable"
                         onClick={() => navigate(`/asientos/${encodeURIComponent(entry.id)}`)}
                       >
-                        <td style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 500 }}>{entry.id}</td>
+                        <td style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 500 }}>{entry.id}</td>
                         <td className="td-muted">{formatDate(entry.postingDate)}</td>
                         <td className="td-muted">{entry.voucherType ?? '—'}</td>
                         <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

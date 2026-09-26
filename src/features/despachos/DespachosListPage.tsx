@@ -18,7 +18,35 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { Select, SelectItem } from '@/components/ui/select'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { DESPACHO_STATUS_BADGE, DESPACHO_STATUS_LABEL } from './lib'
+
+const DESPACHOS_COLUMNS = [
+  { key: 'id', width: 110 },
+  { key: 'cliente', width: 200 },
+  { key: 'fecha', width: 100 },
+  { key: 'origen', width: 120 },
+  { key: 'sucursal', width: 140 },
+  { key: 'estado', width: 110 },
+]
+
+const PENDIENTES_COLUMNS = [
+  { key: 'origen', width: 100 },
+  { key: 'documento', width: 120 },
+  { key: 'cliente', width: 180 },
+  { key: 'articulo', width: 220 },
+  { key: 'almacen', width: 140 },
+  { key: 'pendiente', width: 100 },
+  { key: 'actions', width: 120 },
+]
+
+const CONFIRMACIONES_COLUMNS = [
+  { key: 'pedido', width: 130 },
+  { key: 'cliente', width: 200 },
+  { key: 'sucursal', width: 140 },
+  { key: 'estado', width: 110 },
+  { key: 'actions', width: 70 },
+]
 
 const PAGE_SIZE = 20
 
@@ -94,6 +122,7 @@ function DespachosTable() {
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
   const offset = (page - 1) * PAGE_SIZE
+  const { widths: colWidths, startResize } = useResizableColumns(DESPACHOS_COLUMNS)
 
   const { data, isLoading } = useQuery({
     queryKey: ['despachos', { customer, status, fechaDesde, fechaHasta, orderBy, offset }],
@@ -142,15 +171,24 @@ function DespachosTable() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {DESPACHOS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <SortableTh label="ID" sortKey="id" orderBy={orderBy} onSort={sort} />
-                <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} />
-                <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} />
-                <th>Origen</th>
-                <th>Sucursal</th>
-                <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
+                <SortableTh label="ID" sortKey="id" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('id')} />} />
+                <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('cliente')} />} />
+                <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />} />
+                <th>
+                  Origen
+                  <span className="col-resize-handle" onMouseDown={startResize('origen')} />
+                </th>
+                <th>
+                  Sucursal
+                  <span className="col-resize-handle" onMouseDown={startResize('sucursal')} />
+                </th>
+                <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('estado')} />} />
               </tr>
             </thead>
             <tbody>
@@ -211,6 +249,7 @@ function PendientesTable() {
   const [itemCode, setItemCode] = useState(() => searchParams.get('itemCode') ?? '')
   const [page, setPage] = useState(1)
   const offset = (page - 1) * PAGE_SIZE
+  const { widths: colWidths, startResize } = useResizableColumns(PENDIENTES_COLUMNS)
 
   const { data, isLoading } = useQuery({
     queryKey: ['despachos-pendientes', { customer, itemCode, offset }],
@@ -274,15 +313,36 @@ function PendientesTable() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {PENDIENTES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Origen</th>
-                <th>Documento</th>
-                <th>Cliente</th>
-                <th>Artículo</th>
-                <th>Almacén</th>
-                <th style={{ textAlign: 'right' }}>Pendiente</th>
+                <th>
+                  Origen
+                  <span className="col-resize-handle" onMouseDown={startResize('origen')} />
+                </th>
+                <th>
+                  Documento
+                  <span className="col-resize-handle" onMouseDown={startResize('documento')} />
+                </th>
+                <th>
+                  Cliente
+                  <span className="col-resize-handle" onMouseDown={startResize('cliente')} />
+                </th>
+                <th>
+                  Artículo
+                  <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                </th>
+                <th>
+                  Almacén
+                  <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Pendiente
+                  <span className="col-resize-handle" onMouseDown={startResize('pendiente')} />
+                </th>
                 <th />
               </tr>
             </thead>
@@ -365,6 +425,7 @@ function ConfirmacionesTable() {
   const [branch, setBranch] = useState('')
   const [page, setPage] = useState(1)
   const offset = (page - 1) * PAGE_SIZE
+  const { widths: colWidths, startResize } = useResizableColumns(CONFIRMACIONES_COLUMNS)
 
   const { data, isLoading } = useQuery({
     queryKey: ['despachos-confirmaciones', { search, status, customer, branch, offset }],
@@ -411,13 +472,28 @@ function ConfirmacionesTable() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {CONFIRMACIONES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Pedido</th>
-                <th>Cliente</th>
-                <th>Sucursal</th>
-                <th>Estado</th>
+                <th>
+                  Pedido
+                  <span className="col-resize-handle" onMouseDown={startResize('pedido')} />
+                </th>
+                <th>
+                  Cliente
+                  <span className="col-resize-handle" onMouseDown={startResize('cliente')} />
+                </th>
+                <th>
+                  Sucursal
+                  <span className="col-resize-handle" onMouseDown={startResize('sucursal')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
                 <th />
               </tr>
             </thead>

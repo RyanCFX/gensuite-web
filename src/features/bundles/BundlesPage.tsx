@@ -15,6 +15,7 @@ import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { Select, SelectItem } from '@/components/ui/select'
 
 const PAGE_SIZE = 20
@@ -28,6 +29,18 @@ export default function BundlesPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'disabled'>('active')
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
+
+  const BUNDLES_COLUMNS = [
+    { key: 'nombre', width: 220 },
+    { key: 'udm', width: 90 },
+    { key: 'articulos', width: 120 },
+    { key: 'precioA', width: 100 },
+    { key: 'precioB', width: 100 },
+    { key: 'precioC', width: 100 },
+    { key: 'estado', width: 100 },
+    { key: 'actions', width: 80 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(BUNDLES_COLUMNS)
 
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
@@ -97,17 +110,29 @@ export default function BundlesPage() {
 
       <div className="card navy-table-card">
         <div className="table-wrap">
-          <table className="table-config navy-table">
+          <table className="table-config navy-table items-table-resizable">
+            <colgroup>
+              {BUNDLES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <SortableTh label="Nombre" sortKey="itemName" orderBy={orderBy} onSort={sort} />
-                <th>UdM</th>
-                <th>Artículos</th>
-                <SortableTh label="Precio A" sortKey="priceA" orderBy={orderBy} onSort={sort} />
-                <SortableTh label="Precio B" sortKey="priceB" orderBy={orderBy} onSort={sort} />
-                <SortableTh label="Precio C" sortKey="priceC" orderBy={orderBy} onSort={sort} />
-                <th>Estado</th>
-                <th style={{ width: 80 }} />
+                <SortableTh label="Nombre" sortKey="itemName" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('nombre')} />} />
+                <th>
+                  UdM
+                  <span className="col-resize-handle" onMouseDown={startResize('udm')} />
+                </th>
+                <th>
+                  Artículos
+                  <span className="col-resize-handle" onMouseDown={startResize('articulos')} />
+                </th>
+                <SortableTh label="Precio A" sortKey="priceA" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('precioA')} />} />
+                <SortableTh label="Precio B" sortKey="priceB" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('precioB')} />} />
+                <SortableTh label="Precio C" sortKey="priceC" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('precioC')} />} />
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>

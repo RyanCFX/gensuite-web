@@ -38,8 +38,19 @@ import {
   type PaymentLinesValue,
 } from '@/lib/paymentLines'
 import type { CobrarFacturaDto, PendienteCobroItem } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const PENDIENTES_COLUMNS = [
+  { key: 'factura', width: 120 },
+  { key: 'cliente', width: 200 },
+  { key: 'fecha', width: 100 },
+  { key: 'total', width: 120 },
+  { key: 'cubreArs', width: 120 },
+  { key: 'aCobrar', width: 120 },
+  { key: 'actions', width: 180 },
+]
 
 /**
  * Importe que realmente se le cobra al paciente/cliente. El backend lo manda resuelto en
@@ -352,6 +363,8 @@ function validateAndSubmit() {
     setPage(1)
   }, [])
 
+  const { widths: pendientesColWidths, startResize: startResizePendientes } = useResizableColumns(PENDIENTES_COLUMNS)
+
   return (
     <div className="page-container">
        <div className="page-header">
@@ -409,16 +422,37 @@ function validateAndSubmit() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {PENDIENTES_COLUMNS.map((c) => <col key={c.key} style={{ width: pendientesColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Factura</th>
-                <th>Cliente</th>
-                <th>Fecha</th>
-                <th style={{ textAlign: 'right' }}>Total</th>
-                <th style={{ textAlign: 'right' }}>Cubre ARS</th>
-                <th style={{ textAlign: 'right' }}>A cobrar</th>
-                <th style={{ width: 180 }} />
+                <th>
+                  Factura
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('factura')} />
+                </th>
+                <th>
+                  Cliente
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('cliente')} />
+                </th>
+                <th>
+                  Fecha
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('fecha')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Total
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('total')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Cubre ARS
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('cubreArs')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  A cobrar
+                  <span className="col-resize-handle" onMouseDown={startResizePendientes('aCobrar')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -443,7 +477,7 @@ function validateAndSubmit() {
                     )
                   : pendientes.map((inv) => (
                       <tr key={inv.id}>
-                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500 }}>{inv.id}</td>
+                        <td style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500 }}>{inv.id}</td>
                         <td>{inv.esClienteOcasional ? (
                            <span>
                              {inv.clienteOcasionalNombre ?? inv.customerName}
@@ -453,14 +487,14 @@ function validateAndSubmit() {
                            inv.customerName
                          )}</td>
                         <td className="td-muted">{formatDate(inv.postingDate)}</td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>
                           {formatMoney(inv.roundedTotal ?? inv.grandTotal, inv.currency ?? monedaBase)}
                         </td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--color-brand)' }}>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--color-brand)' }}>
                           {/* La cobertura ARS siempre es DOP, sin importar la moneda de la factura. */}
                           {inv.aseguradora ? formatMoney(inv.aseguradora.montoCobertura, 'DOP') : <span className="td-dim">—</span>}
                         </td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600 }}>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600 }}>
                           {formatMoney(montoACobrarDe(inv), inv.currency ?? monedaBase)}
                         </td>
                         <td>
@@ -673,7 +707,7 @@ function validateAndSubmit() {
                </p>
                <div style={{ fontSize: 13, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
                  <span style={{ color: 'var(--text-secondary)' }}>Factura:</span>
-                 <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{confirmDescartar.id}</span>
+                 <span style={{ fontFamily: 'var(--font-body)', fontWeight: 500 }}>{confirmDescartar.id}</span>
                  <span style={{ color: 'var(--text-secondary)' }}>Cliente:</span>
                  <span>{confirmDescartar.customerName}</span>
                  <span style={{ color: 'var(--text-secondary)' }}>Total:</span>

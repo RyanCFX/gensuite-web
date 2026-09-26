@@ -21,6 +21,15 @@ import { Modal } from '@/shared/ui/Modal'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ITEMS_COLUMNS = [
+  { key: 'descripcion', width: 220 },
+  { key: 'cantidad', width: 90 },
+  { key: 'precioUnit', width: 110 },
+  { key: 'itbis', width: 90 },
+  { key: 'importe', width: 110 },
+]
 
 function vincularErrorMsg(err: ApiError): string {
   switch (err?.statusCode) {
@@ -45,6 +54,7 @@ export default function EcfRecibidoDetail() {
   const [multipleSel, setMultipleSel] = useState('')
   const [acecfModal, setAcecfModal] = useState<AcecfStatus | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  const { widths: itemsColWidths, startResize: itemsStartResize } = useResizableColumns(ITEMS_COLUMNS)
 
   const { data: v, isLoading } = useQuery({
     queryKey: ['ecf-recibido', voucherId],
@@ -160,7 +170,7 @@ export default function EcfRecibidoDetail() {
         </div>
         <div className="card-body">
           <div className="fields-grid">
-            <div className="detail-field"><span className="detail-label">NCF</span><span className="detail-value" style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v.ncf}</span></div>
+            <div className="detail-field"><span className="detail-label">NCF</span><span className="detail-value" style={{ fontFamily: 'var(--font-body)', fontWeight: 600 }}>{v.ncf}</span></div>
             <div className="detail-field"><span className="detail-label">Tipo</span><span className="detail-value">{ecfTipoLabel(v.typeId)}</span></div>
             <div className="detail-field"><span className="detail-label">Emisor</span><span className="detail-value">{v.counterpartName} ({v.counterpartRnc})</span></div>
             <div className="detail-field"><span className="detail-label">Fecha de emisión</span><span className="detail-value">{formatDate(v.issuedAt)}</span></div>
@@ -180,13 +190,13 @@ export default function EcfRecibidoDetail() {
           {v.conciliacion === 'CONCILIADO' && v.purchaseInvoice ? (
             <p style={{ fontSize: 13 }}>
               Vinculado a la factura de compra{' '}
-              <Link to={`/compras/${v.purchaseInvoice}`} style={{ fontFamily: 'monospace' }}>{v.purchaseInvoice}</Link>.
+              <Link to={`/compras/${v.purchaseInvoice}`} style={{ fontFamily: 'var(--font-body)' }}>{v.purchaseInvoice}</Link>.
             </p>
           ) : v.conciliacion === 'UNICO' && v.candidatosConciliacion[0] ? (
             <>
               <p style={{ fontSize: 13 }}>
                 Encontramos una factura de compra que coincide (mismo NCF, RNC y total):{' '}
-                <strong style={{ fontFamily: 'monospace' }}>{v.candidatosConciliacion[0]}</strong>.
+                <strong style={{ fontFamily: 'var(--font-body)' }}>{v.candidatosConciliacion[0]}</strong>.
               </p>
               <div>
                 <button
@@ -254,14 +264,32 @@ export default function EcfRecibidoDetail() {
           <h2 className="card-title">Líneas del proveedor</h2>
         </div>
         <div className="items-table-wrap">
-          <table className="items-table">
+          <table className="items-table items-table-resizable">
+            <colgroup>
+              {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Descripción</th>
-                <th style={{ textAlign: 'right' }}>Cant.</th>
-                <th style={{ textAlign: 'right' }}>Precio Unit.</th>
-                <th style={{ textAlign: 'right' }}>% ITBIS</th>
-                <th style={{ textAlign: 'right' }}>Importe</th>
+                <th>
+                  Descripción
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('descripcion')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Cant.
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('cantidad')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Precio Unit.
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('precioUnit')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  % ITBIS
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('itbis')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Importe
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('importe')} />
+                </th>
               </tr>
             </thead>
             <tbody>

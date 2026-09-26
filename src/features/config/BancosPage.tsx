@@ -12,6 +12,14 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const BANCOS_COLUMNS = [
+  { key: 'nombre', width: 220 },
+  { key: 'swift', width: 140 },
+  { key: 'sitioWeb', width: 200 },
+  { key: 'actions', width: 48 },
+]
 
 const bancoSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -42,6 +50,7 @@ export default function BancosPage() {
   })
 
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, closeDialog)
+  const { widths: colWidths, startResize } = useResizableColumns(BANCOS_COLUMNS)
 
   const createMutation = useMutation({
     mutationFn: createBancoCatalogo,
@@ -133,13 +142,25 @@ export default function BancosPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {BANCOS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>SWIFT</th>
-                <th>Sitio web</th>
-                <th style={{ width: 48 }} />
+                <th>
+                  Nombre
+                  <span className="col-resize-handle" onMouseDown={startResize('nombre')} />
+                </th>
+                <th>
+                  SWIFT
+                  <span className="col-resize-handle" onMouseDown={startResize('swift')} />
+                </th>
+                <th>
+                  Sitio web
+                  <span className="col-resize-handle" onMouseDown={startResize('sitioWeb')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>

@@ -1,6 +1,14 @@
 import { Wallet } from 'lucide-react'
 import { formatMoney } from '@/lib/formatters'
 import type { CorteCaja } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const INGRESOS_COLUMNS = [
+  { key: 'metodo', width: 200 },
+  { key: 'ventasContado', width: 140 },
+  { key: 'recibosCobrados', width: 140 },
+  { key: 'total', width: 130 },
+]
 
 /**
  * Renderiza las secciones del reporte "Corte de Caja" (por turno o consolidado
@@ -9,10 +17,11 @@ import type { CorteCaja } from '@/shared/api/types'
  * no un dato faltante. "Importe a Entregar" es solo el efectivo físico (Cash).
  */
 export function CorteCajaView({ corteCaja, currency }: { corteCaja: CorteCaja; currency?: string }) {
+  const { widths: colWidths, startResize } = useResizableColumns(INGRESOS_COLUMNS)
   const row = (label: string, value: number, opts?: { bold?: boolean; muted?: boolean }) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
       <span style={{ color: opts?.muted ? 'var(--text-tertiary)' : 'var(--text-secondary)' }}>{label}</span>
-      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: opts?.bold ? 700 : 500 }}>{formatMoney(value, currency)}</span>
+      <span style={{ fontFamily: 'var(--font-body)', fontWeight: opts?.bold ? 700 : 500 }}>{formatMoney(value, currency)}</span>
     </div>
   )
 
@@ -48,13 +57,16 @@ export function CorteCajaView({ corteCaja, currency }: { corteCaja: CorteCaja; c
           <span className="card-title">Ingresos</span>
         </div>
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table items-table-resizable">
+            <colgroup>
+              {INGRESOS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Método</th>
-                <th style={{ textAlign: 'right' }}>Ventas de Contado</th>
-                <th style={{ textAlign: 'right' }}>Recibos Cobrados</th>
-                <th style={{ textAlign: 'right' }}>Total</th>
+                <th>Método<span className="col-resize-handle" onMouseDown={startResize('metodo')} /></th>
+                <th style={{ textAlign: 'right' }}>Ventas de Contado<span className="col-resize-handle" onMouseDown={startResize('ventasContado')} /></th>
+                <th style={{ textAlign: 'right' }}>Recibos Cobrados<span className="col-resize-handle" onMouseDown={startResize('recibosCobrados')} /></th>
+                <th style={{ textAlign: 'right' }}>Total<span className="col-resize-handle" onMouseDown={startResize('total')} /></th>
               </tr>
             </thead>
             <tbody>
@@ -68,9 +80,9 @@ export function CorteCajaView({ corteCaja, currency }: { corteCaja: CorteCaja; c
                 corteCaja.ingresos.map((i) => (
                   <tr key={i.metodo}>
                     <td>{i.metodo}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatMoney(i.ventasContado, currency)}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatMoney(i.recibosCobrados, currency)}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatMoney(i.total, currency)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatMoney(i.ventasContado, currency)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatMoney(i.recibosCobrados, currency)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontWeight: 600 }}>{formatMoney(i.total, currency)}</td>
                   </tr>
                 ))
               )}
@@ -79,13 +91,13 @@ export function CorteCajaView({ corteCaja, currency }: { corteCaja: CorteCaja; c
               <tfoot>
                 <tr style={{ borderTop: '2px solid var(--border-strong)' }}>
                   <td style={{ fontWeight: 600 }}>Total</td>
-                  <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                  <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontWeight: 600 }}>
                     {formatMoney(corteCaja.ingresos.reduce((s, i) => s + i.ventasContado, 0), currency)}
                   </td>
-                  <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                  <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontWeight: 600 }}>
                     {formatMoney(corteCaja.ingresos.reduce((s, i) => s + i.recibosCobrados, 0), currency)}
                   </td>
-                  <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                  <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontWeight: 700 }}>
                     {formatMoney(corteCaja.ingresos.reduce((s, i) => s + i.total, 0), currency)}
                   </td>
                 </tr>
@@ -105,7 +117,7 @@ export function CorteCajaView({ corteCaja, currency }: { corteCaja: CorteCaja; c
 
         <div className="card" style={{ padding: '14px 16px' }}>
           <div className="card-title" style={{ fontSize: 13, marginBottom: 8 }}>Fondo de Apertura</div>
-          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-body)' }}>
             {formatMoney(corteCaja.fondoApertura, currency)}
           </div>
         </div>
@@ -114,7 +126,7 @@ export function CorteCajaView({ corteCaja, currency }: { corteCaja: CorteCaja; c
           <div className="card-title" style={{ fontSize: 13, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
             <Wallet size={14} /> Importe a Entregar
           </div>
-          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--brand-primary)' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-body)', color: 'var(--brand-primary)' }}>
             {formatMoney(corteCaja.importeAEntregar, currency)}
           </div>
           <p style={{ fontSize: 11, color: 'var(--text-tertiary)', margin: '4px 0 0' }}>

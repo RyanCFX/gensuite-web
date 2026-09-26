@@ -16,6 +16,15 @@ import { PagoContadoModal } from '@/components/shared/PagoContadoModal'
 import { ECF_SUBMIT_UNAVAILABLE_MSG } from '@/shared/api/ecf'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import type { ImpuestoDistribucionDto, EcfSubmitResult, ApiError, PagoContadoDto } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ITEMS_COLUMNS = [
+  { key: 'codigo', width: 110 },
+  { key: 'descripcion', width: 220 },
+  { key: 'qty', width: 90 },
+  { key: 'precio', width: 110 },
+  { key: 'subtotal', width: 120 },
+]
 
 function apiErrorMessage(error: unknown, fallback: string) {
   const apiErr = error as { message?: string }
@@ -34,6 +43,7 @@ export default function GastoDetail() {
   const [showPagoContadoModal, setShowPagoContadoModal] = useState(false)
   // e-CF autogenerado al someter (gasto B11/B13/B14/B15/B17 sin NCF + e-CF habilitado). Raro hoy.
   const [ecfResult, setEcfResult] = useState<EcfSubmitResult | null>(null)
+  const { widths: itemsColWidths, startResize: itemsStartResize } = useResizableColumns(ITEMS_COLUMNS)
 
   const { data: gasto, isLoading, isError } = useQuery({
     queryKey: ['gasto', id],
@@ -254,7 +264,7 @@ export default function GastoDetail() {
             {gasto.esProveedorOcasional && gasto.proveedorOcasionalRnc && (
               <div className="detail-field">
                 <span className="detail-label">RNC/Cédula</span>
-                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{gasto.proveedorOcasionalRnc}</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{gasto.proveedorOcasionalRnc}</span>
               </div>
             )}
             <div className="detail-field">
@@ -272,13 +282,13 @@ export default function GastoDetail() {
                   {(gasto.impuestos ?? []).map((imp, idx) => (
                     <span key={`${imp.id}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
                       <span>{imp.id} ({imp.tasa}%)</span>
-                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{fmtMonto(imp.monto)}</strong>
+                      <strong style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{fmtMonto(imp.monto)}</strong>
                     </span>
                   ))}
                   {gasto.taxAmount != null && (
                     <span style={{ display: 'flex', justifyContent: 'space-between', gap: 16, borderTop: '1px solid var(--border-default)', paddingTop: 4 }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Total impuestos</span>
-                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{formatDOP(gasto.taxAmount)}</strong>
+                      <strong style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{formatDOP(gasto.taxAmount)}</strong>
                     </span>
                   )}
                 </span>
@@ -293,13 +303,13 @@ export default function GastoDetail() {
                     return (
                       <span key={r.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
                         <span>{opt?.categoryName ?? r.id} ({r.tasa}%)</span>
-                        <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{fmtMonto(r.monto)}</strong>
+                        <strong style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{fmtMonto(r.monto)}</strong>
                       </span>
                     )
                   })}
                   <span style={{ display: 'flex', justifyContent: 'space-between', gap: 16, borderTop: '1px solid var(--border-default)', paddingTop: 4 }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Total retenciones</span>
-                    <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                    <strong style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                       {formatDOP((gasto.retenciones ?? []).reduce((s, r) => s + (r.monto ?? 0), 0))}
                     </strong>
                   </span>
@@ -341,20 +351,38 @@ export default function GastoDetail() {
             <span className="card-title">Conceptos</span>
           </div>
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Código</th>
-                  <th>Descripción</th>
-                  <th style={{ textAlign: 'right' }}>Qty</th>
-                  <th style={{ textAlign: 'right' }}>Precio</th>
-                  <th style={{ textAlign: 'right' }}>Subtotal</th>
+                  <th>
+                    Código
+                    <span className="col-resize-handle" onMouseDown={itemsStartResize('codigo')} />
+                  </th>
+                  <th>
+                    Descripción
+                    <span className="col-resize-handle" onMouseDown={itemsStartResize('descripcion')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Qty
+                    <span className="col-resize-handle" onMouseDown={itemsStartResize('qty')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Precio
+                    <span className="col-resize-handle" onMouseDown={itemsStartResize('precio')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Subtotal
+                    <span className="col-resize-handle" onMouseDown={itemsStartResize('subtotal')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {gasto.items.map((item, i) => (
                   <tr key={i}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                       {item.itemCode ?? <span className="badge badge-info">Ad-hoc</span>}
                     </td>
                     <td>
@@ -395,11 +423,11 @@ export default function GastoDetail() {
           <div className="fields-grid fields-grid-3">
             <div className="detail-field">
               <span className="detail-label">NCF Proveedor</span>
-              <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{gasto.ncfProveedor ?? '—'}</span>
+              <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{gasto.ncfProveedor ?? '—'}</span>
             </div>
             <div className="detail-field">
               <span className="detail-label">N° Factura del Proveedor</span>
-              <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{gasto.billNo ?? '—'}</span>
+              <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{gasto.billNo ?? '—'}</span>
             </div>
             <div className="detail-field">
               <span className="detail-label">Tipo Comprobante</span>

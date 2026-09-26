@@ -20,6 +20,14 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const COLUMNS = [
+  { key: 'nombre', width: 220 },
+  { key: 'descripcion', width: 220 },
+  { key: 'categoria', width: 160 },
+  { key: 'actions', width: 80 },
+]
 
 const brandSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -69,6 +77,7 @@ export default function BrandsPage() {
   })
 
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, closeDialog)
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const createMutation = useMutation({
     mutationFn: createBrand,
@@ -173,13 +182,28 @@ export default function BrandsPage() {
 
       <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <SortableTh label="Nombre" sortKey="name" orderBy={orderBy} onSort={sort} />
-              <th>Descripción</th>
-              <th>Categoría</th>
-              <th style={{ width: 80 }} />
+              <SortableTh
+                label="Nombre"
+                sortKey="name"
+                orderBy={orderBy}
+                onSort={sort}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('nombre')} />}
+              />
+              <th>
+                Descripción
+                <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+              </th>
+              <th>
+                Categoría
+                <span className="col-resize-handle" onMouseDown={startResize('categoria')} />
+              </th>
+              <th />
             </tr>
           </thead>
           <tbody>

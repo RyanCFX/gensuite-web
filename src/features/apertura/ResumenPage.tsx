@@ -6,8 +6,17 @@ import { getAperturaResumen } from '@/shared/api/apertura'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { formatMoney, formatNumber } from '@/lib/formatters'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const POR_ANIO_COLUMNS = [
+  { key: 'anio', width: 90 },
+  { key: 'ventas', width: 130 },
+  { key: 'compras', width: 130 },
+  { key: 'inventario', width: 130 },
+]
 
 export default function ResumenPage() {
+  const { widths: colWidths, startResize } = useResizableColumns(POR_ANIO_COLUMNS)
   const { data: resumen, isLoading } = useQuery({
     queryKey: ['apertura-resumen'],
     queryFn: getAperturaResumen,
@@ -98,13 +107,16 @@ export default function ResumenPage() {
             <div className="card">
               <div className="card-header"><h2 className="card-title">Por año</h2></div>
               <div className="table-scroll">
-                <table className="data-table">
+                <table className="data-table items-table-resizable">
+                  <colgroup>
+                    {POR_ANIO_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Año</th>
-                      <th style={{ textAlign: 'right' }}>Ventas</th>
-                      <th style={{ textAlign: 'right' }}>Compras</th>
-                      <th style={{ textAlign: 'right' }}>Inventario</th>
+                      <th>Año<span className="col-resize-handle" onMouseDown={startResize('anio')} /></th>
+                      <th style={{ textAlign: 'right' }}>Ventas<span className="col-resize-handle" onMouseDown={startResize('ventas')} /></th>
+                      <th style={{ textAlign: 'right' }}>Compras<span className="col-resize-handle" onMouseDown={startResize('compras')} /></th>
+                      <th style={{ textAlign: 'right' }}>Inventario<span className="col-resize-handle" onMouseDown={startResize('inventario')} /></th>
                     </tr>
                   </thead>
                   <tbody>

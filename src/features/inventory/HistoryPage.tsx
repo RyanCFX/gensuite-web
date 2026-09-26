@@ -15,8 +15,19 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { ItemHistoryDrawer } from './ItemHistoryDrawer'
 import { STOCK_VOUCHER_TYPES } from '@/lib/constants'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 30
+
+const COLUMNS = [
+  { key: 'articulo', width: 220 },
+  { key: 'almacen', width: 140 },
+  { key: 'movimiento', width: 110 },
+  { key: 'stockResultante', width: 130 },
+  { key: 'tipoDoc', width: 110 },
+  { key: 'numDoc', width: 110 },
+  { key: 'fecha', width: 100 },
+]
 
 export default function HistoryPage() {
   const [warehouse, setWarehouse] = useState<string>('all')
@@ -27,6 +38,7 @@ export default function HistoryPage() {
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
   const [selectedItem, setSelectedItem] = useState<{ itemCode: string; itemName: string; warehouse: string } | null>(null)
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const offset = (page - 1) * PAGE_SIZE
 
@@ -135,16 +147,46 @@ export default function HistoryPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <SortableTh label="Artículo" sortKey="itemCode" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                <th>Almacén</th>
-                <th style={{ textAlign: 'right' }}>Movimiento</th>
-                <th style={{ textAlign: 'right' }}>Stock Resultante</th>
-                <th>Tipo Doc</th>
-                <th># Doc</th>
-                <SortableTh label="Fecha" sortKey="date" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
+                <SortableTh
+                  label="Artículo"
+                  sortKey="itemCode"
+                  orderBy={orderBy}
+                  onSort={(k) => { sort(k); setPage(1) }}
+                  resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('articulo')} />}
+                />
+                <th>
+                  Almacén
+                  <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Movimiento
+                  <span className="col-resize-handle" onMouseDown={startResize('movimiento')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Stock Resultante
+                  <span className="col-resize-handle" onMouseDown={startResize('stockResultante')} />
+                </th>
+                <th>
+                  Tipo Doc
+                  <span className="col-resize-handle" onMouseDown={startResize('tipoDoc')} />
+                </th>
+                <th>
+                  # Doc
+                  <span className="col-resize-handle" onMouseDown={startResize('numDoc')} />
+                </th>
+                <SortableTh
+                  label="Fecha"
+                  sortKey="date"
+                  orderBy={orderBy}
+                  onSort={(k) => { sort(k); setPage(1) }}
+                  resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />}
+                />
               </tr>
             </thead>
             <tbody>
@@ -188,18 +230,18 @@ export default function HistoryPage() {
                           <td className="td-muted">{entry.warehouse}</td>
                           <td style={{
                             textAlign: 'right',
-                            fontFamily: 'monospace',
+                            fontFamily: 'var(--font-body)',
                             fontWeight: 600,
                             color: entry.movementQty >= 0 ? 'oklch(62.7% 0.194 149.214)' : 'oklch(51.4% 0.222 16.935)',
                           }}
                           >
                             {formatNumber(entry.movementQty)}
                           </td>
-                          <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>
+                          <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>
                             {formatNumber(entry.stockAfter)}
                           </td>
                           <td className="td-muted">{entry.voucherType}</td>
-                          <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{entry.voucherNo}</td>
+                          <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{entry.voucherNo}</td>
                           <td>{formatDate(entry.postingDate)}</td>
                         </tr>
                       ))}

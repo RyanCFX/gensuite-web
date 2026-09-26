@@ -6,6 +6,21 @@ import { Wallet, Shuffle } from 'lucide-react'
 import { getSaldoFavorProveedor, aplicarSaldosFavor } from '@/shared/api/pagos'
 import { formatDOP, formatDate } from '@/lib/formatters'
 import type { SaldoFavorProveedorEntry, FacturaConSaldosFavorDto } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const SALDOS_COLUMNS = [
+  { key: 'paymentEntry', width: 160 },
+  { key: 'fecha', width: 110 },
+  { key: 'disponible', width: 120 },
+  { key: 'monto', width: 140 },
+  { key: 'actions', width: 100 },
+]
+
+const SPLIT_COLUMNS = [
+  { key: 'factura', width: 180 },
+  { key: 'pendiente', width: 120 },
+  { key: 'monto', width: 140 },
+]
 
 export interface SaldoFavorInvoiceRow {
   invoiceId: string
@@ -84,6 +99,8 @@ export function SaldoFavorProveedorPagosSection({
   const [choiceAmount, setChoiceAmount] = useState(0)
   const [splitModal, setSplitModal] = useState<{ entry: SaldoFavorProveedorEntry; amount: number; rows: Record<string, number> } | null>(null)
   const [confirmAction, setConfirmAction] = useState<{ message: string; onConfirm: () => void } | null>(null)
+  const { widths: saldosColWidths, startResize: startSaldosResize } = useResizableColumns(SALDOS_COLUMNS)
+  const { widths: splitColWidths, startResize: startSplitResize } = useResizableColumns(SPLIT_COLUMNS)
 
   const { data: saldoFavor, isLoading } = useQuery({
     queryKey: ['saldo-favor-proveedor-pagos', supplierId],
@@ -244,20 +261,35 @@ export function SaldoFavorProveedorPagosSection({
         </div>
 
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table items-table-resizable">
+            <colgroup>
+              {SALDOS_COLUMNS.map((c) => <col key={c.key} style={{ width: saldosColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Payment Entry</th>
-                <th>Fecha</th>
-                <th style={{ textAlign: 'right' }}>Disponible</th>
-                <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
-                <th style={{ width: 100 }} />
+                <th>
+                  Payment Entry
+                  <span className="col-resize-handle" onMouseDown={startSaldosResize('paymentEntry')} />
+                </th>
+                <th>
+                  Fecha
+                  <span className="col-resize-handle" onMouseDown={startSaldosResize('fecha')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Disponible
+                  <span className="col-resize-handle" onMouseDown={startSaldosResize('disponible')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Monto a aplicar
+                  <span className="col-resize-handle" onMouseDown={startSaldosResize('monto')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {entries.map((entry) => (
                 <tr key={entry.paymentEntryId}>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{entry.paymentEntryId}</td>
+                  <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{entry.paymentEntryId}</td>
                   <td>{formatDate(entry.postingDate)}</td>
                   <td style={{ textAlign: 'right' }}>{formatDOP(entry.availableAmount)}</td>
                   <td>
@@ -324,18 +356,30 @@ export function SaldoFavorProveedorPagosSection({
                 Saldo a repartir de <strong>{splitModal.entry.paymentEntryId}</strong>: {formatDOP(splitModal.amount)}
               </p>
               <div className="table-scroll">
-                <table className="data-table">
+                <table className="data-table items-table-resizable">
+                  <colgroup>
+                    {SPLIT_COLUMNS.map((c) => <col key={c.key} style={{ width: splitColWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Factura</th>
-                      <th style={{ textAlign: 'right' }}>Pendiente</th>
-                      <th style={{ textAlign: 'right', width: 140 }}>Monto</th>
+                      <th>
+                        Factura
+                        <span className="col-resize-handle" onMouseDown={startSplitResize('factura')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Pendiente
+                        <span className="col-resize-handle" onMouseDown={startSplitResize('pendiente')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Monto
+                        <span className="col-resize-handle" onMouseDown={startSplitResize('monto')} />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {selectedInvoices.map((inv) => (
                       <tr key={inv.invoiceId}>
-                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{inv.invoiceId}</td>
+                        <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{inv.invoiceId}</td>
                         <td style={{ textAlign: 'right' }}>{formatDOP(inv.outstandingAmount)}</td>
                         <td>
                           <input

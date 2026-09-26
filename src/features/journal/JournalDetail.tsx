@@ -6,6 +6,7 @@ import { getJournalEntry, submitJournalEntry, cancelJournalEntry } from '@/share
 import { formatDate, formatDOP, formatMoney } from '@/lib/formatters'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ArrowLeft } from 'lucide-react'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 // ─── Confirm Modal ────────────────────────────────────────────────────────────
 
@@ -85,6 +86,18 @@ export default function JournalDetail() {
     },
   })
 
+  // docs/tasks/64_multimoneda_completo.md §5.4 — aquí el campo se llama `currency`, no `moneda`.
+  const algunaLineaEnDivisa = (entry?.entries ?? []).some((l) => l.currency)
+
+  const LINES_COLUMNS = [
+    { key: 'cuenta', width: 160 },
+    { key: 'debito', width: 110 },
+    { key: 'credito', width: 110 },
+    { key: 'descripcion', width: 200 },
+    ...(algunaLineaEnDivisa ? [{ key: 'monedaTasa', width: 140 }] : []),
+  ]
+  const { widths: linesColWidths, startResize: linesStartResize } = useResizableColumns(LINES_COLUMNS)
+
   if (isLoading) {
     return (
       <div className="page-container">
@@ -115,8 +128,6 @@ export default function JournalDetail() {
   }
 
   const isBalanced = Math.abs(entry.totalDebit - entry.totalCredit) < 0.01
-  // docs/tasks/64_multimoneda_completo.md §5.4 — aquí el campo se llama `currency`, no `moneda`.
-  const algunaLineaEnDivisa = (entry.entries ?? []).some((l) => l.currency)
 
   return (
     <div className="page-container">
@@ -208,14 +219,34 @@ export default function JournalDetail() {
         </div>
         <div className="card-body" style={{ padding: 0 }}>
           <div className="items-table-wrap">
-            <table className="items-table">
+            <table className="items-table items-table-resizable">
+              <colgroup>
+                {LINES_COLUMNS.map((c) => <col key={c.key} style={{ width: linesColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Cuenta</th>
-                  <th style={{ textAlign: 'right' }}>Débito</th>
-                  <th style={{ textAlign: 'right' }}>Crédito</th>
-                  <th>Descripción</th>
-                  {algunaLineaEnDivisa && <th>Moneda / Tasa</th>}
+                  <th>
+                    Cuenta
+                    <span className="col-resize-handle" onMouseDown={linesStartResize('cuenta')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Débito
+                    <span className="col-resize-handle" onMouseDown={linesStartResize('debito')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Crédito
+                    <span className="col-resize-handle" onMouseDown={linesStartResize('credito')} />
+                  </th>
+                  <th>
+                    Descripción
+                    <span className="col-resize-handle" onMouseDown={linesStartResize('descripcion')} />
+                  </th>
+                  {algunaLineaEnDivisa && (
+                    <th>
+                      Moneda / Tasa
+                      <span className="col-resize-handle" onMouseDown={linesStartResize('monedaTasa')} />
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -229,7 +260,7 @@ export default function JournalDetail() {
                     )
                   : (entry.entries ?? []).map((line, idx) => (
                       <tr key={idx}>
-                        <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{line.account}</td>
+                        <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{line.account}</td>
                         <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                           {line.debit > 0 ? formatMoney(line.debit, line.currency) : '—'}
                         </td>

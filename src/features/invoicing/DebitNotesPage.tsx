@@ -31,6 +31,27 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const LIST_COLUMNS = [
+  { key: 'id', width: 100 },
+  { key: 'ncf', width: 120 },
+  { key: 'ncfAfectado', width: 120 },
+  { key: 'facturaOriginal', width: 120 },
+  { key: 'cliente', width: 180 },
+  { key: 'fecha', width: 100 },
+  { key: 'total', width: 120 },
+  { key: 'estado', width: 110 },
+  { key: 'actions', width: 60 },
+]
+
+const ITEMS_COLUMNS = [
+  { key: 'codigo', width: 160 },
+  { key: 'cantidad', width: 96 },
+  { key: 'precio', width: 120 },
+  { key: 'importe', width: 120 },
+  { key: 'actions', width: 40 },
+]
 
 interface NoteItem {
   itemCode: string
@@ -81,6 +102,8 @@ export default function DebitNotesPage() {
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
   const { orderBy, sort } = useSortState()
+  const { widths: listColWidths, startResize: listStartResize } = useResizableColumns(LIST_COLUMNS)
+  const { widths: itemsColWidths, startResize: itemsStartResize } = useResizableColumns(ITEMS_COLUMNS)
 
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('')
@@ -331,17 +354,60 @@ export default function DebitNotesPage() {
 
       <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {LIST_COLUMNS.map((c) => <col key={c.key} style={{ width: listColWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} />
-              <th>NCF</th>
-              <th>NCF Afectado</th>
-              <th>Factura Original</th>
-              <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} />
-              <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} />
-              <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={sort} align="right" />
-              <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
+              <SortableTh
+                label="#"
+                sortKey="id"
+                orderBy={orderBy}
+                onSort={sort}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={listStartResize('id')} />}
+              />
+              <th>
+                NCF
+                <span className="col-resize-handle" onMouseDown={listStartResize('ncf')} />
+              </th>
+              <th>
+                NCF Afectado
+                <span className="col-resize-handle" onMouseDown={listStartResize('ncfAfectado')} />
+              </th>
+              <th>
+                Factura Original
+                <span className="col-resize-handle" onMouseDown={listStartResize('facturaOriginal')} />
+              </th>
+              <SortableTh
+                label="Cliente"
+                sortKey="customerName"
+                orderBy={orderBy}
+                onSort={sort}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={listStartResize('cliente')} />}
+              />
+              <SortableTh
+                label="Fecha"
+                sortKey="postingDate"
+                orderBy={orderBy}
+                onSort={sort}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={listStartResize('fecha')} />}
+              />
+              <SortableTh
+                label="Total"
+                sortKey="grandTotal"
+                orderBy={orderBy}
+                onSort={sort}
+                align="right"
+                resizeHandle={<span className="col-resize-handle" onMouseDown={listStartResize('total')} />}
+              />
+              <SortableTh
+                label="Estado"
+                sortKey="status"
+                orderBy={orderBy}
+                onSort={sort}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={listStartResize('estado')} />}
+              />
               <th />
             </tr>
           </thead>
@@ -369,14 +435,14 @@ export default function DebitNotesPage() {
             ) : (
               notes.map((note) => (
                 <tr key={note.id}>
-                  <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.id}</td>
-                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                  <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{note.id}</td>
+                  <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                     {note.ncf ?? <span className="td-dim">Pendiente</span>}
                   </td>
-                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                  <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                     {note.ncfAfectado ?? <span className="td-dim">—</span>}
                   </td>
-                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{note.customer}</td>
+                  <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{note.customer}</td>
                   <td>{note.customerName ?? '—'}</td>
                   <td>{formatDate(note.date)}</td>
                   <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(note.grandTotal, note.currency)}</td>
@@ -579,14 +645,29 @@ export default function DebitNotesPage() {
                 <div>
                   <label className="ff-label">Artículos / cargos adicionales</label>
                   <div className="items-table-wrap" style={{ marginTop: 4 }}>
-                    <table className="items-table">
+                    <table className="items-table items-table-resizable">
+                      <colgroup>
+                        {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+                      </colgroup>
                       <thead>
                         <tr>
-                          <th>Código</th>
-                          <th style={{ textAlign: 'right', width: 96 }}>Cant.</th>
-                          <th style={{ textAlign: 'right', width: 120 }}>Precio unit.</th>
-                          <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
-                          <th style={{ width: 40 }} />
+                          <th>
+                            Código
+                            <span className="col-resize-handle" onMouseDown={itemsStartResize('codigo')} />
+                          </th>
+                          <th style={{ textAlign: 'right' }}>
+                            Cant.
+                            <span className="col-resize-handle" onMouseDown={itemsStartResize('cantidad')} />
+                          </th>
+                          <th style={{ textAlign: 'right' }}>
+                            Precio unit.
+                            <span className="col-resize-handle" onMouseDown={itemsStartResize('precio')} />
+                          </th>
+                          <th style={{ textAlign: 'right' }}>
+                            Importe
+                            <span className="col-resize-handle" onMouseDown={itemsStartResize('importe')} />
+                          </th>
+                          <th />
                         </tr>
                       </thead>
                       <tbody>

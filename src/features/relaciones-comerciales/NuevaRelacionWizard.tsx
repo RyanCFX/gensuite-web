@@ -207,7 +207,7 @@ export function NuevaRelacionWizard({ open, onClose, onSuccess }: NuevaRelacionW
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                           <div>
                             <div style={{ fontWeight: 600, fontSize: 13 }}>{empresa.nombre}</div>
-                            <div className="td-muted" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{empresa.rnc}</div>
+                            <div className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{empresa.rnc}</div>
                           </div>
                           {empresa.puedeInvitar ? (
                             <Permitido accion="relaciones.invitacion.crear">

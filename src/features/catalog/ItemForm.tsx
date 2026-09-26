@@ -692,11 +692,11 @@ export default function ItemForm() {
                         Código {!isEdit && !isAutoCode && <span className="ff-required">*</span>}
                       </label>
                       {isEdit ? (
-                        <div className="ff-input" style={{ color: 'var(--text-secondary)', cursor: 'default', background: 'var(--bg-muted)', fontFamily: 'var(--font-mono)' }}>
+                        <div className="ff-input" style={{ color: 'var(--text-secondary)', cursor: 'default', background: 'var(--bg-muted)', fontFamily: 'var(--font-body)' }}>
                           {existingItem?.id}
                         </div>
                       ) : isAutoCode ? (
-                        <div className="ff-input" style={{ color: 'var(--text-secondary)', cursor: 'default', background: 'var(--bg-muted)', fontFamily: codePreviewPrefix ? 'var(--font-mono)' : undefined }}>
+                        <div className="ff-input" style={{ color: 'var(--text-secondary)', cursor: 'default', background: 'var(--bg-muted)', fontFamily: codePreviewPrefix ? 'var(--font-body)' : undefined }}>
                           {codePreviewPrefix
                             ? `${codePreviewPrefix}-XXXX`
                             : 'El código se asignará automáticamente'}
@@ -711,7 +711,7 @@ export default function ItemForm() {
                       )}
                       {!isEdit && codePreviewPrefix && (
                         <p className="ff-hint">
-                          Se usará el prefijo de la{subcategoryOptions.length > 0 && watchedSubcategory ? ' subcategoría' : ' categoría'}: <strong style={{ fontFamily: 'var(--font-mono)' }}>{codePreviewPrefix}-XXXX</strong>
+                          Se usará el prefijo de la{subcategoryOptions.length > 0 && watchedSubcategory ? ' subcategoría' : ' categoría'}: <strong style={{ fontFamily: 'var(--font-body)' }}>{codePreviewPrefix}-XXXX</strong>
                         </p>
                       )}
                       {isEdit && <p className="ff-hint">El código del artículo no se puede modificar.</p>}

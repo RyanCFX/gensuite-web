@@ -3,25 +3,39 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronRight, History } from 'lucide-react'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import type { AmendmentEntry } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ITEMS_PREVIEW_COLUMNS = [
+  { key: 'codigo', width: 110 },
+  { key: 'descripcion', width: 220 },
+  { key: 'notas', width: 130 },
+  { key: 'cantidad', width: 90 },
+  { key: 'precio', width: 100 },
+  { key: 'importe', width: 110 },
+]
 
 function ItemsPreview({ items }: { items: NonNullable<AmendmentEntry['items']> }) {
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_PREVIEW_COLUMNS)
   return (
     <div style={{ padding: '0 0 12px 44px' }}>
-      <table className="items-table" style={{ fontSize: 12 }}>
+      <table className="items-table items-table-resizable" style={{ fontSize: 12 }}>
+        <colgroup>
+          {ITEMS_PREVIEW_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+        </colgroup>
         <thead>
           <tr>
-            <th>Código</th>
-            <th>Descripción</th>
-            <th>Notas</th>
-            <th style={{ textAlign: 'right' }}>Cant.</th>
-            <th style={{ textAlign: 'right' }}>Precio</th>
-            <th style={{ textAlign: 'right' }}>Importe</th>
+            <th>Código<span className="col-resize-handle" onMouseDown={startResize('codigo')} /></th>
+            <th>Descripción<span className="col-resize-handle" onMouseDown={startResize('descripcion')} /></th>
+            <th>Notas<span className="col-resize-handle" onMouseDown={startResize('notas')} /></th>
+            <th style={{ textAlign: 'right' }}>Cant.<span className="col-resize-handle" onMouseDown={startResize('cantidad')} /></th>
+            <th style={{ textAlign: 'right' }}>Precio<span className="col-resize-handle" onMouseDown={startResize('precio')} /></th>
+            <th style={{ textAlign: 'right' }}>Importe<span className="col-resize-handle" onMouseDown={startResize('importe')} /></th>
           </tr>
         </thead>
         <tbody>
           {items.map((item, i) => (
             <tr key={i}>
-              <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{item.itemCode || '—'}</td>
+              <td style={{ fontFamily: 'var(--font-body)', fontSize: 11 }}>{item.itemCode || '—'}</td>
               <td>{item.description || '—'}</td>
               <td style={{ fontSize: 11, color: 'var(--text-tertiary)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.notes ?? ''}>{item.notes ?? '—'}</td>
               <td style={{ textAlign: 'right' }}>{item.qty}</td>

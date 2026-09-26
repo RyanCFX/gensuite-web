@@ -14,9 +14,19 @@ import {
 import type { EjercicioFiscal, CreateEjercicioFiscalDto } from '@/shared/api/types'
 import { formatDate } from '@/lib/formatters'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const EJERCICIO_FISCAL_COLUMNS = [
+  { key: 'anio', width: 100 },
+  { key: 'inicio', width: 110 },
+  { key: 'fin', width: 110 },
+  { key: 'estado', width: 100 },
+  { key: 'actions', width: 120 },
+]
 
 export default function EjercicioFiscalSection() {
   const queryClient = useQueryClient()
+  const { widths: colWidths, startResize } = useResizableColumns(EJERCICIO_FISCAL_COLUMNS)
 
   const { data, isLoading } = useQuery({
     queryKey: ['ejercicios-fiscales'],
@@ -136,14 +146,29 @@ export default function EjercicioFiscalSection() {
                   </div>
                 )
               : (
-                  <table className="data-table">
+                  <table className="data-table items-table-resizable">
+                    <colgroup>
+                      {EJERCICIO_FISCAL_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                    </colgroup>
                     <thead>
                       <tr>
-                        <th>Año</th>
-                        <th>Inicio</th>
-                        <th>Fin</th>
-                        <th>Estado</th>
-                        <th style={{ width: 120 }} />
+                        <th>
+                          Año
+                          <span className="col-resize-handle" onMouseDown={startResize('anio')} />
+                        </th>
+                        <th>
+                          Inicio
+                          <span className="col-resize-handle" onMouseDown={startResize('inicio')} />
+                        </th>
+                        <th>
+                          Fin
+                          <span className="col-resize-handle" onMouseDown={startResize('fin')} />
+                        </th>
+                        <th>
+                          Estado
+                          <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                        </th>
+                        <th />
                       </tr>
                     </thead>
                     <tbody>

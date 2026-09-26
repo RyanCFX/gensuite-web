@@ -24,6 +24,15 @@ import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { DEVOLUCION_DIAS_LIMITE_ITBIS } from '@/lib/constants'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const DEVOLUCION_FORM_COLUMNS = [
+  { key: 'codigo', width: 120 },
+  { key: 'stockQty', width: 110 },
+  { key: 'precio', width: 110 },
+  { key: 'qtyDevolver', width: 130 },
+  { key: 'subtotal', width: 110 },
+]
 
 interface FormItem {
   itemCode: string
@@ -169,6 +178,8 @@ export default function DevolucionForm() {
       }
     },
   })
+
+  const { widths: colWidths, startResize } = useResizableColumns(DEVOLUCION_FORM_COLUMNS)
 
   function handleSave() {
     if (!rows.some((it) => it.returnQty > 0)) {
@@ -355,20 +366,38 @@ export default function DevolucionForm() {
           <span className="badge badge-info">{rows.filter((it) => it.returnQty > 0).length} seleccionado(s)</span>
         </div>
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table items-table-resizable">
+            <colgroup>
+              {DEVOLUCION_FORM_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Código</th>
-                <th style={{ textAlign: 'right' }}>Stock (qty)</th>
-                <th style={{ textAlign: 'right' }}>Precio</th>
-                <th style={{ textAlign: 'right' }}>Qty a devolver</th>
-                <th style={{ textAlign: 'right' }}>Subtotal</th>
+                <th>
+                  Código
+                  <span className="col-resize-handle" onMouseDown={startResize('codigo')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Stock (qty)
+                  <span className="col-resize-handle" onMouseDown={startResize('stockQty')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Precio
+                  <span className="col-resize-handle" onMouseDown={startResize('precio')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Qty a devolver
+                  <span className="col-resize-handle" onMouseDown={startResize('qtyDevolver')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Subtotal
+                  <span className="col-resize-handle" onMouseDown={startResize('subtotal')} />
+                </th>
               </tr>
             </thead>
             <tbody>
               {rows.map((it, idx) => (
                 <tr key={`${it.itemCode}-${idx}`} style={it.returnQty > 0 ? { background: 'var(--info-bg, var(--surface-sunken))' } : undefined}>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{it.itemCode}</td>
+                  <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{it.itemCode}</td>
                   <td style={{ textAlign: 'right' }}>{it.stockQty}</td>
                   <td style={{ textAlign: 'right' }}>{formatDOP(it.rate, { trimZeros: true })}</td>
                   <td style={{ textAlign: 'right' }}>

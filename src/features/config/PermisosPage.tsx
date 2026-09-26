@@ -15,6 +15,7 @@ import type { PermisoRow, PermisoPtype, PermisoCatalogoItem, ApiError, AssignPer
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 function toOptions(items: PermisoCatalogoItem[]): SearchSelectOption[] {
   return items.map((it) => ({ value: it.value, label: it.label_es ?? it.value }))
@@ -117,6 +118,14 @@ export default function PermisosPage() {
     )
   }
 
+  const PERMISOS_MATRIX_COLUMNS = [
+    { key: 'rol', width: 200 },
+    { key: 'nivel', width: 90 },
+    ...PERMISO_PTYPES.map((pt) => ({ key: pt, width: 100 })),
+    { key: 'actions', width: 48 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(PERMISOS_MATRIX_COLUMNS)
+
   const rows = permisosQuery.data ?? []
   const usedRoles = new Set(rows.map((r) => r.role))
   const availableRolesForAdd = (catalogoQuery.data?.roles ?? []).filter((r) => !usedRoles.has(r.value))
@@ -199,15 +208,27 @@ export default function PermisosPage() {
           )}
           {!permisosQuery.isLoading && !permisosQuery.isError && rows.length > 0 && (
             <div className="table-scroll">
-              <table className="data-table navy-table permisos-matrix">
+              <table className="data-table navy-table permisos-matrix items-table-resizable">
+                <colgroup>
+                  {PERMISOS_MATRIX_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>Rol</th>
-                    <th style={{ textAlign: 'center' }}>Nivel</th>
+                    <th>
+                      Rol
+                      <span className="col-resize-handle" onMouseDown={startResize('rol')} />
+                    </th>
+                    <th style={{ textAlign: 'center' }}>
+                      Nivel
+                      <span className="col-resize-handle" onMouseDown={startResize('nivel')} />
+                    </th>
                     {PERMISO_PTYPES.map((pt) => (
-                      <th key={pt} style={{ textAlign: 'center' }}>{PERMISO_PTYPE_LABELS[pt]}</th>
+                      <th key={pt} style={{ textAlign: 'center' }}>
+                        {PERMISO_PTYPE_LABELS[pt]}
+                        <span className="col-resize-handle" onMouseDown={startResize(pt)} />
+                      </th>
                     ))}
-                    <th style={{ width: 48 }} />
+                    <th />
                   </tr>
                 </thead>
                 <tbody>

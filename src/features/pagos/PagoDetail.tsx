@@ -5,6 +5,12 @@ import { toast } from 'sonner'
 import { getPago, submitPago, cancelPago, getPagoPdfBlobUrl } from '@/shared/api/pagos'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { ArrowLeft, Send, Ban, Printer } from 'lucide-react'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const REFERENCIAS_COLUMNS = [
+  { key: 'factura', width: 220 },
+  { key: 'monto', width: 140 },
+]
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -25,6 +31,7 @@ export default function PagoDetail() {
   const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [printError, setPrintError] = useState<string | null>(null)
+  const { widths: referenciasColWidths, startResize: startReferenciasResize } = useResizableColumns(REFERENCIAS_COLUMNS)
 
   const { data: pago, isLoading, isError } = useQuery({
     queryKey: ['pago', id],
@@ -199,7 +206,7 @@ export default function PagoDetail() {
             {pago.referenceNo && (
               <div className="detail-field">
                 <span className="detail-label">{pago.esCheque ? 'Número de Cheque' : 'No. de Referencia'}</span>
-                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>
                   {pago.referenceNo}
                   {pago.esCheque && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>Cheque</span>}
                 </span>
@@ -250,11 +257,20 @@ export default function PagoDetail() {
             <h2 className="card-title">Facturas Aplicadas</h2>
           </div>
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {REFERENCIAS_COLUMNS.map((c) => <col key={c.key} style={{ width: referenciasColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Factura</th>
-                  <th style={{ textAlign: 'right' }}>Monto Aplicado</th>
+                  <th>
+                    Factura
+                    <span className="col-resize-handle" onMouseDown={startReferenciasResize('factura')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Monto Aplicado
+                    <span className="col-resize-handle" onMouseDown={startReferenciasResize('monto')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -265,7 +281,7 @@ export default function PagoDetail() {
                     onClick={() => navigate(`/compras/${ref.invoiceId}`)}
                   >
                     <td>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }}>
+                      <span style={{ fontFamily: 'var(--font-body)', fontWeight: 500 }}>
                         {ref.invoiceName ?? ref.invoiceId}
                       </span>
                     </td>

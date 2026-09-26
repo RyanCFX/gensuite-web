@@ -23,6 +23,16 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const COLUMNS = [
+  { key: 'titulo', width: 220 },
+  { key: 'tipoDocumento', width: 150 },
+  { key: 'cuenta', width: 160 },
+  { key: 'tipoBienes', width: 200 },
+  { key: 'estado', width: 100 },
+  { key: 'actions', width: 80 },
+]
 
 const TIPO_DOCUMENTO_OPTIONS: TipoDocumentoCuentaPorPagar[] = [
   'Factura',
@@ -160,6 +170,7 @@ export default function CuentasPorPagarPage() {
   }
 
   const conceptos = data?.items ?? []
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   return (
     <div className="page-container">
@@ -200,15 +211,36 @@ export default function CuentasPorPagarPage() {
 
       <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <SortableTh label="Título" sortKey="titulo" orderBy={orderBy} onSort={sort} />
-              <th>Tipo de Documento</th>
-               <th>Cuenta</th>
-               <th>Tipo de Bienes/Servicios (606)</th>
-               <th>Estado</th>
-              <th style={{ width: 80 }} />
+              <SortableTh
+                label="Título"
+                sortKey="titulo"
+                orderBy={orderBy}
+                onSort={sort}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('titulo')} />}
+              />
+              <th>
+                Tipo de Documento
+                <span className="col-resize-handle" onMouseDown={startResize('tipoDocumento')} />
+              </th>
+              <th>
+                Cuenta
+                <span className="col-resize-handle" onMouseDown={startResize('cuenta')} />
+              </th>
+              <th>
+                Tipo de Bienes/Servicios (606)
+                <span className="col-resize-handle" onMouseDown={startResize('tipoBienes')} />
+              </th>
+              <th>
+                Estado
+                <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+              </th>
+              <th />
             </tr>
           </thead>
           <tbody>

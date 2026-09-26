@@ -10,6 +10,16 @@ import { getCatalogosFiscales } from '@/shared/api/config'
 import { Modal } from '@/shared/ui/Modal'
 import type { ApiError } from '@/shared/api/types'
 import { EstadoArsBadge } from './EstadoArsBadge'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ITEMS_COLUMNS = [
+  { key: 'codigo', width: 120 },
+  { key: 'descripcion', width: 220 },
+  { key: 'cantidad', width: 90 },
+  { key: 'precioUnit', width: 110 },
+  { key: 'importe', width: 110 },
+  { key: 'udm', width: 90 },
+]
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -40,6 +50,7 @@ export default function DevolucionDetail() {
 
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
+  const { widths: itemsColWidths, startResize: itemsStartResize } = useResizableColumns(ITEMS_COLUMNS)
 
   const { data: devolucion, isLoading } = useQuery({
     queryKey: ['devolucion', id],
@@ -167,7 +178,7 @@ export default function DevolucionDetail() {
           <div className="fields-grid">
             <div className="detail-field">
               <span className="detail-label">NCF</span>
-              <span className="detail-value" style={{ fontFamily: 'monospace', fontWeight: 600 }}>
+              <span className="detail-value" style={{ fontFamily: 'var(--font-body)', fontWeight: 600 }}>
                 {devolucion.ncf ?? <em style={{ fontStyle: 'italic', fontWeight: 400, color: 'var(--text-secondary)' }}>Pendiente</em>}
               </span>
             </div>
@@ -179,7 +190,7 @@ export default function DevolucionDetail() {
             </div>
             <div className="detail-field">
               <span className="detail-label">NCF Afectado</span>
-              <span className="detail-value" style={{ fontFamily: 'monospace', fontWeight: 600 }}>
+              <span className="detail-value" style={{ fontFamily: 'var(--font-body)', fontWeight: 600 }}>
                 {devolucion.ncfAfectado ?? <em style={{ fontStyle: 'italic', fontWeight: 400, color: 'var(--text-secondary)' }}>Pendiente</em>}
               </span>
             </div>
@@ -216,7 +227,7 @@ export default function DevolucionDetail() {
             <div className="fields-grid">
               <div className="detail-field">
                 <span className="detail-label">NCF</span>
-                <span className="detail-value" style={{ fontFamily: 'monospace' }}>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>
                   {devolucion.originalInvoice.ncf ?? devolucion.originalInvoice.id}
                 </span>
               </div>
@@ -262,7 +273,7 @@ export default function DevolucionDetail() {
               </div>
               <div className="detail-field">
                 <span className="detail-label">Nro. de autorización</span>
-                <span className="detail-value" style={{ fontFamily: 'monospace' }}>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>
                   {devolucion.aseguradora.numeroAutorizacion}
                 </span>
               </div>
@@ -283,7 +294,7 @@ export default function DevolucionDetail() {
                   <span className="detail-label">NC a la aseguradora</span>
                   <span className="detail-value">
                     <button
-                      style={{ fontFamily: 'monospace', color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+                      style={{ fontFamily: 'var(--font-body)', color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
                       onClick={() => navigate(`/devoluciones/${devolucion.aseguradora!.ncAseguradoraId}`)}
                     >
                       {devolucion.aseguradora.ncAseguradoraId}
@@ -296,7 +307,7 @@ export default function DevolucionDetail() {
                   <span className="detail-label">Factura del paciente que la originó</span>
                   <span className="detail-value">
                     <button
-                      style={{ fontFamily: 'monospace', color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+                      style={{ fontFamily: 'var(--font-body)', color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
                       onClick={() => navigate(`/facturas/${devolucion.aseguradora!.facturaPacienteRef}`)}
                     >
                       {devolucion.aseguradora.facturaPacienteRef}
@@ -343,21 +354,42 @@ export default function DevolucionDetail() {
           <h2 className="card-title">Artículos devueltos</h2>
         </div>
         <div className="items-table-wrap">
-          <table className="items-table">
+          <table className="items-table items-table-resizable">
+            <colgroup>
+              {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Código</th>
-                <th>Descripción</th>
-                <th style={{ textAlign: 'right' }}>Cant.</th>
-                <th style={{ textAlign: 'right' }}>Precio Unit.</th>
-                <th style={{ textAlign: 'right' }}>Importe</th>
-                <th>UDM</th>
+                <th>
+                  Código
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('codigo')} />
+                </th>
+                <th>
+                  Descripción
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('descripcion')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Cant.
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('cantidad')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Precio Unit.
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('precioUnit')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Importe
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('importe')} />
+                </th>
+                <th>
+                  UDM
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('udm')} />
+                </th>
               </tr>
             </thead>
             <tbody>
               {devolucion.items.map((item, i) => (
                 <tr key={i}>
-                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.itemCode || '—'}</td>
+                  <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode || '—'}</td>
                   <td>{item.description || '—'}</td>
                   <td style={{ textAlign: 'right' }}>{item.qty}</td>
                   <td style={{ textAlign: 'right' }}>{formatDOP(item.rate)}</td>
@@ -413,7 +445,7 @@ export default function DevolucionDetail() {
                   {devolucion.appliedTo.map((a) => (
                     <div key={a.invoiceId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                       <button
-                        style={{ fontFamily: 'monospace', color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+                        style={{ fontFamily: 'var(--font-body)', color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
                         onClick={() => navigate(`/facturas/${a.invoiceId}`)}
                       >
                         {a.invoiceId}

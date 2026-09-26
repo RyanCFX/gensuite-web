@@ -16,8 +16,21 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const COLUMNS = [
+  { key: 'id', width: 100 },
+  { key: 'proveedor', width: 200 },
+  { key: 'fecha', width: 100 },
+  { key: 'ncf', width: 110 },
+  { key: 'factura', width: 110 },
+  { key: 'categoria', width: 140 },
+  { key: 'deducible', width: 100 },
+  { key: 'total', width: 120 },
+  { key: 'estado', width: 110 },
+]
 
 interface GastoResumenResponse {
   month: string
@@ -55,6 +68,7 @@ export default function GastosPage() {
   const [page, setPage] = useState(1)
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const offset = (page - 1) * PAGE_SIZE
 
@@ -207,18 +221,64 @@ export default function GastosPage() {
 
         <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <SortableTh label="Proveedor" sortKey="supplierName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <th>NCF</th>
-                  <th>N° Factura</th>
-                  <th>Categoría</th>
-                  <th>Deducible</th>
-                  <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} align="right" />
-                  <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
+                  <SortableTh
+                    label="#"
+                    sortKey="id"
+                    orderBy={orderBy}
+                    onSort={(k) => { sort(k); setPage(1) }}
+                    resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('id')} />}
+                  />
+                  <SortableTh
+                    label="Proveedor"
+                    sortKey="supplierName"
+                    orderBy={orderBy}
+                    onSort={(k) => { sort(k); setPage(1) }}
+                    resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('proveedor')} />}
+                  />
+                  <SortableTh
+                    label="Fecha"
+                    sortKey="postingDate"
+                    orderBy={orderBy}
+                    onSort={(k) => { sort(k); setPage(1) }}
+                    resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />}
+                  />
+                  <th>
+                    NCF
+                    <span className="col-resize-handle" onMouseDown={startResize('ncf')} />
+                  </th>
+                  <th>
+                    N° Factura
+                    <span className="col-resize-handle" onMouseDown={startResize('factura')} />
+                  </th>
+                  <th>
+                    Categoría
+                    <span className="col-resize-handle" onMouseDown={startResize('categoria')} />
+                  </th>
+                  <th>
+                    Deducible
+                    <span className="col-resize-handle" onMouseDown={startResize('deducible')} />
+                  </th>
+                  <SortableTh
+                    label="Total"
+                    sortKey="grandTotal"
+                    orderBy={orderBy}
+                    onSort={(k) => { sort(k); setPage(1) }}
+                    align="right"
+                    resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('total')} />}
+                  />
+                  <SortableTh
+                    label="Estado"
+                    sortKey="status"
+                    orderBy={orderBy}
+                    onSort={(k) => { sort(k); setPage(1) }}
+                    resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('estado')} />}
+                  />
                 </tr>
               </thead>
               <tbody>
@@ -255,7 +315,7 @@ export default function GastosPage() {
                         )
                       : data?.items.map((g) => (
                           <tr key={g.id} className="table-row-clickable" onClick={() => navigate(`/gastos/${g.id}`)}>
-                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{g.id}</td>
+                            <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{g.id}</td>
                             <td style={{ fontWeight: 500 }}>
                               {g.esProveedorOcasional
                                 ? (
@@ -267,8 +327,8 @@ export default function GastosPage() {
                                 : g.supplierName}
                             </td>
                             <td>{formatDate(g.postingDate)}</td>
-                            <td className="td-muted" style={{ fontFamily: 'var(--font-mono)' }}>{g.ncfProveedor ?? '—'}</td>
-                            <td className="td-muted" style={{ fontFamily: 'var(--font-mono)' }}>{g.billNo ?? '—'}</td>
+                            <td className="td-muted" style={{ fontFamily: 'var(--font-body)' }}>{g.ncfProveedor ?? '—'}</td>
+                            <td className="td-muted" style={{ fontFamily: 'var(--font-body)' }}>{g.billNo ?? '—'}</td>
                             <td className="td-muted">{g.categoriaGasto ?? '—'}</td>
                             <td>
                               {g.esDeducible

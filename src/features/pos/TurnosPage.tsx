@@ -13,8 +13,22 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { CerrarTurnoModal } from '@/components/shared/CerrarTurnoModal'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import type { TurnoListItem } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const COLUMNS = [
+  { key: 'id', width: 120 },
+  { key: 'cajero', width: 160 },
+  { key: 'perfil', width: 140 },
+  { key: 'compania', width: 140 },
+  { key: 'apertura', width: 140 },
+  { key: 'cierre', width: 140 },
+  { key: 'total', width: 110 },
+  { key: 'diferencia', width: 110 },
+  { key: 'estado', width: 100 },
+  { key: 'actions', width: 90 },
+]
 
 const STATUS_BADGE: Record<string, string> = {
   Open: 'badge-success',
@@ -40,6 +54,7 @@ export default function TurnosPage() {
   const [grandTotalMax, setGrandTotalMax] = useState('')
   const [page, setPage] = useState(1)
   const [closeTarget, setCloseTarget] = useState<TurnoListItem | null>(null)
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const offset = (page - 1) * PAGE_SIZE
 
@@ -153,19 +168,49 @@ export default function TurnosPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Cajero</th>
-                <th>Perfil POS</th>
-                <th>Compañía</th>
-                <th>Apertura</th>
-                <th>Cierre</th>
-                <th>Total</th>
-                <th>Diferencia</th>
-                <th>Estado</th>
-                <th style={{ width: 90 }} />
+                <th>
+                  ID
+                  <span className="col-resize-handle" onMouseDown={startResize('id')} />
+                </th>
+                <th>
+                  Cajero
+                  <span className="col-resize-handle" onMouseDown={startResize('cajero')} />
+                </th>
+                <th>
+                  Perfil POS
+                  <span className="col-resize-handle" onMouseDown={startResize('perfil')} />
+                </th>
+                <th>
+                  Compañía
+                  <span className="col-resize-handle" onMouseDown={startResize('compania')} />
+                </th>
+                <th>
+                  Apertura
+                  <span className="col-resize-handle" onMouseDown={startResize('apertura')} />
+                </th>
+                <th>
+                  Cierre
+                  <span className="col-resize-handle" onMouseDown={startResize('cierre')} />
+                </th>
+                <th>
+                  Total
+                  <span className="col-resize-handle" onMouseDown={startResize('total')} />
+                </th>
+                <th>
+                  Diferencia
+                  <span className="col-resize-handle" onMouseDown={startResize('diferencia')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -194,7 +239,7 @@ export default function TurnosPage() {
                         className="data-table-row-link"
                         onClick={() => navigate(`/turnos/${t.id}`)}
                       >
-                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500 }}>
+                        <td style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500 }}>
                           {t.id}
                         </td>
                         <td>{t.cajero}</td>
@@ -202,13 +247,13 @@ export default function TurnosPage() {
                         <td className="td-muted">{t.company}</td>
                         <td className="td-muted">{formatDateTime(t.periodStartDate)}</td>
                         <td className="td-muted">{t.periodEndDate ? formatDateTime(t.periodEndDate) : '—'}</td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>
                           {t.grandTotal != null ? formatDOP(t.grandTotal) : '—'}
                         </td>
                         <td
                           style={{
                             textAlign: 'right',
-                            fontFamily: 'var(--font-mono)',
+                            fontFamily: 'var(--font-body)',
                             fontSize: 13,
                             fontWeight: 600,
                             color:
