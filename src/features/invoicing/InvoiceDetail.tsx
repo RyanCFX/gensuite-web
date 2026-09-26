@@ -30,7 +30,7 @@ import {
   aplicarCreditNoteAFactura,
   removerCreditNoteAplicada,
 } from "@/shared/api/notes";
-import { listMetodosPago, getFacturacionConfig, getCatalogosFiscales } from "@/shared/api/config";
+import { listMetodosPago, listDenominaciones, getFacturacionConfig, getCatalogosFiscales } from "@/shared/api/config";
 import { createDevolucion } from "@/shared/api/devoluciones";
 import { getItem } from "@/shared/api/catalog";
 import { getBundle } from "@/shared/api/bundles";
@@ -55,9 +55,15 @@ import {
   EMPTY_PAYMENT_LINES_VALUE,
   buildSubmitPayload,
   sumPayments,
+  overpayAmount,
+  hasCashPayment,
+  cashAmount,
+  declaredVuelto,
+  sumVuelto,
   emptyPaymentLine,
   resolveDefaultModeOfPago,
   friendlyPaymentError,
+  PAYMENT_LINES_TOLERANCE,
 } from "@/lib/paymentLines";
 import {
   ArrowLeft,
@@ -304,6 +310,16 @@ export default function InvoiceDetail() {
     enabled: invoice?.status === "draft" || invoice?.status === "submitted",
     staleTime: 5 * 60_000,
   });
+
+  // Misma key que usa PaymentLinesEditor — cache compartido, sin request extra. Hace falta para
+  // validar que el desglose del vuelto suma el excedente cuando hay sobrepago.
+  const { data: denominaciones } = useQuery({
+    queryKey: ["denominaciones"],
+    queryFn: listDenominaciones,
+    enabled: invoice?.status === "draft",
+    staleTime: 5 * 60_000,
+  });
+  const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo);
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ["facturacion-config"],
@@ -599,7 +615,19 @@ export default function InvoiceDetail() {
       }
     }
     const sum = sumPayments(payments.payments);
-    return sum > 0 && sum <= pendingAmount + 0.01;
+    if (sum <= 0) return false;
+    // Sobrepago con vuelto automático (igual que en Caja): permitido solo con al menos una línea
+    // en efectivo, sin superar el efectivo recibido y con el desglose coincidiendo.
+    const over = overpayAmount(payments.payments, pendingAmount);
+    if (over === 0) return sum <= pendingAmount + PAYMENT_LINES_TOLERANCE;
+    if (!hasCashPayment(payments.payments, metodosActivos)) return false;
+    const cash = cashAmount(payments.payments, metodosActivos);
+    if (over > cash + PAYMENT_LINES_TOLERANCE) return false;
+    if (declaredVuelto(payments).length === 0) return false;
+    return (
+      Math.abs(over - sumVuelto(payments.vuelto, denominacionesActivas)) <=
+      PAYMENT_LINES_TOLERANCE
+    );
   }
 
   const submitMutation = useMutation({
@@ -818,7 +846,7 @@ export default function InvoiceDetail() {
       ? undefined
       : flujoCobro === "directo"
         ? { payments: [{ modeOfPayment: directoMop, amount: Number(directoAmount) }] }
-        : buildSubmitPayload(payments);
+        : buildSubmitPayload(payments, pendingAmount, metodosActivos);
     setLastSubmitBody(body);
     submitMutation.mutate(body);
   }

@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { esClienteEmisorNoEncontrado, ECF_ADMIN_ROUTE } from '@/lib/ecfErrors'
 import { Search, DollarSign, ChevronLeft, ChevronRight, X, Clock, AlertTriangle } from 'lucide-react'
 import { listPendientes, cobrarFactura } from '@/shared/api/caja'
-import { getFacturacionConfig, listMetodosPago } from '@/shared/api/config'
+import { getFacturacionConfig, listMetodosPago, listDenominaciones } from '@/shared/api/config'
 import { getTurnoActual } from '@/shared/api/pos'
 import { downloadInvoicePdf } from '@/shared/api/invoices'
 import { formatDate, formatMoney } from '@/lib/formatters'
@@ -14,6 +14,7 @@ import { PaymentLinesEditor } from '@/components/shared/PaymentLinesEditor'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { TurnoCajaIndicator } from '@/components/shared/TurnoCajaIndicator'
+import { CerrarTurnoModal } from '@/components/shared/CerrarTurnoModal'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
@@ -26,6 +27,9 @@ import {
   buildSubmitPayload,
   sumPayments,
   cashAmount,
+  overpayAmount,
+  hasCashPayment,
+  isPaymentLinesValid,
   emptyPaymentLine,
   resolveDefaultModeOfPago,
   friendlyPaymentError,
@@ -62,6 +66,15 @@ export default function CajaPage() {
     queryFn: listMetodosPago,
     staleTime: 5 * 60_000,
   })
+
+  // Misma key que usa PaymentLinesEditor — cache compartido, sin request extra. Hace falta para
+  // validar que el desglose del vuelto suma el excedente.
+  const { data: denominaciones } = useQuery({
+    queryKey: ['denominaciones'],
+    queryFn: listDenominaciones,
+    staleTime: 5 * 60_000,
+  })
+  const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo)
 
 
    const usaModuloPos = facturacion?.usaModuloPos ?? false
@@ -115,6 +128,11 @@ export default function CajaPage() {
 
    const turnoBlockedOrExpired = turnoBlocked || turnoVencido
 
+  // docs/PROMPT_ERRORES_COMERCIALES_FRONTEND.md §4/§5.3 — `POS_TURNO_DESACTUALIZADO` (turno de un
+  // día anterior) ofrece cerrar el turno directo desde el error, reutilizando el mismo
+  // `CerrarTurnoModal` genérico que ya usa `TurnoCajaIndicator` en el header.
+  const [cerrarTurnoDesdeErrorOpen, setCerrarTurnoDesdeErrorOpen] = useState(false)
+
   // ─── Form state ────────────────────────────────────────────────────
 
 const [directoMop, setDirectoMop] = useState('')
@@ -163,6 +181,13 @@ const [directoMop, setDirectoMop] = useState('')
       // fallback genérico de otros errores.
       if (isApiErrorCode(err, ERROR_CODES.POS_PAYMENT_CURRENCY_MISMATCH)) {
         toast.error(err.message, { duration: 8000 })
+        return
+      }
+      if (isApiErrorCode(err, ERROR_CODES.POS_TURNO_DESACTUALIZADO)) {
+        toast.error(err.message, {
+          duration: 10000,
+          action: { label: 'Cerrar turno', onClick: () => setCerrarTurnoDesdeErrorOpen(true) },
+        })
         return
       }
       const msg = friendlyPaymentError(err?.message)
@@ -241,26 +266,30 @@ function validateAndSubmit() {
        return
      }
 
-     // caja flow
-     const validLines = paymentsValue.payments.filter((p) => p.modeOfPayment && Number(p.amount) > 0)
-     if (validLines.length === 0) { toast.error('Agrega al menos una línea de pago válida'); return }
-     const total = sumPayments(paymentsValue.payments)
-     if (total > outstanding + PAYMENT_LINES_TOLERANCE) {
-       toast.error(`La suma de pagos (${formatMoney(total, selectedInvoiceCurrency)}) excede el saldo pendiente (${formatMoney(outstanding, selectedInvoiceCurrency)})`)
-       return
-     }
+      // caja flow
+      const validLines = paymentsValue.payments.filter((p) => p.modeOfPayment && Number(p.amount) > 0)
+      if (validLines.length === 0) { toast.error('Agrega al menos una línea de pago válida'); return }
+      // Sobrepago con vuelto automático: permitido solo con al menos una línea en efectivo y sin
+      // superar el efectivo recibido. El pago parcial (suma < saldo) sigue permitido.
+      const total = sumPayments(paymentsValue.payments)
+      const over = overpayAmount(paymentsValue.payments, outstanding)
+      if (over > 0) {
+        if (!hasCashPayment(paymentsValue.payments, metodosActivos)) {
+          toast.error(`La suma de pagos (${formatMoney(total, selectedInvoiceCurrency)}) excede el saldo pendiente (${formatMoney(outstanding, selectedInvoiceCurrency)}) — agrega una línea en efectivo para registrar el excedente como vuelto`)
+          return
+        }
+        const cash = cashAmount(paymentsValue.payments, metodosActivos)
+        if (over > cash + PAYMENT_LINES_TOLERANCE) {
+          toast.error(`El vuelto (${formatMoney(over, selectedInvoiceCurrency)}) supera el efectivo recibido (${formatMoney(cash, selectedInvoiceCurrency)})`)
+          return
+        }
+      }
+      if (!isPaymentLinesValid(paymentsValue, outstanding, metodosActivos, denominacionesActivas)) {
+        toast.error('Verifica las líneas de pago y el desglose del vuelto')
+        return
+      }
 
-     const cash = cashAmount(paymentsValue.payments, metodosActivos)
-     if (paymentsValue.vueltoEnabled) {
-       const tenderedCash = Number(paymentsValue.tenderedCash) || 0
-       if (tenderedCash <= 0) { toast.error('Indica el efectivo entregado por el cliente'); return }
-       if (cash <= 0) { toast.error('No hay pagos en efectivo para registrar vuelto'); return }
-       if (tenderedCash < cash - PAYMENT_LINES_TOLERANCE) {
-         toast.error(`El efectivo entregado (${formatMoney(tenderedCash, selectedInvoiceCurrency)}) es menor al total de pagos en efectivo (${formatMoney(cash, selectedInvoiceCurrency)})`); return
-       }
-     }
-
-     const payload = buildSubmitPayload(paymentsValue)
+      const payload = buildSubmitPayload(paymentsValue, outstanding, metodosActivos)
      cobrarMutation.mutate({
        ...payload,
        condicionFiscal,
@@ -270,18 +299,15 @@ function validateAndSubmit() {
 
   const canSubmitCaja =
     flujoCobro !== 'caja' ||
-    (() => {
-      if (!paymentsValue.payments.some((p) => p.modeOfPayment && Number(p.amount) > 0)) return false
-      const total = sumPayments(paymentsValue.payments)
-      if (total > selectedInvoice?.outstandingAmount! + PAYMENT_LINES_TOLERANCE) return false
-      if (paymentsValue.vueltoEnabled) {
-        const cash = cashAmount(paymentsValue.payments, metodosActivos)
-        const tenderedCash = Number(paymentsValue.tenderedCash) || 0
-        if (tenderedCash <= 0 || cash <= 0) return false
-        if (tenderedCash < cash - PAYMENT_LINES_TOLERANCE) return false
-      }
-      return true
-    })()
+    (selectedInvoice != null &&
+      isPaymentLinesValid(paymentsValue, selectedInvoice.outstandingAmount, metodosActivos, denominacionesActivas))
+
+  // Con sobrepago válido, lo que realmente se cobra es el saldo (el excedente vuelve como vuelto).
+  const submitButtonAmount = selectedInvoice == null
+    ? 0
+    : overpayAmount(paymentsValue.payments, selectedInvoice.outstandingAmount) > 0
+      ? selectedInvoice.outstandingAmount
+      : sumPayments(paymentsValue.payments)
 
   function getRemaining(outstanding: number): string {
     const total = sumPayments(paymentsValue.payments)
@@ -494,11 +520,11 @@ function validateAndSubmit() {
                ) : (
                  /* ── Flujo caja ────────────────────────────────────── */
                  <>
-                   <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: 0, lineHeight: 1.5 }}>
-                     El monto de cada línea de pago es lo que se aplica a la factura.
-                     Si el cliente entrega más efectivo del que se aplica, registra el excedente en <strong>"Efectivo entregado"</strong> más abajo.
-                     La suma no puede exceder <strong>{formatMoney(selectedInvoice.outstandingAmount, selectedInvoiceCurrency)}</strong> (saldo pendiente).
-                   </p>
+                    <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: 0, lineHeight: 1.5 }}>
+                      El monto de cada línea de pago es lo que se aplica a la factura.
+                      Si la suma supera <strong>{formatMoney(selectedInvoice.outstandingAmount, selectedInvoiceCurrency)}</strong> (saldo pendiente) con
+                      al menos una línea en efectivo, el excedente se devuelve como vuelto automáticamente.
+                    </p>
                    <PaymentLinesEditor
                      amountDue={selectedInvoice.outstandingAmount}
                      value={paymentsValue}
@@ -521,12 +547,12 @@ function validateAndSubmit() {
                  onClick={validateAndSubmit}
                  disabled={cobrarMutation.isPending || (flujoCobro === 'caja' && !canSubmitCaja)}
                >
-                 {cobrarMutation.isPending ? 'Procesando…' : `Cobrar ${formatMoney(
-                   flujoCobro === 'directo'
-                     ? Number(directoAmount) || 0
-                     : sumPayments(paymentsValue.payments),
-                   selectedInvoiceCurrency,
-                 )}`}
+                  {cobrarMutation.isPending ? 'Procesando…' : `Cobrar ${formatMoney(
+                    flujoCobro === 'directo'
+                      ? Number(directoAmount) || 0
+                      : submitButtonAmount,
+                    selectedInvoiceCurrency,
+                  )}`}
                 </button>
               </div>
             </div>
@@ -544,6 +570,15 @@ function validateAndSubmit() {
       />
       </>
     )}
+    <CerrarTurnoModal
+      open={cerrarTurnoDesdeErrorOpen}
+      openingEntryId={turno?.openingEntryId ?? null}
+      onClose={() => setCerrarTurnoDesdeErrorOpen(false)}
+      onClosed={() => {
+        setCerrarTurnoDesdeErrorOpen(false)
+        queryClient.invalidateQueries({ queryKey: ['turno-actual'] })
+      }}
+    />
     {printTargetNode}
   </div>
 )
