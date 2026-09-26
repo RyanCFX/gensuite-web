@@ -22,6 +22,14 @@ import { DESPACHO_STATUS_BADGE, DESPACHO_STATUS_LABEL } from './lib'
 
 const PAGE_SIZE = 20
 
+type DespachosTab = 'despachos' | 'pendientes' | 'confirmaciones'
+
+function tabFromPath(pathname: string): DespachosTab {
+  if (pathname === '/despachos/pendientes') return 'pendientes'
+  if (pathname === '/despachos/confirmaciones') return 'confirmaciones'
+  return 'despachos'
+}
+
 export default function DespachosListPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -29,17 +37,14 @@ export default function DespachosListPage() {
   // /despachos/:id en App.tsx) que abren esta misma pantalla directo en la pestaña
   // correspondiente — antes /despachos/pendientes caía en /despachos/:id con id="pendientes" y
   // renderizaba el detalle equivocado.
-  const [tab, setTab] = useState<'despachos' | 'pendientes' | 'confirmaciones'>(
-    location.pathname === '/despachos/pendientes'
-      ? 'pendientes'
-      : location.pathname === '/despachos/confirmaciones'
-        ? 'confirmaciones'
-        : 'despachos',
-  )
+  // El tab se DERIVA de la ruta en cada render (única fuente de verdad), no vive en estado local:
+  // AppLayout cachea una instancia de esta pantalla por ruta (KeepAlive con activeCacheKey por
+  // pathname), así que un `useState` inicializado del pathname quedaba rancio al reactivar una
+  // instancia cacheada — el resaltado/contenido mostraba el tab anterior aunque la URL ya era otra.
+  const tab = tabFromPath(location.pathname)
   const puedeCrear = usePuede('despachos.crear')
 
   function selectTab(next: 'despachos' | 'pendientes' | 'confirmaciones') {
-    setTab(next)
     navigate(
       next === 'pendientes' ? '/despachos/pendientes' : next === 'confirmaciones' ? '/despachos/confirmaciones' : '/despachos',
       { replace: true },
