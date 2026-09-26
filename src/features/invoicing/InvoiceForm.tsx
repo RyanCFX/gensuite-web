@@ -265,7 +265,6 @@ export default function InvoiceForm() {
   const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
   const [clienteOcasionalRnc, setClienteOcasionalRnc] = useState('')
   const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
-  const [postingDate, setPostingDate] = useState(todayIso())
   const [dueDate, setDueDate] = useState(defaultDueDate())
   const [ncfType, setNcfType] = useState<NcfType>('B02')
   const [items, setItems] = useState<LineItem[]>([])
@@ -768,7 +767,6 @@ export default function InvoiceForm() {
     clienteOcasionalNombre,
     clienteOcasionalRnc,
     clienteOcasionalDireccion,
-    postingDate,
     dueDate,
     ncfType,
     items,
@@ -789,7 +787,6 @@ export default function InvoiceForm() {
     if (!isEdit || !editingInvoice || scalarsHydratedRef.current) return
     scalarsHydratedRef.current = true
     const inv = editingInvoice
-    setPostingDate((inv.postingDate ?? '').slice(0, 10) || todayIso())
     setDueDate((inv.dueDate ?? '').slice(0, 10))
     setNcfType((inv.ncfType || 'B02') as NcfType)
     setBranch(inv.branch ?? '')
@@ -1306,7 +1303,6 @@ persistInvoice(buildInvoiceDto())
             clienteOcasionalDireccion: clienteOcasionalDireccion || undefined,
           }
         : { customer: customerId }),
-      postingDate,
       dueDate,
       branch: branch || undefined,
       department: usaDepartamentos ? (department || undefined) : undefined,
@@ -1478,16 +1474,6 @@ persistInvoice(buildInvoiceDto())
                    )}
                  </label>
                </div>
-
-              <div className="ff-wrap">
-                <label className="ff-label ff-required" htmlFor="postingDate">Fecha</label>
-                <DatePicker
-                  id="postingDate"
-                  className="ff-input"
-                  value={postingDate}
-                  onChange={setPostingDate}
-                />
-              </div>
 
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="dueDate">Fecha vencimiento</label>

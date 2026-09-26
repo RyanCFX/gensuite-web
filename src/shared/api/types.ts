@@ -686,7 +686,8 @@ export interface CreateInvoiceDto {
   clienteOcasionalNombre?: string;
   clienteOcasionalRnc?: string;
   clienteOcasionalDireccion?: string;
-  postingDate: string;
+  /** El servidor siempre asigna la fecha real del request — nunca se envía desde el cliente. */
+  postingDate?: string;
   dueDate?: string;
   branch?: string;
   department?: string;
@@ -826,7 +827,8 @@ export interface CreateQuotationDto {
   /** RNC (9 dígitos) o cédula (11) del comprador ocasional. Se conserva al convertir el documento en factura y se envía a Vega como identificación del comprador en el e-CF. */
   clienteOcasionalRnc?: string;
   clienteOcasionalDireccion?: string;
-  date: string; // required per API
+  /** El servidor siempre asigna la fecha real del request — nunca se envía desde el cliente. */
+  date?: string;
   validTill?: string;
   branch?: string;
   /** Ver `CreateInvoiceDto.currency` — misma regla de resolución. Al editar (PUT), omitirlo

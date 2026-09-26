@@ -36756,7 +36756,6 @@
           }
         },
         "required": [
-          "postingDate",
           "ncfType",
           "items"
         ]
@@ -42564,7 +42563,6 @@
           }
         },
         "required": [
-          "date",
           "items"
         ]
       },

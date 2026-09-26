@@ -87,7 +87,6 @@ function validateLineStock(row: LineItem, stockMap: Map<string, ItemStock>): str
   return undefined
 }
 
-function todayIso() { return format(new Date(), 'yyyy-MM-dd') }
 function defaultDelivery() { return format(addDays(new Date(), 7), 'yyyy-MM-dd') }
 function calcAmount(qty: number, rate: number, discountPct: number = 0, discountAmount: number = 0) {
   const base = qty * rate
@@ -126,7 +125,6 @@ const [customerId, setCustomerId] = useState('')
    const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
    const [clienteOcasionalRnc, setClienteOcasionalRnc] = useState('')
    const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
-   const [transactionDate, setTransactionDate] = useState(todayIso())
   const [deliveryDate, setDeliveryDate] = useState(defaultDelivery())
   const [items, setItems] = useState<LineItem[]>([])
   // Disponibilidad real (físico − reservado) por artículo — docs/tasks/73_alertas_stock_disponible_reservado.md.
@@ -266,7 +264,6 @@ const [customerId, setCustomerId] = useState('')
     setLoaded(true)
     getQuotation(quotationId).then((q) => {
       setCustomerId(q.customer)
-      setTransactionDate(todayIso())
       // Se hereda tal cual de la cotización — nunca se re-resuelve contra el cliente actual.
       setCurrency(q.currency ?? '')
       setConversionRate(q.conversionRate ?? '')
@@ -300,7 +297,6 @@ const [customerId, setCustomerId] = useState('')
     setLoaded(true)
     getPedidoDuplicateSource(duplicateId).then((src) => {
       setCustomerId(src.customer)
-      setTransactionDate(todayIso())
       setItems(src.items.map((i) => {
         const discountAmount = i.discountAmount ?? 0
         const discountPct = discountAmount > 0 ? 0 : (i.discountPct ?? 0)
@@ -344,7 +340,6 @@ const [customerId, setCustomerId] = useState('')
 useEffect(() => {
      if (!existing || loaded) return
      setCustomerId(existing.customer)
-     setTransactionDate(existing.transactionDate)
      setDeliveryDate(existing.deliveryDate ?? defaultDelivery())
      setCurrency(existing.currency ?? '')
      setConversionRate(existing.conversionRate ?? '')
@@ -755,7 +750,6 @@ function buildDto(): CreatePedidoDto {
        ...(esClienteOcasional
          ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalRnc: clienteOcasionalRnc || undefined, clienteOcasionalDireccion: clienteOcasionalDireccion || undefined }
          : { customer: customerId }),
-       transactionDate,
        deliveryDate: deliveryDate || undefined,
        branch: branch || undefined,
        department: usaDepartamentos ? (department || undefined) : undefined,
@@ -797,7 +791,6 @@ function buildDto(): CreatePedidoDto {
     clienteOcasionalNombre,
     clienteOcasionalRnc,
     clienteOcasionalDireccion,
-    transactionDate,
     deliveryDate,
     items,
     notes,
@@ -1000,10 +993,6 @@ try {
                    )}
                  </label>
                </div>
-              <div className="ff-wrap">
-                <label className="ff-label ff-required">Fecha</label>
-                <DatePicker value={transactionDate} onChange={setTransactionDate} className="ff-input" />
-              </div>
               <div className="ff-wrap">
                 <label className="ff-label">Entrega estimada</label>
                 <DatePicker value={deliveryDate} onChange={setDeliveryDate} className="ff-input" clearable />

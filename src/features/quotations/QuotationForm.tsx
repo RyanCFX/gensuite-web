@@ -89,10 +89,6 @@ function validateLineStock(row: LineItem): string | undefined {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function todayIso() {
-  return format(new Date(), 'yyyy-MM-dd')
-}
-
 function defaultValidTill() {
   return format(addDays(new Date(), 15), 'yyyy-MM-dd')
 }
@@ -135,7 +131,6 @@ export default function QuotationForm() {
   const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
   const [clienteOcasionalRnc, setClienteOcasionalRnc] = useState('')
   const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
-  const [date, setDate] = useState(todayIso())
   const [validTill, setValidTill] = useState(defaultValidTill())
   const [items, setItems] = useState<LineItem[]>([])
   // Anchos de columna de la tabla de artículos — el usuario puede arrastrar los divisores del
@@ -252,7 +247,6 @@ useEffect(() => {
      if (!existingQuotation || initialized) return
      setCustomerId(existingQuotation.customer)
      setCustomerName(existingQuotation.customerName)
-     setDate(existingQuotation.date)
      setValidTill(existingQuotation.validTill ?? defaultValidTill())
      setCurrency(existingQuotation.currency ?? '')
      setConversionRate(existingQuotation.conversionRate ?? '')
@@ -522,7 +516,6 @@ function buildDto(): CreateQuotationDto {
        ...(esClienteOcasional
          ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalRnc: clienteOcasionalRnc || undefined, clienteOcasionalDireccion: clienteOcasionalDireccion || undefined }
          : { customer: customerId }),
-       date,
        validTill,
        branch: branch || undefined,
        currency: currency || undefined,
@@ -817,7 +810,6 @@ function buildDto(): CreateQuotationDto {
     clienteOcasionalNombre,
     clienteOcasionalRnc,
     clienteOcasionalDireccion,
-    date,
     validTill,
     items,
     notes,
@@ -1042,16 +1034,6 @@ if (esClienteOcasional) {
                    )}
                  </label>
                </div>
-
-              <div className="ff-wrap">
-                <label className="ff-label ff-required" htmlFor="date">Fecha</label>
-                <DatePicker
-                  id="date"
-                  className="ff-input"
-                  value={date}
-                  onChange={setDate}
-                />
-              </div>
 
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="validTill">Válida hasta</label>
