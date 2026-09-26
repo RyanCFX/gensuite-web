@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffectOnActive } from 'keepalive-for-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -22,10 +22,9 @@ import { formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, PackageOpen, UserPlus, ChevronDown, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, PackageOpen, UserPlus, ChevronDown, RotateCcw } from 'lucide-react'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
-import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
 import { PinModal } from '@/components/shared/PinModal'
@@ -38,6 +37,7 @@ import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales, getSucursal } from '@/shared/api/sucursales'
 import { getCachedUser } from '@/shared/api/storage'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
@@ -62,6 +62,8 @@ interface LineItem {
   uom: string
   conversionFactor: number
   maxDiscountPct?: number
+  /** ITBIS de la ficha del artículo (solo informativo en el pedido) */
+  salesTaxPct: number
   _prices?: ItemPrices
   warehouse: string
   /** Stock por almacén del artículo seleccionado, para validar contra el almacén elegido en la línea */
@@ -145,6 +147,7 @@ const [customerId, setCustomerId] = useState('')
     }, 400)
   }, [])
   const [notes, setNotes] = useState('')
+  const [notesOpen, setNotesOpen] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
@@ -157,7 +160,6 @@ const [customerId, setCustomerId] = useState('')
   const [branch, setBranch] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
-  const [warehouseSearch, setWarehouseSearch] = useState('')
   // '' = automático (Cliente.defaultCurrency → moneda base). Al convertir desde una Cotización se
   // hidrata explícitamente con la moneda/tasa de esa cotización (se hereda tal cual, nunca se
   // re-resuelve — docs/tasks/64_multimoneda_completo.md §3.3).
@@ -284,6 +286,7 @@ const [customerId, setCustomerId] = useState('')
           discountAmount,
           uom: i.uom,
           conversionFactor: 1,
+          salesTaxPct: 0,
           warehouse: '',
         }
       }))
@@ -314,6 +317,7 @@ const [customerId, setCustomerId] = useState('')
           discountAmount,
           uom: 'Unidad',
           conversionFactor: 1,
+          salesTaxPct: 0,
           warehouse: '',
         }
       }))
@@ -360,6 +364,7 @@ useEffect(() => {
          discountAmount,
          uom: i.uom ?? 'Unidad',
          conversionFactor: 1,
+         salesTaxPct: 0,
          warehouse: '',
        }
      }))
@@ -456,17 +461,23 @@ useEffect(() => {
   })
   const almacenVentaSucursal = sucursalActual?.almacenVenta || null
 
+  const ITEMS_COLUMNS = [
+    { key: 'codigo', width: 100 },
+    { key: 'articulo', width: 220 },
+    { key: 'cant', width: 80 },
+    { key: 'udm', width: 100 },
+    { key: 'precio', width: 120 },
+    { key: 'descuento', width: 140 },
+    { key: 'itbis', width: 80 },
+    { key: 'subtotal', width: 120 },
+    { key: 'actions', width: 70 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
+
   // Al cambiar de sucursal, el almacén elegido en cada línea deja de ser válido
   useEffect(() => {
     setItems((prev) => prev.map((row) => (row.warehouse ? { ...row, warehouse: '' } : row)))
   }, [branch])
-
-  const warehouseSelectOptions: SearchSelectOption[] = useMemo(() => {
-    const q = warehouseSearch.toLowerCase()
-    return (branchWarehouses ?? [])
-      .filter((w) => !q || w.name.toLowerCase().includes(q))
-      .map((w) => ({ value: w.id, label: w.name }))
-  }, [branchWarehouses, warehouseSearch])
 
   function defaultWarehouse(): string {
     if (almacenVentaSucursal) return almacenVentaSucursal
@@ -584,17 +595,6 @@ useEffect(() => {
       return updated
     }))
   }
-  function updateWarehouse(index: number, warehouse: string) {
-    setItems((prev) => prev.map((item, i) => {
-      if (i !== index) return item
-      const available = despachoHabilitado ? undefined : item._stockByWarehouse?.[warehouse]
-      const qty = available != null ? Math.min(item.qty, available) : item.qty
-      const amount = item.discountMode === 'amount'
-        ? calcAmount(qty, item.rate, 0, item.discountAmount)
-        : calcAmount(qty, item.rate, item.discountPct)
-      return { ...item, warehouse, qty, amount }
-    }))
-  }
   function selectCatalogItem(index: number, catalogItem: Item, opts?: { autoAddRow?: boolean }) {
     const autoAddRow = opts?.autoAddRow ?? true
     const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
@@ -623,6 +623,7 @@ useEffect(() => {
            uom: catalogItem.stockUom ?? row.uom,
            conversionFactor: 1,
            maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
+          salesTaxPct: catalogItem.salesTaxPct ?? 0,
           _prices: catalogItem.prices,
           warehouse: defaultWarehouse(),
           _stockByWarehouse: catalogItem.stockByWarehouse,
@@ -660,6 +661,7 @@ useEffect(() => {
            uom: bundle.itemUom ?? '',
            conversionFactor: 1,
            maxDiscountPct: undefined,
+          salesTaxPct: 0,
           _prices: bundle.prices,
           warehouse: defaultWarehouse(),
           _stockByWarehouse: undefined,
@@ -690,6 +692,7 @@ useEffect(() => {
           uom: s.item.stockUom ?? 'Unidad',
           conversionFactor: 1,
           maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
+          salesTaxPct: s.item.salesTaxPct ?? 0,
           _prices: s.item.prices,
           warehouse: defaultWarehouse(),
           _stockByWarehouse: s.item.stockByWarehouse,
@@ -721,7 +724,7 @@ useEffect(() => {
       toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
       return
     }
-    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, uom: 'Unidad', conversionFactor: 1, warehouse: '' }])
+    setItems((prev) => [...prev, { itemCode: '', description: '', qty: 1, rate: 0, baseRate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, uom: 'Unidad', conversionFactor: 1, salesTaxPct: 0, warehouse: '' }])
   }
   function removeRow(index: number) { setItems((prev) => prev.filter((_, i) => i !== index)) }
 
@@ -867,7 +870,7 @@ try {
       <div className="page-header">
         <div>
           <a className="page-back-link" onClick={() => navigate('/pedidos')}><ArrowLeft size={14} /> Pedidos</a>
-          <h1 className="page-title">{isEdit ? 'Editar Pedido' : 'Nuevo Pedido'}</h1>
+          <h1 className="page-title"><span className="page-title-dot" />{isEdit ? 'Editar Pedido' : 'Nuevo Pedido'}</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <RecargarButton label="Actualizar" />
@@ -881,9 +884,9 @@ try {
           </div>
         )}
         <div className="card">
-          <div className="card-header"><h2 className="card-title">Información General</h2></div>
+          <div className="card-header navy-card-header"><h2 className="card-title">Información General</h2></div>
           <div className="card-body">
-            <div className="form-row form-row-3">
+            <div className="form-row">
 <div className="ff-wrap">
                  <label className="ff-label ff-required">Cliente</label>
                  {esClienteOcasional ? (
@@ -1093,32 +1096,51 @@ try {
         </div>
 
         <div className="card">
-          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 className="card-title">Artículos</h2>
-            {hasAnyDiscount && (
-              <button type="button" className="btn btn-ghost btn-size-sm" onClick={undoDiscounts}>
-                <RotateCcw size={13} /> Deshacer descuentos
-              </button>
-            )}
-          </div>
           <div className="items-table-wrap">
-            <table className="items-table">
+            <table className="items-table navy-table items-table-resizable">
+              <colgroup>
+                {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th style={{ minWidth: 200 }}>Artículo</th>
-                  <th>Descripción</th>
-                  <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
-                  <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
-                  <th style={{ textAlign: 'right', width: 72 }}>Descuento</th>
-                  <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
-                  <th style={{ width: 72 }}>UDM</th>
-                  {!almacenVentaSucursal && <th style={{ width: 140 }}>Almacén</th>}
-                  <th style={{ width: 40 }} />
+                  <th>
+                    Código
+                    <span className="col-resize-handle" onMouseDown={startResize('codigo')} />
+                  </th>
+                  <th>
+                    Artículo
+                    <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Cant.
+                    <span className="col-resize-handle" onMouseDown={startResize('cant')} />
+                  </th>
+                  <th>
+                    UDM
+                    <span className="col-resize-handle" onMouseDown={startResize('udm')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Precio Unit.
+                    <span className="col-resize-handle" onMouseDown={startResize('precio')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Descuento
+                    <span className="col-resize-handle" onMouseDown={startResize('descuento')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    ITBIS
+                    <span className="col-resize-handle" onMouseDown={startResize('itbis')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Subtotal
+                    <span className="col-resize-handle" onMouseDown={startResize('subtotal')} />
+                  </th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
-                  <tr><td colSpan={almacenVentaSucursal ? 8 : 9} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>No hay artículos.</td></tr>
+                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>No hay artículos. Agrega uno con el botón de abajo.</td></tr>
                 ) : (
                   items.map((item, index) => (
                     <tr
@@ -1126,11 +1148,12 @@ try {
                       ref={(el) => { rowRefs.current[index] = el }}
                       className={highlightedRow === index ? 'row-flash' : undefined}
                     >
+                      {/* Código — solo lectura, informativo */}
                       <td>
-                        <ItemSelect value={item.itemCode} selectedLabel={item.itemLabel} onSelect={(ci) => selectCatalogItem(index, ci)} onSelectBundle={(b) => selectBundle(index, b)} includeBundles onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0 })} onVariantSelect={(t) => setVariantTemplate(t)} validateStock={!despachoHabilitado} branch={despachoHabilitado ? undefined : (branch || undefined)} />
+                        <span className="td-muted" style={{ fontSize: 12 }}>{item.itemCode || '—'}</span>
                       </td>
                       <td>
-                        <input className="items-input" value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="Descripción" />
+                        <ItemSelect value={item.itemCode} selectedLabel={item.itemLabel} onSelect={(ci) => selectCatalogItem(index, ci)} onSelectBundle={(b) => selectBundle(index, b)} includeBundles onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, salesTaxPct: 0 })} onVariantSelect={(t) => setVariantTemplate(t)} validateStock={!despachoHabilitado} branch={despachoHabilitado ? undefined : (branch || undefined)} />
                       </td>
                       <td>
                         {(() => {
@@ -1142,22 +1165,34 @@ try {
                             <>
                               <QtyInput className={`items-input${(submitted && (!item.qty || item.qty <= 0)) || stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
                               {stockError ? (
-                                <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
                                   {stockError}
                                 </span>
                               ) : info && info.reservedStock > 0 ? (
-                                <span style={{ fontSize: 11, color: 'var(--warning-text)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                <span style={{ fontSize: 11, color: 'var(--warning-text)', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
                                   Disponible: {info.disponible} ({info.reservedStock} reservadas para otro cliente)
                                   {enPedido > 0 ? ` · En pedido: ${enPedido} (informativo)` : ''}
                                 </span>
                               ) : enPedido > 0 ? (
-                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
                                   En pedido: {enPedido} (informativo)
                                 </span>
                               ) : null}
                             </>
                           )
                         })()}
+                      </td>
+                      <td>
+                        {item.itemType === 'service' || item.itemType === 'combo' ? (
+                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                        ) : (
+                          <UomSelect
+                            value={item.uom}
+                            onChange={(v, factor) => updateItem(index, { uom: v, rate: saleRate(item.baseRate, factor), conversionFactor: factor })}
+                            itemCode={item.itemCode || undefined}
+                            direction="sale"
+                          />
+                        )}
                       </td>
                       <td>
                         <input className={`items-input${submitted && (!item.rate || item.rate <= 0) ? ' items-input-error' : ''}`} type="number" min="0" step="0.01" value={round2(item.rate)} disabled style={{ textAlign: 'right' }} />
@@ -1204,89 +1239,102 @@ try {
                                   />
                                 )}
                               </div>
-                              {isAmountMode ? (
-                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                  Descuento: {formatMoney(item.discountAmount, currency || monedaBase)}
-                                </span>
-                              ) : (
-                                <>
-                                  {effectiveLimit < 100 && (
-                                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                      máx {effectiveLimit.toFixed(2)}%
-                                    </span>
-                                  )}
-                                  {item.discountPct > effectiveLimit && (
-                                    <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                      Supera el límite de {effectiveLimit.toFixed(2)}%
-                                    </span>
-                                  )}
-                                </>
-                              )}
                             </>
                           )
                         })()}
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount, currency || monedaBase, { trimZeros: true })}</td>
-                      <td>
-                        {item.itemType === 'service' || item.itemType === 'combo' ? (
-                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                      <td style={{ textAlign: 'right' }}>
+                        {item.salesTaxPct > 0 ? (
+                          <span className="td-muted" style={{ fontSize: 12 }}>
+                            {item.salesTaxPct}%
+                          </span>
                         ) : (
-                          <UomSelect
-                            value={item.uom}
-                            onChange={(v, factor) => updateItem(index, { uom: v, rate: saleRate(item.baseRate, factor), conversionFactor: factor })}
-                            itemCode={item.itemCode || undefined}
-                            direction="sale"
-                          />
+                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                         )}
                       </td>
-                      {!almacenVentaSucursal && (
-                        <td>
-                          <SearchSelect
-                            value={item.warehouse}
-                            onChange={(val) => updateWarehouse(index, val)}
-                            options={warehouseSelectOptions}
-                            onSearch={setWarehouseSearch}
-                            selectedLabel={branchWarehouses?.find((w) => w.id === item.warehouse)?.name ?? ''}
-                            placeholder="Almacén por defecto"
-                            disabled={!item.itemCode}
-                          />
-                        </td>
-                      )}
-                      <td onClick={(e) => e.stopPropagation()} className="actions-cell">
-                        <ActionsMenu>
-                          <ActionsMenuItem
-                            onClick={() => setViewItemCode(item.itemCode)}
-                            disabled={!item.itemCode}
-                          >
-                            <Eye size={14} /> Ver detalle
-                          </ActionsMenuItem>
-                          <ActionsMenuItem danger onClick={() => removeRow(index)}>
-                            <Trash2 size={14} /> Eliminar
-                          </ActionsMenuItem>
-                        </ActionsMenu>
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount, currency || monedaBase, { trimZeros: true })}</td>
+                      <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ position: 'relative', verticalAlign: 'middle' }}>
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-size-icon-xs"
+                          onClick={() => setViewItemCode(item.itemCode)}
+                          disabled={!item.itemCode}
+                          title="Ver detalle"
+                        >
+                          <Eye size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-size-icon-xs"
+                          onClick={() => removeRow(index)}
+                          title="Eliminar"
+                          style={{ color: 'var(--error-text)' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                        </div>
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
-            <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
-              <button type="button" className="btn btn-ghost btn-size-sm" onClick={addRow}><Plus size={14} /> Agregar artículo</button>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
+            <button type="button" className="btn btn-ghost btn-size-sm" onClick={addRow}><Plus size={14} /> Agregar artículo</button>
+            {hasAnyDiscount && (
+              <button type="button" className="btn btn-ghost btn-size-sm" onClick={undoDiscounts}>
+                <RotateCcw size={13} /> Deshacer descuentos
+              </button>
+            )}
+          </div>
+          <div className="items-total-row navy-totals">
+            <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ textAlign: 'right' }}>Subtotal bruto</span>
+              <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(grossTotal, currency || monedaBase)}</span>
             </div>
-            <div className="items-total-row">
-              <div className="items-total-line"><span>Subtotal bruto</span><span>{formatMoney(grossTotal, currency || monedaBase)}</span></div>
-              {totalDiscount > 0 && <div className="items-total-line" style={{ color: 'var(--text-danger)' }}><span>Descuento total</span><span>-{formatMoney(totalDiscount, currency || monedaBase)}</span></div>}
-              {/*<div className="items-total-line"><span>Subtotal neto</span><span>{formatDOP(subtotal)}</span></div>*/}
-              <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}><span>Total</span><span>{formatMoney(total, currency || monedaBase)}</span></div>
+            <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ textAlign: 'right' }}>Descuento</span>
+              <span style={{ textAlign: 'left', minWidth: 170 }}>-{formatMoney(totalDiscount, currency || monedaBase)}</span>
+            </div>
+            {/*<div className="items-total-line"><span>Subtotal neto</span><span>{formatDOP(subtotal)}</span></div>*/}
+            <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ fontSize: 20, color: '#FCB124', textAlign: 'right' }}>Total</span>
+              <span style={{ fontSize: 20, color: '#FCB124', textAlign: 'left', minWidth: 170 }}>{formatMoney(total, currency || monedaBase)}</span>
             </div>
           </div>
         </div>
 
         <div className="card">
-          <div className="card-header"><h2 className="card-title">Notas</h2></div>
-          <div className="card-body">
-            <textarea className="ff-textarea" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observaciones, condiciones de entrega…" rows={3} />
+          <div
+            className="card-header navy-card-header"
+            style={{ cursor: 'pointer' }}
+            onClick={() => setNotesOpen((o) => !o)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 className="card-title">Notas</h2>
+              <button
+                type="button"
+                className="navy-header-toggle-btn icon-swap"
+                aria-expanded={notesOpen}
+                aria-label={notesOpen ? 'Ocultar notas' : 'Mostrar notas'}
+                onClick={(e) => { e.stopPropagation(); setNotesOpen((o) => !o) }}
+              >
+                {notesOpen ? <Minus size={13} /> : <Plus size={13} />}
+              </button>
+            </div>
+            {!notesOpen && (
+              <span className="navy-header-hint">
+                Agrega comentarios para aclarar datos del pedido, serán visibles PDF.
+              </span>
+            )}
           </div>
+          {notesOpen && (
+            <div className="card-body">
+              <textarea className="ff-textarea" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observaciones, condiciones de entrega…" rows={3} />
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>

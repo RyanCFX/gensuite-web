@@ -23,6 +23,7 @@ import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { Modal } from '@/shared/ui/Modal'
 import { formatMoney } from '@/lib/formatters'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 function today(): string {
   const d = new Date()
@@ -49,6 +50,15 @@ export default function CargaInicialForm() {
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
   const [items, setItems] = useState<LineItem[]>([emptyRow()])
+  const ITEMS_COLUMNS = [
+    { key: 'articulo', width: 220 },
+    { key: 'almacen', width: 180 },
+    { key: 'cantidad', width: 120 },
+    { key: 'costo', width: 140 },
+    { key: 'importe', width: 120 },
+    { key: 'actions', width: 40 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
   const [branchQuery, setBranchQuery] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -248,7 +258,6 @@ export default function CargaInicialForm() {
         </div>
 
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Artículos</h2></div>
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {hasMixedBranches && (
               <div className="inline-alert inline-alert-warn" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -258,15 +267,33 @@ export default function CargaInicialForm() {
             )}
 
             <div className="items-table-wrap">
-              <table className="items-table">
+              <table className="items-table items-table-resizable">
+                <colgroup>
+                  {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th style={{ minWidth: 220 }}>Artículo</th>
-                    <th style={{ minWidth: 180 }}>Almacén</th>
-                    <th style={{ textAlign: 'right', width: 120 }}>Cantidad</th>
-                    <th style={{ textAlign: 'right', width: 140 }}>Costo unitario</th>
-                    <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
-                    <th style={{ width: 40 }} />
+                    <th>
+                      Artículo
+                      <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                    </th>
+                    <th>
+                      Almacén
+                      <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Cantidad
+                      <span className="col-resize-handle" onMouseDown={startResize('cantidad')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Costo unitario
+                      <span className="col-resize-handle" onMouseDown={startResize('costo')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Importe
+                      <span className="col-resize-handle" onMouseDown={startResize('importe')} />
+                    </th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
@@ -341,9 +368,9 @@ export default function CargaInicialForm() {
                   </tfoot>
                 )}
               </table>
-              <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
-                <button type="button" className="btn btn-ghost btn-size-sm" onClick={addRow}><Plus size={14} /> Agregar artículo</button>
-              </div>
+            </div>
+            <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
+              <button type="button" className="btn btn-ghost btn-size-sm" onClick={addRow}><Plus size={14} /> Agregar artículo</button>
             </div>
           </div>
         </div>

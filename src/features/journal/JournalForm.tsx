@@ -20,6 +20,7 @@ import { formatDOP } from '@/lib/formatters'
 import { ArrowLeft, Plus, Trash2, AlertTriangle } from 'lucide-react'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 interface EntryRow {
   id: number
@@ -190,6 +191,19 @@ export default function JournalForm() {
   // Si ninguna línea usa una cuenta en moneda distinta a la base, la columna de tasa no aporta nada.
   const algunaLineaEnDivisa = rows.some((r) => r.currency && r.currency !== monedaBase)
 
+  const ITEMS_COLUMNS = [
+    { key: 'cuenta', width: 220 },
+    { key: 'debito', width: 100 },
+    { key: 'credito', width: 100 },
+    { key: 'descripcion', width: 160 },
+    { key: 'sucursal', width: 140 },
+    { key: 'departamento', width: 140 },
+    { key: 'costCenter', width: 140 },
+    ...(algunaLineaEnDivisa ? [{ key: 'tasa', width: 100 }] : []),
+    { key: 'actions', width: 40 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
+
   const isPending = createMutation.isPending || submitMutation.isPending
 
   const isDirty = useDirtyCheck({
@@ -303,18 +317,47 @@ export default function JournalForm() {
 
           <div className="card-body" style={{ padding: 0 }}>
             <div className="items-table-wrap">
-              <table className="items-table">
+              <table className="items-table items-table-resizable">
+                <colgroup>
+                  {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th style={{ width: '22%' }}>Cuenta</th>
-                    <th style={{ width: '10%', textAlign: 'right' }}>Débito</th>
-                    <th style={{ width: '10%', textAlign: 'right' }}>Crédito</th>
-                    <th style={{ width: '16%' }}>Descripción</th>
-                    <th style={{ width: '14%' }}>Sucursal</th>
-                    <th style={{ width: '14%' }}>Departamento</th>
-                    <th style={{ width: '14%' }}>Centro de Costo</th>
-                    {algunaLineaEnDivisa && <th style={{ width: '10%' }}>Tasa de cambio</th>}
-                    <th style={{ width: 40 }} />
+                    <th>
+                      Cuenta
+                      <span className="col-resize-handle" onMouseDown={startResize('cuenta')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Débito
+                      <span className="col-resize-handle" onMouseDown={startResize('debito')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Crédito
+                      <span className="col-resize-handle" onMouseDown={startResize('credito')} />
+                    </th>
+                    <th>
+                      Descripción
+                      <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+                    </th>
+                    <th>
+                      Sucursal
+                      <span className="col-resize-handle" onMouseDown={startResize('sucursal')} />
+                    </th>
+                    <th>
+                      Departamento
+                      <span className="col-resize-handle" onMouseDown={startResize('departamento')} />
+                    </th>
+                    <th>
+                      Centro de Costo
+                      <span className="col-resize-handle" onMouseDown={startResize('costCenter')} />
+                    </th>
+                    {algunaLineaEnDivisa && (
+                      <th>
+                        Tasa de cambio
+                        <span className="col-resize-handle" onMouseDown={startResize('tasa')} />
+                      </th>
+                    )}
+                    <th />
                   </tr>
                 </thead>
                 <tbody>

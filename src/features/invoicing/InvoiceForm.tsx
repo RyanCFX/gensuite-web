@@ -28,7 +28,6 @@ import { formatDOP, formatMoney, round2, formatDate } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, Info, UserPlus, Lock, LockOpen, ChevronDown, RotateCcw } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
-import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
@@ -55,6 +54,7 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { useItemInventory } from '@/shared/hooks/useItemInventory'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { formatStockInsufficientMessage, formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { isCostoCompraError } from '@/lib/pinOverride'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
@@ -1175,6 +1175,28 @@ export default function InvoiceForm() {
   /** 11 columnas base + las 5 de cobertura ARS — para los `colSpan` de las filas especiales. */
   const columnCount = (arsActiva ? 16 : 11) - (almacenVentaSucursal ? 1 : 0)
 
+  const itemsColumnDefs: { key: string; width: number }[] = [
+    { key: 'codigo', width: 100 },
+    { key: 'articulo', width: 220 },
+    { key: 'cant', width: 80 },
+    { key: 'udm', width: 100 },
+    { key: 'precio', width: 120 },
+    { key: 'descuento', width: 140 },
+    { key: 'itbis', width: 80 },
+    { key: 'subtotal', width: 120 },
+    ...(!almacenVentaSucursal ? [{ key: 'almacen', width: 160 }] : []),
+    { key: 'ubicacion', width: 140 },
+    ...(arsActiva ? [
+      { key: 'pctTeorico', width: 100 },
+      { key: 'coberturaArs', width: 130 },
+      { key: 'lock', width: 50 },
+      { key: 'paciente', width: 120 },
+      { key: 'pctReal', width: 90 },
+    ] : []),
+    { key: 'actions', width: 70 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(itemsColumnDefs)
+
   /**
    * Campos ARS de una línea. Solo se envían si el usuario realmente los tocó: si NINGUNA línea
    * trae `montoAprobadoArs`/`lineaBloqueadaArs`, el servidor reparte la cobertura solo al
@@ -1636,34 +1658,80 @@ persistInvoice(buildInvoiceDto())
             </div>
           )}
           <div className="items-table-wrap">
-            <table className="items-table navy-table">
+            <table className="items-table navy-table items-table-resizable">
+              <colgroup>
+                {itemsColumnDefs.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th style={{ minWidth: 200 }}>Artículo</th>
-                  <th>Descripción</th>
-                  <th style={{ textAlign: 'right', width: 80 }}>Cant.</th>
-                  <th style={{ textAlign: 'right', width: 120 }}>Precio Unit.</th>
-                  <th style={{ textAlign: 'right', width: 72 }}>
+                  <th>
+                    Código
+                    <span className="col-resize-handle" onMouseDown={startResize('codigo')} />
+                  </th>
+                  <th>
+                    Artículo
+                    <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Cant.
+                    <span className="col-resize-handle" onMouseDown={startResize('cant')} />
+                  </th>
+                  <th>
+                    UDM
+                    <span className="col-resize-handle" onMouseDown={startResize('udm')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Precio Unit.
+                    <span className="col-resize-handle" onMouseDown={startResize('precio')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
                   Descuento
                   <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} />
+                  <span className="col-resize-handle" onMouseDown={startResize('descuento')} />
                 </th>
-                  <th style={{ textAlign: 'right', width: 80 }}>Impuesto</th>
-                  <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
-                  <th style={{ width: 56 }}>UDM</th>
-                  {!almacenVentaSucursal && <th style={{ width: 140 }}>Almacén</th>}
-                  <th style={{ width: 140 }}>Ubicación</th>
+                  <th style={{ textAlign: 'right' }}>
+                    ITBIS
+                    <span className="col-resize-handle" onMouseDown={startResize('itbis')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Subtotal
+                    <span className="col-resize-handle" onMouseDown={startResize('subtotal')} />
+                  </th>
+                  {!almacenVentaSucursal && (
+                    <th>
+                      Almacén
+                      <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                    </th>
+                  )}
+                  <th>
+                    Ubicación
+                    <span className="col-resize-handle" onMouseDown={startResize('ubicacion')} />
+                  </th>
                   {arsActiva && (
                     <>
-                      <th style={{ textAlign: 'right', width: 80 }} title="Peso de esta línea en el reparto automático de la cobertura. Vacío en todas = partes iguales.">
+                      <th style={{ textAlign: 'right' }} title="Peso de esta línea en el reparto automático de la cobertura. Vacío en todas = partes iguales.">
                         % teórico ARS
+                        <span className="col-resize-handle" onMouseDown={startResize('pctTeorico')} />
                       </th>
-                      <th style={{ textAlign: 'right', width: 120 }}>Cobertura ARS</th>
-                      <th style={{ width: 44, textAlign: 'center' }} title="Ajuste manual protegido: Recalcular no toca la línea.">🔒</th>
-                      <th style={{ textAlign: 'right', width: 110 }}>Paciente</th>
-                      <th style={{ textAlign: 'right', width: 72 }}>% real</th>
+                      <th style={{ textAlign: 'right' }}>
+                        Cobertura ARS
+                        <span className="col-resize-handle" onMouseDown={startResize('coberturaArs')} />
+                      </th>
+                      <th style={{ textAlign: 'center' }} title="Ajuste manual protegido: Recalcular no toca la línea.">
+                        🔒
+                        <span className="col-resize-handle" onMouseDown={startResize('lock')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Paciente
+                        <span className="col-resize-handle" onMouseDown={startResize('paciente')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        % real
+                        <span className="col-resize-handle" onMouseDown={startResize('pctReal')} />
+                      </th>
                     </>
                   )}
-                  <th style={{ width: 40 }} />
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -1680,6 +1748,14 @@ persistInvoice(buildInvoiceDto())
                       ref={(el) => { rowRefs.current[index] = el }}
                       className={highlightedRow === index ? 'row-flash' : undefined}
                     >
+                      {/* Código — solo lectura, informativo */}
+                      <td>
+                        <span className="td-muted" style={{ fontSize: 12 }}>{item.itemCode || '—'}</span>
+                      </td>
+
+                      {/* Artículo — SearchSelect por catálogo (la descripción de la línea se
+                          autopobla al seleccionar, ver selectCatalogItem/selectBundle — ya no
+                          hace falta un campo de descripción editable aparte, era redundante). */}
                       <td style={{ minWidth: 200 }}>
                         <ItemSelect
                           value={item.itemCode}
@@ -1693,9 +1769,6 @@ persistInvoice(buildInvoiceDto())
                           branch={branch || undefined}
                           onQueryChange={esFarmacia ? setBusquedaAsistidaQuery : undefined}
                         />
-                      </td>
-                      <td>
-                        <input className="items-input" value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="Descripción" />
                       </td>
                       <td>
                         {(() => {
@@ -1725,6 +1798,20 @@ persistInvoice(buildInvoiceDto())
                             </>
                           )
                         })()}
+                      </td>
+                      <td>
+                        {item.itemType === 'service' || item.itemType === 'combo' ? (
+                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                        ) : (
+                          <UomSelect
+                            value={item.uom}
+                            onChange={(v, factor) => {
+                              updateItem(index, { uom: v, rate: saleRate(item.baseRate, factor), conversionFactor: factor })
+                            }}
+                            itemCode={item.itemCode || undefined}
+                            direction="sale"
+                          />
+                        )}
                       </td>
                       <td>
                         <input className="items-input" type="number" min="0" step="0.01" value={round2(item.rate)} disabled style={{ textAlign: 'right' }} />
@@ -1825,20 +1912,6 @@ persistInvoice(buildInvoiceDto())
                         )}
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount, currency || monedaBase, { trimZeros: true })}</td>
-                      <td>
-                        {item.itemType === 'service' || item.itemType === 'combo' ? (
-                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
-                        ) : (
-                          <UomSelect
-                            value={item.uom}
-                            onChange={(v, factor) => {
-                              updateItem(index, { uom: v, rate: saleRate(item.baseRate, factor), conversionFactor: factor })
-                            }}
-                            itemCode={item.itemCode || undefined}
-                            direction="sale"
-                          />
-                        )}
-                      </td>
                       {!almacenVentaSucursal && (
                         <td>
                           <SearchSelect
@@ -1923,18 +1996,25 @@ persistInvoice(buildInvoiceDto())
                           </td>
                         </>
                       )}
-                      <td onClick={(e) => e.stopPropagation()} className="actions-cell">
-                        <ActionsMenu>
-                          <ActionsMenuItem
-                            onClick={() => setViewItemCode(item.itemCode)}
-                            disabled={!item.itemCode}
-                          >
-                            <Eye size={14} /> Ver detalle
-                          </ActionsMenuItem>
-                          <ActionsMenuItem danger onClick={() => removeRow(index)}>
-                            <Trash2 size={14} /> Eliminar
-                          </ActionsMenuItem>
-                        </ActionsMenu>
+                      <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-size-icon-xs"
+                          onClick={() => setViewItemCode(item.itemCode)}
+                          disabled={!item.itemCode}
+                          title="Ver detalle"
+                        >
+                          <Eye size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-size-icon-xs"
+                          onClick={() => removeRow(index)}
+                          title="Eliminar"
+                          style={{ color: 'var(--error-text)' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </td>
                     </tr>
                     {item.itemType === 'combo' && item._comboComponents && item._comboComponents.length > 0 && (
@@ -2031,7 +2111,6 @@ persistInvoice(buildInvoiceDto())
                 </>
               )}
             </div>
-          </div>
         </div>
 
         {mostrarSelectorDespachoFuturo && (

@@ -2404,9 +2404,6 @@ export default function InvoiceDetail() {
       )}
 
       <div className="card">
-        <div className="card-header navy-card-header">
-          <h2 className="card-title">Artículos</h2>
-        </div>
         <div className="items-table-wrap">
           <table className="items-table navy-table">
             <thead>
