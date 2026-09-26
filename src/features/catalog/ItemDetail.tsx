@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -970,7 +971,7 @@ function UbicacionesPanel({ itemCode }: { itemCode: string }) {
         )}
       </div>
 
-      {showAssign && activeWarehouse && (
+      {showAssign && activeWarehouse && createPortal(
         <AssignUbicacionModal
           itemCode={itemCode}
           warehouse={activeWarehouse}
@@ -979,10 +980,11 @@ function UbicacionesPanel({ itemCode }: { itemCode: string }) {
             setShowAssign(false)
             queryClient.invalidateQueries({ queryKey: ['item-ubicaciones', itemCode, activeWarehouse] })
           }}
-        />
+        />,
+        document.body,
       )}
 
-      {moverTarget && activeWarehouse && (
+      {moverTarget && activeWarehouse && createPortal(
         <MoverUbicacionModal
           itemCode={itemCode}
           warehouse={activeWarehouse}
@@ -992,7 +994,8 @@ function UbicacionesPanel({ itemCode }: { itemCode: string }) {
             setMoverTarget(null)
             queryClient.invalidateQueries({ queryKey: ['item-ubicaciones', itemCode, activeWarehouse] })
           }}
-        />
+        />,
+        document.body,
       )}
     </div>
   )

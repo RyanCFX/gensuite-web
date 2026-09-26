@@ -349,7 +349,6 @@ export default function DespachoDetail() {
       </div>
 
       <div className="card">
-        <div className="card-header"><h2 className="card-title">Artículos</h2></div>
         <div className="table-scroll">
           <table className="data-table">
             <thead>

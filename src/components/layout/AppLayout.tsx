@@ -18,6 +18,7 @@ import {
   BarChart3,
   Settings,
   ChevronRight,
+  ChevronsRight,
   LogOut,
   Menu,
   Building2,
@@ -1161,33 +1162,129 @@ function TabCloseButton({
 // ─── TabBar ──────────────────────────────────────────────────────────────────
 
 function TabBar() {
-  const { tabs, activeId, closeTab } = useTabs();
+  const { tabs, activeId, closeTab, reorderTabs } = useTabs();
   const navigate = useNavigate();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const overflowBtnRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [hasOverflow, setHasOverflow] = useState(false);
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropId, setDropId] = useState<string | null>(null);
+
+  // Detecta si los tabs superan el ancho visible para mostrar el botón ">>"
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const check = () => {
+      setHasOverflow(el.scrollWidth > el.clientWidth + 1);
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    window.addEventListener("resize", check);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", check);
+    };
+  }, [tabs.length]);
+
+  // Lleva el tab activo a la vista
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !activeId) return;
+    const activeEl = el.querySelector<HTMLElement>(`[data-tab-id="${activeId}"]`);
+    activeEl?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeId, tabs.length]);
+
+  // Cierra el desplegable con click fuera / Escape
+  useEffect(() => {
+    if (!overflowOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (
+        dropdownRef.current?.contains(t) ||
+        overflowBtnRef.current?.contains(t)
+      )
+        return;
+      setOverflowOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOverflowOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [overflowOpen]);
 
   if (tabs.length === 0) return null;
+
+  const handleDrop = (targetId: string) => {
+    if (dragId && dragId !== targetId) reorderTabs(dragId, targetId);
+    setDragId(null);
+    setDropId(null);
+  };
 
   return (
     <div
       style={{
         display: "flex",
         alignItems: "stretch",
-        overflowX: "auto",
-        overflowY: "hidden",
         borderBottom: "1px solid var(--border-default)",
         boxShadow: "0 2px 8px rgba(0, 0, 0, 0.02)",
         background: "var(--surface-app)",
         position: "sticky",
         top: 0,
         zIndex: 50,
-        scrollbarWidth: "none",
         flexShrink: 0,
       }}
     >
+      <div
+        ref={scrollRef}
+        style={{
+          display: "flex",
+          alignItems: "stretch",
+          overflowX: "auto",
+          overflowY: "hidden",
+          flex: 1,
+          minWidth: 0,
+          scrollbarWidth: "none",
+        }}
+      >
       {tabs.map((tab) => {
         const isActive = tab.id === activeId;
+        const isDropTarget = dropId === tab.id && dragId !== tab.id;
         return (
           <div
             key={tab.id}
+            data-tab-id={tab.id}
+            draggable
+            onDragStart={(e) => {
+              setDragId(tab.id);
+              e.dataTransfer.effectAllowed = "move";
+              try {
+                e.dataTransfer.setData("text/plain", tab.id);
+              } catch {}
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              if (tab.id !== dragId) setDropId(tab.id);
+            }}
+            onDragLeave={() => {
+              setDropId((prev) => (prev === tab.id ? null : prev));
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              handleDrop(tab.id);
+            }}
+            onDragEnd={() => {
+              setDragId(null);
+              setDropId(null);
+            }}
             style={{
               display: "flex",
               alignItems: "center",
@@ -1197,18 +1294,22 @@ function TabBar() {
               minWidth: 80,
               maxWidth: 200,
               flexShrink: 0,
-              cursor: "pointer",
+              cursor: "grab",
               borderRight: "1px solid var(--border-default)",
               borderTopRightRadius: 10,
               background: isActive ? "#208591" : "transparent",
               borderBottom: isActive
                 ? "none"
                 : "2px solid transparent",
-              transition: "background 0.12s",
+              borderLeft: isDropTarget
+                ? "2px solid var(--brand-primary)"
+                : "2px solid transparent",
+              opacity: dragId === tab.id ? 0.5 : 1,
+              transition: "background 0.12s, opacity 0.12s",
               userSelect: "none",
             }}
             onClick={() => navigate(tab.path)}
-            title={tab.title}
+            title={`${tab.title} — arrastra para reordenar`}
           >
             {tab.isDirty && (
               <span
@@ -1228,10 +1329,11 @@ function TabBar() {
                 fontWeight: isActive ? 600 : 400,
                 color: isActive
                   ? "#ffffff"
-                  : "var(--text-secondary)",
+                  : "#0E3D51",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
+                pointerEvents: "none",
               }}
             >
               {tab.title}
@@ -1254,6 +1356,171 @@ function TabBar() {
           </div>
         );
       })}
+      </div>
+      {hasOverflow && (
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <button
+            ref={overflowBtnRef}
+            type="button"
+            aria-label="Ver pestañas abiertas"
+            aria-haspopup="menu"
+            aria-expanded={overflowOpen}
+            onClick={() => setOverflowOpen((v) => !v)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 36,
+              height: 36,
+              border: "none",
+              borderLeft: "1px solid var(--border-default)",
+              background: overflowOpen
+                ? "var(--surface-hover)"
+                : "var(--surface-app)",
+              color: "var(--text-secondary)",
+              cursor: "pointer",
+            }}
+          >
+            <ChevronsRight size={16} />
+          </button>
+          {overflowOpen && (
+            <div
+              ref={dropdownRef}
+              role="menu"
+              style={{
+                position: "absolute",
+                top: "calc(100% + 4px)",
+                right: 4,
+                minWidth: 220,
+                maxWidth: 320,
+                maxHeight: 320,
+                overflowY: "auto",
+                background:
+                  "var(--surface-raised, var(--bg-surface))",
+                border: "1px solid var(--border-default)",
+                borderRadius: 10,
+                boxShadow: "var(--shadow-xl)",
+                padding: 4,
+                zIndex: 100,
+              }}
+            >
+              {tabs.map((tab) => {
+                const isActive = tab.id === activeId;
+                const handleClose = () => {
+                  if (tab.isDirty) {
+                    if (
+                      !window.confirm(
+                        `"${tab.title}" tiene cambios sin guardar. ¿Cerrar de todas formas?`,
+                      )
+                    )
+                      return;
+                  }
+                  closeTab(tab.id);
+                };
+                return (
+                  <div
+                    key={tab.id}
+                    role="menuitem"
+                    onClick={() => {
+                      navigate(tab.path);
+                      setOverflowOpen(false);
+                    }}
+                    title={tab.title}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      width: "100%",
+                      padding: "8px 6px 8px 10px",
+                      border: "none",
+                      borderRadius: 6,
+                      background: isActive
+                        ? "var(--surface-hover)"
+                        : "transparent",
+                      color: isActive
+                        ? "var(--text-primary)"
+                        : "#0E3D51",
+                      fontSize: 13,
+                      fontWeight: isActive ? 600 : 400,
+                      cursor: "pointer",
+                      textAlign: "left",
+                      boxSizing: "border-box",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive)
+                        e.currentTarget.style.background =
+                          "var(--surface-hover)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive)
+                        e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 16,
+                        flexShrink: 0,
+                        display: "flex",
+                        justifyContent: "center",
+                        color: "var(--brand-primary)",
+                      }}
+                    >
+                      {isActive && <Check size={14} />}
+                    </span>
+                    <span
+                      style={{
+                        flex: 1,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {tab.title}
+                    </span>
+                    {tab.isDirty && (
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background:
+                            "var(--color-primary, #4f46e5)",
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
+                    <button
+                      type="button"
+                      aria-label={`Cerrar ${tab.title}`}
+                      title={`Cerrar ${tab.title}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleClose();
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 20,
+                        height: 20,
+                        border: "none",
+                        borderRadius: 4,
+                        background: "transparent",
+                        color: "var(--text-tertiary)",
+                        cursor: "pointer",
+                        padding: 0,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
