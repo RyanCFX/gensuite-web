@@ -8,7 +8,8 @@ import {
   listUbicaciones, createUbicacion, updateUbicacion, deleteUbicacion,
   listUbicacionesPendientes, distribuirUbicaciones, listMovimientosUbicaciones,
 } from '@/shared/api/ubicaciones'
-import type { ZonaResponseDto, UbicacionResponseDto, ApiError, DistribuirUbicacionItemDto } from '@/shared/api/types'
+import { getItem } from '@/shared/api/catalog'
+import type { ZonaResponseDto, UbicacionResponseDto, ApiError, DistribuirUbicacionItemDto, DimensionesLinea } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ConfirmModal } from '@/shared/ui/Modal'
@@ -19,6 +20,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
+import { CombinacionDimensionSelector } from '@/components/shared/CombinacionDimensionSelector'
 
 // ─── Banner "doctype no instalado" ─────────────────────────────────────────
 
@@ -579,11 +581,50 @@ function UbicacionDestinoSelect({
   )
 }
 
+// ─── Combinación de dimensión de inventario (celda de una fila pendiente) ──
+
+/** `ItemPendienteUbicar` no trae `usaDimensiones`/`dimensiones` del artículo (docs/tasks/
+ *  PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §8.2) — se re-consulta el catálogo por fila, y solo
+ *  una vez que la fila se está editando (ya eligió una ubicación destino), no para toda la lista
+ *  de pendientes de una. */
+function PendienteCombinacionCell({
+  itemCode,
+  editing,
+  value,
+  onChange,
+  disabled,
+}: {
+  itemCode: string
+  editing: boolean
+  value: DimensionesLinea
+  onChange: (v: DimensionesLinea) => void
+  disabled?: boolean
+}) {
+  const { data: catalogItem } = useQuery({
+    queryKey: ['item', itemCode],
+    queryFn: () => getItem(itemCode),
+    enabled: editing && !!itemCode,
+    staleTime: 5 * 60_000,
+  })
+
+  if (!catalogItem?.usaDimensiones || !catalogItem.dimensiones?.length) return null
+
+  return (
+    <CombinacionDimensionSelector
+      itemDimensiones={catalogItem.dimensiones}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      compact
+    />
+  )
+}
+
 // ─── Pendientes de ubicar ───────────────────────────────────────────────────
 
 function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
   const queryClient = useQueryClient()
-  const [rows, setRows] = useState<Record<string, { ubicacion: string; cantidad: number; esPrincipal: boolean }>>({})
+  const [rows, setRows] = useState<Record<string, { ubicacion: string; cantidad: number; esPrincipal: boolean; dimensiones: DimensionesLinea }>>({})
 
   useEffect(() => {
     setRows({})
@@ -614,9 +655,9 @@ function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
     label: zonaNameById.get(u.zona) ? `${zonaNameById.get(u.zona)} / ${u.ubicacionName}` : u.ubicacionName,
   }))
 
-  function updateRow(itemCode: string, actualQty: number, patch: Partial<{ ubicacion: string; cantidad: number; esPrincipal: boolean }>) {
+  function updateRow(itemCode: string, actualQty: number, patch: Partial<{ ubicacion: string; cantidad: number; esPrincipal: boolean; dimensiones: DimensionesLinea }>) {
     setRows((prev) => {
-      const current = prev[itemCode] ?? { ubicacion: '', cantidad: actualQty, esPrincipal: false }
+      const current = prev[itemCode] ?? { ubicacion: '', cantidad: actualQty, esPrincipal: false, dimensiones: {} }
       return { ...prev, [itemCode]: { ...current, ...patch } }
     })
   }
@@ -642,6 +683,7 @@ function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
         ubicacion: draft.ubicacion,
         cantidad: draft.cantidad,
         esPrincipal: draft.esPrincipal || undefined,
+        dimensiones: draft.dimensiones && Object.keys(draft.dimensiones).length > 0 ? draft.dimensiones : undefined,
       })
     }
 
@@ -686,12 +728,13 @@ function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
                 <th style={{ textAlign: 'right', width: 100 }}>Sin ubicar</th>
                 <th style={{ width: 240 }}>Ubicación destino</th>
                 <th style={{ width: 110 }}>Cantidad</th>
+                <th style={{ minWidth: 200 }}>Combinación</th>
                 <th style={{ width: 90 }}>Principal</th>
               </tr>
             </thead>
             <tbody>
               {pendientes.map((p) => {
-                const draft = rows[p.itemCode] ?? { ubicacion: '', cantidad: p.actualQty, esPrincipal: false }
+                const draft = rows[p.itemCode] ?? { ubicacion: '', cantidad: p.actualQty, esPrincipal: false, dimensiones: {} }
                 return (
                   <tr key={p.itemCode}>
                     <td style={{ fontWeight: 500 }}>
@@ -717,6 +760,15 @@ function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
                         value={draft.cantidad}
                         onChange={(e) => updateRow(p.itemCode, p.actualQty, { cantidad: Math.min(parseFloat(e.target.value) || 0, p.actualQty) })}
                         style={{ textAlign: 'right' }}
+                        disabled={readOnly}
+                      />
+                    </td>
+                    <td>
+                      <PendienteCombinacionCell
+                        itemCode={p.itemCode}
+                        editing={!!draft.ubicacion}
+                        value={draft.dimensiones}
+                        onChange={(v) => updateRow(p.itemCode, p.actualQty, { dimensiones: v })}
                         disabled={readOnly}
                       />
                     </td>

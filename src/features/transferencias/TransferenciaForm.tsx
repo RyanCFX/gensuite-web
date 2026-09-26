@@ -11,18 +11,26 @@ import { getCachedUser } from '@/shared/api/storage'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
-import type { Item, ApiError } from '@/shared/api/types'
+import type { Item, ApiError, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { formatStockInsufficientMessage } from '@/lib/stockAlerts'
 import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 
 interface LineItem {
   itemCode: string
   itemLabel?: string
   qty: number
+  // Declaración de dimensiones del artículo elegido (§4.2) — determina si mostramos el selector de
+  // combinación (docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §8.1). La misma combinación
+  // viaja para todo el trayecto de la transferencia (salida y confirmación de llegada) — no hay
+  // "combinación destino" separada, ver nota de §8.1.
+  usaDimensiones?: boolean
+  itemDimensiones?: ItemDimensionDeclarada[]
+  dimensiones?: DimensionesLinea
 }
 
 export default function TransferenciaForm() {
@@ -125,7 +133,12 @@ export default function TransferenciaForm() {
     mutationFn: () => createTransferencia({
       fromWarehouse,
       toWarehouse,
-      items: items.map((i) => ({ itemCode: i.itemCode, qty: i.qty })),
+      items: items.map((i) => ({
+        itemCode: i.itemCode,
+        qty: i.qty,
+        // §5/§10.1: siempre mandar dimensiones cuando el artículo las usa.
+        dimensiones: i.usaDimensiones ? i.dimensiones : undefined,
+      })),
       notes: notes || undefined,
     }),
     onSuccess: (t) => {
@@ -172,6 +185,14 @@ export default function TransferenciaForm() {
     for (let i = 0; i < items.length; i++) {
       if (!items[i].itemCode) { toast.error(`Línea ${i + 1}: selecciona un artículo`); return }
       if (!items[i].qty || items[i].qty <= 0) { toast.error(`Línea ${i + 1}: la cantidad debe ser mayor a 0`); return }
+    }
+
+    // §0.2/§11: un artículo con dimensiones exige la combinación completa en toda línea que mueva
+    // stock — bloqueamos el submit acá para no dejarle al usuario un 400 confuso del servidor.
+    const incompleta = items.find((i) => i.usaDimensiones && !combinacionCompleta(i.itemDimensiones ?? [], i.dimensiones ?? {}))
+    if (incompleta) {
+      toast.error(`Completa la combinación de dimensión del artículo "${incompleta.itemLabel || incompleta.itemCode}" antes de continuar`)
+      return
     }
 
     createMutation.mutate()
@@ -267,6 +288,7 @@ export default function TransferenciaForm() {
                 <tr>
                   <th style={{ minWidth: 240 }}>Artículo</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Cantidad</th>
+                  <th style={{ minWidth: 200 }}>Combinación</th>
                   <th style={{ width: 40 }} />
                 </tr>
               </thead>
@@ -278,8 +300,14 @@ export default function TransferenciaForm() {
                         value={item.itemCode}
                         selectedLabel={item.itemLabel}
                         typeFilter="product"
-                        onSelect={(catalogItem: Item) => updateItem(index, { itemCode: catalogItem.id, itemLabel: catalogItem.itemName })}
-                        onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined })}
+                        onSelect={(catalogItem: Item) => updateItem(index, {
+                          itemCode: catalogItem.id,
+                          itemLabel: catalogItem.itemName,
+                          usaDimensiones: !!catalogItem.usaDimensiones,
+                          itemDimensiones: catalogItem.dimensiones ?? [],
+                          dimensiones: {},
+                        })}
+                        onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, usaDimensiones: false, itemDimensiones: [], dimensiones: {} })}
                       />
                     </td>
                     <td>
@@ -292,6 +320,16 @@ export default function TransferenciaForm() {
                         onChange={(e) => updateItem(index, { qty: parseFloat(e.target.value) || 0 })}
                         style={{ textAlign: 'right' }}
                       />
+                    </td>
+                    <td>
+                      {item.usaDimensiones && item.itemDimensiones && item.itemDimensiones.length > 0 && (
+                        <CombinacionDimensionSelector
+                          itemDimensiones={item.itemDimensiones}
+                          value={item.dimensiones ?? {}}
+                          onChange={(v) => updateItem(index, { dimensiones: v })}
+                          compact
+                        />
+                      )}
                     </td>
                     <td>
                       <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeRow(index)} disabled={items.length === 1}>

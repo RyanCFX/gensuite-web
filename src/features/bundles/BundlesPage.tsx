@@ -339,6 +339,7 @@ function BundleFormModal({ editId, onClose }: { editId: string | null; onClose: 
                               <ItemSelect
                                 value={comp.itemCode}
                                 selectedLabel={comp.itemLabel}
+                                excludeDimensioned
                                 onSelect={(item) => updateComponent(idx, { itemCode: item.id, itemLabel: item.itemName, stockQty: undefined })}
                                 onClear={() => updateComponent(idx, { itemCode: '', itemLabel: undefined, stockQty: undefined })}
                                 placeholder="Buscar artículo…"

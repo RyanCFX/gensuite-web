@@ -282,6 +282,7 @@ export default function CargaInicialForm() {
                             value={row.itemCode}
                             selectedLabel={row.itemLabel}
                             typeFilter="product"
+                            excludeDimensioned
                             onSelect={(item) => selectCatalogItem(index, item)}
                             onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined })}
                           />
