@@ -19,7 +19,7 @@ import { formatMoney, displayId, round2 } from '@/lib/formatters'
 import { formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { Select, SelectItem } from '@/components/ui/select'
-import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, Info, UserPlus, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, UserPlus, ChevronDown, RotateCcw } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { toast } from 'sonner'
@@ -30,6 +30,8 @@ import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
+import { isCostoCompraError } from '@/lib/pinOverride'
+import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { listItems } from '@/shared/api/catalog'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
@@ -124,6 +126,9 @@ export default function QuotationForm() {
   const [customerId, setCustomerId] = useState('')
   const [customerName, setCustomerName] = useState('')
   const [customerPriceTier, setCustomerPriceTier] = useState<keyof ItemPrices | undefined>(undefined)
+  /** % de descuento por defecto del cliente elegido — solo sugiere el valor al AGREGAR una línea
+   *  nueva (selectCatalogItem/selectBundle), nunca reescribe una que el usuario ya haya tocado. */
+  const [customerDefaultDiscountPct, setCustomerDefaultDiscountPct] = useState<number | undefined>(undefined)
   const [customerQuery, setCustomerQuery] = useState('')
   const [showCreateCustomer, setShowCreateCustomer] = useState(false)
   const [esClienteOcasional, setEsClienteOcasional] = useState(false)
@@ -163,6 +168,7 @@ export default function QuotationForm() {
   const [notesOpen, setNotesOpen] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
+  const [costPinModalOpen, setCostPinModalOpen] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
   const [viewItemCode, setViewItemCode] = useState<string | null>(null)
   const [initialized, setInitialized] = useState(false)
@@ -329,6 +335,7 @@ useEffect(() => {
     if (!duplicateCustomer) return
     setCustomerName(duplicateCustomer.customerName)
     setCustomerPriceTier(duplicateCustomer.priceTier)
+    setCustomerDefaultDiscountPct(duplicateCustomer.descuentoDefaultPct ?? undefined)
   }, [duplicateCustomer])
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
@@ -462,6 +469,7 @@ useEffect(() => {
     setCustomerId(customer.id)
     setCustomerName(customer.customerName)
     setCustomerPriceTier(customer.priceTier)
+    setCustomerDefaultDiscountPct(customer.descuentoDefaultPct ?? undefined)
     queryClient.invalidateQueries({ queryKey: ['customerSearch'] })
   }
 
@@ -507,8 +515,10 @@ useEffect(() => {
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
-function submitDto() {
-     const dto: CreateQuotationDto = {
+/** Arma el body de creación/edición desde el estado actual del formulario — usado tanto en el
+ *  submit normal como al reintentar con `pinOverride` (override de descuento y de costo). */
+function buildDto(): CreateQuotationDto {
+     return {
        ...(esClienteOcasional
          ? { clienteOcasionalNombre: clienteOcasionalNombre || undefined, clienteOcasionalRnc: clienteOcasionalRnc || undefined, clienteOcasionalDireccion: clienteOcasionalDireccion || undefined }
          : { customer: customerId }),
@@ -532,11 +542,42 @@ function submitDto() {
        notes: notes || undefined,
        taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
      }
+   }
+
+   function submitDto() {
+     const dto = buildDto()
      if (id) updateMutation.mutate(dto)
      else createMutation.mutate(dto)
    }
 
-  function handleError(err: { message?: string }) {
+   /** Reintenta la MISMA operación (crear o editar) con `pinOverride` embebido, tras el 400 de
+    *  "no puede ser menor al costo de compra" — el backend verifica el PIN dentro de este mismo
+    *  request, no hay un POST /auth/verify-admin-pin aparte. Deja que el 401 (PIN inválido/sin
+    *  permisos) se propague tal cual para que el modal lo muestre y permita reintentar. */
+   async function retryQuotationWithPinOverride(pin: string, identidad: { usuario?: string; codigoTarjeta?: string }) {
+     const dto = { ...buildDto(), pinOverride: { pin, ...identidad } }
+     const formTabId = activeId
+     if (id) {
+       const quotation = await updateQuotation(id, dto)
+       queryClient.invalidateQueries({ queryKey: ['quotations'] })
+       queryClient.removeQueries({ queryKey: ['quotation', id] })
+       if (quotation.id !== id) {
+         toast.success(`Nueva versión creada: ${displayId(quotation.id, quotation.sequence)}`)
+         navigate(`/cotizaciones/${quotation.id}`)
+       } else {
+         toast.success(`Versión ${quotation.sequence} guardada como historial`)
+         navigate(`/cotizaciones/${quotation.id}`, { replace: true })
+       }
+     } else {
+       const quotation = await createQuotation(dto)
+       queryClient.invalidateQueries({ queryKey: ['quotations'] })
+       toast.success('Cotización creada correctamente')
+       navigate(`/cotizaciones/${quotation.id}`)
+     }
+     if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
+   }
+
+  function handleError(err: { message?: string; statusCode?: number }) {
     const msg = err?.message ?? ''
     if (isApiErrorCode(err, ERROR_CODES.SALE_WAREHOUSE_MISMATCH)) {
       toast.error(msg, { duration: 8000 })
@@ -548,6 +589,10 @@ function submitDto() {
     }
     if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) {
       setPinModalOpen(true)
+      return
+    }
+    if (isCostoCompraError(err)) {
+      setCostPinModalOpen(true)
       return
     }
     if (msg.toLowerCase().includes('no tienes acceso a la sucursal')) {
@@ -637,6 +682,12 @@ function submitDto() {
         if (i !== index) return row
         const baseRate = catalogItem.prices?.[tier] ?? catalogItem.standardRate ?? 0
         const rate = saleRate(baseRate)
+        const autoDiscountPct = catalogItem.autoDiscount?.discountType === 'Discount Percentage' ? catalogItem.autoDiscount.discountPercentage : undefined
+        // Sugerencia del % de descuento del cliente al agregar la línea — solo al agregarla, nunca
+        // reescribe una línea que el usuario ya haya tocado. Sigue siendo editable por línea.
+        const defaultManualPct = catalogItem.allowsDiscount && customerDefaultDiscountPct && customerDefaultDiscountPct > 0
+          ? customerDefaultDiscountPct
+          : 0
         return {
           ...row,
           itemCode: catalogItem.id,
@@ -646,13 +697,13 @@ function submitDto() {
           rate,
           baseRate,
           conversionFactor: 1,
-          amount: calcAmount(row.qty, rate, 0, 0),
+          amount: calcAmount(row.qty, rate, (autoDiscountPct ?? 0) + defaultManualPct, 0),
           maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
-          autoDiscountPct: catalogItem.autoDiscount?.discountType === 'Discount Percentage' ? catalogItem.autoDiscount.discountPercentage : undefined,
-          discountPct: 0,
+          autoDiscountPct,
+          discountPct: (autoDiscountPct ?? 0) + defaultManualPct,
           discountMode: 'pct' as const,
           discountAmount: 0,
-          manualDiscountPct: 0,
+          manualDiscountPct: defaultManualPct,
           allowsDiscount: catalogItem.allowsDiscount,
           uom: catalogItem.stockUom ?? row.uom,
           _prices: catalogItem.prices,
@@ -676,6 +727,11 @@ function submitDto() {
         if (i !== index) return row
         const baseRate = bundle.prices?.[tier] ?? 0
         const rate = saleRate(baseRate)
+        // Solo aplica la sugerencia si la línea todavía no tiene un descuento manual (recién
+        // agregada) — no pisa uno que el usuario ya haya tocado.
+        const defaultManualPct = row.discountMode === 'pct' && !row.manualDiscountPct && customerDefaultDiscountPct && customerDefaultDiscountPct > 0
+          ? customerDefaultDiscountPct
+          : row.manualDiscountPct
         return {
           ...row,
           itemCode: bundle.id,
@@ -685,9 +741,11 @@ function submitDto() {
           rate,
           baseRate,
           conversionFactor: 1,
+          manualDiscountPct: defaultManualPct,
+          discountPct: row.discountMode === 'amount' ? row.discountPct : defaultManualPct,
           amount: row.discountMode === 'amount'
             ? calcAmount(row.qty, rate, 0, row.discountAmount)
-            : calcAmount(row.qty, rate, row.discountPct),
+            : calcAmount(row.qty, rate, defaultManualPct),
           maxDiscountPct: undefined,
           uom: bundle.itemUom ?? '',
           _prices: bundle.prices,
@@ -732,6 +790,19 @@ function submitDto() {
   }
   function removeRow(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const hasAnyDiscount = items.some((i) => i.discountPct > 0 || i.discountAmount > 0)
+  /** Quita el descuento de TODAS las líneas de una sola vez — no toca cantidad, precio ni
+   *  ningún otro campo de la línea. */
+  function undoDiscounts() {
+    setItems((prev) => prev.map((item) => ({
+      ...item,
+      discountPct: 0,
+      manualDiscountPct: 0,
+      discountAmount: 0,
+      amount: calcAmount(item.qty, item.rate, 0, 0),
+    })))
   }
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0)
@@ -857,7 +928,7 @@ if (esClienteOcasional) {
           </div>
           <div className="card-body">
             <div className="form-row">
-<div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
+<div className="ff-wrap" style={multimonedaHabilitada ? undefined : { gridColumn: 'span 2' }}>
                  <label className="ff-label ff-required" htmlFor="customer">Cliente</label>
                  {esClienteOcasional ? (
                    <input
@@ -878,6 +949,7 @@ if (esClienteOcasional) {
                        setCustomerName(opt?.label ?? '')
                        const c = cid ? customersData?.items?.find((c) => c.id === cid) : undefined
                        setCustomerPriceTier(c?.priceTier)
+                       setCustomerDefaultDiscountPct(c?.descuentoDefaultPct ?? undefined)
                      }}
                      options={customerOptions}
                      selectedLabel={customerName}
@@ -1059,7 +1131,6 @@ if (esClienteOcasional) {
                   </th>
                   <th style={{ textAlign: 'right' }}>
                     Descuento
-                    <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} />
                     <span className="col-resize-handle" onMouseDown={startResize('descuento')} />
                   </th>
                   <th style={{ textAlign: 'right' }}>
@@ -1207,27 +1278,6 @@ if (esClienteOcasional) {
                                   />
                                 )}
                               </div>
-                              {isAmountMode ? (
-                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
-                                  Descuento: {formatMoney(item.discountAmount, currency || monedaBase)}
-                                </span>
-                              ) : (
-                                <>
-                                  {item.discountPct > 0 && (
-                                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
-                                      Total: {item.discountPct.toFixed(1)}%
-                                    </span>
-                                  )}
-                                  {item.discountPct > effectiveLimit && (
-                                    <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
-                                      Supera el límite de {effectiveLimit.toFixed(2)}%
-                                    </span>
-                                  )}
-                                  <span style={{ fontSize: 10, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
-                                    {effectiveLimit < 100 ? `máx ${effectiveLimit.toFixed(2)}% · ` : ''}ⓘ automático + manual
-                                  </span>
-                                </>
-                              )}
                             </>
                           )
                         })()}
@@ -1273,10 +1323,15 @@ if (esClienteOcasional) {
             </table>
           </div>
 
-          <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
             <button type="button" className="btn btn-ghost btn-size-sm" onClick={addRow}>
               <Plus size={14} /> Agregar artículo
             </button>
+            {hasAnyDiscount && (
+              <button type="button" className="btn btn-ghost btn-size-sm" onClick={undoDiscounts}>
+                <RotateCcw size={13} /> Deshacer descuentos
+              </button>
+            )}
           </div>
 
           <div className="items-total-row navy-totals">
@@ -1296,7 +1351,7 @@ if (esClienteOcasional) {
               </div>
               <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, justifyContent: 'flex-end', gap: 24 }}>
                 <span style={{ fontSize: 20, color: '#FCB124', textAlign: 'right' }}>Total</span>
-                <span style={{ fontSize: 24, color: '#FCB124', textAlign: 'left', minWidth: 170 }}>{formatMoney(total, currency || monedaBase)}</span>
+                <span style={{ fontSize: 20, color: '#FCB124', textAlign: 'left', minWidth: 170 }}>{formatMoney(total, currency || monedaBase)}</span>
               </div>
             </div>
         </div>
@@ -1359,6 +1414,15 @@ if (esClienteOcasional) {
         onAuthorized={(userId) => { client.defaults.headers.common['X-Admin-Pin'] = userId; setPinModalOpen(false); submitDto() }}
         title="Autorización requerida"
         description="El descuento supera tu límite. Ingresa el PIN de un administrador."
+      />
+
+      <PinModal
+        open={costPinModalOpen}
+        onClose={() => setCostPinModalOpen(false)}
+        onSubmitInline={retryQuotationWithPinOverride}
+        onAuthorized={() => setCostPinModalOpen(false)}
+        title="Autorización requerida"
+        description="Esta línea se vendería por debajo del costo. Ingresa un PIN de administrador para autorizarlo."
       />
 
       {variantTemplate && (

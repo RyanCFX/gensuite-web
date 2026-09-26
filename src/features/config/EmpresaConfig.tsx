@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getEmpresa, updateEmpresa, uploadLogoEmpresa, getCuentasEmpresa, updateCuentasEmpresa, listAlmacenes } from '@/shared/api/config'
@@ -11,15 +11,56 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { Select, SelectItem } from '@/components/ui/select'
 import { REGIMENES_FISCALES } from '@/lib/constants'
-import { Building2, Image, Loader2, Save } from 'lucide-react'
+import {
+  Building2, Image, Loader2, Save, Landmark, Phone, Settings2, CheckCircle2,
+  Circle, MapPin, FileText, ShieldCheck, LayoutTemplate, Wallet, ChevronRight,
+  ReceiptText, TrendingUp, Vault, Boxes, CalendarClock, Tractor, BadgePercent,
+  PieChart, TriangleAlert, Upload,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
+import './EmpresaConfig.css'
 
 const LOGO_ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp']
 const LOGO_MAX_SIZE_BYTES = 2 * 1024 * 1024
 
+type TabKey = 'general' | 'cuentas'
+
+/* Pequeño helper para no repetir label + AccountSelect en la pestaña contable */
+function CuentaField({
+  id, label, hint, value, onChange, rootType,
+}: {
+  id: string
+  label: string
+  hint?: string
+  value: string
+  onChange: (v: string) => void
+  rootType?: 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense'
+}) {
+  return (
+    <div className="ff-wrap">
+      <label className="ff-label" htmlFor={id}>
+        {label}
+        {hint && <FieldTooltip>{hint}</FieldTooltip>}
+      </label>
+      <AccountSelect
+        id={id}
+        value={value}
+        onChange={onChange}
+        placeholder="Buscar cuenta…"
+        ledgerOnly={true}
+        {...(rootType ? { rootType } : {})}
+      />
+    </div>
+  )
+}
+
+function scrollTo(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 export default function EmpresaConfig() {
   const queryClient = useQueryClient()
-  const [activeTab, setActiveTab] = useState<'general' | 'cuentas'>('general')
+  const [activeTab, setActiveTab] = useState<TabKey>('general')
 
   // ── General tab state ──────────────────────────────────────────────────────
   const { data, isLoading } = useQuery({
@@ -79,8 +120,8 @@ export default function EmpresaConfig() {
     })
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault()
     const payload: Partial<Empresa> = {}
     for (const key of ['rnc', 'regimenFiscal', 'actividadEconomica', 'representanteLegal', 'cedulaRepresentante', 'telefono', 'email', 'website', 'direccion', 'itemCodeMode', 'defaultWarehouse', 'defaultPriceTipo', 'transitWarehouse'] as const) {
       const value = form[key]
@@ -227,199 +268,399 @@ export default function EmpresaConfig() {
     })
   }
 
+  // ── Completitud del perfil (KPI strip estilo dashboard) ────────────────────
+  const fiscalFields = useMemo(
+    () => [form.companyName, form.rnc, form.regimenFiscal, form.actividadEconomica, form.representanteLegal, form.cedulaRepresentante],
+    [form]
+  )
+  const contactoFields = useMemo(
+    () => [form.telefono, form.email, form.website, form.direccion],
+    [form]
+  )
+  const operativaFields = useMemo(
+    () => [form.itemCodeMode ?? 'manual', form.defaultWarehouse, form.transitWarehouse, form.defaultPriceTipo],
+    [form]
+  )
+  const contableValues = useMemo(
+    () => [
+      defaultReceivableAccount, defaultPayableAccount, defaultIncomeAccount, defaultExpenseAccount,
+      defaultBankAccount, writeOffAccount, roundOffAccount, defaultCashAccount, defaultInventoryAccount,
+      stockReceivedButNotBilled, stockAdjustmentAccount, defaultDeferredRevenueAccount,
+      defaultDeferredExpenseAccount, exchangeGainLossAccount, unrealizedExchangeGainLossAccount,
+      accumulatedDepreciationAccount, depreciationExpenseAccount, disposalAccount, defaultDiscountAccount,
+      costCenter?.name, roundOffCostCenter?.name, depreciationCostCenter?.name,
+    ],
+    [defaultReceivableAccount, defaultPayableAccount, defaultIncomeAccount, defaultExpenseAccount,
+      defaultBankAccount, writeOffAccount, roundOffAccount, defaultCashAccount, defaultInventoryAccount,
+      stockReceivedButNotBilled, stockAdjustmentAccount, defaultDeferredRevenueAccount,
+      defaultDeferredExpenseAccount, exchangeGainLossAccount, unrealizedExchangeGainLossAccount,
+      accumulatedDepreciationAccount, depreciationExpenseAccount, disposalAccount, defaultDiscountAccount,
+      costCenter, roundOffCostCenter, depreciationCostCenter]
+  )
+
+  function pctOf(values: (unknown | undefined | null | string)[]) {
+    const filled = values.filter((v) => v !== undefined && v !== null && v !== '').length
+    return { filled, total: values.length, pct: Math.round((filled / values.length) * 100) }
+  }
+
+  const fiscal = pctOf(fiscalFields)
+  const contacto = pctOf(contactoFields)
+  const operativa = pctOf(operativaFields)
+  const contable = pctOf(contableValues)
+  const global = useMemo(() => {
+    const filled = fiscal.filled + contacto.filled + operativa.filled + contable.filled
+    const total = fiscal.total + contacto.total + operativa.total + contable.total
+    return { filled, total, pct: Math.round((filled / total) * 100) }
+  }, [fiscal, contacto, operativa, contable])
+
+  const missingFiscal = useMemo(() => {
+    const out: string[] = []
+    if (!form.rnc) out.push('RNC')
+    if (!form.regimenFiscal) out.push('Régimen fiscal')
+    if (!form.actividadEconomica) out.push('Actividad económica')
+    if (!form.representanteLegal) out.push('Representante legal')
+    return out
+  }, [form])
+  const missingContacto = useMemo(() => {
+    const out: string[] = []
+    if (!form.telefono) out.push('Teléfono')
+    if (!form.email) out.push('Email')
+    if (!form.direccion) out.push('Dirección')
+    return out
+  }, [form])
+
+  const isSaving = activeTab === 'general' ? saveMutation.isPending : saveCuentasMutation.isPending
+  const regimenLabel = REGIMENES_FISCALES.find((r) => r.value === form.regimenFiscal)?.label ?? form.regimenFiscal
+
+  function goKpi(target: TabKey, anchor: string) {
+    setActiveTab(target)
+    requestAnimationFrame(() => setTimeout(() => scrollTo(anchor), 60))
+  }
+
   if (isLoading) {
     return (
-      <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <span className="skeleton-box" style={{ height: 32, width: 200, display: 'block' }} />
-        <div className="form-row">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <span key={i} className="skeleton-box" style={{ height: 40, display: 'block' }} />
+      <div className="page-container empresa-page">
+        <span className="skeleton-box" style={{ height: 32, width: 240, display: 'block' }} />
+        <div className="empresa-kpis">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <span key={i} className="skeleton-box" style={{ height: 96, display: 'block' }} />
           ))}
+        </div>
+        <div className="empresa-layout">
+          <span className="skeleton-box" style={{ height: 420, display: 'block' }} />
+          <span className="skeleton-box" style={{ height: 420, display: 'block' }} />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="page-container">
+    <div className="page-container empresa-page">
+      <input
+        ref={logoFileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/svg+xml,image/webp"
+        style={{ display: 'none' }}
+        onChange={(e) => { handleLogoFileSelected(e.target.files?.[0]); e.target.value = '' }}
+      />
+
       <PageHeader
-        title="Configuración de Empresa"
-        description="Datos fiscales y de contacto de la empresa"
+        title={
+          <span className="empresa-title-row">
+            <span><span className="page-title-dot" />Empresa</span>
+            <span className="empresa-badges">
+              {form.rnc && <span className="badge badge-neutral">RNC {form.rnc}</span>}
+              {regimenLabel && <span className="badge badge-info">{regimenLabel}</span>}
+              {global.pct === 100
+                ? <span className="badge badge-success">Perfil completo</span>
+                : <span className="badge badge-warning">Perfil {global.pct}%</span>}
+            </span>
+          </span>
+        }
+        description="Identidad fiscal, contacto, valores operativos y cuentas contables por defecto"
+        overline="Configuración · General"
         action={
-          activeTab === 'general' ? (
-            <button className="btn btn-primary" onClick={handleSubmit} disabled={saveMutation.isPending}>
+          <>
+            <span className="empresa-save-hint">
+              {activeTab === 'general' ? 'Se guardan datos y valores operativos' : 'Se guardan cuentas y centros de costo'}
+            </span>
+            <button
+              className="btn btn-navy"
+              onClick={() => (activeTab === 'general' ? handleSubmit() : handleSaveCuentas())}
+              disabled={isSaving}
+            >
               <Save size={16} />
-              {saveMutation.isPending ? 'Guardando…' : 'Guardar'}
+              {isSaving ? 'Guardando…' : 'Guardar cambios'}
             </button>
-          ) : (
-            <button className="btn btn-primary" onClick={handleSaveCuentas} disabled={saveCuentasMutation.isPending}>
-              <Save size={16} />
-              {saveCuentasMutation.isPending ? 'Guardando…' : 'Guardar'}
-            </button>
-          )
+          </>
         }
       />
 
-      <div className="tabs-bar" style={{ marginBottom: 20 }}>
-        <button
-          type="button"
-          className={`tab-btn${activeTab === 'general' ? ' on' : ''}`}
-          onClick={() => setActiveTab('general')}
-        >
-          General
+      {/* ── KPI strip: misma línea visual que el dashboard ── */}
+      <div className="empresa-kpis">
+        <button type="button" className="empresa-kpi" style={{ '--i': 0 } as React.CSSProperties} onClick={() => goKpi('general', 'sec-fiscal')}>
+          <div className="empresa-kpi-top">
+            <span className="empresa-kpi-icon"><Landmark size={14} /></span>
+            <span className="empresa-kpi-label">Identidad fiscal</span>
+          </div>
+          <div className="empresa-kpi-value">{fiscal.pct}<small>% · {fiscal.filled}/{fiscal.total}</small></div>
+          <div className="empresa-progress"><span style={{ width: `${fiscal.pct}%` }} /></div>
+          <div className="empresa-kpi-foot">{missingFiscal.length ? <>Falta: <strong>{missingFiscal.slice(0, 2).join(' · ')}</strong></> : 'Datos fiscales al día'}</div>
         </button>
-        <button
-          type="button"
-          className={`tab-btn${activeTab === 'cuentas' ? ' on' : ''}`}
-          onClick={() => setActiveTab('cuentas')}
-        >
-          Cuentas por Defecto
+        <button type="button" className="empresa-kpi" style={{ '--i': 1 } as React.CSSProperties} onClick={() => goKpi('general', 'sec-contacto')}>
+          <div className="empresa-kpi-top">
+            <span className="empresa-kpi-icon"><Phone size={14} /></span>
+            <span className="empresa-kpi-label">Contacto</span>
+          </div>
+          <div className="empresa-kpi-value">{contacto.pct}<small>% · {contacto.filled}/{contacto.total}</small></div>
+          <div className="empresa-progress"><span style={{ width: `${contacto.pct}%` }} /></div>
+          <div className="empresa-kpi-foot">{missingContacto.length ? <>Falta: <strong>{missingContacto.slice(0, 2).join(' · ')}</strong></> : 'Contacto completo'}</div>
+        </button>
+        <button type="button" className="empresa-kpi" style={{ '--i': 2 } as React.CSSProperties} onClick={() => goKpi('general', 'sec-operativa')}>
+          <div className="empresa-kpi-top">
+            <span className="empresa-kpi-icon"><Settings2 size={14} /></span>
+            <span className="empresa-kpi-label">Operativa</span>
+          </div>
+          <div className="empresa-kpi-value">{operativa.pct}<small>% · {operativa.filled}/{operativa.total}</small></div>
+          <div className="empresa-progress"><span style={{ width: `${operativa.pct}%` }} /></div>
+          <div className="empresa-kpi-foot">
+            {(warehouses ?? []).length} {(warehouses ?? []).length === 1 ? 'almacén' : 'almacenes'} · Nivel {form.defaultPriceTipo ?? '—'}
+          </div>
+        </button>
+        <button type="button" className="empresa-kpi" style={{ '--i': 3 } as React.CSSProperties} onClick={() => goKpi('cuentas', 'sec-contable')}>
+          <div className="empresa-kpi-top">
+            <span className="empresa-kpi-icon"><Vault size={14} /></span>
+            <span className="empresa-kpi-label">Contabilidad</span>
+          </div>
+          <div className="empresa-kpi-value">{contable.pct}<small>% · {contable.filled}/{contable.total}</small></div>
+          <div className="empresa-progress"><span style={{ width: `${contable.pct}%` }} /></div>
+          <div className="empresa-kpi-foot">{enablePerpetualInventory ? 'Inventario perpetuo activo' : 'Sin inventario perpetuo'}</div>
         </button>
       </div>
 
-      {activeTab === 'general' && (
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 720 }}>
-          <div>
-            {/* Datos Fiscales */}
-            <div className="card">
-              <div className="card-header">
-                <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Building2 size={16} />
-                  Datos Fiscales
-                </span>
+      {/* ── Tabs en píldora (period-pills del dashboard) ── */}
+      <div className="empresa-tabs" role="tablist" aria-label="Secciones de empresa">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'general'}
+          className="empresa-tab"
+          data-active={activeTab === 'general' ? '' : undefined}
+          onClick={() => setActiveTab('general')}
+        >
+          <Building2 size={14} />
+          Perfil de empresa
+          <span className="empresa-tab-count">{fiscal.filled + contacto.filled + operativa.filled}/{fiscal.total + contacto.total + operativa.total}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'cuentas'}
+          className="empresa-tab"
+          data-active={activeTab === 'cuentas' ? '' : undefined}
+          onClick={() => setActiveTab('cuentas')}
+        >
+          <Landmark size={14} />
+          Cuentas por defecto
+          <span className="empresa-tab-count">{contable.filled}/{contable.total}</span>
+        </button>
+      </div>
+
+      {activeTab === 'general' ? (
+        <div className="empresa-layout">
+          {/* ── Columna identidad (sticky) ── */}
+          <aside className="empresa-side">
+            <div className="card empresa-identity">
+              <div className="empresa-identity-hero">
+                <p className="empresa-identity-eyebrow">Perfil de la compañía</p>
+                <p className="empresa-identity-name">{form.companyName || data?.companyName || 'Mi Empresa'}</p>
+                <p className="empresa-identity-rnc">{form.rnc ? `RNC ${form.rnc}` : 'Sin RNC registrado'}</p>
               </div>
-              <div className="card-body">
-                <div className="form-section">
-                  <p className="form-section-title">Información Fiscal</p>
-                  <div className="form-row">
-                    <div className="ff-wrap">
-                      <label className="ff-label">
-                        Nombre de la Empresa
-                        <FieldTooltip>El nombre se toma del registro de tu empresa y no se edita desde esta pantalla.</FieldTooltip>
-                      </label>
-                      <input
-                        className="ff-input"
-                        value={form.companyName ?? ''}
-                        disabled
-                        placeholder="Mi Empresa SRL"
-                      />
-                    </div>
-                    <div className="ff-wrap">
-                      <label className="ff-label">RNC</label>
-                      <input
-                        className="ff-input"
-                        value={form.rnc ?? ''}
-                        onChange={(e) => set('rnc', e.target.value)}
-                        placeholder="000000000"
-                      />
-                    </div>
-                    <div className="ff-wrap">
-                      <label className="ff-label">Régimen Fiscal</label>
-                      <Select
-                        value={form.regimenFiscal ?? ''}
-                        onValueChange={(val) => set('regimenFiscal', val as Empresa['regimenFiscal'])}
-                        placeholder="Seleccionar régimen"
-                      >
-                        <SelectItem value="">Seleccionar régimen</SelectItem>
-                        {REGIMENES_FISCALES.map((r) => (
-                          <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                        ))}
-                      </Select>
-                    </div>
-                    <div className="ff-wrap">
-                      <label className="ff-label">Actividad Económica</label>
-                      <input
-                        className="ff-input"
-                        value={form.actividadEconomica ?? ''}
-                        onChange={(e) => set('actividadEconomica', e.target.value)}
-                        placeholder="Comercio al por mayor"
-                      />
-                    </div>
-                    <div className="ff-wrap">
-                      <label className="ff-label">Representante Legal</label>
-                      <input
-                        className="ff-input"
-                        value={form.representanteLegal ?? ''}
-                        onChange={(e) => set('representanteLegal', e.target.value)}
-                      />
-                    </div>
-                    <div className="ff-wrap">
-                      <label className="ff-label">Cédula del Representante</label>
-                      <input
-                        className="ff-input"
-                        value={form.cedulaRepresentante ?? ''}
-                        onChange={(e) => set('cedulaRepresentante', e.target.value)}
-                        placeholder="000-0000000-0"
-                      />
-                    </div>
-                  </div>
+              <div className="empresa-logo-wrap">
+                <div
+                  className="empresa-logo-box"
+                  onClick={() => logoFileInputRef.current?.click()}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') logoFileInputRef.current?.click() }}
+                  title="Subir o cambiar logo"
+                >
+                  {uploadLogoMutation.isPending ? (
+                    <Loader2 size={22} className="spin" />
+                  ) : form.logoUrl ? (
+                    <img src={form.logoUrl} alt="Logo de la empresa" />
+                  ) : (
+                    <span className="empresa-logo-empty">
+                      <Image size={24} style={{ color: 'var(--teal-accent)' }} />
+                      Sin logo — clic para subir
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="empresa-identity-body">
+                <div className="empresa-identity-meta">
+                  <div className="empresa-meta-row"><MapPin size={13} /><span>{form.direccion || 'Sin dirección registrada'}</span></div>
+                  <div className="empresa-meta-row"><Phone size={13} /><span>{form.telefono || 'Sin teléfono'} · {form.email || 'Sin email'}</span></div>
+                  <div className="empresa-meta-row"><ReceiptText size={13} /><span>{regimenLabel || 'Sin régimen'} · {form.actividadEconomica || 'Sin actividad'}</span></div>
+                </div>
+                <div className="empresa-identity-actions">
+                  <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => logoFileInputRef.current?.click()} disabled={uploadLogoMutation.isPending}>
+                    <Upload size={14} />
+                    {uploadLogoMutation.isPending ? 'Subiendo…' : form.logoUrl ? 'Cambiar logo' : 'Subir logo'}
+                  </button>
+                  <button type="button" className="btn btn-ghost btn-size-sm" onClick={() => scrollTo('sec-fiscal')}>Editar datos</button>
+                </div>
+                <p className="ff-hint">El logo se imprime en facturas, cotizaciones, pedidos, compras y notas de crédito/débito. PNG, JPG, SVG o WEBP — máx. 2MB.</p>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-header"><span className="card-title">Completitud del perfil</span><span className="badge badge-neutral">{global.pct}%</span></div>
+              <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div className="empresa-complete-big">
+                  <span className="empresa-complete-pct">{global.filled}/{global.total}</span>
+                  <span className="empresa-complete-label">campos configurados</span>
+                </div>
+                <div className="empresa-progress"><span style={{ width: `${global.pct}%` }} /></div>
+                <div className="empresa-checklist">
+                  <span className="empresa-check" data-done={fiscal.pct === 100 ? '' : undefined}>
+                    {fiscal.pct === 100 ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                    Identidad fiscal {fiscal.filled}/{fiscal.total}
+                  </span>
+                  <span className="empresa-check" data-done={contacto.pct === 100 ? '' : undefined}>
+                    {contacto.pct === 100 ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                    Contacto {contacto.filled}/{contacto.total}
+                  </span>
+                  <span className="empresa-check" data-done={operativa.pct === 100 ? '' : undefined}>
+                    {operativa.pct === 100 ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                    Operativa {operativa.filled}/{operativa.total}
+                  </span>
+                  <span className="empresa-check" data-done={contable.pct === 100 ? '' : undefined}>
+                    {contable.pct === 100 ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                    Contabilidad {contable.filled}/{contable.total}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Logo de la Empresa */}
             <div className="card">
-              <div className="card-header">
-                <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Image size={16} />
-                  Logo de la Empresa
-                </span>
+              <div className="card-header"><span className="card-title">Configuración relacionada</span></div>
+              <div className="card-body" style={{ paddingTop: 8, paddingBottom: 8 }}>
+                <div className="empresa-links">
+                  <Link to="/config/sucursales" className="empresa-link">
+                    <span className="empresa-link-icon"><MapPin size={14} /></span>
+                    <span className="empresa-link-main"><span className="empresa-link-label">Sucursales</span><br /><span className="empresa-link-sub">Sedes y almacenes asignados</span></span>
+                    <ChevronRight size={14} />
+                  </Link>
+                  <Link to="/config/ncf" className="empresa-link">
+                    <span className="empresa-link-icon"><FileText size={14} /></span>
+                    <span className="empresa-link-main"><span className="empresa-link-label">Secuencias NCF</span><br /><span className="empresa-link-sub">Numeración fiscal vigente</span></span>
+                    <ChevronRight size={14} />
+                  </Link>
+                  <Link to="/config/ecf" className="empresa-link">
+                    <span className="empresa-link-icon"><ShieldCheck size={14} /></span>
+                    <span className="empresa-link-main"><span className="empresa-link-label">Facturación electrónica</span><br /><span className="empresa-link-sub">Certificación y contingencia</span></span>
+                    <ChevronRight size={14} />
+                  </Link>
+                  <Link to="/config/plantillas-facturas" className="empresa-link">
+                    <span className="empresa-link-icon"><LayoutTemplate size={14} /></span>
+                    <span className="empresa-link-main"><span className="empresa-link-label">Plantillas PDF</span><br /><span className="empresa-link-sub">Donde se ve este logo</span></span>
+                    <ChevronRight size={14} />
+                  </Link>
+                  <Link to="/config/cajas" className="empresa-link">
+                    <span className="empresa-link-icon"><Wallet size={14} /></span>
+                    <span className="empresa-link-main"><span className="empresa-link-label">Cajas</span><br /><span className="empresa-link-sub">Puntos de cobro por sucursal</span></span>
+                    <ChevronRight size={14} />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          {/* ── Columna de formularios ── */}
+          <form className="empresa-main" onSubmit={handleSubmit} id="sec-fiscal">
+            <div className="card">
+              <div className="card-header navy-card-header">
+                <span className="card-title"><Building2 size={14} style={{ marginRight: 8, verticalAlign: -2 }} />Datos fiscales</span>
+                <span className="navy-header-hint">{fiscal.filled}/{fiscal.total} completos</span>
               </div>
               <div className="card-body">
-                <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                  <div
-                    className="logo-upload-box"
-                    onClick={() => logoFileInputRef.current?.click()}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') logoFileInputRef.current?.click() }}
-                  >
-                    <input
-                      ref={logoFileInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
-                      style={{ display: 'none' }}
-                      onChange={(e) => { handleLogoFileSelected(e.target.files?.[0]); e.target.value = '' }}
-                    />
-                    {uploadLogoMutation.isPending ? (
-                      <Loader2 size={22} className="spin" />
-                    ) : form.logoUrl ? (
-                      <img src={form.logoUrl} alt="Logo de la empresa" />
-                    ) : (
-                      <>
-                        <Image size={26} className="logo-upload-box-icon" />
-                        <span className="logo-upload-box-label">Sin logo configurado</span>
-                      </>
-                    )}
+                <div className="ff-section-divider" style={{ marginBottom: 14 }}>Información fiscal</div>
+                <div className="empresa-section-grid">
+                  <div className="ff-wrap">
+                    <label className="ff-label">
+                      Nombre de la Empresa
+                      <FieldTooltip>El nombre se toma del registro de tu empresa y no se edita desde esta pantalla.</FieldTooltip>
+                    </label>
+                    <input className="ff-input" value={form.companyName ?? ''} disabled placeholder="Mi Empresa SRL" />
                   </div>
-                  <div style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ alignSelf: 'flex-start' }}
-                      onClick={() => logoFileInputRef.current?.click()}
-                      disabled={uploadLogoMutation.isPending}
+                  <div className="ff-wrap">
+                    <label className="ff-label">RNC</label>
+                    <input className="ff-input" value={form.rnc ?? ''} onChange={(e) => set('rnc', e.target.value)} placeholder="000000000" />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">Régimen Fiscal</label>
+                    <Select
+                      value={form.regimenFiscal ?? ''}
+                      onValueChange={(val) => set('regimenFiscal', val as Empresa['regimenFiscal'])}
+                      placeholder="Seleccionar régimen"
                     >
-                      {uploadLogoMutation.isPending ? 'Subiendo…' : form.logoUrl ? 'Cambiar logo' : 'Subir logo'}
-                    </button>
-                    <p className="ff-hint">
-                      Se usa en las facturas, cotizaciones, pedidos, compras, notas de crédito/débito, órdenes de compra
-                      y solicitudes de compra impresas en PDF. Si no subís uno, esos documentos muestran el nombre de la
-                      empresa en su lugar.
-                    </p>
-                    <p className="ff-hint">Formatos: PNG, JPG, SVG o WEBP — máx. 2MB.</p>
+                      <SelectItem value="">Seleccionar régimen</SelectItem>
+                      {REGIMENES_FISCALES.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">Actividad Económica</label>
+                    <input className="ff-input" value={form.actividadEconomica ?? ''} onChange={(e) => set('actividadEconomica', e.target.value)} placeholder="Comercio al por mayor" />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">Representante Legal</label>
+                    <input className="ff-input" value={form.representanteLegal ?? ''} onChange={(e) => set('representanteLegal', e.target.value)} placeholder="Nombre y apellido" />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">Cédula del Representante</label>
+                    <input className="ff-input" value={form.cedulaRepresentante ?? ''} onChange={(e) => set('cedulaRepresentante', e.target.value)} placeholder="000-0000000-0" />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Predeterminados */}
-            <div className="card">
-              <div className="card-header">
-                <span className="card-title">Valores Predeterminados</span>
+            <div className="card" id="sec-contacto">
+              <div className="card-header navy-card-header">
+                <span className="card-title"><Phone size={14} style={{ marginRight: 8, verticalAlign: -2 }} />Contacto</span>
+                <span className="navy-header-hint">{contacto.filled}/{contacto.total} completos</span>
               </div>
               <div className="card-body">
-                <div className="form-row">
+                <div className="empresa-section-grid">
+                  <div className="ff-wrap">
+                    <label className="ff-label">Teléfono</label>
+                    <input className="ff-input" value={form.telefono ?? ''} onChange={(e) => set('telefono', e.target.value)} placeholder="(809) 000-0000" />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">Email</label>
+                    <input type="email" className="ff-input" value={form.email ?? ''} onChange={(e) => set('email', e.target.value)} placeholder="info@empresa.com" />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">Sitio Web</label>
+                    <input className="ff-input" value={form.website ?? ''} onChange={(e) => set('website', e.target.value)} placeholder="https://empresa.com" />
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">Dirección</label>
+                    <input className="ff-input" value={form.direccion ?? ''} onChange={(e) => set('direccion', e.target.value)} placeholder="Calle Principal #1, Santo Domingo" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="card" id="sec-operativa">
+              <div className="card-header navy-card-header">
+                <span className="card-title"><Settings2 size={14} style={{ marginRight: 8, verticalAlign: -2 }} />Valores operativos</span>
+                <span className="navy-header-hint">Defaults de documentos e inventario</span>
+              </div>
+              <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div className="empresa-section-grid">
                   <div className="ff-wrap">
                     <label className="ff-label">
                       Modo de código de artículo
@@ -435,10 +676,27 @@ export default function EmpresaConfig() {
                     </Select>
                     {itemCodeWarning && (
                       <div className="inline-alert inline-alert-warn" style={{ marginTop: 8 }}>
-                        ⚠️ Este cambio es irreversible. Los artículos existentes mantendrán su código actual, pero los nuevos se generarán automáticamente.
-                        <button type="button" className="btn btn-ghost btn-size-xs" style={{ marginLeft: 8 }} onClick={() => setItemCodeWarning(false)}>Entendido</button>
+                        <TriangleAlert size={14} />
+                        <span>Este cambio es irreversible. Los artículos existentes mantienen su código; los nuevos se generarán automáticamente.</span>
+                        <button type="button" className="btn btn-ghost btn-size-xs" style={{ marginLeft: 'auto' }} onClick={() => setItemCodeWarning(false)}>Entendido</button>
                       </div>
                     )}
+                  </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">
+                      Nivel de precio por defecto
+                      <FieldTooltip>Nivel de precio sugerido para nuevos documentos</FieldTooltip>
+                    </label>
+                    <Select
+                      value={form.defaultPriceTipo ?? ''}
+                      onValueChange={(val) => set('defaultPriceTipo', (val || undefined) as 'A' | 'B' | 'C' | undefined)}
+                      placeholder="Sin predeterminado"
+                    >
+                      <SelectItem value="">Sin predeterminado</SelectItem>
+                      <SelectItem value="A">A — Minorista</SelectItem>
+                      <SelectItem value="B">B — Medio mayoreo</SelectItem>
+                      <SelectItem value="C">C — Mayorista</SelectItem>
+                    </Select>
                   </div>
                   <div className="ff-wrap">
                     <label className="ff-label">
@@ -473,412 +731,215 @@ export default function EmpresaConfig() {
                       <p className="ff-hint">Requerido para poder crear transferencias entre almacenes/sucursales.</p>
                     )}
                   </div>
-                  <div className="ff-wrap">
-                    <label className="ff-label">
-                      Nivel de precio por defecto
-                      <FieldTooltip>Nivel de precio sugerido para nuevos documentos</FieldTooltip>
-                    </label>
-                    <Select
-                      value={form.defaultPriceTipo ?? ''}
-                      onValueChange={(val) => set('defaultPriceTipo', (val || undefined) as 'A' | 'B' | 'C' | undefined)}
-                      placeholder="Sin predeterminado"
-                    >
-                      <SelectItem value="">Sin predeterminado</SelectItem>
-                      <SelectItem value="A">A — Minorista</SelectItem>
-                      <SelectItem value="B">B — Medio mayoreo</SelectItem>
-                      <SelectItem value="C">C — Mayorista</SelectItem>
-                    </Select>
-                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Contacto */}
-            <div className="card">
-              <div className="card-header">
-                <span className="card-title">Información de Contacto</span>
-              </div>
-              <div className="card-body">
-                <div className="form-row">
-                  <div className="ff-wrap">
-                    <label className="ff-label">Teléfono</label>
-                    <input
-                      className="ff-input"
-                      value={form.telefono ?? ''}
-                      onChange={(e) => set('telefono', e.target.value)}
-                      placeholder="(809) 000-0000"
-                    />
-                  </div>
-                  <div className="ff-wrap">
-                    <label className="ff-label">Email</label>
-                    <input
-                      type="email"
-                      className="ff-input"
-                      value={form.email ?? ''}
-                      onChange={(e) => set('email', e.target.value)}
-                      placeholder="info@empresa.com"
-                    />
-                  </div>
-                  <div className="ff-wrap">
-                    <label className="ff-label">Sitio Web</label>
-                    <input
-                      className="ff-input"
-                      value={form.website ?? ''}
-                      onChange={(e) => set('website', e.target.value)}
-                      placeholder="https://empresa.com"
-                    />
-                  </div>
-                  <div className="ff-wrap" style={{ gridColumn: '1 / -1' }}>
-                    <label className="ff-label">Dirección</label>
-                    <input
-                      className="ff-input"
-                      value={form.direccion ?? ''}
-                      onChange={(e) => set('direccion', e.target.value)}
-                      placeholder="Calle Principal #1, Santo Domingo"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button type="submit" className="btn btn-primary" disabled={saveMutation.isPending}>
+            <div className="empresa-footbar">
+              <span className="empresa-footbar-hint">Los cambios aplican a los próximos documentos — no reescriben nada ya emitido.</span>
+              <button type="submit" className="btn btn-navy" disabled={saveMutation.isPending}>
                 <Save size={16} />
-                {saveMutation.isPending ? 'Guardando…' : 'Guardar Cambios'}
+                {saveMutation.isPending ? 'Guardando…' : 'Guardar cambios'}
               </button>
             </div>
-          </div>
-        </form>
-      )}
-
-      {activeTab === 'cuentas' && (
-        <div style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {cuentasLoading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {Array.from({ length: 7 }).map((_, i) => (
-                <span key={i} className="skeleton-box" style={{ height: 56, display: 'block' }} />
-              ))}
-            </div>
-          ) : (
+          </form>
+        </div>
+      ) : (
+        <div className="empresa-layout" id="sec-contable">
+          {/* ── Resumen lateral contable ── */}
+          <aside className="empresa-side">
             <div className="card">
-              <div className="card-header">
-                <span className="card-title">Cuentas Contables por Defecto</span>
-              </div>
-              <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="defaultReceivableAccount">
-                    Cuentas por Cobrar (AR)
-                    <FieldTooltip>Para facturas emitidas a clientes</FieldTooltip>
-                  </label>
-                  <AccountSelect
-                    id="defaultReceivableAccount"
-                    value={defaultReceivableAccount}
-                    onChange={setDefaultReceivableAccount}
-                    placeholder="Buscar cuenta…"
-                    ledgerOnly={true}
-                  />
-                </div>
-
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="defaultPayableAccount">
-                    Cuentas por Pagar (AP)
-                    <FieldTooltip>Para facturas de proveedores</FieldTooltip>
-                  </label>
-                  <AccountSelect
-                    id="defaultPayableAccount"
-                    value={defaultPayableAccount}
-                    onChange={setDefaultPayableAccount}
-                    placeholder="Buscar cuenta…"
-                    ledgerOnly={true}
-                  />
-                </div>
-
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="defaultIncomeAccount">
-                    Ingresos por Defecto
-                    <FieldTooltip>Si el artículo no tiene cuenta de ingreso</FieldTooltip>
-                  </label>
-                  <AccountSelect
-                    id="defaultIncomeAccount"
-                    value={defaultIncomeAccount}
-                    onChange={setDefaultIncomeAccount}
-                    placeholder="Buscar cuenta…"
-                    rootType="Income"
-                    ledgerOnly={true}
-                  />
-                </div>
-
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="defaultExpenseAccount">
-                    Gastos por Defecto
-                    <FieldTooltip>Si el artículo no tiene cuenta de gasto</FieldTooltip>
-                  </label>
-                  <AccountSelect
-                    id="defaultExpenseAccount"
-                    value={defaultExpenseAccount}
-                    onChange={setDefaultExpenseAccount}
-                    placeholder="Buscar cuenta…"
-                    rootType="Expense"
-                    ledgerOnly={true}
-                  />
-                </div>
-
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="defaultBankAccount">
-                    Banco Principal
-                    <FieldTooltip>Para cobros y pagos sin cuenta específica</FieldTooltip>
-                  </label>
-                  <AccountSelect
-                    id="defaultBankAccount"
-                    value={defaultBankAccount}
-                    onChange={setDefaultBankAccount}
-                    placeholder="Buscar cuenta…"
-                    ledgerOnly={true}
-                  />
-                </div>
-
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="writeOffAccount">
-                    Cuenta de Descuentos
-                    <FieldTooltip>Ajustes de diferencias al cerrar facturas</FieldTooltip>
-                  </label>
-                  <AccountSelect
-                    id="writeOffAccount"
-                    value={writeOffAccount}
-                    onChange={setWriteOffAccount}
-                    placeholder="Buscar cuenta…"
-                    ledgerOnly={true}
-                  />
-                </div>
-
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="roundOffAccount">
-                    Cuenta de Redondeos
-                    <FieldTooltip>Diferencias de centavos</FieldTooltip>
-                  </label>
-                  <AccountSelect
-                    id="roundOffAccount"
-                    value={roundOffAccount}
-                    onChange={setRoundOffAccount}
-                    placeholder="Buscar cuenta…"
-                    ledgerOnly={true}
-                  />
+              <div className="card-header"><span className="card-title">Mapa contable</span><span className="badge badge-neutral">{contable.filled}/{contable.total}</span></div>
+              <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div className="empresa-progress"><span style={{ width: `${contable.pct}%` }} /></div>
+                <p className="ff-hint">Estas cuentas son los defaults que usa el sistema cuando el documento o el artículo no trae una propia (facturas, cobros, pagos, inventario y depreciación).</p>
+                <div className="empresa-links">
+                  <button type="button" className="empresa-link" onClick={() => scrollTo('cta-cobro')} style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%', padding: '10px 0' }}>
+                    <span className="empresa-link-icon"><ReceiptText size={14} /></span>
+                    <span className="empresa-link-main"><span className="empresa-link-label">Cobro y pago</span><br /><span className="empresa-link-sub">AR · AP · banco · caja</span></span>
+                    <ChevronRight size={14} />
+                  </button>
+                  <button type="button" className="empresa-link" onClick={() => scrollTo('cta-resultados')} style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%', padding: '10px 0' }}>
+                    <span className="empresa-link-icon"><TrendingUp size={14} /></span>
+                    <span className="empresa-link-main"><span className="empresa-link-label">Resultados</span><br /><span className="empresa-link-sub">Ingresos · gastos · descuentos</span></span>
+                    <ChevronRight size={14} />
+                  </button>
+                  <button type="button" className="empresa-link" onClick={() => scrollTo('cta-inventario')} style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%', padding: '10px 0' }}>
+                    <span className="empresa-link-icon"><Boxes size={14} /></span>
+                    <span className="empresa-link-main"><span className="empresa-link-label">Inventario</span><br /><span className="empresa-link-sub">Existencias y ajustes</span></span>
+                    <ChevronRight size={14} />
+                  </button>
+                  <button type="button" className="empresa-link" onClick={() => scrollTo('cta-diferidos')} style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%', padding: '10px 0' }}>
+                    <span className="empresa-link-icon"><CalendarClock size={14} /></span>
+                    <span className="empresa-link-main"><span className="empresa-link-label">Diferidos y cambiario</span><br /><span className="empresa-link-sub">4 cuentas</span></span>
+                    <ChevronRight size={14} />
+                  </button>
+                  <button type="button" className="empresa-link" onClick={() => scrollTo('cta-activos')} style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%', padding: '10px 0' }}>
+                    <span className="empresa-link-icon"><Tractor size={14} /></span>
+                    <span className="empresa-link-main"><span className="empresa-link-label">Activos fijos</span><br /><span className="empresa-link-sub">Depreciación y bajas</span></span>
+                    <ChevronRight size={14} />
+                  </button>
+                  <button type="button" className="empresa-link" onClick={() => scrollTo('cta-costos')} style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%', padding: '10px 0' }}>
+                    <span className="empresa-link-icon"><PieChart size={14} /></span>
+                    <span className="empresa-link-main"><span className="empresa-link-label">Centros de costo</span><br /><span className="empresa-link-sub">3 centros por defecto</span></span>
+                    <ChevronRight size={14} />
+                  </button>
                 </div>
               </div>
             </div>
-          )}
 
-          {!cuentasLoading && (
-            <>
-              <div className="card">
-                <div className="card-header">
-                  <span className="card-title">Inventario</span>
-                </div>
-                <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="defaultCashAccount">Caja por Defecto</label>
-                    <AccountSelect
-                      id="defaultCashAccount"
-                      value={defaultCashAccount}
-                      onChange={setDefaultCashAccount}
-                      placeholder="Buscar cuenta…"
-                      ledgerOnly={true}
-                    />
-                  </div>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="defaultInventoryAccount">Inventario por Defecto</label>
-                    <AccountSelect
-                      id="defaultInventoryAccount"
-                      value={defaultInventoryAccount}
-                      onChange={setDefaultInventoryAccount}
-                      placeholder="Buscar cuenta…"
-                      ledgerOnly={true}
-                    />
-                  </div>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="stockReceivedButNotBilled">Existencias Recibidas No Facturadas</label>
-                    <AccountSelect
-                      id="stockReceivedButNotBilled"
-                      value={stockReceivedButNotBilled}
-                      onChange={setStockReceivedButNotBilled}
-                      placeholder="Buscar cuenta…"
-                      ledgerOnly={true}
-                    />
-                  </div>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="stockAdjustmentAccount">Cuenta de Ajuste de Inventario</label>
-                    <AccountSelect
-                      id="stockAdjustmentAccount"
-                      value={stockAdjustmentAccount}
-                      onChange={setStockAdjustmentAccount}
-                      placeholder="Buscar cuenta…"
-                      ledgerOnly={true}
-                    />
-                  </div>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="enablePerpetualInventory">
-                      <input
-                        id="enablePerpetualInventory"
-                        type="checkbox"
-                        checked={enablePerpetualInventory}
-                        onChange={(e) => handleTogglePerpetualInventory(e.target.checked)}
-                        style={{ marginRight: 8 }}
-                      />
-                      Habilitar Inventario Perpetuo
-                      <FieldTooltip>
-                        Advertencia: una vez que existan movimientos de inventario, no será posible desactivar esta opción.
-                      </FieldTooltip>
-                    </label>
-                  </div>
-                </div>
+            <div className="card">
+              <div className="card-header"><span className="card-title">Inventario perpetuo</span>{enablePerpetualInventory ? <span className="badge badge-success">Activo</span> : <span className="badge badge-neutral">Apagado</span>}</div>
+              <div className="card-body">
+                <label className="empresa-toggle-row">
+                  <span className="ff-toggle">
+                    <input type="checkbox" checked={enablePerpetualInventory} onChange={(e) => handleTogglePerpetualInventory(e.target.checked)} />
+                    <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+                  </span>
+                  Habilitar inventario perpetuo
+                </label>
+                <p className="ff-hint" style={{ marginTop: 8 }}>Una vez que existan movimientos, no podrá desactivarse.</p>
               </div>
+            </div>
+          </aside>
 
-              <div className="card">
-                <div className="card-header">
-                  <span className="card-title">Diferidos / Cambiario</span>
-                </div>
-                <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="defaultDeferredRevenueAccount">Ingresos Diferidos por Defecto</label>
-                    <AccountSelect
-                      id="defaultDeferredRevenueAccount"
-                      value={defaultDeferredRevenueAccount}
-                      onChange={setDefaultDeferredRevenueAccount}
-                      placeholder="Buscar cuenta…"
-                      ledgerOnly={true}
-                    />
-                  </div>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="defaultDeferredExpenseAccount">Gastos Diferidos por Defecto</label>
-                    <AccountSelect
-                      id="defaultDeferredExpenseAccount"
-                      value={defaultDeferredExpenseAccount}
-                      onChange={setDefaultDeferredExpenseAccount}
-                      placeholder="Buscar cuenta…"
-                      ledgerOnly={true}
-                    />
-                  </div>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="exchangeGainLossAccount">Ganancia/Pérdida Cambiaria</label>
-                    <AccountSelect
-                      id="exchangeGainLossAccount"
-                      value={exchangeGainLossAccount}
-                      onChange={setExchangeGainLossAccount}
-                      placeholder="Buscar cuenta…"
-                      ledgerOnly={true}
-                    />
-                  </div>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="unrealizedExchangeGainLossAccount">Ganancia/Pérdida Cambiaria No Realizada</label>
-                    <AccountSelect
-                      id="unrealizedExchangeGainLossAccount"
-                      value={unrealizedExchangeGainLossAccount}
-                      onChange={setUnrealizedExchangeGainLossAccount}
-                      placeholder="Buscar cuenta…"
-                      ledgerOnly={true}
-                    />
-                  </div>
-                </div>
+          {/* ── Grupos contables ── */}
+          <div className="empresa-main">
+            {cuentasLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <span key={i} className="skeleton-box" style={{ height: 160, display: 'block' }} />
+                ))}
               </div>
+            ) : (
+              <>
+                <div className="card" id="cta-cobro">
+                  <div className="card-header navy-card-header">
+                    <span className="card-title"><ReceiptText size={14} style={{ marginRight: 8, verticalAlign: -2 }} />Cobro y pago</span>
+                    <span className="navy-header-hint">AR · AP · tesorería</span>
+                  </div>
+                  <div className="card-body">
+                    <p className="empresa-group-desc">Defaults para facturas de clientes y proveedores, y para cobros/pagos sin cuenta específica.</p>
+                    <div className="empresa-accounts-grid">
+                      <CuentaField id="defaultReceivableAccount" label="Cuentas por Cobrar (AR)" hint="Para facturas emitidas a clientes" value={defaultReceivableAccount} onChange={setDefaultReceivableAccount} />
+                      <CuentaField id="defaultPayableAccount" label="Cuentas por Pagar (AP)" hint="Para facturas de proveedores" value={defaultPayableAccount} onChange={setDefaultPayableAccount} />
+                      <CuentaField id="defaultBankAccount" label="Banco Principal" hint="Para cobros y pagos sin cuenta específica" value={defaultBankAccount} onChange={setDefaultBankAccount} />
+                      <CuentaField id="defaultCashAccount" label="Caja por Defecto" value={defaultCashAccount} onChange={setDefaultCashAccount} />
+                    </div>
+                  </div>
+                </div>
 
-              <div className="card">
-                <div className="card-header">
-                  <span className="card-title">Depreciación</span>
-                </div>
-                <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="accumulatedDepreciationAccount">Depreciación Acumulada</label>
-                    <AccountSelect
-                      id="accumulatedDepreciationAccount"
-                      value={accumulatedDepreciationAccount}
-                      onChange={setAccumulatedDepreciationAccount}
-                      placeholder="Buscar cuenta…"
-                      ledgerOnly={true}
-                    />
+                <div className="card" id="cta-resultados">
+                  <div className="card-header navy-card-header">
+                    <span className="card-title"><TrendingUp size={14} style={{ marginRight: 8, verticalAlign: -2 }} />Resultados</span>
+                    <span className="navy-header-hint">PyG por defecto</span>
                   </div>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="depreciationExpenseAccount">Gasto de Depreciación</label>
-                    <AccountSelect
-                      id="depreciationExpenseAccount"
-                      value={depreciationExpenseAccount}
-                      onChange={setDepreciationExpenseAccount}
-                      placeholder="Buscar cuenta…"
-                      ledgerOnly={true}
-                    />
-                  </div>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="disposalAccount">Cuenta de Baja de Activos</label>
-                    <AccountSelect
-                      id="disposalAccount"
-                      value={disposalAccount}
-                      onChange={setDisposalAccount}
-                      placeholder="Buscar cuenta…"
-                      ledgerOnly={true}
-                    />
+                  <div className="card-body">
+                    <p className="empresa-group-desc">Se usan cuando el artículo no trae su propia cuenta de ingreso, gasto o descuento.</p>
+                    <div className="empresa-accounts-grid">
+                      <CuentaField id="defaultIncomeAccount" label="Ingresos por Defecto" hint="Si el artículo no tiene cuenta de ingreso" value={defaultIncomeAccount} onChange={setDefaultIncomeAccount} rootType="Income" />
+                      <CuentaField id="defaultExpenseAccount" label="Gastos por Defecto" hint="Si el artículo no tiene cuenta de gasto" value={defaultExpenseAccount} onChange={setDefaultExpenseAccount} rootType="Expense" />
+                      <CuentaField id="defaultDiscountAccount" label="Cuenta de Descuento" value={defaultDiscountAccount} onChange={setDefaultDiscountAccount} />
+                      <CuentaField id="writeOffAccount" label="Cuenta de Diferencias (write-off)" hint="Ajustes de diferencias al cerrar facturas" value={writeOffAccount} onChange={setWriteOffAccount} />
+                      <CuentaField id="roundOffAccount" label="Cuenta de Redondeos" hint="Diferencias de centavos" value={roundOffAccount} onChange={setRoundOffAccount} />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="card">
-                <div className="card-header">
-                  <span className="card-title">Descuentos</span>
-                </div>
-                <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="defaultDiscountAccount">Cuenta de Descuento por Defecto</label>
-                    <AccountSelect
-                      id="defaultDiscountAccount"
-                      value={defaultDiscountAccount}
-                      onChange={setDefaultDiscountAccount}
-                      placeholder="Buscar cuenta…"
-                      ledgerOnly={true}
-                    />
+                <div className="card" id="cta-inventario">
+                  <div className="card-header navy-card-header">
+                    <span className="card-title"><Boxes size={14} style={{ marginRight: 8, verticalAlign: -2 }} />Inventario</span>
+                    <span className="navy-header-hint">Existencias y ajustes</span>
+                  </div>
+                  <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div className="empresa-accounts-grid">
+                      <CuentaField id="defaultInventoryAccount" label="Inventario por Defecto" value={defaultInventoryAccount} onChange={setDefaultInventoryAccount} />
+                      <CuentaField id="stockReceivedButNotBilled" label="Recibido No Facturado" hint="Mercancía recibida pendiente de factura del proveedor" value={stockReceivedButNotBilled} onChange={setStockReceivedButNotBilled} />
+                      <CuentaField id="stockAdjustmentAccount" label="Ajuste de Inventario" value={stockAdjustmentAccount} onChange={setStockAdjustmentAccount} />
+                    </div>
+                    <div className="empresa-highlight">
+                      <Boxes size={16} />
+                      <div style={{ flex: 1 }}>
+                        <label className="empresa-toggle-row">
+                          <span className="ff-toggle">
+                            <input type="checkbox" checked={enablePerpetualInventory} onChange={(e) => handleTogglePerpetualInventory(e.target.checked)} />
+                            <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+                          </span>
+                          Habilitar Inventario Perpetuo
+                          <FieldTooltip>Advertencia: una vez que existan movimientos de inventario, no será posible desactivar esta opción.</FieldTooltip>
+                        </label>
+                        <p className="empresa-highlight-sub">Cada movimiento de stock genera su asiento contable en tiempo real. Recomendado si valuás inventario con el sistema.</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="card">
-                <div className="card-header">
-                  <span className="card-title">Centros de Costo</span>
-                </div>
-                <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="costCenter">Centro de Costo por Defecto</label>
-                    <CostCenterSelect
-                      id="costCenter"
-                      value={costCenter}
-                      onChange={setCostCenter}
-                      placeholder="Buscar centro de costo…"
-                    />
+                <div className="card" id="cta-diferidos">
+                  <div className="card-header navy-card-header">
+                    <span className="card-title"><CalendarClock size={14} style={{ marginRight: 8, verticalAlign: -2 }} />Diferidos y cambiario</span>
+                    <span className="navy-header-hint">Devengo y moneda</span>
                   </div>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="roundOffCostCenter">Centro de Costo de Redondeos</label>
-                    <CostCenterSelect
-                      id="roundOffCostCenter"
-                      value={roundOffCostCenter}
-                      onChange={setRoundOffCostCenter}
-                      placeholder="Buscar centro de costo…"
-                    />
-                  </div>
-                  <div className="ff-wrap">
-                    <label className="ff-label" htmlFor="depreciationCostCenter">Centro de Costo de Depreciación</label>
-                    <CostCenterSelect
-                      id="depreciationCostCenter"
-                      value={depreciationCostCenter}
-                      onChange={setDepreciationCostCenter}
-                      placeholder="Buscar centro de costo…"
-                    />
+                  <div className="card-body">
+                    <div className="empresa-accounts-grid">
+                      <CuentaField id="defaultDeferredRevenueAccount" label="Ingresos Diferidos" value={defaultDeferredRevenueAccount} onChange={setDefaultDeferredRevenueAccount} />
+                      <CuentaField id="defaultDeferredExpenseAccount" label="Gastos Diferidos" value={defaultDeferredExpenseAccount} onChange={setDefaultDeferredExpenseAccount} />
+                      <CuentaField id="exchangeGainLossAccount" label="Ganancia/Pérdida Cambiaria" value={exchangeGainLossAccount} onChange={setExchangeGainLossAccount} />
+                      <CuentaField id="unrealizedExchangeGainLossAccount" label="Cambiaria No Realizada" value={unrealizedExchangeGainLossAccount} onChange={setUnrealizedExchangeGainLossAccount} />
+                    </div>
                   </div>
                 </div>
-              </div>
-            </>
-          )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn btn-primary" onClick={handleSaveCuentas} disabled={saveCuentasMutation.isPending}>
-              <Save size={16} />
-              {saveCuentasMutation.isPending ? 'Guardando…' : 'Guardar Cambios'}
-            </button>
+                <div className="card" id="cta-activos">
+                  <div className="card-header navy-card-header">
+                    <span className="card-title"><Tractor size={14} style={{ marginRight: 8, verticalAlign: -2 }} />Activos fijos</span>
+                    <span className="navy-header-hint">Depreciación</span>
+                  </div>
+                  <div className="card-body">
+                    <div className="empresa-accounts-grid">
+                      <CuentaField id="accumulatedDepreciationAccount" label="Depreciación Acumulada" value={accumulatedDepreciationAccount} onChange={setAccumulatedDepreciationAccount} />
+                      <CuentaField id="depreciationExpenseAccount" label="Gasto de Depreciación" value={depreciationExpenseAccount} onChange={setDepreciationExpenseAccount} />
+                      <CuentaField id="disposalAccount" label="Baja de Activos" value={disposalAccount} onChange={setDisposalAccount} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="card" id="cta-costos">
+                  <div className="card-header navy-card-header">
+                    <span className="card-title"><PieChart size={14} style={{ marginRight: 8, verticalAlign: -2 }} />Centros de costo</span>
+                    <span className="navy-header-hint">Dimensiones por defecto</span>
+                  </div>
+                  <div className="card-body">
+                    <div className="empresa-section-grid-3 empresa-section-grid">
+                      <div className="ff-wrap">
+                        <label className="ff-label" htmlFor="costCenter">Centro de Costo por Defecto</label>
+                        <CostCenterSelect id="costCenter" value={costCenter} onChange={setCostCenter} placeholder="Buscar centro de costo…" />
+                      </div>
+                      <div className="ff-wrap">
+                        <label className="ff-label" htmlFor="roundOffCostCenter">Centro de Costo de Redondeos</label>
+                        <CostCenterSelect id="roundOffCostCenter" value={roundOffCostCenter} onChange={setRoundOffCostCenter} placeholder="Buscar centro de costo…" />
+                      </div>
+                      <div className="ff-wrap">
+                        <label className="ff-label" htmlFor="depreciationCostCenter">Centro de Costo de Depreciación</label>
+                        <CostCenterSelect id="depreciationCostCenter" value={depreciationCostCenter} onChange={setDepreciationCostCenter} placeholder="Buscar centro de costo…" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="inline-alert inline-alert-info">
+                  <BadgePercent size={15} />
+                  <span>Vaciar un campo y guardar <strong>limpia</strong> ese default en el servidor — no lo deja con el valor anterior.</span>
+                </div>
+              </>
+            )}
+
+            <div className="empresa-footbar">
+              <span className="empresa-footbar-hint">{contable.filled}/{contable.total} cuentas configuradas · los vacíos usan el fallback del documento.</span>
+              <button className="btn btn-navy" onClick={handleSaveCuentas} disabled={saveCuentasMutation.isPending}>
+                <Save size={16} />
+                {saveCuentasMutation.isPending ? 'Guardando…' : 'Guardar cuentas'}
+              </button>
+            </div>
           </div>
         </div>
       )}

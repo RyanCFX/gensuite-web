@@ -1,0 +1,431 @@
+/* Empresa — rediseño bajo la misma línea del sistema:
+ * header de listados navy (dot + btn-navy), KPI cards del dashboard,
+ * navy-card-header de los formularios (InvoiceForm) y tokens globales
+ * (.card, .ff-*, .badge). Todo scoping bajo .empresa-page. */
+
+.empresa-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  --emp-navy: var(--color-navy);
+  --emp-teal: #208591;
+  --emp-aqua: #84CDBA;
+  --emp-track: var(--surface-sunken);
+}
+
+/* ── Header: overline + título con dot (listados navy) + badges ── */
+.empresa-overline {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 3px;
+}
+
+.empresa-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.empresa-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.empresa-save-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* ── Tabs: misma línea que .tabs-bar pero en píldora (dashboard period-pills) ── */
+.empresa-tabs {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--surface-page);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow: var(--shadow-xs);
+  align-self: flex-start;
+}
+
+.empresa-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 160ms var(--ease-out), color 160ms var(--ease-out);
+  white-space: nowrap;
+}
+
+.empresa-tab:hover { color: var(--text-primary); }
+
+.empresa-tab[data-active] {
+  background: var(--emp-navy);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.empresa-tab-count {
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: color-mix(in oklch, var(--emp-teal) 14%, transparent);
+  color: var(--emp-teal);
+}
+
+.empresa-tab[data-active] .empresa-tab-count {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+/* ── KPI strip (dashboard kpi-grid, 4 columnas) ── */
+.empresa-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.empresa-kpi {
+  background: var(--surface-page);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-body);
+  transition: border-color 150ms var(--ease-in-out), box-shadow 150ms var(--ease-in-out), transform 150ms var(--ease-out);
+  animation: _fade-up 360ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+.empresa-kpi:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.empresa-kpi-top { display: flex; align-items: center; gap: 8px; }
+
+.empresa-kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--emp-teal) 12%, var(--surface-page));
+  color: var(--emp-teal);
+  flex-shrink: 0;
+}
+
+.empresa-kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--emp-teal);
+}
+
+.empresa-kpi-value { font-size: 20px; font-weight: 700; letter-spacing: -0.015em; color: var(--text-primary); line-height: 1.2; }
+.empresa-kpi-value small { font-size: 12px; font-weight: 500; color: var(--text-tertiary); }
+
+.empresa-progress { height: 6px; border-radius: 999px; background: var(--emp-track); overflow: hidden; }
+.empresa-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--emp-teal), var(--emp-aqua));
+  transition: width 480ms var(--ease-out);
+}
+
+.empresa-kpi-foot { font-size: 11px; color: var(--text-tertiary); }
+.empresa-kpi-foot strong { color: var(--warning-text); font-weight: 600; }
+
+/* ── Layout principal: identidad fija + contenido ── */
+.empresa-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.empresa-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 16px;
+}
+
+/* Tarjeta identidad: hero navy (marca) + logo solapado */
+.empresa-identity { overflow: hidden; }
+
+.empresa-identity-hero {
+  background: var(--emp-navy);
+  padding: 18px 18px 44px;
+  position: relative;
+  overflow: hidden;
+}
+
+.empresa-identity-hero::after {
+  content: '';
+  position: absolute;
+  right: -40px;
+  top: -40px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(132, 205, 186, 0.35) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.empresa-identity-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--on-dark-sub);
+}
+
+.empresa-identity-name {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--on-dark-ink);
+  margin-top: 4px;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.empresa-identity-rnc {
+  font-size: 12px;
+  color: var(--on-dark-sub);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.empresa-logo-wrap {
+  padding: 0 18px;
+  margin-top: -32px;
+  position: relative;
+  z-index: 1;
+}
+
+.empresa-logo-box {
+  width: 100%;
+  height: 110px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-page);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 150ms var(--ease-in-out);
+  padding: 10px;
+}
+
+.empresa-logo-box:hover { border-color: var(--emp-teal); }
+.empresa-logo-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+.empresa-logo-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.empresa-identity-body { padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
+
+.empresa-identity-meta { display: flex; flex-direction: column; gap: 8px; }
+
+.empresa-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  min-width: 0;
+}
+
+.empresa-meta-row svg { color: var(--emp-teal); flex-shrink: 0; }
+.empresa-meta-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.empresa-identity-actions { display: flex; gap: 8px; }
+.empresa-identity-actions .btn { flex: 1; }
+
+/* Completitud */
+.empresa-complete-big {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.empresa-complete-pct { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); }
+.empresa-complete-label { font-size: 12px; color: var(--text-secondary); }
+
+.empresa-checklist { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+
+.empresa-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.empresa-check svg { flex-shrink: 0; }
+.empresa-check[data-done] { color: var(--text-primary); }
+.empresa-check[data-done] svg { color: var(--success-text); }
+.empresa-check:not([data-done]) svg { color: var(--text-tertiary); }
+
+/* Accesos directos (lista tipo dashboard pending-list) */
+.empresa-links { display: flex; flex-direction: column; }
+
+.empresa-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.empresa-link:not(:last-child) { border-bottom: 1px solid var(--border-subtle); }
+
+.empresa-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--surface-sunken);
+  color: var(--emp-teal);
+  flex-shrink: 0;
+}
+
+.empresa-link-main { flex: 1; min-width: 0; }
+.empresa-link-label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.empresa-link-sub { font-size: 11.5px; color: var(--text-tertiary); }
+.empresa-link > svg { color: var(--text-tertiary); flex-shrink: 0; }
+.empresa-link:hover .empresa-link-label { color: var(--emp-teal); }
+
+/* ── Columna de contenido ── */
+.empresa-main { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+
+.empresa-section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.empresa-section-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+/* Caja destacada: inventario perpetuo */
+.empresa-highlight {
+  border: 1.5px solid var(--emp-aqua);
+  background: color-mix(in oklch, var(--emp-aqua) 10%, var(--surface-page));
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.empresa-highlight svg { color: var(--emp-teal); flex-shrink: 0; margin-top: 1px; }
+.empresa-highlight-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.empresa-highlight-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; line-height: 1.5; }
+
+.empresa-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  user-select: none;
+}
+
+/* Barra de guardado al pie (misma línea que .modal-foot pero en página) */
+.empresa-footbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  position: sticky;
+  bottom: 16px;
+  box-shadow: var(--shadow-md);
+  flex-wrap: wrap;
+}
+
+.empresa-footbar-hint { font-size: 12px; color: var(--text-tertiary); }
+
+/* Grupos contables: rejilla de 2 columnas dentro de cada card */
+.empresa-accounts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.empresa-group-desc {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+  .empresa-kpis { grid-template-columns: 1fr 1fr; }
+  .empresa-layout { grid-template-columns: 1fr; }
+  .empresa-side { position: static; display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+  .empresa-side .empresa-identity { grid-column: 1 / -1; }
+}
+
+@media (max-width: 720px) {
+  .empresa-kpis { grid-template-columns: 1fr 1fr; }
+  .empresa-side { grid-template-columns: 1fr; }
+  .empresa-section-grid,
+  .empresa-section-grid-3,
+  .empresa-accounts-grid { grid-template-columns: 1fr; }
+  .empresa-tabs { width: 100%; }
+  .empresa-tab { flex: 1; justify-content: center; }
+}
+
+@media (max-width: 460px) {
+  .empresa-kpis { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .empresa-kpi { animation: none; }
+  .empresa-progress > span { transition: none; }
+}

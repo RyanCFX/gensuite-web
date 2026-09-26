@@ -17,7 +17,6 @@ import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateCompraDto, Supplier, DistribucionCuentaDto } from '@/shared/api/types'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
-import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { SupplierQuickCreateModal } from '@/features/suppliers/SupplierQuickCreateModal'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -48,6 +47,7 @@ import { AccountSelect } from '@/components/shared/AccountSelect'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 interface ItemRow {
   itemCode: string
@@ -307,22 +307,26 @@ function SerialBatchRow({
             direction="purchase"
           />
         </td>
-        <td onClick={(e) => e.stopPropagation()} className="actions-cell">
-          <ActionsMenu>
-            <ActionsMenuItem
-              onClick={() => onViewItem(item.itemCode)}
-              disabled={!item.itemCode}
-            >
-              <Eye size={14} /> Ver detalle
-            </ActionsMenuItem>
-            <ActionsMenuItem
-              danger
-              onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
-              disabled={items.length === 1}
-            >
-              <Trash2 size={14} /> Eliminar
-            </ActionsMenuItem>
-          </ActionsMenu>
+        <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-size-icon-xs"
+            onClick={() => onViewItem(item.itemCode)}
+            disabled={!item.itemCode}
+            title="Ver detalle"
+          >
+            <Eye size={14} />
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-size-icon-xs"
+            onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
+            disabled={items.length === 1}
+            title="Eliminar"
+            style={{ color: 'var(--error-text)' }}
+          >
+            <Trash2 size={14} />
+          </button>
         </td>
       </tr>
 
@@ -530,6 +534,17 @@ export default function CompraForm() {
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0])
   const [dueDate, setDueDate] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem(defaultWh)])
+  const ITEMS_COLUMNS = [
+    { key: 'articulo', width: 220 },
+    { key: 'descripcion', width: 220 },
+    { key: 'cant', width: 80 },
+    { key: 'precio', width: 120 },
+    { key: 'impuesto', width: 100 },
+    { key: 'almacen', width: 160 },
+    { key: 'udm', width: 120 },
+    { key: 'actions', width: 70 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
   const [branch, setBranch] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
@@ -1475,17 +1490,41 @@ export default function CompraForm() {
           <div className="card">
             <div className="card-body" style={{ padding: 0 }}>
               <div className="items-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
-                <table className="items-table navy-table">
+                <table className="items-table navy-table items-table-resizable">
+                  <colgroup>
+                    {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ minWidth: 180 }}>Artículo</th>
-                      <th>Descripción</th>
-                      <th style={{ width: '8%', textAlign: 'right' }}>Qty</th>
-                      <th style={{ width: '12%', textAlign: 'right' }}>Precio</th>
-                      <th style={{ width: '10%', textAlign: 'right' }}>Impuesto</th>
-                      <th style={{ width: '14%' }}>Almacén</th>
-                      <th style={{ width: '7%' }}>UOM</th>
-                      <th style={{ width: '40px' }} />
+                      <th>
+                        Artículo
+                        <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                      </th>
+                      <th>
+                        Descripción
+                        <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Qty
+                        <span className="col-resize-handle" onMouseDown={startResize('cant')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Precio
+                        <span className="col-resize-handle" onMouseDown={startResize('precio')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Impuesto
+                        <span className="col-resize-handle" onMouseDown={startResize('impuesto')} />
+                      </th>
+                      <th>
+                        Almacén
+                        <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                      </th>
+                      <th>
+                        UOM
+                        <span className="col-resize-handle" onMouseDown={startResize('udm')} />
+                      </th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
@@ -1510,30 +1549,30 @@ export default function CompraForm() {
                     ))}
                   </tbody>
                 </table>
-                <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-size-sm"
-                    onClick={() => setItems((prev) => [...prev, emptyItem(defaultWh)])}
-                  >
-                    <Plus size={14} /> Agregar artículo
-                  </button>
+              </div>
+              <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-size-sm"
+                  onClick={() => setItems((prev) => [...prev, emptyItem(defaultWh)])}
+                >
+                  <Plus size={14} /> Agregar artículo
+                </button>
+              </div>
+              <div className="items-total-row navy-totals">
+                <div className="items-total-line">
+                  <span>Subtotal</span>
+                  <span>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(subtotal)}</span>
                 </div>
-                <div className="items-total-row navy-totals">
-                  <div className="items-total-line">
-                    <span>Subtotal</span>
-                    <span>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(subtotal)}</span>
+                {taxTotal > 0 && (
+                  <div className="items-total-line" style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+                    <span>Impuesto</span>
+                    <span>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(taxTotal)}</span>
                   </div>
-                  {taxTotal > 0 && (
-                    <div className="items-total-line" style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
-                      <span>Impuesto</span>
-                      <span>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(taxTotal)}</span>
-                    </div>
-                  )}
-                  <div className="items-total-line total-row-highlight">
-                    <span>Total</span>
-                    <strong>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(grandTotal)}</strong>
-                  </div>
+                )}
+                <div className="items-total-line total-row-highlight">
+                  <span>Total</span>
+                  <strong>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(grandTotal)}</strong>
                 </div>
               </div>
             </div>

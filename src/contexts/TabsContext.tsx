@@ -18,6 +18,7 @@ interface TabsContextValue {
   tabs: Tab[]
   activeId: string | null
   closeTab: (id: string, options?: CloseTabOptions) => void
+  reorderTabs: (fromId: string, toId: string) => void
   setTabDirty: (pathname: string, dirty: boolean) => void
   updateTabTitle: (pathname: string, title: string) => void
   multiTab: boolean
@@ -298,12 +299,25 @@ function TabsProviderInner({ children }: { children: React.ReactNode }) {
     setTabs((prev) => prev.map((t) => t.path.split('?')[0] === pathname ? { ...t, isDirty: dirty } : t))
   }
 
+  const reorderTabs = (fromId: string, toId: string) => {
+    if (fromId === toId) return
+    setTabs((prev) => {
+      const fromIdx = prev.findIndex((t) => t.id === fromId)
+      const toIdx = prev.findIndex((t) => t.id === toId)
+      if (fromIdx === -1 || toIdx === -1) return prev
+      const next = [...prev]
+      const [moved] = next.splice(fromIdx, 1)
+      next.splice(toIdx, 0, moved)
+      return next
+    })
+  }
+
   const updateTabTitle = (pathname: string, title: string) => {
     setTabs((prev) => prev.map((t) => t.path.split('?')[0] === pathname ? { ...t, title } : t))
   }
 
   return (
-    <TabsContext.Provider value={{ tabs, activeId, closeTab, setTabDirty, updateTabTitle, multiTab, toggleMultiTab, keepAliveRef }}>
+    <TabsContext.Provider value={{ tabs, activeId, closeTab, reorderTabs, setTabDirty, updateTabTitle, multiTab, toggleMultiTab, keepAliveRef }}>
       {children}
     </TabsContext.Provider>
   )

@@ -1,0 +1,198 @@
+/* Tipos de Documento Bancario — misma línea que Empresa rediseñada:
+ * header navy (dot + overline + btn-navy), KPI strip estilo dashboard,
+ * tabla navy de listados y modal con header navy. Scope: .tdoc-page */
+
+.tdoc-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  --tdoc-navy: var(--color-navy);
+  --tdoc-teal: #208591;
+  --tdoc-aqua: #84CDBA;
+}
+
+.tdoc-page .page-header { margin-bottom: 0; }
+
+.tdoc-overline {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 3px;
+}
+
+.tdoc-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tdoc-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ── KPI strip (dashboard) — cada tarjeta filtra la vista ── */
+.tdoc-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.tdoc-kpi {
+  background: var(--surface-page);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-body);
+  transition: border-color 150ms var(--ease-in-out), box-shadow 150ms var(--ease-in-out), transform 150ms var(--ease-out);
+  animation: _fade-up 360ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+.tdoc-kpi:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.tdoc-kpi[data-active] {
+  border-color: var(--tdoc-teal);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--tdoc-teal) 16%, transparent);
+}
+
+.tdoc-kpi-top { display: flex; align-items: center; gap: 8px; }
+
+.tdoc-kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--tdoc-teal) 12%, var(--surface-page));
+  color: var(--tdoc-teal);
+  flex-shrink: 0;
+}
+
+.tdoc-kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tdoc-teal);
+}
+
+.tdoc-kpi-value { font-size: 20px; font-weight: 700; letter-spacing: -0.015em; color: var(--text-primary); line-height: 1.2; }
+.tdoc-kpi-value small { font-size: 12px; font-weight: 500; color: var(--text-tertiary); }
+
+.tdoc-kpi-foot { font-size: 11px; color: var(--text-tertiary); }
+
+/* Barra partida Débito / Crédito */
+.tdoc-split { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: var(--surface-sunken); gap: 2px; }
+.tdoc-split > span { display: block; height: 100%; transition: width 480ms var(--ease-out); }
+.tdoc-split-deb { background: var(--success-text); border-radius: 999px 0 0 999px; }
+.tdoc-split-cred { background: var(--tdoc-teal); border-radius: 0 999px 999px 0; }
+
+/* ── Código mono + preview del modal ── */
+.tdoc-code {
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.tdoc-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-default);
+}
+
+.tdoc-preview-code {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  color: var(--text-primary);
+  background: var(--surface-page);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 3px 10px;
+}
+
+.tdoc-preview-desc { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.tdoc-preview-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+
+/* ── Modal con header navy ── */
+.tdoc-modal .modal-head {
+  background: var(--tdoc-navy);
+  border-bottom: none;
+}
+
+.tdoc-modal .modal-title { color: var(--on-dark-ink); }
+.tdoc-modal .modal-close { color: var(--on-dark-sub); }
+.tdoc-modal .modal-close:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+.tdoc-modal .modal-sub { color: var(--on-dark-sub); font-size: 12px; margin-top: 2px; }
+
+/* Requisitos como tarjetas clicables */
+.tdoc-req-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tdoc-req {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 150ms var(--ease-in-out), background-color 150ms var(--ease-in-out);
+  user-select: none;
+}
+
+.tdoc-req:hover { border-color: var(--border-strong); }
+
+.tdoc-req[data-on] {
+  border-color: var(--tdoc-teal);
+  background: color-mix(in oklch, var(--tdoc-teal) 7%, var(--surface-page));
+}
+
+.tdoc-req input { margin-top: 2px; }
+.tdoc-req-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.tdoc-req-sub { font-size: 11.5px; color: var(--text-tertiary); margin-top: 1px; line-height: 1.4; }
+
+.tdoc-req-ncf { grid-column: 1 / -1; }
+
+@media (max-width: 1100px) {
+  .tdoc-kpis { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 640px) {
+  .tdoc-kpis { grid-template-columns: 1fr 1fr; }
+  .tdoc-req-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 460px) {
+  .tdoc-kpis { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tdoc-kpi { animation: none; }
+  .tdoc-split > span { transition: none; }
+}

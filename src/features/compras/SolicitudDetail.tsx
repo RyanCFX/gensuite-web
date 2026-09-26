@@ -191,9 +191,6 @@ export default function SolicitudDetail() {
         </div>
 
         <div className="card">
-          <div className="card-header">
-            <span className="card-title">Artículos</span>
-          </div>
           <div className="table-scroll">
             <table className="data-table">
               <thead>

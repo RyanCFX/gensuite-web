@@ -45,8 +45,9 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { formatDate } from '@/lib/formatters'
-import { Plus, Trash2, Save, FileWarning, X, Pencil, ChevronLeft, ChevronRight, Info, ChevronDown, Check, Search } from 'lucide-react'
+import { Plus, Trash2, Save, FileWarning, X, Pencil, ChevronLeft, ChevronRight, Info, ChevronDown, Check, Search, TrafficCone, TriangleAlert, BellRing, BarChart3 } from 'lucide-react'
 import EjercicioFiscalSection from './EjercicioFiscalSection'
+import './CobrosConfig.css'
 import { DGII_UOM_CODES, dgiiUomLabel, ECF_TIPOS, TIPO_PAGO_DEFAULT_OPTIONS, TIPO_INGRESOS_DEFAULT_OPTIONS } from '@/lib/dgii'
 
 function is503(error: unknown): boolean {
@@ -67,6 +68,8 @@ function ServiceUnavailableBanner({ message }: { message: string }) {
 }
 
 // ---- Cobros Config Section ----
+// Rediseño bajo la misma línea que Empresa: header navy con dot + overline,
+// KPI strip estilo dashboard, semáforo-preview en vivo y cards con navy-header.
 function CobrosConfigSection() {
   const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({ queryKey: ['cobros-config'], queryFn: getCobrosConfig })
@@ -80,59 +83,215 @@ function CobrosConfigSection() {
     onError: () => toast.error('Error al guardar'),
   })
 
-  if (isLoading) return <span className="skeleton-box" style={{ height: 256, display: 'block' }} />
+  if (isLoading) {
+    return (
+      <div className="cobros-cfg">
+        <span className="skeleton-box" style={{ height: 32, width: 240, display: 'block' }} />
+        <div className="cobros-kpis">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <span key={i} className="skeleton-box" style={{ height: 96, display: 'block' }} />
+          ))}
+        </div>
+        <span className="skeleton-box" style={{ height: 220, display: 'block' }} />
+      </div>
+    )
+  }
 
   function setNum(key: keyof CobrosConfig, val: number) {
     setForm((prev) => ({ ...prev, [key]: val }))
   }
 
+  const amarilla = form.limiteCreditoAmarilloPct ?? 70
+  const roja = form.limiteCreditoRojoPct ?? 90
+  const dias = form.diasAlertaVencimiento ?? 7
+  const incoherent = amarilla >= roja
+  const warnWidth = Math.min(amarilla, 100)
+  const dangerWidth = Math.max(0, Math.min(roja, 100) - warnWidth)
+  const okWidth = Math.max(0, 100 - warnWidth - dangerWidth)
+
+  function scrollTo(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
-    <div className="card">
-      <div className="card-header">
-        <span className="card-title">Configuración de Cobranza</span>
+    <div className="cobros-cfg">
+      <PageHeader
+        overline="Configuración · Tesorería"
+        title={
+          <span className="cobros-title-row">
+            <span><span className="page-title-dot" />Configuración de Cobranza</span>
+            <span className="cobros-badges">
+              <span className="badge badge-warning">{amarilla}% amarilla</span>
+              <span className="badge badge-error">{roja}% roja</span>
+              <span className="badge badge-info">{dias} {dias === 1 ? 'día' : 'días'} de alerta</span>
+            </span>
+          </span>
+        }
+        description="Umbrales del semáforo de crédito y alertas de vencimiento para Cuentas por Cobrar"
+        action={
+          <button className="btn btn-navy" onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending}>
+            <Save size={16} />
+            {saveMutation.isPending ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+        }
+      />
+
+      {/* ── KPI strip: misma línea visual que el dashboard ── */}
+      <div className="cobros-kpis">
+        <button type="button" className="cobros-kpi" style={{ '--i': 0 } as React.CSSProperties} onClick={() => scrollTo('cob-semaforo')}>
+          <div className="cobros-kpi-top">
+            <span className="cobros-kpi-icon"><TrafficCone size={14} /></span>
+            <span className="cobros-kpi-label">Alerta amarilla</span>
+          </div>
+          <div className="cobros-kpi-value">{amarilla}<small>% del límite usado</small></div>
+          <div className="cobros-kpi-foot">El cliente pasa a vigilancia</div>
+        </button>
+        <button type="button" className="cobros-kpi" style={{ '--i': 1 } as React.CSSProperties} onClick={() => scrollTo('cob-semaforo')}>
+          <div className="cobros-kpi-top">
+            <span className="cobros-kpi-icon"><TriangleAlert size={14} /></span>
+            <span className="cobros-kpi-label">Alerta roja</span>
+          </div>
+          <div className="cobros-kpi-value">{roja}<small>% del límite usado</small></div>
+          <div className="cobros-kpi-foot">Se sugiere bloquear ventas a crédito</div>
+        </button>
+        <button type="button" className="cobros-kpi" style={{ '--i': 2 } as React.CSSProperties} onClick={() => scrollTo('cob-vencimiento')}>
+          <div className="cobros-kpi-top">
+            <span className="cobros-kpi-icon"><BellRing size={14} /></span>
+            <span className="cobros-kpi-label">Alerta de vencimiento</span>
+          </div>
+          <div className="cobros-kpi-value">{dias}<small> {dias === 1 ? 'día' : 'días'} antes</small></div>
+          <div className="cobros-kpi-foot">Aviso previo al vencimiento de facturas</div>
+        </button>
       </div>
-      <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div className="ff-wrap">
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-            <label className="ff-label">Alerta Amarilla — límite de crédito usado</label>
-            <span style={{ fontWeight: 600, fontSize: 13 }}>{form.limiteCreditoAmarilloPct ?? 70}%</span>
+
+      <div className="cobros-layout">
+        <div className="cobros-main">
+          {/* ── Vista previa en vivo del semáforo ── */}
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Así se verá el semáforo</span>
+              <span className="badge badge-neutral">Vista previa en vivo</span>
+            </div>
+            <div className="card-body">
+              <div className="cobros-semaforo">
+                <div className="cobros-semaforo-bar">
+                  <span className="cobros-semaforo-seg" data-zone="ok" style={{ width: `${okWidth}%` }}>
+                    {okWidth >= 18 ? `0–${Math.round(warnWidth)}%` : ''}
+                  </span>
+                  <span className="cobros-semaforo-seg" data-zone="warn" style={{ width: `${warnWidth}%` }}>
+                    {warnWidth >= 12 ? `${Math.round(warnWidth)}–${Math.round(warnWidth + dangerWidth)}%` : ''}
+                  </span>
+                  <span className="cobros-semaforo-seg" data-zone="danger" style={{ width: `${dangerWidth}%` }}>
+                    {dangerWidth >= 12 ? `${Math.round(warnWidth + dangerWidth)}–100%` : ''}
+                  </span>
+                </div>
+                <div className="cobros-semaforo-legend">
+                  <span><span className="cobros-dot" data-zone="ok" />Verde · crédito sano</span>
+                  <span><span className="cobros-dot" data-zone="warn" />Amarillo · desde {amarilla}%</span>
+                  <span><span className="cobros-dot" data-zone="danger" />Rojo · desde {roja}%</span>
+                </div>
+                {incoherent && (
+                  <div className="inline-alert inline-alert-warn">
+                    <TriangleAlert size={14} />
+                    <span>La alerta amarilla ({amarilla}%) debe ser menor que la roja ({roja}%) para que el semáforo tenga sus tres zonas.</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-          <input
-            type="range" min={1} max={100} step={1}
-            value={form.limiteCreditoAmarilloPct ?? 70}
-            onChange={(e) => setNum('limiteCreditoAmarilloPct', parseInt(e.target.value))}
-            style={{ width: '100%', accentColor: 'var(--warning-text)' }}
-          />
-        </div>
-        <div className="ff-wrap">
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-            <label className="ff-label">Alerta Roja — límite de crédito usado</label>
-            <span style={{ fontWeight: 600, fontSize: 13 }}>{form.limiteCreditoRojoPct ?? 90}%</span>
+
+          {/* ── Umbrales ── */}
+          <div className="card" id="cob-semaforo">
+            <div className="card-header navy-card-header">
+              <span className="card-title"><TrafficCone size={14} style={{ marginRight: 8, verticalAlign: -2 }} />Semáforo de crédito</span>
+              <span className="navy-header-hint">% del límite de crédito usado</span>
+            </div>
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div className="cobros-slider-row">
+                <div className="cobros-slider-head">
+                  <label className="cobros-slider-label">Alerta amarilla — límite de crédito usado</label>
+                  <span className="cobros-slider-value" data-tone="warn">{amarilla}%</span>
+                </div>
+                <input
+                  type="range" min={1} max={100} step={1}
+                  value={amarilla}
+                  onChange={(e) => setNum('limiteCreditoAmarilloPct', parseInt(e.target.value))}
+                  style={{ accentColor: 'var(--warning-text)' }}
+                />
+                <div className="cobros-slider-ticks"><span>1%</span><span>50%</span><span>100%</span></div>
+              </div>
+              <div className="cobros-slider-row">
+                <div className="cobros-slider-head">
+                  <label className="cobros-slider-label">Alerta roja — límite de crédito usado</label>
+                  <span className="cobros-slider-value" data-tone="danger">{roja}%</span>
+                </div>
+                <input
+                  type="range" min={1} max={100} step={1}
+                  value={roja}
+                  onChange={(e) => setNum('limiteCreditoRojoPct', parseInt(e.target.value))}
+                  style={{ accentColor: 'var(--error-text)' }}
+                />
+                <div className="cobros-slider-ticks"><span>1%</span><span>50%</span><span>100%</span></div>
+              </div>
+            </div>
           </div>
-          <input
-            type="range" min={1} max={100} step={1}
-            value={form.limiteCreditoRojoPct ?? 90}
-            onChange={(e) => setNum('limiteCreditoRojoPct', parseInt(e.target.value))}
-            style={{ width: '100%', accentColor: 'var(--error-text)' }}
-          />
-        </div>
-        <div className="ff-wrap">
-          <label className="ff-label">Días para alerta de vencimiento</label>
-          <input
-            type="number" min={0}
-            className="ff-input"
-            style={{ width: 128 }}
-            value={form.diasAlertaVencimiento ?? 7}
-            onChange={(e) => setNum('diasAlertaVencimiento', parseInt(e.target.value) || 0)}
-          />
+
+          {/* ── Vencimiento ── */}
+          <div className="card" id="cob-vencimiento">
+            <div className="card-header navy-card-header">
+              <span className="card-title"><BellRing size={14} style={{ marginRight: 8, verticalAlign: -2 }} />Alertas de vencimiento</span>
+              <span className="navy-header-hint">Anticipación del aviso</span>
+            </div>
+            <div className="card-body">
+              <div className="cobros-dias-wrap">
+                <div className="ff-wrap" style={{ width: 120 }}>
+                  <label className="ff-label">Días antes</label>
+                  <input
+                    type="number" min={0}
+                    className="ff-input cobros-dias-input"
+                    value={dias}
+                    onChange={(e) => setNum('diasAlertaVencimiento', parseInt(e.target.value) || 0)}
+                  />
+                </div>
+                <div className="cobros-dias-preview">
+                  <BellRing size={16} />
+                  <span>
+                    Las facturas que venzan en <strong>{dias} {dias === 1 ? 'día' : 'días'}</strong> o menos
+                    se marcarán como <strong>próximas a vencer</strong> en el aging y la lista de cobros.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="cobros-footbar">
+            <span className="cobros-footbar-hint">Aplica al semáforo de crédito y a las alertas de CxC en toda la app.</span>
+            <button className="btn btn-navy" onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending}>
+              <Save size={16} />
+              {saveMutation.isPending ? 'Guardando…' : 'Guardar cambios'}
+            </button>
+          </div>
         </div>
 
-        <div>
-          <button className="btn btn-primary" onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending}>
-            <Save size={16} />
-            {saveMutation.isPending ? 'Guardando…' : 'Guardar'}
-          </button>
-        </div>
+        <aside className="cobros-side">
+          <div className="card">
+            <div className="card-header"><span className="card-title">Ver en acción</span></div>
+            <div className="card-body" style={{ paddingTop: 8, paddingBottom: 8 }}>
+              <div className="cobros-links">
+                <Link to="/cobros/semaforo" className="cobros-link">
+                  <span className="cobros-link-icon"><TrafficCone size={14} /></span>
+                  <span className="cobros-link-main"><span className="cobros-link-label">Semáforo de crédito</span><br /><span className="cobros-link-sub">Con estos umbrales aplicados</span></span>
+                  <ChevronRight size={14} />
+                </Link>
+                <Link to="/cobros/aging" className="cobros-link">
+                  <span className="cobros-link-icon"><BarChart3 size={14} /></span>
+                  <span className="cobros-link-main"><span className="cobros-link-label">Antigüedad de saldos</span><br /><span className="cobros-link-sub">Alertas de vencimiento en CxC</span></span>
+                  <ChevronRight size={14} />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   )
@@ -4177,7 +4336,7 @@ const IMPUESTOS_SECTIONS = new Set([
  * propia tabla "navy", así que no usan el `<PageHeader>` genérico de acá ni el ancho angosto
  * (760px) pensado para los formularios de configuración simples. */
 const NAVY_LIST_SECTIONS = new Set([
-  'metodos-pago', 'listas-precio', 'tasas-impuesto', 'ejercicio-fiscal',
+  'cobros', 'metodos-pago', 'listas-precio', 'tasas-impuesto', 'ejercicio-fiscal',
 ])
 
 export default function ConfigPage() {

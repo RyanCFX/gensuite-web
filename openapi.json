@@ -36241,6 +36241,11 @@
             "example": "Tarjeta de Crédito",
             "description": "Mode of Payment por defecto de este cliente — para prellenar el formulario de nueva factura/cotización (ver GET /config/metodos-pago). Editable por documento."
           },
+          "descuentoDefaultPct": {
+            "type": "number",
+            "example": 10,
+            "description": "% de descuento por defecto de este cliente (0-100), solo para prellenar el descuento de cada línea al armar una factura/cotización/pedido nuevo — el frontend lo aplica como sugerencia editable por línea, nunca se envía ni valida en el backend. No relaja ninguna regla de facturación: los límites de descuento por vendedor, el piso de costo, etc. siguen aplicando igual sobre el descuento que finalmente se envíe en cada línea."
+          },
           "cuentaCxcDefault": {
             "type": "string",
             "example": "112-01-002 - CxC Especial - JBC",
@@ -36360,6 +36365,11 @@
             "example": "Tarjeta de Crédito",
             "description": "Mode of Payment por defecto de este cliente — para prellenar el formulario de nueva factura/cotización (ver GET /config/metodos-pago). Editable por documento."
           },
+          "descuentoDefaultPct": {
+            "type": "number",
+            "example": 10,
+            "description": "% de descuento por defecto de este cliente (0-100), solo para prellenar el descuento de cada línea al armar una factura/cotización/pedido nuevo — el frontend lo aplica como sugerencia editable por línea, nunca se envía ni valida en el backend. No relaja ninguna regla de facturación: los límites de descuento por vendedor, el piso de costo, etc. siguen aplicando igual sobre el descuento que finalmente se envíe en cada línea."
+          },
           "cuentaCxcDefault": {
             "type": "string",
             "example": "112-01-002 - CxC Especial - JBC",
@@ -36478,7 +36488,8 @@
           },
           "rate": {
             "type": "number",
-            "example": 45000
+            "example": 45000,
+            "description": "Precio BRUTO por unidad (antes de descuentos). El servidor calcula el neto (`rate − descuento`) y ese neto es lo que suma al total (`amount = qty × neto`). Si la línea lleva descuento, el total SÍ baja respecto a `qty × rate`."
           },
           "uom": {
             "type": "string",
@@ -36497,12 +36508,12 @@
           "discountPct": {
             "type": "number",
             "example": 10,
-            "description": "% de descuento en la línea (0-100). Mutuamente excluyente con discountAmount."
+            "description": "% de descuento sobre el precio bruto (`rate`) de la línea (0-100). El neto cobrado es `rate × (1 − pct/100)`. Mutuamente excluyente con discountAmount."
           },
           "discountAmount": {
             "type": "number",
             "example": 50,
-            "description": "Descuento fijo en RD$ para la línea. Mutuamente excluyente con discountPct — use uno u otro, nunca ambos."
+            "description": "Descuento fijo en RD$ POR UNIDAD sobre el precio bruto (`rate`) de la línea. El neto cobrado es `rate − discountAmount`. Mutuamente excluyente con discountPct — use uno u otro, nunca ambos."
           },
           "componentTracking": {
             "description": "Solo cuando itemCode es un Combo y alguno de sus componentes tiene tracking de serial/lote — indica qué serial(es)/lote(s) específicos de ese componente se están vendiendo. ERPNext no los asigna automáticamente al explotar el bundle.",
@@ -36597,6 +36608,29 @@
           "numeroAutorizacion",
           "tipoCobertura",
           "valorCobertura"
+        ]
+      },
+      "PinOverrideDto": {
+        "type": "object",
+        "properties": {
+          "pin": {
+            "type": "string",
+            "example": "482913",
+            "description": "PIN de 6 dígitos del usuario autorizador."
+          },
+          "usuario": {
+            "type": "string",
+            "example": "gerente@empresa.com",
+            "description": "Email (name de User en ERPNext) del usuario dueño del PIN. Obligatorio si no se manda `codigoTarjeta`."
+          },
+          "codigoTarjeta": {
+            "type": "string",
+            "example": "EMP-00231",
+            "description": "Código de carnet/QR/barcode (`custom_admin_code`) del usuario dueño del PIN — alternativa a `usuario`. Obligatorio si no se manda `usuario`."
+          }
+        },
+        "required": [
+          "pin"
         ]
       },
       "CreateInvoiceDto": {
@@ -36711,6 +36745,14 @@
             "type": "boolean",
             "example": false,
             "description": "Solo con despacho habilitado para el tenant. `true` = a futuro: se factura y cobra ahora, la salida física se registra después con un Delivery Note (POST /despachos) — no se valida stock físico al someter. `false` = inmediato: antes de someter se confirma que las unidades existan en el almacén, igual que sin despacho. Si se omite, se conserva el comportamiento previo del tenant (a futuro, si el módulo lo permite) — ver docs/plans/PLAN_DESPACHO_FUTURO_CONFIGURABLE.md. `true` es rechazado (400) si el tenant no tiene despacho habilitado, o no permite elegir despacho a futuro por venta."
+          },
+          "pinOverride": {
+            "description": "PIN administrativo para forzar líneas que venderían por debajo del costo (ver 400 \"El precio neto de X no puede ser menor al costo de compra\") — mismo mecanismo que POST /auth/verify-admin-pin, acción \"override_costo_minimo\". Sin esto, esa validación sigue rechazando la línea; con un PIN autorizado (rol System Manager / Sales Manager / Sales Master Manager), la línea se acepta y queda auditada en GET /auth/admin-pin-log. Solo afecta el piso de costo — el tope de descuento y el tier del cliente se validan igual.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PinOverrideDto"
+              }
+            ]
           }
         },
         "required": [
@@ -36831,6 +36873,14 @@
             "type": "boolean",
             "example": false,
             "description": "Solo con despacho habilitado para el tenant. `true` = a futuro: se factura y cobra ahora, la salida física se registra después con un Delivery Note (POST /despachos) — no se valida stock físico al someter. `false` = inmediato: antes de someter se confirma que las unidades existan en el almacén, igual que sin despacho. Si se omite, se conserva el comportamiento previo del tenant (a futuro, si el módulo lo permite) — ver docs/plans/PLAN_DESPACHO_FUTURO_CONFIGURABLE.md. `true` es rechazado (400) si el tenant no tiene despacho habilitado, o no permite elegir despacho a futuro por venta."
+          },
+          "pinOverride": {
+            "description": "PIN administrativo para forzar líneas que venderían por debajo del costo (ver 400 \"El precio neto de X no puede ser menor al costo de compra\") — mismo mecanismo que POST /auth/verify-admin-pin, acción \"override_costo_minimo\". Sin esto, esa validación sigue rechazando la línea; con un PIN autorizado (rol System Manager / Sales Manager / Sales Master Manager), la línea se acepta y queda auditada en GET /auth/admin-pin-log. Solo afecta el piso de costo — el tope de descuento y el tier del cliente se validan igual.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PinOverrideDto"
+              }
+            ]
           }
         },
         "required": [
@@ -39576,6 +39626,14 @@
           },
           "sincronizarBarcodes": {
             "type": "boolean"
+          },
+          "tipoBienes606": {
+            "type": "string",
+            "description": "Solo si la transacción es tipo Venta (se acepta como compra): tipo de bienes/servicios (606) a fijar en el borrador antes de someter, si el Supplier espejo del socio no tiene su propio default configurado. Ver GET /config/catalogos-fiscales → tipoBienes606."
+          },
+          "formaPago606": {
+            "type": "string",
+            "description": "Solo si la transacción es tipo Venta: forma de pago (606) a fijar en el borrador antes de someter, mismo criterio que tipoBienes606."
           }
         },
         "required": [
@@ -42402,7 +42460,8 @@
             "type": "number"
           },
           "rate": {
-            "type": "number"
+            "type": "number",
+            "description": "Precio BRUTO por unidad (antes de descuentos). El servidor calcula el neto y ese neto es lo que suma al total."
           },
           "uom": {
             "type": "string",
@@ -42411,12 +42470,12 @@
           "discountPct": {
             "type": "number",
             "example": 10,
-            "description": "% de descuento en la línea (0-100). Mutuamente excluyente con discountAmount."
+            "description": "% de descuento sobre el precio bruto (`rate`) de la línea (0-100). El neto cobrado es `rate × (1 − pct/100)`. Mutuamente excluyente con discountAmount."
           },
           "discountAmount": {
             "type": "number",
             "example": 50,
-            "description": "Descuento fijo en RD$ para la línea. Mutuamente excluyente con discountPct — use uno u otro, nunca ambos."
+            "description": "Descuento fijo en RD$ POR UNIDAD sobre el precio bruto (`rate`) de la línea. El neto cobrado es `rate − discountAmount`. Mutuamente excluyente con discountPct — use uno u otro, nunca ambos."
           },
           "warehouse": {
             "type": "string",
@@ -42494,6 +42553,14 @@
             "type": "string",
             "example": "Dominican Republic Tax - JB",
             "description": "ID del template de impuestos del documento (Sales Taxes and Charges Template, ver /config/impuestos-ventas). Si se omite, se usa el template marcado como default para la compañía, si existe."
+          },
+          "pinOverride": {
+            "description": "PIN administrativo para forzar líneas que venderían por debajo del costo — mismo mecanismo que en Facturas (POST /invoicing/invoices), acción \"override_costo_minimo\".",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PinOverrideDto"
+              }
+            ]
           }
         },
         "required": [
@@ -42929,17 +42996,18 @@
             "type": "number"
           },
           "rate": {
-            "type": "number"
+            "type": "number",
+            "description": "Precio BRUTO por unidad (antes de descuentos). El servidor calcula el neto y ese neto es lo que suma al total."
           },
           "discountPct": {
             "type": "number",
             "example": 10,
-            "description": "% de descuento en la línea (0-100). Mutuamente excluyente con discountAmount."
+            "description": "% de descuento sobre el precio bruto (`rate`) de la línea (0-100). El neto cobrado es `rate × (1 − pct/100)`. Mutuamente excluyente con discountAmount."
           },
           "discountAmount": {
             "type": "number",
             "example": 50,
-            "description": "Descuento fijo en RD$ para la línea. Mutuamente excluyente con discountPct — use uno u otro, nunca ambos."
+            "description": "Descuento fijo en RD$ POR UNIDAD sobre el precio bruto (`rate`) de la línea. El neto cobrado es `rate − discountAmount`. Mutuamente excluyente con discountPct — use uno u otro, nunca ambos."
           },
           "warehouse": {
             "type": "string",
@@ -43034,6 +43102,14 @@
             "type": "string",
             "example": "Ventas - JBC",
             "description": "Departamento del documento (dimensión contable informativa, nunca obligatoria)."
+          },
+          "pinOverride": {
+            "description": "PIN administrativo para forzar líneas que venderían por debajo del costo — mismo mecanismo que en Facturas (POST /invoicing/invoices), acción \"override_costo_minimo\".",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PinOverrideDto"
+              }
+            ]
           }
         },
         "required": [

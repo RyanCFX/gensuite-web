@@ -38,6 +38,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { DistribucionCuentaEditor } from '@/components/shared/DistribucionCuentaEditor'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 
 interface ItemRow {
@@ -134,6 +135,15 @@ export default function GastoForm() {
   // automáticamente al cambiar de proveedor.
   const [dueDateTouched, setDueDateTouched] = useState(false)
   const [items, setItems] = useState<ItemRow[]>([emptyItem()])
+  const ITEMS_COLUMNS = [
+    { key: 'articulo', width: 220 },
+    { key: 'descripcion', width: 200 },
+    { key: 'cant', width: 90 },
+    { key: 'precio', width: 120 },
+    { key: 'cuenta', width: 220 },
+    { key: 'actions', width: 64 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
 
   const [ncfProveedor, setNcfProveedor] = useState('')
   const [billNo, setBillNo] = useState('')
@@ -854,15 +864,33 @@ export default function GastoForm() {
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               <div className="items-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
-                <table className="items-table">
+                <table className="items-table items-table-resizable">
+                  <colgroup>
+                    {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ minWidth: 180 }}>Artículo / Concepto</th>
-                      <th>Descripción</th>
-                      <th style={{ width: '10%', textAlign: 'right' }}>Qty</th>
-                      <th style={{ width: '12%', textAlign: 'right' }}>Precio</th>
-                      <th style={{ width: '18%' }}>Cuenta contable</th>
-                      <th style={{ width: '64px' }} />
+                      <th>
+                        Artículo / Concepto
+                        <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                      </th>
+                      <th>
+                        Descripción
+                        <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Qty
+                        <span className="col-resize-handle" onMouseDown={startResize('cant')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Precio
+                        <span className="col-resize-handle" onMouseDown={startResize('precio')} />
+                      </th>
+                      <th>
+                        Cuenta contable
+                        <span className="col-resize-handle" onMouseDown={startResize('cuenta')} />
+                      </th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
@@ -959,37 +987,37 @@ export default function GastoForm() {
                     ))}
                   </tbody>
                 </table>
+              </div>
 
-                {b17Error && (
-                  <div style={{ padding: '12px 16px' }}>
-                    <div className="inline-alert inline-alert-error">
-                      <AlertCircle size={16} />
-                      Gastos Menores no pueden superar RD$50.00. Total actual: {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(grandTotal)}
-                    </div>
+              {b17Error && (
+                <div style={{ padding: '12px 16px' }}>
+                  <div className="inline-alert inline-alert-error">
+                    <AlertCircle size={16} />
+                    Gastos Menores no pueden superar RD$50.00. Total actual: {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(grandTotal)}
+                  </div>
+                </div>
+              )}
+
+              <div className="items-total-row">
+                <div className="items-total-line">
+                  <span>Subtotal</span>
+                  <span>{currency(subtotal)}</span>
+                </div>
+                {impuestoAmount > 0 && (
+                  <div className="items-total-line" style={{ color: 'var(--text-secondary)' }}>
+                    <span>Impuesto ({impuestoRate.toFixed(2)}%)</span>
+                    <span>+ {currency(impuestoAmount)}</span>
                   </div>
                 )}
-
-                <div className="items-total-row">
-                  <div className="items-total-line">
-                    <span>Subtotal</span>
-                    <span>{currency(subtotal)}</span>
+                {retencionAmount > 0 && (
+                  <div className="items-total-line" style={{ color: 'var(--text-secondary)' }}>
+                    <span>Retenciones ({retencionRate.toFixed(2)}%)</span>
+                    <span>- {currency(retencionAmount)}</span>
                   </div>
-                  {impuestoAmount > 0 && (
-                    <div className="items-total-line" style={{ color: 'var(--text-secondary)' }}>
-                      <span>Impuesto ({impuestoRate.toFixed(2)}%)</span>
-                      <span>+ {currency(impuestoAmount)}</span>
-                    </div>
-                  )}
-                  {retencionAmount > 0 && (
-                    <div className="items-total-line" style={{ color: 'var(--text-secondary)' }}>
-                      <span>Retenciones ({retencionRate.toFixed(2)}%)</span>
-                      <span>- {currency(retencionAmount)}</span>
-                    </div>
-                  )}
-                  <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
-                    <span>Total</span>
-                    <strong>{currency(grandTotal)}</strong>
-                  </div>
+                )}
+                <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
+                  <span>Total</span>
+                  <strong>{currency(grandTotal)}</strong>
                 </div>
               </div>
             </div>

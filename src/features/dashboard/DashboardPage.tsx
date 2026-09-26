@@ -69,69 +69,108 @@ function ChartPlaceholder({ title, sub }: { title: string; sub: string }) {
   )
 }
 
-// SVG dibujado a mano (no Recharts): en recharts@3.9.2 un BarChart con dos series de signo
-// mixto (positiva/negativa) en la misma categoría produce barras cuya altura no coincide con
-// la escala real del eje Y — a veces ni se renderizan según la cantidad de categorías. Es un
-// bug de la librería, no de los datos. Con SVG propio controlamos la escala nosotros mismos.
+// Gráfica divergente con HTML/CSS (no SVG): el SVG anterior usaba
+// `preserveAspectRatio="none"` y estiraba los números de los ejes y el radio de
+// las barras según el ancho del contenedor. Con layout HTML los labels nunca se
+// escalan y las barras son píldoras como la referencia (mint arriba / teal
+// abajo, con gap en la línea cero).
+// Etiqueta compacta del eje Y: nunca más de ~4 caracteres para que no se
+// desborde del gutter (ej. 8M en vez de 8000k, 2.5M, 500k).
+function formatAxisValue(v: number): string {
+  const a = Math.abs(v)
+  if (a >= 1_000_000) {
+    const m = v / 1_000_000
+    return `${Number.isInteger(m) ? m.toFixed(0) : m.toFixed(1)}M`
+  }
+  if (a >= 1000) return `${(v / 1000).toFixed(0)}k`
+  return `${Math.round(v)}`
+}
 function DivergingBarChart({ data, height = 220, currency }: {
   data: { label: string; ingresos: number; gastos: number }[]
   height?: number
   /** Moneda base de la compañía (`kpis.currency`). */
   currency?: string
 }) {
-  const viewW = 600
   const padLeft = 34
-  const padRight = 6
-  const padTop = 8
-  const padBottom = 20
-  const plotW = viewW - padLeft - padRight
-  const plotH = height - padTop - padBottom
-  const midY = padTop + plotH / 2
+  const padBottom = 28
+  // Sin gap: las barras nacen pegadas a la línea divisora (0k). El `overflow:
+  // hidden` de cada mitad impide que la crucen.
+  const gap = 0
+  const barW = 20
+  const plotH = height - padBottom
+  const halfH = plotH / 2
+  /** Alto disponible para la barra dentro de cada mitad (descontando el gap de la línea cero). */
+  const availH = halfH - gap
+  const midPct = 50
 
   const rawMax = data.reduce((m, d) => Math.max(m, d.ingresos, d.gastos), 0)
   const maxAbs = Math.ceil((rawMax || 1) / 1000) * 1000
-  const scale = (plotH / 2) / maxAbs
-
-  const band = plotW / data.length
-  const barW = Math.min(28, band * 0.5)
 
   const gridSteps = [-1, -2 / 3, -1 / 3, 0, 1 / 3, 2 / 3, 1]
 
   return (
-    <svg viewBox={`0 0 ${viewW} ${height}`} width="100%" height={height} preserveAspectRatio="none" role="img" aria-label="Ingresos vs. Gastos">
+    <div role="img" aria-label="Ingresos vs. Gastos" style={{ height, position: 'relative', paddingLeft: padLeft, paddingBottom: padBottom, boxSizing: 'border-box' }}>
+      {/* Líneas de grid + etiquetas del eje Y (HTML: nunca se distorsionan) */}
       {gridSteps.map((step) => {
-        const y = midY - step * maxAbs * scale
+        const topPct = midPct - step * 50
         return (
-          <g key={step}>
-            <line x1={padLeft} x2={viewW - padRight} y1={y} y2={y} stroke={step === 0 ? 'var(--dash-border-2)' : 'var(--dash-border)'} strokeDasharray={step === 0 ? undefined : '3 3'} />
-            <text x={padLeft - 6} y={y} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="var(--dash-ink-400)">
-              {`${(step * maxAbs / 1000).toFixed(0)}k`}
-            </text>
-          </g>
+          <div key={step} style={{ position: 'absolute', left: 0, right: 0, top: `${(topPct / 100) * plotH}px`, display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+            <span style={{ width: padLeft - 6, paddingRight: 6, textAlign: 'right', fontSize: 10, lineHeight: 1, color: 'var(--dash-ink-400)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+              {formatAxisValue(step * maxAbs)}
+            </span>
+            <span style={{ flex: 1, borderTop: '1px dashed var(--dash-border)' }} />
+          </div>
         )
       })}
-      {data.map((d, i) => {
-        const cx = padLeft + band * i + band / 2
-        const x = cx - barW / 2
-        const ingresosH = d.ingresos * scale
-        const gastosH = d.gastos * scale
-        return (
-          <g key={d.label}>
-            {ingresosH > 0 && (
-              <rect x={x} y={midY - ingresosH} width={barW} height={ingresosH} rx={4} fill="var(--dash-mint)">
-                <title>{`Ingresos ${d.label}: ${formatMoney(d.ingresos, currency)}`}</title>
-              </rect>
-            )}
-            {gastosH > 0 && (
-              <rect x={x} y={midY} width={barW} height={gastosH} rx={4} fill="var(--dash-teal)">
-                <title>{`Gastos ${d.label}: ${formatMoney(d.gastos, currency)}`}</title>
-              </rect>
-            )}
-            <text x={cx} y={height - 4} textAnchor="middle" fontSize={10} fill="var(--dash-ink-400)">{d.label}</text>
-          </g>
-        )
-      })}
-    </svg>
+      {/* Columnas de barras (sin overflow aquí: las etiquetas del eje X van fuera de su caja) */}
+      <div style={{ position: 'relative', height: plotH, display: 'flex', alignItems: 'stretch' }}>
+        {data.map((d) => {
+          // Alturas en px (no en %): deterministas y siempre ancladas a la línea cero.
+          const ingresosPx = d.ingresos > 0 ? Math.max(6, (d.ingresos / maxAbs) * availH) : 0
+          const gastosPx = d.gastos > 0 ? Math.max(6, (d.gastos / maxAbs) * availH) : 0
+          return (
+            <div key={d.label} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+              {/* Mitad superior: ingresos — anclada abajo (línea cero), con clip */}
+              <div style={{ height: halfH, width: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: gap, boxSizing: 'border-box', overflow: 'hidden' }}>
+                {ingresosPx > 0 && (
+                  <div
+                    title={`Ingresos ${d.label}: ${formatMoney(d.ingresos, currency)}`}
+                    style={{
+                      width: barW,
+                      maxWidth: '50%',
+                      height: ingresosPx,
+                      flexShrink: 0,
+                      background: 'var(--dash-mint)',
+                      borderRadius: '999px 999px 3px 3px',
+                    }}
+                  />
+                )}
+              </div>
+              {/* Mitad inferior: gastos — anclada arriba (línea cero), con clip */}
+              <div style={{ height: halfH, width: '100%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: gap, boxSizing: 'border-box', overflow: 'hidden' }}>
+                {gastosPx > 0 && (
+                  <div
+                    title={`Gastos ${d.label}: ${formatMoney(d.gastos, currency)}`}
+                    style={{
+                      width: barW,
+                      maxWidth: '50%',
+                      height: gastosPx,
+                      flexShrink: 0,
+                      background: 'var(--dash-teal)',
+                      borderRadius: '3px 3px 999px 999px',
+                    }}
+                  />
+                )}
+              </div>
+              {/* Etiqueta del eje X */}
+              <span style={{ position: 'absolute', bottom: -padBottom, left: '50%', transform: 'translateX(-50%)', fontSize: 10, lineHeight: `${padBottom}px`, color: 'var(--dash-ink-400)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {d.label}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

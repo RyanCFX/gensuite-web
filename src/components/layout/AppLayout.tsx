@@ -255,7 +255,7 @@ const NAV_OPS: NavEntry[] = [
     icon: <ShoppingCart size={16} aria-hidden="true" />,
     prefix: "/compras",
     children: [
-      { label: "Compras", icon: <ShoppingCart size={14} />, path: "/compras" },
+      { label: "Compras", icon: <ShoppingCart size={14} />, path: "/compras", exact: true },
       {
         label: "Solicitudes de Compra",
         icon: <ClipboardList size={14} />,
@@ -309,7 +309,7 @@ const NAV_OPS: NavEntry[] = [
     icon: <Handshake size={16} aria-hidden="true" />,
     prefix: "/relaciones-comerciales",
     children: [
-      { label: "Socios y Solicitudes", icon: <Handshake size={14} />, path: "/relaciones-comerciales" },
+      { label: "Socios y Solicitudes", icon: <Handshake size={14} />, path: "/relaciones-comerciales", exact: true },
       { label: "Transacciones B2B", icon: <ArrowLeftRight size={14} />, path: "/relaciones-comerciales/transacciones" },
     ],
   },

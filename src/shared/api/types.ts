@@ -318,6 +318,12 @@ export interface Customer {
   branch?: string;
   /** Mode of Payment por defecto — prellena el método de pago al facturar a este cliente. */
   formaPagoDefault?: string;
+  /** % de descuento por defecto de este cliente (0-100), solo para prellenar el descuento de cada
+   *  línea al armar una factura/cotización/pedido nuevo — el frontend lo aplica como sugerencia
+   *  editable por línea, nunca se envía ni valida en el backend. No relaja ninguna regla de
+   *  facturación: los límites de descuento por vendedor, el piso de costo, etc. siguen aplicando
+   *  igual sobre el descuento que finalmente se envíe en cada línea. */
+  descuentoDefaultPct?: number | null;
   /** Cuenta contable (Account) alterna para la CxC de este cliente — si se omite, se usa el default de la compañía. */
   cuentaCxcDefault?: string;
   /** Moneda por defecto de este cliente ('DOP'|'USD'|'EUR') — debe estar habilitada primero si
@@ -354,6 +360,8 @@ export interface CreateCustomerDto {
   telefonos?: TelefonoCliente[];
   branch?: string;
   formaPagoDefault?: string;
+  /** Ver `Customer.descuentoDefaultPct` — 0-100, `null` limpia el default en edición. */
+  descuentoDefaultPct?: number | null;
   cuentaCxcDefault?: string;
   /** Ver `Customer.defaultCurrency`. Si al editar se manda igual a la moneda base de la
    *  compañía, el backend limpia `cuentaCxcDefault` automáticamente salvo que también se
@@ -727,6 +735,10 @@ export interface CreateInvoiceDto {
    *  conserva el comportamiento por defecto del tenant. `true` sin despacho habilitado, o sin
    *  despachoFuturoHabilitado, responde 400. */
   despachoFuturo?: boolean;
+  /** Solo al reintentar tras un 400 de "el precio neto de X no puede ser menor al costo de
+   *  compra" — autoriza esa venta bajo costo. El backend verifica el PIN dentro de este mismo
+   *  request (no hace falta llamar a /auth/verify-admin-pin aparte). */
+  pinOverride?: PinOverrideDto;
 }
 
 /**
@@ -837,6 +849,8 @@ export interface CreateQuotationDto {
   notes?: string;
   /** ID de un Sales Taxes and Charges Template (/config/impuestos-ventas). Si se omite, se usa el default de la compañía si existe. */
   taxesTemplate?: string;
+  /** Ver `CreateInvoiceDto.pinOverride` — mismo mecanismo, misma condición de uso. */
+  pinOverride?: PinOverrideDto;
 }
 
 export type UpdateQuotationDto = Partial<CreateQuotationDto>;
@@ -1703,6 +1717,8 @@ export interface CreatePedidoDto {
    *  excluyente con `isLayaway`: un pedido a futuro nunca pide confirmación de despacho (§2/§4.1
    *  de docs/tasks/79_confirmacion_despacho_pedido.md). */
   despachoFuturo?: boolean;
+  /** Ver `CreateInvoiceDto.pinOverride` — mismo mecanismo, misma condición de uso. */
+  pinOverride?: PinOverrideDto;
 }
 
 export type UpdatePedidoDto = Partial<CreatePedidoDto>;
@@ -1833,6 +1849,20 @@ export interface VerifyPinDto {
   usuario?: string;
   /** Código de carnet/QR/barcode (adminCode) del dueño del PIN — alternativa a `usuario` para
    *  resolverlo por escaneo. Obligatorio si no se manda `usuario`. */
+  codigoTarjeta?: string;
+}
+
+/** Autorización de PIN embebida directamente en el body de creación/edición de Factura, Pedido o
+ *  Cotización — a diferencia de `VerifyPinDto` (POST /auth/verify-admin-pin aparte), acá el
+ *  backend verifica el PIN DENTRO del mismo request al reintentarlo tras un 400 de "no puede ser
+ *  menor al costo de compra". `usuario` y `codigoTarjeta` son mutuamente excluyentes — nunca
+ *  mandar ambos. */
+export interface PinOverrideDto {
+  /** PIN de 6 dígitos del usuario autorizador. */
+  pin: string;
+  /** Email del dueño del PIN. Obligatorio si no se manda `codigoTarjeta`. */
+  usuario?: string;
+  /** Código de carnet/QR/barcode (adminCode) del dueño del PIN — alternativa a `usuario`. */
   codigoTarjeta?: string;
 }
 

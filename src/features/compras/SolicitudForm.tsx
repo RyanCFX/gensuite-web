@@ -25,6 +25,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -55,6 +56,16 @@ export default function SolicitudForm() {
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0])
   const [scheduleDate, setScheduleDate] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem(defaultWh)])
+  const ITEMS_COLUMNS = [
+    { key: 'articulo', width: 220 },
+    { key: 'descripcion', width: 220 },
+    { key: 'cant', width: 80 },
+    { key: 'precio', width: 130 },
+    { key: 'almacen', width: 160 },
+    { key: 'udm', width: 120 },
+    { key: 'actions', width: 40 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
   const [branch, setBranch] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
@@ -334,16 +345,37 @@ export default function SolicitudForm() {
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               <div className="items-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
-                <table className="items-table">
+                <table className="items-table items-table-resizable">
+                  <colgroup>
+                    {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ minWidth: 180 }}>Artículo</th>
-                      <th>Descripción</th>
-                      <th style={{ width: '9%', textAlign: 'right' }}>Qty</th>
-                      <th style={{ width: '13%', textAlign: 'right' }}>Precio Estimado</th>
-                      <th style={{ width: '16%' }}>Almacén</th>
-                      <th style={{ width: '8%' }}>UOM</th>
-                      <th style={{ width: '40px' }} />
+                      <th>
+                        Artículo
+                        <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                      </th>
+                      <th>
+                        Descripción
+                        <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Qty
+                        <span className="col-resize-handle" onMouseDown={startResize('cant')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Precio Estimado
+                        <span className="col-resize-handle" onMouseDown={startResize('precio')} />
+                      </th>
+                      <th>
+                        Almacén
+                        <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                      </th>
+                      <th>
+                        UOM
+                        <span className="col-resize-handle" onMouseDown={startResize('udm')} />
+                      </th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
@@ -429,11 +461,11 @@ export default function SolicitudForm() {
                     ))}
                   </tbody>
                 </table>
-                <div className="items-total-row">
-                  <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
-                    <span>Total Estimado</span>
-                    <strong>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(grandTotal)}</strong>
-                  </div>
+              </div>
+              <div className="items-total-row">
+                <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
+                  <span>Total Estimado</span>
+                  <strong>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(grandTotal)}</strong>
                 </div>
               </div>
             </div>

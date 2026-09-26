@@ -23,6 +23,7 @@ import { MOTIVOS_ANULACION_ARS, esCoberturaCompleta } from '@/shared/api/types'
 import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DEVOLUCION_DIAS_LIMITE_ITBIS } from '@/lib/constants'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const RETURN_RESOLUTION_OPTIONS: SearchSelectOption[] = [
   { value: 'credit_note_only', label: 'Saldo a favor' },
@@ -134,6 +135,13 @@ export default function DevolucionForm() {
 
   const [returnFullInvoice, setReturnFullInvoice] = useState(true)
   const [returnRows, setReturnRows] = useState<ReturnRow[]>([])
+  const ITEMS_COLUMNS = [
+    { key: 'check', width: 36 },
+    { key: 'articulo', width: 260 },
+    { key: 'comprado', width: 100 },
+    { key: 'devolver', width: 120 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
   const [returnResolution, setReturnResolution] = useState<'refund' | 'credit_note_only'>('credit_note_only')
   const [returnModeOfPayment, setReturnModeOfPayment] = useState('')
   const [returnReason, setReturnReason] = useState('')
@@ -464,13 +472,26 @@ export default function DevolucionForm() {
 
               {!returnFullInvoice && (
                 <div className="items-table-wrap">
-                  <table className="items-table">
+                  <table className="items-table items-table-resizable">
+                    <colgroup>
+                      {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                    </colgroup>
                     <thead>
                       <tr>
-                        <th style={{ width: 36 }} />
-                        <th>Artículo</th>
-                        <th style={{ textAlign: 'right', width: 100 }}>Comprado</th>
-                        <th style={{ textAlign: 'right', width: 120 }}>Cant. a devolver</th>
+                        <th>
+                          <span className="col-resize-handle" onMouseDown={startResize('check')} />
+                        </th>
+                        <th>
+                          Artículo
+                          <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                        </th>
+                        <th style={{ textAlign: 'right' }}>
+                          Comprado
+                          <span className="col-resize-handle" onMouseDown={startResize('comprado')} />
+                        </th>
+                        <th style={{ textAlign: 'right' }}>
+                          Cant. a devolver
+                        </th>
                       </tr>
                     </thead>
                     <tbody>

@@ -274,7 +274,7 @@ export default function UsuariosPage() {
       adminCode: adminCode || undefined,
       ...(selectedPerfiles.length > 0 ? { perfiles: selectedPerfiles } : {}),
       branches: isSystemManager ? undefined : selectedBranches,
-      defaultBranch: isSystemManager ? undefined : (defaultBranch || undefined),
+      defaultBranch: defaultBranch || undefined,
       defaultPosProfile: defaultPosProfile || undefined,
     }
     updateMutation.mutate({ email: editingUser.email, data: payload })
@@ -596,63 +596,66 @@ export default function UsuariosPage() {
                     </label>
                   </div>
                 ) : (
-                  <>
-                    <div className="ff-wrap">
-                      <label className="ff-label">
-                        Sucursales asignadas
-                        <FieldTooltip>El usuario solo podrá crear documentos desde estas sucursales.</FieldTooltip>
-                      </label>
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: 8,
-                        maxHeight: 160,
-                        overflowY: 'auto',
-                        border: '1px solid var(--border-default)',
-                        borderRadius: 'var(--radius-md)',
-                        padding: 12,
-                      }}>
-                        {sucursales.length === 0 ? (
-                          <p style={{ fontSize: 13, color: 'var(--text-tertiary)', gridColumn: '1 / -1' }}>
-                            No hay sucursales configuradas.
-                          </p>
-                        ) : (
-                          sucursales.map((s) => (
-                            <label key={s.id} className="ff-check-wrap">
-                              <input
-                                type="checkbox"
-                                className="ff-check"
-                                checked={selectedBranches.includes(s.name)}
-                                onChange={() =>
-                                  setSelectedBranches((prev) =>
-                                    prev.includes(s.name)
-                                      ? prev.filter((x) => x !== s.name)
-                                      : [...prev, s.name],
-                                  )
-                                }
-                              />
-                              <span style={{ fontSize: 13 }}>{s.name}</span>
-                            </label>
-                          ))
-                        )}
-                      </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">
+                      Sucursales asignadas
+                      <FieldTooltip>El usuario solo podrá crear documentos desde estas sucursales.</FieldTooltip>
+                    </label>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: 8,
+                      maxHeight: 160,
+                      overflowY: 'auto',
+                      border: '1px solid var(--border-default)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: 12,
+                    }}>
+                      {sucursales.length === 0 ? (
+                        <p style={{ fontSize: 13, color: 'var(--text-tertiary)', gridColumn: '1 / -1' }}>
+                          No hay sucursales configuradas.
+                        </p>
+                      ) : (
+                        sucursales.map((s) => (
+                          <label key={s.id} className="ff-check-wrap">
+                            <input
+                              type="checkbox"
+                              className="ff-check"
+                              checked={selectedBranches.includes(s.name)}
+                              onChange={() =>
+                                setSelectedBranches((prev) =>
+                                  prev.includes(s.name)
+                                    ? prev.filter((x) => x !== s.name)
+                                    : [...prev, s.name],
+                                )
+                              }
+                            />
+                            <span style={{ fontSize: 13 }}>{s.name}</span>
+                          </label>
+                        ))
+                      )}
                     </div>
-
-                    <div className="ff-wrap">
-                      <label className="ff-label">Sucursal por defecto</label>
-                      <SearchSelect
-                        value={defaultBranch}
-                        onChange={setDefaultBranch}
-                        options={selectedBranches
-                          .filter((b) => !defaultBranchSearch || b.toLowerCase().includes(defaultBranchSearch.toLowerCase()))
-                          .map((b): SearchSelectOption => ({ value: b, label: b }))}
-                        onSearch={setDefaultBranchSearch}
-                        selectedLabel={defaultBranch}
-                        placeholder="Sin sucursal por defecto"
-                      />
-                    </div>
-                  </>
+                  </div>
                 )}
+
+                <div className="ff-wrap">
+                  <label className="ff-label">
+                    Sucursal por defecto
+                    {isSystemManager && (
+                      <FieldTooltip>Se preselecciona al crear documentos, pero se puede cambiar en cada documento.</FieldTooltip>
+                    )}
+                  </label>
+                  <SearchSelect
+                    value={defaultBranch}
+                    onChange={setDefaultBranch}
+                    options={(isSystemManager ? sucursales.map((s) => s.name) : selectedBranches)
+                      .filter((b) => !defaultBranchSearch || b.toLowerCase().includes(defaultBranchSearch.toLowerCase()))
+                      .map((b): SearchSelectOption => ({ value: b, label: b }))}
+                    onSearch={setDefaultBranchSearch}
+                    selectedLabel={defaultBranch}
+                    placeholder="Sin sucursal por defecto"
+                  />
+                </div>
 
                 <div className="ff-wrap">
                   <label className="ff-label">

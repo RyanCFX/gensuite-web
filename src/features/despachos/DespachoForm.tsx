@@ -20,6 +20,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 interface ItemRow {
   itemCode: string
@@ -43,6 +44,13 @@ export default function DespachoForm() {
   const [department, setDepartment] = useState('')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyRow()])
+  const ITEMS_COLUMNS = [
+    { key: 'articulo', width: 240 },
+    { key: 'cantidad', width: 100 },
+    { key: 'almacen', width: 200 },
+    { key: 'actions', width: 64 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
@@ -182,13 +190,25 @@ export default function DespachoForm() {
           </div>
           <div className="card-body" style={{ padding: 0 }}>
             <div className="items-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
-              <table className="items-table">
+              <table className="items-table items-table-resizable">
+                <colgroup>
+                  {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th style={{ minWidth: 240 }}>Artículo</th>
-                    <th style={{ width: '15%', textAlign: 'right' }}>Cantidad</th>
-                    <th style={{ width: '30%' }}>Almacén</th>
-                    <th style={{ width: 64 }} />
+                    <th>
+                      Artículo
+                      <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Cantidad
+                      <span className="col-resize-handle" onMouseDown={startResize('cantidad')} />
+                    </th>
+                    <th>
+                      Almacén
+                      <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                    </th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>

@@ -49,6 +49,7 @@ const schema = z.object({
   })).optional(),
   branch: z.string().optional(),
   formaPagoDefault: z.string().optional(),
+  descuentoDefaultPct: z.number().min(0, 'Debe ser entre 0 y 100').max(100, 'Debe ser entre 0 y 100').optional(),
   cuentaCxcDefault: z.string().optional(),
   defaultCurrency: z.string().optional(),
   encargadoCxc: z.string().email('Email inválido').optional().or(z.literal('')),
@@ -157,6 +158,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
       telefonos: [],
       branch: '',
       formaPagoDefault: '',
+      descuentoDefaultPct: undefined,
       cuentaCxcDefault: '',
       defaultCurrency: '',
       encargadoCxc: '',
@@ -191,6 +193,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
         telefonos: customer.telefonos ?? [],
         branch: customer.branch ?? '',
         formaPagoDefault: customer.formaPagoDefault ?? '',
+        descuentoDefaultPct: customer.descuentoDefaultPct ?? undefined,
         cuentaCxcDefault: customer.cuentaCxcDefault ?? '',
         defaultCurrency: customer.defaultCurrency ?? '',
         encargadoCxc: customer.encargadoCxc ?? '',
@@ -252,6 +255,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
       telefonos: values.telefonos && values.telefonos.length > 0 ? values.telefonos : undefined,
       branch: values.branch || undefined,
       formaPagoDefault: values.formaPagoDefault || undefined,
+      descuentoDefaultPct: values.descuentoDefaultPct,
       cuentaCxcDefault: values.cuentaCxcDefault || undefined,
       defaultCurrency: values.defaultCurrency || undefined,
       encargadoCxc: values.encargadoCxc || undefined,
@@ -717,6 +721,31 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
                   </Select>
                 )}
               />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="ff-wrap">
+              <label className="ff-label" htmlFor="descuentoDefaultPct">
+                % Descuento por Defecto
+                <FieldTooltip>
+                  Sugiere este descuento al agregar líneas nuevas en factura/pedido/cotización — puramente informativo,
+                  editable por línea en cualquier momento. Vacío = sin descuento por defecto.
+                </FieldTooltip>
+              </label>
+              <input
+                id="descuentoDefaultPct"
+                type="number"
+                min={0}
+                max={100}
+                step={0.01}
+                placeholder="Sin descuento por defecto"
+                className={`ff-input${errors.descuentoDefaultPct ? ' ff-input-error' : ''}`}
+                {...register('descuentoDefaultPct', {
+                  setValueAs: (v) => (v === '' ? undefined : Number(v)),
+                })}
+              />
+              {errors.descuentoDefaultPct && <p className="ff-error">{errors.descuentoDefaultPct.message}</p>}
             </div>
           </div>
 
