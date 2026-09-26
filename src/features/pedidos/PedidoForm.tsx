@@ -7,7 +7,9 @@ import { createPedido, updatePedido, getPedido, getPedidoDuplicateSource } from 
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getQuotation } from '@/shared/api/quotations'
 import { getLayawayConfig, listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
-import type { Item, ItemPrices, CreatePedidoDto, Bundle, Customer, ItemStock, MonedaCode } from '@/shared/api/types'
+import type { Item, ItemPrices, CreatePedidoDto, Bundle, Customer, ItemStock, MonedaCode, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
+import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
+import { mergeLineasIguales } from '@/shared/lib/mergeLineasIguales'
 import { getTasaVigente } from '@/shared/api/monedas'
 import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { useItemInventory } from '@/shared/hooks/useItemInventory'
@@ -32,7 +34,7 @@ import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
-import { listItems, getDefaultPriceTier } from '@/shared/api/catalog'
+import { listItems, getDefaultPriceTier, getItem } from '@/shared/api/catalog'
 import { client, isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales, getSucursal } from '@/shared/api/sucursales'
@@ -66,6 +68,14 @@ interface LineItem {
   warehouse: string
   /** Stock por almacén del artículo seleccionado, para validar contra el almacén elegido en la línea */
   _stockByWarehouse?: Record<string, number>
+  /** Combinación de dimensión de inventario elegida para esta línea (docs/tasks/
+   *  PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §5) — solo relevante si el artículo la usa. */
+  dimensiones?: DimensionesLinea
+  /** Dimensiones que el artículo de esta línea declara (`item.dimensiones`), guardadas en la fila
+   *  al seleccionar el artículo (o al re-consultar el catálogo al hidratar desde una cotización, un
+   *  pedido a duplicar o un pedido existente) para poder renderizar el selector de combinación sin
+   *  tener que re-pedirlo. Vacío/undefined si el artículo no usa dimensiones. */
+  itemDimensionesDeclaradas?: ItemDimensionDeclarada[]
 }
 
 // Un Pedido no valida disponibilidad del lado del servidor antes de crearse (ni siquiera al
@@ -262,16 +272,21 @@ const [customerId, setCustomerId] = useState('')
   useEffect(() => {
     if (!quotationId || loaded || isEdit) return
     setLoaded(true)
-    getQuotation(quotationId).then((q) => {
+    getQuotation(quotationId).then(async (q) => {
       setCustomerId(q.customer)
       setTransactionDate(todayIso())
       // Se hereda tal cual de la cotización — nunca se re-resuelve contra el cliente actual.
       setCurrency(q.currency ?? '')
       setConversionRate(q.conversionRate ?? '')
-      setItems(q.items.map((i) => {
+      // GET /quotations/:id tampoco ecoa la combinación de dimensión elegida por línea (§10.2) — se
+      // re-consulta el catálogo solo para saber si el artículo USA dimensiones y así mostrar el
+      // selector vacío, obligando a reingresar la combinación en este nuevo Pedido.
+      const catalogItems = await Promise.all(q.items.map((i) => getItem(i.itemCode).catch(() => null)))
+      setItems(q.items.map((i, idx) => {
         const discountAmount = i.discountAmount ?? 0
         const discountPct = discountAmount > 0 ? 0 : (i.discountPct ?? 0)
         const discountMode: 'pct' | 'amount' = discountAmount > 0 ? 'amount' : 'pct'
+        const catalogItem = catalogItems[idx]
         return {
           itemCode: i.itemCode,
           description: i.description ?? '',
@@ -285,6 +300,7 @@ const [customerId, setCustomerId] = useState('')
           uom: i.uom,
           conversionFactor: 1,
           warehouse: '',
+          itemDimensionesDeclaradas: catalogItem?.usaDimensiones ? catalogItem.dimensiones : undefined,
         }
       }))
       setNotes(q.notes ?? '')
@@ -295,13 +311,18 @@ const [customerId, setCustomerId] = useState('')
   useEffect(() => {
     if (!duplicateId || loaded || isEdit || quotationId) return
     setLoaded(true)
-    getPedidoDuplicateSource(duplicateId).then((src) => {
+    getPedidoDuplicateSource(duplicateId).then(async (src) => {
       setCustomerId(src.customer)
       setTransactionDate(todayIso())
-      setItems(src.items.map((i) => {
+      // GET /pedidos/:id/duplicate-source tampoco ecoa la combinación de dimensión elegida por línea
+      // (§10.2) — se re-consulta el catálogo solo para saber si el artículo USA dimensiones y así
+      // mostrar el selector vacío, obligando a reingresar la combinación en este nuevo Pedido.
+      const catalogItems = await Promise.all(src.items.map((i) => getItem(i.itemCode).catch(() => null)))
+      setItems(src.items.map((i, idx) => {
         const discountAmount = i.discountAmount ?? 0
         const discountPct = discountAmount > 0 ? 0 : (i.discountPct ?? 0)
         const discountMode: 'pct' | 'amount' = discountAmount > 0 ? 'amount' : 'pct'
+        const catalogItem = catalogItems[idx]
         return {
           itemCode: i.itemCode,
           description: i.description ?? '',
@@ -315,6 +336,7 @@ const [customerId, setCustomerId] = useState('')
           uom: 'Unidad',
           conversionFactor: 1,
           warehouse: '',
+          itemDimensionesDeclaradas: catalogItem?.usaDimensiones ? catalogItem.dimensiones : undefined,
         }
       }))
       getCustomer(src.customer).then((c) => {
@@ -374,6 +396,23 @@ useEffect(() => {
      }
      setLoaded(true)
    }, [existing])
+
+  // GET /pedidos/:id no ecoa la combinación de dimensión elegida por línea (§10.2) — al editar solo
+  // podemos saber si el artículo de cada línea USA dimensiones (re-consultando el catálogo) para
+  // mostrarle el selector y obligarlo a reingresarla antes de guardar (§10.1/§10.2, opción (b) de
+  // las sugeridas por el documento).
+  useEffect(() => {
+    if (!existing) return
+    let cancelled = false
+    Promise.all(existing.items.map((i) => getItem(i.itemCode).catch(() => null))).then((catalogItems) => {
+      if (cancelled) return
+      setItems((prev) => prev.map((row, idx) => {
+        const catalogItem = catalogItems[idx]
+        return catalogItem?.usaDimensiones ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones } : row
+      }))
+    })
+    return () => { cancelled = true }
+  }, [existing])
 
   const { data: customersData } = useQuery({
     queryKey: ['customerSearch', customerQuery],
@@ -626,6 +665,10 @@ useEffect(() => {
           _prices: catalogItem.prices,
           warehouse: defaultWarehouse(),
           _stockByWarehouse: catalogItem.stockByWarehouse,
+          // Un artículo nuevo en la fila implica una combinación nueva — nunca arrastramos la
+          // combinación del artículo anterior (docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §5).
+          itemDimensionesDeclaradas: catalogItem.usaDimensiones ? catalogItem.dimensiones : undefined,
+          dimensiones: undefined,
         }
       })
     })
@@ -663,6 +706,9 @@ useEffect(() => {
           _prices: bundle.prices,
           warehouse: defaultWarehouse(),
           _stockByWarehouse: undefined,
+          // Un combo no declara dimensiones de inventario propias.
+          itemDimensionesDeclaradas: undefined,
+          dimensiones: undefined,
         }
       })
     })
@@ -693,6 +739,9 @@ useEffect(() => {
           _prices: s.item.prices,
           warehouse: defaultWarehouse(),
           _stockByWarehouse: s.item.stockByWarehouse,
+          // Variantes y dimensiones son mutuamente excluyentes por artículo (§0.4) — se respeta el
+          // flag igual que en las demás vías de selección, por si alguna vez dejara de serlo.
+          itemDimensionesDeclaradas: s.item.usaDimensiones ? s.item.dimensiones : undefined,
         }
       }),
     ])
@@ -742,10 +791,31 @@ useEffect(() => {
   const totalDiscount = grossTotal - subtotal
   const total = subtotal
 
+  // Al editar, ninguna línea trae de vuelta su combinación previa (§10.2) — si el artículo la usa
+  // y la fila todavía no tiene una elegida, hay que avisarle al usuario que la reingrese antes de
+  // guardar (si no, el PUT la reenviaría vacía y el servidor rechazaría esa línea, §11).
+  const lineasRequierenReingresoDimension = isEdit && items.some(
+    (i) => (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
+  )
+
 /** Arma el body de creación/edición desde el estado actual del formulario — usado tanto en el
  *  submit normal como al reintentar con `pinOverride` (override de descuento y de costo). */
 function buildDto(): CreatePedidoDto {
-     const itemsDto = items.filter((i) => i.itemCode).map((i) => ({
+     // Fusiona líneas del mismo artículo con la misma combinación de dimensión exacta antes de
+     // armar el payload (§5.1) — evita dejarle al servidor un único error de "stock insuficiente"
+     // sobre la suma sin que el usuario entienda por qué dos líneas separadas sumaban demasiado.
+     const merged = mergeLineasIguales(items.filter((i) => i.itemCode), {
+       getItemCode: (r) => r.itemCode,
+       getDimensiones: (r) => r.dimensiones,
+       sumQty: (base, extra) => {
+         const qty = base.qty + extra.qty
+         const amount = base.discountMode === 'amount'
+           ? calcAmount(qty, base.rate, 0, base.discountAmount)
+           : calcAmount(qty, base.rate, base.discountPct)
+         return { ...base, qty, amount }
+       },
+     })
+     const itemsDto = merged.map((i) => ({
        itemCode: i.itemCode,
        qty: i.qty,
        rate: i.rate,
@@ -755,6 +825,9 @@ function buildDto(): CreatePedidoDto {
        discountAmount: i.discountMode === 'amount' ? (i.discountAmount || undefined) : undefined,
        warehouse: i.warehouse || undefined,
        uom: i.uom || undefined,
+       // Se reenvía SIEMPRE en cada guardado (create y PUT) — la conservación automática de
+       // /pedidos en el PUT es una heurística frágil (§7.2/§10.1), nunca hay que depender de ella.
+       ...(i.dimensiones && Object.keys(i.dimensiones).length > 0 ? { dimensiones: i.dimensiones } : {}),
      }))
      return {
        ...(esClienteOcasional
@@ -854,6 +927,14 @@ try {
           toast.error(`Línea ${num}: ${stockError}`)
           return
         }
+        // Un artículo con dimensiones exige la combinación completa en toda línea que mueva stock
+        // (§0 regla 2) — se bloquea el envío antes de dejar que el servidor lo rechace con un 400
+        // menos claro (§11).
+        if (item.itemDimensionesDeclaradas && item.itemDimensionesDeclaradas.length > 0
+          && !combinacionCompleta(item.itemDimensionesDeclaradas, item.dimensiones ?? {})) {
+          toast.error(`Línea ${num}: selecciona la combinación completa de dimensión de inventario del artículo`)
+          return
+        }
       }
       submitDto()
     } catch (err) {
@@ -874,6 +955,11 @@ try {
         </div>
       </div>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {lineasRequierenReingresoDimension && (
+          <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
+            <span>Este pedido tiene línea(s) con un artículo que usa combinación de dimensión de inventario, pero el sistema no puede recuperar la combinación con la que se guardaron originalmente. Vuelve a seleccionarla en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
+          </div>
+        )}
         {submitError && (
           <div className="alert alert-danger" style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 14px', borderRadius: 6, background: 'var(--bg-danger)', border: '1px solid var(--border-danger)', color: 'var(--text-danger)' }}>
             <span style={{ flex: 1, fontSize: 13, lineHeight: 1.4 }}>{submitError}</span>
@@ -1113,12 +1199,13 @@ try {
                   <th style={{ textAlign: 'right', width: 120 }}>Importe</th>
                   <th style={{ width: 72 }}>UDM</th>
                   {!almacenVentaSucursal && <th style={{ width: 140 }}>Almacén</th>}
+                  <th style={{ width: 160 }}>Combinación</th>
                   <th style={{ width: 40 }} />
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
-                  <tr><td colSpan={almacenVentaSucursal ? 8 : 9} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>No hay artículos.</td></tr>
+                  <tr><td colSpan={almacenVentaSucursal ? 9 : 10} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>No hay artículos.</td></tr>
                 ) : (
                   items.map((item, index) => (
                     <tr
@@ -1127,7 +1214,7 @@ try {
                       className={highlightedRow === index ? 'row-flash' : undefined}
                     >
                       <td>
-                        <ItemSelect value={item.itemCode} selectedLabel={item.itemLabel} onSelect={(ci) => selectCatalogItem(index, ci)} onSelectBundle={(b) => selectBundle(index, b)} includeBundles onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0 })} onVariantSelect={(t) => setVariantTemplate(t)} validateStock={!despachoHabilitado} branch={despachoHabilitado ? undefined : (branch || undefined)} />
+                        <ItemSelect value={item.itemCode} selectedLabel={item.itemLabel} onSelect={(ci) => selectCatalogItem(index, ci)} onSelectBundle={(b) => selectBundle(index, b)} includeBundles onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, itemDimensionesDeclaradas: undefined, dimensiones: undefined })} onVariantSelect={(t) => setVariantTemplate(t)} validateStock={!despachoHabilitado} branch={despachoHabilitado ? undefined : (branch || undefined)} />
                       </td>
                       <td>
                         <input className="items-input" value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} placeholder="Descripción" />
@@ -1252,6 +1339,16 @@ try {
                           />
                         </td>
                       )}
+                      <td>
+                        {item.itemDimensionesDeclaradas && item.itemDimensionesDeclaradas.length > 0 && (
+                          <CombinacionDimensionSelector
+                            itemDimensiones={item.itemDimensionesDeclaradas}
+                            value={item.dimensiones ?? {}}
+                            onChange={(v) => updateItem(index, { dimensiones: v })}
+                            compact
+                          />
+                        )}
+                      </td>
                       <td onClick={(e) => e.stopPropagation()} className="actions-cell">
                         <ActionsMenu>
                           <ActionsMenuItem

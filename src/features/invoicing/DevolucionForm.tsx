@@ -37,10 +37,17 @@ const PAYMENT_STATUS_LABEL: Record<string, string> = {
 
 interface ReturnRow {
   itemCode: string
+  /** `items[].id` de esta línea en la factura original (`GET /invoices/:id`) — se manda como
+   *  `lineaOriginal` al devolver, obligatorio si `itemCode` es ambiguo en esta factura (§7.5 /
+   *  mismo criterio que Notas de Crédito, ya que este endpoint delega en POST /credit-notes). */
+  id?: string
   description: string
   qtyPurchased: number
   qty: number
   checked: boolean
+  /** `true` si otra línea de esta misma factura comparte `itemCode` — usado solo para mostrar un
+   *  aviso no bloqueante cuando `id` no está disponible. */
+  ambiguous: boolean
 }
 
 export default function DevolucionForm() {
@@ -160,13 +167,17 @@ export default function DevolucionForm() {
   useEffect(() => {
     if (!invoice || rowsSeededFor.current === invoice.id) return
     rowsSeededFor.current = invoice.id
+    const countByCode = new Map<string, number>()
+    for (const i of invoice.items) countByCode.set(i.itemCode, (countByCode.get(i.itemCode) ?? 0) + 1)
     setReturnRows(
       invoice.items.map((i) => ({
         itemCode: i.itemCode,
+        id: i.id,
         description: i.description || i.itemCode,
         qtyPurchased: i.qty,
         qty: i.qty,
         checked: false,
+        ambiguous: (countByCode.get(i.itemCode) ?? 0) > 1,
       })),
     )
   }, [invoice])
@@ -255,7 +266,11 @@ export default function DevolucionForm() {
       setModificationCodeError('')
       return createDevolucion({
         invoiceId,
-        items: returnFullInvoice ? undefined : returnCheckedRows.map((r) => ({ itemCode: r.itemCode, qty: r.qty })),
+        items: returnFullInvoice ? undefined : returnCheckedRows.map((r) => ({
+          itemCode: r.itemCode,
+          qty: r.qty,
+          ...(r.id ? { lineaOriginal: r.id } : {}),
+        })),
         resolution: returnResolution,
         refundModeOfPayment: returnResolution === 'refund' ? returnModeOfPayment : undefined,
         reason: returnReason.trim(),
@@ -486,6 +501,11 @@ export default function DevolucionForm() {
                           </td>
                           <td>
                             <span style={{ fontWeight: 500 }}>{row.description}</span>
+                            {row.ambiguous && !row.id && (
+                              <span title="Este artículo aparece en más de una línea de esta factura — identifíquelo con cuidado antes de devolverlo.">
+                                <AlertTriangle size={14} style={{ marginLeft: 6, verticalAlign: 'middle', color: 'var(--color-warning, #b45309)' }} />
+                              </span>
+                            )}
                             <br />
                             <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--text-tertiary)' }}>{row.itemCode}</span>
                           </td>
