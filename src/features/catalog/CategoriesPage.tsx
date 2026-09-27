@@ -536,7 +536,10 @@ export default function CategoriesPage() {
               <h2 className="modal-title">{editTarget ? 'Editar Categoría' : 'Nueva Categoría'}</h2>
               <button className="modal-close" type="button" onClick={requestClose}>×</button>
             </div>
-            <form onSubmit={handleSubmit(onSubmit)}>
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}
+            >
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div className="ff-wrap">
                   <label className="ff-label ff-required" htmlFor="catName">Nombre</label>

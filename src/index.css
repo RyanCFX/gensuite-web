@@ -719,16 +719,18 @@ button {
 .nav-float-panel .nav-child.active { color: var(--text-brand); }
 
 /* ─── MAIN CONTENT ─── */
-/* Mismo patrón que .sidebar: alto explícito + sticky, no solo overflow-y:auto — con
-   .app-shell en min-height:100vh (no height fija), sin esto el grid crece con el contenido
-   y termina scrolleando la página completa en vez de solo este panel, arrastrando el TabBar
-   (que vive dentro de .main) por debajo del header sticky. */
+/* Alto explícito, no solo overflow-y:auto — con .app-shell en min-height:100vh (no height fija),
+   sin esto el grid crece con el contenido y termina scrolleando la página completa en vez de solo
+   este panel, arrastrando el TabBar (que vive dentro de .main) por debajo del header sticky.
+   A propósito SIN `position: sticky` (a diferencia de .sidebar): sticky/fixed/absolute crean un
+   stacking context nuevo acá, lo que atrapa el z-index de cualquier modal/dropdown renderizado
+   sin portal dentro de .main — quedaban pintados por DEBAJO del header aunque su z-index fuera
+   mayor. Con solo `height` + `overflow-y: auto` (position: static) ya no se crea ese stacking
+   context y el scroll queda igual de contenido. */
 .main {
   grid-area: main;
   overflow-y: auto;
   background: var(--surface-app);
-  position: sticky;
-  top: var(--navbar-height);
   height: calc(100vh - var(--navbar-height));
 }
 

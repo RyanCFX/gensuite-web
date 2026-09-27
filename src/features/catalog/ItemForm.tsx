@@ -389,6 +389,8 @@ export default function ItemForm() {
   }, [existingItem, reset, fixedType, navigate])
 
   const watchedPriceMode = watch('priceMode')
+  // Servicios: "Modo de precio" oculto — la UI y el payload siempre usan "manual".
+  const effectivePriceMode = isProduct ? watchedPriceMode : 'manual'
   const watchedSalesTaxTemplate = watch('salesTaxTemplate')
   const watchedValuationRate = watch('valuationRate')
   const watchedMarginA = watch('marginA')
@@ -448,15 +450,18 @@ export default function ItemForm() {
     .find((meta) => meta?.tipo === 'Ordinal')
 
   const onSubmit = (data: FormValues) => {
+    // Servicios: sin costo de valoración — el modo siempre es manual y no aplica
+    // "Actualizar costo al comprar" (ambos campos ocultos en la UI para servicios).
+    const submitPriceMode = isProduct ? data.priceMode : 'manual'
     if (subcategoryOptions.length > 0 && !data.subcategory) {
       toast.error('Selecciona una subcategoría')
       return
     }
-    if (data.priceMode === 'cost_plus' && !data.valuationRate) {
+    if (submitPriceMode === 'cost_plus' && !data.valuationRate) {
       toast.error('Debes ingresar el Costo de Valoración para usar el modo "Sobre costo"')
       return
     }
-    if (!noPurchaseTax && !data.purchaseTaxTemplate) {
+    if (isProduct && !noPurchaseTax && !data.purchaseTaxTemplate) {
       toast.error('Selecciona el impuesto de compra o marca "No lleva impuesto de compra"')
       return
     }
@@ -473,17 +478,20 @@ export default function ItemForm() {
       internalDescription: description || undefined,
       image: data.image || undefined,
       defaultWarehouse: data.defaultWarehouse || undefined,
-      valuationRate: data.valuationRate || undefined,
+      valuationRate: isProduct ? (data.valuationRate || undefined) : undefined,
       stockUom: data.stockUom || undefined,
       purchaseUoms: isProduct ? (data.purchaseUoms ?? []) : undefined,
       saleUoms: isProduct ? (data.saleUoms ?? []) : undefined,
       priceA: data.priceA || undefined,
       priceB: data.priceB || undefined,
       priceC: data.priceC || undefined,
-      priceMode: data.priceMode || undefined,
-      marginA: data.marginA || undefined,
-      marginB: data.marginB || undefined,
-      marginC: data.marginC || undefined,
+      // Servicios: "Modo de precio" oculto — siempre se manda "manual".
+      priceMode: isProduct ? (data.priceMode || undefined) : 'manual',
+      // Servicios: "Actualizar costo al comprar" oculto — no se manda override.
+      actualizarCostoEnCompraOverride: isProduct ? (data.actualizarCostoEnCompraOverride || undefined) : undefined,
+      marginA: isProduct ? (data.marginA || undefined) : undefined,
+      marginB: isProduct ? (data.marginB || undefined) : undefined,
+      marginC: isProduct ? (data.marginC || undefined) : undefined,
       allowsDiscount: data.allowsDiscount,
       maxDiscountPct: data.maxDiscountPct || undefined,
       shortName: data.shortName || undefined,
@@ -500,7 +508,8 @@ export default function ItemForm() {
       // Solo tiene sentido con seguimiento activo — mismo criterio que hasExpiryDate/shelfLifeInDays
       // arriba (docs/tasks/79_confirmacion_despacho_pedido.md §9).
       asignarSerialEnDespacho: data.trackingType !== 'none' ? data.asignarSerialEnDespacho : undefined,
-      purchaseTaxTemplate: noPurchaseTax ? undefined : data.purchaseTaxTemplate || undefined,
+      // Servicios: sección "Compra" oculta — no se manda impuesto de compra.
+      purchaseTaxTemplate: !isProduct ? undefined : (noPurchaseTax ? undefined : data.purchaseTaxTemplate || undefined),
       salesTaxTemplate: noSalesTax ? undefined : data.salesTaxTemplate || undefined,
     }
 
@@ -1203,6 +1212,8 @@ export default function ItemForm() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
           {/* ── COMPRA ────────────────────────────────────────────────── */}
+          {/* Servicios: sin costo de valoración — sección oculta completa. */}
+          {isProduct && (
           <div className="card">
             <div className="card-header navy-card-header"><h2 className="card-title">Compra</h2></div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1260,12 +1271,15 @@ export default function ItemForm() {
               </label>
             </div>
           </div>
+          )}
 
           {/* ── VENTA ──────────────────────────────────────────────────── */}
           <div className="card">
             <div className="card-header navy-card-header"><h2 className="card-title">Venta</h2></div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
+              {/* Servicios: "Modo de precio" oculto — siempre "manual". */}
+              {isProduct && (
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="priceMode">Modo de precio</label>
                 <Controller
@@ -1289,7 +1303,10 @@ export default function ItemForm() {
                   )}
                 />
               </div>
+              )}
 
+              {/* Servicios: "Actualizar costo al comprar" oculto — no aplica sin costo. */}
+              {isProduct && (
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="actualizarCostoEnCompraOverride">
                   Actualizar costo al comprar
@@ -1314,12 +1331,13 @@ export default function ItemForm() {
                   )}
                 />
               </div>
+              )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <span className="ff-section-divider">Precio de venta</span>
                 <div className="form-row" style={{ alignItems: 'start' }}>
                   <div className="ff-wrap">
-                    {watchedPriceMode === 'cost_plus' ? (
+                    {effectivePriceMode === 'cost_plus' ? (
                       <>
                         <label className="ff-label">Margen A (%)</label>
                         <input type="number" step="0.1" min="0" max="100" className="ff-input" placeholder="Ej: 40" {...register('marginA', { valueAsNumber: true })} />
@@ -1376,7 +1394,7 @@ export default function ItemForm() {
                   </div>
                 </div>
 
-                {watchedPriceMode === 'cost_plus' ? (
+                {effectivePriceMode === 'cost_plus' ? (
                   <>
                     <div className="ff-wrap">
                       <label className="ff-label">Margen B (%) <span className="ff-required">*</span></label>

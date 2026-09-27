@@ -7886,6 +7886,19 @@
               ],
               "type": "string"
             }
+          },
+          {
+            "name": "moneda",
+            "required": false,
+            "in": "query",
+            "description": "Solo aplica a formato \"a4\"/\"carta\"/\"a6\": \"dop\" (default) imprime en DOP con la tasa del documento; \"factura\" imprime en la moneda del documento. El ticket POS siempre imprime en DOP y no acepta este parámetro.",
+            "schema": {
+              "enum": [
+                "dop",
+                "factura"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -39205,6 +39218,10 @@
           },
           "staleDays": {
             "type": "number"
+          },
+          "allowMultiCurrencyInvoicesAgainstSinglePartyAccount": {
+            "type": "boolean",
+            "description": "Permite que la moneda del documento difiera de la moneda de la cuenta CxC/CxP (que siempre es DOP). No es una perilla operativa real — el modelo usa cuenta única."
           },
           "bookDeferredEntriesViaJournalEntry": {
             "type": "boolean"
