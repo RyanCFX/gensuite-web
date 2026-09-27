@@ -277,9 +277,9 @@ const [customerId, setCustomerId] = useState('')
       // Se hereda tal cual de la cotización — nunca se re-resuelve contra el cliente actual.
       setCurrency(q.currency ?? '')
       setConversionRate(q.conversionRate ?? '')
-      // GET /quotations/:id tampoco ecoa la combinación de dimensión elegida por línea (§10.2) — se
-      // re-consulta el catálogo solo para saber si el artículo USA dimensiones y así mostrar el
-      // selector vacío, obligando a reingresar la combinación en este nuevo Pedido.
+      // A diferencia de lo que originalmente documentaba §10.2, GET /quotations/:id SÍ ecoa la
+      // combinación de dimensión elegida por línea (confirmado en vivo 2026-09-27) — se usa
+      // directamente para precargar este nuevo Pedido.
       const catalogItems = await Promise.all(q.items.map((i) => getItem(i.itemCode).catch(() => null)))
       setItems(q.items.map((i, idx) => {
         const discountAmount = i.discountAmount ?? 0
@@ -301,6 +301,7 @@ const [customerId, setCustomerId] = useState('')
           salesTaxPct: 0,
           warehouse: '',
           itemDimensionesDeclaradas: catalogItem?.usaDimensiones ? catalogItem.dimensiones : undefined,
+          dimensiones: i.dimensiones,
         }
       }))
       setNotes(q.notes ?? '')
@@ -397,10 +398,9 @@ useEffect(() => {
      setLoaded(true)
    }, [existing])
 
-  // GET /pedidos/:id no ecoa la combinación de dimensión elegida por línea (§10.2) — al editar solo
-  // podemos saber si el artículo de cada línea USA dimensiones (re-consultando el catálogo) para
-  // mostrarle el selector y obligarlo a reingresarla antes de guardar (§10.1/§10.2, opción (b) de
-  // las sugeridas por el documento).
+  // A diferencia de lo que originalmente documentaba §10.2, GET /pedidos/:id SÍ ecoa la
+  // combinación de dimensión elegida por línea (confirmado en vivo 2026-09-27) — se usa
+  // directamente para poblar la línea.
   useEffect(() => {
     if (!existing) return
     let cancelled = false
@@ -408,7 +408,10 @@ useEffect(() => {
       if (cancelled) return
       setItems((prev) => prev.map((row, idx) => {
         const catalogItem = catalogItems[idx]
-        return catalogItem?.usaDimensiones ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones } : row
+        const ei = existing.items[idx]
+        return catalogItem?.usaDimensiones
+          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones, dimensiones: ei?.dimensiones ?? row.dimensiones }
+          : row
       }))
     })
     return () => { cancelled = true }
@@ -802,9 +805,7 @@ useEffect(() => {
   const totalDiscount = grossTotal - subtotal
   const total = subtotal
 
-  // Al editar, ninguna línea trae de vuelta su combinación previa (§10.2) — si el artículo la usa
-  // y la fila todavía no tiene una elegida, hay que avisarle al usuario que la reingrese antes de
-  // guardar (si no, el PUT la reenviaría vacía y el servidor rechazaría esa línea, §11).
+  // Red de seguridad — ver misma nota en CompraForm.tsx.
   const lineasRequierenReingresoDimension = isEdit && items.some(
     (i) => (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
   )
@@ -968,7 +969,7 @@ try {
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         {lineasRequierenReingresoDimension && (
           <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
-            <span>Este pedido tiene línea(s) con un artículo que usa combinación de dimensión de inventario, pero el sistema no puede recuperar la combinación con la que se guardaron originalmente. Vuelve a seleccionarla en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
+            <span>Este pedido tiene línea(s) con un artículo que usa combinación de dimensión de inventario sin una combinación completa. Selecciónala en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
           </div>
         )}
         {submitError && (

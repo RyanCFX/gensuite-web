@@ -580,6 +580,11 @@ export interface InvoiceItem {
   montoPacienteArs?: number;
   /** Calculado por el servidor. Solo lectura. */
   porcientoRealArs?: number;
+  /** Combinación de dimensión de inventario de esta línea. Confirmado contra el backend real
+   *  (2026-09-27) que SÍ viene en la respuesta de `GET /invoices/:id` — contradice lo que decía
+   *  originalmente §10.2 del doc de la feature ("ningún GET expone la combinación"); usarla acá
+   *  para poblar la línea al editar en vez de forzar reingreso manual. */
+  dimensiones?: DimensionesLinea;
 }
 
 export interface Invoice {
@@ -802,6 +807,9 @@ export interface QuotationItem {
   notes?: string;
   taxRate: number;
   taxAmount: number;
+  /** Combinación de dimensión de inventario de esta línea — confirmado en `GET /quotations/:id`
+   *  (2026-09-27), contradice el §10.2 original del doc. Usarla para poblar la línea al editar. */
+  dimensiones?: DimensionesLinea;
 }
 
 export interface Quotation {
@@ -2134,6 +2142,9 @@ export interface PedidoItem {
   notes?: string;
   taxRate: number;
   taxAmount: number;
+  /** Combinación de dimensión de inventario de esta línea — confirmado en `GET /pedidos/:id`
+   *  (2026-09-27), contradice el §10.2 original del doc. Usarla para poblar la línea al editar. */
+  dimensiones?: DimensionesLinea;
 }
 
 export interface Pedido {
@@ -2739,6 +2750,10 @@ export interface TransferenciaItem {
   itemCode: string;
   itemName?: string;
   qty: number;
+  /** Combinación de dimensión de inventario de esta línea — confirmado en vivo (2026-09-27) en
+   *  otros módulos (Compras/Facturación/Despachos/Pedidos/Cotizaciones/Recepción); no verificado
+   *  puntualmente acá pero se agrega por consistencia — ajustar si Transferencias difiere. */
+  dimensiones?: DimensionesLinea;
 }
 
 export interface Transferencia {
@@ -2908,6 +2923,9 @@ export interface CompraItem {
    *  efecto real en líneas que no afectan valorización de inventario — ver CompraItemDto. */
   cuentaContable?: string;
   // NOTE: no "description" in CompraItemDto per BFF schema
+  /** Combinación de dimensión de inventario de esta línea — confirmado en `GET /compras/:id`
+   *  (2026-09-27), contradice el §10.2 original del doc. Usarla para poblar la línea al editar. */
+  dimensiones?: DimensionesLinea;
 }
 
 export interface Compra {
@@ -3094,6 +3112,9 @@ export interface PurchaseReceiptItem {
   uom: string;
   /** Monto de esta línea ya facturado desde este receipt */
   billedAmt: number;
+  /** Combinación de dimensión de inventario de esta línea — confirmado en
+   *  `GET /compras/purchase-receipt/:id` (2026-09-27), contradice el §10.2 original del doc. */
+  dimensiones?: DimensionesLinea;
 }
 
 export interface PurchaseReceipt {
@@ -3265,6 +3286,9 @@ export interface OrdenCompraItem {
   /** Presentes solo si esta línea viene de una Solicitud de Compra. */
   materialRequest?: string | null;
   materialRequestItem?: string | null;
+  /** Combinación de dimensión de inventario de esta línea — confirmado en vivo (2026-09-27) en
+   *  otros módulos de Compras; no verificado puntualmente acá pero se agrega por consistencia. */
+  dimensiones?: DimensionesLinea;
 }
 
 export interface OrdenCompra {
@@ -7414,6 +7438,9 @@ export interface DespachoItem {
   /** Factura de origen de esta línea, si nació de desde-factura. */
   againstSalesInvoice: string | null;
   siDetail: string | null;
+  /** Combinación de dimensión de inventario de esta línea — confirmado en `GET /despachos/:id`
+   *  (2026-09-27), contradice el §10.2 original del doc. Usarla para poblar la línea al editar. */
+  dimensiones?: DimensionesLinea;
 }
 
 export interface Despacho {
