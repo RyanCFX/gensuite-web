@@ -2166,29 +2166,25 @@ persistInvoice(buildInvoiceDto())
             )}
 
             <div className="items-total-row navy-totals">
-              {/* <div className="items-total-line">
-                <span>Subtotal bruto</span>
-                <span>{formatDOP(grossTotal)}</span>
-              </div> */}
-              {totalDiscount > 0 && (
-                <div className="items-total-line">
-                  <span>Descuento total</span>
-                  <span>-{formatMoney(totalDiscount, currency || monedaBase)}</span>
-                </div>
-              )}
-              <div className="items-total-line">
-                <span>Subtotal</span>
-                <span>{formatMoney(subtotal, currency || monedaBase)}</span>
+              <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ textAlign: 'right' }}>Subtotal bruto</span>
+                <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(grossTotal, currency || monedaBase)}</span>
               </div>
-              {taxTotal > 0 && (
-                <div className="items-total-line" style={{ fontSize: 13 }}>
-                  <span>Impuesto</span>
-                  <span>{formatMoney(taxTotal, currency || monedaBase)}</span>
-                </div>
-              )}
-              <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, fontSize: 15 }}>
-                <span>Total</span>
-                <span>{formatMoney(total, currency || monedaBase)}</span>
+              <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ textAlign: 'right' }}>Descuento</span>
+                <span style={{ textAlign: 'left', minWidth: 170 }}>-{formatMoney(totalDiscount, currency || monedaBase)}</span>
+              </div>
+              <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ textAlign: 'right' }}>Subtotal</span>
+                <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(subtotal, currency || monedaBase)}</span>
+              </div>
+              <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ textAlign: 'right' }}>Impuesto</span>
+                <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(taxTotal, currency || monedaBase)}</span>
+              </div>
+              <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ fontSize: 20, color: '#FCB124', textAlign: 'right' }}>Total</span>
+                <span style={{ fontSize: 20, color: '#FCB124', textAlign: 'left', minWidth: 170 }}>{formatMoney(total, currency || monedaBase)}</span>
               </div>
               {arsActiva && arsServidor && (
                 <>
